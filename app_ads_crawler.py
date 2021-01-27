@@ -447,8 +447,6 @@ def create_insert_query(table, insert_columns, df):
     else:
         vals = df[insert_columns[0]].unique().tolist()
         values = f"('" + ("'), ('").join(vals) + "')"
-    # update_str = '(id) DO UPDATE' if update else 'DO NOTHING'
-    # ON CONFLICT {update_str}
     insert_query = f""" 
     INSERT INTO {table} ({cols_str})
     VALUES {values}
