@@ -220,6 +220,12 @@ def clean_ads_txt_df(txt_df):
     txt_df["domain"] = txt_df["domain"].str.replace("/", "", regex=False)
     txt_df["domain"] = txt_df["domain"].str.replace("[", "", regex=False)
     txt_df["domain"] = txt_df["domain"].str.replace("]", "", regex=False)
+    txt_df["relationship"] = (
+        txt_df["relationship"].str.encode("ascii", errors="ignore").str.decode("ascii")
+    )
+    txt_df["publisher_id"] = (
+        txt_df["publisher_id"].str.encode("ascii", errors="ignore").str.decode("ascii")
+    )
     txt_df["publisher_id"] = txt_df["publisher_id"].str.replace("]", "", regex=False)
     txt_df["publisher_id"] = txt_df["publisher_id"].str.replace("[", "", regex=False)
     txt_df["relationship"] = txt_df["relationship"].str.upper()
@@ -238,6 +244,7 @@ def clean_ads_txt_df(txt_df):
 
 
 def crawl_apps_df(df):
+
     # TODO where to get this from
     df["store_name"] = "google_play"
     df["store"] = 1
@@ -251,7 +258,7 @@ def crawl_apps_df(df):
         #    break
         # if bundle == 'com.gameloft.android.ANMP.GloftDMHM':
         #   break
-        if i <= 103:
+        if i <= 266:
             continue
         logger.info(f"{row_info} scrape store info")
         app_url, dev_id, dev_name = get_url_dev_id(bundle, row.store_name)
@@ -328,6 +335,9 @@ def crawl_apps_df(df):
             validate="many_to_one",
         )
         insert_columns = ["app_url", "app_ads_entry"]
+        null_df = app_df_final[app_df_final.app_ads_entry.isnull()]
+        if not null_df.empty:
+            logger.warning(f"{null_df=} NULLs in app_ads_entry")
         ins_query = create_insert_query("app_ads_map", insert_columns, app_df_final)
         MADRONE.engine.execute(ins_query)
         logger.info(f"{row_info} DONE")
