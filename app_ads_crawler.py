@@ -502,9 +502,12 @@ if __name__ == "__main__":
     platforms = args.platforms if "args" in locals() else ["android"]
     update_all = args.update_all if "args" in locals() else False
 
-    server = OpenSSHTunnel()
-    server.start()
-    local_port = str(server.local_bind_port)
+    if "james" in CONFIG_PATH:
+        server = OpenSSHTunnel()
+        server.start()
+        local_port = str(server.local_bind_port)
+    else:
+        local_port = 5432
     MADRONE = dbconn.PostgresCon("madrone", "127.0.0.1", local_port)
     MADRONE.set_engine()
     if "android" in platforms:
