@@ -40,18 +40,16 @@ with CONFIG_PATH.open() as f:
 LOG_PATH = pathlib.Path(f"{MY_DIR}/logs/crawler.log")
 LOG_FORMAT = "%(asctime)s: %(name)s: %(levelname)s: %(message)s"
 
-logger = logging.getLogger(f"{__name__}")
+logger.setLevel(logging.INFO)
 
-# logger.setLevel(logging.INFO)
-#
-# streamhandler = logging.StreamHandler()
-# streamhandler.setFormatter(logging.Formatter(LOG_FORMAT))
-# logger.addHandler(streamhandler)
-# log_rotate = logging.handlers.RotatingFileHandler(
-#    filename=LOG_PATH, maxBytes=10000000, backupCount=4
-# )
-# log_rotate.setFormatter(logging.Formatter(LOG_FORMAT))
-# logger.addHandler(log_rotate)
+streamhandler = logging.StreamHandler()
+streamhandler.setFormatter(logging.Formatter(LOG_FORMAT))
+logger.addHandler(streamhandler)
+log_rotate = logging.handlers.RotatingFileHandler(
+    filename=LOG_PATH, maxBytes=10000000, backupCount=4
+)
+log_rotate.setFormatter(logging.Formatter(LOG_FORMAT))
+logger.addHandler(log_rotate)
 
 
 def OpenSSHTunnel():
@@ -125,11 +123,11 @@ def get_app_ads_text(app_url):
     else:
         ads_url = app_url + "/" + "app-ads.txt"
     try:
-        headers = {
-            "User-Agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:84.0)",
-        }
         response = requests.get(ads_url)
         if response.status_code == 403:
+            headers = {
+                "User-Agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:84.0)",
+            }
             response = requests.get(ads_url, headers=headers)
         assert (
             response.status_code == 200
@@ -192,7 +190,7 @@ def get_app_ads_text(app_url):
             except Exception as err:
                 logger.error(f"Parser skipping row: {row}, error: {err}")
                 continue
-        if np.shape(rows)[1] == len(csv_header) - 1:
+        if pd.DataFrame(rows).shape[1] == len(csv_header) - 1:
             df = pd.DataFrame(rows, columns=csv_header[:-1])
         else:
             df = pd.DataFrame(rows, columns=csv_header)
@@ -205,7 +203,7 @@ def get_app_ads_text(app_url):
 def insert_get(table_name, insert_df, insert_columns, query_column):
     if isinstance(insert_df, pd.Series):
         insert_df = pd.DataFrame(insert_df).T
-    logger.info(f"insert_get table: {table_name}")
+    # logger.info(f"insert_get table: {table_name}")
     ins_query = create_insert_query(table_name, insert_columns, insert_df)
     MADRONE.engine.execute(ins_query)
     keys = insert_df[query_column].unique().tolist()
@@ -214,15 +212,15 @@ def insert_get(table_name, insert_df, insert_columns, query_column):
 
 
 def clean_ads_txt_df(txt_df):
-    txt_df["relationship"] = txt_df["relationship"].str.replace("\\", "")
+    txt_df["relationship"] = txt_df["relationship"].str.replace("\\", "", regex=False)
     txt_df["domain"] = txt_df["domain"].str.lower()
-    txt_df["domain"] = txt_df["domain"].str.replace("http://", "")
-    txt_df["domain"] = txt_df["domain"].str.replace("https://", "")
-    txt_df["domain"] = txt_df["domain"].str.replace("/", "")
-    txt_df["domain"] = txt_df["domain"].str.replace("[", "")
-    txt_df["domain"] = txt_df["domain"].str.replace("]", "")
-    txt_df["publisher_id"] = txt_df["publisher_id"].str.replace("]", "")
-    txt_df["publisher_id"] = txt_df["publisher_id"].str.replace("[", "")
+    txt_df["domain"] = txt_df["domain"].str.replace("http://", "", regex=False)
+    txt_df["domain"] = txt_df["domain"].str.replace("https://", "", regex=False)
+    txt_df["domain"] = txt_df["domain"].str.replace("/", "", regex=False)
+    txt_df["domain"] = txt_df["domain"].str.replace("[", "", regex=False)
+    txt_df["domain"] = txt_df["domain"].str.replace("]", "", regex=False)
+    txt_df["publisher_id"] = txt_df["publisher_id"].str.replace("]", "", regex=False)
+    txt_df["publisher_id"] = txt_df["publisher_id"].str.replace("[", "", regex=False)
     txt_df["relationship"] = txt_df["relationship"].str.upper()
     keep_rows = (
         (txt_df.publisher_id.notnull())
@@ -239,7 +237,6 @@ def clean_ads_txt_df(txt_df):
 
 
 def crawl_apps_df(df):
-
     # TODO where to get this from
     df["store_name"] = "google_play"
     df["store"] = 1
@@ -252,8 +249,9 @@ def crawl_apps_df(df):
         #    break
         # if bundle == 'com.gameloft.android.ANMP.GloftDMHM':
         #   break
-        # if i==23:
-        #   break
+        # if i<=59:
+        #    i+=1
+        #    continue
         logger.info(f"{row_info} scrape store info")
         app_url, dev_id, dev_name = get_url_dev_id(bundle, row.store_name)
         logger.info(f"{row_info} {dev_id=}")
@@ -285,7 +283,6 @@ def crawl_apps_df(df):
         )
         row["app_url"] = app_urls_df.id.values[0]
         logger.info(f"{row_info} scrape ads.txt")
-
         ads_txt_df = get_app_ads_text(app_url)
         if ads_txt_df.empty:
             logger.warning(f"{row_info} Skipping, DF empty")
@@ -471,14 +468,14 @@ def check_app_ads():
 
 if __name__ == "__main__":
 
-    FORMAT = "%(asctime)s: %(name)s: %(levelname)s: %(message)s"
-    logging.basicConfig(format=FORMAT, level=logging.INFO)
-    formatter = logging.Formatter(FORMAT)
-    logger.setLevel(logging.DEBUG)
-    ch = logging.StreamHandler()
-    ch.setLevel(logging.INFO)
-    ch.setFormatter(formatter)
-    logger.addHandler(ch)
+    # FORMAT = "%(asctime)s: %(name)s: %(levelname)s: %(message)s"
+    # logging.basicConfig(format=FORMAT, level=logging.INFO)
+    # formatter = logging.Formatter(FORMAT)
+    # logger.setLevel(logging.DEBUG)
+    # ch = logging.StreamHandler()
+    # ch.setLevel(logging.INFO)
+    # ch.setFormatter(formatter)
+    # logger.addHandler(ch)
 
     logger.info("Starting app-ads.txt crawler")
 
@@ -502,7 +499,7 @@ if __name__ == "__main__":
     platforms = args.platforms if "args" in locals() else ["android"]
     update_all = args.update_all if "args" in locals() else False
 
-    if "james" in f'{CONFIG_PATH}':
+    if "james" in f"{CONFIG_PATH}":
         server = OpenSSHTunnel()
         server.start()
         local_port = str(server.local_bind_port)
