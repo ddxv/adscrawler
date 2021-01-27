@@ -138,6 +138,7 @@ def get_app_ads_text(app_url):
         ), f"DIRECT, RESELLER not in ads.txt, skipping"
         txt = response.text.replace(" ", "")
         txt = txt.replace("Â\xa0", "")
+        txt = txt.replace("Ã\x82", "")
         txt = txt.replace("\t", "")
         txt = txt.replace("\u202a", "")
         txt = txt.replace("\u202c", "")
@@ -242,6 +243,7 @@ def crawl_apps_df(df):
     df["store"] = 1
     i = 0
     for index, row in df.iterrows():
+        i += 1
         row_info = f"{i=}, {row.bundle_id=}"
         logger.info(f"{row_info} START")
         bundle = row.bundle_id
@@ -329,7 +331,6 @@ def crawl_apps_df(df):
         insert_columns = ["app_url", "app_ads_entry"]
         ins_query = create_insert_query("app_ads_map", insert_columns, app_df_final)
         MADRONE.engine.execute(ins_query)
-        i += 1
         logger.info(f"{row_info} DONE")
 
 
