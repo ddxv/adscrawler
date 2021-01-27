@@ -251,9 +251,8 @@ def crawl_apps_df(df):
         #    break
         # if bundle == 'com.gameloft.android.ANMP.GloftDMHM':
         #   break
-        # if i<=59:
-        #    i+=1
-        #    continue
+        if i <= 103:
+            continue
         logger.info(f"{row_info} scrape store info")
         app_url, dev_id, dev_name = get_url_dev_id(bundle, row.store_name)
         logger.info(f"{row_info} {dev_id=}")
@@ -399,6 +398,7 @@ def query_all(table_name, key_col, values):
         values_str = f"(" + (", ").join([str(x) for x in values]) + ")"
     else:
         values_str = f"('" + ("', '").join(values) + "')"
+        values_str = values_str.replace("%", "%%")
     sel_query = f"""SELECT *
     FROM {table_name}
     WHERE 
@@ -441,6 +441,7 @@ def create_insert_query(table, insert_columns, df):
         vals = [[a if a else "CUSTOMNULL" for a in x] for x in vals]
         values = ", ".join([str(i) if i else " " for i in vals])
         values = values.replace("[", "(").replace("]", ")")
+        values = values.replace("%", "%%")
         values = values.replace("'CUSTOMNULL'", "NULL")
     else:
         vals = df[insert_columns[0]].unique().tolist()
