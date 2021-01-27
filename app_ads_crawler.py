@@ -502,7 +502,7 @@ if __name__ == "__main__":
     platforms = args.platforms if "args" in locals() else ["android"]
     update_all = args.update_all if "args" in locals() else False
 
-    if "james" in CONFIG_PATH:
+    if "james" in f'{CONFIG_PATH}':
         server = OpenSSHTunnel()
         server.start()
         local_port = str(server.local_bind_port)
