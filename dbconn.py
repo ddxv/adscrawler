@@ -38,7 +38,7 @@ class PostgresCon:
 
     def set_engine(self):
         try:
-            db_login = "postgresql://{self.db_user}:{self.db_pass}"
+            db_login = f"postgresql://{self.db_user}:{self.db_pass}"
             db_uri = f"{db_login}@{self.db_ip}:{self.db_port}/{self.db_name}"
             logger.info(f"Connecting to PostgreSQL {self.db_name}")
             self.engine = create_engine(db_uri, connect_args={"connect_timeout": 10})

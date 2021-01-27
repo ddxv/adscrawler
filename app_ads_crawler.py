@@ -202,6 +202,42 @@ def get_app_ads_text(app_url):
         return pd.DataFrame()
 
 
+def insert_get(table_name, insert_df, insert_columns, query_column):
+    if isinstance(insert_df, pd.Series):
+        insert_df = pd.DataFrame(insert_df).T
+    logger.info(f"insert_get table: {table_name}")
+    ins_query = create_insert_query(table_name, insert_columns, insert_df)
+    MADRONE.engine.execute(ins_query)
+    keys = insert_df[query_column].unique().tolist()
+    get_df = query_all(table_name, query_column, keys)
+    return get_df
+
+
+def clean_ads_txt_df(txt_df):
+    txt_df["relationship"] = txt_df["relationship"].str.replace("\\", "")
+    txt_df["domain"] = txt_df["domain"].str.lower()
+    txt_df["domain"] = txt_df["domain"].str.replace("http://", "")
+    txt_df["domain"] = txt_df["domain"].str.replace("https://", "")
+    txt_df["domain"] = txt_df["domain"].str.replace("/", "")
+    txt_df["domain"] = txt_df["domain"].str.replace("[", "")
+    txt_df["domain"] = txt_df["domain"].str.replace("]", "")
+    txt_df["publisher_id"] = txt_df["publisher_id"].str.replace("]", "")
+    txt_df["publisher_id"] = txt_df["publisher_id"].str.replace("[", "")
+    txt_df["relationship"] = txt_df["relationship"].str.upper()
+    keep_rows = (
+        (txt_df.publisher_id.notnull())
+        & (txt_df.relationship.notnull())
+        & (txt_df.relationship != "")
+        & (txt_df.publisher_id != "")
+        & (txt_df.domain != "")
+    )
+    dropped_rows = txt_df.shape[0] - keep_rows.sum()
+    if dropped_rows > 0:
+        logger.warning(f"Dropped rows: {dropped_rows}")
+    txt_df = txt_df[keep_rows]
+    return txt_df
+
+
 def crawl_apps_df(df):
 
     # TODO where to get this from
@@ -219,9 +255,7 @@ def crawl_apps_df(df):
         # if i==23:
         #   break
         logger.info(f"{row_info} scrape store info")
-
         app_url, dev_id, dev_name = get_url_dev_id(bundle, row.store_name)
-
         logger.info(f"{row_info} {dev_id=}")
         row["developer_id"] = dev_id
         row["developer_name"] = dev_name
@@ -229,77 +263,64 @@ def crawl_apps_df(df):
         if not dev_id:
             logger.error(f"{row_info} {dev_id=} dev_id missing, skipping")
             continue
-        dev_df = get_store_developer(row.store_name, dev_id, dev_name)
-        row["developer"] = dev_df["id"].values[0]
+        insert_columns = ["store", "developer_id"]
+        dev_df = insert_get(
+            "developers", row, insert_columns, query_column="developer_id"
+        )
+        row["developer"] = dev_df.id.values[0]
+        # NOTE This should not be bundle for iTunes?
         if row.store_name == "google_play":
             row["store_id"] = row.bundle_id
-        # Insert & Fetch for store_apps
-        # NOTE This should not be bundle for iTunes?
-        columns = ["developer", "store_id", "store", "app", "app_ads_url"]
-
+        insert_columns = ["developer", "store_id", "store", "app"]
+        store_apps_df = insert_get(
+            "store_apps", row, insert_columns, query_column="store_id"
+        )
+        row["store_app"] = store_apps_df.id.values[0]
         if not app_url:
             logger.warning(f"{row_info} Skipping, no URL")
             continue
-
-        ins_query = create_insert_query("store_apps", columns, row)
-
-        MADRONE.engine.execute(ins_query)
-        store_apps_df = get_store_app_ids(row.store, bundle)
-        row["store_app"] = store_apps_df.id.values[0]
-
+        insert_columns = ["store_app", "app_ads_url"]
+        app_urls_df = insert_get(
+            "app_urls", row, insert_columns, query_column="store_app"
+        )
+        row["app_url"] = app_urls_df.id.values[0]
         logger.info(f"{row_info} scrape ads.txt")
-        app_df = get_app_ads_text(app_url)
-        if app_df.empty:
+
+        ads_txt_df = get_app_ads_text(app_url)
+        if ads_txt_df.empty:
             logger.warning(f"{row_info} Skipping, DF empty")
             continue
-        app_df["store_app"] = row.store_app
-        app_df["relationship"] = app_df["relationship"].str.replace("\\", "")
-        app_df["domain"] = app_df["domain"].str.lower()
-        app_df["domain"] = app_df["domain"].str.replace("http://", "")
-        app_df["domain"] = app_df["domain"].str.replace("https://", "")
-        app_df["domain"] = app_df["domain"].str.replace("/", "")
-        app_df["domain"] = app_df["domain"].str.replace("[", "")
-        app_df["domain"] = app_df["domain"].str.replace("]", "")
-        app_df["publisher_id"] = app_df["publisher_id"].str.replace("]", "")
-        app_df["publisher_id"] = app_df["publisher_id"].str.replace("[", "")
-        app_df["relationship"] = app_df["relationship"].str.upper()
-        keep_rows = (
-            (app_df.publisher_id.notnull())
-            & (app_df.relationship.notnull())
-            & (app_df.relationship != "")
-            & (app_df.publisher_id != "")
-            & (app_df.domain != "")
+        txt_df = clean_ads_txt_df(ads_txt_df)
+        txt_df["store_app"] = row.store_app
+        txt_df["app_url"] = row.app_url
+        txt_df["store_id"] = bundle
+        txt_df["developer_store_id"] = dev_id
+        txt_df["developer_store_name"] = dev_name
+        txt_df["updated_at"] = datetime.datetime.now()
+        insert_columns = ["domain"]
+        domain_df = insert_get(
+            "ad_domains", txt_df, insert_columns, query_column="domain"
         )
-        dropped_rows = app_df.shape[0] - keep_rows.sum()
-        if dropped_rows > 0:
-            logger.warning(f"{row_info} dropped rows: {dropped_rows}")
-        app_df = app_df[keep_rows]
-        app_df["store_id"] = bundle
-        app_df["developer_store_id"] = dev_id
-        app_df["developer_store_name"] = dev_name
-        app_df["updated_at"] = datetime.datetime.now()
-        columns = ["domain"]
-        ins_query = create_insert_query("ad_domains", columns, app_df)
-        MADRONE.engine.execute(ins_query)
-        domains = app_df.domain.unique().tolist()
-        domain_df = query_all("ad_domains", "domain", domains)
         app_df = pd.merge(
-            app_df, domain_df, how="left", on=["domain"], validate="many_to_one"
+            txt_df, domain_df, how="left", on=["domain"], validate="many_to_one"
         ).rename(columns={"id": "ad_domain"})
-        logger.info(f"{row_info} insert app ads.txt entries")
-        columns = ["ad_domain", "publisher_id", "relationship", "certification_auth"]
+        insert_columns = [
+            "ad_domain",
+            "publisher_id",
+            "relationship",
+            "certification_auth",
+        ]
         if "notes" in df.columns:
-            columns = [
+            insert_columns = [
                 "ad_domain",
                 "publisher_id",
                 "relationship",
                 "certification_auth",
                 "notes",
             ]
-        ins_query = create_insert_query("app_ads_entrys", columns, app_df)
-        MADRONE.engine.execute(ins_query)
-        pub_ids = app_df.publisher_id.unique().tolist()
-        entrys_df = query_all("app_ads_entrys", "publisher_id", pub_ids)
+        entrys_df = insert_get(
+            "app_ads_entrys", app_df, insert_columns, query_column="publisher_id"
+        )
         entrys_df = entrys_df.rename(columns={"id": "app_ads_entry"})
         app_df_final = pd.merge(
             app_df,
@@ -308,11 +329,10 @@ def crawl_apps_df(df):
             on=["ad_domain", "publisher_id", "relationship"],
             validate="many_to_one",
         )
-        logger.info(f"{row_info} insert app ads.txt entries")
-        i += 1
-        columns = ["store_app", "app_ads_entry"]
-        ins_query = create_insert_query("app_ads_map", columns, app_df_final)
+        insert_columns = ["app_url", "app_ads_entry"]
+        ins_query = create_insert_query("app_ads_map", insert_columns, app_df_final)
         MADRONE.engine.execute(ins_query)
+        i += 1
         logger.info(f"{row_info} DONE")
 
 
@@ -375,9 +395,12 @@ def clean_android_df(df):
 
 
 def query_all(table_name, key_col, values):
-    if isinstance(values, str):
+    if not isinstance(values, list):
         values = [values]
-    values_str = f"('" + ("', '").join(values) + "')"
+    if all([isinstance(x, (np.integer, int)) for x in values]):
+        values_str = f"(" + (", ").join([str(x) for x in values]) + ")"
+    else:
+        values_str = f"('" + ("', '").join(values) + "')"
     sel_query = f"""SELECT *
     FROM {table_name}
     WHERE 
@@ -411,23 +434,23 @@ def get_app_ids(bundles, platform):
     return app_ids
 
 
-def create_insert_query(table, columns, df):
-    cols = ", ".join([f"{col}" for col in columns])
+def create_insert_query(table, insert_columns, df):
+    cols_str = ", ".join([f"{col}" for col in insert_columns])
     if isinstance(df, pd.Series):
         df = pd.DataFrame(df).T
-    if len(columns) > 1:
-        vals = list(df[columns].to_records(index=False))
+    if len(insert_columns) > 1:
+        vals = list(df[insert_columns].to_records(index=False))
         vals = [[a if a else "CUSTOMNULL" for a in x] for x in vals]
         values = ", ".join([str(i) if i else " " for i in vals])
         values = values.replace("[", "(").replace("]", ")")
         values = values.replace("'CUSTOMNULL'", "NULL")
     else:
-        vals = df[columns[0]].unique().tolist()
+        vals = df[insert_columns[0]].unique().tolist()
         values = f"('" + ("'), ('").join(vals) + "')"
     # update_str = '(id) DO UPDATE' if update else 'DO NOTHING'
     # ON CONFLICT {update_str}
     insert_query = f""" 
-    INSERT INTO {table} ({cols})
+    INSERT INTO {table} ({cols_str})
     VALUES {values}
     ON CONFLICT DO NOTHING
     """
