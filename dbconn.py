@@ -1,6 +1,7 @@
 from sqlalchemy import create_engine
 import yaml
 import logging
+import numpy as np
 import pathlib
 import pandas as pd
 import io
@@ -30,16 +31,17 @@ class PostgresCon:
         self.db_ip = db_ip
         self.db_port = db_port
         try:
-            #self.db_ip = CONFIG["db"][self.db_name]["host"]
             self.db_pass = CONFIG["db"][self.db_name]["db_password"]
             self.db_user = CONFIG["db"][self.db_name]["db_user"]
         except Exception as error:
             logger.error(f"Loading db_auth for {self.db_name}, error: {error}")
+
     def set_engine(self):
         try:
-            db_uri =f'postgresql://{self.db_user}:{self.db_pass}@{self.db_ip}:{self.db_port}/{self.db_name}' 
+            db_login = "postgresql://{self.db_user}:{self.db_pass}"
+            db_uri = f"{db_login}@{self.db_ip}:{self.db_port}/{self.db_name}"
             logger.info(f"Connecting to PostgreSQL {self.db_name}")
-            self.engine = create_engine(db_uri, connect_args={'connect_timeout': 10})
+            self.engine = create_engine(db_uri, connect_args={"connect_timeout": 10})
         except Exception as error:
             logger.error(
                 f"Failed to connect {self.db_name} @ {self.db_ip}, error: {error}"
@@ -79,16 +81,15 @@ def pd_to_psql(df, uri, table_name, if_exists="fail", sep=","):
     cursor.close()
 
 
-
-
 def delete_and_insert(
     df,
     table_name,
     col_del_keys,
-    strict_cols=True, check_table=True,
+    my_db,
+    strict_cols=True,
+    check_table=True,
     date_based_delete=True,
 ):
-    my_db = MADRONE
     """
     Parameters
     ----------------
@@ -166,16 +167,11 @@ def delete_and_insert(
     pd_to_psql(df, uri, table_name, if_exists="append", sep="\t")
 
 
-
 MY_DIR = pathlib.Path(pathlib.Path.home(), "adscrawler/")
 CONFIG_PATH = pathlib.Path(MY_DIR, "config.yml")
 
 with CONFIG_PATH.open() as f:
     CONFIG = yaml.safe_load(f)
 
-#MADRONE = PostgresCon("madrone")
-#MADRONE.set_engine()
-
-
-
-
+# MADRONE = PostgresCon("madrone")
+# MADRONE.set_engine()
