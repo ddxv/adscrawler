@@ -74,7 +74,7 @@ def get_url_dev_id(bundle, store_name):
         store_url = "http://itunes.apple.com/lookup?id=%s" % bundle
         # Get '1.txt' from itunes store, process result to grab sellerUrl
         try:
-            response = requests.get(store_url)
+            response = requests.get(store_url, timeout=2)
             payload = response.json()
             if payload:
                 results = payload["results"][0]
@@ -86,7 +86,7 @@ def get_url_dev_id(bundle, store_name):
     elif store_name == "google_play":
         store_url = f"https://play.google.com/store/apps/details?id={bundle}"
         try:
-            response = requests.get(store_url)
+            response = requests.get(store_url, timeout=2)
             if response.status_code != 200:
                 logger.warning(
                     f"GooglePlay response code: {response.status_code}, no success"
@@ -123,12 +123,12 @@ def get_app_ads_text(app_url):
     else:
         ads_url = app_url + "/" + "app-ads.txt"
     try:
-        response = requests.get(ads_url)
+        response = requests.get(ads_url, timeout=2)
         if response.status_code == 403:
             headers = {
                 "User-Agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:84.0)",
             }
-            response = requests.get(ads_url, headers=headers)
+            response = requests.get(ads_url, headers=headers, timeout=2)
         assert (
             response.status_code == 200
         ), f"GET {ads_url} status_code: {response.status_code}, skipping"
