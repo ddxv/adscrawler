@@ -243,13 +243,13 @@ def clean_ads_txt_df(txt_df):
     return txt_df
 
 
-def crawl_apps_df(df):
+def crawl_apps_df(df, skip_rows):
 
     # TODO where to get this from
     df["store_name"] = "google_play"
     df["store"] = 1
-    i = 0
-    for index, row in df.iterrows():
+    i = skip_rows
+    for index, row in df[skip_rows:].iterrows():
         i += 1
         row_info = f"{i=}, {row.bundle_id=}"
         logger.info(f"{row_info} START")
@@ -258,8 +258,6 @@ def crawl_apps_df(df):
         #    break
         # if bundle == 'com.gameloft.android.ANMP.GloftDMHM':
         #   break
-        if i <= 266:
-            continue
         logger.info(f"{row_info} scrape store info")
         app_url, dev_id, dev_name = get_url_dev_id(bundle, row.store_name)
         logger.info(f"{row_info} {dev_id=}")
@@ -499,6 +497,7 @@ if __name__ == "__main__":
         help="String as portion of android or ios",
         default=[],
     )
+
     parser.add_argument(
         "-a",
         "--update-all",
@@ -506,10 +505,22 @@ if __name__ == "__main__":
         help="if included will update ALL bundles provided",
         default=False,
     )
+
+    parser.add_argument(
+        "-s",
+        "--skip-rows",
+        help="integer of rows to skip",
+        default=0,
+    )
+
+
     args, leftovers = parser.parse_known_args()
 
     platforms = args.platforms if "args" in locals() else ["android"]
     update_all = args.update_all if "args" in locals() else False
+    skip_rows = args.skip_rows if "args" in locals() else 0
+
+    skip_rows = int(skip_rows)
 
     if "james" in f"{CONFIG_PATH}":
         server = OpenSSHTunnel()
@@ -528,4 +539,4 @@ if __name__ == "__main__":
     #    ex_app = existing_df.app_id.unique().tolist()
     #    df = df[~df.app_id.isin(ex_app)]
 
-    crawl_apps_df(df)
+    crawl_apps_df(df, skip_rows)
