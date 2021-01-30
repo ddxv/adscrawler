@@ -201,14 +201,24 @@ def get_app_ads_text(app_url):
         return pd.DataFrame()
 
 
-def insert_get(table_name, insert_df, insert_columns, query_column):
+def insert_get(table_name, insert_df, insert_columns, key_columns):
+    logger.info(f"insert_get table: {table_name}")
     if isinstance(insert_df, pd.Series):
         insert_df = pd.DataFrame(insert_df).T
-    # logger.info(f"insert_get table: {table_name}")
-    ins_query = create_insert_query(table_name, insert_columns, insert_df)
-    MADRONE.engine.execute(ins_query)
-    keys = insert_df[query_column].unique().tolist()
-    get_df = query_all(table_name, query_column, keys)
+    ins_query = create_insert_query(table_name, insert_columns, insert_df, key_columns)
+    with MADRONE.engine.begin() as connection:
+        connection.execute(ins_query)
+    # TODO OMG THIS IS HACKY BAD BAD
+    if isinstance(key_columns, list):
+        if "publisher_id" in key_columns:
+            key_col = "publisher_id"
+        else:
+            key_col = "publisher_id"
+    else:
+        key_col = key_columns
+    keys = insert_df[key_col].unique().tolist()
+    # logger.info(f"insert_get table: {keys=}")
+    get_df = query_all(table_name, key_col, keys)
     return get_df
 
 
@@ -253,6 +263,7 @@ def clean_raw_txt_df(txt_df):
 
 
 def crawl_apps_df(df, skip_rows):
+
     # TODO where to get this from
     df["store_name"] = "google_play"
     df["store"] = 1
@@ -277,7 +288,7 @@ def crawl_apps_df(df, skip_rows):
             continue
         insert_columns = ["store", "developer_id"]
         dev_df = insert_get(
-            "developers", row, insert_columns, query_column="developer_id"
+            "developers", row, insert_columns, key_columns="developer_id"
         )
         row["developer"] = dev_df.id.values[0]
         # NOTE This should not be bundle for iTunes?
@@ -285,7 +296,7 @@ def crawl_apps_df(df, skip_rows):
             row["store_id"] = row.bundle_id
         insert_columns = ["developer", "store_id", "store", "app"]
         store_apps_df = insert_get(
-            "store_apps", row, insert_columns, query_column="store_id"
+            "store_apps", row, insert_columns, key_columns="store_id"
         )
         row["store_app"] = store_apps_df.id.values[0]
         if not app_url:
@@ -293,7 +304,7 @@ def crawl_apps_df(df, skip_rows):
             continue
         insert_columns = ["store_app", "app_ads_url"]
         app_urls_df = insert_get(
-            "app_urls", row, insert_columns, query_column="store_app"
+            "app_urls", row, insert_columns, key_columns="store_app"
         )
         row["app_url"] = app_urls_df.id.values[0]
         logger.info(f"{row_info} scrape ads.txt")
@@ -311,7 +322,7 @@ def crawl_apps_df(df, skip_rows):
         txt_df["updated_at"] = datetime.datetime.now()
         insert_columns = ["domain"]
         domain_df = insert_get(
-            "ad_domains", txt_df, insert_columns, query_column="domain"
+            "ad_domains", txt_df, insert_columns, key_columns="domain"
         )
         app_df = pd.merge(
             txt_df, domain_df, how="left", on=["domain"], validate="many_to_one"
@@ -330,8 +341,10 @@ def crawl_apps_df(df, skip_rows):
                 "certification_auth",
                 "notes",
             ]
+        key_cols = ["ad_domain", "publisher_id", "relationship"]
+        app_df = app_df.drop_duplicates(subset=key_cols)
         entrys_df = insert_get(
-            "app_ads_entrys", app_df, insert_columns, query_column="publisher_id"
+            "app_ads_entrys", app_df, insert_columns, key_columns=key_cols
         )
         entrys_df = entrys_df.rename(columns={"id": "app_ads_entry"})
         app_df_final = pd.merge(
@@ -449,8 +462,9 @@ def get_app_ids(bundles, platform):
     return app_ids
 
 
-def create_insert_query(table, insert_columns, df):
-    cols_str = ", ".join([f"{col}" for col in insert_columns])
+def create_insert_query(table, insert_columns, df, key_columns=None):
+    cols_str = ", ".join([f'"{col}"' for col in insert_columns])
+    d_cols_str = ", ".join([f'd."{col}"' for col in insert_columns])
     if isinstance(df, pd.Series):
         df = pd.DataFrame(df).T
     if len(insert_columns) > 1:
@@ -463,11 +477,26 @@ def create_insert_query(table, insert_columns, df):
     else:
         vals = df[insert_columns[0]].unique().tolist()
         values = f"('" + ("'), ('").join(vals) + "')"
-    insert_query = f""" 
-    INSERT INTO {table} ({cols_str})
-    VALUES {values}
-    ON CONFLICT DO NOTHING
-    """
+    if key_columns:
+        if isinstance(key_columns, str):
+            key_columns = [key_columns]
+        where_keys = " AND ".join([f"t.{key} = d.{key}" for key in key_columns])
+        insert_query = f"""WITH DATA ({cols_str}) AS  
+                ( 
+                VALUES {values} 
+                ) INSERT INTO {table} ({cols_str}) 
+            SELECT {d_cols_str} 
+            FROM DATA d 
+            WHERE NOT EXISTS (  
+            SELECT 1 FROM {table} t 
+            WHERE {where_keys}); 
+            """
+    else:
+        insert_query = f""" 
+        INSERT INTO {table} ({cols_str})
+        VALUES {values}
+        ON CONFLICT DO NOTHING
+        """
     return insert_query
 
 
