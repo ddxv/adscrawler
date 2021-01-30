@@ -109,7 +109,6 @@ def get_url_dev_id(bundle, store_name):
             if len(re.findall(r"\.", url)) > 1:
                 url = ".".join(url.split(".")[1:])
             url = "http://" + url
-            logger.info(f"Android app url is {url}")
         except Exception as err:
             logger.error(f"Failed to get URL, error occurred: {err}")
     else:
@@ -213,7 +212,6 @@ def insert_get(table_name, insert_df, insert_columns, query_column):
 
 
 def clean_ads_txt_df(txt_df):
-    txt_df["relationship"] = txt_df["relationship"].str.replace("\\", "", regex=False)
     txt_df["domain"] = txt_df["domain"].str.lower()
     txt_df["domain"] = txt_df["domain"].str.replace("http://", "", regex=False)
     txt_df["domain"] = txt_df["domain"].str.replace("https://", "", regex=False)
@@ -226,9 +224,11 @@ def clean_ads_txt_df(txt_df):
     txt_df["publisher_id"] = (
         txt_df["publisher_id"].str.encode("ascii", errors="ignore").str.decode("ascii")
     )
-    txt_df["publisher_id"] = txt_df["publisher_id"].str.replace("]", "", regex=False)
-    txt_df["publisher_id"] = txt_df["publisher_id"].str.replace("[", "", regex=False)
     txt_df["relationship"] = txt_df["relationship"].str.upper()
+    standard_str_cols = ["publisher_id", "relationship", "certification_auth"]
+    txt_df[standard_str_cols] = txt_df[standard_str_cols].replace(
+        "[^a-zA-Z0-9_-]", "", regex=True
+    )
     keep_rows = (
         (txt_df.publisher_id.notnull())
         & (txt_df.relationship.notnull())
@@ -244,7 +244,6 @@ def clean_ads_txt_df(txt_df):
 
 
 def crawl_apps_df(df, skip_rows):
-
     # TODO where to get this from
     df["store_name"] = "google_play"
     df["store"] = 1
@@ -289,6 +288,7 @@ def crawl_apps_df(df, skip_rows):
         )
         row["app_url"] = app_urls_df.id.values[0]
         logger.info(f"{row_info} scrape ads.txt")
+        # Get App Ads.txt
         ads_txt_df = get_app_ads_text(app_url)
         if ads_txt_df.empty:
             logger.warning(f"{row_info} Skipping, DF empty")
@@ -497,7 +497,6 @@ if __name__ == "__main__":
         help="String as portion of android or ios",
         default=[],
     )
-
     parser.add_argument(
         "-a",
         "--update-all",
@@ -505,21 +504,15 @@ if __name__ == "__main__":
         help="if included will update ALL bundles provided",
         default=False,
     )
-
     parser.add_argument(
-        "-s",
-        "--skip-rows",
-        help="integer of rows to skip",
-        default=0,
+        "-s", "--skip-rows", help="integer of rows to skip", default=0,
     )
-
 
     args, leftovers = parser.parse_known_args()
 
     platforms = args.platforms if "args" in locals() else ["android"]
     update_all = args.update_all if "args" in locals() else False
     skip_rows = args.skip_rows if "args" in locals() else 0
-
     skip_rows = int(skip_rows)
 
     if "james" in f"{CONFIG_PATH}":
@@ -530,9 +523,11 @@ if __name__ == "__main__":
         local_port = 5432
     MADRONE = dbconn.PostgresCon("madrone", "127.0.0.1", local_port)
     MADRONE.set_engine()
+
     if "android" in platforms:
         df = get_android_df()
         df = clean_android_df(df)
+
     # TODO USED?
     # if not update_all:
     #    existing_df = get_existing_app_ads()
