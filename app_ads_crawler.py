@@ -136,11 +136,12 @@ def get_app_ads_text(app_url):
             term in response.text for term in ["DIRECT", "RESELLER"]
         ), f"DIRECT, RESELLER not in ads.txt, skipping"
         txt = response.text.replace(" ", "")
-        txt = txt.replace("Â\xa0", "")
-        txt = txt.replace("Ã\x82", "")
-        txt = txt.replace("\t", "")
-        txt = txt.replace("\u202a", "")
-        txt = txt.replace("\u202c", "")
+        # TODO Does later cleaning solve this?, likely domains not cleaned...
+        # txt = txt.replace("Â\xa0", "")
+        # txt = txt.replace("Ã\x82", "")
+        # txt = txt.replace("\t", "")
+        # txt = txt.replace("\u202a", "")
+        # txt = txt.replace("\u202c", "")
         csv_header = [
             "domain",
             "publisher_id",
@@ -211,30 +212,38 @@ def insert_get(table_name, insert_df, insert_columns, query_column):
     return get_df
 
 
-def clean_ads_txt_df(txt_df):
+def clean_raw_txt_df(txt_df):
+    # Domain
     txt_df["domain"] = txt_df["domain"].str.lower()
     txt_df["domain"] = txt_df["domain"].str.replace("http://", "", regex=False)
     txt_df["domain"] = txt_df["domain"].str.replace("https://", "", regex=False)
-    txt_df["domain"] = txt_df["domain"].str.replace("/", "", regex=False)
-    txt_df["domain"] = txt_df["domain"].str.replace("[", "", regex=False)
-    txt_df["domain"] = txt_df["domain"].str.replace("]", "", regex=False)
-    txt_df["relationship"] = (
-        txt_df["relationship"].str.encode("ascii", errors="ignore").str.decode("ascii")
-    )
-    txt_df["publisher_id"] = (
-        txt_df["publisher_id"].str.encode("ascii", errors="ignore").str.decode("ascii")
-    )
-    txt_df["relationship"] = txt_df["relationship"].str.upper()
-    standard_str_cols = ["publisher_id", "relationship", "certification_auth"]
+    # txt_df["relationship"] = (
+    #    txt_df["relationship"].str.encode("ascii", errors="ignore").str.decode("ascii")
+    # )
+    # txt_df["publisher_id"] = (
+    #    txt_df["publisher_id"].str.encode("ascii", errors="ignore").str.decode("ascii")
+    # )
+    standard_str_cols = ["domain", "publisher_id", "relationship", "certification_auth"]
     txt_df[standard_str_cols] = txt_df[standard_str_cols].replace(
-        "[^a-zA-Z0-9_-]", "", regex=True
+        "[^a-zA-Z0-9_\\-\\.]", "", regex=True
     )
+    # Clean Relationship
+    txt_df["relationship"] = txt_df["relationship"].str.upper()
+    txt_df.loc[
+        txt_df.relationship.notnull() & txt_df.relationship.str.contains("DIRECT"),
+        "relationship",
+    ] = "DIRECT"
+    txt_df.loc[
+        txt_df.relationship.notnull() & txt_df.relationship.str.contains("RESELLER"),
+        "relationship",
+    ] = "RESELLER"
+    # Drop unwanted rows
     keep_rows = (
-        (txt_df.publisher_id.notnull())
-        & (txt_df.relationship.notnull())
-        & (txt_df.relationship != "")
-        & (txt_df.publisher_id != "")
+        (txt_df.domain.notnull())
         & (txt_df.domain != "")
+        & (txt_df.publisher_id.notnull())
+        & (txt_df.publisher_id != "")
+        & (txt_df.relationship.isin(["DIRECT", "RESELLER"]))
     )
     dropped_rows = txt_df.shape[0] - keep_rows.sum()
     if dropped_rows > 0:
@@ -289,11 +298,11 @@ def crawl_apps_df(df, skip_rows):
         row["app_url"] = app_urls_df.id.values[0]
         logger.info(f"{row_info} scrape ads.txt")
         # Get App Ads.txt
-        ads_txt_df = get_app_ads_text(app_url)
-        if ads_txt_df.empty:
+        raw_txt_df = get_app_ads_text(app_url)
+        if raw_txt_df.empty:
             logger.warning(f"{row_info} Skipping, DF empty")
             continue
-        txt_df = clean_ads_txt_df(ads_txt_df)
+        txt_df = clean_raw_txt_df(txt_df=raw_txt_df.copy())
         txt_df["store_app"] = row.store_app
         txt_df["app_url"] = row.app_url
         txt_df["store_id"] = bundle
