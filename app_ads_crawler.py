@@ -132,12 +132,6 @@ def get_app_ads_text(app_url):
             term in response.text for term in ["DIRECT", "RESELLER"]
         ), f"DIRECT, RESELLER not in ads.txt, skipping"
         txt = response.text.replace(" ", "")
-        # TODO Does later cleaning solve this?, likely domains not cleaned...
-        # txt = txt.replace("Â\xa0", "")
-        # txt = txt.replace("Ã\x82", "")
-        # txt = txt.replace("\t", "")
-        # txt = txt.replace("\u202a", "")
-        # txt = txt.replace("\u202c", "")
         csv_header = [
             "domain",
             "publisher_id",
@@ -280,7 +274,6 @@ def crawl_apps_df(df, skip_rows):
         except Exception as err:
             logger.error(f"Failed to get AppStore dev and app_url, error: {err}")
             continue
-        logger.info(f"{row_info} {dev_id=}")
         row["developer_id"] = dev_id
         row["developer_name"] = dev_name
         row["app_ads_url"] = app_url
@@ -288,6 +281,7 @@ def crawl_apps_df(df, skip_rows):
         dev_df = insert_get(
             "developers", row, insert_columns, key_columns=["store", "developer_id"]
         )
+
         row["developer"] = dev_df["id"].astype(object)[0]
         # NOTE This should not be bundle for iTunes?
         if row.store_name == "google_play":
@@ -318,6 +312,9 @@ def crawl_apps_df(df, skip_rows):
         txt_df["developer_store_id"] = dev_id
         txt_df["developer_store_name"] = dev_name
         txt_df["updated_at"] = datetime.datetime.now()
+        if txt_df.empty:
+            logger.warning(f"{row_info} Cleaned DF empty")
+            continue
         insert_columns = ["domain"]
         domain_df = insert_get(
             "ad_domains", txt_df, insert_columns, key_columns="domain"
@@ -563,7 +560,6 @@ if __name__ == "__main__":
                 insert_columns=["platform", "bundle_id", "name"],
                 key_columns=["platform", "bundle_id"],
             )
-
             df = df.rename(columns={"id": "app"})
 
     sel_query = """SELECT ap.id as app, ap.bundle_id, ap.updated_at  
@@ -571,4 +567,5 @@ if __name__ == "__main__":
     """
     df = pd.read_sql(sel_query, MADRONE.engine)
     df = df.sort_values("updated_at")
+
     crawl_apps_df(df, skip_rows)
