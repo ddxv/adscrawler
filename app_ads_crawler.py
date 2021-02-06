@@ -1,3 +1,4 @@
+import play_scraper
 from typing import Union, List, Optional
 from sshtunnel import SSHTunnelForwarder
 import numpy as np
@@ -67,11 +68,11 @@ def OpenSSHTunnel():
     return server
 
 
-def get_url_dev_id(bundle, store_name):
+def get_url_dev_id(bundle, store):
     url = None
     dev_id = None
     dev_name = None
-    if store_name == "itunes":
+    if store == 2:
         store_url = "http://itunes.apple.com/lookup?id=%s" % bundle
         # Get '1.txt' from itunes store, process result to grab sellerUrl
         try:
@@ -84,12 +85,12 @@ def get_url_dev_id(bundle, store_name):
                     logger.info(f"iOS app url is {url}\n")
         except Exception as err:
             logger.error(f"Failed to get URL, error occurred: {err}")
-    elif store_name == "google_play":
+    elif store == 1:
         store_url = f"https://play.google.com/store/apps/details?id={bundle}"
         response = requests.get(store_url, timeout=2)
         assert (
             response.status_code == 200
-        ), f"{store_name} response code: {response.status_code}"
+        ), f"Store: {store} response code: {response.status_code}"
         rawhtml = re.search("appstore:developer_url.*>", response.text)
         # Get the First Developer Name
         dev_html = re.search('/store/apps/dev.*"', response.text)[0]
@@ -104,7 +105,8 @@ def get_url_dev_id(bundle, store_name):
         assert url, "Did not find URL http in app store HTML content"
         url = url[0].strip('"')
         url = urllib.parse.urlparse(url).netloc
-        if len(re.findall(r"\.", url)) > 1:
+        # Drop first subdomain if it is mobile
+        if url.split(".")[0] == "m":
             url = ".".join(url.split(".")[1:])
         url = "http://" + url
     else:
@@ -250,67 +252,91 @@ def clean_raw_txt_df(txt_df):
     return txt_df
 
 
-def crawl_apps_df(df, skip_rows):
-    # TODO where to get this from
-    df["store_name"] = "google_play"
-    df["platform"] = 1
-    df["store"] = 1
+def google_play(store_id):
+    app = play_scraper.details(store_id)
+    app_df = pd.DataFrame.from_dict(app, orient="index").T
+    app_df["installs"] = pd.to_numeric(app_df["installs"].str.replace(r"[,+]", ""))
+    app_df = app_df.rename(
+        columns={
+            "title": "name",
+            "app_id": "store_id",
+            "score": "rating",
+            "updated": "store_last_updated",
+            "reviews": "review_count",
+            "contains_ads": "ad_supported",
+            "iap": "in_app_purchases",
+            "url": "store_url",
+            "developer_url": "url",
+            "reviews": "review_count",
+            "required_android_version": "minimum_android",
+        }
+    )
+    return app_df
+
+
+def crawl_stores(df):
     i = skip_rows
     for index, row in df[skip_rows:].iterrows():
         i += 1
-        row_info = f"{i=}, {row.bundle_id=}"
+        row_info = f"{i=}, {row.store_id=}"
         logger.info(f"{row_info} START")
-        # if bundle == 'com.outfit7.mytalkingtomfree':
-        #    break
-        # if bundle == 'com.gameloft.android.ANMP.GloftDMHM':
-        #   break
-        insert_columns = ["platform", "bundle_id"]
-        dev_df = insert_get(
-            "apps", row, insert_columns, key_columns=["platform", "bundle_id"]
-        )
-        try:
-            app_url, dev_id, dev_name = get_url_dev_id(row.bundle_id, row.store_name)
-            assert dev_id, f"missing {dev_id=}"
-        except Exception as err:
-            logger.error(f"Failed to get AppStore dev and app_url, error: {err}")
-            continue
-        row["developer_id"] = dev_id
-        row["developer_name"] = dev_name
-        row["app_ads_url"] = app_url
+        app_df = google_play(row.store_id)
+        app_df["store"] = row.store
         insert_columns = ["store", "developer_id"]
         dev_df = insert_get(
-            "developers", row, insert_columns, key_columns=["store", "developer_id"]
+            "developers", app_df, insert_columns, key_columns=["store", "developer_id"]
         )
-
-        row["developer"] = dev_df["id"].astype(object)[0]
-        # NOTE This should not be bundle for iTunes?
-        if row.store_name == "google_play":
-            row["store_id"] = row.bundle_id
-        insert_columns = ["developer", "store_id", "store", "app"]
+        app_df["developer"] = dev_df["id"].astype(object)[0]
+        insert_columns = [
+            "developer",
+            "name",
+            "store_id",
+            "store",
+            "category",
+            "rating",
+            "installs",
+            "free",
+            "price",
+            "size",
+            "minimum_android",
+            "review_count",
+            "content_rating",
+            "store_last_updated",
+            "developer_email",
+            "ad_supported",
+            "in_app_purchases",
+            "editors_choice",
+        ]
         store_apps_df = insert_get(
-            "store_apps", row, insert_columns, key_columns="store_id"
+            "store_apps", app_df, insert_columns, key_columns=["store", "store_id"]
         )
-        row["store_app"] = store_apps_df["id"].astype(object)[0]
-        if not app_url:
-            logger.warning(f"{row_info} Skipping, no URL")
-            continue
-        insert_columns = ["store_app", "app_ads_url"]
+        app_df["store_app"] = store_apps_df["id"].astype(object)[0]
+        insert_columns = ["url"]
         app_urls_df = insert_get(
-            "app_urls", row, insert_columns, key_columns=["store_app", "app_ads_url"]
+            "pub_domains", app_df, insert_columns, key_columns=["url"]
         )
-        row["app_url"] = app_urls_df.id.values[0]
-        logger.info(f"{row_info} scrape ads.txt")
+        app_df["pub_domain"] = app_urls_df["id"].astype(object)[0]
+        insert_columns = ["store_app", "pub_domain"]
+        insert_df("app_urls_map", insert_columns, app_df, key_columns=["store_app"])
+
+
+def crawl_app_ads(df):
+    i = skip_rows
+    for index, row in df[skip_rows:].iterrows():
+        i += 1
+        row_info = f"{i=}, {row.store_id=}"
+        logger.info(f"{row_info} START")
         # Get App Ads.txt
-        raw_txt_df = get_app_ads_text(app_url)
+        raw_txt_df = get_app_ads_text(row.app_url)
         if raw_txt_df.empty:
             logger.warning(f"{row_info} Skipping, DF empty")
             continue
         txt_df = clean_raw_txt_df(txt_df=raw_txt_df.copy())
         txt_df["store_app"] = row.store_app
         txt_df["app_url"] = row.app_url
-        txt_df["store_id"] = row.bundle_id
-        txt_df["developer_store_id"] = dev_id
-        txt_df["developer_store_name"] = dev_name
+        txt_df["store_id"] = row.store_id
+        # txt_df["developer_store_id"] = dev_id
+        # txt_df["developer_store_name"] = dev_name
         txt_df["updated_at"] = datetime.datetime.now()
         if txt_df.empty:
             logger.warning(f"{row_info} Cleaned DF empty")
@@ -359,9 +385,7 @@ def crawl_apps_df(df, skip_rows):
         logger.info(f"{row_info} DONE")
 
 
-def get_store_developer(store_name, dev_id, dev_name):
-    if store_name == "google_play":
-        store = 1
+def get_store_developer(store, dev_id, dev_name):
     sel_query = f"""SELECT * FROM developers 
     WHERE store = 1
     AND developer_id = '{dev_id}';
@@ -374,44 +398,6 @@ def get_store_developer(store_name, dev_id, dev_name):
         """
         MADRONE.engine.execute(ins_query)
         df = pd.read_sql(sel_query, MADRONE.engine)
-    return df
-
-
-def get_android_df_from_csv():
-    filename = f"{MY_DIR}/store-data/Google-Playstore_kaggle.csv"
-    filename = f"{MY_DIR}/store-data/Google-Playstore_kaggle_ONLYGAMES.csv"
-    df = pd.read_csv(filename)
-    skip_categories = [
-        "Video Players & Editors",
-        "Social",
-        "Tools",
-        "News & Magazines",
-        "Travel & Local",
-        "Communication",
-        "Music & Audio",
-        "Productivity",
-        "Personalization",
-        "Shopping",
-        "Photography",
-        "Business",
-        "Education",
-        "Books & Reference",
-        "Health & Fitness",
-        "Finance",
-        "Medical",
-        "Maps & Navigation",
-        "Food & Drink",
-        "Beauty",
-        "Libraries & Demo",
-        "Weather",
-        "Events",
-        "Parenting",
-        "House & Home",
-        "Lifestyle",
-        "Art & Design",
-    ]
-    df = df[~df["Category"].isin(skip_categories)]
-    df = df[df["Ad Supported"]]
     return df
 
 
@@ -454,26 +440,15 @@ def get_store_app_ids(store, store_ids):
     return df
 
 
-def get_app_ids(bundles, platform):
-    bundle_str = f"('" + ("', '").join(bundles) + "')"
-    sel_query = f"""SELECT id as app, bundle_id 
-    FROM apps 
-    WHERE platform = {platform}
-    AND bundle_id IN {bundle_str};
-    """
-    app_ids = pd.read_sql(sel_query, MADRONE.engine)
-    return app_ids
-
-
 def insert_df(table_name, insert_columns, df, key_columns, log=None):
-    cols_str = ", ".join([f'"{col}"' for col in insert_columns])
+    db_cols_str = ", ".join([f'"{col}"' for col in insert_columns])
     key_cols_str = ", ".join([f'"{col}"' for col in key_columns])
     values_str = ", ".join([f"%({col})s" for col in insert_columns])
     set_update = ", ".join([f"{col} = excluded.{col}" for col in insert_columns])
     if isinstance(df, pd.Series):
         df = pd.DataFrame(df).T
     insert_query = f""" 
-        INSERT INTO {table_name} ({cols_str})
+        INSERT INTO {table_name} ({db_cols_str})
         VALUES ({values_str})
         ON CONFLICT ({key_cols_str})
         DO UPDATE SET {set_update}
@@ -497,6 +472,38 @@ def check_app_ads():
     """
     df = pd.read_sql(sel_query, MADRONE.engine)
     return df
+
+
+def reinsert_from_csv():
+    filename = f"{MY_DIR}/store-data/Google-Playstore_kaggle.csv"
+    chunksize = 100000
+    i = 0
+    with pd.read_csv(filename, chunksize=chunksize) as reader:
+        for chunk in reader:
+            logger.info(f"chunk {i}")
+            chunk["platform"] = 1
+            chunk["store"] = 1
+            chunk.columns = [x.replace(" ", "_").lower() for x in chunk.columns]
+            insert_df(
+                table_name="app_store_csv_dump",
+                insert_columns=chunk.columns.tolist(),
+                df=chunk,
+                key_columns=["platform", "store", "app_id"],
+            )
+            i += 1
+
+
+def main():
+    while True:
+        # Query Apps table
+        sel_query = """SELECT store, id as store_app, store_id, updated_at  
+        FROM store_apps
+        WHERE ad_supported = true
+        ORDER BY updated_at
+        limit 1000
+        """
+        df = pd.read_sql(sel_query, MADRONE.engine)
+        crawl_stores(df)
 
 
 if __name__ == "__main__":
@@ -535,7 +542,6 @@ if __name__ == "__main__":
 
     platforms = args.platforms if "args" in locals() else ["android"]
     update_all = args.update_all if "args" in locals() else False
-    reinsert_from_csv = args.update_all if "args" in locals() else False
     skip_rows = args.skip_rows if "args" in locals() else 0
     skip_rows = int(skip_rows)
 
@@ -548,24 +554,4 @@ if __name__ == "__main__":
     MADRONE = dbconn.PostgresCon("madrone", "127.0.0.1", local_port)
     MADRONE.set_engine()
 
-    if "android" in platforms:
-        if reinsert_from_csv:
-            df = get_android_df_from_csv()
-            df["platform"] = 1
-            df = df.rename(columns={"App Id": "bundle_id", "App Name": "name"})
-            df = df.sort_values("Minimum Installs", ascending=False)
-            df = insert_get(
-                "apps",
-                df,
-                insert_columns=["platform", "bundle_id", "name"],
-                key_columns=["platform", "bundle_id"],
-            )
-            df = df.rename(columns={"id": "app"})
-
-    sel_query = """SELECT ap.id as app, ap.bundle_id, ap.updated_at  
-    FROM apps ap
-    """
-    df = pd.read_sql(sel_query, MADRONE.engine)
-    df = df.sort_values("updated_at")
-
-    crawl_apps_df(df, skip_rows)
+    main()
