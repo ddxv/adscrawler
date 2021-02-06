@@ -1,3 +1,4 @@
+from itunes_app_scraper.scraper import AppStoreScraper
 import play_scraper
 from typing import Union, List, Optional
 from sshtunnel import SSHTunnelForwarder
@@ -252,10 +253,25 @@ def clean_raw_txt_df(txt_df):
     return txt_df
 
 
-def google_play(store_id):
+def scrape_app(store, store_id):
+    if store == 1:
+        app_df = scrape_app_gp(store_id)
+    elif store == 2:
+        app_df = scrape_app_ios(store_id)
+    else:
+        logger.error(f"Store not supported {store=}")
+    app_df["store"] = store
+    return app_df
+
+
+def scrape_app_gp(store_id):
     app = play_scraper.details(store_id)
     app_df = pd.DataFrame.from_dict(app, orient="index").T
     app_df["installs"] = pd.to_numeric(app_df["installs"].str.replace(r"[,+]", ""))
+    app_df["price"] = pd.to_numeric(app_df["price"].str.replace(r"$", "", regex=False))
+    app_df["category"] = app_df["category"].apply(
+        lambda x: ",".join([i.lower() for i in x])
+    )
     app_df = app_df.rename(
         columns={
             "title": "name",
@@ -274,42 +290,54 @@ def google_play(store_id):
     return app_df
 
 
+def scrape_app_ios(store_id):
+    scraper = AppStoreScraper()
+    app = scraper.get_app_details(store_id)
+    app_df = pd.DataFrame.from_dict(app, orient="index").T
+    app_df = app_df.rename(
+        columns={
+            "trackId": "store_id",
+            "trackName": "name",
+            "averageUserRating": "rating",
+            "sellerUrl": "url",
+            "minimum_OsVersion": "minimum_android",
+            "primaryGenreName": "category",
+            "bundleId": "bundle_id",
+            "currentVersionReleaseDate": "store_last_updated",
+            "artistId": "developer_id",
+            "artistName": "developer_name",
+            "userRatingCount": "review_count",
+        }
+    )
+    app_df["free"] = app_df.price == 0
+    app_df[["developer_id", "store_id"]] = app_df[["developer_id", "store_id"]].astype(
+        str
+    )
+    return app_df
+
+
 def crawl_stores(df):
-    i = skip_rows
-    for index, row in df[skip_rows:].iterrows():
-        i += 1
-        row_info = f"{i=}, {row.store_id=}"
-        logger.info(f"{row_info} START")
-        app_df = google_play(row.store_id)
-        app_df["store"] = row.store
+
+    for index, row in df.iterrows():
+        row_info = f"{index=} {row.store=} {row.store_id=}"
+        logger.info(f"{row_info} start")
+        try:
+            app_df = scrape_app(row.store, store_id=row.store_id)
+        except Exception as error:
+            logger.info(f"{row_info} {error=}")
+            continue
         insert_columns = ["store", "developer_id"]
         dev_df = insert_get(
             "developers", app_df, insert_columns, key_columns=["store", "developer_id"]
         )
         app_df["developer"] = dev_df["id"].astype(object)[0]
-        insert_columns = [
-            "developer",
-            "name",
-            "store_id",
-            "store",
-            "category",
-            "rating",
-            "installs",
-            "free",
-            "price",
-            "size",
-            "minimum_android",
-            "review_count",
-            "content_rating",
-            "store_last_updated",
-            "developer_email",
-            "ad_supported",
-            "in_app_purchases",
-            "editors_choice",
-        ]
+        insert_columns = [x for x in STORE_APP_COLUMNS if x in app_df.columns]
         store_apps_df = insert_get(
             "store_apps", app_df, insert_columns, key_columns=["store", "store_id"]
         )
+        if "url" not in app_df.columns or not app_df["url"].values:
+            logger.info(f"{row_info} no developer url")
+            continue
         app_df["store_app"] = store_apps_df["id"].astype(object)[0]
         insert_columns = ["url"]
         app_urls_df = insert_get(
@@ -321,8 +349,9 @@ def crawl_stores(df):
 
 
 def crawl_app_ads(df):
-    i = skip_rows
-    for index, row in df[skip_rows:].iterrows():
+
+    i = 0
+    for index, row in df.iterrows():
         i += 1
         row_info = f"{i=}, {row.store_id=}"
         logger.info(f"{row_info} START")
@@ -475,30 +504,65 @@ def check_app_ads():
 
 
 def reinsert_from_csv():
-    filename = f"{MY_DIR}/store-data/Google-Playstore_kaggle.csv"
-    chunksize = 100000
+
+    filename = f"{MY_DIR}/store-data/763K_plus_IOS_Apps_Info.csv"
+    chunksize = 10000
     i = 0
+    store = 2
+    platform = 2
+
     with pd.read_csv(filename, chunksize=chunksize) as reader:
         for chunk in reader:
             logger.info(f"chunk {i}")
-            chunk["platform"] = 1
-            chunk["store"] = 1
+            chunk["platform"] = platform
+            chunk["store"] = store
             chunk.columns = [x.replace(" ", "_").lower() for x in chunk.columns]
+            if store == 1:
+                insert_columns = chunk.columns.tolist()
+            if store == 2:
+                chunk = chunk.rename(
+                    columns={
+                        "ios_app_id": "app_id",
+                        "title": "app_name",
+                        "developer_ios_id": "developer_id",
+                        "current_version_release_date": "last_updated",
+                        "primary_genre": "category",
+                        "total_number_of_ratings": "rating_count",
+                        "price_usd": "price",
+                    }
+                )
+                insert_columns = [
+                    "app_id",
+                    "app_name",
+                    "developer_id",
+                    "rating_count",
+                    "last_updated",
+                    "category",
+                    "platform",
+                    "store",
+                ]
             insert_df(
                 table_name="app_store_csv_dump",
-                insert_columns=chunk.columns.tolist(),
+                insert_columns=insert_columns,
                 df=chunk,
                 key_columns=["platform", "store", "app_id"],
             )
             i += 1
 
 
-def main():
-    while True:
+def main(args):
+    platforms = args.platforms if "args" in locals() else ["android"]
+    update_all = args.update_all if "args" in locals() else False
+    stores = []
+    stores.append(1) if "android" in platforms else None
+    stores.append(2) if "ios" in platforms else None
+    while 1 in stores or 2 in stores:
         # Query Apps table
-        sel_query = """SELECT store, id as store_app, store_id, updated_at  
+        # WHERE ad_supported = true
+        stores_str = f"(" + (", ").join([str(x) for x in stores]) + ")"
+        sel_query = f"""SELECT store, id as store_app, store_id, updated_at  
         FROM store_apps
-        WHERE ad_supported = true
+        WHERE store IN {stores_str}
         ORDER BY updated_at
         limit 1000
         """
@@ -506,17 +570,29 @@ def main():
         crawl_stores(df)
 
 
+STORE_APP_COLUMNS = [
+    "developer",
+    "name",
+    "store_id",
+    "store",
+    "category",
+    "rating",
+    "installs",
+    "free",
+    "price",
+    "size",
+    "minimum_android",
+    "review_count",
+    "content_rating",
+    "store_last_updated",
+    "developer_email",
+    "ad_supported",
+    "in_app_purchases",
+    "editors_choice",
+]
+
+
 if __name__ == "__main__":
-
-    # FORMAT = "%(asctime)s: %(name)s: %(levelname)s: %(message)s"
-    # logging.basicConfig(format=FORMAT, level=logging.INFO)
-    # formatter = logging.Formatter(FORMAT)
-    # logger.setLevel(logging.DEBUG)
-    # ch = logging.StreamHandler()
-    # ch.setLevel(logging.INFO)
-    # ch.setFormatter(formatter)
-    # logger.addHandler(ch)
-
     logger.info("Starting app-ads.txt crawler")
 
     parser = argparse.ArgumentParser()
@@ -537,13 +613,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "-s", "--skip-rows", help="integer of rows to skip", default=0,
     )
-
     args, leftovers = parser.parse_known_args()
-
-    platforms = args.platforms if "args" in locals() else ["android"]
-    update_all = args.update_all if "args" in locals() else False
-    skip_rows = args.skip_rows if "args" in locals() else 0
-    skip_rows = int(skip_rows)
 
     if "james" in f"{CONFIG_PATH}":
         server = OpenSSHTunnel()
@@ -554,4 +624,4 @@ if __name__ == "__main__":
     MADRONE = dbconn.PostgresCon("madrone", "127.0.0.1", local_port)
     MADRONE.set_engine()
 
-    main()
+    main(args)
