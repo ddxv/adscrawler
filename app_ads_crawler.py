@@ -18,7 +18,7 @@ import pathlib
 import logging
 import logging.handlers
 
-# import tldextract
+import tldextract
 
 
 logger = logging.getLogger(__name__)
@@ -352,6 +352,9 @@ def crawl_stores(df):
         if "url" not in app_df.columns or not app_df["url"].values:
             logger.info(f"{row_info} no developer url")
             continue
+        app_df["url"] = app_df["url"].apply(
+            lambda x: ".".join(part for part in tldextract.extract(x) if part)
+        )
         app_df["store_app"] = store_apps_df["id"].astype(object)[0]
         insert_columns = ["url"]
         app_urls_df = insert_get(
@@ -589,6 +592,7 @@ def main(args):
 
         # Query Apps table
         # WHERE ad_supported = true
+        # --AND installs > 100000
         stores_str = f"(" + (", ").join([str(x) for x in stores]) + ")"
         sel_query = f"""SELECT store, id as store_app, store_id, updated_at  
         FROM store_apps
