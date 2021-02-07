@@ -9,7 +9,7 @@ import io
 
 # import re
 # import urllib
-import datetime
+# import datetime
 import requests
 import pandas as pd
 import csv
@@ -119,83 +119,109 @@ def OpenSSHTunnel():
 #    return url, dev_id, dev_name
 
 
+def request_app_ads(ads_url):
+    if not "http" == ads_url[0:4]:
+        ads_url = "http://" + ads_url
+    response = requests.get(ads_url, timeout=2)
+    if response.status_code == 403:
+        headers = {
+            "User-Agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:84.0)",
+        }
+        response = requests.get(ads_url, headers=headers, timeout=2)
+    if response.status_code != 200:
+        err = f"{ads_url} status_code: {response.status_code}"
+        raise NoAdsTxt(err)
+    if "<head>" in response.text:
+        err = f"{ads_url} HTML in adstxt"
+        raise NoAdsTxt(err)
+    if not any(term in response.text for term in ["DIRECT", "RESELLER"]):
+        err = f"DIRECT, RESELLER not in ads.txt"
+        raise NoAdsTxt(err)
+    return response
+
+
+class NoAdsTxt(Exception):
+    pass
+
+
+class AdsTxtEmpty(Exception):
+    pass
+
+
 def get_app_ads_text(app_url):
-    if app_url[-1] == "/":
-        ads_url = app_url + "app-ads.txt"
-    else:
-        ads_url = app_url + "/" + "app-ads.txt"
-    try:
-        response = requests.get(ads_url, timeout=2)
-        if response.status_code == 403:
-            headers = {
-                "User-Agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:84.0)",
-            }
-            response = requests.get(ads_url, headers=headers, timeout=2)
-        assert (
-            response.status_code == 200
-        ), f"GET {ads_url} status_code: {response.status_code}, skipping"
-        assert "<head>" not in response.text, f"WARN: {ads_url} HTML in adstxt"
-        assert any(
-            term in response.text for term in ["DIRECT", "RESELLER"]
-        ), f"DIRECT, RESELLER not in ads.txt, skipping"
-        txt = response.text.replace(" ", "")
-        csv_header = [
-            "domain",
-            "publisher_id",
-            "relationship",
-            "certification_auth",
-            "notes",
-        ]
-        rows = []
-        input_stream_lines = txt.split("\n")
-        output_stream = ""
-        for line in input_stream_lines:
-            if not line or line[0] == "#":
-                continue
-            else:
-                output_stream = output_stream + line + "\n"
-        for row in csv.DictReader(
-            io.StringIO(output_stream),
-            delimiter=",",
-            fieldnames=csv_header[:-1],
-            restkey=csv_header[-1],
-            quoting=csv.QUOTE_NONE,
-        ):
-            try:
-                if len(row) == 4:
-                    rows.append(
-                        [
-                            row["domain"],
-                            row["publisher_id"],
-                            row["relationship"],
-                            row["certification_auth"],
-                        ]
-                    )
-                elif len(row) > 4:
-                    rows.append(
-                        [
-                            row["domain"],
-                            row["publisher_id"],
-                            row["relationship"],
-                            row["certification_auth"],
-                            ",".join(row["notes"]),
-                        ]
-                    )
-                else:
-                    rows.append(
-                        [row["domain"], row["publisher_id"], row["relationship"]]
-                    )
-            except Exception as err:
-                logger.error(f"Parser skipping row: {row}, error: {err}")
-                continue
-        if pd.DataFrame(rows).shape[1] == len(csv_header) - 1:
-            df = pd.DataFrame(rows, columns=csv_header[:-1])
+    ext_url = tldextract.extract(app_url)
+    sub_domains_url = ""
+    if ext_url.subdomain:
+        # Note contains all subdomains, even m
+        # TODO parse & exclude for m subdomain
+        sub_domains_url = ".".join(ext_url) + "/" + "app-ads.txt"
+        sub_domains_url = "http://" + sub_domains_url
+    top_domain_url = ".".join([ext_url.domain, ext_url.suffix]) + "/" + "app-ads.txt"
+    top_domain_url = "http://" + top_domain_url
+    if sub_domains_url:
+        try:
+            response = request_app_ads(ads_url=sub_domains_url)
+            return response.text
+        except NoAdsTxt as error:
+            logger.error(f"{error}")
+    response = request_app_ads(ads_url=top_domain_url)
+    return response.text
+
+
+def parse_ads_txt(txt):
+    txt = txt.replace(" ", "")
+    csv_header = [
+        "domain",
+        "publisher_id",
+        "relationship",
+        "certification_auth",
+        "notes",
+    ]
+    rows = []
+    input_stream_lines = txt.split("\n")
+    output_stream = ""
+    for line in input_stream_lines:
+        if not line or line[0] == "#":
+            continue
         else:
-            df = pd.DataFrame(rows, columns=csv_header)
-        return df
-    except Exception as err:
-        logger.error(f"{err}")
-        return pd.DataFrame()
+            output_stream = output_stream + line + "\n"
+    for row in csv.DictReader(
+        io.StringIO(output_stream),
+        delimiter=",",
+        fieldnames=csv_header[:-1],
+        restkey=csv_header[-1],
+        quoting=csv.QUOTE_NONE,
+    ):
+        try:
+            if len(row) == 4:
+                rows.append(
+                    [
+                        row["domain"],
+                        row["publisher_id"],
+                        row["relationship"],
+                        row["certification_auth"],
+                    ]
+                )
+            elif len(row) > 4:
+                rows.append(
+                    [
+                        row["domain"],
+                        row["publisher_id"],
+                        row["relationship"],
+                        row["certification_auth"],
+                        ",".join(row["notes"]),
+                    ]
+                )
+            else:
+                rows.append([row["domain"], row["publisher_id"], row["relationship"]])
+        except Exception as err:
+            logger.error(f"Parser skipping row: {row}, error: {err}")
+            continue
+    if pd.DataFrame(rows).shape[1] == len(csv_header) - 1:
+        df = pd.DataFrame(rows, columns=csv_header[:-1])
+    else:
+        df = pd.DataFrame(rows, columns=csv_header)
+    return df
 
 
 def insert_get(
@@ -220,14 +246,9 @@ def insert_get(
 def clean_raw_txt_df(txt_df):
     # Domain
     txt_df["domain"] = txt_df["domain"].str.lower()
-    txt_df["domain"] = txt_df["domain"].str.replace("http://", "", regex=False)
-    txt_df["domain"] = txt_df["domain"].str.replace("https://", "", regex=False)
-    # txt_df["relationship"] = (
-    #    txt_df["relationship"].str.encode("ascii", errors="ignore").str.decode("ascii")
-    # )
-    # txt_df["publisher_id"] = (
-    #    txt_df["publisher_id"].str.encode("ascii", errors="ignore").str.decode("ascii")
-    # )
+    txt_df["domain"] = txt_df["domain"].apply(
+        lambda x: ".".join([tldextract.extract(x).domain, tldextract.extract(x).suffix])
+    )
     standard_str_cols = ["domain", "publisher_id", "relationship", "certification_auth"]
     txt_df[standard_str_cols] = txt_df[standard_str_cols].replace(
         "[^a-zA-Z0-9_\\-\\.]", "", regex=True
@@ -254,6 +275,8 @@ def clean_raw_txt_df(txt_df):
     if dropped_rows > 0:
         logger.warning(f"Dropped rows: {dropped_rows}")
     txt_df = txt_df[keep_rows]
+    if txt_df.empty:
+        raise AdsTxtEmpty(f"AdsTxtDF Empty")
     return txt_df
 
 
@@ -320,8 +343,19 @@ def scrape_app_ios(store_id):
     return app_df
 
 
-def crawl_stores(df):
+def extract_domains(x):
+    ext = tldextract.extract(x)
+    use_top_domain = any(
+        ["m" == ext.subdomain, "www" in ext.subdomain.split("."), ext.subdomain == ""]
+    )
+    if use_top_domain:
+        url = ".".join([ext.domain, ext.suffix])
+    else:
+        url = ".".join(part for part in ext if part)
+    return url
 
+
+def crawl_stores(df):
     for index, row in df.iterrows():
         row_info = f"{index=} {row.store=} {row.store_id=}"
         logger.info(f"{row_info} start")
@@ -352,9 +386,7 @@ def crawl_stores(df):
         if "url" not in app_df.columns or not app_df["url"].values:
             logger.info(f"{row_info} no developer url")
             continue
-        app_df["url"] = app_df["url"].apply(
-            lambda x: ".".join(part for part in tldextract.extract(x) if part)
-        )
+        app_df["url"] = app_df["url"].apply(lambda x: extract_domains(x))
         app_df["store_app"] = store_apps_df["id"].astype(object)[0]
         insert_columns = ["url"]
         app_urls_df = insert_get(
@@ -366,27 +398,38 @@ def crawl_stores(df):
 
 
 def crawl_app_ads(df):
-
     i = 0
     for index, row in df.iterrows():
         i += 1
-        row_info = f"{i=}, {row.store_id=}"
-
+        app_url = row.url
+        row_info = f"{i=}, {app_url=}"
         logger.info(f"{row_info} START")
-        # Get App Ads.txt
-        raw_txt_df = get_app_ads_text(row.app_url)
-        if raw_txt_df.empty:
-            logger.warning(f"{row_info} Skipping, DF empty")
-            continue
-        txt_df = clean_raw_txt_df(txt_df=raw_txt_df.copy())
-        txt_df["store_app"] = row.store_app
-        txt_df["app_url"] = row.app_url
-        txt_df["store_id"] = row.store_id
-        # txt_df["developer_store_id"] = dev_id
-        # txt_df["developer_store_name"] = dev_name
-        txt_df["updated_at"] = datetime.datetime.now()
-        if txt_df.empty:
-            logger.warning(f"{row_info} Cleaned DF empty")
+        # Get App Ads.txt Text File
+        try:
+            raw_txt = get_app_ads_text(app_url)
+            raw_txt_df = parse_ads_txt(txt=raw_txt)
+            txt_df = clean_raw_txt_df(txt_df=raw_txt_df.copy())
+            # txt_df["store_app"] = row.store_app
+            # txt_df["app_url"] = row.app_url
+            # txt_df["store_id"] = row.store_id
+            row["crawl_result"] = 1
+        except NoAdsTxt as error:
+            logger.error(f"{row_info} ads.txt not found {error}")
+            row["crawl_result"] = 3
+        except AdsTxtEmpty as error:
+            logger.error(f"{row_info} ads.txt parsing error {error}")
+            row["crawl_result"] = 2
+        except ConnectionError as error:
+            logger.error(f"{row_info} domain not found {error}")
+            row["crawl_result"] = 3
+        except Exception as error:
+            logger.error(f"{row_info} unknown error: {error}")
+            row["crawl_result"] = 4
+        insert_columns = ["url", "crawl_result"]
+        pub_domain_df = insert_get(
+            "pub_domains", row, insert_columns, key_columns="url"
+        )
+        if row.crawl_result != 1:
             continue
         insert_columns = ["domain"]
         domain_df = insert_get(
@@ -395,6 +438,7 @@ def crawl_app_ads(df):
         app_df = pd.merge(
             txt_df, domain_df, how="left", on=["domain"], validate="many_to_one"
         ).rename(columns={"id": "ad_domain"})
+        app_df["pub_domain"] = pub_domain_df["id"].astype(object)[0]
         insert_columns = [
             "ad_domain",
             "publisher_id",
@@ -422,7 +466,7 @@ def crawl_app_ads(df):
             on=["ad_domain", "publisher_id", "relationship"],
             validate="many_to_one",
         )
-        insert_columns = ["app_url", "app_ads_entry"]
+        insert_columns = ["pub_domain", "app_ads_entry"]
         null_df = app_df_final[app_df_final.app_ads_entry.isnull()]
         if not null_df.empty:
             logger.warning(f"{null_df=} NULLs in app_ads_entry")
@@ -578,21 +622,22 @@ def main(args):
     stores.append(2) if "ios" in platforms else None
 
     if crawl_aa:
+
         # Query Pub Domain Table
-        stores_str = f"(" + (", ").join([str(x) for x in stores]) + ")"
-        sel_query = f"""SELECT store, id as store_app, store_id, updated_at  
-        FROM store_apps
-        WHERE store IN {stores_str}
-        ORDER BY updated_at
+        sel_query = f"""SELECT id, url, crawled_at
+        FROM pub_domains
+        ORDER BY crawled_at
         limit 1000
         """
         df = pd.read_sql(sel_query, MADRONE.engine)
 
-    while 1 in stores or 2 in stores:
+        crawl_app_ads(df)
 
+    while 1 in stores or 2 in stores:
         # Query Apps table
         # WHERE ad_supported = true
         # --AND installs > 100000
+
         stores_str = f"(" + (", ").join([str(x) for x in stores]) + ")"
         sel_query = f"""SELECT store, id as store_app, store_id, updated_at  
         FROM store_apps
@@ -601,7 +646,6 @@ def main(args):
         limit 1000
         """
         df = pd.read_sql(sel_query, MADRONE.engine)
-
         crawl_stores(df)
 
 
