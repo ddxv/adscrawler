@@ -339,10 +339,10 @@ def crawl_stores(df):
         except Exception as error:
             error_message = f"{row_info} {error=}"
             logger.error(error_message)
-            if "404" in error_message:
+            if "404" in error_message or "No app found" in error_message:
                 crawl_result = 3
             else:
-                crawl_result = 5
+                crawl_result = 4
             row["crawl_result"] = crawl_result
             app_df = pd.DataFrame(row).T
         insert_columns = [x for x in STORE_APP_COLUMNS if x in app_df.columns]
@@ -637,7 +637,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "-a",
-        "--update-all",
+        "--crawl-aa",
         action="store_true",
         help="if included will update ALL bundles provided",
         default=False,
