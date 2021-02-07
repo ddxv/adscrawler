@@ -6,8 +6,9 @@ import numpy as np
 import yaml
 import argparse
 import io
-import re
-import urllib
+
+# import re
+# import urllib
 import datetime
 import requests
 import pandas as pd
@@ -16,6 +17,9 @@ import dbconn
 import pathlib
 import logging
 import logging.handlers
+
+# import tldextract
+
 
 logger = logging.getLogger(__name__)
 
@@ -69,50 +73,50 @@ def OpenSSHTunnel():
     return server
 
 
-def get_url_dev_id(bundle, store):
-    url = None
-    dev_id = None
-    dev_name = None
-    if store == 2:
-        store_url = "http://itunes.apple.com/lookup?id=%s" % bundle
-        # Get '1.txt' from itunes store, process result to grab sellerUrl
-        try:
-            response = requests.get(store_url, timeout=2)
-            payload = response.json()
-            if payload:
-                results = payload["results"][0]
-                if results["sellerUrl"]:
-                    url = results["sellerUrl"]
-                    logger.info(f"iOS app url is {url}\n")
-        except Exception as err:
-            logger.error(f"Failed to get URL, error occurred: {err}")
-    elif store == 1:
-        store_url = f"https://play.google.com/store/apps/details?id={bundle}"
-        response = requests.get(store_url, timeout=2)
-        assert (
-            response.status_code == 200
-        ), f"Store: {store} response code: {response.status_code}"
-        rawhtml = re.search("appstore:developer_url.*>", response.text)
-        # Get the First Developer Name
-        dev_html = re.search('/store/apps/dev.*"', response.text)[0]
-        dev_html = re.split("<", dev_html)[0]
-        dev_name = re.split(">", dev_html)[1]
-        # Next Developer ID
-        dev_html = re.split("=", dev_html)[1]
-        dev_id = re.split('"', dev_html)[0]
-        assert rawhtml, "Did not find appstore:developer_url in app store HTML"
-        rawhtml = rawhtml[0]
-        url = re.search('"http[^"]+"', rawhtml)
-        assert url, "Did not find URL http in app store HTML content"
-        url = url[0].strip('"')
-        url = urllib.parse.urlparse(url).netloc
-        # Drop first subdomain if it is mobile
-        if url.split(".")[0] == "m":
-            url = ".".join(url.split(".")[1:])
-        url = "http://" + url
-    else:
-        logger.error('Invalid Platform Name - send "itunes" or "google_play"\n')
-    return url, dev_id, dev_name
+# def get_url_dev_id(bundle, store):
+#    url = None
+#    dev_id = None
+#    dev_name = None
+#    if store == 2:
+#        store_url = "http://itunes.apple.com/lookup?id=%s" % bundle
+#        # Get '1.txt' from itunes store, process result to grab sellerUrl
+#        try:
+#            response = requests.get(store_url, timeout=2)
+#            payload = response.json()
+#            if payload:
+#                results = payload["results"][0]
+#                if results["sellerUrl"]:
+#                    url = results["sellerUrl"]
+#                    logger.info(f"iOS app url is {url}\n")
+#        except Exception as err:
+#            logger.error(f"Failed to get URL, error occurred: {err}")
+#    elif store == 1:
+#        store_url = f"https://play.google.com/store/apps/details?id={bundle}"
+#        response = requests.get(store_url, timeout=2)
+#        assert (
+#            response.status_code == 200
+#        ), f"Store: {store} response code: {response.status_code}"
+#        rawhtml = re.search("appstore:developer_url.*>", response.text)
+#        # Get the First Developer Name
+#        dev_html = re.search('/store/apps/dev.*"', response.text)[0]
+#        dev_html = re.split("<", dev_html)[0]
+#        dev_name = re.split(">", dev_html)[1]
+#        # Next Developer ID
+#        dev_html = re.split("=", dev_html)[1]
+#        dev_id = re.split('"', dev_html)[0]
+#        assert rawhtml, "Did not find appstore:developer_url in app store HTML"
+#        rawhtml = rawhtml[0]
+#        url = re.search('"http[^"]+"', rawhtml)
+#        assert url, "Did not find URL http in app store HTML content"
+#        url = url[0].strip('"')
+#        url = urllib.parse.urlparse(url).netloc
+#        # Drop first subdomain if it is mobile
+#        if url.split(".")[0] == "m":
+#            url = ".".join(url.split(".")[1:])
+#        url = "http://" + url
+#    else:
+#        logger.error('Invalid Platform Name - send "itunes" or "google_play"\n')
+#    return url, dev_id, dev_name
 
 
 def get_app_ads_text(app_url):
@@ -323,14 +327,24 @@ def crawl_stores(df):
         logger.info(f"{row_info} start")
         try:
             app_df = scrape_app(row.store, store_id=row.store_id)
+            app_df["crawl_result"] = 1
+            insert_columns = ["store", "developer_id"]
+            dev_df = insert_get(
+                "developers",
+                app_df,
+                insert_columns,
+                key_columns=["store", "developer_id"],
+            )
+            app_df["developer"] = dev_df["id"].astype(object)[0]
         except Exception as error:
-            logger.info(f"{row_info} {error=}")
-            continue
-        insert_columns = ["store", "developer_id"]
-        dev_df = insert_get(
-            "developers", app_df, insert_columns, key_columns=["store", "developer_id"]
-        )
-        app_df["developer"] = dev_df["id"].astype(object)[0]
+            error_message = f"{row_info} {error=}"
+            logger.error(error_message)
+            if "404" in error_message:
+                crawl_result = 3
+            else:
+                crawl_result = 5
+            row["crawl_result"] = crawl_result
+            app_df = pd.DataFrame(row).T
         insert_columns = [x for x in STORE_APP_COLUMNS if x in app_df.columns]
         store_apps_df = insert_get(
             "store_apps", app_df, insert_columns, key_columns=["store", "store_id"]
@@ -354,6 +368,7 @@ def crawl_app_ads(df):
     for index, row in df.iterrows():
         i += 1
         row_info = f"{i=}, {row.store_id=}"
+
         logger.info(f"{row_info} START")
         # Get App Ads.txt
         raw_txt_df = get_app_ads_text(row.app_url)
@@ -551,12 +566,27 @@ def reinsert_from_csv():
 
 
 def main(args):
+
     platforms = args.platforms if "args" in locals() else ["android"]
-    update_all = args.update_all if "args" in locals() else False
+    crawl_aa = args.crawl_aa if "args" in locals() else False
+
     stores = []
     stores.append(1) if "android" in platforms else None
     stores.append(2) if "ios" in platforms else None
+
+    if crawl_aa:
+        # Query Pub Domain Table
+        stores_str = f"(" + (", ").join([str(x) for x in stores]) + ")"
+        sel_query = f"""SELECT store, id as store_app, store_id, updated_at  
+        FROM store_apps
+        WHERE store IN {stores_str}
+        ORDER BY updated_at
+        limit 1000
+        """
+        df = pd.read_sql(sel_query, MADRONE.engine)
+
     while 1 in stores or 2 in stores:
+
         # Query Apps table
         # WHERE ad_supported = true
         stores_str = f"(" + (", ").join([str(x) for x in stores]) + ")"
@@ -567,6 +597,7 @@ def main(args):
         limit 1000
         """
         df = pd.read_sql(sel_query, MADRONE.engine)
+
         crawl_stores(df)
 
 
@@ -589,6 +620,7 @@ STORE_APP_COLUMNS = [
     "ad_supported",
     "in_app_purchases",
     "editors_choice",
+    "crawl_result",
 ]
 
 
