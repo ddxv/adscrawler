@@ -352,6 +352,7 @@ def extract_domains(x):
         url = ".".join([ext.domain, ext.suffix])
     else:
         url = ".".join(part for part in ext if part)
+    url = url.lower()
     return url
 
 
