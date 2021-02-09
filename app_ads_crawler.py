@@ -627,12 +627,12 @@ def main(args):
         # Query Pub Domain Table
         sel_query = f"""SELECT id, url, crawled_at
         FROM pub_domains
-        ORDER BY crawled_at
+        ORDER BY crawled_at NULLS FIRST
         limit 1000
         """
-        df = pd.read_sql(sel_query, MADRONE.engine)
-
-        crawl_app_ads(df)
+        while True:
+            df = pd.read_sql(sel_query, MADRONE.engine)
+            crawl_app_ads(df)
 
     while 1 in stores or 2 in stores:
         # Query Apps table
@@ -643,7 +643,7 @@ def main(args):
         sel_query = f"""SELECT store, id as store_app, store_id, updated_at  
         FROM store_apps
         WHERE store IN {stores_str}
-        ORDER BY updated_at
+        ORDER BY updated_at NULLS FIRST
         limit 1000
         """
         df = pd.read_sql(sel_query, MADRONE.engine)
