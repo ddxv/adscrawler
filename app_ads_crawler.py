@@ -6,10 +6,6 @@ import numpy as np
 import yaml
 import argparse
 import io
-
-# import re
-# import urllib
-# import datetime
 import requests
 import pandas as pd
 import csv
@@ -17,7 +13,6 @@ import dbconn
 import pathlib
 import logging
 import logging.handlers
-
 import tldextract
 
 
@@ -71,52 +66,6 @@ def OpenSSHTunnel():
         logger.info("Connecting via SSH")
         # connect to PostgreSQL
     return server
-
-
-# def get_url_dev_id(bundle, store):
-#    url = None
-#    dev_id = None
-#    dev_name = None
-#    if store == 2:
-#        store_url = "http://itunes.apple.com/lookup?id=%s" % bundle
-#        # Get '1.txt' from itunes store, process result to grab sellerUrl
-#        try:
-#            response = requests.get(store_url, timeout=2)
-#            payload = response.json()
-#            if payload:
-#                results = payload["results"][0]
-#                if results["sellerUrl"]:
-#                    url = results["sellerUrl"]
-#                    logger.info(f"iOS app url is {url}\n")
-#        except Exception as err:
-#            logger.error(f"Failed to get URL, error occurred: {err}")
-#    elif store == 1:
-#        store_url = f"https://play.google.com/store/apps/details?id={bundle}"
-#        response = requests.get(store_url, timeout=2)
-#        assert (
-#            response.status_code == 200
-#        ), f"Store: {store} response code: {response.status_code}"
-#        rawhtml = re.search("appstore:developer_url.*>", response.text)
-#        # Get the First Developer Name
-#        dev_html = re.search('/store/apps/dev.*"', response.text)[0]
-#        dev_html = re.split("<", dev_html)[0]
-#        dev_name = re.split(">", dev_html)[1]
-#        # Next Developer ID
-#        dev_html = re.split("=", dev_html)[1]
-#        dev_id = re.split('"', dev_html)[0]
-#        assert rawhtml, "Did not find appstore:developer_url in app store HTML"
-#        rawhtml = rawhtml[0]
-#        url = re.search('"http[^"]+"', rawhtml)
-#        assert url, "Did not find URL http in app store HTML content"
-#        url = url[0].strip('"')
-#        url = urllib.parse.urlparse(url).netloc
-#        # Drop first subdomain if it is mobile
-#        if url.split(".")[0] == "m":
-#            url = ".".join(url.split(".")[1:])
-#        url = "http://" + url
-#    else:
-#        logger.error('Invalid Platform Name - send "itunes" or "google_play"\n')
-#    return url, dev_id, dev_name
 
 
 def request_app_ads(ads_url):
@@ -357,20 +306,14 @@ def extract_domains(x):
 
 
 def crawl_stores(df):
+
     for index, row in df.iterrows():
         row_info = f"{index=} {row.store=} {row.store_id=}"
         logger.info(f"{row_info} start")
+
         try:
             app_df = scrape_app(row.store, store_id=row.store_id)
             app_df["crawl_result"] = 1
-            insert_columns = ["store", "developer_id"]
-            dev_df = insert_get(
-                "developers",
-                app_df,
-                insert_columns,
-                key_columns=["store", "developer_id"],
-            )
-            app_df["developer"] = dev_df["id"].astype(object)[0]
         except Exception as error:
             error_message = f"{row_info} {error=}"
             logger.error(error_message)
@@ -380,6 +323,15 @@ def crawl_stores(df):
                 crawl_result = 4
             row["crawl_result"] = crawl_result
             app_df = pd.DataFrame(row).T
+        else:
+            insert_columns = ["store", "developer_id"]
+            dev_df = insert_get(
+                "developers",
+                app_df,
+                insert_columns,
+                key_columns=["store", "developer_id"],
+            )
+            app_df["developer"] = dev_df["id"].astype(object)[0]
         insert_columns = [x for x in STORE_APP_COLUMNS if x in app_df.columns]
         store_apps_df = insert_get(
             "store_apps", app_df, insert_columns, key_columns=["store", "store_id"]
@@ -617,7 +569,6 @@ def main(args):
 
     platforms = args.platforms if "args" in locals() else ["android"]
     crawl_aa = args.crawl_aa if "args" in locals() else False
-
     stores = []
     stores.append(1) if "android" in platforms else None
     stores.append(2) if "ios" in platforms else None
@@ -630,23 +581,26 @@ def main(args):
         ORDER BY crawled_at NULLS FIRST
         limit 1000
         """
-        #while True:
         df = pd.read_sql(sel_query, MADRONE.engine)
+
         crawl_app_ads(df)
 
     while 1 in stores or 2 in stores:
+
         # Query Apps table
         # WHERE ad_supported = true
         # --AND installs > 100000
-
-        stores_str = f"(" + (", ").join([str(x) for x in stores]) + ")"
+        where_str = f"store IN (" + (", ").join([str(x) for x in stores]) + ")"
+        if stores[0] == 1:
+            where_str += " AND installs >= 100000"
         sel_query = f"""SELECT store, id as store_app, store_id, updated_at  
         FROM store_apps
-        WHERE store IN {stores_str}
+        WHERE {where_str}
         ORDER BY updated_at NULLS FIRST
         limit 1000
         """
         df = pd.read_sql(sel_query, MADRONE.engine)
+
         crawl_stores(df)
 
 
@@ -695,7 +649,6 @@ if __name__ == "__main__":
         "-s", "--skip-rows", help="integer of rows to skip", default=0,
     )
     args, leftovers = parser.parse_known_args()
-
     if "james" in f"{CONFIG_PATH}":
         server = OpenSSHTunnel()
         server.start()
