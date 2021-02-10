@@ -630,9 +630,9 @@ def main(args):
         ORDER BY crawled_at NULLS FIRST
         limit 1000
         """
-        while True:
-            df = pd.read_sql(sel_query, MADRONE.engine)
-            crawl_app_ads(df)
+        #while True:
+        df = pd.read_sql(sel_query, MADRONE.engine)
+        crawl_app_ads(df)
 
     while 1 in stores or 2 in stores:
         # Query Apps table
