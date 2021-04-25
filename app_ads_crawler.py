@@ -622,7 +622,7 @@ def main(args):
     stores.append(1) if "android" in platforms else None
     stores.append(2) if "ios" in platforms else None
 
-    if crawl_aa:
+    while crawl_aa:
 
         # Query Pub Domain Table
         sel_query = f"""SELECT id, url, crawled_at
