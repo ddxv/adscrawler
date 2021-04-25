@@ -1,3 +1,4 @@
+from itunes_app_scraper.util import AppStoreCollections, AppStoreCategories
 from itunes_app_scraper.scraper import AppStoreScraper
 import play_scraper
 from typing import Union, List, Optional
@@ -14,7 +15,6 @@ import pathlib
 import logging
 import logging.handlers
 import tldextract
-
 
 logger = logging.getLogger(__name__)
 
@@ -187,7 +187,7 @@ def insert_get(
         key_columns = [key_columns]
     if isinstance(df, pd.Series):
         df = pd.DataFrame(df).T
-    insert_df(table_name, insert_columns, df, key_columns)
+    upsert_df(table_name, insert_columns, df, key_columns)
     get_df = query_all(table_name, key_columns, df)
     return get_df
 
@@ -347,7 +347,7 @@ def crawl_stores(df):
         )
         app_df["pub_domain"] = app_urls_df["id"].astype(object)[0]
         insert_columns = ["store_app", "pub_domain"]
-        insert_df("app_urls_map", insert_columns, app_df, key_columns=["store_app"])
+        upsert_df("app_urls_map", insert_columns, app_df, key_columns=["store_app"])
 
 
 def crawl_app_ads(df):
@@ -423,7 +423,7 @@ def crawl_app_ads(df):
         null_df = app_df_final[app_df_final.app_ads_entry.isnull()]
         if not null_df.empty:
             logger.warning(f"{null_df=} NULLs in app_ads_entry")
-        insert_df(
+        upsert_df(
             "app_ads_map", insert_columns, app_df_final, key_columns=insert_columns
         )
         logger.info(f"{row_info} DONE")
@@ -484,7 +484,7 @@ def get_store_app_ids(store, store_ids):
     return df
 
 
-def insert_df(table_name, insert_columns, df, key_columns, log=None):
+def upsert_df(table_name, insert_columns, df, key_columns, log=None):
     db_cols_str = ", ".join([f'"{col}"' for col in insert_columns])
     key_cols_str = ", ".join([f'"{col}"' for col in key_columns])
     values_str = ", ".join([f"%({col})s" for col in insert_columns])
@@ -516,6 +516,37 @@ def check_app_ads():
     """
     df = pd.read_sql(sel_query, MADRONE.engine)
     return df
+
+
+def scrape_ios_frontpage():
+    scraper = AppStoreScraper()
+    categories = {k: v for k, v in AppStoreCategories.__dict__.items() if "GAME" in k}
+    collections = {
+        k: v
+        for k, v in AppStoreCollections.__dict__.items()
+        if "_I" in k and "PAID" not in k
+    }
+    store_ids = []
+    for coll_key, coll_value in collections.items():
+        logger.info(f"Collection: {coll_value}")
+        for cat_key, cat_value in categories.items():
+            logger.info(f"Collection: {coll_value}, category: {cat_value}")
+            coll_key, coll_value, cat_key, cat_value
+            new_ids = scraper.get_app_ids_for_collection(
+                collection=coll_value, category=cat_value, num=200
+            )
+            store_ids += new_ids
+    store_ids = list(set(store_ids))
+    apps_df = pd.DataFrame({"store": 2, "store_id": store_ids})
+    insert_columns = ["store", "store_id"]
+    upsert_df("store_apps", insert_columns, apps_df, key_columns=insert_columns)
+    sel_query = f"""SELECT store, id as store_app, store_id, updated_at  
+    FROM store_apps
+    WHERE store = 2
+    AND crawl_result IS NULL
+    """
+    df = pd.read_sql(sel_query, MADRONE.engine)
+    crawl_stores(df)
 
 
 def reinsert_from_csv():
@@ -556,7 +587,7 @@ def reinsert_from_csv():
                     "platform",
                     "store",
                 ]
-            insert_df(
+            upsert_df(
                 table_name="app_store_csv_dump",
                 insert_columns=insert_columns,
                 df=chunk,
@@ -569,9 +600,13 @@ def main(args):
 
     platforms = args.platforms if "args" in locals() else ["android"]
     crawl_aa = args.crawl_aa if "args" in locals() else False
+    store_page_crawl = args.store_page_crawl if "args" in locals() else False
     stores = []
     stores.append(1) if "android" in platforms else None
     stores.append(2) if "ios" in platforms else None
+
+    if store_page_crawl:
+        scrape_ios_frontpage()
 
     if crawl_aa:
 
@@ -646,7 +681,7 @@ if __name__ == "__main__":
         default=False,
     )
     parser.add_argument(
-        "-s", "--skip-rows", help="integer of rows to skip", default=0,
+        "-s", "--store-page-crawl", help="Crawl the Store for new IDs", default=0,
     )
     args, leftovers = parser.parse_known_args()
     if "james" in f"{CONFIG_PATH}":
