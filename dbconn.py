@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 class PostgresCon:
-    """ Class for managing the connection to postgres
+    """Class for managing the connection to postgres
     Parameters:
     ----------------
         my_db: String, passed on init, string name of db
@@ -57,7 +57,7 @@ def pd_to_psql(df, uri, table_name, if_exists="fail", sep=","):
         uri (str): postgres psycopg2 sqlalchemy database uri
         table_name (str): table to store data in
         schema_name (str): name of schema in db to write to
-        if_exists (str): {‘fail’, ‘replace’, ‘append’}, default ‘fail’. 
+        if_exists (str): {‘fail’, ‘replace’, ‘append’}, default ‘fail’.
             See `pandas.to_sql()` for details
         sep (str): separator for temp file, eg ',' or '\t'
     Returns:
@@ -172,6 +172,3 @@ CONFIG_PATH = pathlib.Path(MY_DIR, "config.yml")
 
 with CONFIG_PATH.open() as f:
     CONFIG = yaml.safe_load(f)
-
-# MADRONE = PostgresCon("madrone")
-# MADRONE.set_engine()
