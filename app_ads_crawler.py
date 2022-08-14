@@ -1,6 +1,6 @@
+from google_play_scraper import app
 from itunes_app_scraper.util import AppStoreCollections, AppStoreCategories
 from itunes_app_scraper.scraper import AppStoreScraper
-import play_scraper
 from sshtunnel import SSHTunnelForwarder
 import numpy as np
 import argparse
@@ -142,6 +142,7 @@ def insert_get(
     log: bool | None = None,
 ) -> pd.DataFrame:
     logger.info(f"insert_get table: {table_name}")
+
     if isinstance(insert_columns, str):
         insert_columns = [insert_columns]
     if isinstance(key_columns, str):
@@ -202,27 +203,31 @@ def scrape_app(store, store_id):
 
 
 def scrape_app_gp(store_id):
-    app = play_scraper.details(store_id)
-    app_df = pd.DataFrame.from_dict(app, orient="index").T
-    app_df["installs"] = pd.to_numeric(app_df["installs"].str.replace(r"[,+]", ""))
-    app_df["price"] = pd.to_numeric(app_df["price"].str.replace(r"$", "", regex=False))
-    app_df["category"] = app_df["category"].apply(
-        lambda x: ",".join([i.lower() for i in x])
+    result = app(
+        store_id, lang="en", country="us"  # defaults to 'en'  # defaults to 'us'
     )
+    app_df = pd.DataFrame.from_dict(result, orient="index").T
+    app_df["installs"] = pd.to_numeric(app_df["installs"].str.replace(r"[,+]", ""))
     app_df = app_df.rename(
         columns={
             "title": "name",
-            "app_id": "store_id",
+            "installs": "min_installs",
+            "realInstalls": "installs",
+            "appId": "store_id",
             "score": "rating",
             "updated": "store_last_updated",
             "reviews": "review_count",
-            "contains_ads": "ad_supported",
-            "iap": "in_app_purchases",
+            "containsAds": "ad_supported",
+            "offersIAP": "in_app_purchases",
             "url": "store_url",
-            "developer_url": "url",
+            "developerWebsite": "url",
+            "developerId": "developer_id",
             "reviews": "review_count",
-            "required_android_version": "minimum_android",
         }
+    )
+    app_df["category"] = app_df["genreId"].str.lower()
+    app_df["store_last_updated"] = pd.to_datetime(
+        app_df["store_last_updated"], unit="s"
     )
     return app_df
 
@@ -271,9 +276,8 @@ def crawl_stores(df):
     for index, row in df.iterrows():
         row_info = f"{index=} {row.store=} {row.store_id=}"
         logger.info(f"{row_info} start")
-
         try:
-            app_df = scrape_app(row.store, store_id=row.store_id)
+            app_df = scrape_app(store=row.store, store_id=row.store_id)
             app_df["crawl_result"] = 1
         except Exception as error:
             error_message = f"{row_info} {error=}"
@@ -287,9 +291,9 @@ def crawl_stores(df):
         else:
             insert_columns = ["store", "developer_id"]
             dev_df = insert_get(
-                "developers",
-                app_df,
-                insert_columns,
+                table_name="developers",
+                df=app_df,
+                insert_columns=insert_columns,
                 key_columns=["store", "developer_id"],
             )
             app_df["developer"] = dev_df["id"].astype(object)[0]
