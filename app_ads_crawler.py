@@ -648,7 +648,11 @@ if __name__ == "__main__":
         default=0,
     )
     parser.add_argument(
-        "-l", "--is-local-db", help="Connect to local db on port 5432", default=False
+        "-l",
+        "--is-local-db",
+        help="Connect to local db on port 5432",
+        default=False,
+        action="store_true",
     )
     args, leftovers = parser.parse_known_args()
     if args.is_local_db:
