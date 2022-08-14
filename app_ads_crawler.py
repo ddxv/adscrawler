@@ -458,6 +458,9 @@ def upsert_df(table_name, insert_columns, df, key_columns, log=None):
     set_update = ", ".join([f"{col} = excluded.{col}" for col in insert_columns])
     if isinstance(df, pd.Series):
         df = pd.DataFrame(df).T
+    obj_cols = [x for x in insert_columns if df[x].dtype == "object"]
+    if len(obj_cols) > 0:
+        df[obj_cols] = df[obj_cols].apply(lambda x: x.str.replace("%", "%%"))
     insert_query = f""" 
         INSERT INTO {table_name} ({db_cols_str})
         VALUES ({values_str})
