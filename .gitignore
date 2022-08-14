@@ -2,6 +2,8 @@
 config.yml
 store-data/
 
+.virtualenv/
+
 ### Vim ###
 # Swap
 [._]*.s[a-v][a-z]
