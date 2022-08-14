@@ -289,7 +289,7 @@ def crawl_stores(df):
             else:
                 crawl_result = 4
             row["crawl_result"] = crawl_result
-            app_df = pd.DataFrame(row).T
+            app_df = pd.DataFrame([row])
         else:
             insert_columns = ["store", "developer_id"]
             dev_df = insert_get(
