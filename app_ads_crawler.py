@@ -1,57 +1,18 @@
 from itunes_app_scraper.util import AppStoreCollections, AppStoreCategories
 from itunes_app_scraper.scraper import AppStoreScraper
 import play_scraper
-from typing import Union, List, Optional
 from sshtunnel import SSHTunnelForwarder
 import numpy as np
-import yaml
 import argparse
 import io
 import requests
 import pandas as pd
 import csv
 import dbconn
-import pathlib
-import logging
-import logging.handlers
 import tldextract
+from config import get_logger, CONFIG, MODULE_DIR
 
-logger = logging.getLogger(__name__)
-
-# Get module directory
-try:
-    print(
-        "Parent directory from __file__ Path:",
-        pathlib.Path(__file__).parent.parent.absolute(),
-    )
-    MY_DIR = pathlib.Path(pathlib.Path(__file__).parent.parent.absolute())
-except Exception as error:
-    print(
-        f"""Error: {error} \n 
-            Guess running from interpreter and home dir:
-            """,
-        pathlib.Path().home().absolute(),
-    )
-    MY_DIR = pathlib.Path(pathlib.Path.home(), "adscrawler/")
-
-
-CONFIG_PATH = pathlib.Path(MY_DIR, "config.yml")
-with CONFIG_PATH.open() as f:
-    CONFIG = yaml.safe_load(f)
-
-LOG_PATH = pathlib.Path(f"{MY_DIR}/logs/crawler.log")
-LOG_FORMAT = "%(asctime)s: %(name)s: %(levelname)s: %(message)s"
-
-logger.setLevel(logging.INFO)
-
-streamhandler = logging.StreamHandler()
-streamhandler.setFormatter(logging.Formatter(LOG_FORMAT))
-logger.addHandler(streamhandler)
-log_rotate = logging.handlers.RotatingFileHandler(
-    filename=LOG_PATH, maxBytes=10000000, backupCount=4
-)
-log_rotate.setFormatter(logging.Formatter(LOG_FORMAT))
-logger.addHandler(log_rotate)
+logger = get_logger(__name__)
 
 
 def OpenSSHTunnel():
@@ -60,7 +21,7 @@ def OpenSSHTunnel():
         ssh_username=CONFIG["ssh"]["username"],
         ssh_pkey=CONFIG["ssh"]["pkey"],
         ssh_private_key_password=CONFIG["ssh"]["pkey_password"],
-        remote_bind_address=(f"127.0.0.1", 5432),
+        remote_bind_address=("127.0.0.1", 5432),
     ) as server:  # PostgreSQL server IP and sever port on remote machine
         server.start()  # start ssh sever
         logger.info("Connecting via SSH")
@@ -84,7 +45,7 @@ def request_app_ads(ads_url):
         err = f"{ads_url} HTML in adstxt"
         raise NoAdsTxt(err)
     if not any(term in response.text for term in ["DIRECT", "RESELLER"]):
-        err = f"DIRECT, RESELLER not in ads.txt"
+        err = "DIRECT, RESELLER not in ads.txt"
         raise NoAdsTxt(err)
     return response
 
@@ -175,10 +136,10 @@ def parse_ads_txt(txt):
 
 def insert_get(
     table_name: str,
-    df: Union[pd.DataFrame, pd.Series],
-    insert_columns: Union[str, List[str]],
-    key_columns: Union[str, List[str]],
-    log: Optional[bool] = None,
+    df: pd.DataFrame | pd.Series,
+    insert_columns: str | list[str],
+    key_columns: str | list[str],
+    log: bool | None = None,
 ) -> pd.DataFrame:
     logger.info(f"insert_get table: {table_name}")
     if isinstance(insert_columns, str):
@@ -225,7 +186,7 @@ def clean_raw_txt_df(txt_df):
         logger.warning(f"Dropped rows: {dropped_rows}")
     txt_df = txt_df[keep_rows]
     if txt_df.empty:
-        raise AdsTxtEmpty(f"AdsTxtDF Empty")
+        raise AdsTxtEmpty("AdsTxtDF Empty")
     return txt_df
 
 
@@ -446,7 +407,7 @@ def get_store_developer(store, dev_id, dev_name):
 
 
 def query_all(
-    table_name: str, key_cols: Union[List[str], str], df: pd.DataFrame
+    table_name: str, key_cols: list[str] | str, df: pd.DataFrame
 ) -> pd.DataFrame:
     if isinstance(key_cols, str):
         key_cols = [key_cols]
@@ -454,10 +415,10 @@ def query_all(
     for key_col in key_cols:
         keys = df[key_col].unique().tolist()
         if all([isinstance(x, (np.integer, int)) for x in keys]):
-            values_str = f"(" + (", ").join([str(x) for x in keys]) + ")"
+            values_str = "(" + (", ").join([str(x) for x in keys]) + ")"
             values_str = values_str.replace("%", "%%")
         else:
-            values_str = f"('" + ("', '").join(keys) + "')"
+            values_str = "('" + ("', '").join(keys) + "')"
             values_str = values_str.replace("%", "%%")
         where = f"{key_col} IN {values_str}"
         wheres.append(where)
@@ -474,7 +435,7 @@ def query_all(
 def get_store_app_ids(store, store_ids):
     if isinstance(store_ids, str):
         store_ids = [store_ids]
-    store_ids_str = f"('" + ("', '").join(store_ids) + "')"
+    store_ids_str = "('" + ("', '").join(store_ids) + "')"
     sel_query = f"""SELECT *
     FROM store_apps
     WHERE store = {store}
@@ -540,7 +501,7 @@ def scrape_ios_frontpage():
     apps_df = pd.DataFrame({"store": 2, "store_id": store_ids})
     insert_columns = ["store", "store_id"]
     upsert_df("store_apps", insert_columns, apps_df, key_columns=insert_columns)
-    sel_query = f"""SELECT store, id as store_app, store_id, updated_at  
+    sel_query = """SELECT store, id as store_app, store_id, updated_at  
     FROM store_apps
     WHERE store = 2
     AND crawl_result IS NULL
@@ -551,7 +512,7 @@ def scrape_ios_frontpage():
 
 def reinsert_from_csv():
 
-    filename = f"{MY_DIR}/store-data/763K_plus_IOS_Apps_Info.csv"
+    filename = f"{MODULE_DIR}/store-data/763K_plus_IOS_Apps_Info.csv"
     chunksize = 10000
     i = 0
     store = 2
@@ -611,7 +572,7 @@ def main(args):
     while crawl_aa:
 
         # Query Pub Domain Table
-        sel_query = f"""SELECT id, url, crawled_at
+        sel_query = """SELECT id, url, crawled_at
         FROM pub_domains
         ORDER BY crawled_at NULLS FIRST
         limit 1000
@@ -625,7 +586,7 @@ def main(args):
         # Query Apps table
         # WHERE ad_supported = true
         # --AND installs > 100000
-        where_str = f"store IN (" + (", ").join([str(x) for x in stores]) + ")"
+        where_str = "store IN (" + (", ").join([str(x) for x in stores]) + ")"
         if stores[0] == 1:
             where_str += " AND installs >= 100000"
         sel_query = f"""SELECT store, id as store_app, store_id, updated_at  
@@ -671,7 +632,7 @@ if __name__ == "__main__":
         "--platforms",
         action="append",
         help="String as portion of android or ios",
-        default=[],
+        default=["android"],
     )
     parser.add_argument(
         "-a",
@@ -681,15 +642,21 @@ if __name__ == "__main__":
         default=False,
     )
     parser.add_argument(
-        "-s", "--store-page-crawl", help="Crawl the Store for new IDs", default=0,
+        "-s",
+        "--store-page-crawl",
+        help="Crawl the Store for new IDs",
+        default=0,
+    )
+    parser.add_argument(
+        "-l", "--is-local-db", help="Connect to local db on port 5432", default=False
     )
     args, leftovers = parser.parse_known_args()
-    if "james" in f"{CONFIG_PATH}":
+    if args.is_local_db:
+        local_port = 5432
+    else:
         server = OpenSSHTunnel()
         server.start()
         local_port = str(server.local_bind_port)
-    else:
-        local_port = 5432
     MADRONE = dbconn.PostgresCon("madrone", "127.0.0.1", local_port)
     MADRONE.set_engine()
 

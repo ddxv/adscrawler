@@ -1,12 +1,10 @@
 from sqlalchemy import create_engine
-import yaml
-import logging
 import numpy as np
-import pathlib
 import pandas as pd
 import io
+from config import CONFIG, get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class PostgresCon:
@@ -111,7 +109,7 @@ def delete_and_insert(
         df_ed = df[date_col].max()
         where_clause = f"WHERE {date_col} >= '{df_sd}' AND {date_col} <= '{df_ed}'"
     else:
-        where_clause = f""
+        where_clause = ""
     if "campaign" in df.columns:
         df["campaign"] = df["campaign"].str.replace("\t", "")
     if "network_key" in df.columns:
@@ -165,10 +163,3 @@ def delete_and_insert(
     )
     uri = f"postgresql+psycopg2://{connection_uri}"
     pd_to_psql(df, uri, table_name, if_exists="append", sep="\t")
-
-
-MY_DIR = pathlib.Path(pathlib.Path.home(), "adscrawler/")
-CONFIG_PATH = pathlib.Path(MY_DIR, "config.yml")
-
-with CONFIG_PATH.open() as f:
-    CONFIG = yaml.safe_load(f)
