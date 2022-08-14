@@ -207,7 +207,9 @@ def scrape_app_gp(store_id):
         store_id, lang="en", country="us"  # defaults to 'en'  # defaults to 'us'
     )
     app_df = pd.DataFrame.from_dict(result, orient="index").T
-    app_df["installs"] = pd.to_numeric(app_df["installs"].str.replace(r"[,+]", ""))
+    app_df["installs"] = pd.to_numeric(
+        app_df["installs"].str.replace(r"[,+]", "", regex=True)
+    )
     app_df = app_df.rename(
         columns={
             "title": "name",
