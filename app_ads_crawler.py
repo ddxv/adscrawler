@@ -329,9 +329,6 @@ def crawl_app_ads(df):
             raw_txt = get_app_ads_text(app_url)
             raw_txt_df = parse_ads_txt(txt=raw_txt)
             txt_df = clean_raw_txt_df(txt_df=raw_txt_df.copy())
-            # txt_df["store_app"] = row.store_app
-            # txt_df["app_url"] = row.app_url
-            # txt_df["store_id"] = row.store_id
             row["crawl_result"] = 1
         except NoAdsTxt as error:
             logger.error(f"{row_info} ads.txt not found {error}")
