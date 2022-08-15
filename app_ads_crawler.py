@@ -261,11 +261,16 @@ def crawl_stores_for_app_details(df):
                 df=app_df,
                 insert_columns=insert_columns,
                 key_columns=["store", "developer_id"],
+                database_connection=PGCON,
             )
             app_df["developer"] = dev_df["id"].astype(object)[0]
         insert_columns = [x for x in STORE_APP_COLUMNS if x in app_df.columns]
         store_apps_df = insert_get(
-            "store_apps", app_df, insert_columns, key_columns=["store", "store_id"]
+            "store_apps",
+            app_df,
+            insert_columns,
+            key_columns=["store", "store_id"],
+            database_connection=PGCON,
         )
         if "url" not in app_df.columns or not app_df["url"].values:
             logger.info(f"{row_info} no developer url")
@@ -274,14 +279,24 @@ def crawl_stores_for_app_details(df):
         app_df["store_app"] = store_apps_df["id"].astype(object)[0]
         insert_columns = ["url"]
         app_urls_df = insert_get(
-            "pub_domains", app_df, insert_columns, key_columns=["url"]
+            "pub_domains",
+            app_df,
+            insert_columns,
+            key_columns=["url"],
+            database_connection=PGCON,
         )
         app_df["pub_domain"] = app_urls_df["id"].astype(object)[0]
         insert_columns = ["store_app", "pub_domain"]
-        upsert_df("app_urls_map", insert_columns, app_df, key_columns=["store_app"])
+        upsert_df(
+            "app_urls_map",
+            insert_columns,
+            app_df,
+            key_columns=["store_app"],
+            database_connection=PGCON,
+        )
 
 
-def crawl_app_ads(df):
+def crawl_app_ads():
     df = query_pub_domains(database_connection=PGCON)
     i = 0
     for index, row in df.iterrows():
@@ -309,13 +324,21 @@ def crawl_app_ads(df):
             row["crawl_result"] = 4
         insert_columns = ["url", "crawl_result"]
         pub_domain_df = insert_get(
-            "pub_domains", row, insert_columns, key_columns="url"
+            "pub_domains",
+            row,
+            insert_columns,
+            key_columns="url",
+            database_connection=PGCON,
         )
         if row.crawl_result != 1:
             continue
         insert_columns = ["domain"]
         domain_df = insert_get(
-            "ad_domains", txt_df, insert_columns, key_columns="domain"
+            "ad_domains",
+            txt_df,
+            insert_columns,
+            key_columns="domain",
+            database_connection=PGCON,
         )
         app_df = pd.merge(
             txt_df, domain_df, how="left", on=["domain"], validate="many_to_one"
@@ -338,7 +361,11 @@ def crawl_app_ads(df):
         key_cols = ["ad_domain", "publisher_id", "relationship"]
         app_df = app_df.drop_duplicates(subset=key_cols)
         entrys_df = insert_get(
-            "app_ads_entrys", app_df, insert_columns, key_columns=key_cols
+            "app_ads_entrys",
+            app_df,
+            insert_columns,
+            key_columns=key_cols,
+            database_connection=PGCON,
         )
         entrys_df = entrys_df.rename(columns={"id": "app_ads_entry"})
         app_df_final = pd.merge(
@@ -353,7 +380,11 @@ def crawl_app_ads(df):
         if not null_df.empty:
             logger.warning(f"{null_df=} NULLs in app_ads_entry")
         upsert_df(
-            "app_ads_map", insert_columns, app_df_final, key_columns=insert_columns
+            "app_ads_map",
+            insert_columns,
+            app_df_final,
+            key_columns=insert_columns,
+            database_connection=PGCON,
         )
         logger.info(f"{row_info} DONE")
 
@@ -384,6 +415,7 @@ def scrape_ios_frontpage():
         insert_columns=insert_columns,
         df=apps_df,
         key_columns=insert_columns,
+        database_connection=PGCON,
     )
     crawl_stores_for_app_details(my_df)
 
