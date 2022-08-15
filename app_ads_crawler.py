@@ -1,32 +1,17 @@
 from itunes_app_scraper.util import AppStoreCollections, AppStoreCategories
 from itunes_app_scraper.scraper import AppStoreScraper
-from sshtunnel import SSHTunnelForwarder
 from google_play_scraper import app
-import numpy as np
 import argparse
 import io
 import requests
 import pandas as pd
 import csv
-import dbconn
+from dbcon.connection import get_db_connection
+from dbcon.queries import insert_get, upsert_df, query_store_apps, query_pub_domains
 import tldextract
-from config import get_logger, CONFIG, MODULE_DIR
+from config import get_logger
 
 logger = get_logger(__name__)
-
-
-def OpenSSHTunnel():
-    with SSHTunnelForwarder(
-        (CONFIG["ssh"]["host"], 22),  # Remote server IP and SSH port
-        ssh_username=CONFIG["ssh"]["username"],
-        ssh_pkey=CONFIG["ssh"]["pkey"],
-        ssh_private_key_password=CONFIG["ssh"]["pkey_password"],
-        remote_bind_address=("127.0.0.1", 5432),
-    ) as server:  # PostgreSQL server IP and sever port on remote machine
-        server.start()  # start ssh sever
-        logger.info("Connecting via SSH")
-        # connect to PostgreSQL
-    return server
 
 
 def request_app_ads(ads_url):
@@ -132,26 +117,6 @@ def parse_ads_txt(txt):
     else:
         df = pd.DataFrame(rows, columns=csv_header)
     return df
-
-
-def insert_get(
-    table_name: str,
-    df: pd.DataFrame | pd.Series,
-    insert_columns: str | list[str],
-    key_columns: str | list[str],
-    log: bool | None = None,
-) -> pd.DataFrame:
-    logger.info(f"insert_get table: {table_name}")
-
-    if isinstance(insert_columns, str):
-        insert_columns = [insert_columns]
-    if isinstance(key_columns, str):
-        key_columns = [key_columns]
-    if isinstance(df, pd.Series):
-        df = pd.DataFrame(df).T
-    upsert_df(table_name, insert_columns, df, key_columns)
-    get_df = query_all(table_name, key_columns, df)
-    return get_df
 
 
 def clean_raw_txt_df(txt_df):
@@ -317,6 +282,7 @@ def crawl_stores_for_app_details(df):
 
 
 def crawl_app_ads(df):
+    df = query_pub_domains(database_connection=PGCON)
     i = 0
     for index, row in df.iterrows():
         i += 1
@@ -392,98 +358,6 @@ def crawl_app_ads(df):
         logger.info(f"{row_info} DONE")
 
 
-def get_store_developer(store, dev_id, dev_name):
-    sel_query = f"""SELECT * FROM developers 
-    WHERE store = 1
-    AND developer_id = '{dev_id}';
-    """
-    df = pd.read_sql(sel_query, MADRONE.engine)
-    if df.empty:
-        ins_query = f"""INSERT INTO developers
-        (store, name, developer_id)
-        VALUES ({store}, '{dev_name}', '{dev_id}');
-        """
-        MADRONE.engine.execute(ins_query)
-        df = pd.read_sql(sel_query, MADRONE.engine)
-    return df
-
-
-def query_all(
-    table_name: str, key_cols: list[str] | str, df: pd.DataFrame
-) -> pd.DataFrame:
-    if isinstance(key_cols, str):
-        key_cols = [key_cols]
-    wheres = []
-    for key_col in key_cols:
-        keys = df[key_col].unique().tolist()
-        if all([isinstance(x, (np.integer, int)) for x in keys]):
-            values_str = "(" + (", ").join([str(x) for x in keys]) + ")"
-            values_str = values_str.replace("%", "%%")
-        else:
-            values_str = "('" + ("', '").join(keys) + "')"
-            values_str = values_str.replace("%", "%%")
-        where = f"{key_col} IN {values_str}"
-        wheres.append(where)
-    where_str = " AND ".join(wheres)
-    sel_query = f"""SELECT *
-    FROM {table_name}
-    WHERE {where_str}
-    """
-    # logger.info(sel_query)
-    df = pd.read_sql(sel_query, MADRONE.engine)
-    return df
-
-
-def get_store_app_ids(store, store_ids):
-    if isinstance(store_ids, str):
-        store_ids = [store_ids]
-    store_ids_str = "('" + ("', '").join(store_ids) + "')"
-    sel_query = f"""SELECT *
-    FROM store_apps
-    WHERE store = {store}
-    AND store_id IN {store_ids_str};
-    """
-    df = pd.read_sql(sel_query, MADRONE.engine)
-    return df
-
-
-def upsert_df(table_name, insert_columns, df, key_columns, log=None):
-    db_cols_str = ", ".join([f'"{col}"' for col in insert_columns])
-    key_cols_str = ", ".join([f'"{col}"' for col in key_columns])
-    values_str = ", ".join([f"%({col})s" for col in insert_columns])
-    set_update = ", ".join([f"{col} = excluded.{col}" for col in insert_columns])
-    if isinstance(df, pd.Series):
-        df = pd.DataFrame(df).T
-    for col in insert_columns:
-        if pd.api.types.is_string_dtype(df[col]):
-            df[col] = df[col].apply(lambda x: x.replace("'", "''"))
-    insert_query = f""" 
-        INSERT INTO {table_name} ({db_cols_str})
-        VALUES ({values_str})
-        ON CONFLICT ({key_cols_str})
-        DO UPDATE SET {set_update}
-        """
-    values = df[insert_columns].to_dict("records")
-    if log:
-        logger.info(f"MY INSERT QUERY: {insert_query.format(values)}")
-    with MADRONE.engine.begin() as connection:
-        connection.execute(insert_query, values)
-
-
-def get_existing_app_ads():
-    sel_query = """select app_id, max(updated_at) as last_updated from app_ads group by app_id;
-    """
-    df = pd.read_sql(sel_query, MADRONE.engine)
-    return df
-
-
-def check_app_ads():
-    sel_query = """select app_id, updated_at from app_ads limit 10;
-    """
-    df = pd.read_sql(sel_query, MADRONE.engine)
-    return df
-
-
 def scrape_ios_frontpage():
     scraper = AppStoreScraper()
     categories = {k: v for k, v in AppStoreCategories.__dict__.items() if "GAME" in k}
@@ -514,77 +388,10 @@ def scrape_ios_frontpage():
     crawl_stores_for_app_details(my_df)
 
 
-def reinsert_from_csv():
-
-    filename = f"{MODULE_DIR}/store-data/763K_plus_IOS_Apps_Info.csv"
-    chunksize = 10000
-    i = 0
-    store = 2
-    platform = 2
-
-    with pd.read_csv(filename, chunksize=chunksize) as reader:
-        for chunk in reader:
-            logger.info(f"chunk {i}")
-            chunk["platform"] = platform
-            chunk["store"] = store
-            chunk.columns = [x.replace(" ", "_").lower() for x in chunk.columns]
-            if store == 1:
-                insert_columns = chunk.columns.tolist()
-            if store == 2:
-                chunk = chunk.rename(
-                    columns={
-                        "ios_app_id": "app_id",
-                        "title": "app_name",
-                        "developer_ios_id": "developer_id",
-                        "current_version_release_date": "last_updated",
-                        "primary_genre": "category",
-                        "total_number_of_ratings": "rating_count",
-                        "price_usd": "price",
-                    }
-                )
-                insert_columns = [
-                    "app_id",
-                    "app_name",
-                    "developer_id",
-                    "rating_count",
-                    "last_updated",
-                    "category",
-                    "platform",
-                    "store",
-                ]
-            upsert_df(
-                table_name="app_store_csv_dump",
-                insert_columns=insert_columns,
-                df=chunk,
-                key_columns=["platform", "store", "app_id"],
-            )
-            i += 1
-
-
-def crawl_app_ads_txt():
-    # Query Pub Domain Table
-    sel_query = """SELECT id, url, crawled_at
-        FROM pub_domains
-        ORDER BY crawled_at NULLS FIRST
-        limit 10000
-        """
-    df = pd.read_sql(sel_query, MADRONE.engine)
-    crawl_app_ads(df)
-
-
 def update_app_details(stores):
     i = 0
     while i < 100:
-        where_str = "store IN (" + (", ").join([str(x) for x in stores]) + ")"
-        if stores[0] == 1:
-            where_str += " AND installs >= 100000"
-        sel_query = f"""SELECT store, id as store_app, store_id, updated_at  
-        FROM store_apps
-        WHERE {where_str}
-        ORDER BY updated_at NULLS FIRST
-        limit 1000
-        """
-        df = pd.read_sql(sel_query, MADRONE.engine)
+        df = query_store_apps(stores, database_connection=PGCON)
         crawl_stores_for_app_details(df)
         i += 1
 
@@ -594,7 +401,7 @@ def main(args):
     platforms = args.platforms if "args" in locals() else ["android"]
     platforms = ["ios", "android"]
     # crawl_aa = args.crawl_aa if "args" in locals() else False
-    store_page_crawl = args.store_page_crawl if "args" in locals() else False
+    # store_page_crawl = args.store_page_crawl if "args" in locals() else False
     stores = []
     stores.append(1) if "android" in platforms else None
     stores.append(2) if "ios" in platforms else None
@@ -606,7 +413,7 @@ def main(args):
     update_app_details(stores)
 
     # Crawl developwer websites to check for app ads
-    crawl_app_ads_txt()
+    crawl_app_ads()
 
 
 STORE_APP_COLUMNS = [
@@ -664,13 +471,7 @@ if __name__ == "__main__":
         action="store_true",
     )
     args, leftovers = parser.parse_known_args()
-    if args.is_local_db:
-        local_port = 5432
-    else:
-        server = OpenSSHTunnel()
-        server.start()
-        local_port = str(server.local_bind_port)
-    MADRONE = dbconn.PostgresCon("madrone", "127.0.0.1", local_port)
-    MADRONE.set_engine()
+    PGCON = get_db_connection(args.is_local_db)
+    PGCON.set_engine()
 
     main(args)
