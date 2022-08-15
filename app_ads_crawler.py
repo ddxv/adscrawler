@@ -1,7 +1,7 @@
-from google_play_scraper import app
 from itunes_app_scraper.util import AppStoreCollections, AppStoreCategories
 from itunes_app_scraper.scraper import AppStoreScraper
 from sshtunnel import SSHTunnelForwarder
+from google_play_scraper import app
 import numpy as np
 import argparse
 import io
@@ -237,7 +237,7 @@ def scrape_app_gp(store_id):
 def scrape_app_ios(store_id):
     scraper = AppStoreScraper()
     app = scraper.get_app_details(store_id)
-    app_df = pd.DataFrame.from_dict(app, orient="index").T
+    app_df = pd.DataFrame([app])
     app_df = app_df.rename(
         columns={
             "trackId": "store_id",
@@ -273,8 +273,7 @@ def extract_domains(x):
     return url
 
 
-def crawl_stores(df):
-
+def crawl_stores_for_app_details(df):
     for index, row in df.iterrows():
         row_info = f"{index=} {row.store=} {row.store_id=}"
         logger.info(f"{row_info} start")
@@ -506,14 +505,13 @@ def scrape_ios_frontpage():
     store_ids = list(set(store_ids))
     apps_df = pd.DataFrame({"store": 2, "store_id": store_ids})
     insert_columns = ["store", "store_id"]
-    upsert_df("store_apps", insert_columns, apps_df, key_columns=insert_columns)
-    sel_query = """SELECT store, id as store_app, store_id, updated_at  
-    FROM store_apps
-    WHERE store = 2
-    AND crawl_result IS NULL
-    """
-    df = pd.read_sql(sel_query, MADRONE.engine)
-    crawl_stores(df)
+    my_df = insert_get(
+        "store_apps",
+        insert_columns=insert_columns,
+        df=apps_df,
+        key_columns=insert_columns,
+    )
+    crawl_stores_for_app_details(my_df)
 
 
 def reinsert_from_csv():
@@ -563,35 +561,20 @@ def reinsert_from_csv():
             i += 1
 
 
-def main(args):
-
-    platforms = args.platforms if "args" in locals() else ["android"]
-    crawl_aa = args.crawl_aa if "args" in locals() else False
-    store_page_crawl = args.store_page_crawl if "args" in locals() else False
-    stores = []
-    stores.append(1) if "android" in platforms else None
-    stores.append(2) if "ios" in platforms else None
-
-    if store_page_crawl:
-        scrape_ios_frontpage()
-
-    while crawl_aa:
-
-        # Query Pub Domain Table
-        sel_query = """SELECT id, url, crawled_at
+def crawl_app_ads_txt():
+    # Query Pub Domain Table
+    sel_query = """SELECT id, url, crawled_at
         FROM pub_domains
         ORDER BY crawled_at NULLS FIRST
-        limit 1000
+        limit 10000
         """
-        df = pd.read_sql(sel_query, MADRONE.engine)
+    df = pd.read_sql(sel_query, MADRONE.engine)
+    crawl_app_ads(df)
 
-        crawl_app_ads(df)
 
-    while 1 in stores or 2 in stores:
-
-        # Query Apps table
-        # WHERE ad_supported = true
-        # --AND installs > 100000
+def update_app_details(stores):
+    i = 0
+    while i < 100:
         where_str = "store IN (" + (", ").join([str(x) for x in stores]) + ")"
         if stores[0] == 1:
             where_str += " AND installs >= 100000"
@@ -602,8 +585,28 @@ def main(args):
         limit 1000
         """
         df = pd.read_sql(sel_query, MADRONE.engine)
+        crawl_stores_for_app_details(df)
+        i += 1
 
-        crawl_stores(df)
+
+def main(args):
+
+    platforms = args.platforms if "args" in locals() else ["android"]
+    platforms = ["ios", "android"]
+    # crawl_aa = args.crawl_aa if "args" in locals() else False
+    store_page_crawl = args.store_page_crawl if "args" in locals() else False
+    stores = []
+    stores.append(1) if "android" in platforms else None
+    stores.append(2) if "ios" in platforms else None
+
+    # Scrape Store for new apps
+    scrape_ios_frontpage()
+
+    # Update the app details
+    update_app_details(stores)
+
+    # Crawl developwer websites to check for app ads
+    crawl_app_ads_txt()
 
 
 STORE_APP_COLUMNS = [
