@@ -1,5 +1,5 @@
 import pandas as pd
-from .connection import PostgresCon
+from dbcon.connection import PostgresCon
 from config import get_logger
 import numpy as np
 
@@ -13,6 +13,7 @@ def upsert_df(
     key_columns,
     database_connection: PostgresCon,
     log=None,
+    return_rows: bool = False,
 ):
     db_cols_str = ", ".join([f'"{col}"' for col in insert_columns])
     key_cols_str = ", ".join([f'"{col}"' for col in key_columns])
@@ -21,19 +22,29 @@ def upsert_df(
     if isinstance(df, pd.Series):
         df = pd.DataFrame(df).T
     for col in insert_columns:
-        if pd.api.types.is_string_dtype(df[col]):
+        if (
+            pd.api.types.is_string_dtype(df[col])
+            and pd.api.types.infer_dtype(df[col]) == "string"
+        ):
             df[col] = df[col].apply(lambda x: x.replace("'", "''"))
+    if return_rows:
+        return_str = " RETURNING * "
+    else:
+        return_str = ""
     insert_query = f""" 
         INSERT INTO {table_name} ({db_cols_str})
         VALUES ({values_str})
         ON CONFLICT ({key_cols_str})
         DO UPDATE SET {set_update}
+        {return_str}
+        ;
         """
     values = df[insert_columns].to_dict("records")
     if log:
         logger.info(f"MY INSERT QUERY: {insert_query.format(values)}")
     with database_connection.engine.begin() as connection:
-        connection.execute(insert_query, values)
+        result = connection.execute(insert_query, values)
+    return result
 
 
 def insert_get(
@@ -52,16 +63,20 @@ def insert_get(
         key_columns = [key_columns]
     if isinstance(df, pd.Series):
         df = pd.DataFrame(df).T
-    upsert_df(
+    result = upsert_df(
         table_name,
         insert_columns,
         df,
         key_columns,
         database_connection=database_connection,
+        return_rows=True,
     )
-    get_df = query_all(
-        table_name, key_columns, df, database_connection=database_connection
-    )
+    logger.info(f"Upserted rows: {result.rowcount}")
+    if result.returns_rows:
+        get_df = pd.DataFrame(result.fetchall())
+    else:
+        get_df = pd.DataFrame()
+    logger.info(f"Returning df: {get_df.shape}")
     return get_df
 
 

@@ -240,10 +240,13 @@ def extract_domains(x):
 
 def crawl_stores_for_app_details(df):
     for index, row in df.iterrows():
-        row_info = f"{index=} {row.store=} {row.store_id=}"
+        store_id = row.store_id
+        store = row.store
+        row_info = f"{index=} {store=} {store_id=}"
         logger.info(f"{row_info} start")
         try:
-            app_df = scrape_app(store=row.store, store_id=row.store_id)
+            app_df = scrape_app(store=store, store_id=store_id)
+            assert app_df["developer_id"].values[0], f"{row_info} Missing Developer ID"
             app_df["crawl_result"] = 1
         except Exception as error:
             error_message = f"{row_info} {error=}"
