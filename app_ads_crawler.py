@@ -435,8 +435,6 @@ def main(args):
 
     platforms = args.platforms if "args" in locals() else ["android"]
     platforms = ["ios", "android"]
-    # crawl_aa = args.crawl_aa if "args" in locals() else False
-    # store_page_crawl = args.store_page_crawl if "args" in locals() else False
     stores = []
     stores.append(1) if "android" in platforms else None
     stores.append(2) if "ios" in platforms else None
