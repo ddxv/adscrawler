@@ -483,20 +483,7 @@ if __name__ == "__main__":
         "--platforms",
         action="append",
         help="String as portion of android or ios",
-        default=["android"],
-    )
-    parser.add_argument(
-        "-a",
-        "--crawl-aa",
-        action="store_true",
-        help="if included will update ALL bundles provided",
-        default=False,
-    )
-    parser.add_argument(
-        "-s",
-        "--store-page-crawl",
-        help="Crawl the Store for new IDs",
-        default=0,
+        default=["android", "ios"],
     )
     parser.add_argument(
         "-l",
