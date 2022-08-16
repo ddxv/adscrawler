@@ -40,7 +40,7 @@ def request_app_ads(ads_url):
     if "<head>" in response.text:
         err = f"{ads_url} HTML in adstxt"
         raise NoAdsTxt(err)
-    if not any(term in response.text for term in ["DIRECT", "RESELLER"]):
+    if not any(term in response.text.upper() for term in ["DIRECT", "RESELLER"]):
         err = "DIRECT, RESELLER not in ads.txt"
         raise NoAdsTxt(err)
     return response
