@@ -1,17 +1,28 @@
+from dbcon.queries import insert_get, upsert_df, query_store_apps, query_pub_domains
+from dbcon.connection import get_db_connection
 from itunes_app_scraper.util import AppStoreCollections, AppStoreCategories
 from itunes_app_scraper.scraper import AppStoreScraper
 from google_play_scraper import app
-import argparse
-import io
-import requests
-import pandas as pd
-import csv
-from dbcon.connection import get_db_connection
-from dbcon.queries import insert_get, upsert_df, query_store_apps, query_pub_domains
-import tldextract
 from config import get_logger
+import pandas as pd
+import tldextract
+import argparse
+import requests
+import csv
+import io
+import os
 
 logger = get_logger(__name__)
+
+
+def script_has_process():
+    already_running = False
+    processes = [x for x in os.popen("ps aux")]
+    my_processes = [x for x in processes if "app_ads_crawler" in x]
+    if len(my_processes) > 0:
+        logger.warning(f"Already running {my_processes}")
+        already_running = True
+    return already_running
 
 
 def request_app_ads(ads_url):
@@ -432,7 +443,7 @@ def update_app_details(stores):
 
 
 def main(args):
-
+    logger.info(f"Main starting with args: {args}")
     platforms = args.platforms if "args" in locals() else ["android"]
     platforms = ["ios", "android"]
     stores = []
@@ -472,10 +483,7 @@ STORE_APP_COLUMNS = [
 ]
 
 
-if __name__ == "__main__":
-    logger.info("Starting app-ads.txt crawler")
-
-    parser = argparse.ArgumentParser()
+def add_cli_arguments(parser):
     parser.add_argument(
         "-p",
         "--platforms",
@@ -490,7 +498,27 @@ if __name__ == "__main__":
         default=False,
         action="store_true",
     )
+    parser.add_argument(
+        "-s",
+        "--single-run-check",
+        help="If included prevent running if script already running",
+        default=False,
+        action="store_true",
+    )
+    return parser
+
+
+if __name__ == "__main__":
+    logger.info("Starting app-ads.txt crawler")
+
+    parser = argparse.ArgumentParser()
+    parser = add_cli_arguments(parser)
     args, leftovers = parser.parse_known_args()
+
+    if args.single_run_check and script_has_process():
+        logger.warning("Script already running, exiting")
+        quit()
+
     PGCON = get_db_connection(args.is_local_db)
     PGCON.set_engine()
 
