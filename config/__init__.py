@@ -51,20 +51,3 @@ DATE_FORMAT = "%Y-%m-%d"
 
 
 logger.info("Logger and Config loaded")
-
-
-KRAKULA_DIMENSIONS = [
-    "company_uid",
-    "symbol",
-    "store_id",
-    "kraken_campaign_name",
-    "crid",
-    "crname",
-    "pub_id",
-    "date",
-    "geo",
-    "campaign_id",
-    "campaign_name",
-    "currency",
-]
-KRAKULA_METRICS = ["spend", "impressions", "clicks", "installs"]
