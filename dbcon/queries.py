@@ -115,7 +115,6 @@ def query_all(
         keys = df[key_col].unique().tolist()
         if all([isinstance(x, (np.integer, int)) for x in keys]):
             values_str = "(" + (", ").join([str(x) for x in keys]) + ")"
-            values_str = values_str.replace("%", "%%")
         else:
             values_str = "('" + ("', '").join(keys) + "')"
             values_str = values_str.replace("%", "%%")
