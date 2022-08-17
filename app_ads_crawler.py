@@ -508,9 +508,7 @@ def add_cli_arguments(parser):
     return parser
 
 
-if __name__ == "__main__":
-    logger.info("Starting app-ads.txt crawler")
-
+def manage_cli_args():
     parser = argparse.ArgumentParser()
     parser = add_cli_arguments(parser)
     args, leftovers = parser.parse_known_args()
@@ -518,7 +516,12 @@ if __name__ == "__main__":
     if args.single_run_check and script_has_process():
         logger.warning("Script already running, exiting")
         quit()
+    return args
 
+
+if __name__ == "__main__":
+    logger.info("Starting app-ads.txt crawler")
+    args = manage_cli_args()
     PGCON = get_db_connection(args.is_local_db)
     PGCON.set_engine()
 
