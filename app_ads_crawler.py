@@ -15,7 +15,7 @@ import os
 logger = get_logger(__name__)
 
 
-def script_has_process():
+def script_has_process() -> bool:
     already_running = False
     processes = [x for x in os.popen("ps aux")]
     my_processes = [x for x in processes if "app_ads_crawler" in x]
@@ -25,7 +25,7 @@ def script_has_process():
     return already_running
 
 
-def request_app_ads(ads_url):
+def request_app_ads(ads_url: str) -> requests.Response:
     if not "http" == ads_url[0:4]:
         ads_url = "http://" + ads_url
     response = requests.get(ads_url, timeout=2)
@@ -54,7 +54,7 @@ class AdsTxtEmpty(Exception):
     pass
 
 
-def get_app_ads_text(app_url):
+def get_app_ads_text(app_url: str) -> str:
     ext_url = tldextract.extract(app_url)
     sub_domains_url = ""
     if ext_url.subdomain:
@@ -74,7 +74,7 @@ def get_app_ads_text(app_url):
     return response.text
 
 
-def parse_ads_txt(txt):
+def parse_ads_txt(txt: str) -> pd.DataFrame:
     txt = txt.replace(" ", "")
     csv_header = [
         "domain",
@@ -130,7 +130,7 @@ def parse_ads_txt(txt):
     return df
 
 
-def clean_raw_txt_df(txt_df):
+def clean_raw_txt_df(txt_df: pd.DataFrame) -> pd.DataFrame:
     # Domain
     txt_df["domain"] = txt_df["domain"].str.lower()
     txt_df["domain"] = txt_df["domain"].apply(
@@ -167,7 +167,7 @@ def clean_raw_txt_df(txt_df):
     return txt_df
 
 
-def scrape_app(store, store_id):
+def scrape_app(store: int, store_id: str) -> pd.DataFrame:
     if store == 1:
         app_df = scrape_app_gp(store_id)
     elif store == 2:
@@ -210,7 +210,7 @@ def scrape_app_gp(store_id):
     return app_df
 
 
-def scrape_app_ios(store_id):
+def scrape_app_ios(store_id: str) -> pd.DataFrame:
     scraper = AppStoreScraper()
     app = scraper.get_app_details(store_id)
     app_df = pd.DataFrame([app])
@@ -236,7 +236,7 @@ def scrape_app_ios(store_id):
     return app_df
 
 
-def extract_domains(x):
+def extract_domains(x: str) -> str:
     ext = tldextract.extract(x)
     use_top_domain = any(
         ["m" == ext.subdomain, "www" in ext.subdomain.split("."), ext.subdomain == ""]
@@ -249,7 +249,7 @@ def extract_domains(x):
     return url
 
 
-def crawl_stores_for_app_details(df):
+def crawl_stores_for_app_details(df: pd.DataFrame) -> None:
     for index, row in df.iterrows():
         store_id = row.store_id
         store = row.store
@@ -310,7 +310,7 @@ def crawl_stores_for_app_details(df):
         )
 
 
-def crawl_app_ads():
+def crawl_app_ads() -> None:
     df = query_pub_domains(database_connection=PGCON)
     i = 0
     for index, row in df.iterrows():
@@ -403,7 +403,7 @@ def crawl_app_ads():
         logger.info(f"{row_info} DONE")
 
 
-def scrape_ios_frontpage():
+def scrape_ios_frontpage() -> None:
     scraper = AppStoreScraper()
     categories = {k: v for k, v in AppStoreCategories.__dict__.items() if "GAME" in k}
     collections = {
@@ -434,7 +434,7 @@ def scrape_ios_frontpage():
     crawl_stores_for_app_details(my_df)
 
 
-def update_app_details(stores):
+def update_app_details(stores: list[int]) -> None:
     i = 0
     while i < 100:
         df = query_store_apps(stores, database_connection=PGCON)
@@ -442,7 +442,7 @@ def update_app_details(stores):
         i += 1
 
 
-def main(args):
+def main(args) -> None:
     logger.info(f"Main starting with args: {args}")
     platforms = args.platforms if "args" in locals() else ["android"]
     platforms = ["ios", "android"]
@@ -508,7 +508,7 @@ def add_cli_arguments(parser):
     return parser
 
 
-def manage_cli_args():
+def manage_cli_args() -> None:
     parser = argparse.ArgumentParser()
     parser = add_cli_arguments(parser)
     args, leftovers = parser.parse_known_args()
