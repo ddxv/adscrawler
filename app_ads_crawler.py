@@ -249,43 +249,49 @@ def extract_domains(x: str) -> str:
     return url
 
 
+def scrape_and_save_app(row, store, store_id):
+    row_info = row["row_info"]
+    logger.info(f"{row_info} start")
+    try:
+        app_df = scrape_app(store=store, store_id=store_id)
+        assert app_df["developer_id"].values[0], f"{row_info} Missing Developer ID"
+        app_df["crawl_result"] = 1
+    except Exception as error:
+        error_message = f"{row_info} {error=}"
+        logger.error(error_message)
+        if "404" in error_message or "No app found" in error_message:
+            crawl_result = 3
+        else:
+            crawl_result = 4
+        row["crawl_result"] = crawl_result
+        app_df = pd.DataFrame([row])
+    else:
+        insert_columns = ["store", "developer_id"]
+        dev_df = insert_get(
+            table_name="developers",
+            df=app_df,
+            insert_columns=insert_columns,
+            key_columns=["store", "developer_id"],
+            database_connection=PGCON,
+        )
+        app_df["developer"] = dev_df["id"].astype(object)[0]
+    insert_columns = [x for x in STORE_APP_COLUMNS if x in app_df.columns]
+    store_apps_df = insert_get(
+        "store_apps",
+        app_df,
+        insert_columns,
+        key_columns=["store", "store_id"],
+        database_connection=PGCON,
+    )
+    return app_df, store_apps_df
+
+
 def crawl_stores_for_app_details(df: pd.DataFrame) -> None:
     for index, row in df.iterrows():
         store_id = row.store_id
         store = row.store
         row_info = f"{index=} {store=} {store_id=}"
-        logger.info(f"{row_info} start")
-        try:
-            app_df = scrape_app(store=store, store_id=store_id)
-            assert app_df["developer_id"].values[0], f"{row_info} Missing Developer ID"
-            app_df["crawl_result"] = 1
-        except Exception as error:
-            error_message = f"{row_info} {error=}"
-            logger.error(error_message)
-            if "404" in error_message or "No app found" in error_message:
-                crawl_result = 3
-            else:
-                crawl_result = 4
-            row["crawl_result"] = crawl_result
-            app_df = pd.DataFrame([row])
-        else:
-            insert_columns = ["store", "developer_id"]
-            dev_df = insert_get(
-                table_name="developers",
-                df=app_df,
-                insert_columns=insert_columns,
-                key_columns=["store", "developer_id"],
-                database_connection=PGCON,
-            )
-            app_df["developer"] = dev_df["id"].astype(object)[0]
-        insert_columns = [x for x in STORE_APP_COLUMNS if x in app_df.columns]
-        store_apps_df = insert_get(
-            "store_apps",
-            app_df,
-            insert_columns,
-            key_columns=["store", "store_id"],
-            database_connection=PGCON,
-        )
+        app_df, store_apps_df = scrape_and_save_app(row, store, store_id)
         if "url" not in app_df.columns or not app_df["url"].values:
             logger.info(f"{row_info} no developer url")
             continue
