@@ -53,8 +53,8 @@ class PostgresCon:
         self.db_ip = db_ip
         self.db_port = db_port
         try:
-            self.db_pass = CONFIG["db"][self.db_name]["db_password"]
-            self.db_user = CONFIG["db"][self.db_name]["db_user"]
+            self.db_pass = CONFIG[self.db_name]["password"]
+            self.db_user = CONFIG[self.db_name]["user"]
         except Exception as error:
             logger.error(f"Loading db_auth for {self.db_name}, error: {error}")
 
