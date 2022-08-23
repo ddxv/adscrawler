@@ -19,7 +19,7 @@ def script_has_process() -> bool:
     already_running = False
     processes = [x for x in os.popen("ps aux")]
     my_processes = [x for x in processes if "app_ads_crawler" in x]
-    if len(my_processes) > 0:
+    if len(my_processes) > 1:
         logger.warning(f"Already running {my_processes}")
         already_running = True
     return already_running
@@ -489,7 +489,8 @@ STORE_APP_COLUMNS = [
 ]
 
 
-def add_cli_arguments(parser):
+def manage_cli_args() -> None:
+    parser = argparse.ArgumentParser()
     parser.add_argument(
         "-p",
         "--platforms",
@@ -511,12 +512,6 @@ def add_cli_arguments(parser):
         default=False,
         action="store_true",
     )
-    return parser
-
-
-def manage_cli_args() -> None:
-    parser = argparse.ArgumentParser()
-    parser = add_cli_arguments(parser)
     args, leftovers = parser.parse_known_args()
 
     if args.single_run_check and script_has_process():
