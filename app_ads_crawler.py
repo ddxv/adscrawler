@@ -424,7 +424,7 @@ def scrape_ios_frontpage() -> None:
             logger.info(f"Collection: {coll_value}, category: {cat_value}")
             coll_key, coll_value, cat_key, cat_value
             new_ids = scraper.get_app_ids_for_collection(
-                collection=coll_value, category=cat_value, num=200
+                collection=coll_value, category=cat_value, num=200, timeout=10
             )
             store_ids += new_ids
     store_ids = list(set(store_ids))
