@@ -289,10 +289,12 @@ def scrape_and_save_app(row, store, store_id):
 
 
 def crawl_stores_for_app_details(df: pd.DataFrame) -> None:
+    logger.info(f"Update App Details: df:{df.shape}")
     for index, row in df.iterrows():
         store_id = row.store_id
         store = row.store
         row_info = f"{index=} {store=} {store_id=}"
+        row["row_info"] = row_info
         app_df, store_apps_df = scrape_and_save_app(row, store, store_id)
         if "url" not in app_df.columns or not app_df["url"].values:
             logger.info(f"{row_info} no developer url")
@@ -445,6 +447,7 @@ def scrape_ios_frontpage() -> None:
 def update_app_details(stores: list[int]) -> None:
     i = 0
     while i < 100:
+        logger.info(f"Update App Details: Round {i} of 100")
         df = query_store_apps(stores, database_connection=PGCON)
         crawl_stores_for_app_details(df)
         i += 1
