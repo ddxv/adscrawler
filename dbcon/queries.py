@@ -18,6 +18,9 @@ def upsert_df(
     db_cols_str = ", ".join([f'"{col}"' for col in insert_columns])
     key_cols_str = ", ".join([f'"{col}"' for col in key_columns])
     values_str = ", ".join([f"%({col})s" for col in insert_columns])
+    # values = df["domain"].unique().tolist()
+    # values_str = "'" + "', '".join(values) + "'"
+    # values_str = ", ".join([f":{col}" for col in insert_columns])
     set_update = ", ".join([f"{col} = excluded.{col}" for col in insert_columns])
     if isinstance(df, pd.Series):
         df = pd.DataFrame(df).T
@@ -41,7 +44,7 @@ def upsert_df(
         """
     values = df[insert_columns].to_dict("records")
     if log:
-        logger.info(f"MY INSERT QUERY: {insert_query.format(values)}")
+        logger.info(f"MY INSERT QUERY: {insert_query}")
     with database_connection.engine.begin() as connection:
         result = connection.execute(insert_query, values)
     return result
@@ -70,6 +73,7 @@ def insert_get(
         key_columns,
         database_connection=database_connection,
         return_rows=True,
+        log=True,
     )
     logger.info(f"Upserted rows: {result.rowcount}")
     if result.returns_rows:
@@ -80,12 +84,12 @@ def insert_get(
     return get_df
 
 
-def query_pub_domains(database_connection):
+def query_pub_domains(database_connection, limit=10000):
     # Query Pub Domain Table
-    sel_query = """SELECT id, url, crawled_at
+    sel_query = f"""SELECT id, url, crawled_at
         FROM pub_domains
         ORDER BY crawled_at NULLS FIRST
-        limit 10000
+        limit {limit}
         """
     df = pd.read_sql(sel_query, database_connection.engine)
     return df

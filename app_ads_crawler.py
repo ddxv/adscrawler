@@ -357,10 +357,11 @@ def crawl_app_ads() -> None:
         if row.crawl_result != 1:
             continue
         insert_columns = ["domain"]
+        ad_domains = txt_df[["domain"]].drop_duplicates()
         domain_df = insert_get(
-            "ad_domains",
-            txt_df,
-            insert_columns,
+            table_name="ad_domains",
+            df=ad_domains,
+            insert_columns=insert_columns,
             key_columns="domain",
             database_connection=PGCON,
         )
