@@ -252,27 +252,26 @@ def extract_domains(x: str) -> str:
     return url
 
 
-def scrape_and_save_app(row, store, store_id):
-    row_info = row["row_info"]
-    logger.info(f"{row_info} start")
+def scrape_and_save_app(store, store_id):
+    scrape = {"store": store, "store_id": store_id}
+    logger.info(f"scrape:{scrape} start")
     try:
         app_df = scrape_app(store=store, store_id=store_id)
-        assert app_df["developer_id"].values[0], f"{row_info} Missing Developer ID"
+        assert app_df["developer_id"].values[0], f"{scrape} Missing Developer ID"
         app_df["crawl_result"] = 1
     except Exception as error:
-        error_message = f"{row_info} {error=}"
+        error_message = f"{scrape} {error=}"
         logger.error(error_message)
         if "404" in error_message or "No app found" in error_message:
             crawl_result = 3
         else:
             crawl_result = 4
-        row["crawl_result"] = crawl_result
-        app_df = pd.DataFrame([row])
+        scrape["crawl_result"] = crawl_result
+        app_df = pd.DataFrame([scrape])
     else:
         dev_df = app_df[["store", "developer_id", "developer_name"]].rename(
             columns={"developer_name": "name"}
         )
-        dev_df
         insert_columns = ["store", "developer_id", "name"]
         dev_df = insert_get(
             table_name="developers",
@@ -298,31 +297,34 @@ def crawl_stores_for_app_details(df: pd.DataFrame) -> None:
     for index, row in df.iterrows():
         store_id = row.store_id
         store = row.store
-        row_info = f"{index=} {store=} {store_id=}"
-        row["row_info"] = row_info
-        app_df, store_apps_df = scrape_and_save_app(row, store, store_id)
-        if "url" not in app_df.columns or not app_df["url"].values:
-            logger.info(f"{row_info} no developer url")
-            continue
-        app_df["url"] = app_df["url"].apply(lambda x: extract_domains(x))
-        app_df["store_app"] = store_apps_df["id"].astype(object)[0]
-        insert_columns = ["url"]
-        app_urls_df = insert_get(
-            "pub_domains",
-            app_df,
-            insert_columns,
-            key_columns=["url"],
-            database_connection=PGCON,
-        )
-        app_df["pub_domain"] = app_urls_df["id"].astype(object)[0]
-        insert_columns = ["store_app", "pub_domain"]
-        upsert_df(
-            "app_urls_map",
-            insert_columns,
-            app_df,
-            key_columns=["store_app"],
-            database_connection=PGCON,
-        )
+        update_all_app_info(store, store_id)
+
+
+def update_all_app_info(store: int, store_id: str):
+    info = f"{store=} {store_id=}"
+    app_df, store_apps_df = scrape_and_save_app(store, store_id)
+    if "url" not in app_df.columns or not app_df["url"].values:
+        logger.info(f"{info} no developer url")
+        return
+    app_df["url"] = app_df["url"].apply(lambda x: extract_domains(x))
+    app_df["store_app"] = store_apps_df["id"].astype(object)[0]
+    insert_columns = ["url"]
+    app_urls_df = insert_get(
+        "pub_domains",
+        app_df,
+        insert_columns,
+        key_columns=["url"],
+        database_connection=PGCON,
+    )
+    app_df["pub_domain"] = app_urls_df["id"].astype(object)[0]
+    insert_columns = ["store_app", "pub_domain"]
+    upsert_df(
+        "app_urls_map",
+        insert_columns,
+        app_df,
+        key_columns=["store_app"],
+        database_connection=PGCON,
+    )
 
 
 def crawl_app_ads() -> None:
