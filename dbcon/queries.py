@@ -17,8 +17,7 @@ def upsert_df(
 ):
     db_cols_str = ", ".join([f'"{col}"' for col in insert_columns])
     key_cols_str = ", ".join([f'"{col}"' for col in key_columns])
-    values_str = ", ".join([f"%({col})s" for col in insert_columns])
-    set_update = ", ".join([f"{col} = excluded.{col}" for col in insert_columns])
+    set_update = ", ".join([f"{col} = EXCLUDED.{col}" for col in insert_columns])
     if isinstance(df, pd.Series):
         df = pd.DataFrame(df).T
     for col in insert_columns:
@@ -31,19 +30,24 @@ def upsert_df(
         return_str = " RETURNING * "
     else:
         return_str = ""
+    values_str = ", ".join(
+        [
+            str(x).replace("[", "(").replace("]", ")")
+            for x in df[insert_columns].values.tolist()
+        ]
+    )
     insert_query = f""" 
         INSERT INTO {table_name} ({db_cols_str})
-        VALUES ({values_str})
+        VALUES {values_str}
         ON CONFLICT ({key_cols_str})
         DO UPDATE SET {set_update}
         {return_str}
         ;
         """
-    values = df[insert_columns].to_dict("records")
     if log:
         logger.info(f"MY INSERT QUERY: {insert_query}")
     with database_connection.engine.begin() as connection:
-        result = connection.execute(insert_query, values)
+        result = connection.execute(insert_query)
     return result
 
 

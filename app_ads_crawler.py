@@ -202,6 +202,7 @@ def scrape_app_gp(store_id):
             "url": "store_url",
             "developerWebsite": "url",
             "developerId": "developer_id",
+            "developer": "developer_name",
             "reviews": "review_count",
         }
     )
@@ -268,10 +269,14 @@ def scrape_and_save_app(row, store, store_id):
         row["crawl_result"] = crawl_result
         app_df = pd.DataFrame([row])
     else:
-        insert_columns = ["store", "developer_id"]
+        dev_df = app_df[["store", "developer_id", "developer_name"]].rename(
+            columns={"developer_name": "name"}
+        )
+        dev_df
+        insert_columns = ["store", "developer_id", "name"]
         dev_df = insert_get(
             table_name="developers",
-            df=app_df,
+            df=dev_df,
             insert_columns=insert_columns,
             key_columns=["store", "developer_id"],
             database_connection=PGCON,
