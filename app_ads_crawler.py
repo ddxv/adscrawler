@@ -177,6 +177,9 @@ def scrape_app(store: int, store_id: str) -> pd.DataFrame:
     else:
         logger.error(f"Store not supported {store=}")
     app_df["store"] = store
+    app_df["store_last_updated"] = app_df["store_last_updated"].dt.strftime(
+        "%Y-%m-%d %H:%M"
+    )
     return app_df
 
 
@@ -281,6 +284,7 @@ def scrape_and_save_app(store, store_id):
             database_connection=PGCON,
         )
         app_df["developer"] = dev_df["id"].astype(object)[0]
+    app_df.dtypes
     insert_columns = [x for x in STORE_APP_COLUMNS if x in app_df.columns]
     store_apps_df = insert_get(
         "store_apps",
@@ -329,6 +333,7 @@ def update_all_app_info(store: int, store_id: str):
 
 def crawl_app_ads() -> None:
     df = query_pub_domains(database_connection=PGCON)
+    logger.info("Crawl app-ads from pub domains")
     i = 0
     for index, row in df.iterrows():
         i += 1
