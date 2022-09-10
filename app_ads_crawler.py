@@ -328,8 +328,6 @@ def save_developer_info(app_df: pd.DataFrame) -> pd.DataFrame:
 def scrape_and_save_app(store, store_id):
     info = f"{store=}, {store_id=}"
     logger.info(f"{info} start scrape")
-    store_id = "com.nexonm.dominations.adk"
-    store = 2
     app_df = scrape_any_app(store=store, store_id=store_id)
     crawl_result = app_df["crawl_result"].values[0]
     if crawl_result != 1:
