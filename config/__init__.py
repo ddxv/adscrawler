@@ -1,6 +1,7 @@
 import pathlib
 import yaml
 import logging
+from logging.handlers import RotatingFileHandler
 
 HOME = pathlib.Path.home()
 TOP_CONFIGDIR = pathlib.Path(HOME, pathlib.Path(".config"))
@@ -28,6 +29,9 @@ def get_logger(mod_name):
     ch.setLevel(logging.INFO)
     ch.setFormatter(logging.Formatter(format))
     logger.addHandler(ch)
+    # add a rotating handler
+    handler = RotatingFileHandler(filename=filename, maxBytes=100000, backupCount=50)
+    logger.addHandler(handler)
     return logger
 
 
