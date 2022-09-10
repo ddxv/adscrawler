@@ -520,7 +520,6 @@ def scrape_ios_frontpage() -> None:
 def update_app_details(stores: list[int]) -> None:
     logger.info("Update App Details: start with oldest first")
     df = query_store_apps(stores, database_connection=PGCON, limit=20000)
-    df = df.sort_values("updated_at", ascending=False)
     crawl_stores_for_app_details(df)
 
 
