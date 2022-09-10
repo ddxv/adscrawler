@@ -314,14 +314,17 @@ def save_developer_info(app_df: pd.DataFrame) -> pd.DataFrame:
         columns={"developer_name": "name"}
     )
     insert_columns = ["store", "developer_id", "name"]
-    dev_df = insert_get(
-        table_name="developers",
-        df=dev_df,
-        insert_columns=insert_columns,
-        key_columns=["store", "developer_id"],
-        database_connection=PGCON,
-    )
-    app_df["developer"] = dev_df["id"].astype(object)[0]
+    try:
+        dev_df = insert_get(
+            table_name="developers",
+            df=dev_df,
+            insert_columns=insert_columns,
+            key_columns=["store", "developer_id"],
+            database_connection=PGCON,
+        )
+        app_df["developer"] = dev_df["id"].astype(object)[0]
+    except Exception as error:
+        logger.error(f"Insert failed with error {error}")
     return app_df
 
 
@@ -335,20 +338,25 @@ def scrape_and_save_app(store, store_id):
         return app_df
     app_df = save_developer_info(app_df)
     insert_columns = [x for x in STORE_APP_COLUMNS if x in app_df.columns]
-    store_apps_df = insert_get(
-        "store_apps",
-        app_df,
-        insert_columns,
-        key_columns=["store", "store_id"],
-        database_connection=PGCON,
-    )
-    app_df["store_app_id"] = store_apps_df["id"].astype(object)[0]
+    try:
+        store_apps_df = insert_get(
+            "store_apps",
+            app_df,
+            insert_columns,
+            key_columns=["store", "store_id"],
+            database_connection=PGCON,
+        )
+        app_df["store_app_id"] = store_apps_df["id"].astype(object)[0]
+    except Exception as error:
+        logger.error(f"Error on insert app_df: {error=}")
     return app_df
 
 
 def crawl_stores_for_app_details(df: pd.DataFrame) -> None:
     logger.info(f"Update App Details: df:{df.shape}")
+    rows = df.shape[0]
     for index, row in df.iterrows():
+        logger.info(f"Update App Details row {index} of {rows}")
         store_id = row.store_id
         store = row.store
         update_all_app_info(store, store_id)
@@ -478,6 +486,7 @@ def crawl_app_ads() -> None:
 
 
 def scrape_ios_frontpage() -> None:
+    logger.info("Scrape iOS frontpage for new apps")
     scraper = AppStoreScraper()
     categories = {k: v for k, v in AppStoreCategories.__dict__.items() if "GAME" in k}
     collections = {
@@ -509,12 +518,10 @@ def scrape_ios_frontpage() -> None:
 
 
 def update_app_details(stores: list[int]) -> None:
-    i = 0
-    while i < 100:
-        logger.info(f"Update App Details: Round {i} of 100")
-        df = query_store_apps(stores, database_connection=PGCON)
-        crawl_stores_for_app_details(df)
-        i += 1
+    logger.info("Update App Details: start with oldest first")
+    df = query_store_apps(stores, database_connection=PGCON, limit=20000)
+    df = df.sort_values("updated_at", ascending=False)
+    crawl_stores_for_app_details(df)
 
 
 def main(args) -> None:
@@ -525,11 +532,11 @@ def main(args) -> None:
     stores.append(1) if "android" in platforms else None
     stores.append(2) if "ios" in platforms else None
 
-    # Scrape Store for new apps
-    scrape_ios_frontpage()
-
     # Update the app details
     update_app_details(stores)
+
+    # Scrape Store for new apps
+    scrape_ios_frontpage()
 
     # Crawl developwer websites to check for app ads
     crawl_app_ads()

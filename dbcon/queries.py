@@ -32,7 +32,7 @@ def upsert_df(
         return_str = ""
     values_str = ", ".join(
         [
-            str(x).replace("[", "(").replace("]", ")")
+            str(x).replace("[", "(").replace("]", ")").replace('"', "'")
             for x in df[insert_columns].values.tolist()
         ]
     )
@@ -68,10 +68,10 @@ def insert_get(
     if isinstance(df, pd.Series):
         df = pd.DataFrame(df).T
     result = upsert_df(
-        table_name,
-        insert_columns,
-        df,
-        key_columns,
+        table_name=table_name,
+        insert_columns=insert_columns,
+        df=df,
+        key_columns=key_columns,
         database_connection=database_connection,
         return_rows=True,
         log=log,
@@ -96,15 +96,16 @@ def query_pub_domains(database_connection, limit=10000):
     return df
 
 
-def query_store_apps(stores, database_connection):
+def query_store_apps(
+    stores: list[int], database_connection, limit: int = 1000
+) -> pd.DataFrame:
     where_str = "store IN (" + (", ").join([str(x) for x in stores]) + ")"
-    if stores[0] == 1:
-        where_str += " AND installs >= 100000"
+    where_str += " AND (installs >= 10000 OR review_count >= 1000)"
     sel_query = f"""SELECT store, id as store_app, store_id, updated_at  
         FROM store_apps
         WHERE {where_str}
         ORDER BY updated_at NULLS FIRST
-        limit 1000
+        limit {limit}
         """
     df = pd.read_sql(sel_query, database_connection.engine)
     return df
