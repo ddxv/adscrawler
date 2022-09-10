@@ -30,7 +30,7 @@ def get_logger(mod_name):
     ch.setFormatter(logging.Formatter(format))
     logger.addHandler(ch)
     # add a rotating handler
-    handler = RotatingFileHandler(filename=filename, maxBytes=100000, backupCount=50)
+    handler = RotatingFileHandler(filename=filename, maxBytes=10000000, backupCount=50)
     logger.addHandler(handler)
     return logger
 
