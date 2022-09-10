@@ -1,8 +1,12 @@
 from dbcon.queries import insert_get, upsert_df, query_store_apps, query_pub_domains
 from dbcon.connection import get_db_connection
-from itunes_app_scraper.util import AppStoreCollections, AppStoreCategories
+from itunes_app_scraper.util import (
+    AppStoreCollections,
+    AppStoreCategories,
+    AppStoreException,
+)
 from itunes_app_scraper.scraper import AppStoreScraper
-from google_play_scraper import app
+import google_play_scraper
 from config import get_logger
 import pandas as pd
 import tldextract
@@ -169,29 +173,63 @@ def clean_raw_txt_df(txt_df: pd.DataFrame) -> pd.DataFrame:
     return txt_df
 
 
-def scrape_app(store: int, store_id: str) -> pd.DataFrame:
+def scrape_from_store(store: int, store_id: str) -> dict:
     if store == 1:
-        app_df = scrape_app_gp(store_id)
+        result_dict = scrape_app_gp(store_id)
     elif store == 2:
-        app_df = scrape_app_ios(store_id)
+        result_dict = scrape_app_ios(store_id)
     else:
         logger.error(f"Store not supported {store=}")
-    app_df["store"] = store
-    app_df["store_last_updated"] = app_df["store_last_updated"].dt.strftime(
-        "%Y-%m-%d %H:%M"
-    )
-    return app_df
+    return result_dict
 
 
-def scrape_app_gp(store_id):
-    result = app(
+def scrape_any_app(store: int, store_id: str) -> pd.DataFrame:
+    scrape_info = f"{store=}, {store_id=}"
+    try:
+        result_dict = scrape_from_store(store=store, store_id=store_id)
+        crawl_result = 1
+    except google_play_scraper.exceptions.NotFoundError:
+        crawl_result = 3
+        logger.warning(f"{scrape_info} failed to find app")
+    except AppStoreException as error:
+        if "No app found" in str(error):
+            crawl_result = 3
+            logger.warning(f"{scrape_info} failed to find app")
+        else:
+            crawl_result = 4
+            logger.error(f"{scrape_info} unexpected error: {error=}")
+    except Exception as error:
+        logger.error(f"{scrape_info} unexpected error: {error=}")
+        crawl_result = 4
+    if crawl_result != 1:
+        result_dict = {}
+    result_dict["crawl_result"] = crawl_result
+    result_dict["store"] = store
+    df = pd.DataFrame([result_dict])
+    if crawl_result == 1:
+        df = clean_scraped_df(df=df, store=store)
+    if "store_id" not in result_dict.keys():
+        result_dict["store_id"] = store_id
+    return df
+
+
+def clean_scraped_df(df: pd.DataFrame, store: int) -> pd.DataFrame:
+    if store == 1:
+        df = clean_google_play_app_df(df)
+    if store == 2:
+        df = clean_ios_app_df(df)
+    return df
+
+
+def scrape_app_gp(store_id: str) -> dict:
+    result = google_play_scraper.app(
         store_id, lang="en", country="us"  # defaults to 'en'  # defaults to 'us'
     )
-    app_df = pd.DataFrame([result])
-    app_df["installs"] = pd.to_numeric(
-        app_df["installs"].str.replace(r"[,+]", "", regex=True)
-    )
-    app_df = app_df.rename(
+    return result
+
+
+def clean_google_play_app_df(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.rename(
         columns={
             "title": "name",
             "installs": "min_installs",
@@ -207,20 +245,29 @@ def scrape_app_gp(store_id):
             "developerId": "developer_id",
             "developer": "developer_name",
             "reviews": "review_count",
+            "genreId": "category",
         }
     )
-    app_df["category"] = app_df["genreId"].str.lower()
-    app_df["store_last_updated"] = pd.to_datetime(
-        app_df["store_last_updated"], unit="s"
+    df = df.assign(
+        min_installs=df["min_installs"]
+        .str.replace(r"[,+]", "", regex=True)
+        .astype(int),
+        category=df["category"].str.lower(),
+        store_last_updated=pd.to_datetime(
+            df["store_last_updated"], unit="s"
+        ).dt.strftime("%Y-%m-%d %H:%M"),
     )
-    return app_df
+    return df
 
 
-def scrape_app_ios(store_id: str) -> pd.DataFrame:
+def scrape_app_ios(store_id: str) -> dict:
     scraper = AppStoreScraper()
-    app = scraper.get_app_details(store_id)
-    app_df = pd.DataFrame([app])
-    app_df = app_df.rename(
+    result = scraper.get_app_details(store_id)
+    return result
+
+
+def clean_ios_app_df(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.rename(
         columns={
             "trackId": "store_id",
             "trackName": "name",
@@ -235,11 +282,15 @@ def scrape_app_ios(store_id: str) -> pd.DataFrame:
             "userRatingCount": "review_count",
         }
     )
-    app_df["free"] = app_df.price == 0
-    app_df[["developer_id", "store_id"]] = app_df[["developer_id", "store_id"]].astype(
-        str
+    df = df.assign(
+        free=df.price == 0,
+        developer_id=df["developer_id"].astype(str),
+        store_id=df["store_id"].astype(str),
+        store_last_updated=pd.to_datetime(df["store_last_updated"]).dt.strftime(
+            "%Y-%m-%d %H:%M"
+        ),
     )
-    return app_df
+    return df
 
 
 def extract_domains(x: str) -> str:
@@ -255,36 +306,36 @@ def extract_domains(x: str) -> str:
     return url
 
 
+def save_developer_info(app_df: pd.DataFrame) -> pd.DataFrame:
+    assert app_df["developer_id"].values[
+        0
+    ], f"{app_df['store_id']} Missing Developer ID"
+    dev_df = app_df[["store", "developer_id", "developer_name"]].rename(
+        columns={"developer_name": "name"}
+    )
+    insert_columns = ["store", "developer_id", "name"]
+    dev_df = insert_get(
+        table_name="developers",
+        df=dev_df,
+        insert_columns=insert_columns,
+        key_columns=["store", "developer_id"],
+        database_connection=PGCON,
+    )
+    app_df["developer"] = dev_df["id"].astype(object)[0]
+    return app_df
+
+
 def scrape_and_save_app(store, store_id):
-    scrape = {"store": store, "store_id": store_id}
-    logger.info(f"scrape:{scrape} start")
-    try:
-        app_df = scrape_app(store=store, store_id=store_id)
-        assert app_df["developer_id"].values[0], f"{scrape} Missing Developer ID"
-        app_df["crawl_result"] = 1
-    except Exception as error:
-        error_message = f"{scrape} {error=}"
-        logger.error(error_message)
-        if "404" in error_message or "No app found" in error_message:
-            crawl_result = 3
-        else:
-            crawl_result = 4
-        scrape["crawl_result"] = crawl_result
-        app_df = pd.DataFrame([scrape])
-    else:
-        dev_df = app_df[["store", "developer_id", "developer_name"]].rename(
-            columns={"developer_name": "name"}
-        )
-        insert_columns = ["store", "developer_id", "name"]
-        dev_df = insert_get(
-            table_name="developers",
-            df=dev_df,
-            insert_columns=insert_columns,
-            key_columns=["store", "developer_id"],
-            database_connection=PGCON,
-        )
-        app_df["developer"] = dev_df["id"].astype(object)[0]
-    app_df.dtypes
+    info = f"{store=}, {store_id=}"
+    logger.info(f"{info} start scrape")
+    store_id = "com.nexonm.dominations.adk"
+    store = 2
+    app_df = scrape_any_app(store=store, store_id=store_id)
+    crawl_result = app_df["crawl_result"].values[0]
+    if crawl_result != 1:
+        logger.warning(f"{info} {crawl_result=} returning empty df")
+        return app_df
+    app_df = save_developer_info(app_df)
     insert_columns = [x for x in STORE_APP_COLUMNS if x in app_df.columns]
     store_apps_df = insert_get(
         "store_apps",
@@ -293,7 +344,8 @@ def scrape_and_save_app(store, store_id):
         key_columns=["store", "store_id"],
         database_connection=PGCON,
     )
-    return app_df, store_apps_df
+    app_df["store_app_id"] = store_apps_df["id"].astype(object)[0]
+    return app_df
 
 
 def crawl_stores_for_app_details(df: pd.DataFrame) -> None:
@@ -304,14 +356,15 @@ def crawl_stores_for_app_details(df: pd.DataFrame) -> None:
         update_all_app_info(store, store_id)
 
 
-def update_all_app_info(store: int, store_id: str):
+def update_all_app_info(store: int, store_id: str) -> None:
     info = f"{store=} {store_id=}"
-    app_df, store_apps_df = scrape_and_save_app(store, store_id)
+    app_df = scrape_and_save_app(store, store_id)
+    if "store_app" not in app_df.columns:
+        return
     if "url" not in app_df.columns or not app_df["url"].values:
         logger.info(f"{info} no developer url")
         return
     app_df["url"] = app_df["url"].apply(lambda x: extract_domains(x))
-    app_df["store_app"] = store_apps_df["id"].astype(object)[0]
     insert_columns = ["url"]
     app_urls_df = insert_get(
         "pub_domains",
