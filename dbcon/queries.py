@@ -100,8 +100,9 @@ def query_store_apps(
     stores: list[int], database_connection, limit: int = 1000
 ) -> pd.DataFrame:
     where_str = "store IN (" + (", ").join([str(x) for x in stores]) + ")"
-    where_str += """ AND ((installs >= 10000 OR review_count >= 1000) 
-                    OR craw_result IS NULL) """
+    where_str += """ AND (installs >= 10000 
+                    OR review_count >= 1000
+                    OR crawl_result IS NULL) """
     sel_query = f"""SELECT store, id as store_app, store_id, updated_at  
         FROM store_apps
         WHERE {where_str}
@@ -113,6 +114,7 @@ def query_store_apps(
             updated_at
         limit {limit}
         """
+    logger.info(sel_query)
     df = pd.read_sql(sel_query, database_connection.engine)
     return df
 

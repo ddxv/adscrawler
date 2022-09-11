@@ -367,7 +367,16 @@ def scrape_and_save_app(store, store_id):
     app_df = scrape_any_app(store=store, store_id=store_id)
     crawl_result = app_df["crawl_result"].values[0]
     if crawl_result != 1:
-        logger.warning(f"{info} {crawl_result=} returning empty df")
+        logger.warning(
+            f"{info} {crawl_result=} bad crawl result, updating table without details"
+        )
+        upsert_df(
+            table_name="store_apps",
+            df=app_df,
+            insert_columns=["store", "store_id", "crawl_result"],
+            key_columns=["store", "store_id"],
+            database_connection=PGCON,
+        )
         return app_df
     app_df = save_developer_info(app_df)
     insert_columns = [x for x in STORE_APP_COLUMNS if x in app_df.columns]
@@ -389,10 +398,11 @@ def crawl_stores_for_app_details(df: pd.DataFrame) -> None:
     logger.info(f"Update App Details: df:{df.shape}")
     rows = df.shape[0]
     for index, row in df.iterrows():
-        logger.info(f"Update App Details row {index} of {rows}")
+        logger.info(f"Update App Details row {index} of {rows} start")
         store_id = row.store_id
         store = row.store
         update_all_app_info(store, store_id)
+        logger.info(f"Update App Details row {index} of {rows} finish")
 
 
 def update_all_app_info(store: int, store_id: str) -> None:
