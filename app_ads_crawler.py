@@ -241,11 +241,10 @@ def scrape_any_app(store: int, store_id: str) -> pd.DataFrame:
         result_dict = {}
     result_dict["crawl_result"] = crawl_result
     result_dict["store"] = store
+    result_dict["store_id"] = store_id
     df = pd.DataFrame([result_dict])
     if crawl_result == 1:
         df = clean_scraped_df(df=df, store=store)
-    if "store_id" not in result_dict.keys():
-        result_dict["store_id"] = store_id
     return df
 
 
@@ -270,7 +269,7 @@ def clean_google_play_app_df(df: pd.DataFrame) -> pd.DataFrame:
             "title": "name",
             "installs": "min_installs",
             "realInstalls": "installs",
-            "appId": "store_id",
+            # "appId": "store_id",
             "score": "rating",
             "updated": "store_last_updated",
             "reviews": "review_count",
@@ -305,7 +304,7 @@ def scrape_app_ios(store_id: str) -> dict:
 def clean_ios_app_df(df: pd.DataFrame) -> pd.DataFrame:
     df = df.rename(
         columns={
-            "trackId": "store_id",
+            # "trackId": "store_id",
             "trackName": "name",
             "averageUserRating": "rating",
             "sellerUrl": "url",
