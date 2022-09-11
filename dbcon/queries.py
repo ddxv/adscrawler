@@ -30,13 +30,16 @@ def upsert_df(
         return_str = " RETURNING * "
     else:
         return_str = ""
-    values_str = ", ".join(
-        [
-            str(x).replace("[", "(").replace("]", ")").replace('"', "'")
-            for x in df[insert_columns].values.tolist()
-        ]
-    )
-    insert_query = f""" 
+    values = [
+        str(x)
+        .replace("[", "(")
+        .replace("]", ")")
+        .replace('"', "'")
+        .replace("'MYNULL'", "NULL")
+        for x in df[insert_columns].fillna("MYNULL").values.tolist()
+    ]
+    values_str = ", ".join(values)
+    insert_query = f"""
         INSERT INTO {table_name} ({db_cols_str})
         VALUES {values_str}
         ON CONFLICT ({key_cols_str})
