@@ -574,7 +574,7 @@ def update_app_details(stores: list[int]) -> None:
 def main(args) -> None:
     logger.info(f"Main starting with args: {args}")
     platforms = args.platforms if "args" in locals() else ["android", "ios"]
-    new_apps_check = args.new_app_checks if "args" in locals() else False
+    new_apps_check = args.new_apps_checks if "args" in locals() else False
     stores = []
     stores.append(1) if "android" in platforms else None
     stores.append(2) if "ios" in platforms else None
