@@ -110,7 +110,7 @@ def query_store_apps(
                 WHEN crawl_result IS NULL THEN 0
                 ELSE 1
             END),
-            updated_at;
+            updated_at
         limit {limit}
         """
     df = pd.read_sql(sel_query, database_connection.engine)
