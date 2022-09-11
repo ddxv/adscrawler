@@ -3,6 +3,7 @@ config.yml
 store-data/
 
 .virtualenv/
+node_modules/
 
 ### Vim ###
 # Swap

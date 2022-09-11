@@ -1,0 +1,22 @@
+{
+  "name": "adscrawler",
+  "version": "1.0.0",
+  "description": "Used for a personal project to crawl app-ads.",
+  "main": "pullAppIds.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ddxv/adscrawler.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/ddxv/adscrawler/issues"
+  },
+  "homepage": "https://github.com/ddxv/adscrawler#readme",
+  "dependencies": {
+    "google-play-scraper": "^9.1.1"
+  }
+}
