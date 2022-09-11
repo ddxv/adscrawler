@@ -19,6 +19,39 @@ import os
 logger = get_logger(__name__)
 
 
+def js_update_ids_file(filepath: str) -> None:
+    if os.path.exists(filepath):
+        os.remove(filepath)
+    os.system("node pullAppIds.js")
+    logger.info("Js pull finished")
+
+
+def get_js_ids(filepath: str) -> list[str]:
+    with open(filepath, mode="r") as file:
+        ids = file.readlines()
+    ids = [x.replace("\n", "") for x in ids]
+    return ids
+
+
+def scrape_gp_for_app_ids():
+    filepath = "/tmp/googleplay_ids.txt"
+    try:
+        js_update_ids_file(filepath)
+    except Exception as error:
+        logger.warning(f"JS pull failed with {error=}")
+    ids = get_js_ids(filepath)
+    ids = list(set(ids))
+    df = pd.DataFrame({"store": 1, "store_id": ids})
+    insert_columns = ["store", "store_id"]
+    upsert_df(
+        "store_apps",
+        insert_columns=insert_columns,
+        df=df,
+        key_columns=insert_columns,
+        database_connection=PGCON,
+    )
+
+
 def script_has_process() -> bool:
     already_running = False
     processes = [x for x in os.popen("ps aux")]
@@ -507,14 +540,13 @@ def scrape_ios_frontpage() -> None:
     store_ids = list(set(store_ids))
     apps_df = pd.DataFrame({"store": 2, "store_id": store_ids})
     insert_columns = ["store", "store_id"]
-    my_df = insert_get(
-        "store_apps",
+    upsert_df(
+        table_name="store_apps",
         insert_columns=insert_columns,
         df=apps_df,
         key_columns=insert_columns,
         database_connection=PGCON,
     )
-    crawl_stores_for_app_details(my_df)
 
 
 def update_app_details(stores: list[int]) -> None:
@@ -531,11 +563,12 @@ def main(args) -> None:
     stores.append(1) if "android" in platforms else None
     stores.append(2) if "ios" in platforms else None
 
-    # Update the app details
-    update_app_details(stores)
-
     # Scrape Store for new apps
     scrape_ios_frontpage()
+    scrape_gp_for_app_ids()
+
+    # Update the app details
+    update_app_details(stores)
 
     # Crawl developwer websites to check for app ads
     crawl_app_ads()
