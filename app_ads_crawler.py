@@ -567,15 +567,18 @@ def update_app_details(stores: list[int]) -> None:
 
 def main(args) -> None:
     logger.info(f"Main starting with args: {args}")
-    platforms = args.platforms if "args" in locals() else ["android"]
-    platforms = ["ios", "android"]
+    platforms = args.platforms if "args" in locals() else ["android", "ios"]
+    new_apps_check = args.new_app_checks if "args" in locals() else False
     stores = []
     stores.append(1) if "android" in platforms else None
     stores.append(2) if "ios" in platforms else None
 
     # Scrape Store for new apps
-    scrape_ios_frontpage()
-    scrape_gp_for_app_ids()
+    if new_apps_check:
+        if 1 in stores:
+            scrape_ios_frontpage()
+        if 2 in stores:
+            scrape_gp_for_app_ids()
 
     # Update the app details
     update_app_details(stores)
@@ -627,6 +630,13 @@ def manage_cli_args() -> None:
         "-s",
         "--single-run-check",
         help="If included prevent running if script already running",
+        default=False,
+        action="store_true",
+    )
+    parser.add_argument(
+        "-n",
+        "--new-apps-check",
+        help="Scrape the iTunes and Play Store front pages to find new apps",
         default=False,
         action="store_true",
     )

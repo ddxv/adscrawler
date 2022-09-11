@@ -114,7 +114,6 @@ def query_store_apps(
             updated_at
         limit {limit}
         """
-    logger.info(sel_query)
     df = pd.read_sql(sel_query, database_connection.engine)
     return df
 
