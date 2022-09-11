@@ -34,6 +34,7 @@ def get_js_ids(filepath: str) -> list[str]:
 
 
 def scrape_gp_for_app_ids():
+    logger.info("Scrape GP frontpage for new apps start")
     filepath = "/tmp/googleplay_ids.txt"
     try:
         js_update_ids_file(filepath)
@@ -43,6 +44,7 @@ def scrape_gp_for_app_ids():
     ids = list(set(ids))
     df = pd.DataFrame({"store": 1, "store_id": ids})
     insert_columns = ["store", "store_id"]
+    logger.info(f"Scrape GP frontpage for new apps: insert to db {df.shape=}")
     upsert_df(
         "store_apps",
         insert_columns=insert_columns,
@@ -50,6 +52,7 @@ def scrape_gp_for_app_ids():
         key_columns=insert_columns,
         database_connection=PGCON,
     )
+    logger.info("Scrape GP frontpage for new apps finished")
 
 
 def script_has_process() -> bool:
@@ -395,7 +398,7 @@ def scrape_and_save_app(store, store_id):
 
 
 def crawl_stores_for_app_details(df: pd.DataFrame) -> None:
-    logger.info(f"Update App Details: df:{df.shape}")
+    logger.info(f"Update App Details: df: {df.shape}")
     rows = df.shape[0]
     for index, row in df.iterrows():
         logger.info(f"Update App Details row {index} of {rows} start")
@@ -526,6 +529,7 @@ def crawl_app_ads() -> None:
             database_connection=PGCON,
         )
         logger.info(f"{row_info} DONE")
+    logger.info("Crawl app-ads from pub domains finished")
 
 
 def scrape_ios_frontpage() -> None:
@@ -550,6 +554,7 @@ def scrape_ios_frontpage() -> None:
     store_ids = list(set(store_ids))
     apps_df = pd.DataFrame({"store": 2, "store_id": store_ids})
     insert_columns = ["store", "store_id"]
+    logger.info(f"Scrape iOS frontpage for new apps: insert to db {apps_df.shape=}")
     upsert_df(
         table_name="store_apps",
         insert_columns=insert_columns,
@@ -557,6 +562,7 @@ def scrape_ios_frontpage() -> None:
         key_columns=insert_columns,
         database_connection=PGCON,
     )
+    logger.info("Scrape iOS frontpage for new apps finished")
 
 
 def update_app_details(stores: list[int]) -> None:
