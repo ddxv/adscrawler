@@ -357,16 +357,17 @@ def save_developer_info(app_df: pd.DataFrame) -> pd.DataFrame:
     insert_columns = ["store", "developer_id", "name"]
     key_columns = ["store", "developer_id"]
     try:
-        df = upsert_df(
+        dev_df = upsert_df(
             table_name=table_name,
             df=df,
             insert_columns=insert_columns,
             key_columns=key_columns,
             database_connection=PGCON,
+            return_rows=True,
         )
-        app_df["developer"] = df["id"].astype(object)[0]
+        app_df["developer"] = dev_df["id"].astype(object)[0]
     except Exception as error:
-        logger.error(f"Insert failed with error {error}")
+        logger.error(f"Developer insert failed with error {error}")
     return app_df
 
 
@@ -414,8 +415,6 @@ def crawl_stores_for_app_details(df: pd.DataFrame) -> None:
         logger.info(f"Update App Details row {index} of {rows} start")
         store_id = row.store_id
         store = row.store
-        store = 1
-        store_id = "com.jeroendebusser.aspiemeltdown"
         update_all_app_info(store, store_id)
         logger.info(f"Update App Details row {index} of {rows} finish")
 
