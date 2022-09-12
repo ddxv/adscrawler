@@ -36,6 +36,7 @@ def upsert_df(
         .replace("]", ")")
         .replace('"', "'")
         .replace("'MYNULL'", "NULL")
+        .replace("%", "%%")
         for x in df[insert_columns].fillna("MYNULL").values.tolist()
     ]
     values_str = ", ".join(values)

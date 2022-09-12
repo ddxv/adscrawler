@@ -384,9 +384,9 @@ def scrape_and_save_app(store, store_id):
     insert_columns = [x for x in STORE_APP_COLUMNS if x in app_df.columns]
     try:
         store_apps_df = insert_get(
-            "store_apps",
-            app_df,
-            insert_columns,
+            table_name="store_apps",
+            df=app_df,
+            insert_columns=insert_columns,
             key_columns=["store", "store_id"],
             database_connection=PGCON,
         )
