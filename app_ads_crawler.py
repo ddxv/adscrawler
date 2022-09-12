@@ -424,6 +424,7 @@ def update_all_app_info(store: int, store_id: str) -> None:
     logger.info(f"{info} start")
     app_df = scrape_and_save_app(store, store_id)
     if "store_app" not in app_df.columns:
+        logger.error(f"{info} store_app db id not in app_df columns")
         return
     if "url" not in app_df.columns or not app_df["url"].values:
         logger.info(f"{info} no developer url")
@@ -438,6 +439,7 @@ def update_all_app_info(store: int, store_id: str) -> None:
         database_connection=PGCON,
         return_rows=True,
     )
+    logger.info(f"{info} saved developer url")
     app_df["pub_domain"] = app_urls_df["id"].astype(object)[0]
     insert_columns = ["store_app", "pub_domain"]
     key_columns = ["store_app"]
@@ -448,6 +450,7 @@ def update_all_app_info(store: int, store_id: str) -> None:
         key_columns=key_columns,
         database_connection=PGCON,
     )
+    logger.info(f"{info} updated app urls map")
     logger.info(f"{info} finished")
 
 
