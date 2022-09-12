@@ -7,86 +7,72 @@ logger = get_logger(__name__)
 
 
 def upsert_df(
-    table_name,
-    insert_columns,
-    df,
-    key_columns,
-    database_connection: PostgresCon,
-    log=None,
-    return_rows: bool = False,
-):
-    db_cols_str = ", ".join([f'"{col}"' for col in insert_columns])
-    key_cols_str = ", ".join([f'"{col}"' for col in key_columns])
-    set_update = ", ".join([f"{col} = EXCLUDED.{col}" for col in insert_columns])
-    if isinstance(df, pd.Series):
-        df = pd.DataFrame(df).T
-    for col in insert_columns:
-        if (
-            pd.api.types.is_string_dtype(df[col])
-            and pd.api.types.infer_dtype(df[col]) == "string"
-        ):
-            df[col] = df[col].apply(lambda x: x.replace("'", "''"))
-    if return_rows:
-        return_str = " RETURNING * "
-    else:
-        return_str = ""
-    values = [
-        str(x)
-        .replace("[", "(")
-        .replace("]", ")")
-        .replace('"', "'")
-        .replace("'MYNULL'", "NULL")
-        .replace("%", "%%")
-        for x in df[insert_columns].fillna("MYNULL").values.tolist()
-    ]
-    values_str = ", ".join(values)
-    insert_query = f"""
-        INSERT INTO {table_name} ({db_cols_str})
-        VALUES {values_str}
-        ON CONFLICT ({key_cols_str})
-        DO UPDATE SET {set_update}
-        {return_str}
-        ;
-        """
-    if log:
-        logger.info(f"MY INSERT QUERY: {insert_query}")
-    with database_connection.engine.begin() as connection:
-        result = connection.execute(insert_query)
-    return result
-
-
-def insert_get(
+    df: pd.DataFrame,
     table_name: str,
-    df: pd.DataFrame | pd.Series,
-    insert_columns: str | list[str],
-    key_columns: str | list[str],
     database_connection: PostgresCon,
-    log: bool | None = None,
-) -> pd.DataFrame:
-    logger.info(f"insert_get table: {table_name}")
+    key_columns: list[str],
+    insert_columns: list[str],
+    return_rows: bool = False,
+    schema: str = None,
+    log: bool = False,
+) -> None | pd.DataFrame:
+    """
+    Perform an "upsert" on a PostgreSQL table from a DataFrame.
+    Constructs an INSERT … ON CONFLICT statement, uploads the DataFrame to a
+    temporary table, and then executes the INSERT.
+    Parameters
+    ----------
+    data_frame : pandas.DataFrame
+        The DataFrame to be upserted.
+    table_name : str
+        The name of the target table.
+    engine : sqlalchemy.engine.Engine
+        The SQLAlchemy Engine to use.
+    schema : str, optional
+        The name of the schema containing the target table.
+    key_columns : list of str, optional
+        A list of the column name(s) on which to match. If omitted, the
+        primary key columns of the target table will be used.
+    """
+    table_spec = ""
+    if schema:
+        table_spec += '"' + schema.replace('"', '""') + '".'
+    table_spec += '"' + table_name.replace('"', '""') + '"'
 
-    if isinstance(insert_columns, str):
-        insert_columns = [insert_columns]
-    if isinstance(key_columns, str):
-        key_columns = [key_columns]
-    if isinstance(df, pd.Series):
-        df = pd.DataFrame(df).T
-    result = upsert_df(
-        table_name=table_name,
-        insert_columns=insert_columns,
-        df=df,
-        key_columns=key_columns,
-        database_connection=database_connection,
-        return_rows=True,
-        log=log,
-    )
-    logger.info(f"Upserted rows: {result.rowcount}")
-    if result.returns_rows:
-        get_df = pd.DataFrame(result.fetchall())
+    all_columns = list(set(key_columns + insert_columns))
+
+    insert_col_list = ", ".join([f'"{col_name}"' for col_name in all_columns])
+    match_col_list = ", ".join([f'"{col}"' for col in key_columns])
+    update_on = ", ".join([f'"{col}" = EXCLUDED."{col}"' for col in key_columns])
+
+    if return_rows:
+        returning_str = " RETURNING * "
     else:
-        get_df = pd.DataFrame()
-    logger.info(f"Returning df: {get_df.shape}")
-    return get_df
+        returning_str = ""
+
+    sql_query = f"""INSERT INTO {table_spec} ({insert_col_list})
+                SELECT {insert_col_list} FROM temp_table
+                ON CONFLICT ({match_col_list}) 
+                DO UPDATE SET
+                    {update_on}
+                {returning_str}
+    """
+
+    if log:
+        logger.info(sql_query)
+    temp_table_name = "temp_table"
+    with database_connection.engine.begin() as conn:
+        conn.exec_driver_sql("DROP TABLE IF EXISTS temp_table")
+        conn.exec_driver_sql(
+            f"""CREATE TEMPORARY TABLE temp_table 
+            AS SELECT * FROM {table_spec} WHERE false"""
+        )
+        df[all_columns].to_sql("temp_table", conn, if_exists="append", index=False)
+        result = conn.exec_driver_sql(sql_query)
+        conn.execute(f'DROP TABLE "{temp_table_name}"')
+    if result.returns_rows and return_rows:
+        get_df = pd.DataFrame(result.fetchall())
+        return get_df
 
 
 def query_pub_domains(database_connection, limit=10000):

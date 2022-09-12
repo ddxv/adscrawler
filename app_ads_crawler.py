@@ -1,4 +1,4 @@
-from dbcon.queries import insert_get, upsert_df, query_store_apps, query_pub_domains
+from dbcon.queries import upsert_df, query_store_apps, query_pub_domains
 from dbcon.connection import get_db_connection
 from itunes_app_scraper.util import (
     AppStoreCollections,
@@ -219,8 +219,9 @@ def scrape_from_store(store: int, store_id: str) -> dict:
     return result_dict
 
 
-def scrape_any_app(store: int, store_id: str) -> pd.DataFrame:
+def scrape_app(store: int, store_id: str) -> pd.DataFrame:
     scrape_info = f"{store=}, {store_id=}"
+    logger.info(f"{scrape_info} scrape")
     try:
         result_dict = scrape_from_store(store=store, store_id=store_id)
         crawl_result = 1
@@ -245,6 +246,7 @@ def scrape_any_app(store: int, store_id: str) -> pd.DataFrame:
     df = pd.DataFrame([result_dict])
     if crawl_result == 1:
         df = clean_scraped_df(df=df, store=store)
+    logger.info(f"{scrape_info} scraped with {crawl_result=}")
     return df
 
 
@@ -348,19 +350,21 @@ def save_developer_info(app_df: pd.DataFrame) -> pd.DataFrame:
     assert app_df["developer_id"].values[
         0
     ], f"{app_df['store_id']} Missing Developer ID"
-    dev_df = app_df[["store", "developer_id", "developer_name"]].rename(
+    df = app_df[["store", "developer_id", "developer_name"]].rename(
         columns={"developer_name": "name"}
     )
+    table_name = "developers"
     insert_columns = ["store", "developer_id", "name"]
+    key_columns = ["store", "developer_id"]
     try:
-        dev_df = insert_get(
-            table_name="developers",
-            df=dev_df,
+        df = upsert_df(
+            table_name=table_name,
+            df=df,
             insert_columns=insert_columns,
-            key_columns=["store", "developer_id"],
+            key_columns=key_columns,
             database_connection=PGCON,
         )
-        app_df["developer"] = dev_df["id"].astype(object)[0]
+        app_df["developer"] = df["id"].astype(object)[0]
     except Exception as error:
         logger.error(f"Insert failed with error {error}")
     return app_df
@@ -368,34 +372,38 @@ def save_developer_info(app_df: pd.DataFrame) -> pd.DataFrame:
 
 def scrape_and_save_app(store, store_id):
     info = f"{store=}, {store_id=}"
-    logger.info(f"{info} start scrape")
-    app_df = scrape_any_app(store=store, store_id=store_id)
+    app_df = scrape_app(store=store, store_id=store_id)
     crawl_result = app_df["crawl_result"].values[0]
+    table_name = "store_apps"
+    key_columns = ["store", "store_id"]
     if crawl_result != 1:
         logger.warning(
             f"{info} {crawl_result=} bad crawl result, updating table without details"
         )
+        insert_columns = [x for x in STORE_APP_COLUMNS if x in app_df.columns]
         upsert_df(
-            table_name="store_apps",
+            table_name=table_name,
             df=app_df,
-            insert_columns=["store", "store_id", "crawl_result"],
-            key_columns=["store", "store_id"],
+            insert_columns=insert_columns,
+            key_columns=key_columns,
             database_connection=PGCON,
         )
         return app_df
     app_df = save_developer_info(app_df)
     insert_columns = [x for x in STORE_APP_COLUMNS if x in app_df.columns]
     try:
-        store_apps_df = insert_get(
-            table_name="store_apps",
+        store_apps_df = upsert_df(
+            table_name=table_name,
             df=app_df,
             insert_columns=insert_columns,
-            key_columns=["store", "store_id"],
+            key_columns=key_columns,
             database_connection=PGCON,
+            return_rows=True,
         )
-        app_df["store_app_id"] = store_apps_df["id"].astype(object)[0]
+        app_df["store_app"] = store_apps_df["id"].astype(object)[0]
     except Exception as error:
         logger.error(f"Error on insert app_df: {error=}")
+    logger.info(f"{info} scraped and saved app and developer")
     return app_df
 
 
@@ -406,12 +414,15 @@ def crawl_stores_for_app_details(df: pd.DataFrame) -> None:
         logger.info(f"Update App Details row {index} of {rows} start")
         store_id = row.store_id
         store = row.store
+        store = 1
+        store_id = "com.jeroendebusser.aspiemeltdown"
         update_all_app_info(store, store_id)
         logger.info(f"Update App Details row {index} of {rows} finish")
 
 
 def update_all_app_info(store: int, store_id: str) -> None:
     info = f"{store=} {store_id=}"
+    logger.info(f"{info} start")
     app_df = scrape_and_save_app(store, store_id)
     if "store_app" not in app_df.columns:
         return
@@ -420,22 +431,25 @@ def update_all_app_info(store: int, store_id: str) -> None:
         return
     app_df["url"] = app_df["url"].apply(lambda x: extract_domains(x))
     insert_columns = ["url"]
-    app_urls_df = insert_get(
-        "pub_domains",
-        app_df,
-        insert_columns,
+    app_urls_df = upsert_df(
+        table_name="pub_domains",
+        df=app_df,
+        insert_columns=insert_columns,
         key_columns=["url"],
         database_connection=PGCON,
+        return_rows=True,
     )
     app_df["pub_domain"] = app_urls_df["id"].astype(object)[0]
     insert_columns = ["store_app", "pub_domain"]
+    key_columns = ["store_app"]
     upsert_df(
-        "app_urls_map",
-        insert_columns,
-        app_df,
-        key_columns=["store_app"],
+        table_name="app_urls_map",
+        insert_columns=insert_columns,
+        df=app_df,
+        key_columns=key_columns,
         database_connection=PGCON,
     )
+    logger.info(f"{info} finished")
 
 
 def crawl_app_ads() -> None:
@@ -466,7 +480,7 @@ def crawl_app_ads() -> None:
             logger.error(f"{row_info} unknown error: {error}")
             row["crawl_result"] = 4
         insert_columns = ["url", "crawl_result"]
-        pub_domain_df = insert_get(
+        pub_domain_df = upsert_df(
             "pub_domains",
             row,
             insert_columns,
@@ -477,7 +491,7 @@ def crawl_app_ads() -> None:
             continue
         insert_columns = ["domain"]
         ad_domains = txt_df[["domain"]].drop_duplicates()
-        domain_df = insert_get(
+        domain_df = upsert_df(
             table_name="ad_domains",
             df=ad_domains,
             insert_columns=insert_columns,
@@ -504,7 +518,7 @@ def crawl_app_ads() -> None:
             ]
         key_cols = ["ad_domain", "publisher_id", "relationship"]
         app_df = app_df.drop_duplicates(subset=key_cols)
-        entrys_df = insert_get(
+        entrys_df = upsert_df(
             "app_ads_entrys",
             app_df,
             insert_columns,
