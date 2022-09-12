@@ -46,7 +46,7 @@ def scrape_gp_for_app_ids():
     insert_columns = ["store", "store_id"]
     logger.info(f"Scrape GP frontpage for new apps: insert to db {df.shape=}")
     upsert_df(
-        "store_apps",
+        table_name="store_apps",
         insert_columns=insert_columns,
         df=df,
         key_columns=insert_columns,
