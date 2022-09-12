@@ -483,9 +483,9 @@ def crawl_app_ads() -> None:
             row["crawl_result"] = 4
         insert_columns = ["url", "crawl_result"]
         pub_domain_df = upsert_df(
-            "pub_domains",
-            row,
-            insert_columns,
+            table_name="pub_domains",
+            df=row,
+            insert_columns=insert_columns,
             key_columns="url",
             database_connection=PGCON,
         )
@@ -521,9 +521,9 @@ def crawl_app_ads() -> None:
         key_cols = ["ad_domain", "publisher_id", "relationship"]
         app_df = app_df.drop_duplicates(subset=key_cols)
         entrys_df = upsert_df(
-            "app_ads_entrys",
-            app_df,
-            insert_columns,
+            table_name="app_ads_entrys",
+            df=app_df,
+            insert_columns=insert_columns,
             key_columns=key_cols,
             database_connection=PGCON,
         )
@@ -540,9 +540,9 @@ def crawl_app_ads() -> None:
         if not null_df.empty:
             logger.warning(f"{null_df=} NULLs in app_ads_entry")
         upsert_df(
-            "app_ads_map",
-            insert_columns,
-            app_df_final,
+            table_name="app_ads_map",
+            insert_columns=insert_columns,
+            df=app_df_final,
             key_columns=insert_columns,
             database_connection=PGCON,
         )
