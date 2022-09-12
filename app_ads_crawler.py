@@ -457,12 +457,10 @@ def update_all_app_info(store: int, store_id: str) -> None:
 def crawl_app_ads() -> None:
     df = query_pub_domains(database_connection=PGCON)
     logger.info("Crawl app-ads from pub domains")
-    i = 0
-    for index, row in df.iterrows():
-        i += 1
+    for i, row in df.iterrows():
         app_url = row.url
         row_info = f"{i=}, {app_url=}"
-        logger.info(f"{row_info} START")
+        logger.info(f"{row_info} start")
         # Get App Ads.txt Text File
         try:
             raw_txt = get_app_ads_text(app_url)
@@ -470,7 +468,7 @@ def crawl_app_ads() -> None:
             txt_df = clean_raw_txt_df(txt_df=raw_txt_df.copy())
             row["crawl_result"] = 1
         except NoAdsTxt as error:
-            logger.error(f"{row_info} ads.txt not found {error}")
+            logger.warning(f"{row_info} ads.txt not found {error}")
             row["crawl_result"] = 3
         except AdsTxtEmpty as error:
             logger.error(f"{row_info} ads.txt parsing error {error}")
@@ -482,12 +480,15 @@ def crawl_app_ads() -> None:
             logger.error(f"{row_info} unknown error: {error}")
             row["crawl_result"] = 4
         insert_columns = ["url", "crawl_result"]
+        pub_domain_df = pd.DataFrame(row).T
+        pub_domain_df["crawl_result"] = pub_domain_df["crawl_result"].astype(int)
         pub_domain_df = upsert_df(
             table_name="pub_domains",
-            df=row,
+            df=pub_domain_df,
             insert_columns=insert_columns,
-            key_columns="url",
+            key_columns=["url"],
             database_connection=PGCON,
+            return_rows=True,
         )
         if row.crawl_result != 1:
             continue
@@ -497,8 +498,9 @@ def crawl_app_ads() -> None:
             table_name="ad_domains",
             df=ad_domains,
             insert_columns=insert_columns,
-            key_columns="domain",
+            key_columns=["domain"],
             database_connection=PGCON,
+            return_rows=True,
         )
         app_df = pd.merge(
             txt_df, domain_df, how="left", on=["domain"], validate="many_to_one"
@@ -526,6 +528,7 @@ def crawl_app_ads() -> None:
             insert_columns=insert_columns,
             key_columns=key_cols,
             database_connection=PGCON,
+            return_rows=True,
         )
         entrys_df = entrys_df.rename(columns={"id": "app_ads_entry"})
         app_df_final = pd.merge(
@@ -546,7 +549,7 @@ def crawl_app_ads() -> None:
             key_columns=insert_columns,
             database_connection=PGCON,
         )
-        logger.info(f"{row_info} DONE")
+        logger.info(f"{row_info} finished")
     logger.info("Crawl app-ads from pub domains finished")
 
 

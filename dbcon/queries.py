@@ -2,6 +2,7 @@ import pandas as pd
 from dbcon.connection import PostgresCon
 from config import get_logger
 import numpy as np
+import uuid
 
 logger = get_logger(__name__)
 
@@ -43,15 +44,17 @@ def upsert_df(
 
     insert_col_list = ", ".join([f'"{col_name}"' for col_name in all_columns])
     match_col_list = ", ".join([f'"{col}"' for col in key_columns])
-    update_on = ", ".join([f'"{col}" = EXCLUDED."{col}"' for col in key_columns])
+    update_on = ", ".join([f'"{col}" = EXCLUDED."{col}"' for col in all_columns])
 
     if return_rows:
-        returning_str = " RETURNING * "
+        returning_str = " RETURNING * ;"
     else:
         returning_str = ""
 
+    temp_table = f"temp_{uuid.uuid4().hex[:6]}"
+
     sql_query = f"""INSERT INTO {table_spec} ({insert_col_list})
-                SELECT {insert_col_list} FROM temp_table
+                SELECT {insert_col_list} FROM {temp_table}
                 ON CONFLICT ({match_col_list}) 
                 DO UPDATE SET
                     {update_on}
@@ -60,18 +63,28 @@ def upsert_df(
 
     if log:
         logger.info(sql_query)
-    temp_table_name = "temp_table"
+
     with database_connection.engine.begin() as conn:
-        conn.exec_driver_sql("DROP TABLE IF EXISTS temp_table")
+        conn.exec_driver_sql(f"DROP TABLE IF EXISTS {temp_table}")
         conn.exec_driver_sql(
-            f"""CREATE TEMPORARY TABLE temp_table 
+            f"""CREATE TEMPORARY TABLE {temp_table} 
             AS SELECT * FROM {table_spec} WHERE false"""
         )
-        df[all_columns].to_sql("temp_table", conn, if_exists="append", index=False)
+        df[all_columns].to_sql(
+            temp_table,
+            con=conn,
+            if_exists="append",
+            index=False,
+        )
         result = conn.exec_driver_sql(sql_query)
-        conn.execute(f'DROP TABLE "{temp_table_name}"')
-    if result.returns_rows and return_rows:
-        get_df = pd.DataFrame(result.fetchall())
+        if return_rows:
+            if result.returns_rows:
+                get_df = pd.DataFrame(result.mappings().all())
+            else:
+                logger.warning("Sqlalchemy result did not have rows")
+                get_df = pd.DataFrame()
+        conn.execute(f'DROP TABLE "{temp_table}"')
+    if return_rows:
         return get_df
 
 
