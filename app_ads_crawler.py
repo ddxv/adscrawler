@@ -285,7 +285,7 @@ def clean_google_play_app_df(df: pd.DataFrame) -> pd.DataFrame:
     )
     df.loc[df["min_installs"].isnull(), "min_installs"] = df.loc[
         df["min_installs"].isnull(), "installs"
-    ]
+    ].astype(str)
     df = df.assign(
         min_installs=df["min_installs"]
         .str.replace(r"[,+]", "", regex=True)
@@ -406,8 +406,6 @@ def crawl_stores_for_app_details(df: pd.DataFrame) -> None:
         logger.info(f"Update App Details row {index} of {rows} start")
         store_id = row.store_id
         store = row.store
-        store_id = "com.nvsgames.snap"
-        store = 1
         update_all_app_info(store, store_id)
         logger.info(f"Update App Details row {index} of {rows} finish")
 
