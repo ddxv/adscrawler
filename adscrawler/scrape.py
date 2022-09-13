@@ -1,5 +1,4 @@
-from dbcon.queries import upsert_df, query_store_apps, query_pub_domains
-from dbcon.connection import get_db_connection
+from adscrawler.queries import upsert_df, query_store_apps, query_pub_domains
 from itunes_app_scraper.util import (
     AppStoreCollections,
     AppStoreCategories,
@@ -7,14 +6,18 @@ from itunes_app_scraper.util import (
 )
 from itunes_app_scraper.scraper import AppStoreScraper
 import google_play_scraper
-from config import get_logger
+from adscrawler.config import get_logger
 import pandas as pd
 import tldextract
-import argparse
 import requests
 import csv
 import io
 import os
+
+"""
+    Top level script for managing getting app-ads.txt
+"""
+
 
 logger = get_logger(__name__)
 
@@ -33,7 +36,7 @@ def get_js_ids(filepath: str) -> list[str]:
     return ids
 
 
-def scrape_gp_for_app_ids():
+def scrape_gp_for_app_ids(database_connection):
     logger.info("Scrape GP frontpage for new apps start")
     filepath = "/tmp/googleplay_ids.txt"
     try:
@@ -50,21 +53,9 @@ def scrape_gp_for_app_ids():
         insert_columns=insert_columns,
         df=df,
         key_columns=insert_columns,
-        database_connection=PGCON,
+        database_connection=database_connection,
     )
     logger.info("Scrape GP frontpage for new apps finished")
-
-
-def script_has_process() -> bool:
-    already_running = False
-    processes = [x for x in os.popen("ps aux")]
-    my_processes = [
-        x for x in processes if "app_ads_crawler.py" in x and "/bin/sh" not in x
-    ]
-    if len(my_processes) > 1:
-        logger.warning(f"Already running {my_processes}")
-        already_running = True
-    return already_running
 
 
 def request_app_ads(ads_url: str) -> requests.Response:
@@ -346,7 +337,7 @@ def extract_domains(x: str) -> str:
     return url
 
 
-def save_developer_info(app_df: pd.DataFrame) -> pd.DataFrame:
+def save_developer_info(app_df: pd.DataFrame, database_connection) -> pd.DataFrame:
     assert app_df["developer_id"].values[
         0
     ], f"{app_df['store_id']} Missing Developer ID"
@@ -362,7 +353,7 @@ def save_developer_info(app_df: pd.DataFrame) -> pd.DataFrame:
             df=df,
             insert_columns=insert_columns,
             key_columns=key_columns,
-            database_connection=PGCON,
+            database_connection=database_connection,
             return_rows=True,
         )
         app_df["developer"] = dev_df["id"].astype(object)[0]
@@ -371,7 +362,7 @@ def save_developer_info(app_df: pd.DataFrame) -> pd.DataFrame:
     return app_df
 
 
-def scrape_and_save_app(store, store_id):
+def scrape_and_save_app(store, store_id, database_connection):
     info = f"{store=}, {store_id=}"
     app_df = scrape_app(store=store, store_id=store_id)
     crawl_result = app_df["crawl_result"].values[0]
@@ -387,10 +378,10 @@ def scrape_and_save_app(store, store_id):
             df=app_df,
             insert_columns=insert_columns,
             key_columns=key_columns,
-            database_connection=PGCON,
+            database_connection=database_connection,
         )
         return app_df
-    app_df = save_developer_info(app_df)
+    app_df = save_developer_info(app_df, database_connection)
     insert_columns = [x for x in STORE_APP_COLUMNS if x in app_df.columns]
     try:
         store_apps_df = upsert_df(
@@ -398,7 +389,7 @@ def scrape_and_save_app(store, store_id):
             df=app_df,
             insert_columns=insert_columns,
             key_columns=key_columns,
-            database_connection=PGCON,
+            database_connection=database_connection,
             return_rows=True,
         )
         app_df["store_app"] = store_apps_df["id"].astype(object)[0]
@@ -408,21 +399,21 @@ def scrape_and_save_app(store, store_id):
     return app_df
 
 
-def crawl_stores_for_app_details(df: pd.DataFrame) -> None:
+def crawl_stores_for_app_details(df: pd.DataFrame, database_connection) -> None:
     logger.info(f"Update App Details: df: {df.shape}")
     rows = df.shape[0]
     for index, row in df.iterrows():
         logger.info(f"Update App Details row {index} of {rows} start")
         store_id = row.store_id
         store = row.store
-        update_all_app_info(store, store_id)
+        update_all_app_info(store, store_id, database_connection)
         logger.info(f"Update App Details row {index} of {rows} finish")
 
 
-def update_all_app_info(store: int, store_id: str) -> None:
+def update_all_app_info(store: int, store_id: str, database_connection) -> None:
     info = f"{store=} {store_id=}"
     logger.info(f"{info} start")
-    app_df = scrape_and_save_app(store, store_id)
+    app_df = scrape_and_save_app(store, store_id, database_connection)
     if "store_app" not in app_df.columns:
         logger.error(f"{info} store_app db id not in app_df columns")
         return
@@ -436,7 +427,7 @@ def update_all_app_info(store: int, store_id: str) -> None:
         df=app_df,
         insert_columns=insert_columns,
         key_columns=["url"],
-        database_connection=PGCON,
+        database_connection=database_connection,
         return_rows=True,
     )
     logger.info(f"{info} saved developer url")
@@ -448,14 +439,14 @@ def update_all_app_info(store: int, store_id: str) -> None:
         insert_columns=insert_columns,
         df=app_df,
         key_columns=key_columns,
-        database_connection=PGCON,
+        database_connection=database_connection,
     )
     logger.info(f"{info} updated app urls map")
     logger.info(f"{info} finished")
 
 
-def crawl_app_ads() -> None:
-    df = query_pub_domains(database_connection=PGCON)
+def crawl_app_ads(database_connection) -> None:
+    df = query_pub_domains(database_connection=database_connection)
     logger.info("Crawl app-ads from pub domains")
     for i, row in df.iterrows():
         app_url = row.url
@@ -487,7 +478,7 @@ def crawl_app_ads() -> None:
             df=pub_domain_df,
             insert_columns=insert_columns,
             key_columns=["url"],
-            database_connection=PGCON,
+            database_connection=database_connection,
             return_rows=True,
         )
         if row.crawl_result != 1:
@@ -499,7 +490,7 @@ def crawl_app_ads() -> None:
             df=ad_domains,
             insert_columns=insert_columns,
             key_columns=["domain"],
-            database_connection=PGCON,
+            database_connection=database_connection,
             return_rows=True,
         )
         app_df = pd.merge(
@@ -527,7 +518,7 @@ def crawl_app_ads() -> None:
             df=app_df,
             insert_columns=insert_columns,
             key_columns=key_cols,
-            database_connection=PGCON,
+            database_connection=database_connection,
             return_rows=True,
         )
         entrys_df = entrys_df.rename(columns={"id": "app_ads_entry"})
@@ -547,13 +538,13 @@ def crawl_app_ads() -> None:
             insert_columns=insert_columns,
             df=app_df_final,
             key_columns=insert_columns,
-            database_connection=PGCON,
+            database_connection=database_connection,
         )
         logger.info(f"{row_info} finished")
     logger.info("Crawl app-ads from pub domains finished")
 
 
-def scrape_ios_frontpage() -> None:
+def scrape_ios_frontpage(database_connection) -> None:
     logger.info("Scrape iOS frontpage for new apps")
     scraper = AppStoreScraper()
     categories = {k: v for k, v in AppStoreCategories.__dict__.items() if "GAME" in k}
@@ -581,37 +572,15 @@ def scrape_ios_frontpage() -> None:
         insert_columns=insert_columns,
         df=apps_df,
         key_columns=insert_columns,
-        database_connection=PGCON,
+        database_connection=database_connection,
     )
     logger.info("Scrape iOS frontpage for new apps finished")
 
 
-def update_app_details(stores: list[int]) -> None:
+def update_app_details(stores: list[int], database_connection) -> None:
     logger.info("Update App Details: start with oldest first")
-    df = query_store_apps(stores, database_connection=PGCON, limit=20000)
-    crawl_stores_for_app_details(df)
-
-
-def main(args) -> None:
-    logger.info(f"Main starting with args: {args}")
-    platforms = args.platforms if "args" in locals() else ["android", "ios"]
-    new_apps_check = args.new_apps_check if "args" in locals() else False
-    stores = []
-    stores.append(1) if "android" in platforms else None
-    stores.append(2) if "ios" in platforms else None
-
-    # Scrape Store for new apps
-    if new_apps_check:
-        if 1 in stores:
-            scrape_ios_frontpage()
-        if 2 in stores:
-            scrape_gp_for_app_ids()
-
-    # Update the app details
-    update_app_details(stores)
-
-    # Crawl developwer websites to check for app ads
-    crawl_app_ads()
+    df = query_store_apps(stores, database_connection=database_connection, limit=20000)
+    crawl_stores_for_app_details(df, database_connection)
 
 
 STORE_APP_COLUMNS = [
@@ -635,50 +604,3 @@ STORE_APP_COLUMNS = [
     "editors_choice",
     "crawl_result",
 ]
-
-
-def manage_cli_args() -> None:
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "-p",
-        "--platforms",
-        action="append",
-        help="String as portion of android or ios",
-        default=["android", "ios"],
-    )
-    parser.add_argument(
-        "-l",
-        "--is-local-db",
-        help="Connect to local db on port 5432",
-        default=False,
-        action="store_true",
-    )
-    parser.add_argument(
-        "-s",
-        "--single-run-check",
-        help="If included prevent running if script already running",
-        default=False,
-        action="store_true",
-    )
-    parser.add_argument(
-        "-n",
-        "--new-apps-check",
-        help="Scrape the iTunes and Play Store front pages to find new apps",
-        default=False,
-        action="store_true",
-    )
-    args, leftovers = parser.parse_known_args()
-
-    if args.single_run_check and script_has_process():
-        logger.warning("Script already running, exiting")
-        quit()
-    return args
-
-
-if __name__ == "__main__":
-    logger.info("Starting app-ads.txt crawler")
-    args = manage_cli_args()
-    PGCON = get_db_connection(args.is_local_db)
-    PGCON.set_engine()
-
-    main(args)

@@ -1,6 +1,6 @@
 import pandas as pd
-from dbcon.connection import PostgresCon
-from config import get_logger
+from adscrawler.connection import PostgresCon
+from adscrawler.config import get_logger
 import numpy as np
 import uuid
 

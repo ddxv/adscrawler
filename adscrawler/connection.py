@@ -1,5 +1,5 @@
 from sqlalchemy import create_engine
-from config import CONFIG, get_logger
+from adscrawler.config import CONFIG, get_logger
 from sshtunnel import SSHTunnelForwarder
 
 logger = get_logger(__name__)
