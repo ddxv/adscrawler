@@ -20,7 +20,7 @@ def script_has_process() -> bool:
     already_running = False
     processes = [x for x in os.popen("ps aux")]
     my_processes = [
-        x for x in processes if "app_ads_crawler.py" in x and "/bin/sh" not in x
+        x for x in processes if "/adscrawler/main.py" in x and "/bin/sh" not in x
     ]
     if len(my_processes) > 1:
         logger.warning(f"Already running {my_processes}")
