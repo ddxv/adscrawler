@@ -82,10 +82,10 @@ def main(args) -> None:
             scrape_gp_for_app_ids(PGCON)
 
     # Update the app details
-    update_app_details(stores, PGCON)
+    update_app_details(stores, PGCON, limit=20000)
 
     # Crawl developwer websites to check for app ads
-    crawl_app_ads(PGCON)
+    crawl_app_ads(PGCON, limit=5000)
 
 
 if __name__ == "__main__":
