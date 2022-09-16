@@ -373,13 +373,15 @@ def scrape_and_save_app(store, store_id, database_connection):
             f"{info} {crawl_result=} bad crawl result, updating table without details"
         )
         insert_columns = [x for x in STORE_APP_COLUMNS if x in app_df.columns]
-        upsert_df(
+        store_apps_df = upsert_df(
             table_name=table_name,
             df=app_df,
             insert_columns=insert_columns,
             key_columns=key_columns,
             database_connection=database_connection,
+            return_rows=True,
         )
+        app_df["store_app"] = store_apps_df["id"].astype(object)[0]
         return app_df
     app_df = save_developer_info(app_df, database_connection)
     insert_columns = [x for x in STORE_APP_COLUMNS if x in app_df.columns]
@@ -416,6 +418,9 @@ def update_all_app_info(store: int, store_id: str, database_connection) -> None:
     app_df = scrape_and_save_app(store, store_id, database_connection)
     if "store_app" not in app_df.columns:
         logger.error(f"{info} store_app db id not in app_df columns")
+        return
+    if app_df["crawl_result"].values[0] != 1:
+        logger.info(f"{info} crawl not successful, don't update further")
         return
     if "url" not in app_df.columns or not app_df["url"].values:
         logger.info(f"{info} no developer url")
