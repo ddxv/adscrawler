@@ -212,7 +212,6 @@ def scrape_from_store(store: int, store_id: str) -> dict:
 
 def scrape_app(store: int, store_id: str) -> pd.DataFrame:
     scrape_info = f"{store=}, {store_id=}"
-    logger.info(f"{scrape_info} scrape")
     try:
         result_dict = scrape_from_store(store=store, store_id=store_id)
         crawl_result = 1
@@ -237,7 +236,6 @@ def scrape_app(store: int, store_id: str) -> pd.DataFrame:
     df = pd.DataFrame([result_dict])
     if crawl_result == 1:
         df = clean_scraped_df(df=df, store=store)
-    logger.info(f"{scrape_info} scraped with {crawl_result=}")
     return df
 
 
@@ -368,36 +366,19 @@ def scrape_and_save_app(store, store_id, database_connection):
     crawl_result = app_df["crawl_result"].values[0]
     table_name = "store_apps"
     key_columns = ["store", "store_id"]
-    if crawl_result != 1:
-        logger.warning(
-            f"{info} {crawl_result=} bad crawl result, updating table without details"
-        )
-        insert_columns = [x for x in STORE_APP_COLUMNS if x in app_df.columns]
-        store_apps_df = upsert_df(
-            table_name=table_name,
-            df=app_df,
-            insert_columns=insert_columns,
-            key_columns=key_columns,
-            database_connection=database_connection,
-            return_rows=True,
-        )
-        app_df["store_app"] = store_apps_df["id"].astype(object)[0]
-        return app_df
-    app_df = save_developer_info(app_df, database_connection)
+    if crawl_result == 1:
+        app_df = save_developer_info(app_df, database_connection)
     insert_columns = [x for x in STORE_APP_COLUMNS if x in app_df.columns]
-    try:
-        store_apps_df = upsert_df(
-            table_name=table_name,
-            df=app_df,
-            insert_columns=insert_columns,
-            key_columns=key_columns,
-            database_connection=database_connection,
-            return_rows=True,
-        )
-        app_df["store_app"] = store_apps_df["id"].astype(object)[0]
-    except Exception as error:
-        logger.error(f"Error on insert app_df: {error=}")
-    logger.info(f"{info} scraped and saved app and developer")
+    store_apps_df = upsert_df(
+        table_name=table_name,
+        df=app_df,
+        insert_columns=insert_columns,
+        key_columns=key_columns,
+        database_connection=database_connection,
+        return_rows=True,
+    )
+    app_df["store_app"] = store_apps_df["id"].astype(object)[0]
+    logger.info(f"{info} {crawl_result=} scraped and saved app")
     return app_df
 
 
@@ -454,99 +435,105 @@ def crawl_app_ads(database_connection, limit=5000) -> None:
     df = query_pub_domains(database_connection=database_connection, limit=limit)
     logger.info("Crawl app-ads from pub domains")
     for i, row in df.iterrows():
-        app_url = row.url
-        row_info = f"{i=}, {app_url=}"
-        logger.info(f"{row_info} start")
-        # Get App Ads.txt Text File
-        try:
-            raw_txt = get_app_ads_text(app_url)
-            raw_txt_df = parse_ads_txt(txt=raw_txt)
-            txt_df = clean_raw_txt_df(txt_df=raw_txt_df.copy())
-            row["crawl_result"] = 1
-        except NoAdsTxt as error:
-            logger.warning(f"{row_info} ads.txt not found {error}")
-            row["crawl_result"] = 3
-        except AdsTxtEmpty as error:
-            logger.error(f"{row_info} ads.txt parsing error {error}")
-            row["crawl_result"] = 2
-        except ConnectionError as error:
-            logger.error(f"{row_info} domain not found {error}")
-            row["crawl_result"] = 3
-        except Exception as error:
-            logger.error(f"{row_info} unknown error: {error}")
-            row["crawl_result"] = 4
-        insert_columns = ["url", "crawl_result"]
-        pub_domain_df = pd.DataFrame(row).T
-        pub_domain_df["crawl_result"] = pub_domain_df["crawl_result"].astype(int)
-        pub_domain_df = upsert_df(
-            table_name="pub_domains",
-            df=pub_domain_df,
-            insert_columns=insert_columns,
-            key_columns=["url"],
-            database_connection=database_connection,
-            return_rows=True,
-        )
-        if row.crawl_result != 1:
-            continue
-        insert_columns = ["domain"]
-        ad_domains = txt_df[["domain"]].drop_duplicates()
-        domain_df = upsert_df(
-            table_name="ad_domains",
-            df=ad_domains,
-            insert_columns=insert_columns,
-            key_columns=["domain"],
-            database_connection=database_connection,
-            return_rows=True,
-        )
-        app_df = pd.merge(
-            txt_df, domain_df, how="left", on=["domain"], validate="many_to_one"
-        ).rename(columns={"id": "ad_domain"})
-        app_df["pub_domain"] = pub_domain_df["id"].astype(object)[0]
+        url = row.url
+        scrape_app_ads_url(url=url, database_connection=database_connection)
+    logger.info("Crawl app-ads from pub domains finished")
+
+
+def scrape_app_ads_url(url: str, database_connection):
+    info = f"{url=} scrape app-ads.txt"
+    result_dict = {}
+    result_dict["url"] = url
+    logger.info(f"{info} start")
+    # Get App Ads.txt Text File
+    try:
+        raw_txt = get_app_ads_text(url)
+        raw_txt_df = parse_ads_txt(txt=raw_txt)
+        txt_df = clean_raw_txt_df(txt_df=raw_txt_df.copy())
+        result_dict["crawl_result"] = 1
+    except NoAdsTxt as error:
+        logger.warning(f"{info} ads.txt not found {error}")
+        result_dict["crawl_result"] = 3
+    except AdsTxtEmpty as error:
+        logger.error(f"{info} ads.txt parsing error {error}")
+        result_dict["crawl_result"] = 2
+    except requests.exceptions.ConnectionError as error:
+        logger.warning(f"{info} domain not found {error}")
+        result_dict["crawl_result"] = 3
+    except Exception as error:
+        logger.error(f"{info} unknown error: {error}")
+        result_dict["crawl_result"] = 4
+    insert_columns = ["url", "crawl_result"]
+    pub_domain_df = pd.DataFrame([result_dict])
+    pub_domain_df["crawl_result"] = pub_domain_df["crawl_result"].astype(int)
+    pub_domain_df = upsert_df(
+        table_name="pub_domains",
+        df=pub_domain_df,
+        insert_columns=insert_columns,
+        key_columns=["url"],
+        database_connection=database_connection,
+        return_rows=True,
+    )
+    if result_dict.crawl_result != 1:
+        return
+    insert_columns = ["domain"]
+    ad_domains = txt_df[["domain"]].drop_duplicates()
+    domain_df = upsert_df(
+        table_name="ad_domains",
+        df=ad_domains,
+        insert_columns=insert_columns,
+        key_columns=["domain"],
+        database_connection=database_connection,
+        return_rows=True,
+    )
+    app_df = pd.merge(
+        txt_df, domain_df, how="left", on=["domain"], validate="many_to_one"
+    ).rename(columns={"id": "ad_domain"})
+    app_df["pub_domain"] = pub_domain_df["id"].astype(object)[0]
+    insert_columns = [
+        "ad_domain",
+        "publisher_id",
+        "relationship",
+        "certification_auth",
+    ]
+    if "notes" in app_df.columns:
         insert_columns = [
             "ad_domain",
             "publisher_id",
             "relationship",
             "certification_auth",
+            "notes",
         ]
-        if "notes" in df.columns:
-            insert_columns = [
-                "ad_domain",
-                "publisher_id",
-                "relationship",
-                "certification_auth",
-                "notes",
-            ]
-        key_cols = ["ad_domain", "publisher_id", "relationship"]
-        app_df = app_df.drop_duplicates(subset=key_cols)
-        entrys_df = upsert_df(
-            table_name="app_ads_entrys",
-            df=app_df,
-            insert_columns=insert_columns,
-            key_columns=key_cols,
-            database_connection=database_connection,
-            return_rows=True,
-        )
-        entrys_df = entrys_df.rename(columns={"id": "app_ads_entry"})
-        app_df_final = pd.merge(
-            app_df,
-            entrys_df,
-            how="left",
-            on=["ad_domain", "publisher_id", "relationship"],
-            validate="many_to_one",
-        )
-        insert_columns = ["pub_domain", "app_ads_entry"]
-        null_df = app_df_final[app_df_final.app_ads_entry.isnull()]
-        if not null_df.empty:
-            logger.warning(f"{null_df=} NULLs in app_ads_entry")
-        upsert_df(
-            table_name="app_ads_map",
-            insert_columns=insert_columns,
-            df=app_df_final,
-            key_columns=insert_columns,
-            database_connection=database_connection,
-        )
-        logger.info(f"{row_info} finished")
-    logger.info("Crawl app-ads from pub domains finished")
+    key_cols = ["ad_domain", "publisher_id", "relationship"]
+    app_df = app_df.drop_duplicates(subset=key_cols)
+    entrys_df = upsert_df(
+        table_name="app_ads_entrys",
+        df=app_df,
+        insert_columns=insert_columns,
+        key_columns=key_cols,
+        database_connection=database_connection,
+        return_rows=True,
+    )
+    entrys_df = entrys_df.rename(columns={"id": "app_ads_entry"})
+    app_df_final = pd.merge(
+        app_df,
+        entrys_df,
+        how="left",
+        on=["ad_domain", "publisher_id", "relationship"],
+        validate="many_to_one",
+    )
+    insert_columns = ["pub_domain", "app_ads_entry"]
+    null_df = app_df_final[app_df_final.app_ads_entry.isnull()]
+    if not null_df.empty:
+        logger.warning(f"{null_df=} NULLs in app_ads_entry")
+    upsert_df(
+        table_name="app_ads_map",
+        insert_columns=insert_columns,
+        df=app_df_final,
+        key_columns=insert_columns,
+        database_connection=database_connection,
+    )
+    logger.info(f"{info} finished")
 
 
 def scrape_ios_frontpage(database_connection) -> None:
