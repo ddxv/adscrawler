@@ -27,19 +27,19 @@ def check_config_dirs():
 
 def get_logger(mod_name):
     format = "%(asctime)s: %(name)s: %(levelname)s: %(message)s"
-    logger = logging.getLogger(mod_name)
     check_config_dirs()
     filename = f"{LOG_DIR}/adscrawler.log"
     # Writes to file
-    logging.basicConfig(format=format, level=logging.INFO, filename=filename)
-    # Writes to stdout
-    ch = logging.StreamHandler()
-    ch.setLevel(logging.INFO)
-    ch.setFormatter(logging.Formatter(format))
-    logger.addHandler(ch)
-    # add a rotating handler
-    handler = RotatingFileHandler(filename=filename, maxBytes=10000000, backupCount=50)
-    logger.addHandler(handler)
+    rotate_handler = RotatingFileHandler(
+        filename=filename, maxBytes=50000000, backupCount=50
+    )
+    # Stream handler for stdout
+    logging.basicConfig(
+        format=format,
+        level=logging.INFO,
+        handlers=[rotate_handler, logging.StreamHandler()],
+    )
+    logger = logging.getLogger(mod_name)
     return logger
 
 
