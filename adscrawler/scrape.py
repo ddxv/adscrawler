@@ -6,7 +6,7 @@ from itunes_app_scraper.util import (
 )
 from itunes_app_scraper.scraper import AppStoreScraper
 import google_play_scraper
-from adscrawler.config import get_logger
+from adscrawler.config import get_logger, MODULE_DIR
 import pandas as pd
 import tldextract
 import requests
@@ -25,7 +25,7 @@ logger = get_logger(__name__)
 def js_update_ids_file(filepath: str) -> None:
     if os.path.exists(filepath):
         os.remove(filepath)
-    os.system("node pullAppIds.js")
+    os.system(f"node {MODULE_DIR}/pullAppIds.js")
     logger.info("Js pull finished")
 
 
