@@ -474,7 +474,7 @@ def scrape_app_ads_url(url: str, database_connection):
         database_connection=database_connection,
         return_rows=True,
     )
-    if result_dict.crawl_result != 1:
+    if result_dict["crawl_result"] != 1:
         return
     insert_columns = ["domain"]
     ad_domains = txt_df[["domain"]].drop_duplicates()
