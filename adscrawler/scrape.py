@@ -102,7 +102,7 @@ def get_app_ads_text(app_url: str) -> str:
             response = request_app_ads(ads_url=sub_domains_url)
             return response.text
         except NoAdsTxt as error:
-            logger.error(f"{error}")
+            logger.warning(f"{error}")
     response = request_app_ads(ads_url=top_domain_url)
     return response.text
 
