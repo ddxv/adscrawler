@@ -1,4 +1,5 @@
 import pandas as pd
+import datetime
 from adscrawler.connection import PostgresCon
 from adscrawler.config import get_logger
 import numpy as np
@@ -102,10 +103,14 @@ def query_pub_domains(database_connection, limit=10000):
 def query_store_apps(
     stores: list[int], database_connection, limit: int = 1000
 ) -> pd.DataFrame:
+    before_date = (datetime.datetime.today() - datetime.timedelta(days=3)).strftime(
+        "%Y-%m-%d"
+    )
     where_str = "store IN (" + (", ").join([str(x) for x in stores]) + ")"
-    where_str += """ AND (installs >= 10000 
-                    OR review_count >= 1000
+    where_str += """ AND (installs >= 1000
+                    OR review_count >= 100
                     OR crawl_result IS NULL) """
+    where_str += f""" AND updated_at <= {before_date}"""
     sel_query = f"""SELECT store, id as store_app, store_id, updated_at  
         FROM store_apps
         WHERE {where_str}
