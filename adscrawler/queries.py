@@ -110,7 +110,7 @@ def query_store_apps(
     where_str += """ AND (installs >= 1000
                     OR review_count >= 100
                     OR crawl_result IS NULL) """
-    where_str += f""" AND updated_at <= {before_date}"""
+    where_str += f""" AND updated_at <= '{before_date}'"""
     sel_query = f"""SELECT store, id as store_app, store_id, updated_at  
         FROM store_apps
         WHERE {where_str}
