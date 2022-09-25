@@ -5,24 +5,25 @@ from sshtunnel import SSHTunnelForwarder
 logger = get_logger(__name__)
 
 
-def get_db_connection(is_local_db):
+def get_db_connection(use_ssh_tunnel: bool = False):
     server_name = "madrone"
-    if is_local_db:
-        local_port = 5432
-    else:
-        server = OpenSSHTunnel(server_name)
+    host = CONFIG[server_name]["host"]  # Remote server
+    if use_ssh_tunnel:
+        ssh_username = CONFIG[server_name]["os_user"]
+        server = OpenSSHTunnel(host, ssh_username)
         server.start()
-        local_port = str(server.local_bind_port)
-    conn = PostgresCon(server_name, "127.0.0.1", local_port)
+        db_port = str(server.local_bind_port)
+        host = "127.0.0.1"
+    else:
+        db_port = 5432
+    conn = PostgresCon(server_name, host, db_port)
     return conn
 
 
-def OpenSSHTunnel(server_name):
+def OpenSSHTunnel(remote_host: str, ssh_username: str):
     with SSHTunnelForwarder(
-        (CONFIG[server_name]["host"], 22),  # Remote server IP and SSH port
-        ssh_username=CONFIG[server_name]["os_user"],
-        # ssh_pkey=CONFIG["ssh"]["pkey"],
-        # ssh_private_key_password=CONFIG["ssh"]["pkey_password"],
+        (remote_host, 22),  # Remote server IP and SSH port
+        ssh_username=ssh_username,
         remote_bind_address=("127.0.0.1", 5432),
     ) as server:  # PostgreSQL server IP and sever port on remote machine
         server.start()  # start ssh sever
@@ -44,9 +45,6 @@ class PostgresCon:
     db_uri = None
     db_user = None
     db_ip = None
-    ssh_pkey_password = None
-    ssh_pkey = None
-    ssh_username = None
 
     def __init__(self, my_db, db_ip, db_port):
         self.db_name = my_db

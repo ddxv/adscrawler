@@ -38,15 +38,15 @@ def manage_cli_args() -> None:
         default=["android", "ios"],
     )
     parser.add_argument(
-        "-l",
-        "--is-local-db",
-        help="Connect to local db on port 5432",
+        "-t",
+        "--use-ssh-tunnel",
+        help="Use SSH tunnel with port fowarding to connect",
         default=False,
         action="store_true",
     )
     parser.add_argument(
-        "-s",
-        "--single-run-check",
+        "-l",
+        "--limit-processes",
         help="If included prevent running if script already running",
         default=False,
         action="store_true",
@@ -59,8 +59,7 @@ def manage_cli_args() -> None:
         action="store_true",
     )
     args, leftovers = parser.parse_known_args()
-
-    if args.single_run_check and script_has_process():
+    if args.limit_processes and script_has_process():
         logger.warning("Script already running, exiting")
         quit()
     return args
@@ -91,7 +90,7 @@ def main(args) -> None:
 if __name__ == "__main__":
     logger.info("Starting app-ads.txt crawler")
     args = manage_cli_args()
-    PGCON = get_db_connection(args.is_local_db)
+    PGCON = get_db_connection(use_ssh_tunnel=args.use_ssh_tunnel)
     PGCON.set_engine()
 
     main(args)
