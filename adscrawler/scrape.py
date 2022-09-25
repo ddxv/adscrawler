@@ -384,13 +384,10 @@ def scrape_and_save_app(store, store_id, database_connection):
 
 def crawl_stores_for_app_details(df: pd.DataFrame, database_connection) -> None:
     logger.info(f"Update App Details: df: {df.shape}")
-    rows = df.shape[0]
     for index, row in df.iterrows():
-        logger.info(f"Update App Details row {index} of {rows} start")
         store_id = row.store_id
         store = row.store
         update_all_app_info(store, store_id, database_connection)
-        logger.info(f"Update App Details row {index} of {rows} finish")
 
 
 def update_all_app_info(store: int, store_id: str, database_connection) -> None:
@@ -416,7 +413,6 @@ def update_all_app_info(store: int, store_id: str, database_connection) -> None:
         database_connection=database_connection,
         return_rows=True,
     )
-    logger.info(f"{info} saved developer url")
     app_df["pub_domain"] = app_urls_df["id"].astype(object)[0]
     insert_columns = ["store_app", "pub_domain"]
     key_columns = ["store_app"]
@@ -427,7 +423,6 @@ def update_all_app_info(store: int, store_id: str, database_connection) -> None:
         key_columns=key_columns,
         database_connection=database_connection,
     )
-    logger.info(f"{info} updated app urls map")
     logger.info(f"{info} finished")
 
 
