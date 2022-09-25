@@ -366,7 +366,7 @@ def scrape_and_save_app(store, store_id, database_connection):
     crawl_result = app_df["crawl_result"].values[0]
     table_name = "store_apps"
     key_columns = ["store", "store_id"]
-    if crawl_result == 1:
+    if crawl_result == 1 and app_df["developer_id"].notnull().all():
         app_df = save_developer_info(app_df, database_connection)
     insert_columns = [x for x in STORE_APP_COLUMNS if x in app_df.columns]
     store_apps_df = upsert_df(
