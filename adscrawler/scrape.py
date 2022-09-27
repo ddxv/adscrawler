@@ -392,7 +392,6 @@ def crawl_stores_for_app_details(df: pd.DataFrame, database_connection) -> None:
 
 def update_all_app_info(store: int, store_id: str, database_connection) -> None:
     info = f"{store=} {store_id=}"
-    logger.info(f"{info} start")
     app_df = scrape_and_save_app(store, store_id, database_connection)
     if "store_app" not in app_df.columns:
         logger.error(f"{info} store_app db id not in app_df columns")
