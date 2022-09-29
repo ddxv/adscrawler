@@ -434,7 +434,7 @@ def crawl_app_ads(database_connection, limit=5000) -> None:
     logger.info("Crawl app-ads from pub domains finished")
 
 
-def scrape_app_ads_url(url: str, database_connection):
+def scrape_app_ads_url(url: str, database_connection) -> None:
     info = f"{url=} scrape app-ads.txt"
     result_dict = {}
     result_dict["url"] = url
