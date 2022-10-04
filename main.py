@@ -58,6 +58,20 @@ def manage_cli_args() -> None:
         default=False,
         action="store_true",
     )
+    parser.add_argument(
+        "-u",
+        "--update-app-store-details",
+        help="Scrape app stores for app details, ie downloads",
+        default=False,
+        action="store_true",
+    )
+    parser.add_argument(
+        "-a",
+        "--app-ads-txt-scrape",
+        help="Scrape app stores for app details, ie downloads",
+        default=False,
+        action="store_true",
+    )
     args, leftovers = parser.parse_known_args()
     if args.limit_processes and script_has_process():
         logger.warning("Script already running, exiting")
@@ -69,6 +83,10 @@ def main(args) -> None:
     logger.info(f"Main starting with args: {args}")
     platforms = args.platforms if "args" in locals() else ["android", "ios"]
     new_apps_check = args.new_apps_check if "args" in locals() else False
+    update_app_store_details = (
+        args.update_app_store_details if "args" in locals() else False
+    )
+    app_ads_txt_scrape = args.app_ads_txt_scrape if "args" in locals() else False
     stores = []
     stores.append(1) if "android" in platforms else None
     stores.append(2) if "ios" in platforms else None
@@ -81,10 +99,12 @@ def main(args) -> None:
             scrape_gp_for_app_ids(PGCON)
 
     # Update the app details
-    update_app_details(stores, PGCON, limit=20000)
+    if update_app_store_details:
+        update_app_details(stores, PGCON, limit=20000)
 
     # Crawl developwer websites to check for app ads
-    crawl_app_ads(PGCON, limit=5000)
+    if app_ads_txt_scrape:
+        crawl_app_ads(PGCON, limit=5000)
 
 
 if __name__ == "__main__":
