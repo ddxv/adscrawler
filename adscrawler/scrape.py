@@ -530,27 +530,56 @@ def scrape_app_ads_url(url: str, database_connection) -> None:
     logger.info(f"{info} finished")
 
 
-def scrape_ios_frontpage(database_connection) -> None:
+def scrape_ios_frontpage(
+    database_connection, category_keyword: str = None, collection_keyword: str = None
+) -> None:
     logger.info("Scrape iOS frontpage for new apps")
     scraper = AppStoreScraper()
-    categories = {k: v for k, v in AppStoreCategories.__dict__.items() if "GAME" in k}
-    collections = {
-        k: v
-        for k, v in AppStoreCollections.__dict__.items()
-        if "_I" in k and "PAID" not in k
-    }
-    store_ids = []
+    # Eg: MAGAZINES_MEN, GAMES_ADVENTURE
+    if category_keyword:
+        category_keyword = category_keyword.upper()
+        categories = {
+            k: v
+            for k, v in AppStoreCategories.__dict__.items()
+            if (category_keyword in k.upper()) and (not k.startswith("__"))
+        }
+    else:
+        categories = {
+            k: v
+            for k, v in AppStoreCategories.__dict__.items()
+            if not k.startswith("__")
+        }
+    # Eg: TOP_PAID / TOP_FREE
+    if collection_keyword:
+        collection_keyword = collection_keyword.upper()
+        collections = {
+            k: v
+            for k, v in AppStoreCollections.__dict__.items()
+            if not k.startswith("__")
+            and "_MAC" not in k
+            and (collection_keyword in k.upper())
+        }
+    else:
+        collections = {
+            k: v
+            for k, v in AppStoreCollections.__dict__.items()
+            if not k.startswith("__") and "_MAC" not in k
+        }
+    all_scraped_ids = []
     for coll_key, coll_value in collections.items():
         logger.info(f"Collection: {coll_value}")
         for cat_key, cat_value in categories.items():
-            logger.info(f"Collection: {coll_value}, category: {cat_value}")
-            coll_key, coll_value, cat_key, cat_value
-            new_ids = scraper.get_app_ids_for_collection(
-                collection=coll_value, category=cat_value, num=200, timeout=10
+            logger.info(f"Collection: {coll_value}, category: {cat_key}")
+            scraped_ids = scraper.get_app_ids_for_collection(
+                collection=coll_value,
+                category=cat_value,
+                country="us",
+                num=200,
+                timeout=10,
             )
-            store_ids += new_ids
-    store_ids = list(set(store_ids))
-    apps_df = pd.DataFrame({"store": 2, "store_id": store_ids})
+            all_scraped_ids += scraped_ids
+    all_scraped_ids = list(set(all_scraped_ids))
+    apps_df = pd.DataFrame({"store": 2, "store_id": all_scraped_ids})
     insert_columns = ["store", "store_id"]
     logger.info(f"Scrape iOS frontpage for new apps: insert to db {apps_df.shape=}")
     upsert_df(

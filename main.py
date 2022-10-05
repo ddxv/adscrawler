@@ -94,7 +94,7 @@ def main(args) -> None:
     # Scrape Store for new apps
     if new_apps_check:
         if 1 in stores:
-            scrape_ios_frontpage(PGCON)
+            scrape_ios_frontpage(PGCON, collection_keyword="NEW")
         if 2 in stores:
             scrape_gp_for_app_ids(PGCON)
 
