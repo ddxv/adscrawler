@@ -89,12 +89,26 @@ def upsert_df(
         return get_df
 
 
-def query_pub_domains(database_connection, limit=10000):
-    # Query Pub Domain Table
-    sel_query = f"""SELECT id, url, crawled_at
-        FROM pub_domains
-        ORDER BY crawled_at NULLS FIRST
-        limit {limit}
+def query_pub_domains(database_connection, limit=10000) -> pd.DataFrame:
+    """Query pub domains
+    that have apps which are ad supported and still on store
+    params: limit: int number of rows to return
+    """
+    sel_query = f"""SELECT
+            pd.id, pd.url, pd.crawled_at
+        FROM
+            app_urls_map aum
+        LEFT JOIN pub_domains pd ON
+            pd.id = aum.pub_domain
+        LEFT JOIN store_apps sa ON
+            sa.id = aum.store_app
+        WHERE
+            sa.ad_supported
+            AND sa.crawl_result = 1
+        ORDER BY
+            pd.crawled_at NULLS FIRST
+        LIMIT {limit}
+        ; 
         """
     df = pd.read_sql(sel_query, database_connection.engine)
     return df
