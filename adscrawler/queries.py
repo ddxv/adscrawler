@@ -121,8 +121,8 @@ def query_store_apps(
         "%Y-%m-%d"
     )
     where_str = "store IN (" + (", ").join([str(x) for x in stores]) + ")"
-    where_str += """ AND (installs >= 1000
-                    OR review_count >= 100
+    where_str += """ AND (installs >= 100
+                    OR review_count >= 10
                     OR crawl_result IS NULL) """
     where_str += f""" AND updated_at <= '{before_date}'"""
     sel_query = f"""SELECT store, id as store_app, store_id, updated_at  
