@@ -1,4 +1,10 @@
-from adscrawler.queries import upsert_df, query_store_apps, query_pub_domains
+from adscrawler.queries import (
+    upsert_df,
+    query_store_apps,
+    query_pub_domains,
+    query_developers,
+    query_store_ids,
+)
 from itunes_app_scraper.util import (
     AppStoreCollections,
     AppStoreCategories,
@@ -8,6 +14,7 @@ from itunes_app_scraper.scraper import AppStoreScraper
 import google_play_scraper
 from adscrawler.config import get_logger, MODULE_DIR
 from urllib3 import PoolManager
+import datetime
 import pandas as pd
 import tldextract
 import requests
@@ -614,6 +621,44 @@ def scrape_ios_frontpage(
         database_connection=database_connection,
     )
     logger.info("Scrape iOS frontpage for new apps finished")
+
+
+def crawl_developers_for_new_store_ids(database_connection, store: int):
+    ios_scraper = AppStoreScraper()
+    store_ids = query_store_ids(database_connection, store=store)
+    df = query_developers(database_connection, store=store)
+    for id, row in df.iterrows():
+        row_info = f'{store=} developer_id={row["developer_id"]}'
+        new_store_ids = []
+        if row.store == 2:
+            developers_store_ids = ios_scraper.get_app_ids_for_developer(
+                developer_id=row["developer_id"]
+            )
+            developers_store_ids = [str(x) for x in developers_store_ids]
+            new_store_ids = [x for x in developers_store_ids if x not in store_ids]
+        if len(new_store_ids) > 0:
+            apps_df = pd.DataFrame({"store": row.store, "store_id": new_store_ids})
+            insert_columns = ["store", "store_id"]
+            upsert_df(
+                table_name="store_apps",
+                insert_columns=insert_columns,
+                df=apps_df,
+                key_columns=insert_columns,
+                database_connection=database_connection,
+            )
+        dev_df = pd.DataFrame(row).T[["id"]].rename(columns={"id": "developer"})
+        dev_df[["apps_crawled_at"]] = datetime.datetime.utcnow()
+        insert_columns = dev_df.columns.tolist()
+        key_columns = ["developer"]
+        upsert_df(
+            table_name="developers_crawled_at",
+            schema="logging",
+            insert_columns=insert_columns,
+            df=dev_df,
+            key_columns=key_columns,
+            database_connection=database_connection,
+        )
+        logger.info(f"{row_info=} crawled, {len(new_store_ids)} new store ids")
 
 
 def update_app_details(

@@ -5,6 +5,7 @@ from adscrawler.scrape import (
     scrape_ios_frontpage,
     scrape_gp_for_app_ids,
     update_app_details,
+    crawl_developers_for_new_store_ids,
 )
 import argparse
 import os
@@ -97,6 +98,7 @@ def main(args) -> None:
             scrape_ios_frontpage(PGCON, collection_keyword="NEW")
         if 2 in stores:
             scrape_gp_for_app_ids(PGCON)
+            crawl_developers_for_new_store_ids(database_connection=PGCON, store=2)
 
     # Update the app details
     if update_app_store_details:

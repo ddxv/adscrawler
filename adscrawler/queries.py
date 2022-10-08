@@ -89,6 +89,39 @@ def upsert_df(
         return get_df
 
 
+def query_developers(database_connection, store, limit: int = 1000) -> pd.DataFrame:
+    before_date = (datetime.datetime.today() - datetime.timedelta(days=7)).strftime(
+        "%Y-%m-%d"
+    )
+    sel_query = f"""SELECT
+        *
+        FROM
+        developers d
+        LEFT JOIN logging.developers_crawled_at dc
+        ON d.id = dc.developer
+        WHERE store = {store} 
+            AND (apps_crawled_at <= {before_date} OR apps_crawled_at IS NULL)
+        ORDER BY apps_crawled_at NULLS FIRST
+        limit {limit}
+        ;
+        """
+    df = pd.read_sql(sel_query, database_connection.engine)
+    return df
+
+
+def query_store_ids(database_connection, store: int) -> list:
+    sel_query = f"""SELECT
+        store_id
+        FROM
+        store_apps
+        WHERE store = {store}
+        ;
+        """
+    df = pd.read_sql(sel_query, database_connection.engine)
+    store_ids = df["store_id"].tolist()
+    return store_ids
+
+
 def query_pub_domains(database_connection, limit=10000) -> pd.DataFrame:
     """Query pub domains
     that have apps which are ad supported and still on store
