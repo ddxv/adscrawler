@@ -23,7 +23,7 @@ def script_has_process() -> bool:
         x for x in processes if "/adscrawler/main.py" in x and "/bin/sh" not in x
     ]
     if len(my_processes) > 1:
-        logger.warning(f"Already running {my_processes}")
+        logger.info(f"Already running {my_processes}")
         already_running = True
     return already_running
 
@@ -74,7 +74,7 @@ def manage_cli_args() -> None:
     )
     args, leftovers = parser.parse_known_args()
     if args.limit_processes and script_has_process():
-        logger.warning("Script already running, exiting")
+        logger.info("Script already running, exiting")
         quit()
     return args
 

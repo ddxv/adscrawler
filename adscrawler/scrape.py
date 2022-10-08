@@ -7,6 +7,7 @@ from itunes_app_scraper.util import (
 from itunes_app_scraper.scraper import AppStoreScraper
 import google_play_scraper
 from adscrawler.config import get_logger, MODULE_DIR
+from urllib3 import PoolManager
 import pandas as pd
 import tldextract
 import requests
@@ -58,25 +59,47 @@ def scrape_gp_for_app_ids(database_connection):
     logger.info("Scrape GP frontpage for new apps finished")
 
 
-def request_app_ads(ads_url: str) -> requests.Response:
+def request_app_ads(ads_url: str) -> str:
     if not "http" == ads_url[0:4]:
         ads_url = "http://" + ads_url
-    response = requests.get(ads_url, timeout=2)
-    if response.status_code == 403:
+    pool = PoolManager()
+    response = pool.request("GET", ads_url, preload_content=False, timeout=2)
+    # TODO: Handle 403?
+    if response.status == 403:
         headers = {
             "User-Agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:84.0)",
         }
-        response = requests.get(ads_url, headers=headers, timeout=2)
-    if response.status_code != 200:
-        err = f"{ads_url} status_code: {response.status_code}"
+        response = pool.request(
+            "GET", ads_url, headers=headers, timeout=2, preload_content=False
+        )
+    if response.status != 200:
+        err = f"{ads_url} status_code: {response.status}"
         raise NoAdsTxt(err)
-    if "<head>" in response.text:
+    # Maximum amount we want to read
+    max_bytes = 1000000
+    content_bytes = response.headers.get("Content-Length")
+    if content_bytes and int(content_bytes) < max_bytes:
+        # Expected body is smaller than our maximum, read the whole thing
+        text = response.read()
+    else:
+        # Alternatively, stream until we hit our limit
+        amount_read = 0
+        text = b""
+        for chunk in response.stream():
+            amount_read += len(chunk)
+            # Save chunk
+            text += chunk
+            if amount_read > max_bytes:
+                logger.warning("Encountered large file, quitting")
+                raise NoAdsTxt("File too large")
+    text = text.decode("utf-8")
+    if "<head>" in text:
         err = f"{ads_url} HTML in adstxt"
         raise NoAdsTxt(err)
-    if not any(term in response.text.upper() for term in ["DIRECT", "RESELLER"]):
+    if not any(term in text.upper() for term in ["DIRECT", "RESELLER"]):
         err = "DIRECT, RESELLER not in ads.txt"
         raise NoAdsTxt(err)
-    return response
+    return text
 
 
 class NoAdsTxt(Exception):
@@ -87,8 +110,8 @@ class AdsTxtEmpty(Exception):
     pass
 
 
-def get_app_ads_text(app_url: str) -> str:
-    ext_url = tldextract.extract(app_url)
+def get_app_ads_text(url: str) -> str:
+    ext_url = tldextract.extract(url)
     sub_domains_url = ""
     if ext_url.subdomain:
         # Note contains all subdomains, even m
@@ -99,12 +122,13 @@ def get_app_ads_text(app_url: str) -> str:
     top_domain_url = "http://" + top_domain_url
     if sub_domains_url:
         try:
-            response = request_app_ads(ads_url=sub_domains_url)
-            return response.text
+            text = request_app_ads(ads_url=sub_domains_url)
+            return text
         except NoAdsTxt as error:
-            logger.warning(f"{error}")
-    response = request_app_ads(ads_url=top_domain_url)
-    return response.text
+            info = f"{top_domain_url=}, {sub_domains_url=} {error=}"
+            logger.warning(f"Subdomain has no ads.txt {info}")
+    text = request_app_ads(ads_url=top_domain_url)
+    return text
 
 
 def parse_ads_txt(txt: str) -> pd.DataFrame:
