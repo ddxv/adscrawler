@@ -100,7 +100,7 @@ def query_developers(database_connection, store, limit: int = 1000) -> pd.DataFr
         LEFT JOIN logging.developers_crawled_at dc
         ON d.id = dc.developer
         WHERE store = {store} 
-            AND (apps_crawled_at <= {before_date} OR apps_crawled_at IS NULL)
+            AND (apps_crawled_at <= '{before_date}' OR apps_crawled_at IS NULL)
         ORDER BY apps_crawled_at NULLS FIRST
         limit {limit}
         ;
