@@ -13,7 +13,6 @@ from itunes_app_scraper.util import (
 from itunes_app_scraper.scraper import AppStoreScraper
 import google_play_scraper
 from adscrawler.config import get_logger, MODULE_DIR
-from urllib3 import PoolManager
 import datetime
 import pandas as pd
 import tldextract
@@ -69,39 +68,35 @@ def scrape_gp_for_app_ids(database_connection):
 
 
 def request_app_ads(ads_url: str) -> str:
+    max_bytes = 100000
     if not "http" == ads_url[0:4]:
         ads_url = "http://" + ads_url
-    pool = PoolManager()
-    response = pool.request("GET", ads_url, preload_content=False, timeout=2)
-    # TODO: Handle 403?
-    if response.status == 403:
+    response = requests.get(ads_url, stream=True, timeout=2)
+    if response.status_code == 403:
         headers = {
             "User-Agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:84.0)",
         }
-        response = pool.request(
-            "GET", ads_url, headers=headers, timeout=2, preload_content=False
-        )
-    if response.status != 200:
-        err = f"{ads_url} status_code: {response.status}"
+        response = requests.get(ads_url, headers=headers, timeout=2, stream=True)
+    if response.status_code != 200:
+        err = f"{ads_url} status_code: {response.status_code}"
         raise NoAdsTxt(err)
     # Maximum amount we want to read
-    max_bytes = 1000000
     content_bytes = response.headers.get("Content-Length")
     if content_bytes and int(content_bytes) < max_bytes:
         # Expected body is smaller than our maximum, read the whole thing
-        text = response.read()
+        text = response.text
     else:
         # Alternatively, stream until we hit our limit
         amount_read = 0
         text = b""
-        for chunk in response.stream():
+        for chunk in response.iter_content():
             amount_read += len(chunk)
             # Save chunk
             text += chunk
             if amount_read > max_bytes:
                 logger.warning("Encountered large file, quitting")
                 raise NoAdsTxt("File too large")
-    text = text.decode("utf-8")
+        text = text.decode("utf-8")
     if "<head>" in text:
         err = f"{ads_url} HTML in adstxt"
         raise NoAdsTxt(err)
