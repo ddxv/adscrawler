@@ -53,7 +53,9 @@ def scrape_gp_for_app_ids(database_connection):
         logger.warning(f"JS pull failed with {error=}")
     ids = get_js_ids(filepath)
     ids = list(set(ids))
-    df = pd.DataFrame({"store": 1, "store_id": ids})
+    existing_store_ids = query_store_ids(database_connection, store=1)
+    only_new = [x for x in ids if x not in existing_store_ids]
+    df = pd.DataFrame({"store": 1, "store_id": only_new})
     insert_columns = ["store", "store_id"]
     logger.info(f"Scrape GP frontpage for new apps: insert to db {df.shape=}")
     upsert_df(
@@ -610,7 +612,9 @@ def scrape_ios_frontpage(
             )
             all_scraped_ids += scraped_ids
     all_scraped_ids = list(set(all_scraped_ids))
-    apps_df = pd.DataFrame({"store": 2, "store_id": all_scraped_ids})
+    existing_store_ids = query_store_ids(database_connection, store=2)
+    only_new = [x for x in all_scraped_ids if str(x) not in existing_store_ids]
+    apps_df = pd.DataFrame({"store": 2, "store_id": only_new})
     insert_columns = ["store", "store_id"]
     logger.info(f"Scrape iOS frontpage for new apps: insert to db {apps_df.shape=}")
     upsert_df(
