@@ -129,13 +129,15 @@ def query_pub_domains(
     that have apps which are ad supported and still on store
     params: limit: int number of rows to return
     """
+    limit_str = ""
+    exclude_str = ""
     if exclude_recent_days:
         before_date = (
             datetime.datetime.today() - datetime.timedelta(days=exclude_recent_days)
         ).strftime("%Y-%m-%d")
         exclude_str = f"AND (pd.crawled_at <= '{before_date}' OR pd.crawled_at IS NULL)"
-    else:
-        exclude_str = ""
+    if limit:
+        limit_str = f"LIMIT {limit}"
     sel_query = f"""SELECT
             DISTINCT pd.id, pd.url, pd.crawled_at
         FROM
@@ -150,7 +152,7 @@ def query_pub_domains(
             {exclude_str}
         ORDER BY
             pd.crawled_at NULLS FIRST
-        LIMIT {limit}
+        {limit_str}
         ; 
         """
     df = pd.read_sql(sel_query, database_connection.engine)
@@ -168,7 +170,7 @@ def delete_app_url_mapping(store_app: int, database_connection: PostgresCon) -> 
 
 
 def query_store_apps(
-    stores: list[int], database_connection: PostgresCon, limit: int = 1000
+    stores: list[int], database_connection: PostgresCon, limit: int | None = 1000
 ) -> pd.DataFrame:
     before_date = (datetime.datetime.today() - datetime.timedelta(days=3)).strftime(
         "%Y-%m-%d"
@@ -178,6 +180,9 @@ def query_store_apps(
                     OR review_count >= 10
                     OR crawl_result IS NULL) """
     where_str += f""" AND updated_at <= '{before_date}'"""
+    limit_str = ""
+    if limit:
+        limit_str = f"LIMIT {limit}"
     sel_query = f"""SELECT store, id as store_app, store_id, updated_at  
         FROM store_apps
         WHERE {where_str}
@@ -187,7 +192,7 @@ def query_store_apps(
                 ELSE 1
             END),
             updated_at
-        limit {limit}
+        {limit_str}
         """
     df = pd.read_sql(sel_query, database_connection.engine)
     return df

@@ -73,6 +73,12 @@ def manage_cli_args() -> None:
         default=False,
         action="store_true",
     )
+    parser.add_argument(
+        "--no-limits",
+        help="Run queries without limits",
+        default=False,
+        action="store_true",
+    )
     args, leftovers = parser.parse_known_args()
     if args.limit_processes and script_has_process():
         logger.info("Script already running, exiting")
@@ -84,6 +90,7 @@ def main(args) -> None:
     logger.info(f"Main starting with args: {args}")
     platforms = args.platforms if "args" in locals() else ["android", "ios"]
     new_apps_check = args.new_apps_check if "args" in locals() else False
+    no_limits = args.no_limits if "args" in locals() else False
     update_app_store_details = (
         args.update_app_store_details if "args" in locals() else False
     )
@@ -102,11 +109,19 @@ def main(args) -> None:
 
     # Update the app details
     if update_app_store_details:
+        if no_limits:
+            limit = None
+        else:
+            limit = 20000
         update_app_details(stores, PGCON, limit=20000)
 
     # Crawl developwer websites to check for app ads
     if app_ads_txt_scrape:
-        crawl_app_ads(PGCON, limit=5000)
+        if no_limits:
+            limit = None
+        else:
+            limit = 5000
+        crawl_app_ads(PGCON, limit=limit)
     logger.info("Adscrawler exiting main")
 
 

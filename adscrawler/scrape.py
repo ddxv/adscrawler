@@ -463,7 +463,7 @@ def update_all_app_info(store: int, store_id: str, database_connection) -> None:
     logger.info(f"{info} finished")
 
 
-def crawl_app_ads(database_connection, limit=5000) -> None:
+def crawl_app_ads(database_connection, limit: int | None = 5000) -> None:
     df = query_pub_domains(database_connection=database_connection, limit=limit)
     logger.info("Crawl app-ads from pub domains")
     for i, row in df.iterrows():
