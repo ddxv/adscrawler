@@ -122,16 +122,22 @@ def query_store_ids(database_connection, store: int) -> list:
     return store_ids
 
 
-def query_pub_domains(database_connection, limit=10000) -> pd.DataFrame:
+def query_pub_domains(
+    database_connection, limit=10000, exclude_recent_days=2
+) -> pd.DataFrame:
     """Query pub domains
     that have apps which are ad supported and still on store
     params: limit: int number of rows to return
     """
-    before_date = (datetime.datetime.today() - datetime.timedelta(days=1)).strftime(
-        "%Y-%m-%d"
-    )
+    if exclude_recent_days:
+        before_date = (
+            datetime.datetime.today() - datetime.timedelta(days=exclude_recent_days)
+        ).strftime("%Y-%m-%d")
+        exclude_str = f"AND (pd.crawled_at <= '{before_date}' OR pd.crawled_at IS NULL)"
+    else:
+        exclude_str = ""
     sel_query = f"""SELECT
-            pd.id, pd.url, pd.crawled_at
+            DISTINCT pd.id, pd.url, pd.crawled_at
         FROM
             app_urls_map aum
         LEFT JOIN pub_domains pd ON
@@ -141,7 +147,7 @@ def query_pub_domains(database_connection, limit=10000) -> pd.DataFrame:
         WHERE
             sa.ad_supported
             AND sa.crawl_result = 1
-            AND (pd.crawled_at <= '{before_date}' OR pd.crawled_at IS NULL)
+            {exclude_str}
         ORDER BY
             pd.crawled_at NULLS FIRST
         LIMIT {limit}
