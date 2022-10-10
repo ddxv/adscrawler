@@ -147,8 +147,18 @@ def query_pub_domains(database_connection, limit=10000) -> pd.DataFrame:
     return df
 
 
+def delete_app_url_mapping(store_app: int, database_connection: PostgresCon) -> None:
+    del_query = f"""DELETE
+        FROM app_urls_map
+        WHERE store_app = {store_app}
+        ;
+        """
+    with database_connection.engine.begin() as conn:
+        conn.exec_driver_sql(del_query)
+
+
 def query_store_apps(
-    stores: list[int], database_connection, limit: int = 1000
+    stores: list[int], database_connection: PostgresCon, limit: int = 1000
 ) -> pd.DataFrame:
     before_date = (datetime.datetime.today() - datetime.timedelta(days=3)).strftime(
         "%Y-%m-%d"

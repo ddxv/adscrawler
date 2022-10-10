@@ -1,4 +1,5 @@
 from adscrawler.queries import (
+    delete_app_url_mapping,
     upsert_df,
     query_store_apps,
     query_pub_domains,
@@ -431,8 +432,14 @@ def update_all_app_info(store: int, store_id: str, database_connection) -> None:
     if app_df["crawl_result"].values[0] != 1:
         logger.info(f"{info} crawl not successful, don't update further")
         return
-    if "url" not in app_df.columns or not app_df["url"].values:
+    if (
+        "store_app" in app_df.columns
+        and "url" not in app_df.columns
+        or not app_df["url"].values
+    ):
         logger.info(f"{info} no developer url")
+        store_app = app_df["store_app"].values[0]
+        delete_app_url_mapping(store_app, database_connection)
         return
     app_df["url"] = app_df["url"].apply(lambda x: extract_domains(x))
     insert_columns = ["url"]

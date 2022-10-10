@@ -107,6 +107,7 @@ def main(args) -> None:
     # Crawl developwer websites to check for app ads
     if app_ads_txt_scrape:
         crawl_app_ads(PGCON, limit=5000)
+    logger.info("Adscrawler exiting main")
 
 
 if __name__ == "__main__":
