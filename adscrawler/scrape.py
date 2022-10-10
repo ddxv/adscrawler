@@ -132,7 +132,6 @@ def get_app_ads_text(url: str) -> str:
         except NoAdsTxt as error:
             info = f"{top_domain_url=}, {sub_domains_url=} {error=}"
             logger.warning(f"Subdomain has no ads.txt {info}")
-    top_domain_url = "https://blogspot.com/"
     tld_dont_run = any([True if x in top_domain_url else False for x in IGNORE_TLDS])
     if tld_dont_run:
         raise NoAdsTxt
