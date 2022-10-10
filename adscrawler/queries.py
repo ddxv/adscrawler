@@ -127,6 +127,9 @@ def query_pub_domains(database_connection, limit=10000) -> pd.DataFrame:
     that have apps which are ad supported and still on store
     params: limit: int number of rows to return
     """
+    before_date = (datetime.datetime.today() - datetime.timedelta(days=1)).strftime(
+        "%Y-%m-%d"
+    )
     sel_query = f"""SELECT
             pd.id, pd.url, pd.crawled_at
         FROM
@@ -138,6 +141,7 @@ def query_pub_domains(database_connection, limit=10000) -> pd.DataFrame:
         WHERE
             sa.ad_supported
             AND sa.crawl_result = 1
+            AND (pd.crawled_at <= '{before_date}' OR pd.crawled_at IS NULL)
         ORDER BY
             pd.crawled_at NULLS FIRST
         LIMIT {limit}
