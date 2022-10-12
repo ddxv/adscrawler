@@ -179,8 +179,6 @@ def query_store_apps(
         datetime.datetime.today() - datetime.timedelta(days=short_update_days)
     ).strftime("%Y-%m-%d")
     long_update_days = 15
-    long_update_installs = 0
-    long_update_reviews = 0
     long_update_date = (
         datetime.datetime.today() - datetime.timedelta(days=long_update_days)
     ).strftime("%Y-%m-%d")
@@ -193,9 +191,7 @@ def query_store_apps(
                             ) 
 
                         OR (
-                            installs >= {long_update_installs}
-                                OR review_count >= {long_update_reviews})
-                            AND updated_at <= '{long_update_date}'
+                            updated_at <= '{long_update_date}'
                             )
                         )
                             """
