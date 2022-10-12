@@ -189,7 +189,6 @@ def query_store_apps(
                                 OR review_count >= {short_update_reviews})
                             AND updated_at <= '{short_update_date}'
                             ) 
-
                         OR (
                             updated_at <= '{long_update_date}'
                             )
