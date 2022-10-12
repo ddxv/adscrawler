@@ -113,7 +113,7 @@ def main(args) -> None:
             limit = None
         else:
             limit = 20000
-        update_app_details(stores, PGCON, limit=20000)
+        update_app_details(stores, PGCON, limit=limit)
 
     # Crawl developwer websites to check for app ads
     if app_ads_txt_scrape:

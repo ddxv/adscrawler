@@ -262,6 +262,9 @@ def scrape_app(store: int, store_id: str) -> pd.DataFrame:
         crawl_result = 4
     if crawl_result != 1:
         result_dict = {}
+    if "kind" in result_dict.keys() and result_dict["kind"] == "mac-software":
+        logger.error(f"{scrape_info} Crawled app is not Mac Software, not iOS!")
+        crawl_result = 4
     result_dict["crawl_result"] = crawl_result
     result_dict["store"] = store
     result_dict["store_id"] = store_id
@@ -344,7 +347,7 @@ def clean_ios_app_df(df: pd.DataFrame) -> pd.DataFrame:
         }
     )
     df = df.assign(
-        free=df.price == 0,
+        free=df["price"] == 0,
         developer_id=df["developer_id"].astype(str),
         store_id=df["store_id"].astype(str),
         store_last_updated=pd.to_datetime(df["store_last_updated"]).dt.strftime(
@@ -671,7 +674,7 @@ def crawl_developers_for_new_store_ids(database_connection, store: int):
 
 
 def update_app_details(
-    stores: list[int], database_connection, limit: int = 1000
+    stores: list[int], database_connection, limit: int | None = 1000
 ) -> None:
     logger.info("Update App Details: start with oldest first")
     df = query_store_apps(stores, database_connection=database_connection, limit=limit)
