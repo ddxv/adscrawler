@@ -182,10 +182,9 @@ def query_store_apps(
     long_update_date = (
         datetime.datetime.today() - datetime.timedelta(days=long_update_days)
     ).strftime("%Y-%m-%d")
-    installs_and_dates_str = f""" AND
-                        (
+    installs_and_dates_str = f""" AND (
                             (
-                            installs >= {short_update_installs}
+                            (installs >= {short_update_installs}
                                 OR review_count >= {short_update_reviews})
                             AND updated_at <= '{short_update_date}'
                             ) 
@@ -193,7 +192,7 @@ def query_store_apps(
                             updated_at <= '{long_update_date}'
                             )
                         )
-                            """
+                        """
     where_str = "store IN (" + (", ").join([str(x) for x in stores]) + ")"
     where_str += installs_and_dates_str
     where_str += " OR crawl_result IS NULL "
