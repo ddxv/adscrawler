@@ -172,14 +172,36 @@ def delete_app_url_mapping(store_app: int, database_connection: PostgresCon) -> 
 def query_store_apps(
     stores: list[int], database_connection: PostgresCon, limit: int | None = 1000
 ) -> pd.DataFrame:
-    before_date = (datetime.datetime.today() - datetime.timedelta(days=3)).strftime(
-        "%Y-%m-%d"
-    )
+    short_update_days = 3
+    short_update_installs = 1000
+    short_update_reviews = 100
+    short_update_date = (
+        datetime.datetime.today() - datetime.timedelta(days=short_update_days)
+    ).strftime("%Y-%m-%d")
+    long_update_days = 15
+    long_update_installs = 0
+    long_update_reviews = 0
+    long_update_date = (
+        datetime.datetime.today() - datetime.timedelta(days=long_update_days)
+    ).strftime("%Y-%m-%d")
+    installs_and_dates_str = f""" AND
+                        (
+                            (
+                            installs >= {short_update_installs}
+                                OR review_count >= {short_update_reviews})
+                            AND updated_at <= '{short_update_date}'
+                            ) 
+
+                        OR (
+                            installs >= {long_update_installs}
+                                OR review_count >= {long_update_reviews})
+                            AND updated_at <= '{long_update_date}'
+                            )
+                        )
+                            """
     where_str = "store IN (" + (", ").join([str(x) for x in stores]) + ")"
-    where_str += """ AND (installs >= 100
-                    OR review_count >= 10
-                    OR crawl_result IS NULL) """
-    where_str += f""" AND updated_at <= '{before_date}'"""
+    where_str += installs_and_dates_str
+    where_str += " OR crawl_result IS NULL "
     limit_str = ""
     if limit:
         limit_str = f"LIMIT {limit}"
