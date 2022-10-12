@@ -413,8 +413,21 @@ def scrape_and_save_app(store, store_id, database_connection):
         return_rows=True,
     )
     app_df["store_app"] = store_apps_df["id"].astype(object)[0]
+    log_crawl_results(app_df)
     logger.info(f"{info} {crawl_result=} scraped and saved app")
     return app_df
+
+
+def log_crawl_results(app_df: pd.DataFrame, database_connection):
+    app_df["crawled_at"] = datetime.datetime.utcnow()
+    insert_columns = ["crawl_result", "store", "store_id", "store_app", "crawled_at"]
+    app_df = app_df[insert_columns]
+    app_df.to_sql(
+        name="store_apps_crawl",
+        schema="logging",
+        con=database_connection.engine,
+        if_exists="append",
+    )
 
 
 def crawl_stores_for_app_details(df: pd.DataFrame, database_connection) -> None:
