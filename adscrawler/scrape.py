@@ -264,7 +264,7 @@ def scrape_app(store: int, store_id: str) -> pd.DataFrame:
         result_dict = {}
     if "kind" in result_dict.keys() and "software" in result_dict["kind"]:
         logger.error(f"{scrape_info} Crawled app is not Mac Software, not iOS!")
-        crawl_result = 4
+        crawl_result = 5
     result_dict["crawl_result"] = crawl_result
     result_dict["store"] = store
     result_dict["store_id"] = store_id
