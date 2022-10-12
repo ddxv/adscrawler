@@ -444,9 +444,6 @@ def update_all_app_info(store: int, store_id: str, database_connection) -> None:
     if "store_app" not in app_df.columns:
         logger.error(f"{info} store_app db id not in app_df columns")
         return
-    if app_df["crawl_result"].values[0] != 1:
-        logger.info(f"{info} crawl not successful, don't update further")
-        return
     if (
         "store_app" in app_df.columns
         and "url" not in app_df.columns
@@ -455,6 +452,9 @@ def update_all_app_info(store: int, store_id: str, database_connection) -> None:
         logger.info(f"{info} no developer url")
         store_app = app_df["store_app"].values[0]
         delete_app_url_mapping(store_app, database_connection)
+        return
+    if app_df["crawl_result"].values[0] != 1:
+        logger.info(f"{info} crawl not successful, don't update further")
         return
     app_df["url"] = app_df["url"].apply(lambda x: extract_domains(x))
     insert_columns = ["url"]
