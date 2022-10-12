@@ -681,7 +681,13 @@ def update_app_details(
     crawl_stores_for_app_details(df, database_connection)
 
 
-IGNORE_TLDS = ["blogspot.com", "blogger.com"]
+IGNORE_TLDS = [
+    "blogspot.com",
+    "blogger.com",
+    "wordpress.com",
+    "flycricket.io",
+    "wixsite.com",
+]
 
 STORE_APP_COLUMNS = [
     "developer",
