@@ -687,6 +687,15 @@ IGNORE_TLDS = [
     "wordpress.com",
     "flycricket.io",
     "wixsite.com",
+    "wix.com",
+    "github.io",
+    "tumblr.com",
+    "netlify.com",
+    "bitballoon.com",
+    "facebook.com",
+    "weebly.com",
+    "page.link",
+    "site123.me",
 ]
 
 STORE_APP_COLUMNS = [
