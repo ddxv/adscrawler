@@ -413,7 +413,7 @@ def scrape_and_save_app(store, store_id, database_connection):
         return_rows=True,
     )
     app_df["store_app"] = store_apps_df["id"].astype(object)[0]
-    log_crawl_results(app_df)
+    log_crawl_results(app_df, database_connection=database_connection)
     logger.info(f"{info} {crawl_result=} scraped and saved app")
     return app_df
 
