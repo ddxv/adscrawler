@@ -374,12 +374,15 @@ def save_developer_info(app_df: pd.DataFrame, database_connection) -> pd.DataFra
     assert app_df["developer_id"].values[
         0
     ], f"{app_df['store_id']} Missing Developer ID"
-    df = app_df[["store", "developer_id", "developer_name"]].rename(
-        columns={"developer_name": "name"}
+    df = (
+        app_df[["store", "developer_id", "developer_name"]]
+        .rename(columns={"developer_name": "name"})
+        .drop_duplicates()
     )
     table_name = "developers"
     insert_columns = ["store", "developer_id", "name"]
     key_columns = ["store", "developer_id"]
+
     try:
         dev_df = upsert_df(
             table_name=table_name,
@@ -398,24 +401,36 @@ def save_developer_info(app_df: pd.DataFrame, database_connection) -> pd.DataFra
 def scrape_and_save_app(store, store_id, database_connection):
     info = f"{store=}, {store_id=}"
     app_df = scrape_app(store=store, store_id=store_id)
+    save_apps_df(apps_df=app_df, database_connection=database_connection)
     crawl_result = app_df["crawl_result"].values[0]
+    logger.info(f"{info} {crawl_result=} scraped and saved app")
+
+
+def save_apps_df(
+    apps_df: pd.DataFrame, database_connection, update_developer=True
+) -> None:
     table_name = "store_apps"
     key_columns = ["store", "store_id"]
-    if crawl_result == 1 and app_df["developer_id"].notnull().all():
-        app_df = save_developer_info(app_df, database_connection)
-    insert_columns = [x for x in STORE_APP_COLUMNS if x in app_df.columns]
+    if (
+        (apps_df["crawl_result"] == 1).all()
+        and apps_df["developer_id"].notnull().all()
+        and update_developer
+    ):
+        apps_df = save_developer_info(apps_df, database_connection)
+    insert_columns = [x for x in STORE_APP_COLUMNS if x in apps_df.columns]
     store_apps_df = upsert_df(
         table_name=table_name,
-        df=app_df,
+        df=apps_df,
         insert_columns=insert_columns,
         key_columns=key_columns,
         database_connection=database_connection,
         return_rows=True,
     )
-    app_df["store_app"] = store_apps_df["id"].astype(object)[0]
-    log_crawl_results(app_df, database_connection=database_connection)
-    logger.info(f"{info} {crawl_result=} scraped and saved app")
-    return app_df
+    store_apps_df = store_apps_df.rename(columns={"id": "store_app"})
+    apps_df = pd.merge(
+        apps_df, store_apps_df[["store_id", "store_app"]], how="left", validate="1:1"
+    )
+    log_crawl_results(apps_df, database_connection=database_connection)
 
 
 def log_crawl_results(app_df: pd.DataFrame, database_connection):
@@ -653,24 +668,29 @@ def crawl_developers_for_new_store_ids(database_connection, store: int):
     store_ids = query_store_ids(database_connection, store=store)
     df = query_developers(database_connection, store=store)
     for id, row in df.iterrows():
-        row_info = f'{store=} developer_id={row["developer_id"]}'
-        new_store_ids = []
+        developer_id = row["developer_id"]
+        row_info = f"{store=} {developer_id=}"
         if row.store == 2:
-            developers_store_ids = ios_scraper.get_app_ids_for_developer(
-                developer_id=row["developer_id"]
-            )
-            developers_store_ids = [str(x) for x in developers_store_ids]
-            new_store_ids = [x for x in developers_store_ids if x not in store_ids]
-        if len(new_store_ids) > 0:
-            apps_df = pd.DataFrame({"store": row.store, "store_id": new_store_ids})
-            insert_columns = ["store", "store_id"]
-            upsert_df(
-                table_name="store_apps",
-                insert_columns=insert_columns,
-                df=apps_df,
-                key_columns=insert_columns,
-                database_connection=database_connection,
-            )
+            apps = ios_scraper.get_apps_for_developer(developer_id=developer_id)
+            my_devices = ["iphone", "ipad"]
+            apps = [
+                x
+                for x in apps
+                if "supportedDevices" in x.keys()
+                and any(
+                    map("".join(x["supportedDevices"]).lower().__contains__, my_devices)
+                )
+            ]
+            apps_df = pd.DataFrame(apps).rename(columns={"trackId": "store_id"})
+            if not apps_df.empty:
+                apps_df["store_id"] = apps_df["store_id"].astype(str)
+                apps_df = apps_df[~apps_df["store_id"].isin(store_ids)]
+                if not apps_df.empty:
+                    apps_df["crawl_result"] = 1
+                    apps_df["store"] = 2
+                    apps_df["developer"] = row["id"]
+                    apps_df = clean_scraped_df(df=apps_df, store=row.store)
+                    save_apps_df(apps_df, database_connection, update_developer=False)
         dev_df = pd.DataFrame(row).T[["id"]].rename(columns={"id": "developer"})
         dev_df[["apps_crawled_at"]] = datetime.datetime.utcnow()
         insert_columns = dev_df.columns.tolist()
@@ -683,7 +703,7 @@ def crawl_developers_for_new_store_ids(database_connection, store: int):
             key_columns=key_columns,
             database_connection=database_connection,
         )
-        logger.info(f"{row_info=} crawled, {len(new_store_ids)} new store ids")
+        logger.info(f"{row_info=} crawled, {apps_df.shape[0]} new store ids")
 
 
 def update_app_details(
