@@ -1,3 +1,4 @@
+from adscrawler.connection import PostgresCon
 from adscrawler.queries import (
     delete_app_url_mapping,
     upsert_df,
@@ -398,12 +399,15 @@ def save_developer_info(app_df: pd.DataFrame, database_connection) -> pd.DataFra
     return app_df
 
 
-def scrape_and_save_app(store, store_id, database_connection):
+def scrape_and_save_app(
+    store: int, store_id: str, database_connection: PostgresCon
+) -> pd.DataFrame:
     info = f"{store=}, {store_id=}"
     app_df = scrape_app(store=store, store_id=store_id)
-    save_apps_df(apps_df=app_df, database_connection=database_connection)
+    app_df = save_apps_df(apps_df=app_df, database_connection=database_connection)
     crawl_result = app_df["crawl_result"].values[0]
     logger.info(f"{info} {crawl_result=} scraped and saved app")
+    return app_df
 
 
 def save_apps_df(
@@ -431,6 +435,7 @@ def save_apps_df(
         apps_df, store_apps_df[["store_id", "store_app"]], how="left", validate="1:1"
     )
     log_crawl_results(apps_df, database_connection=database_connection)
+    return apps_df
 
 
 def log_crawl_results(app_df: pd.DataFrame, database_connection):
