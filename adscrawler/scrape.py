@@ -263,7 +263,7 @@ def scrape_app(store: int, store_id: str) -> pd.DataFrame:
         crawl_result = 4
     if crawl_result != 1:
         result_dict = {}
-    if "kind" in result_dict.keys() and "mac" in result_dict["kind"]:
+    if "kind" in result_dict.keys() and "mac" in result_dict["kind"].lower():
         logger.error(f"{scrape_info} Crawled app is not Mac Software, not iOS!")
         crawl_result = 5
     result_dict["crawl_result"] = crawl_result
@@ -347,6 +347,8 @@ def clean_ios_app_df(df: pd.DataFrame) -> pd.DataFrame:
             "userRatingCount": "review_count",
         }
     )
+    if "price" not in df.columns:
+        df["price"] = 0
     df = df.assign(
         free=df["price"] == 0,
         developer_id=df["developer_id"].astype(str),
