@@ -316,6 +316,7 @@ def clean_google_play_app_df(df: pd.DataFrame) -> pd.DataFrame:
     df = df.assign(
         min_installs=df["min_installs"]
         .str.replace(r"[,+]", "", regex=True)
+        .fillna(0)
         .astype(int),
         category=df["category"].str.lower(),
         store_last_updated=pd.to_datetime(
