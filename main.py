@@ -1,11 +1,10 @@
 from adscrawler.connection import get_db_connection
 from adscrawler.config import get_logger
-from adscrawler.scrape import (
-    crawl_app_ads,
-    scrape_ios_frontpage,
-    scrape_gp_for_app_ids,
+from adscrawler.scrape import crawl_app_ads
+from adscrawler.app_stores.scrape_stores import (
     update_app_details,
     crawl_developers_for_new_store_ids,
+    scrape_stores_frontpage,
 )
 import argparse
 import os
@@ -101,11 +100,8 @@ def main(args) -> None:
 
     # Scrape Store for new apps
     if new_apps_check:
-        if 2 in stores:
-            scrape_ios_frontpage(PGCON, collection_keyword="NEW")
-            crawl_developers_for_new_store_ids(database_connection=PGCON, store=2)
-        if 1 in stores:
-            scrape_gp_for_app_ids(PGCON)
+        scrape_stores_frontpage(database_connection=PGCON, stores=stores)
+        crawl_developers_for_new_store_ids(store=2)
 
     # Update the app details
     if update_app_store_details:
