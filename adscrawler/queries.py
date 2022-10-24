@@ -89,7 +89,9 @@ def upsert_df(
         return get_df
 
 
-def query_developers(database_connection, store, limit: int = 1000) -> pd.DataFrame:
+def query_developers(
+    database_connection: PostgresCon, store: int, limit: int = 1000
+) -> pd.DataFrame:
     before_date = (datetime.datetime.today() - datetime.timedelta(days=7)).strftime(
         "%Y-%m-%d"
     )
@@ -109,7 +111,7 @@ def query_developers(database_connection, store, limit: int = 1000) -> pd.DataFr
     return df
 
 
-def query_store_ids(database_connection, store: int) -> list:
+def query_store_ids(database_connection: PostgresCon, store: int) -> list:
     sel_query = f"""SELECT
         store_id
         FROM
