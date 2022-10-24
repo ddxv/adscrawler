@@ -1,3 +1,4 @@
+from adscrawler.connection import PostgresCon
 from adscrawler.queries import (
     upsert_df,
     query_pub_domains,
@@ -181,7 +182,7 @@ def clean_raw_txt_df(txt_df: pd.DataFrame) -> pd.DataFrame:
     return txt_df
 
 
-def crawl_app_ads(database_connection, limit: int | None = 5000) -> None:
+def crawl_app_ads(database_connection: PostgresCon, limit: int | None = 5000) -> None:
     df = query_pub_domains(database_connection=database_connection, limit=limit)
     logger.info("Crawl app-ads from pub domains")
     for i, row in df.iterrows():
@@ -190,7 +191,7 @@ def crawl_app_ads(database_connection, limit: int | None = 5000) -> None:
     logger.info("Crawl app-ads from pub domains finished")
 
 
-def scrape_app_ads_url(url: str, database_connection) -> None:
+def scrape_app_ads_url(url: str, database_connection: PostgresCon) -> None:
     info = f"{url=} scrape app-ads.txt"
     result_dict = {}
     result_dict["url"] = url
