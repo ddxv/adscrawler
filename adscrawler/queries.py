@@ -7,6 +7,10 @@ import uuid
 
 logger = get_logger(__name__)
 
+"""Database Quries
+Most queries attempt to stay simple without significant processing
+"""
+
 
 def upsert_df(
     df: pd.DataFrame,

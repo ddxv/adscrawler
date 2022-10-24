@@ -46,7 +46,7 @@ class PostgresCon:
     db_user = None
     db_ip = None
 
-    def __init__(self, my_db, db_ip, db_port):
+    def __init__(self, my_db: str, db_ip: str, db_port: str) -> None:
         self.db_name = my_db
         self.db_ip = db_ip
         self.db_port = db_port

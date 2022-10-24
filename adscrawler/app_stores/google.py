@@ -6,6 +6,7 @@ from adscrawler.queries import (
 )
 from adscrawler.config import get_logger, MODULE_DIR
 import pandas as pd
+from adscrawler.connection import PostgresCon
 
 logger = get_logger(__name__)
 
@@ -31,7 +32,7 @@ def get_js_ids(filepath: str) -> list[str]:
     return ids
 
 
-def scrape_gp_for_app_ids(database_connection):
+def scrape_gp_for_app_ids(database_connection: PostgresCon):
     logger.info("Scrape GP frontpage for new apps start")
     filepath = "/tmp/googleplay_ids.txt"
     try:

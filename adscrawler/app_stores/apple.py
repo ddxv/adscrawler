@@ -4,6 +4,7 @@ from itunes_app_scraper.util import (
 )
 from itunes_app_scraper.scraper import AppStoreScraper
 import pandas as pd
+from adscrawler.connection import PostgresCon
 from adscrawler.queries import (
     upsert_df,
     query_store_ids,
@@ -14,7 +15,9 @@ logger = get_logger(__name__)
 
 
 def scrape_ios_frontpage(
-    database_connection, category_keyword: str = None, collection_keyword: str = None
+    database_connection: PostgresCon,
+    category_keyword: str = None,
+    collection_keyword: str = None,
 ) -> None:
     logger.info("Scrape iOS frontpage for new apps")
     scraper = AppStoreScraper()
@@ -77,7 +80,12 @@ def scrape_ios_frontpage(
     logger.info("Scrape iOS frontpage for new apps finished")
 
 
-def crawl_ios_developers(database_connection, developer_db_id, developer_id, store_ids):
+def crawl_ios_developers(
+    database_connection: PostgresCon,
+    developer_db_id: int,
+    developer_id: str,
+    store_ids: list[str],
+) -> pd.DataFrame:
     store = 2
     ios_scraper = AppStoreScraper()
     apps = ios_scraper.get_apps_for_developer(developer_id=developer_id)

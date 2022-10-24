@@ -11,21 +11,21 @@ LOG_DIR = pathlib.Path(CONFIG_DIR, pathlib.Path("logs"))
 MODULE_DIR = pathlib.Path(__file__).resolve().parent.parent
 
 
-def handle_exception(exc_type, exc_value, exc_traceback):
+def handle_exception(exc_type, exc_value, exc_traceback) -> None:
     if issubclass(exc_type, KeyboardInterrupt):
         sys.__excepthook__(exc_type, exc_value, exc_traceback)
         return
     logger.critical("Uncaught exception", exc_info=(exc_type, exc_value, exc_traceback))
 
 
-def check_config_dirs():
+def check_config_dirs() -> None:
     dirs = [TOP_CONFIGDIR, CONFIG_DIR, LOG_DIR]
     for dir in dirs:
         if not pathlib.Path.exists(dir):
             pathlib.Path.mkdir(dir, exist_ok=True)
 
 
-def get_logger(mod_name):
+def get_logger(mod_name: str) -> logging.Logger:
     format = "%(asctime)s: %(name)s: %(levelname)s: %(message)s"
     check_config_dirs()
     filename = f"{LOG_DIR}/adscrawler.log"
