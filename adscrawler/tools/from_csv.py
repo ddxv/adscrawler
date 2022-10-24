@@ -5,9 +5,9 @@ from adscrawler.queries import upsert_df
 logger = get_logger(__name__)
 
 
-def reinsert_from_csv():
+def reinsert_from_csv(filename: str) -> pd.DataFrame:
 
-    filename = f"{MODULE_DIR}/store-data/763K_plus_IOS_Apps_Info.csv"
+    filename = f"{MODULE_DIR}/{filename}"
     chunksize = 10000
     i = 0
     store = 2
