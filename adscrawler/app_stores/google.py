@@ -41,7 +41,7 @@ def scrape_gp_for_app_ids(database_connection: PostgresCon):
         logger.warning(f"JS pull failed with {error=}")
     ids = get_js_ids(filepath)
     ids = list(set(ids))
-    existing_store_ids = query_store_ids(database_connection, store=1)
+    existing_store_ids = query_store_ids(database_connection, store=1, store_ids=ids)
     only_new = [x for x in ids if x not in existing_store_ids]
     df = pd.DataFrame({"store": 1, "store_id": only_new})
     insert_columns = ["store", "store_id"]

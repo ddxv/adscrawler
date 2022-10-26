@@ -65,7 +65,9 @@ def scrape_ios_frontpage(
             )
             all_scraped_ids += scraped_ids
     all_scraped_ids = list(set(all_scraped_ids))
-    existing_store_ids = query_store_ids(database_connection, store=2)
+    existing_store_ids = query_store_ids(
+        database_connection, store=2, store_ids=all_scraped_ids
+    )
     only_new = [x for x in all_scraped_ids if str(x) not in existing_store_ids]
     apps_df = pd.DataFrame({"store": 2, "store_id": only_new})
     insert_columns = ["store", "store_id"]
