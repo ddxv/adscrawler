@@ -1,6 +1,6 @@
 from adscrawler.connection import PostgresCon
 from itunes_app_scraper.util import AppStoreException
-from .apple import (
+from adscrawler.app_stores.apple import (
     scrape_app_ios,
     clean_ios_app_df,
     crawl_ios_developers,
@@ -49,7 +49,7 @@ def crawl_developers_for_new_store_ids(database_connection, store: int):
     store_ids = query_store_ids(database_connection, store=store)
     df = query_developers(database_connection, store=store)
     for id, row in df.iterrows():
-        developer_db_id = row["developer"]
+        developer_db_id = row["id"]
         developer_id = row["developer_id"]
         row_info = f"{store=} {developer_id=}"
         if store == 2:
@@ -59,12 +59,11 @@ def crawl_developers_for_new_store_ids(database_connection, store: int):
         if not apps_df.empty:
             apps_df = clean_scraped_df(df=apps_df, store=store)
             save_apps_df(apps_df, database_connection, update_developer=False)
-        dev_df = pd.DataFrame(
-            {
-                "developer": developer_db_id,
-                "apps_crawled_at": datetime.datetime.utcnow(),
-            }
-        )
+        dev_dict = {
+            "developer": developer_db_id,
+            "apps_crawled_at": datetime.datetime.utcnow(),
+        }
+        dev_df = pd.DataFrame([dev_dict])
         insert_columns = dev_df.columns.tolist()
         key_columns = ["developer"]
         upsert_df(
