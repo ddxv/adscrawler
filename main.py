@@ -101,7 +101,7 @@ def main(args) -> None:
     # Scrape Store for new apps
     if new_apps_check:
         scrape_stores_frontpage(database_connection=PGCON, stores=stores)
-        crawl_developers_for_new_store_ids(store=2)
+        crawl_developers_for_new_store_ids(database_connection=PGCON, store=2)
 
     # Update the app details
     if update_app_store_details:
