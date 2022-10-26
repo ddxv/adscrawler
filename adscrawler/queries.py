@@ -115,16 +115,27 @@ def query_developers(
     return df
 
 
-def query_store_ids(database_connection: PostgresCon, store: int) -> list:
+def query_store_ids(
+    database_connection: PostgresCon, store: int, store_ids: str = None
+) -> list:
+    if store_ids:
+        store_ids_list = "'" + "','".join(store_ids) + "'"
+        store_ids_str = f"""AND store_id in ({store_ids_list}) """
+    else:
+        store_ids_str = ""
     sel_query = f"""SELECT
         store_id
         FROM
         store_apps
         WHERE store = {store}
+        {store_ids_str}
         ;
         """
     df = pd.read_sql(sel_query, database_connection.engine)
-    store_ids = df["store_id"].tolist()
+    if not df.empty:
+        store_ids = df["store_id"].tolist()
+    else:
+        store_ids = []
     return store_ids
 
 
