@@ -6,7 +6,6 @@ logger = get_logger(__name__)
 
 
 def reinsert_from_csv(filename: str) -> pd.DataFrame:
-
     filename = f"{MODULE_DIR}/{filename}"
     chunksize = 10000
     i = 0

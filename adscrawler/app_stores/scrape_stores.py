@@ -48,7 +48,7 @@ def extract_domains(x: str) -> str:
 def crawl_developers_for_new_store_ids(database_connection, store: int):
     store_ids = query_store_ids(database_connection, store=store)
     df = query_developers(database_connection, store=store)
-    for id, row in df.iterrows():
+    for _id, row in df.iterrows():
         developer_db_id = row["id"]
         developer_id = row["developer_id"]
         row_info = f"{store=} {developer_id=}"
@@ -87,7 +87,7 @@ def update_app_details(
 
 def crawl_stores_for_app_details(df: pd.DataFrame, database_connection) -> None:
     logger.info(f"Update App Details: df: {df.shape}")
-    for index, row in df.iterrows():
+    for _index, row in df.iterrows():
         store_id = row.store_id
         store = row.store
         update_all_app_info(store, store_id, database_connection)
