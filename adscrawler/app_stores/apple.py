@@ -52,7 +52,7 @@ def scrape_ios_frontpage(
             if not k.startswith("__") and "_MAC" not in k
         }
     all_scraped_ids = []
-    for coll_key, coll_value in collections.items():
+    for _coll_key, coll_value in collections.items():
         logger.info(f"Collection: {coll_value}")
         for cat_key, cat_value in categories.items():
             logger.info(f"Collection: {coll_value}, category: {cat_key}")

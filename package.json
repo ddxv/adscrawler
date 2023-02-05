@@ -17,6 +17,7 @@
   },
   "homepage": "https://github.com/ddxv/adscrawler#readme",
   "dependencies": {
-    "google-play-scraper": "^9.1.1"
+    "google-play-scraper": "^9.1.1",
+    "http-cache-semantics": "^4.1.1"
   }
 }

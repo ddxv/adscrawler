@@ -72,7 +72,6 @@ def clean_google_play_app_df(df: pd.DataFrame) -> pd.DataFrame:
             "developerWebsite": "url",
             "developerId": "developer_id",
             "developer": "developer_name",
-            "reviews": "review_count",
             "genreId": "category",
         }
     )
