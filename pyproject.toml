@@ -1,0 +1,22 @@
+[project]
+authors = [{ name = "James O'Claire" }]
+name = "adscrawler"
+description = "project description adscrawler"
+version = "0.1.1"
+dependencies = ["pandas", "numpy", "requests"]
+
+[project.optional-dependencies]
+dev = ["pre-commit", "bump2version"]
+
+[build-system]
+requires = ["setuptools", "wheel"]
+
+[tool.ruff]
+# Enable flake8-bugbear (`B`) rules.
+select = ["E", "F", "B"]
+
+# Never enforce `E501` (line length violations).
+ignore = ["E501"]
+
+# Avoid trying to fix flake8-bugbear (`B`) violations.
+unfixable = ["B"]
