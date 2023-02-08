@@ -8,10 +8,11 @@ repos:
     hooks:
       - id: flake8
   - repo: https://github.com/charliermarsh/ruff-pre-commit
-    rev: "v0.0.241"
+    rev: "v0.0.243"
     hooks:
       - id: ruff
   - repo: https://github.com/pre-commit/mirrors-mypy
     rev: "v1.0.0"
     hooks:
       - id: mypy
+        additional_dependencies: ["types-requests", "types-PyYAML"]

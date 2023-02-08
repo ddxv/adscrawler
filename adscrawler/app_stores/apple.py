@@ -16,8 +16,8 @@ logger = get_logger(__name__)
 
 def scrape_ios_frontpage(
     database_connection: PostgresCon,
-    category_keyword: str = None,
-    collection_keyword: str = None,
+    category_keyword: str | None = None,
+    collection_keyword: str | None = None,
 ) -> None:
     logger.info("Scrape iOS frontpage for new apps")
     scraper = AppStoreScraper()

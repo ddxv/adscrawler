@@ -9,6 +9,7 @@ import tldextract
 import requests
 import csv
 import io
+from typing import TypedDict
 
 """
     Pulling, parsing and save to db for app-ads.txt
@@ -39,15 +40,15 @@ def request_app_ads(ads_url: str) -> str:
     else:
         # Alternatively, stream until we hit our limit
         amount_read = 0
-        text = b""
+        mybytes = b""
         for chunk in response.iter_content():
             amount_read += len(chunk)
             # Save chunk
-            text += chunk
+            mybytes += chunk
             if amount_read > max_bytes:
                 logger.warning("Encountered large file, quitting")
                 raise NoAdsTxt("File too large")
-        text = text.decode("utf-8")
+        text = mybytes.decode("utf-8")
     if "<head>" in text:
         err = f"{ads_url} HTML in adstxt"
         raise NoAdsTxt(err)
@@ -191,11 +192,15 @@ def crawl_app_ads(database_connection: PostgresCon, limit: int | None = 5000) ->
     logger.info("Crawl app-ads from pub domains finished")
 
 
+class ResultDict(TypedDict):
+    crawl_result: int
+    url: str
+
+
 def scrape_app_ads_url(url: str, database_connection: PostgresCon) -> None:
     info = f"{url=} scrape app-ads.txt"
-    result_dict = {}
-    result_dict["url"] = url
     logger.info(f"{info} start")
+    result_dict = ResultDict(url=url, crawl_result=4)
     # Get App Ads.txt Text File
     try:
         raw_txt = get_app_ads_text(url)
