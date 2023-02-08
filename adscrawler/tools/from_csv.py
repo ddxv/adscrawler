@@ -1,11 +1,11 @@
 from adscrawler.config import MODULE_DIR, get_logger
 import pandas as pd
-from adscrawler.queries import upsert_df
+from adscrawler.queries import upsert_df, PostgresCon
 
 logger = get_logger(__name__)
 
 
-def reinsert_from_csv(filename: str) -> pd.DataFrame:
+def reinsert_from_csv(filename: str, database_connection: PostgresCon):
     filename = f"{MODULE_DIR}/{filename}"
     chunksize = 10000
     i = 0
@@ -17,9 +17,10 @@ def reinsert_from_csv(filename: str) -> pd.DataFrame:
             logger.info(f"chunk {i}")
             chunk["platform"] = platform
             chunk["store"] = store
-            chunk.columns = [x.replace(" ", "_").lower() for x in chunk.columns]
+            my_columns = [x.replace(" ", "_").lower() for x in chunk.columns]
+            chunk.columns = my_columns
             if store == 1:
-                insert_columns = chunk.columns.tolist()
+                insert_columns = my_columns
             if store == 2:
                 chunk = chunk.rename(
                     columns={
@@ -47,5 +48,6 @@ def reinsert_from_csv(filename: str) -> pd.DataFrame:
                 insert_columns=insert_columns,
                 df=chunk,
                 key_columns=["platform", "store", "app_id"],
+                database_connection=database_connection,
             )
             i += 1

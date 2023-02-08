@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine
+import sqlalchemy
 from adscrawler.config import CONFIG, get_logger
 from sshtunnel import SSHTunnelForwarder
 
@@ -15,7 +15,7 @@ def get_db_connection(use_ssh_tunnel: bool = False):
         db_port = str(server.local_bind_port)
         host = "127.0.0.1"
     else:
-        db_port = 5432
+        db_port = str(5432)
     conn = PostgresCon(server_name, host, db_port)
     return conn
 
@@ -39,7 +39,7 @@ class PostgresCon:
         my_db: String, passed on init, string name of db
     """
 
-    engine = None
+    engine = sqlalchemy.engine
     db_name = None
     db_pass = None
     db_uri = None
@@ -61,7 +61,7 @@ class PostgresCon:
             db_login = f"postgresql://{self.db_user}:{self.db_pass}"
             db_uri = f"{db_login}@{self.db_ip}:{self.db_port}/{self.db_name}"
             logger.info(f"Connecting to PostgreSQL {self.db_name}")
-            self.engine = create_engine(
+            self.engine = sqlalchemy.create_engine(
                 db_uri,
                 connect_args={"connect_timeout": 10, "application_name": "adscrawler"},
             )

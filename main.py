@@ -28,7 +28,7 @@ def script_has_process() -> bool:
     return already_running
 
 
-def manage_cli_args() -> None:
+def manage_cli_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "-p",

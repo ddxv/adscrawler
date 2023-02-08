@@ -19,9 +19,9 @@ def upsert_df(
     key_columns: list[str],
     insert_columns: list[str],
     return_rows: bool = False,
-    schema: str = None,
+    schema: str | None = None,
     log: bool = False,
-) -> None | pd.DataFrame:
+):
     """
     Perform an "upsert" on a PostgreSQL table from a DataFrame.
     Constructs an INSERT … ON CONFLICT statement, uploads the DataFrame to a
@@ -55,9 +55,7 @@ def upsert_df(
         returning_str = " RETURNING * ;"
     else:
         returning_str = ""
-
     temp_table = f"temp_{uuid.uuid4().hex[:6]}"
-
     sql_query = f"""INSERT INTO {table_spec} ({insert_col_list})
                 SELECT {insert_col_list} FROM {temp_table}
                 ON CONFLICT ({match_col_list}) 
@@ -91,6 +89,8 @@ def upsert_df(
         conn.execute(f'DROP TABLE "{temp_table}"')
     if return_rows:
         return get_df
+    else:
+        return None
 
 
 def query_developers(
@@ -116,7 +116,7 @@ def query_developers(
 
 
 def query_store_ids(
-    database_connection: PostgresCon, store: int, store_ids: str = None
+    database_connection: PostgresCon, store: int, store_ids: list[str] | None = None
 ) -> list:
     if store_ids:
         store_ids_list = "'" + "','".join(store_ids) + "'"
@@ -133,10 +133,10 @@ def query_store_ids(
         """
     df = pd.read_sql(sel_query, database_connection.engine)
     if not df.empty:
-        store_ids = df["store_id"].tolist()
+        ids = df["store_id"].tolist()
     else:
-        store_ids = []
-    return store_ids
+        ids = []
+    return ids
 
 
 def query_pub_domains(

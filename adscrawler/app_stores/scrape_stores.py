@@ -225,7 +225,7 @@ def scrape_and_save_app(
 
 def save_apps_df(
     apps_df: pd.DataFrame, database_connection, update_developer=True
-) -> None:
+) -> pd.DataFrame:
     table_name = "store_apps"
     key_columns = ["store", "store_id"]
     if (
