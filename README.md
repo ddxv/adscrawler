@@ -1,4 +1,4 @@
-# adscrawler
+# adscrawler project
 
 The ultimate goal is to crawl app-ads.txt files, as based on the Interactive Advertising Bureau's Tech Lab specs. 
 
