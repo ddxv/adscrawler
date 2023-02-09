@@ -1,15 +1,10 @@
-from itunes_app_scraper.util import (
-    AppStoreCollections,
-    AppStoreCategories,
-)
-from itunes_app_scraper.scraper import AppStoreScraper
 import pandas as pd
-from adscrawler.connection import PostgresCon
-from adscrawler.queries import (
-    upsert_df,
-    query_store_ids,
-)
+from itunes_app_scraper.scraper import AppStoreScraper
+from itunes_app_scraper.util import AppStoreCategories, AppStoreCollections
+
 from adscrawler.config import get_logger
+from adscrawler.connection import PostgresCon
+from adscrawler.queries import query_store_ids, upsert_df
 
 logger = get_logger(__name__)
 

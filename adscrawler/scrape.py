@@ -1,15 +1,14 @@
-from adscrawler.connection import PostgresCon
-from adscrawler.queries import (
-    upsert_df,
-    query_pub_domains,
-)
-from adscrawler.config import get_logger
-import pandas as pd
-import tldextract
-import requests
 import csv
 import io
 from typing import TypedDict
+
+import pandas as pd
+import requests
+import tldextract
+
+from adscrawler.config import get_logger
+from adscrawler.connection import PostgresCon
+from adscrawler.queries import query_pub_domains, upsert_df
 
 """
     Pulling, parsing and save to db for app-ads.txt
@@ -31,7 +30,7 @@ def request_app_ads(ads_url: str) -> str:
         response = requests.get(ads_url, headers=headers, timeout=2, stream=True)
     if response.status_code != 200:
         err = f"{ads_url} status_code: {response.status_code}"
-        raise NoAdsTxt(err)
+        raise NoAdsTxtError(err)
     # Maximum amount we want to read
     content_bytes = response.headers.get("Content-Length")
     if content_bytes and int(content_bytes) < max_bytes:
@@ -47,22 +46,22 @@ def request_app_ads(ads_url: str) -> str:
             mybytes += chunk
             if amount_read > max_bytes:
                 logger.warning("Encountered large file, quitting")
-                raise NoAdsTxt("File too large")
+                raise NoAdsTxtError("File too large")
         text = mybytes.decode("utf-8")
     if "<head>" in text:
         err = f"{ads_url} HTML in adstxt"
-        raise NoAdsTxt(err)
+        raise NoAdsTxtError(err)
     if not any(term in text.upper() for term in ["DIRECT", "RESELLER"]):
         err = "DIRECT, RESELLER not in ads.txt"
-        raise NoAdsTxt(err)
+        raise NoAdsTxtError(err)
     return text
 
 
-class NoAdsTxt(Exception):
+class NoAdsTxtError(Exception):
     pass
 
 
-class AdsTxtEmpty(Exception):
+class AdsTxtEmptyError(Exception):
     pass
 
 
@@ -80,12 +79,12 @@ def get_app_ads_text(url: str) -> str:
         try:
             text = request_app_ads(ads_url=sub_domains_url)
             return text
-        except NoAdsTxt as error:
+        except NoAdsTxtError as error:
             info = f"{top_domain_url=}, {sub_domains_url=} {error=}"
             logger.warning(f"Subdomain has no ads.txt {info}")
     tld_dont_run = any([True if x in top_domain_url else False for x in IGNORE_TLDS])
     if tld_dont_run:
-        raise NoAdsTxt
+        raise NoAdsTxtError
     text = request_app_ads(ads_url=top_domain_url)
     return text
 
@@ -179,7 +178,7 @@ def clean_raw_txt_df(txt_df: pd.DataFrame) -> pd.DataFrame:
         logger.warning(f"Dropped rows: {dropped_rows}")
     txt_df = txt_df[keep_rows]
     if txt_df.empty:
-        raise AdsTxtEmpty("AdsTxtDF Empty")
+        raise AdsTxtEmptyError("AdsTxtDF Empty")
     return txt_df
 
 
@@ -207,10 +206,10 @@ def scrape_app_ads_url(url: str, database_connection: PostgresCon) -> None:
         raw_txt_df = parse_ads_txt(txt=raw_txt)
         txt_df = clean_raw_txt_df(txt_df=raw_txt_df.copy())
         result_dict["crawl_result"] = 1
-    except NoAdsTxt as error:
+    except NoAdsTxtError as error:
         logger.warning(f"{info} ads.txt not found {error}")
         result_dict["crawl_result"] = 3
-    except AdsTxtEmpty as error:
+    except AdsTxtEmptyError as error:
         logger.error(f"{info} ads.txt parsing error {error}")
         result_dict["crawl_result"] = 2
     except requests.exceptions.ConnectionError as error:

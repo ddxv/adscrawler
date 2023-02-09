@@ -1,9 +1,11 @@
-import pandas as pd
 import datetime
-from adscrawler.connection import PostgresCon
-from adscrawler.config import get_logger
-import numpy as np
 import uuid
+
+import numpy as np
+import pandas as pd
+
+from adscrawler.config import get_logger
+from adscrawler.connection import PostgresCon
 
 logger = get_logger(__name__)
 

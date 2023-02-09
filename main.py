@@ -1,13 +1,14 @@
-from adscrawler.connection import get_db_connection
-from adscrawler.config import get_logger
-from adscrawler.scrape import crawl_app_ads
-from adscrawler.app_stores.scrape_stores import (
-    update_app_details,
-    crawl_developers_for_new_store_ids,
-    scrape_stores_frontpage,
-)
 import argparse
 import os
+
+from adscrawler.app_stores.scrape_stores import (
+    crawl_developers_for_new_store_ids,
+    scrape_stores_frontpage,
+    update_app_details,
+)
+from adscrawler.config import get_logger
+from adscrawler.connection import get_db_connection
+from adscrawler.scrape import crawl_app_ads
 
 logger = get_logger(__name__)
 

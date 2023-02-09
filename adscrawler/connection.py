@@ -1,6 +1,7 @@
 import sqlalchemy
-from adscrawler.config import CONFIG, get_logger
 from sshtunnel import SSHTunnelForwarder
+
+from adscrawler.config import CONFIG, get_logger
 
 logger = get_logger(__name__)
 
@@ -10,7 +11,7 @@ def get_db_connection(use_ssh_tunnel: bool = False):
     host = CONFIG[server_name]["host"]  # Remote server
     if use_ssh_tunnel:
         ssh_username = CONFIG[server_name]["os_user"]
-        server = OpenSSHTunnel(host, ssh_username)
+        server = open_ssh_tunnel(host, ssh_username)
         server.start()
         db_port = str(server.local_bind_port)
         host = "127.0.0.1"
@@ -20,7 +21,7 @@ def get_db_connection(use_ssh_tunnel: bool = False):
     return conn
 
 
-def OpenSSHTunnel(remote_host: str, ssh_username: str):
+def open_ssh_tunnel(remote_host: str, ssh_username: str):
     with SSHTunnelForwarder(
         (remote_host, 22),  # Remote server IP and SSH port
         ssh_username=ssh_username,
