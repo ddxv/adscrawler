@@ -1,24 +1,27 @@
-from adscrawler.connection import PostgresCon
-from itunes_app_scraper.util import AppStoreException
-from adscrawler.app_stores.apple import (
-    scrape_app_ios,
-    clean_ios_app_df,
-    crawl_ios_developers,
-    scrape_ios_frontpage,
-)
-from .google import scrape_app_gp, clean_google_play_app_df, scrape_gp_for_app_ids
+import datetime
+
 import google_play_scraper
 import pandas as pd
+import tldextract
+from itunes_app_scraper.util import AppStoreException
+
+from adscrawler.app_stores.apple import (
+    clean_ios_app_df,
+    crawl_ios_developers,
+    scrape_app_ios,
+    scrape_ios_frontpage,
+)
 from adscrawler.config import get_logger
+from adscrawler.connection import PostgresCon
 from adscrawler.queries import (
-    upsert_df,
     delete_app_url_mapping,
+    query_developers,
     query_store_apps,
     query_store_ids,
-    query_developers,
+    upsert_df,
 )
-import datetime
-import tldextract
+
+from .google import clean_google_play_app_df, scrape_app_gp, scrape_gp_for_app_ids
 
 logger = get_logger(__name__)
 

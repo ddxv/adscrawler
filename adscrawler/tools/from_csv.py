@@ -1,6 +1,7 @@
-from adscrawler.config import MODULE_DIR, get_logger
 import pandas as pd
-from adscrawler.queries import upsert_df, PostgresCon
+
+from adscrawler.config import MODULE_DIR, get_logger
+from adscrawler.queries import PostgresCon, upsert_df
 
 logger = get_logger(__name__)
 

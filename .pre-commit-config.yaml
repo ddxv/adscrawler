@@ -7,8 +7,14 @@ repos:
     rev: 6.0.0
     hooks:
       - id: flake8
+  - repo: https://github.com/pycqa/isort
+    rev: 5.12.0
+    hooks:
+      - id: isort
+        name: isort (python)
   - repo: https://github.com/charliermarsh/ruff-pre-commit
-    rev: "v0.0.243"
+    # Ruff version.
+    rev: "v0.0.244"
     hooks:
       - id: ruff
   - repo: https://github.com/pre-commit/mirrors-mypy

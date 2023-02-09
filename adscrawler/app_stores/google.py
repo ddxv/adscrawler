@@ -1,12 +1,11 @@
-import google_play_scraper
 import os
-from adscrawler.queries import (
-    upsert_df,
-    query_store_ids,
-)
-from adscrawler.config import get_logger, MODULE_DIR
+
+import google_play_scraper
 import pandas as pd
+
+from adscrawler.config import MODULE_DIR, get_logger
 from adscrawler.connection import PostgresCon
+from adscrawler.queries import query_store_ids, upsert_df
 
 logger = get_logger(__name__)
 
