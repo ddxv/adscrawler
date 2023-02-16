@@ -34,7 +34,7 @@ def get_logger(mod_name: str) -> logging.Logger:
     filename = f"{LOG_DIR}/adscrawler.log"
     # Writes to file
     rotate_handler = RotatingFileHandler(
-        filename=filename, maxBytes=50000000, backupCount=50
+        filename=filename, maxBytes=50000000, backupCount=10
     )
     # Stream handler for stdout
     logging.basicConfig(
