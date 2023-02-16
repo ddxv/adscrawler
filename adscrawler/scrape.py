@@ -269,26 +269,27 @@ def scrape_app_ads_url(url: str, database_connection: PostgresCon) -> None:
         database_connection=database_connection,
         return_rows=True,
     )
-    entrys_df = entrys_df.rename(columns={"id": "app_ads_entry"})
-    app_df_final = pd.merge(
-        app_df,
-        entrys_df,
-        how="left",
-        on=["ad_domain", "publisher_id", "relationship"],
-        validate="many_to_one",
-    )
-    insert_columns = ["pub_domain", "app_ads_entry"]
-    null_df = app_df_final[app_df_final.app_ads_entry.isnull()]
-    if not null_df.empty:
-        logger.warning(f"{null_df=} NULLs in app_ads_entry")
-    upsert_df(
-        table_name="app_ads_map",
-        insert_columns=insert_columns,
-        df=app_df_final,
-        key_columns=insert_columns,
-        database_connection=database_connection,
-    )
-    logger.info(f"{info} finished")
+    if entrys_df:
+        entrys_df = entrys_df.rename(columns={"id": "app_ads_entry"})
+        app_df_final = pd.merge(
+            app_df,
+            entrys_df,
+            how="left",
+            on=["ad_domain", "publisher_id", "relationship"],
+            validate="many_to_one",
+        )
+        insert_columns = ["pub_domain", "app_ads_entry"]
+        null_df = app_df_final[app_df_final.app_ads_entry.isnull()]
+        if not null_df.empty:
+            logger.warning(f"{null_df=} NULLs in app_ads_entry")
+        upsert_df(
+            table_name="app_ads_map",
+            insert_columns=insert_columns,
+            df=app_df_final,
+            key_columns=insert_columns,
+            database_connection=database_connection,
+        )
+        logger.info(f"{info} finished")
 
 
 IGNORE_TLDS = [

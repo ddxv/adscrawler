@@ -11,7 +11,7 @@ logger = get_logger(__name__)
 
 
 def scrape_app_gp(store_id: str) -> dict:
-    result = google_play_scraper.app(
+    result: dict = google_play_scraper.app(
         store_id, lang="en", country="us"  # defaults to 'en'  # defaults to 'us'
     )
     return result
@@ -31,7 +31,7 @@ def get_js_ids(filepath: str) -> list[str]:
     return ids
 
 
-def scrape_gp_for_app_ids(database_connection: PostgresCon):
+def scrape_gp_for_app_ids(database_connection: PostgresCon) -> None:
     logger.info("Scrape GP frontpage for new apps start")
     filepath = "/tmp/googleplay_ids.txt"
     try:

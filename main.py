@@ -86,7 +86,7 @@ def manage_cli_args() -> argparse.Namespace:
     return args
 
 
-def main(args) -> None:
+def main(args: argparse.Namespace) -> None:
     logger.info(f"Main starting with args: {args}")
     platforms = args.platforms if "args" in locals() else ["android", "ios"]
     new_apps_check = args.new_apps_check if "args" in locals() else False

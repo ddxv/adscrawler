@@ -105,7 +105,7 @@ def crawl_ios_developers(
 
 def scrape_app_ios(store_id: str) -> dict:
     scraper = AppStoreScraper()
-    result = scraper.get_app_details(store_id)
+    result: dict = scraper.get_app_details(store_id)
     return result
 
 

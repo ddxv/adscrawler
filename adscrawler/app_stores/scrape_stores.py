@@ -26,7 +26,9 @@ from .google import clean_google_play_app_df, scrape_app_gp, scrape_gp_for_app_i
 logger = get_logger(__name__)
 
 
-def scrape_stores_frontpage(database_connection, stores: list[int]) -> None:
+def scrape_stores_frontpage(
+    database_connection: PostgresCon, stores: list[int]
+) -> None:
     if 2 in stores:
         scrape_ios_frontpage(database_connection, collection_keyword="NEW")
 
@@ -48,7 +50,9 @@ def extract_domains(x: str) -> str:
     return url
 
 
-def crawl_developers_for_new_store_ids(database_connection, store: int):
+def crawl_developers_for_new_store_ids(
+    database_connection: PostgresCon, store: int
+) -> None:
     store_ids = query_store_ids(database_connection, store=store)
     df = query_developers(database_connection, store=store)
     for _id, row in df.iterrows():
@@ -81,14 +85,16 @@ def crawl_developers_for_new_store_ids(database_connection, store: int):
 
 
 def update_app_details(
-    stores: list[int], database_connection, limit: int | None = 1000
+    stores: list[int], database_connection: PostgresCon, limit: int | None = 1000
 ) -> None:
     logger.info("Update App Details: start with oldest first")
     df = query_store_apps(stores, database_connection=database_connection, limit=limit)
     crawl_stores_for_app_details(df, database_connection)
 
 
-def crawl_stores_for_app_details(df: pd.DataFrame, database_connection) -> None:
+def crawl_stores_for_app_details(
+    df: pd.DataFrame, database_connection: PostgresCon
+) -> None:
     logger.info(f"Update App Details: df: {df.shape}")
     for _index, row in df.iterrows():
         store_id = row.store_id
@@ -96,7 +102,9 @@ def crawl_stores_for_app_details(df: pd.DataFrame, database_connection) -> None:
         update_all_app_info(store, store_id, database_connection)
 
 
-def update_all_app_info(store: int, store_id: str, database_connection) -> None:
+def update_all_app_info(
+    store: int, store_id: str, database_connection: PostgresCon
+) -> None:
     info = f"{store=} {store_id=}"
     app_df = scrape_and_save_app(store, store_id, database_connection)
     if "store_app" not in app_df.columns:
@@ -124,17 +132,18 @@ def update_all_app_info(store: int, store_id: str, database_connection) -> None:
         database_connection=database_connection,
         return_rows=True,
     )
-    app_df["pub_domain"] = app_urls_df["id"].astype(object)[0]
-    insert_columns = ["store_app", "pub_domain"]
-    key_columns = ["store_app"]
-    upsert_df(
-        table_name="app_urls_map",
-        insert_columns=insert_columns,
-        df=app_df,
-        key_columns=key_columns,
-        database_connection=database_connection,
-    )
-    logger.info(f"{info} finished")
+    if app_urls_df:
+        app_df["pub_domain"] = app_urls_df["id"].astype(object)[0]
+        insert_columns = ["store_app", "pub_domain"]
+        key_columns = ["store_app"]
+        upsert_df(
+            table_name="app_urls_map",
+            insert_columns=insert_columns,
+            df=app_df,
+            key_columns=key_columns,
+            database_connection=database_connection,
+        )
+        logger.info(f"{info} finished")
 
 
 def scrape_from_store(store: int, store_id: str) -> dict:
@@ -187,7 +196,9 @@ def scrape_app(store: int, store_id: str) -> pd.DataFrame:
     return df
 
 
-def save_developer_info(app_df: pd.DataFrame, database_connection) -> pd.DataFrame:
+def save_developer_info(
+    app_df: pd.DataFrame, database_connection: PostgresCon
+) -> pd.DataFrame:
     assert app_df["developer_id"].values[
         0
     ], f"{app_df['store_id']} Missing Developer ID"
@@ -209,6 +220,7 @@ def save_developer_info(app_df: pd.DataFrame, database_connection) -> pd.DataFra
             database_connection=database_connection,
             return_rows=True,
         )
+        assert dev_df is not None, "Dev_df is none!"
         app_df["developer"] = dev_df["id"].astype(object)[0]
     except Exception as error:
         logger.error(f"Developer insert failed with error {error}")
@@ -227,7 +239,9 @@ def scrape_and_save_app(
 
 
 def save_apps_df(
-    apps_df: pd.DataFrame, database_connection, update_developer=True
+    apps_df: pd.DataFrame,
+    database_connection: PostgresCon,
+    update_developer: bool = True,
 ) -> pd.DataFrame:
     table_name = "store_apps"
     key_columns = ["store", "store_id"]
@@ -246,15 +260,19 @@ def save_apps_df(
         database_connection=database_connection,
         return_rows=True,
     )
-    store_apps_df = store_apps_df.rename(columns={"id": "store_app"})
-    apps_df = pd.merge(
-        apps_df, store_apps_df[["store_id", "store_app"]], how="left", validate="1:1"
-    )
+    if store_apps_df:
+        store_apps_df = store_apps_df.rename(columns={"id": "store_app"})
+        apps_df = pd.merge(
+            apps_df,
+            store_apps_df[["store_id", "store_app"]],
+            how="left",
+            validate="1:1",
+        )
     log_crawl_results(apps_df, database_connection=database_connection)
     return apps_df
 
 
-def log_crawl_results(app_df: pd.DataFrame, database_connection):
+def log_crawl_results(app_df: pd.DataFrame, database_connection: PostgresCon) -> None:
     app_df["crawled_at"] = datetime.datetime.utcnow()
     insert_columns = ["crawl_result", "store", "store_id", "store_app", "crawled_at"]
     app_df = app_df[insert_columns]

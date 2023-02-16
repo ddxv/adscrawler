@@ -6,7 +6,7 @@ from adscrawler.queries import PostgresCon, upsert_df
 logger = get_logger(__name__)
 
 
-def reinsert_from_csv(filename: str, database_connection: PostgresCon):
+def reinsert_from_csv(filename: str, database_connection: PostgresCon) -> None:
     filename = f"{MODULE_DIR}/{filename}"
     chunksize = 10000
     i = 0

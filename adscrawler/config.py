@@ -1,6 +1,7 @@
 import logging
 import pathlib
 import sys
+import typing
 from logging.handlers import RotatingFileHandler
 
 import yaml
@@ -12,6 +13,7 @@ LOG_DIR = pathlib.Path(CONFIG_DIR, pathlib.Path("logs"))
 MODULE_DIR = pathlib.Path(__file__).resolve().parent.parent
 
 
+@typing.no_type_check
 def handle_exception(exc_type, exc_value, exc_traceback) -> None:
     if issubclass(exc_type, KeyboardInterrupt):
         sys.__excepthook__(exc_type, exc_value, exc_traceback)

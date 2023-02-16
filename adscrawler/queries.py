@@ -23,7 +23,7 @@ def upsert_df(
     return_rows: bool = False,
     schema: str | None = None,
     log: bool = False,
-):
+) -> pd.DataFrame | None:
     """
     Perform an "upsert" on a PostgreSQL table from a DataFrame.
     Constructs an INSERT … ON CONFLICT statement, uploads the DataFrame to a
@@ -119,7 +119,7 @@ def query_developers(
 
 def query_store_ids(
     database_connection: PostgresCon, store: int, store_ids: list[str] | None = None
-) -> list:
+) -> list[str]:
     if store_ids:
         store_ids_list = "'" + "','".join(store_ids) + "'"
         store_ids_str = f"""AND store_id in ({store_ids_list}) """
@@ -134,6 +134,7 @@ def query_store_ids(
         ;
         """
     df = pd.read_sql(sel_query, database_connection.engine)
+    ids: list = []
     if not df.empty:
         ids = df["store_id"].tolist()
     else:
@@ -142,7 +143,9 @@ def query_store_ids(
 
 
 def query_pub_domains(
-    database_connection, limit=10000, exclude_recent_days=2
+    database_connection: PostgresCon,
+    limit: None | int = 10000,
+    exclude_recent_days: int = 2,
 ) -> pd.DataFrame:
     """Query pub domains
     that have apps which are ad supported and still on store
@@ -234,7 +237,10 @@ def query_store_apps(
 
 
 def query_all(
-    table_name: str, key_cols: list[str] | str, df: pd.DataFrame, database_connection
+    table_name: str,
+    key_cols: list[str] | str,
+    df: pd.DataFrame,
+    database_connection: PostgresCon,
 ) -> pd.DataFrame:
     if isinstance(key_cols, str):
         key_cols = [key_cols]
