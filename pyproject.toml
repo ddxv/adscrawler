@@ -11,6 +11,9 @@ dev = ["pre-commit", "bump2version"]
 [build-system]
 requires = ["setuptools", "wheel"]
 
+
+dependencies = ['requests', 'pandas', 'sqlalchemy', 'google-play-scraper']
+
 [tool.isort]
 profile = 'black'
 
