@@ -8,11 +8,11 @@ dependencies = ["pandas", "numpy", "requests", "sqlalchemy"]
 [project.optional-dependencies]
 dev = ["pre-commit", "bump2version"]
 
+dependencies = ['requests', 'pandas', 'sqlalchemy', 'google-play-scraper']
+
 [build-system]
 requires = ["setuptools", "wheel"]
 
-
-dependencies = ['requests', 'pandas', 'sqlalchemy', 'google-play-scraper']
 
 [tool.isort]
 profile = 'black'
