@@ -269,7 +269,7 @@ def scrape_app_ads_url(url: str, database_connection: PostgresCon) -> None:
         database_connection=database_connection,
         return_rows=True,
     )
-    if entrys_df:
+    if entrys_df is not None and not entrys_df.empty:
         entrys_df = entrys_df.rename(columns={"id": "app_ads_entry"})
         app_df_final = pd.merge(
             app_df,

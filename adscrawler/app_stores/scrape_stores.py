@@ -132,7 +132,7 @@ def update_all_app_info(
         database_connection=database_connection,
         return_rows=True,
     )
-    if app_urls_df:
+    if app_urls_df is not None and not app_urls_df.empty:
         app_df["pub_domain"] = app_urls_df["id"].astype(object)[0]
         insert_columns = ["store_app", "pub_domain"]
         key_columns = ["store_app"]
@@ -260,7 +260,7 @@ def save_apps_df(
         database_connection=database_connection,
         return_rows=True,
     )
-    if store_apps_df and not store_apps_df.empty:
+    if store_apps_df is not None and not store_apps_df.empty:
         store_apps_df = store_apps_df.rename(columns={"id": "store_app"})
         apps_df = pd.merge(
             apps_df,
