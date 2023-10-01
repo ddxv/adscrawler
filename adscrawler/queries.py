@@ -3,6 +3,7 @@ import uuid
 
 import numpy as np
 import pandas as pd
+from sqlalchemy import text
 
 from adscrawler.config import get_logger
 from adscrawler.connection import PostgresCon
@@ -88,7 +89,7 @@ def upsert_df(
             else:
                 logger.warning("Sqlalchemy result did not have rows")
                 get_df = pd.DataFrame()
-        conn.execute(f'DROP TABLE "{temp_table}"')
+        conn.execute(text(f'DROP TABLE "{temp_table}";'))
     if return_rows:
         return get_df
     else:
