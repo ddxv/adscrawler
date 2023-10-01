@@ -2,6 +2,7 @@
 config.yml
 store-data/
 
+.vscode
 .virtualenv/
 node_modules/
 
