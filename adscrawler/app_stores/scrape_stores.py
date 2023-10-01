@@ -260,7 +260,7 @@ def save_apps_df(
         database_connection=database_connection,
         return_rows=True,
     )
-    if store_apps_df:
+    if store_apps_df and not store_apps_df.empty:
         store_apps_df = store_apps_df.rename(columns={"id": "store_app"})
         apps_df = pd.merge(
             apps_df,
