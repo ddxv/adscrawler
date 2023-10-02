@@ -260,8 +260,23 @@ def save_apps_df(
         database_connection=database_connection,
         return_rows=True,
     )
+
     if store_apps_df is not None and not store_apps_df.empty:
         store_apps_df = store_apps_df.rename(columns={"id": "store_app"})
+        store_apps_history = store_apps_df.copy()
+        store_apps_history["crawled_date"] = (
+            datetime.datetime.utcnow().date().strftime("%Y-%m-%d")
+        )
+        table_name = "store_apps_history"
+        insert_columns = ["installs", "review_count", "rating"]
+        key_columns = ["store_app", "crawled_date"]
+        upsert_df(
+            table_name=table_name,
+            df=store_apps_history,
+            insert_columns=insert_columns,
+            key_columns=key_columns,
+            database_connection=database_connection,
+        )
         apps_df = pd.merge(
             apps_df,
             store_apps_df[["store_id", "store_app"]],
