@@ -759,6 +759,43 @@ AS WITH uniq_pub_urls AS (
 WITH DATA;
 
 
+--Make index of just categories
+CREATE MATERIALIZED VIEW mv_app_categories AS
+WITH CategoryMapping AS (
+    SELECT
+        original_category,
+        CASE
+            WHEN original_category IN ('action', 'casual', 'adventure', 'arcade', 'board', 'card', 'casino', 'puzzle', 'racing', 'simulation' , 'strategy', 'trivia', 'word') THEN 'game_' || original_category
+            WHEN original_category = 'news' THEN 'magazines_and_newspapers'
+            WHEN original_category = 'educational' THEN 'education'
+            WHEN original_category = 'book' THEN 'books_and_reference'
+            WHEN original_category = 'navigation' THEN 'maps_and_navigation'
+            WHEN original_category = 'music' THEN 'music_and_audio'
+            WHEN original_category = 'photography' THEN 'photo_and_video'
+            WHEN original_category = 'reference' THEN 'books_and_reference'
+            WHEN original_category = 'role playing' THEN 'game_role_playing'
+            WHEN original_category = 'social' THEN 'social networking'
+            WHEN original_category = 'travel' THEN 'travel_and_local'
+            WHEN original_category = 'utilities' THEN 'tools'
+            WHEN original_category = 'video players_and_editors' THEN 'video_players'
+            ELSE original_category
+        END AS mapped_category
+    FROM (
+        SELECT DISTINCT regexp_replace(lower(sa.category), ' & ', '_and_') AS original_category
+        FROM store_apps sa
+    ) AS DistinctCategories
+)
+SELECT
+    sa.store,
+    cm.mapped_category AS category,
+    COUNT(*) AS app_count
+FROM store_apps sa
+JOIN CategoryMapping cm ON regexp_replace(lower(sa.category), ' & ', '_and_') = cm.original_category
+GROUP BY sa.store, cm.mapped_category
+ORDER BY sa.store, cm.mapped_category
+;
+
+
 
 CREATE OR REPLACE FUNCTION public.pg_stat_statements(showtext boolean, OUT userid oid, OUT dbid oid, OUT toplevel boolean, OUT queryid bigint, OUT query text, OUT plans bigint, OUT total_plan_time double precision, OUT min_plan_time double precision, OUT max_plan_time double precision, OUT mean_plan_time double precision, OUT stddev_plan_time double precision, OUT calls bigint, OUT total_exec_time double precision, OUT min_exec_time double precision, OUT max_exec_time double precision, OUT mean_exec_time double precision, OUT stddev_exec_time double precision, OUT rows bigint, OUT shared_blks_hit bigint, OUT shared_blks_read bigint, OUT shared_blks_dirtied bigint, OUT shared_blks_written bigint, OUT local_blks_hit bigint, OUT local_blks_read bigint, OUT local_blks_dirtied bigint, OUT local_blks_written bigint, OUT temp_blks_read bigint, OUT temp_blks_written bigint, OUT blk_read_time double precision, OUT blk_write_time double precision, OUT temp_blk_read_time double precision, OUT temp_blk_write_time double precision, OUT wal_records bigint, OUT wal_fpi bigint, OUT wal_bytes numeric, OUT jit_functions bigint, OUT jit_generation_time double precision, OUT jit_inlining_count bigint, OUT jit_inlining_time double precision, OUT jit_optimization_count bigint, OUT jit_optimization_time double precision, OUT jit_emission_count bigint, OUT jit_emission_time double precision)
  RETURNS SETOF record
