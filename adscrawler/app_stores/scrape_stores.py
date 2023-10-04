@@ -63,7 +63,9 @@ def crawl_developers_for_new_store_ids(
             apps_df = crawl_ios_developers(developer_db_id, developer_id, store_ids)
         if not apps_df.empty:
             apps_df = clean_scraped_df(df=apps_df, store=store)
-            save_apps_df(apps_df, database_connection, update_developer=False)
+            save_apps_df(
+                apps_df, database_connection, update_developer=False, country="us"
+            )
         dev_dict = {
             "developer": developer_db_id,
             "apps_crawled_at": datetime.datetime.utcnow(),
@@ -144,11 +146,11 @@ def update_all_app_info(
         logger.info(f"{info} finished")
 
 
-def scrape_from_store(store: int, store_id: str) -> dict:
+def scrape_from_store(store: int, store_id: str, country: str) -> dict:
     if store == 1:
-        result_dict = scrape_app_gp(store_id)
+        result_dict = scrape_app_gp(store_id, country=country)
     elif store == 2:
-        result_dict = scrape_app_ios(store_id)
+        result_dict = scrape_app_ios(store_id, country=country)
     else:
         logger.error(f"Store not supported {store=}")
     return result_dict
@@ -162,10 +164,10 @@ def clean_scraped_df(df: pd.DataFrame, store: int) -> pd.DataFrame:
     return df
 
 
-def scrape_app(store: int, store_id: str) -> pd.DataFrame:
+def scrape_app(store: int, store_id: str, country: str) -> pd.DataFrame:
     scrape_info = f"{store=}, {store_id=}"
     try:
-        result_dict = scrape_from_store(store=store, store_id=store_id)
+        result_dict = scrape_from_store(store=store, store_id=store_id, country=country)
         crawl_result = 1
     except google_play_scraper.exceptions.NotFoundError:
         crawl_result = 3
@@ -228,9 +230,13 @@ def save_developer_info(
 def scrape_and_save_app(
     store: int, store_id: str, database_connection: PostgresCon
 ) -> pd.DataFrame:
-    info = f"{store=}, {store_id=}"
-    app_df = scrape_app(store=store, store_id=store_id)
-    app_df = save_apps_df(apps_df=app_df, database_connection=database_connection)
+    country_list = ["us"]
+    for country in country_list:
+        info = f"{store=}, {store_id=}, {country=}"
+        app_df = scrape_app(store=store, store_id=store_id, country=country)
+        app_df = save_apps_df(
+            apps_df=app_df, database_connection=database_connection, country=country
+        )
     crawl_result = app_df["crawl_result"].values[0]
     logger.info(f"{info} {crawl_result=} scraped and saved app")
     return app_df
@@ -239,6 +245,7 @@ def scrape_and_save_app(
 def save_apps_df(
     apps_df: pd.DataFrame,
     database_connection: PostgresCon,
+    country: str,
     update_developer: bool = True,
 ) -> pd.DataFrame:
     table_name = "store_apps"
@@ -262,12 +269,19 @@ def save_apps_df(
     if store_apps_df is not None and not store_apps_df.empty:
         store_apps_df = store_apps_df.rename(columns={"id": "store_app"})
         store_apps_history = store_apps_df.copy()
+        store_apps_history["country"] = country.upper()
         store_apps_history["crawled_date"] = (
             datetime.datetime.utcnow().date().strftime("%Y-%m-%d")
         )
-        table_name = "store_apps_history"
-        insert_columns = ["installs", "review_count", "rating"]
-        key_columns = ["store_app", "crawled_date"]
+        table_name = "store_apps_country_history"
+        insert_columns = [
+            "installs",
+            "review_count",
+            "rating",
+            "rating_count",
+            "histogram",
+        ]
+        key_columns = ["store_app", "country", "crawled_date"]
         upsert_df(
             table_name=table_name,
             df=store_apps_history,

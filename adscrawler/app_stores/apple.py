@@ -1,3 +1,5 @@
+import re
+
 import numpy as np
 import pandas as pd
 from itunes_app_scraper.scraper import AppStoreScraper
@@ -103,9 +105,11 @@ def crawl_ios_developers(
     return apps_df
 
 
-def scrape_app_ios(store_id: str) -> dict:
+def scrape_app_ios(store_id: str, country: str) -> dict:
+    # NOTE: averageUserRating, Rating_count, Histogram are country specific
     scraper = AppStoreScraper()
-    result: dict = scraper.get_app_details(store_id, country="us")
+    result: dict = scraper.get_app_details(store_id, country=country, add_ratings=True)
+
     return result
 
 
@@ -122,7 +126,8 @@ def clean_ios_app_df(df: pd.DataFrame) -> pd.DataFrame:
             "currentVersionReleaseDate": "store_last_updated",
             "artistId": "developer_id",
             "artistName": "developer_name",
-            "userRatingCount": "review_count",
+            "userRatingCount": "rating_count",
+            "artworkUrl512": "icon_url_512",
         }
     )
     if "price" not in df.columns:
@@ -144,4 +149,11 @@ def clean_ios_app_df(df: pd.DataFrame) -> pd.DataFrame:
             "%Y-%m-%d %H:%M"
         ),
     )
+    try:
+        df["histogram"] = [
+            int(num) for num in re.findall(r"\d+", df["user_ratings"])[1::2]
+        ]
+    except Exception:
+        logger.exception("Unable to parse histogram")
+        df["histogram"] = None
     return df
