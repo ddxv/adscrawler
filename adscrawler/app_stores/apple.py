@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 from itunes_app_scraper.scraper import AppStoreScraper
 from itunes_app_scraper.util import AppStoreCategories, AppStoreCollections
@@ -78,7 +79,6 @@ def scrape_ios_frontpage(
 
 
 def crawl_ios_developers(
-    database_connection: PostgresCon,
     developer_db_id: int,
     developer_id: str,
     store_ids: list[str],
@@ -105,7 +105,7 @@ def crawl_ios_developers(
 
 def scrape_app_ios(store_id: str) -> dict:
     scraper = AppStoreScraper()
-    result: dict = scraper.get_app_details(store_id)
+    result: dict = scraper.get_app_details(store_id, country="us")
     return result
 
 
@@ -127,6 +127,14 @@ def clean_ios_app_df(df: pd.DataFrame) -> pd.DataFrame:
     )
     if "price" not in df.columns:
         df["price"] = 0
+    try:
+        df["category"] = np.where(
+            df["category"] == "Games",
+            "game_" + df["genres"].apply(lambda x: x.split(",")[1]),
+            df["category"],
+        )
+    except Exception as e:
+        logger.warning(f"Split genre ID for iOS Game didn't work {e}")
     df = df.assign(
         free=df["price"] == 0,
         developer_id=df["developer_id"].astype(str),

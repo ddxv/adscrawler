@@ -60,9 +60,7 @@ def crawl_developers_for_new_store_ids(
         developer_id = row["developer_id"]
         row_info = f"{store=} {developer_id=}"
         if store == 2:
-            apps_df = crawl_ios_developers(
-                database_connection, developer_db_id, developer_id, store_ids
-            )
+            apps_df = crawl_ios_developers(developer_db_id, developer_id, store_ids)
         if not apps_df.empty:
             apps_df = clean_scraped_df(df=apps_df, store=store)
             save_apps_df(apps_df, database_connection, update_developer=False)
