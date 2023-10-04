@@ -165,7 +165,7 @@ def clean_scraped_df(df: pd.DataFrame, store: int) -> pd.DataFrame:
 
 
 def scrape_app(store: int, store_id: str, country: str) -> pd.DataFrame:
-    scrape_info = f"{store=}, {store_id=}"
+    scrape_info = f"{store=}, {store_id=}, {country=}"
     try:
         result_dict = scrape_from_store(store=store, store_id=store_id, country=country)
         crawl_result = 1
@@ -266,9 +266,19 @@ def save_apps_df(
         return_rows=True,
     )
 
-    if store_apps_df is not None and not store_apps_df.empty:
+    if (
+        store_apps_df is not None
+        and not store_apps_df[store_apps_df["crawl_result"] == 1].empty
+    ):
         store_apps_df = store_apps_df.rename(columns={"id": "store_app"})
-        store_apps_history = store_apps_df.copy()
+        store_apps_history = store_apps_df[store_apps_df["crawl_result"] == 1].copy()
+
+        store_apps_history = pd.merge(
+            store_apps_history,
+            apps_df[["store_id", "histogram", "rating_count"]],
+            on="store_id",
+        )
+
         store_apps_history["country"] = country.upper()
         store_apps_history["crawled_date"] = (
             datetime.datetime.utcnow().date().strftime("%Y-%m-%d")
@@ -289,6 +299,9 @@ def save_apps_df(
             key_columns=key_columns,
             database_connection=database_connection,
         )
+
+    if store_apps_df is not None and not store_apps_df.empty:
+        store_apps_df = store_apps_df.rename(columns={"id": "store_app"})
         apps_df = pd.merge(
             apps_df,
             store_apps_df[["store_id", "store_app"]],

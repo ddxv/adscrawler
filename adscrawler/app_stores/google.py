@@ -13,7 +13,7 @@ logger = get_logger(__name__)
 def scrape_app_gp(store_id: str, country: str, language: str = "") -> dict:
     # Note language seems not to change the number of reviews, but country does
     # Note country does not change number of installs
-    # NOTE: Histogram, Ratings, score and installs are SOMETIMES country specific
+    # NOTE: Histogram, Ratings, score are SOMETIMES country specific
     # NOTE: Reviews are always country specific?
     # NOTE: Installs are never country specific
     # Example: 'ratings'
