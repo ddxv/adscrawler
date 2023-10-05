@@ -195,24 +195,33 @@ def delete_app_url_mapping(store_app: int, database_connection: PostgresCon) -> 
 def query_store_apps(
     stores: list[int], database_connection: PostgresCon, limit: int | None = 1000
 ) -> pd.DataFrame:
-    short_update_days = 3
+    short_update_days = 7
     short_update_installs = 1000
     short_update_reviews = 100
     short_update_date = (
         datetime.datetime.today() - datetime.timedelta(days=short_update_days)
     ).strftime("%Y-%m-%d")
-    long_update_days = 15
+    long_update_days = 20
+    bad_crawl_result_days = 30
     long_update_date = (
         datetime.datetime.today() - datetime.timedelta(days=long_update_days)
+    ).strftime("%Y-%m-%d")
+    recrawl_404_date = (
+        datetime.datetime.today() - datetime.timedelta(days=bad_crawl_result_days)
     ).strftime("%Y-%m-%d")
     installs_and_dates_str = f""" AND (
                             (
                             (installs >= {short_update_installs}
                                 OR review_count >= {short_update_reviews})
                             AND updated_at <= '{short_update_date}'
+                            AND crawl_result = 1 OR crawl_result IS NULL
                             ) 
                         OR (
                             updated_at <= '{long_update_date}'
+                            AND crawl_result = 1
+                            )
+                            OR (
+                            updated_at <= '{recrawl_404_date}'
                             )
                         )
                         """
@@ -230,9 +239,11 @@ def query_store_apps(
                 WHEN crawl_result IS NULL THEN 0
                 ELSE 1
             END),
-            updated_at
+            --updated_at
+            (installs + review_count) DESC NULLS LAST
         {limit_str}
         """
+    print(sel_query)
     df = pd.read_sql(sel_query, database_connection.engine)
     return df
 
