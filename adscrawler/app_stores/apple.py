@@ -175,6 +175,8 @@ GAME_CATEGORIES = [
     "trivia",
     "board",
     "strategy",
+    "puzzle",
+    "casual",
     "word",
     "card",
     "sports",
