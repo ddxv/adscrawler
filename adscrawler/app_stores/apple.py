@@ -150,9 +150,9 @@ def clean_ios_app_df(df: pd.DataFrame) -> pd.DataFrame:
         ),
     )
     try:
-        df["histogram"] = [
-            int(num) for num in re.findall(r"\d+", df["user_ratings"])[1::2]
-        ]
+        df["histogram"] = df["user_ratings"].apply(
+            lambda x: [int(num) for num in re.findall(r"\d+", x)[1::2]]
+        )
     except Exception:
         logger.exception("Unable to parse histogram")
         df["histogram"] = None
