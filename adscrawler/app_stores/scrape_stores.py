@@ -344,4 +344,5 @@ STORE_APP_COLUMNS = [
     "in_app_purchases",
     "editors_choice",
     "crawl_result",
+    "icon_url_512",
 ]

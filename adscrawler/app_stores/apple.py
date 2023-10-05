@@ -1,6 +1,5 @@
 import re
 
-import numpy as np
 import pandas as pd
 from itunes_app_scraper.scraper import AppStoreScraper
 from itunes_app_scraper.util import AppStoreCategories, AppStoreCollections
@@ -133,13 +132,13 @@ def clean_ios_app_df(df: pd.DataFrame) -> pd.DataFrame:
     if "price" not in df.columns:
         df["price"] = 0
     try:
-        df["category"] = np.where(
-            df["category"] == "Games",
-            "game_" + df["genres"].apply(lambda x: x.split(",")[1]),
-            df["category"],
-        )
+        df.loc[df["category"] == "Games", "category"] = "game_" + df.loc[
+            df["category"] == "Games", "genres"
+        ].apply(lambda x: x.split(",")[1])
     except Exception as e:
-        logger.warning(f"Split genre ID for iOS Game didn't work {e}")
+        logger.warning(
+            f"store_id={df['store_id'].values[0]} split genre IDs failed {e}"
+        )
     df = df.assign(
         free=df["price"] == 0,
         developer_id=df["developer_id"].astype(str),
