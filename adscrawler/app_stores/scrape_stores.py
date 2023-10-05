@@ -11,6 +11,11 @@ from adscrawler.app_stores.apple import (
     scrape_app_ios,
     scrape_ios_frontpage,
 )
+from adscrawler.app_stores.google import (
+    clean_google_play_app_df,
+    scrape_app_gp,
+    scrape_gp_for_app_ids,
+)
 from adscrawler.config import get_logger
 from adscrawler.connection import PostgresCon
 from adscrawler.queries import (
@@ -20,8 +25,6 @@ from adscrawler.queries import (
     query_store_ids,
     upsert_df,
 )
-
-from .google import clean_google_play_app_df, scrape_app_gp, scrape_gp_for_app_ids
 
 logger = get_logger(__name__)
 
@@ -115,7 +118,6 @@ def update_all_app_info(
         and "url" not in app_df.columns
         or not app_df["url"].values
     ):
-        logger.info(f"{info} no developer url")
         store_app = app_df["store_app"].values[0]
         delete_app_url_mapping(store_app, database_connection)
         return

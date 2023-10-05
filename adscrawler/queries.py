@@ -188,6 +188,7 @@ def delete_app_url_mapping(store_app: int, database_connection: PostgresCon) -> 
         WHERE store_app = {store_app}
         ;
         """
+    logger.info("delete app_urls_map")
     with database_connection.engine.begin() as conn:
         conn.exec_driver_sql(del_query)
 
