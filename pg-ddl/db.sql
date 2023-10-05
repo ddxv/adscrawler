@@ -342,6 +342,7 @@ CREATE TABLE public.store_apps (
 	ad_supported bool NULL,
 	in_app_purchases bool NULL,
 	editors_choice bool NULL,
+    icon_url_512 varchar NULL,
 	created_at timestamp NULL DEFAULT timezone('utc'::text, now()),
 	updated_at timestamp NULL DEFAULT timezone('utc'::text, now()),
 	crawl_result int4 NULL,
