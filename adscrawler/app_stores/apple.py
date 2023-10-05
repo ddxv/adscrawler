@@ -132,9 +132,15 @@ def clean_ios_app_df(df: pd.DataFrame) -> pd.DataFrame:
     if "price" not in df.columns:
         df["price"] = 0
     try:
+        # Complicated way to get around many games having very random selections like "games + shopping"
+        # TODO: Just store categories as list!
         df.loc[df["category"] == "Games", "category"] = "game_" + df.loc[
             df["category"] == "Games", "genres"
-        ].apply(lambda x: x.split(",")[1])
+        ].apply(
+            lambda x: [
+                cat.lower() for cat in x.split(",") if cat.lower() in GAME_CATEGORIES
+            ][0]
+        )
     except Exception as e:
         logger.warning(
             f"store_id={df['store_id'].values[0]} split genre IDs failed {e}"
@@ -156,3 +162,22 @@ def clean_ios_app_df(df: pd.DataFrame) -> pd.DataFrame:
         logger.exception("Unable to parse histogram")
         df["histogram"] = None
     return df
+
+
+GAME_CATEGORIES = [
+    "arcade",
+    "simulation",
+    "action",
+    "adventure",
+    "educational",
+    "role_playing",
+    "racing",
+    "trivia",
+    "board",
+    "strategy",
+    "word",
+    "card",
+    "sports",
+    "casino",
+    "music",
+]
