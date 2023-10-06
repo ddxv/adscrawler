@@ -6,7 +6,7 @@ from itunes_app_scraper.util import AppStoreCategories, AppStoreCollections
 
 from adscrawler.config import get_logger
 from adscrawler.connection import PostgresCon
-from adscrawler.queries import query_store_ids, upsert_df
+from adscrawler.queries import query_store_id_map, upsert_df
 
 logger = get_logger(__name__)
 
@@ -49,10 +49,12 @@ def scrape_ios_frontpage(
             if not k.startswith("__") and "_MAC" not in k
         }
     all_scraped_ids = []
+    ranked_dict: dict = {}
     for _coll_key, coll_value in collections.items():
-        logger.info(f"Collection: {coll_value}")
+        logger.info(f"Collection: {_coll_key}")
+        ranked_dict[_coll_key] = {}
         for cat_key, cat_value in categories.items():
-            logger.info(f"Collection: {coll_value}, category: {cat_key}")
+            logger.info(f"Collection: {_coll_key}, category: {cat_key}")
             scraped_ids = scraper.get_app_ids_for_collection(
                 collection=coll_value,
                 category=cat_value,
@@ -61,9 +63,23 @@ def scrape_ios_frontpage(
                 timeout=10,
             )
             all_scraped_ids += scraped_ids
+            ranked_dict[_coll_key][cat_key] = [
+                {"rank": rank + 1, "app": app} for rank, app in enumerate(scraped_ids)
+            ]
     all_scraped_ids = list(set(all_scraped_ids))
-    existing_store_ids = query_store_ids(
+    existing_ids_map = query_store_id_map(
         database_connection, store=2, store_ids=all_scraped_ids
+    )
+    existing_store_ids = existing_ids_map["store_id"].tolist()
+    pd.json_normalize(ranked_dict)
+    df = (
+        pd.DataFrame(ranked_dict)[_coll_key]
+        .reset_index()
+        .explode(_coll_key)
+        .reset_index(drop=True)
+    )
+    df = pd.concat(
+        [df.drop(_coll_key, axis=1), pd.json_normalize(df[_coll_key])], axis=1
     )
     only_new = [x for x in all_scraped_ids if str(x) not in existing_store_ids]
     apps_df = pd.DataFrame({"store": 2, "store_id": only_new})
