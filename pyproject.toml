@@ -3,12 +3,19 @@ authors = [{ name = "James O'Claire" }]
 name = "adscrawler"
 description = "project description adscrawler"
 version = "0.1.2"
-dependencies = ["pandas", "numpy", "requests", "sqlalchemy"]
 
 [project.optional-dependencies]
 dev = ["pre-commit", "bump2version"]
 
-dependencies = ['requests', 'pandas', 'sqlalchemy', 'google-play-scraper']
+dependencies = [
+    'requests',
+    'pandas',
+    'sqlalchemy',
+    'google-play-scraper',
+    'tldextract',
+    'git+https://github.com/itunes-app-scraper.git',
+    'sshtunnel',
+]
 
 [build-system]
 requires = ["setuptools", "wheel"]
