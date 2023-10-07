@@ -36,6 +36,8 @@ def scrape_stores_frontpage(
 ) -> None:
     collections_map = query_collections(database_connection)
     categories_map = query_categories(database_connection)
+    collections_map = collections_map.rename(columns={"id": "store_collection"})
+    categories_map = categories_map.rename(columns={"id": "store_category"})
     if 2 in stores:
         scrape_ios_frontpage(
             database_connection,
