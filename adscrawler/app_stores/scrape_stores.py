@@ -22,6 +22,7 @@ from adscrawler.queries import (
     delete_app_url_mapping,
     query_categories,
     query_collections,
+    query_countries,
     query_developers,
     query_store_apps,
     query_store_id_map,
@@ -38,6 +39,7 @@ def scrape_stores_frontpage(
     collection_keywords = ["NEW", "TOP", "BEST"]
     collections_map = query_collections(database_connection)
     categories_map = query_categories(database_connection)
+    countries_map = query_countries(database_connection)
     collections_map = collections_map.rename(columns={"id": "store_collection"})
     categories_map = categories_map.rename(columns={"id": "store_category"})
     for collection_keyword in collection_keywords:
@@ -50,6 +52,7 @@ def scrape_stores_frontpage(
                 ranked_dicts=ranked_dicts,
                 collections_map=collections_map,
                 categories_map=categories_map,
+                countries_map=countries_map,
             )
 
     if 1 in stores:
@@ -59,6 +62,7 @@ def scrape_stores_frontpage(
             ranked_dicts=ranked_dicts,
             collections_map=collections_map,
             categories_map=categories_map,
+            countries_map=countries_map,
         )
     return
 
@@ -68,40 +72,57 @@ def process_scraped(
     ranked_dicts: list[dict],
     collections_map: pd.DataFrame,
     categories_map: pd.DataFrame,
+    countries_map: pd.DataFrame,
 ) -> None:
     df = pd.DataFrame(ranked_dicts)
     all_scraped_ids = df["store_id"].unique().tolist()
     existing_ids_map = query_store_id_map(
-        database_connection, store=2, store_ids=all_scraped_ids
+        database_connection, store_ids=all_scraped_ids
     )
     existing_store_ids = existing_ids_map["store_id"].tolist()
     new_apps_df = df[~(df["store_id"].isin(existing_store_ids))][
         ["store", "store_id"]
-    ].copy()
-    insert_columns = ["store", "store_id"]
-    logger.info(f"Scrape iOS frontpage for new apps: insert to db {new_apps_df.shape=}")
-    upsert_df(
-        table_name="store_apps",
-        insert_columns=insert_columns,
-        df=new_apps_df,
-        key_columns=insert_columns,
-        database_connection=database_connection,
-    )
+    ].drop_duplicates()
+    if not new_apps_df.empty:
+        logger.info(f"Scrape store: insert new apps to db {new_apps_df.shape=}")
+        insert_columns = ["store", "store_id"]
+        upsert_df(
+            table_name="store_apps",
+            insert_columns=insert_columns,
+            df=new_apps_df,
+            key_columns=insert_columns,
+            database_connection=database_connection,
+        )
     logger.info("Store rankings start")
     new_existing_ids_map = query_store_id_map(
-        database_connection, store=2, store_ids=all_scraped_ids
+        database_connection, store_ids=all_scraped_ids
     ).rename(columns={"id": "store_app"})
     df = df.rename(columns={"app": "store_id"})
+
     df = pd.merge(
-        df, new_existing_ids_map, how="left", on="store_id", validate="m:1"
+        df, new_existing_ids_map, how="left", on=["store", "store_id"], validate="m:1"
     ).drop("store_id", axis=1)
+
     df = pd.merge(
         df, collections_map, how="left", on=["store", "collection"], validate="m:1"
     ).drop("collection", axis=1)
     df = pd.merge(
         df, categories_map, how="left", on=["store", "category"], validate="m:1"
     ).drop("category", axis=1)
-    df["crawled_date"] = datetime.datetime.utcnow().date()
+    df["country"] = df["country"].str.upper()
+    df = (
+        pd.merge(
+            df,
+            countries_map[["id", "alpha2"]],
+            how="left",
+            left_on=["country"],
+            right_on="alpha2",
+            validate="m:1",
+        )
+        .drop(["country", "alpha2"], axis=1)
+        .rename(columns={"id": "country"})
+    )
+    # df["crawled_date"] = datetime.datetime.now(tz=datetime.timezone.utc).date()
     upsert_df(
         database_connection=database_connection,
         df=df,

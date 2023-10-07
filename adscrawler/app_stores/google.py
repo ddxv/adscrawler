@@ -88,6 +88,6 @@ def scrape_gp_for_app_ids() -> list[dict]:
         js_update_ids_file(filepath)
     except Exception as error:
         logger.exception(f"JS pull failed with {error=}")
-    dicts = get_js_data(filepath)
+    ranked_dicts = get_js_data(filepath)
     logger.info("Scrape GP frontpage for new apps finished")
-    return dicts
+    return ranked_dicts

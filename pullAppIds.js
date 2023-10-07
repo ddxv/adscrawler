@@ -12,9 +12,10 @@ async function pullRank(category, collection, country, numApps) {
 
         return result.map((item, index) => ({
             crawled_date: new Date().toISOString().split('T')[0],  // Gets the current date in "YYYY-mm-dd" format
-            store_collection: collection,
-            store_category: category,
+            store: 1,
             country: country,
+            collection: collection,
+            category: category,
             rank: index + 1,  // Assuming the list starts from rank 1
             store_id: item.appId
         }));

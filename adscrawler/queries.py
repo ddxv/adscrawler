@@ -119,19 +119,25 @@ def query_developers(
 
 
 def query_store_id_map(
-    database_connection: PostgresCon, store: int, store_ids: list[str] | None = None
+    database_connection: PostgresCon,
+    store: int | None = None,
+    store_ids: list[str] | None = None,
 ) -> pd.DataFrame:
+    where_statement = ""
+    if store:
+        where_statement += f"WHERE store = {store} "
     if store_ids:
+        if "WHERE" not in where_statement:
+            where_statement += " WHERE "
+        else:
+            where_statement += " AND "
         store_ids_list = "'" + "','".join(store_ids) + "'"
-        store_ids_str = f"""AND store_id in ({store_ids_list}) """
-    else:
-        store_ids_str = ""
+        where_statement += f" store_id in ({store_ids_list}) "
     sel_query = f"""SELECT
         id, store, store_id
         FROM
         store_apps
-        WHERE store = {store}
-        {store_ids_str}
+        {where_statement}
         ;
         """
     df = pd.read_sql(sel_query, database_connection.engine)
@@ -154,6 +160,17 @@ def query_categories(database_connection: PostgresCon) -> pd.DataFrame:
         *
         FROM
         store_categories
+        ;
+        """
+    df = pd.read_sql(sel_query, database_connection.engine)
+    return df
+
+
+def query_countries(database_connection: PostgresCon) -> pd.DataFrame:
+    sel_query = """SELECT
+        *
+        FROM
+        countries
         ;
         """
     df = pd.read_sql(sel_query, database_connection.engine)
