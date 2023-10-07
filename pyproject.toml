@@ -5,7 +5,7 @@ description = "project description adscrawler"
 version = "0.1.2"
 
 [project.optional-dependencies]
-dev = ["pre-commit", "bump2version"]
+dev = ["pre-commit", "bump2version", "psycopg2-binary"]
 
 dependencies = [
     'requests',
@@ -13,7 +13,7 @@ dependencies = [
     'sqlalchemy',
     'google-play-scraper',
     'tldextract',
-    'git+https://github.com/itunes-app-scraper.git',
+    'git+https://github.com/ddxv/itunes-app-scraper.git',
     'sshtunnel',
 ]
 
