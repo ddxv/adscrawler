@@ -1,3 +1,4 @@
+import datetime
 import re
 
 import pandas as pd
@@ -14,6 +15,7 @@ def scrape_ios_frontpage(
     collection_keyword: str | None = None,
 ) -> list[dict]:
     logger.info("Scrape iOS frontpage for new apps")
+    country = "us"
     scraper = AppStoreScraper()
     # Eg: MAGAZINES_MEN, GAMES_ADVENTURE
     if category_keyword:
@@ -45,9 +47,7 @@ def scrape_ios_frontpage(
             for k, v in AppStoreCollections.__dict__.items()
             if not k.startswith("__") and "_MAC" not in k
         }
-    all_scraped_ids = []
     ranked_dicts: list[dict] = []
-    country = "us"
     for _coll_key, coll_value in collections.items():
         logger.info(f"Collection: {_coll_key}")
         for cat_key, cat_value in categories.items():
@@ -59,7 +59,6 @@ def scrape_ios_frontpage(
                 num=200,
                 timeout=10,
             )
-            all_scraped_ids += scraped_ids
             ranked_dicts += [
                 {
                     "store": 2,
@@ -67,7 +66,10 @@ def scrape_ios_frontpage(
                     "collection": _coll_key,
                     "category": cat_key,
                     "rank": rank + 1,
-                    "app": app,
+                    "store_id": app,
+                    "crawled_date": datetime.datetime.now(
+                        tz=datetime.timezone.utc
+                    ).date(),
                 }
                 for rank, app in enumerate(scraped_ids)
             ]

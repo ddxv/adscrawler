@@ -63,7 +63,7 @@ async function appendToFile(collectedAppRanks) {
 
 
 // Apps pulled per category per collection
-var numApps = 3
+var numApps = 500
 var country = "us"
 
 async function main() {

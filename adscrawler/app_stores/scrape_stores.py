@@ -97,12 +97,9 @@ def process_scraped(
     new_existing_ids_map = query_store_id_map(
         database_connection, store_ids=all_scraped_ids
     ).rename(columns={"id": "store_app"})
-    df = df.rename(columns={"app": "store_id"})
-
     df = pd.merge(
         df, new_existing_ids_map, how="left", on=["store", "store_id"], validate="m:1"
     ).drop("store_id", axis=1)
-
     df = pd.merge(
         df, collections_map, how="left", on=["store", "collection"], validate="m:1"
     ).drop("collection", axis=1)
@@ -122,7 +119,6 @@ def process_scraped(
         .drop(["country", "alpha2"], axis=1)
         .rename(columns={"id": "country"})
     )
-    # df["crawled_date"] = datetime.datetime.now(tz=datetime.timezone.utc).date()
     upsert_df(
         database_connection=database_connection,
         df=df,
