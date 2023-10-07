@@ -1,66 +1,70 @@
 var gplay = require('google-play-scraper');
 
-async function pullList(category, collection) {
-    // Pull a list of Apps and limited details for a specific category and collection
+
+async function pullRank(category, collection, country, numApps) {
     try {
-        //var category = 'GAME_ADVENTURE'
-        //var collection = 'TOP_FREE'
-        //numApps = 2
-        let result = await gplay.list({ category: category, collection: collection, num: numApps });
-        let newAppIds = result.map(item => item.appId)
-        return newAppIds
+        let result = await gplay.list({ category: category, collection: collection, num: numApps, country: country });
+
+        if (!Array.isArray(result)) {
+            console.warn(`No results for Category: ${category}, Collection: ${collection}, Country: ${country}`);
+            return [];
+        }
+
+        return result.map((item, index) => ({
+            crawled_date: new Date().toISOString().split('T')[0],  // Gets the current date in "YYYY-mm-dd" format
+            store: 1,
+            country: country,
+            collection: collection,
+            category: category,
+            rank: index + 1,  // Assuming the list starts from rank 1
+            store_id: item.appId
+        }));
     }
     catch (e) {
-        console.error(e)
-        return []
+        console.error(e);
+        return [];
     }
 }
 
-async function loopLists(categories, collections) {
+
+async function loopLists(categories, collections, country, numApps) {
     // Loop over each keys in categories and collections
     for (const categoryKey in categories) {
-        let collectedAppIds = new Set();
+        let collectedAppRanks = [];
         const category = gplay.category[categoryKey]
         for (const collectionKey in collections) {
 
             const collection = gplay.collection[collectionKey]
             const logString = "Category:" + category + ", Collection: " + collection
-
             console.log(logString)
 
-            let newAppIds = await pullList(category, collection, collectedAppIds)
-
-            let originalSetSize = collectedAppIds.size
-            collectedAppIds = new Set([...collectedAppIds, ...newAppIds])
-            let newSetSize = collectedAppIds.size - originalSetSize
-
-            console.log(logString + " pulled %i apps, %i new", newAppIds.length, newSetSize)
+            let appRanks = await pullRank(category, collection, country, numApps)
+            collectedAppRanks = collectedAppRanks.concat(appRanks);
 
         }
-        appendToFile(collectedAppIds)
+        appendToFile(collectedAppRanks)
     }
 }
-async function appendToFile(collectedAppIds) {
 
-    // Change Set to Array to use .join
-    let collectedAppIdsArray = Array.from(collectedAppIds)
+async function appendToFile(collectedAppRanks) {
+    const fs = require('fs');
 
-    // Requiring fs module in which
-    const fs = require('fs')
+    // Convert each JSON object to a string and join them with newline characters
+    const dataString = collectedAppRanks.map(rank => JSON.stringify(rank)).join('\n');
 
-    // Write data in 'Output.txt' .
-    fs.appendFile('/tmp/googleplay_ids.txt', collectedAppIdsArray.join('\n') + '\n', (err) => {
-        // In case of a error throw err.
+    // Append the data string to the file with an additional newline at the end
+    fs.appendFile('/tmp/googleplay_json.txt', dataString + '\n', (err) => {
         if (err) throw err;
-    })
+    });
 
-    console.log('Appeneded %i Ids', collectedAppIdsArray.length)
-
+    console.log('Appended %i Ids', collectedAppRanks.length);
 }
+
 
 
 // Apps pulled per category per collection
 var numApps = 500
+var country = "us"
 
 async function main() {
 
@@ -71,7 +75,7 @@ async function main() {
     console.log("Starting %i categories and %i collections", Object.keys(categories).length, Object.keys(collections).length)
 
     // nested for loop for two iterables
-    loopLists(categories, collections, numApps)
+    loopLists(categories, collections, country, numApps)
 
 
 }

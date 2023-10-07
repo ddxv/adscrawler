@@ -1,11 +1,10 @@
+import json
 import os
 
 import google_play_scraper
 import pandas as pd
 
 from adscrawler.config import MODULE_DIR, get_logger
-from adscrawler.connection import PostgresCon
-from adscrawler.queries import query_store_ids, upsert_df
 
 logger = get_logger(__name__)
 
@@ -76,32 +75,19 @@ def js_update_ids_file(filepath: str) -> None:
     logger.info("Js pull finished")
 
 
-def get_js_ids(filepath: str) -> list[str]:
+def get_js_data(filepath: str) -> list[dict]:
     with open(filepath, mode="r") as file:
-        ids = file.readlines()
-    ids = [x.replace("\n", "") for x in ids]
-    return ids
+        data = [json.loads(line) for line in file if line.strip()]
+    return data
 
 
-def scrape_gp_for_app_ids(database_connection: PostgresCon) -> None:
+def scrape_gp_for_app_ids() -> list[dict]:
     logger.info("Scrape GP frontpage for new apps start")
-    filepath = "/tmp/googleplay_ids.txt"
+    filepath = "/tmp/googleplay_json.txt"
     try:
         js_update_ids_file(filepath)
     except Exception as error:
-        logger.warning(f"JS pull failed with {error=}")
-    ids = get_js_ids(filepath)
-    ids = list(set(ids))
-    existing_store_ids = query_store_ids(database_connection, store=1, store_ids=ids)
-    only_new = [x for x in ids if x not in existing_store_ids]
-    df = pd.DataFrame({"store": 1, "store_id": only_new})
-    insert_columns = ["store", "store_id"]
-    logger.info(f"Scrape GP frontpage for new apps: insert to db {df.shape=}")
-    upsert_df(
-        table_name="store_apps",
-        insert_columns=insert_columns,
-        df=df,
-        key_columns=insert_columns,
-        database_connection=database_connection,
-    )
+        logger.exception(f"JS pull failed with {error=}")
+    ranked_dicts = get_js_data(filepath)
     logger.info("Scrape GP frontpage for new apps finished")
+    return ranked_dicts
