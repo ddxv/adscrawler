@@ -1,9 +1,10 @@
 import logging
 import pathlib
 import sys
-import tomllib
 import typing
 from logging.handlers import RotatingFileHandler
+
+import tomllib
 
 HOME = pathlib.Path.home()
 TOP_CONFIGDIR = pathlib.Path(HOME, pathlib.Path(".config"))
