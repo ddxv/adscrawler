@@ -20,11 +20,11 @@ from adscrawler.config import get_logger
 from adscrawler.connection import PostgresCon
 from adscrawler.queries import (
     delete_app_url_mapping,
+    query_categories,
+    query_collections,
     query_developers,
     query_store_apps,
     query_store_ids,
-    query_collections,
-    query_categories,
     upsert_df,
 )
 

@@ -139,7 +139,7 @@ def query_store_id_map(
 
 
 def query_collections(database_connection: PostgresCon) -> pd.DataFrame:
-    sel_query = f"""SELECT
+    sel_query = """SELECT
         *
         FROM
         store_collections
@@ -150,7 +150,7 @@ def query_collections(database_connection: PostgresCon) -> pd.DataFrame:
 
 
 def query_categories(database_connection: PostgresCon) -> pd.DataFrame:
-    sel_query = f"""SELECT
+    sel_query = """SELECT
         *
         FROM
         store_categories
