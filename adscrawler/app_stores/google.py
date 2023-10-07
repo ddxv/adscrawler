@@ -89,7 +89,7 @@ def scrape_gp_for_app_ids(database_connection: PostgresCon) -> None:
     try:
         js_update_ids_file(filepath)
     except Exception as error:
-        logger.warning(f"JS pull failed with {error=}")
+        logger.exception(f"JS pull failed with {error=}")
     ids = get_js_ids(filepath)
     ids = list(set(ids))
     existing_store_ids = query_store_ids(database_connection, store=1, store_ids=ids)

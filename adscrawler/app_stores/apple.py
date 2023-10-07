@@ -1,5 +1,5 @@
-import re
 import datetime
+import re
 
 import pandas as pd
 from itunes_app_scraper.scraper import AppStoreScraper
@@ -52,7 +52,7 @@ def scrape_ios_frontpage(
             if not k.startswith("__") and "_MAC" not in k
         }
     all_scraped_ids = []
-    ranked_dicts: list = []
+    ranked_dicts: list[dict] = []
     country = "us"
     for _coll_key, coll_value in collections.items():
         logger.info(f"Collection: {_coll_key}")
@@ -107,7 +107,7 @@ def insert_full_rankings(
     collections_map: pd.DataFrame,
     categories_map: pd.DataFrame,
     all_scraped_ids: list[str],
-    ranked_dicts: dict,
+    ranked_dicts: list[dict],
 ) -> None:
     logger.info("Store rankings start")
     new_existing_ids_map = query_store_id_map(
