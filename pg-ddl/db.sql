@@ -356,6 +356,26 @@ CREATE TABLE store_categories (
 category)
     )
 
+
+CREATE TABLE app_rankings (
+    id SERIAL PRIMARY KEY,
+    crawled_date DATE NOT NULL,
+    "rank" INT NOT NULL,
+    store INT NOT NULL,
+    store_collection INT NOT NULL,
+    store_category INT NOT NULL,
+    store_app INT NOT NULL,
+    CONSTRAINT fk_store_app FOREIGN KEY (store_app) REFERENCES store_apps(id),
+    CONSTRAINT fk_store FOREIGN KEY (store) REFERENCES stores(id),
+    CONSTRAINT fk_store_collection FOREIGN KEY (store_collection) REFERENCES store_collections(id),
+    CONSTRAINT fk_store_category FOREIGN KEY (store_category) REFERENCES store_categories(id),
+    CONSTRAINT unique_ranking UNIQUE (crawled_date,
+"rank",
+store,
+store_collection,
+store_category)
+);
+
     
     -- Insert for Store: 1
 INSERT INTO store_categories (store, category) VALUES

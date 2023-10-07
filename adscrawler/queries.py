@@ -127,11 +127,33 @@ def query_store_id_map(
     else:
         store_ids_str = ""
     sel_query = f"""SELECT
-        id, store_id
+        id, store, store_id
         FROM
         store_apps
         WHERE store = {store}
         {store_ids_str}
+        ;
+        """
+    df = pd.read_sql(sel_query, database_connection.engine)
+    return df
+
+
+def query_collections(database_connection: PostgresCon) -> pd.DataFrame:
+    sel_query = f"""SELECT
+        *
+        FROM
+        store_collections
+        ;
+        """
+    df = pd.read_sql(sel_query, database_connection.engine)
+    return df
+
+
+def query_categories(database_connection: PostgresCon) -> pd.DataFrame:
+    sel_query = f"""SELECT
+        *
+        FROM
+        store_categories
         ;
         """
     df = pd.read_sql(sel_query, database_connection.engine)

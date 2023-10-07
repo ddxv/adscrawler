@@ -23,6 +23,8 @@ from adscrawler.queries import (
     query_developers,
     query_store_apps,
     query_store_ids,
+    query_collections,
+    query_categories,
     upsert_df,
 )
 
@@ -32,8 +34,15 @@ logger = get_logger(__name__)
 def scrape_stores_frontpage(
     database_connection: PostgresCon, stores: list[int]
 ) -> None:
+    collections_map = query_collections(database_connection)
+    categories_map = query_categories(database_connection)
     if 2 in stores:
-        scrape_ios_frontpage(database_connection, collection_keyword="NEW")
+        scrape_ios_frontpage(
+            database_connection,
+            collections_map=collections_map,
+            categories_map=categories_map,
+            collection_keyword="NEW",
+        )
 
     if 1 in stores:
         scrape_gp_for_app_ids(database_connection)
