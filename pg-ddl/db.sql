@@ -364,20 +364,22 @@ category)
 CREATE TABLE app_rankings (
     id SERIAL PRIMARY KEY,
     crawled_date DATE NOT NULL,
-    "rank" INT NOT NULL,
+    country int NOT NULL,
     store INT NOT NULL,
     store_collection INT NOT NULL,
     store_category INT NOT NULL,
+    "rank" INT NOT NULL,
     store_app INT NOT NULL,
-    CONSTRAINT fk_store_app FOREIGN KEY (store_app) REFERENCES store_apps(id),
     CONSTRAINT fk_store FOREIGN KEY (store) REFERENCES stores(id),
     CONSTRAINT fk_store_collection FOREIGN KEY (store_collection) REFERENCES store_collections(id),
     CONSTRAINT fk_store_category FOREIGN KEY (store_category) REFERENCES store_categories(id),
-    CONSTRAINT unique_ranking UNIQUE (crawled_date,
-"rank",
-store,
-store_collection,
-store_category)
+    CONSTRAINT fk_country FOREIGN KEY (country) REFERENCES countries(id),
+    CONSTRAINT fk_store_app FOREIGN KEY (store_app) REFERENCES store_apps(id),
+    CONSTRAINT unique_ranking UNIQUE (crawled_date, country,
+    "rank",
+    store,
+    store_collection,
+    store_category)
 );
 
     
