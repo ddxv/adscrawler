@@ -14,7 +14,7 @@ def scrape_ios_frontpage(
     category_keyword: str | None = None,
     collection_keyword: str | None = None,
 ) -> list[dict]:
-    logger.info("Scrape iOS frontpage for new apps")
+    logger.info(f"Scrape iOS frontpage for {collection_keyword=} {category_keyword=}")
     country = "us"
     scraper = AppStoreScraper()
     # Eg: MAGAZINES_MEN, GAMES_ADVENTURE

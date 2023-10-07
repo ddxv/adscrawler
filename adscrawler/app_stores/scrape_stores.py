@@ -36,7 +36,7 @@ logger = get_logger(__name__)
 def scrape_stores_frontpage(
     database_connection: PostgresCon, stores: list[int]
 ) -> None:
-    collection_keywords = ["NEW", "TOP", "BEST"]
+    collection_keywords = ["NEW", "TOP"]
     collections_map = query_collections(database_connection)
     categories_map = query_categories(database_connection)
     countries_map = query_countries(database_connection)
@@ -44,16 +44,19 @@ def scrape_stores_frontpage(
     categories_map = categories_map.rename(columns={"id": "store_category"})
     for collection_keyword in collection_keywords:
         if 2 in stores:
-            ranked_dicts = scrape_ios_frontpage(
-                collection_keyword=collection_keyword,
-            )
-            process_scraped(
-                database_connection=database_connection,
-                ranked_dicts=ranked_dicts,
-                collections_map=collections_map,
-                categories_map=categories_map,
-                countries_map=countries_map,
-            )
+            try:
+                ranked_dicts = scrape_ios_frontpage(
+                    collection_keyword=collection_keyword,
+                )
+                process_scraped(
+                    database_connection=database_connection,
+                    ranked_dicts=ranked_dicts,
+                    collections_map=collections_map,
+                    categories_map=categories_map,
+                    countries_map=countries_map,
+                )
+            except Exception:
+                logger.exception(f"collection={collection_keyword} hit error, skipping")
 
     if 1 in stores:
         ranked_dicts = scrape_gp_for_app_ids()
