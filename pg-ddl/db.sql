@@ -332,7 +332,11 @@ INSERT INTO store_collections (store, collection) VALUES
 (2, 'TOP_GROSSING_IOS'),
 (2, 'TOP_GROSSING_IPAD'),
 (2, 'TOP_PAID_IOS'),
-(2, 'TOP_PAID_IPAD');
+(2, 'TOP_PAID_IPAD'),
+(2, 'NEW_IOS'),
+(2, 'NEW_PAID_IOS'),
+(2, 'NEW_FREE_IOS')
+;
 
 
 CREATE TABLE store_categories (

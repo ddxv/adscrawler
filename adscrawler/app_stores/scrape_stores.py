@@ -34,20 +34,22 @@ logger = get_logger(__name__)
 def scrape_stores_frontpage(
     database_connection: PostgresCon, stores: list[int]
 ) -> None:
+    collection_keywords = ["NEW", "TOP", "BEST"]
     collections_map = query_collections(database_connection)
     categories_map = query_categories(database_connection)
     collections_map = collections_map.rename(columns={"id": "store_collection"})
     categories_map = categories_map.rename(columns={"id": "store_category"})
-    if 2 in stores:
-        scrape_ios_frontpage(
-            database_connection,
-            collections_map=collections_map,
-            categories_map=categories_map,
-            collection_keyword="NEW",
-        )
+    for collection_keyword in collection_keywords:
+        if 2 in stores:
+            scrape_ios_frontpage(
+                database_connection,
+                collections_map=collections_map,
+                categories_map=categories_map,
+                collection_keyword=collection_keyword,
+            )
 
-    if 1 in stores:
-        scrape_gp_for_app_ids(database_connection)
+        if 1 in stores:
+            scrape_gp_for_app_ids(database_connection)
     return
 
 
