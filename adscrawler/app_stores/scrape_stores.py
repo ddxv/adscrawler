@@ -24,6 +24,7 @@ from adscrawler.queries import (
     query_collections,
     query_developers,
     query_store_apps,
+    query_store_id_map,
     query_store_ids,
     upsert_df,
 )
@@ -41,16 +42,80 @@ def scrape_stores_frontpage(
     categories_map = categories_map.rename(columns={"id": "store_category"})
     for collection_keyword in collection_keywords:
         if 2 in stores:
-            scrape_ios_frontpage(
-                database_connection,
-                collections_map=collections_map,
-                categories_map=categories_map,
+            ranked_dicts = scrape_ios_frontpage(
                 collection_keyword=collection_keyword,
             )
+            process_scraped(
+                database_connection=database_connection,
+                ranked_dicts=ranked_dicts,
+                collections_map=collections_map,
+                categories_map=categories_map,
+            )
 
-        if 1 in stores:
-            scrape_gp_for_app_ids(database_connection)
+    if 1 in stores:
+        ranked_dicts = scrape_gp_for_app_ids()
+        process_scraped(
+            database_connection=database_connection,
+            ranked_dicts=ranked_dicts,
+            collections_map=collections_map,
+            categories_map=categories_map,
+        )
     return
+
+
+def process_scraped(
+    database_connection: PostgresCon,
+    ranked_dicts: list[dict],
+    collections_map: pd.DataFrame,
+    categories_map: pd.DataFrame,
+) -> None:
+    df = pd.DataFrame(ranked_dicts)
+    all_scraped_ids = df["store_id"].unique().tolist()
+    existing_ids_map = query_store_id_map(
+        database_connection, store=2, store_ids=all_scraped_ids
+    )
+    existing_store_ids = existing_ids_map["store_id"].tolist()
+    new_apps_df = df[~(df["store_id"].isin(existing_store_ids))][
+        ["store", "store_id"]
+    ].copy()
+    insert_columns = ["store", "store_id"]
+    logger.info(f"Scrape iOS frontpage for new apps: insert to db {new_apps_df.shape=}")
+    upsert_df(
+        table_name="store_apps",
+        insert_columns=insert_columns,
+        df=new_apps_df,
+        key_columns=insert_columns,
+        database_connection=database_connection,
+    )
+    logger.info("Store rankings start")
+    new_existing_ids_map = query_store_id_map(
+        database_connection, store=2, store_ids=all_scraped_ids
+    ).rename(columns={"id": "store_app"})
+    df = df.rename(columns={"app": "store_id"})
+    df = pd.merge(
+        df, new_existing_ids_map, how="left", on="store_id", validate="m:1"
+    ).drop("store_id", axis=1)
+    df = pd.merge(
+        df, collections_map, how="left", on=["store", "collection"], validate="m:1"
+    ).drop("collection", axis=1)
+    df = pd.merge(
+        df, categories_map, how="left", on=["store", "category"], validate="m:1"
+    ).drop("category", axis=1)
+    df["crawled_date"] = datetime.datetime.utcnow().date()
+    upsert_df(
+        database_connection=database_connection,
+        df=df,
+        table_name="app_rankings",
+        key_columns=[
+            "crawled_date",
+            "country",
+            "rank",
+            "store",
+            "store_category",
+            "store_collection",
+        ],
+        insert_columns=["store_app"],
+    )
 
 
 def extract_domains(x: str) -> str:

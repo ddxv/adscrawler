@@ -1,4 +1,3 @@
-import datetime
 import re
 
 import pandas as pd
@@ -6,19 +5,14 @@ from itunes_app_scraper.scraper import AppStoreScraper
 from itunes_app_scraper.util import AppStoreCategories, AppStoreCollections
 
 from adscrawler.config import get_logger
-from adscrawler.connection import PostgresCon
-from adscrawler.queries import query_store_id_map, upsert_df
 
 logger = get_logger(__name__)
 
 
 def scrape_ios_frontpage(
-    database_connection: PostgresCon,
-    collections_map: pd.DataFrame,
-    categories_map: pd.DataFrame,
     category_keyword: str | None = None,
     collection_keyword: str | None = None,
-) -> None:
+) -> list[dict]:
     logger.info("Scrape iOS frontpage for new apps")
     scraper = AppStoreScraper()
     # Eg: MAGAZINES_MEN, GAMES_ADVENTURE
@@ -68,6 +62,8 @@ def scrape_ios_frontpage(
             all_scraped_ids += scraped_ids
             ranked_dicts += [
                 {
+                    "store": 2,
+                    "country": country,
                     "collection": _coll_key,
                     "category": cat_key,
                     "rank": rank + 1,
@@ -75,69 +71,7 @@ def scrape_ios_frontpage(
                 }
                 for rank, app in enumerate(scraped_ids)
             ]
-    all_scraped_ids = list(set(all_scraped_ids))
-    existing_ids_map = query_store_id_map(
-        database_connection, store=2, store_ids=all_scraped_ids
-    )
-    existing_store_ids = existing_ids_map["store_id"].tolist()
-
-    only_new = [x for x in all_scraped_ids if str(x) not in existing_store_ids]
-    apps_df = pd.DataFrame({"store": 2, "store_id": only_new})
-    insert_columns = ["store", "store_id"]
-    logger.info(f"Scrape iOS frontpage for new apps: insert to db {apps_df.shape=}")
-    upsert_df(
-        table_name="store_apps",
-        insert_columns=insert_columns,
-        df=apps_df,
-        key_columns=insert_columns,
-        database_connection=database_connection,
-    )
-    insert_full_rankings(
-        database_connection=database_connection,
-        collections_map=collections_map,
-        categories_map=categories_map,
-        all_scraped_ids=all_scraped_ids,
-        ranked_dicts=ranked_dicts,
-    )
-    logger.info("Scrape iOS frontpage for new apps finished")
-
-
-def insert_full_rankings(
-    database_connection: PostgresCon,
-    collections_map: pd.DataFrame,
-    categories_map: pd.DataFrame,
-    all_scraped_ids: list[str],
-    ranked_dicts: list[dict],
-) -> None:
-    logger.info("Store rankings start")
-    new_existing_ids_map = query_store_id_map(
-        database_connection, store=2, store_ids=all_scraped_ids
-    ).rename(columns={"id": "store_app"})
-    df = pd.DataFrame.from_dict(ranked_dicts)
-    df = df.rename(columns={"app": "store_id"})
-    df = pd.merge(
-        df, new_existing_ids_map, how="left", on="store_id", validate="m:1"
-    ).drop("store_id", axis=1)
-    df = pd.merge(
-        df, collections_map, how="left", on=["store", "collection"], validate="m:1"
-    ).drop("collection", axis=1)
-    df = pd.merge(
-        df, categories_map, how="left", on=["store", "category"], validate="m:1"
-    ).drop("category", axis=1)
-    df["crawled_date"] = datetime.datetime.utcnow().date()
-    upsert_df(
-        database_connection=database_connection,
-        df=df,
-        table_name="app_rankings",
-        key_columns=[
-            "crawled_date",
-            "rank",
-            "store",
-            "store_category",
-            "store_collection",
-        ],
-        insert_columns=["store_app"],
-    )
+    return ranked_dicts
 
 
 def crawl_ios_developers(

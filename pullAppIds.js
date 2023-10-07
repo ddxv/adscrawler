@@ -16,7 +16,7 @@ async function pullRank(category, collection, country, numApps) {
             store_category: category,
             country: country,
             rank: index + 1,  // Assuming the list starts from rank 1
-            appId: item.appId
+            store_id: item.appId
         }));
     }
     catch (e) {
