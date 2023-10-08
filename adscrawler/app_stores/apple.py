@@ -156,7 +156,7 @@ def clean_ios_app_df(df: pd.DataFrame) -> pd.DataFrame:
             lambda x: [int(num) for num in re.findall(r"\d+", x)[1::2]]
         )
     except Exception:
-        logger.exception("Unable to parse histogram")
+        logger.warning("Unable to parse histogram")
         df["histogram"] = None
     return df
 
