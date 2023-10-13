@@ -13,6 +13,7 @@ from adscrawler.app_stores.apple import (
 )
 from adscrawler.app_stores.google import (
     clean_google_play_app_df,
+    crawl_google_developers,
     scrape_app_gp,
     scrape_gp_for_app_ids,
 )
@@ -156,36 +157,62 @@ def crawl_developers_for_new_store_ids(
 ) -> None:
     store_ids = query_store_ids(database_connection, store=store)
     df = query_developers(database_connection, store=store)
-    for _id, row in df.iterrows():
-        developer_db_id = row["id"]
-        developer_id = row["developer_id"]
-        row_info = f"{store=} {developer_id=}"
-        try:
-            if store == 2:
-                apps_df = crawl_ios_developers(developer_db_id, developer_id, store_ids)
-            if not apps_df.empty:
-                apps_df = clean_scraped_df(df=apps_df, store=store)
-                save_apps_df(
-                    apps_df, database_connection, update_developer=False, country="us"
+    if store == 1:
+        developer_ids = df["developer_id"].unique().tolist()
+        apps_df = crawl_google_developers(developer_ids, store_ids)
+        dev_dict = {
+            "developer": df["id"].tolist(),
+            "apps_crawled_at": datetime.datetime.utcnow(),
+        }
+        dev_df = pd.DataFrame([dev_dict])
+        insert_columns = dev_df.columns.tolist()
+        key_columns = ["developer"]
+        upsert_df(
+            table_name="developers_crawled_at",
+            schema="logging",
+            insert_columns=insert_columns,
+            df=dev_df,
+            key_columns=key_columns,
+            database_connection=database_connection,
+        )
+        logger.info(f"{store=} crawled, {apps_df.shape[0]} new store ids")
+    if store == 2:
+        for _id, row in df.iterrows():
+            developer_db_id = row["id"]
+            developer_id = row["developer_id"]
+            row_info = f"{store=} {developer_id=}"
+            try:
+                if store == 2:
+                    apps_df = crawl_ios_developers(
+                        developer_db_id, developer_id, store_ids
+                    )
+
+                if not apps_df.empty:
+                    apps_df = clean_scraped_df(df=apps_df, store=store)
+                    save_apps_df(
+                        apps_df,
+                        database_connection,
+                        update_developer=False,
+                        country="us",
+                    )
+                dev_dict = {
+                    "developer": developer_db_id,
+                    "apps_crawled_at": datetime.datetime.utcnow(),
+                }
+                dev_df = pd.DataFrame([dev_dict])
+                insert_columns = dev_df.columns.tolist()
+                key_columns = ["developer"]
+                upsert_df(
+                    table_name="developers_crawled_at",
+                    schema="logging",
+                    insert_columns=insert_columns,
+                    df=dev_df,
+                    key_columns=key_columns,
+                    database_connection=database_connection,
                 )
-            dev_dict = {
-                "developer": developer_db_id,
-                "apps_crawled_at": datetime.datetime.utcnow(),
-            }
-            dev_df = pd.DataFrame([dev_dict])
-            insert_columns = dev_df.columns.tolist()
-            key_columns = ["developer"]
-            upsert_df(
-                table_name="developers_crawled_at",
-                schema="logging",
-                insert_columns=insert_columns,
-                df=dev_df,
-                key_columns=key_columns,
-                database_connection=database_connection,
-            )
-            logger.info(f"{row_info=} crawled, {apps_df.shape[0]} new store ids")
-        except Exception:
-            logger.exception(f"{row_info=} failed!")
+                logger.info(f"{row_info=} crawled, {apps_df.shape[0]} new store ids")
+            except Exception:
+                logger.exception(f"{row_info=} failed!")
 
 
 def update_app_details(

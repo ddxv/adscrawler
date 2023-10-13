@@ -102,7 +102,14 @@ def main(args: argparse.Namespace) -> None:
     # Scrape Store for new apps
     if new_apps_check:
         scrape_stores_frontpage(database_connection=PGCON, stores=stores)
-        crawl_developers_for_new_store_ids(database_connection=PGCON, store=2)
+        try:
+            crawl_developers_for_new_store_ids(database_connection=PGCON, store=2)
+        except Exception:
+            logger.exception("Crawling developers for Apple failed")
+        try:
+            crawl_developers_for_new_store_ids(database_connection=PGCON, store=1)
+        except Exception:
+            logger.exception("Crawling developers for Google failed")
 
     # Update the app details
     if update_app_store_details:
