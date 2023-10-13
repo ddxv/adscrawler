@@ -101,7 +101,10 @@ def main(args: argparse.Namespace) -> None:
 
     # Scrape Store for new apps
     if new_apps_check:
-        scrape_stores_frontpage(database_connection=PGCON, stores=stores)
+        try:
+            scrape_stores_frontpage(database_connection=PGCON, stores=stores)
+        except Exception:
+            logger.exception("Crawling front pages failed")
         try:
             crawl_developers_for_new_store_ids(database_connection=PGCON, store=2)
         except Exception:
