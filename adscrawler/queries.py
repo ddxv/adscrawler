@@ -289,8 +289,8 @@ def query_store_apps(
                 WHEN crawl_result IS NULL THEN 0
                 ELSE 1
             END),
-            --updated_at
-            (installs + review_count) DESC NULLS LAST
+            updated_at
+            --(installs + review_count) DESC NULLS LAST
         {limit_str}
         """
     print(sel_query)
