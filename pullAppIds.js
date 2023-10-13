@@ -111,8 +111,6 @@ async function main() {
 
 
     if (argv.developers) {
-        fileName = '/tmp/googleplay_devs.txt'
-        readFile(fileName)
         loopDevelopers(country, numApps = 60)
     }
     else {

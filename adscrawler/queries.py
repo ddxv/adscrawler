@@ -99,6 +99,7 @@ def upsert_df(
 def query_developers(
     database_connection: PostgresCon, store: int, limit: int = 1000
 ) -> pd.DataFrame:
+    logger.info(f"Query developers {store=} start")
     before_date = (datetime.datetime.today() - datetime.timedelta(days=7)).strftime(
         "%Y-%m-%d"
     )
@@ -115,6 +116,7 @@ def query_developers(
         ;
         """
     df = pd.read_sql(sel_query, database_connection.engine)
+    logger.info(f"Query developers {store=} returning rows:{df.shape[0]}")
     return df
 
 
@@ -259,25 +261,24 @@ def query_store_apps(
         datetime.datetime.today() - datetime.timedelta(days=max_recrawl_days)
     ).strftime("%Y-%m-%d")
     installs_and_dates_str = f""" AND (
+                        (
                             (
-                             (installs >= {short_update_installs}
-                              OR review_count >= {short_update_reviews}
-                             )
-                             AND updated_at <= '{short_update_date}'
-                             AND crawl_result = 1 OR crawl_result IS NULL
-                            ) 
-                        OR (
-                             updated_at <= '{long_update_date}'
-                             AND crawl_result = 1
+                             installs >= {short_update_installs}
+                             OR review_count >= {short_update_reviews}
                             )
+                            AND updated_at <= '{short_update_date}'
+                            AND crawl_result = 1 OR crawl_result IS NULL
+                        ) 
                         OR (
-                            updated_at <= '{max_recrawl_date}'
+                            updated_at <= '{long_update_date}'
+                            AND crawl_result = 1
                            )
+                        OR updated_at <= '{max_recrawl_date}'
+                        OR crawl_result IS NULL
                         )
                         """
     where_str = "store IN (" + (", ").join([str(x) for x in stores]) + ")"
     where_str += installs_and_dates_str
-    where_str += " OR crawl_result IS NULL "
     limit_str = ""
     if limit:
         limit_str = f"LIMIT {limit}"

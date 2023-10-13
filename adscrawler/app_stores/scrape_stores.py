@@ -155,6 +155,7 @@ def extract_domains(x: str) -> str:
 def crawl_developers_for_new_store_ids(
     database_connection: PostgresCon, store: int
 ) -> None:
+    logger.info(f"Crawl devevelopers for {store=} start")
     store_ids = query_store_ids(database_connection, store=store)
     df = query_developers(database_connection, store=store)
     if store == 1:
