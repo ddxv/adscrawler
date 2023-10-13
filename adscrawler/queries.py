@@ -100,11 +100,10 @@ def query_developers(
     database_connection: PostgresCon, store: int, limit: int = 1000
 ) -> pd.DataFrame:
     logger.info(f"Query developers {store=} start")
-    before_date = (datetime.datetime.today() - datetime.timedelta(days=7)).strftime(
+    before_date = (datetime.datetime.today() - datetime.timedelta(days=15)).strftime(
         "%Y-%m-%d"
     )
     sel_query = f"""SELECT
-        *
         FROM
         developers d
         LEFT JOIN logging.developers_crawled_at dc
