@@ -37,7 +37,7 @@ logger = get_logger(__name__)
 def scrape_stores_frontpage(
     database_connection: PostgresCon, stores: list[int]
 ) -> None:
-    collection_keywords = ["NEW", "TOP"]
+    collection_keywords = ["TOP"]
     collections_map = query_collections(database_connection)
     categories_map = query_categories(database_connection)
     countries_map = query_countries(database_connection)
