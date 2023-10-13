@@ -68,16 +68,22 @@ def clean_google_play_app_df(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def js_update_ids_file(filepath: str) -> None:
+def js_update_ids_file(filepath: str, is_developers: bool = False) -> None:
     if os.path.exists(filepath):
         os.remove(filepath)
-    os.system(f"node {MODULE_DIR}/pullAppIds.js")
+    cmd = f"node {MODULE_DIR}/pullAppIds.js"
+    if is_developers:
+        cmd += " --developers"
+    os.system(cmd)
     logger.info("Js pull finished")
 
 
-def get_js_data(filepath: str) -> list[dict]:
+def get_js_data(filepath: str, is_json: bool = True) -> list[dict] | list:
     with open(filepath, mode="r") as file:
-        data = [json.loads(line) for line in file if line.strip()]
+        if is_json:
+            data = [json.loads(line) for line in file if line.strip()]
+        else:
+            data = [line for line in file]
     return data
 
 
@@ -91,3 +97,35 @@ def scrape_gp_for_app_ids() -> list[dict]:
     ranked_dicts = get_js_data(filepath)
     logger.info("Scrape GP frontpage for new apps finished")
     return ranked_dicts
+
+
+def scrape_gp_for_developer_app_ids(developer_ids: list[str]) -> list:
+    logger.info("Scrape GP developers for new apps start")
+    developers_filepath = "/tmp/googleplay_developers.txt"
+    if os.path.exists(developers_filepath):
+        os.remove(developers_filepath)
+
+    with open(developers_filepath, "w") as file:
+        for dev_id in developer_ids:
+            file.write(f"{dev_id}\n")
+
+    app_ids_filepath = "/tmp/googleplay_developers_app_ids.txt"
+    try:
+        js_update_ids_file(app_ids_filepath, is_developers=True)
+    except Exception as error:
+        logger.exception(f"JS pull failed with {error=}")
+    app_ids = get_js_data(app_ids_filepath, is_json=False)
+    logger.info("Scrape GP developers for new apps finished")
+    return app_ids
+
+
+def crawl_google_developers(
+    developer_ids: list[str],
+    store_ids: list[str],
+) -> pd.DataFrame:
+    store = 1
+    app_ids = scrape_gp_for_developer_app_ids(developer_ids=developer_ids)
+    new_app_ids = [x for x in app_ids if x not in store_ids]
+    if not len(new_app_ids) > 0:
+        apps_df = pd.DataFrame({"store": store, "store_id": new_app_ids})
+    return apps_df

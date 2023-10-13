@@ -1,5 +1,17 @@
+const yargs = require('yargs/yargs');
+const fs = require('fs');
 var gplay = require('google-play-scraper');
 
+
+const { hideBin } = require('yargs/helpers');
+
+const argv = yargs(hideBin(process.argv))
+    .option('developers', {
+        alias: 'd',
+        type: 'boolean',
+        description: 'Set to true or false to include developers'
+    })
+    .argv;
 
 async function pullRank(category, collection, country, numApps) {
     try {
@@ -26,6 +38,35 @@ async function pullRank(category, collection, country, numApps) {
     }
 }
 
+async function loopDevelopers(country, numApps) {
+    // Read the file synchronously
+    const fileContent = fs.readFileSync('/tmp/googleplay_developers.txt', 'utf8');
+
+    // Split the content by newlines to get an array of developer IDs
+    const developerIds = fileContent.split('\n').filter(Boolean);
+
+    let allAppIds = [];
+
+    // Loop over the list of developer IDs
+    for (const devId of developerIds) {
+        try {
+            const apps = await gplay.developer({ devId: devId, country: country, num: numApps });
+
+            // Extract the appId from each app and add it to the allAppIds array
+            const appIds = apps.map(app => app.appId);
+            if (appIds.length > 1) {
+                allAppIds = allAppIds.concat(appIds);
+            }
+        } catch (error) {
+            console.error(`Error fetching apps for developer ${devId}:`, error);
+        }
+    }
+    if (allAppIds.length > 0) {
+        // Save the list of appIds to a file separated by newlines
+        fs.writeFileSync('/tmp/googleplay_developers_app_ids.txt', allAppIds.join('\n'));
+
+    }
+}
 
 async function loopLists(categories, collections, country, numApps) {
     // Loop over each keys in categories and collections
@@ -68,15 +109,20 @@ var country = "us"
 
 async function main() {
 
-    // 54 Categories: GAME_TRIVIA, EVENTS, TRAVEL
-    var categories = gplay.category
-    // 3 Collections: TOP_FREE, TOP_PAID, GROSSING
-    var collections = gplay.collection
-    console.log("Starting %i categories and %i collections", Object.keys(categories).length, Object.keys(collections).length)
 
-    // nested for loop for two iterables
-    loopLists(categories, collections, country, numApps)
+    if (argv.developers) {
+        loopDevelopers(country, numApps = 60)
+    }
+    else {
+        // 54 Categories: GAME_TRIVIA, EVENTS, TRAVEL
+        var categories = gplay.category
+        // 3 Collections: TOP_FREE, TOP_PAID, GROSSING
+        var collections = gplay.collection
+        console.log("Starting %i categories and %i collections", Object.keys(categories).length, Object.keys(collections).length)
 
+        // nested for loop for two iterables
+        loopLists(categories, collections, country, numApps)
+    }
 
 }
 
