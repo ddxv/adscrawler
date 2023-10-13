@@ -161,11 +161,17 @@ def crawl_developers_for_new_store_ids(
     if store == 1:
         developer_ids = df["developer_id"].unique().tolist()
         apps_df = crawl_google_developers(developer_ids, store_ids)
-        dev_dict = {
-            "developer": df["id"].tolist(),
-            "apps_crawled_at": datetime.datetime.utcnow(),
-        }
-        dev_df = pd.DataFrame([dev_dict])
+        if not apps_df.empty:
+            crawl_stores_for_app_details(apps_df, database_connection)
+        dev_df = pd.DataFrame(
+            [
+                {
+                    "developer": id,
+                    "apps_crawled_at": datetime.datetime.now(tz=datetime.timezone.utc),
+                }
+                for id in df["id"].tolist()
+            ]
+        )
         insert_columns = dev_df.columns.tolist()
         key_columns = ["developer"]
         upsert_df(
@@ -196,11 +202,14 @@ def crawl_developers_for_new_store_ids(
                         update_developer=False,
                         country="us",
                     )
-                dev_dict = {
-                    "developer": developer_db_id,
-                    "apps_crawled_at": datetime.datetime.utcnow(),
-                }
-                dev_df = pd.DataFrame([dev_dict])
+                dev_df = pd.DataFrame(
+                    [
+                        {
+                            "developer": developer_db_id,
+                            "apps_crawled_at": datetime.datetime.utcnow(),
+                        }
+                    ]
+                )
                 insert_columns = dev_df.columns.tolist()
                 key_columns = ["developer"]
                 upsert_df(

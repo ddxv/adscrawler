@@ -83,7 +83,7 @@ def get_js_data(filepath: str, is_json: bool = True) -> list[dict] | list:
         if is_json:
             data = [json.loads(line) for line in file if line.strip()]
         else:
-            data = [line for line in file]
+            data = [line.strip() for line in file]
     return data
 
 
@@ -114,7 +114,11 @@ def scrape_gp_for_developer_app_ids(developer_ids: list[str]) -> list:
         js_update_ids_file(app_ids_filepath, is_developers=True)
     except Exception as error:
         logger.exception(f"JS pull failed with {error=}")
-    app_ids = get_js_data(app_ids_filepath, is_json=False)
+    try:
+        app_ids = get_js_data(app_ids_filepath, is_json=False)
+    except Exception:
+        logger.exception("Unable to load scraped js developer app file")
+        app_ids = []
     logger.info("Scrape GP developers for new apps finished")
     return app_ids
 
@@ -126,6 +130,8 @@ def crawl_google_developers(
     store = 1
     app_ids = scrape_gp_for_developer_app_ids(developer_ids=developer_ids)
     new_app_ids = [x for x in app_ids if x not in store_ids]
-    if not len(new_app_ids) > 0:
+    if len(new_app_ids) > 1:
         apps_df = pd.DataFrame({"store": store, "store_id": new_app_ids})
+    else:
+        apps_df = pd.DataFrame(columns=["store", "store_id"])
     return apps_df
