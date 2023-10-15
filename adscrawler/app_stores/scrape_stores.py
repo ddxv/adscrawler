@@ -1,4 +1,6 @@
 import datetime
+import time
+from urllib.error import URLError
 
 import google_play_scraper
 import pandas as pd
@@ -304,35 +306,67 @@ def clean_scraped_df(df: pd.DataFrame, store: int) -> pd.DataFrame:
     return df
 
 
-def scrape_app(store: int, store_id: str, country: str) -> pd.DataFrame:
+def scrape_app(
+    store: int,
+    store_id: str,
+    country: str,
+) -> pd.DataFrame:
     scrape_info = f"{store=}, {store_id=}, {country=}"
-    try:
-        result_dict = scrape_from_store(store=store, store_id=store_id, country=country)
-        crawl_result = 1
-    except google_play_scraper.exceptions.NotFoundError:
-        crawl_result = 3
-        logger.warning(f"{scrape_info} failed to find app")
-    except AppStoreException as error:
-        if "No app found" in str(error):
+    max_retries = 2
+    base_delay = 2
+    retries = 0
+
+    while retries <= max_retries:
+        try:
+            result_dict = scrape_from_store(
+                store=store, store_id=store_id, country=country
+            )
+            crawl_result = 1
+            break  # If successful, break out of the retry loop
+        except google_play_scraper.exceptions.NotFoundError:
             crawl_result = 3
             logger.warning(f"{scrape_info} failed to find app")
-        else:
+            break  # If app not found, break out of the retry loop as retrying won't help
+        except AppStoreException as error:
+            if "No app found" in str(error):
+                crawl_result = 3
+                logger.warning(f"{scrape_info} failed to find app")
+                break  # Similarly, if app not found, break out of the retry loop
+            else:
+                crawl_result = 4
+                logger.error(f"{scrape_info} unexpected error: {error=}")
+        except URLError as error:
+            logger.warning(f"{scrape_info} {error=}")
             crawl_result = 4
+            retries += 1
+            if retries <= max_retries:
+                sleep_time = base_delay * (2**retries)
+                logger.info(f"{scrape_info} Retrying in {sleep_time} seconds...")
+                time.sleep(sleep_time)
+                continue
+            else:
+                logger.error(f"{scrape_info} Max retries reached. Giving up.")
+                break
+        except Exception as error:
             logger.error(f"{scrape_info} unexpected error: {error=}")
-    except Exception as error:
-        logger.error(f"{scrape_info} unexpected error: {error=}")
-        crawl_result = 4
+            crawl_result = 4
+            break
+
     if crawl_result != 1:
         result_dict = {}
+
     if "kind" in result_dict.keys() and "mac" in result_dict["kind"].lower():
         logger.error(f"{scrape_info} Crawled app is not Mac Software, not iOS!")
         crawl_result = 5
+
     result_dict["crawl_result"] = crawl_result
     result_dict["store"] = store
     result_dict["store_id"] = store_id
+
     df = pd.DataFrame([result_dict])
     if crawl_result == 1:
         df = clean_scraped_df(df=df, store=store)
+
     return df
 
 
