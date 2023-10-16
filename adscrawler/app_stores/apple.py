@@ -59,7 +59,6 @@ def scrape_ios_frontpage(
                 num=200,
                 timeout=10,
             )
-            logger.info(f"{scraped_ids=}")
             ranked_dicts += [
                 {
                     "store": 2,
