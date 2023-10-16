@@ -1,6 +1,7 @@
 import datetime
 import time
 from urllib.error import URLError
+from urllib.parse import unquote_plus
 
 import google_play_scraper
 import pandas as pd
@@ -162,6 +163,7 @@ def crawl_developers_for_new_store_ids(
     df = query_developers(database_connection, store=store)
     if store == 1:
         developer_ids = df["developer_id"].unique().tolist()
+        developer_ids = [unquote_plus(x) for x in developer_ids]
         apps_df = crawl_google_developers(developer_ids, store_ids)
         if not apps_df.empty:
             crawl_stores_for_app_details(apps_df, database_connection)
@@ -244,8 +246,11 @@ def crawl_stores_for_app_details(
     for _index, row in df.iterrows():
         store_id = row.store_id
         store = row.store
-        app_url_id = row.app_url_id
-        app_url_id = None if pd.isnull(app_url_id) else int(app_url_id)
+        if "app_url_id" in row:
+            app_url_id = row.app_url_id
+            app_url_id = None if pd.isnull(app_url_id) else int(app_url_id)
+        else:
+            app_url_id = None
         update_all_app_info(store, store_id, database_connection, app_url_id)
 
 
@@ -268,7 +273,7 @@ def update_all_app_info(
     if app_df["crawl_result"].values[0] != 1:
         logger.info(f"{info} crawl not successful, don't update further")
         return
-    if "url" not in app_df.columns:
+    if "url" not in app_df.columns or not app_df["url"].values:
         logger.info(f"{info} no app url, finished")
         return
     app_df["url"] = app_df["url"].apply(lambda x: extract_domains(x))

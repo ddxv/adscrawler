@@ -103,14 +103,23 @@ def query_developers(
     before_date = (datetime.datetime.today() - datetime.timedelta(days=15)).strftime(
         "%Y-%m-%d"
     )
-    sel_query = f"""SELECT *
+    sel_query = f"""SELECT 
+            d.*,
+            SUM(sa.installs) AS total_installs,
+            dc.apps_crawled_at
         FROM
-        developers d
+            developers d
         LEFT JOIN logging.developers_crawled_at dc
-        ON d.id = dc.developer
-        WHERE store = {store} 
+            ON d.id = dc.developer
+        LEFT JOIN store_apps sa 
+            ON d.id = sa.developer 
+        WHERE d.store = {store} 
             AND (apps_crawled_at <= '{before_date}' OR apps_crawled_at IS NULL)
-        ORDER BY apps_crawled_at NULLS FIRST
+            AND sa.crawl_result = 1
+        GROUP BY
+            d.id, dc.apps_crawled_at
+        ORDER BY apps_crawled_at NULLS FIRST,
+        sum(sa.installs) DESC
         limit {limit}
         ;
         """
