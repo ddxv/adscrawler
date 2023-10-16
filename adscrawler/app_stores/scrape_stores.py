@@ -8,6 +8,7 @@ import pandas as pd
 import tldextract
 from itunes_app_scraper.util import AppStoreException
 
+from adscrawler.app_stores.apkcombo import get_apkcombo_android_apps
 from adscrawler.app_stores.apple import (
     clean_ios_app_df,
     crawl_ios_developers,
@@ -71,15 +72,20 @@ def scrape_stores_frontpage(
             categories_map=categories_map,
             countries_map=countries_map,
         )
+        dicts = get_apkcombo_android_apps()
+        process_scraped(
+            database_connection=database_connection,
+            ranked_dicts=dicts,
+        )
     return
 
 
 def process_scraped(
     database_connection: PostgresCon,
     ranked_dicts: list[dict],
-    collections_map: pd.DataFrame,
-    categories_map: pd.DataFrame,
-    countries_map: pd.DataFrame,
+    collections_map: pd.DataFrame | None = None,
+    categories_map: pd.DataFrame | None = None,
+    countries_map: pd.DataFrame | None = None,
 ) -> None:
     df = pd.DataFrame(ranked_dicts)
     all_scraped_ids = df["store_id"].unique().tolist()
@@ -100,6 +106,8 @@ def process_scraped(
             key_columns=insert_columns,
             database_connection=database_connection,
         )
+    if "rank" not in df.columns or countries_map is None:
+        return
     logger.info("Store rankings start")
     new_existing_ids_map = query_store_id_map(
         database_connection, store_ids=all_scraped_ids
