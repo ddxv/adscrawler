@@ -242,11 +242,16 @@ def crawl_stores_for_app_details(
     for _index, row in df.iterrows():
         store_id = row.store_id
         store = row.store
-        update_all_app_info(store, store_id, database_connection)
+        app_url_id = row.app_url_id
+        app_url_id = None if pd.isnull(app_url_id) else int(app_url_id)
+        update_all_app_info(store, store_id, database_connection, app_url_id)
 
 
 def update_all_app_info(
-    store: int, store_id: str, database_connection: PostgresCon
+    store: int,
+    store_id: str,
+    database_connection: PostgresCon,
+    app_url_id: int | None = None,
 ) -> None:
     info = f"{store=} {store_id=}"
     app_df = scrape_and_save_app(store, store_id, database_connection)
@@ -254,15 +259,15 @@ def update_all_app_info(
         logger.error(f"{info} store_app db id not in app_df columns")
         return
     if (
-        "store_app" in app_df.columns
-        and "url" not in app_df.columns
-        or not app_df["url"].values
-    ):
-        store_app = app_df["store_app"].values[0]
-        delete_app_url_mapping(store_app, database_connection)
+        "url" not in app_df.columns or not app_df["url"].values
+    ) and app_url_id is not None:
+        delete_app_url_mapping(app_url_id, database_connection)
         return
     if app_df["crawl_result"].values[0] != 1:
         logger.info(f"{info} crawl not successful, don't update further")
+        return
+    if "url" not in app_df.columns:
+        logger.info(f"{info} no app url, finished")
         return
     app_df["url"] = app_df["url"].apply(lambda x: extract_domains(x))
     insert_columns = ["url"]
@@ -285,7 +290,7 @@ def update_all_app_info(
             key_columns=key_columns,
             database_connection=database_connection,
         )
-        logger.info(f"{info} finished")
+    logger.info(f"{info} finished")
 
 
 def scrape_from_store(store: int, store_id: str, country: str) -> dict:

@@ -231,15 +231,11 @@ def query_pub_domains(
     return df
 
 
-def delete_app_url_mapping(store_app: int, database_connection: PostgresCon) -> None:
-    del_query = f"""DELETE
-        FROM app_urls_map
-        WHERE store_app = {store_app}
-        ;
-        """
-    logger.info(f"{store_app=} delete app_urls_map start")
+def delete_app_url_mapping(app_url_id: int, database_connection: PostgresCon) -> None:
+    del_query = text("DELETE FROM app_urls_map WHERE id = :app_url_id")
+    logger.info(f"{app_url_id=} delete app_urls_map start")
     with database_connection.engine.begin() as conn:
-        conn.exec_driver_sql(del_query)
+        conn.execute(del_query, {"app_url_id": app_url_id})
 
 
 def query_store_apps(
@@ -265,14 +261,14 @@ def query_store_apps(
                              installs >= {short_update_installs}
                              OR review_count >= {short_update_reviews}
                             )
-                            AND updated_at <= '{short_update_date}'
+                            AND sa.updated_at <= '{short_update_date}'
                             AND crawl_result = 1 OR crawl_result IS NULL
                         ) 
                         OR (
-                            updated_at <= '{long_update_date}'
+                            sa.updated_at <= '{long_update_date}'
                             AND crawl_result = 1
                            )
-                        OR updated_at <= '{max_recrawl_date}'
+                        OR sa.updated_at <= '{max_recrawl_date}'
                         OR crawl_result IS NULL
                         )
                         """
@@ -281,19 +277,26 @@ def query_store_apps(
     limit_str = ""
     if limit:
         limit_str = f"LIMIT {limit}"
-    sel_query = f"""SELECT store, id as store_app, store_id, updated_at  
-        FROM store_apps
+    sel_query = f"""SELECT 
+            store, 
+            sa.id as store_app, 
+            store_id, 
+            sa.updated_at, 
+            aum.id as app_url_id  
+        FROM 
+            store_apps sa
+        LEFT JOIN app_urls_map aum
+            ON aum.store_app = sa.id
         WHERE {where_str}
         ORDER BY
             (CASE
                 WHEN crawl_result IS NULL THEN 0
                 ELSE 1
             END),
-            updated_at
+            sa.updated_at
             --(installs + review_count) DESC NULLS LAST
         {limit_str}
         """
-    print(sel_query)
     df = pd.read_sql(sel_query, database_connection.engine)
     return df
 
