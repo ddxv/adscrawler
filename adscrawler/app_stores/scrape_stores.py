@@ -72,11 +72,14 @@ def scrape_stores_frontpage(
             categories_map=categories_map,
             countries_map=countries_map,
         )
-        dicts = get_apkcombo_android_apps()
-        process_scraped(
-            database_connection=database_connection,
-            ranked_dicts=dicts,
-        )
+        try:
+            dicts = get_apkcombo_android_apps()
+            process_scraped(
+                database_connection=database_connection,
+                ranked_dicts=dicts,
+            )
+        except Exception:
+            logger.exception("ApkCombo RSS feed failed")
     return
 
 
