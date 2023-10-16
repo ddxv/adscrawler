@@ -160,7 +160,7 @@ def crawl_developers_for_new_store_ids(
 ) -> None:
     logger.info(f"Crawl devevelopers for {store=} start")
     store_ids = query_store_ids(database_connection, store=store)
-    df = query_developers(database_connection, store=store)
+    df = query_developers(database_connection, store=store, limit=10000)
     if store == 1:
         developer_ids = df["developer_id"].unique().tolist()
         developer_ids = [unquote_plus(x) for x in developer_ids]
