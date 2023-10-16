@@ -15,6 +15,7 @@ dependencies = [
     'tldextract',
     'git+https://github.com/ddxv/itunes-app-scraper.git',
     'sshtunnel',
+    'selenium',
 ]
 
 [build-system]
