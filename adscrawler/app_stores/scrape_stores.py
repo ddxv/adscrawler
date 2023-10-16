@@ -208,7 +208,9 @@ def crawl_developers_for_new_store_ids(
                     [
                         {
                             "developer": developer_db_id,
-                            "apps_crawled_at": datetime.datetime.utcnow(),
+                            "apps_crawled_at": datetime.datetime.now(
+                                datetime.timezone.utc
+                            ),
                         }
                     ]
                 )
@@ -460,7 +462,7 @@ def save_apps_df(
 
         store_apps_history["country"] = country.upper()
         store_apps_history["crawled_date"] = (
-            datetime.datetime.utcnow().date().strftime("%Y-%m-%d")
+            datetime.datetime.now(datetime.timezone.utc).date().strftime("%Y-%m-%d")
         )
         table_name = "store_apps_country_history"
         insert_columns = [
@@ -492,7 +494,7 @@ def save_apps_df(
 
 
 def log_crawl_results(app_df: pd.DataFrame, database_connection: PostgresCon) -> None:
-    app_df["crawled_at"] = datetime.datetime.utcnow()
+    app_df["crawled_at"] = datetime.datetime.now(datetime.timezone.utc)
     insert_columns = ["crawl_result", "store", "store_id", "store_app", "crawled_at"]
     app_df = app_df[insert_columns]
     app_df.to_sql(
