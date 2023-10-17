@@ -602,6 +602,37 @@ CREATE TABLE public.store_apps_country_history (
 );
 
 
+-- logging.developers_crawled_at definition
+
+-- Drop table
+
+-- DROP TABLE logging.developers_crawled_at;
+
+CREATE TABLE logging.developers_crawled_at (
+	developer int4 NOT NULL,
+	apps_crawled_at timestamp NULL,
+	CONSTRAINT developers_crawled_at_pk PRIMARY KEY (developer),
+	CONSTRAINT newtable_fk FOREIGN KEY (developer) REFERENCES public.developers(id)
+);
+
+-- logging.developers_crawled_at definition
+
+-- Drop table
+
+-- DROP TABLE logging.developers_crawled_at;
+
+CREATE TABLE logging.store_app_sources (
+    store int2 NOT NULL,
+    store_app int4 NOT NULL,
+    crawl_source text NULL,
+    CONSTRAINT store_app_sources_pk PRIMARY KEY (store, store_app),
+    CONSTRAINT store_app_sources_store_fk FOREIGN KEY (store) REFERENCES public.stores(id),
+    CONSTRAINT store_app_sources_app_fk FOREIGN KEY (store_app) REFERENCES public.store_apps(id)
+);
+
+
+
+
 -- Table Triggers
 
 CREATE TRIGGER store_app_audit AFTER
