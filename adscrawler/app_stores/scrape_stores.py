@@ -121,7 +121,7 @@ def insert_new_apps(
             insert_columns = ["store", "store_app"]
             upsert_df(
                 table_name="store_app_sources",
-                insert_columns=insert_columns,
+                insert_columns=insert_columns + ["crawl_source"],
                 df=inserted_apps,
                 key_columns=insert_columns,
                 database_connection=database_connection,
