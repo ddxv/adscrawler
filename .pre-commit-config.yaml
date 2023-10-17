@@ -14,3 +14,12 @@ repos:
     hooks:
       - id: mypy
         additional_dependencies: ["types-requests", "types-PyYAML"]
+  - repo: local
+    hooks:
+      - id: pytest
+        name: pytest
+        language: system
+        entry: pytest -s
+        pass_filenames: false
+        types: [python]
+        stages: [commit]
