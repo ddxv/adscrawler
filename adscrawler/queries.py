@@ -106,6 +106,7 @@ def query_developers(
     sel_query = f"""SELECT 
             d.*,
             SUM(sa.installs) AS total_installs,
+            SUM(sa.review_count) AS total_reviews,
             dc.apps_crawled_at
         FROM
             developers d
@@ -118,8 +119,9 @@ def query_developers(
             AND sa.crawl_result = 1
         GROUP BY
             d.id, dc.apps_crawled_at
-        ORDER BY apps_crawled_at NULLS FIRST,
-        sum(sa.installs) DESC
+        ORDER BY apps_crawled_at::date NULLS FIRST,
+        total_installs DESC NULLS LAST,
+        total_reviews DESC NULLS LAST
         limit {limit}
         ;
         """

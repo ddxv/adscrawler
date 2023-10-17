@@ -203,6 +203,7 @@ def crawl_developers_for_new_store_ids(
             developer_db_id = row["id"]
             developer_id = row["developer_id"]
             row_info = f"{store=} {developer_id=}"
+            logger.info(f"{row_info=} start")
             try:
                 if store == 2:
                     apps_df = crawl_ios_developers(
