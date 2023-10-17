@@ -15,13 +15,14 @@ class TestApkcombo(unittest.TestCase):
             ) as mock_scrape:
                 mock_scrape.return_value = ["sample_app_id_1", "sample_app_id_2"]
                 # Call the function
-                result = apkcombo.get_apkcombo_android_apps()
+                results = apkcombo.get_apkcombo_android_apps()
         else:
             # Call the function without mocking
-            result = apkcombo.get_apkcombo_android_apps()
+            results = apkcombo.get_apkcombo_android_apps()
 
+        print(f"Scrape found results length:{len(results)}")
         # Assert that the returned list has length greater than 0
-        self.assertTrue(len(result) > 0)
+        self.assertTrue(len(results) > 0)
 
 
 if __name__ == "__main__":
