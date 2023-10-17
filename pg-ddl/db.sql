@@ -1,6 +1,7 @@
 -- DROP SCHEMA public;
 
 CREATE SCHEMA public AUTHORIZATION postgres;
+CREATE SCHEMA logging AUTHORIZATION postgres;
 
 -- DROP SEQUENCE public.ad_domains_id_seq;
 
