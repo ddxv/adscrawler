@@ -1,12 +1,16 @@
 import re
 
+from config import get_logger
 from selenium import webdriver
 from selenium.webdriver.firefox.options import Options
 from selenium.webdriver.firefox.service import Service
 
+logger = get_logger(__name__)
+
 
 def scrape_with_firefox() -> list[str]:
     """Open Firefox and navigate to apkcombo.com."""
+    logger.info("Pull RSS feed using Selenium Firefox")
     options = Options()
     options.add_argument("--headless")
 
@@ -28,3 +32,11 @@ def get_apkcombo_android_apps() -> list[dict]:
     scraped_ids = scrape_with_firefox()
     dicts = [{"store": 1, "store_id": x} for x in scraped_ids]
     return dicts
+
+
+if __name__ == "__main__":
+    logger.info("Start main")
+    scraped_dicts = get_apkcombo_android_apps()
+    logger.info(
+        f"Scraped dicts length={len(scraped_dicts)} example: {scraped_dicts[0]}"
+    )
