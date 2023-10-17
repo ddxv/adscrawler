@@ -9,6 +9,7 @@ import tldextract
 from itunes_app_scraper.util import AppStoreException
 
 from adscrawler.app_stores.apkcombo import get_apkcombo_android_apps
+from adscrawler.app_stores.appbrain import get_appbrain_android_apps
 from adscrawler.app_stores.apple import (
     clean_ios_app_df,
     crawl_ios_developers,
@@ -80,6 +81,15 @@ def scrape_stores_frontpage(
                 database_connection=database_connection,
                 ranked_dicts=dicts,
                 crawl_source="scrape_rss_apkcombo",
+            )
+        except Exception:
+            logger.exception("ApkCombo RSS feed failed")
+        try:
+            dicts = get_appbrain_android_apps()
+            process_scraped(
+                database_connection=database_connection,
+                ranked_dicts=dicts,
+                crawl_source="scrape_appbrain",
             )
         except Exception:
             logger.exception("ApkCombo RSS feed failed")
