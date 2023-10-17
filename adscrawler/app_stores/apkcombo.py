@@ -1,9 +1,10 @@
 import re
 
-from config import get_logger
 from selenium import webdriver
 from selenium.webdriver.firefox.options import Options
 from selenium.webdriver.firefox.service import Service
+
+from adscrawler.config import get_logger
 
 logger = get_logger(__name__)
 
