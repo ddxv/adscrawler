@@ -628,7 +628,7 @@ CREATE TABLE logging.store_app_sources (
     crawl_source text NULL,
     CONSTRAINT store_app_sources_pk PRIMARY KEY (store, store_app),
     CONSTRAINT store_app_sources_store_fk FOREIGN KEY (store) REFERENCES public.stores(id),
-    CONSTRAINT store_app_sources_app_fk FOREIGN KEY (store_app) REFERENCES public.store_apps(id)
+    CONSTRAINT store_app_sources_app_fk FOREIGN KEY (store_app) REFERENCES public.store_apps(id) ON DELETE CASCADE
 );
 
 
