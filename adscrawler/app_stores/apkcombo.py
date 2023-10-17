@@ -33,11 +33,3 @@ def get_apkcombo_android_apps() -> list[dict]:
     scraped_ids = scrape_with_firefox()
     dicts = [{"store": 1, "store_id": x} for x in scraped_ids]
     return dicts
-
-
-if __name__ == "__main__":
-    logger.info("Start main")
-    scraped_dicts = get_apkcombo_android_apps()
-    logger.info(
-        f"Scraped dicts length={len(scraped_dicts)} example: {scraped_dicts[0]}"
-    )
