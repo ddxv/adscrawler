@@ -105,7 +105,6 @@ def scrape_app_ios(store_id: str, country: str) -> dict:
     # NOTE: averageUserRating, Rating_count, Histogram are country specific
     scraper = AppStoreScraper()
     result: dict = scraper.get_app_details(store_id, country=country, add_ratings=True)
-
     return result
 
 
@@ -119,6 +118,7 @@ def clean_ios_app_df(df: pd.DataFrame) -> pd.DataFrame:
             "minimum_OsVersion": "minimum_android",
             "primaryGenreName": "category",
             "bundleId": "bundle_id",
+            "releaseDate": "release_date",
             "currentVersionReleaseDate": "store_last_updated",
             "artistId": "developer_id",
             "artistName": "developer_name",
@@ -150,6 +150,9 @@ def clean_ios_app_df(df: pd.DataFrame) -> pd.DataFrame:
         store_last_updated=pd.to_datetime(df["store_last_updated"]).dt.strftime(
             "%Y-%m-%d %H:%M"
         ),
+        release_date=pd.to_datetime(
+            df["release_date"], format="%Y-%m-%dT%H:%M:%SZ"
+        ).dt.date,
     )
     try:
         df["histogram"] = df["user_ratings"].apply(

@@ -42,6 +42,8 @@ def clean_google_play_app_df(df: pd.DataFrame) -> pd.DataFrame:
             "updated": "store_last_updated",
             "reviews": "review_count",
             "ratings": "rating_count",
+            "summary": "short_description",
+            "released": "release_date",
             "containsAds": "ad_supported",
             "offersIAP": "in_app_purchases",
             "url": "store_url",
@@ -64,6 +66,7 @@ def clean_google_play_app_df(df: pd.DataFrame) -> pd.DataFrame:
         store_last_updated=pd.to_datetime(
             df["store_last_updated"], unit="s"
         ).dt.strftime("%Y-%m-%d %H:%M"),
+        release_date=pd.to_datetime(df["release_date"], format="%b %d, %Y").dt.date,
     )
     return df
 
