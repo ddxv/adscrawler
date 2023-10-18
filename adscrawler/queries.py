@@ -304,8 +304,9 @@ def query_store_apps(
                 WHEN crawl_result IS NULL THEN 0
                 ELSE 1
             END),
-            sa.updated_at
-            --(installs + review_count) DESC NULLS LAST
+            --sa.updated_at
+            COALESCE (review_count,0) + COALESCE (installs,0) + COALESCE (rating_count,0) 
+                DESC NULLS LAST
         {limit_str}
         """
     df = pd.read_sql(sel_query, database_connection.engine)

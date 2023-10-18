@@ -295,7 +295,7 @@ def crawl_developers_for_new_store_ids(
 def update_app_details(
     stores: list[int], database_connection: PostgresCon, limit: int | None = 1000
 ) -> None:
-    logger.info("Update App Details: start with oldest first")
+    logger.info("Update App Details: start")
     df = query_store_apps(stores, database_connection=database_connection, limit=limit)
     crawl_stores_for_app_details(df, database_connection)
 
