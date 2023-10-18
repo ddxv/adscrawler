@@ -522,7 +522,7 @@ def save_apps_df(
 
         store_apps_history = pd.merge(
             store_apps_history,
-            apps_df[["store_id", "histogram", "rating_count"]],
+            apps_df[["store_id", "histogram"]],
             on="store_id",
         )
 
