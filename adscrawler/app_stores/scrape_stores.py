@@ -584,6 +584,7 @@ STORE_APP_COLUMNS = [
     "size",
     "minimum_android",
     "review_count",
+    "rating_count",
     "release_date",
     "content_rating",
     "store_last_updated",

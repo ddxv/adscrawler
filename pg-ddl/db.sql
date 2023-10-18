@@ -540,6 +540,7 @@ CREATE TABLE public.store_apps (
 	store int4 NOT NULL,
 	category varchar NULL,
 	rating float8 NULL,
+    rating_count float8 NULL;
 	review_count float8 NULL,
 	installs float8 NULL,
 	"free" bool NULL,
