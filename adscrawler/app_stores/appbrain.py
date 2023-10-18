@@ -75,7 +75,7 @@ def scrape_for_ids(collection: str, category: str | None = None) -> list[str]:
         url_part = f"/{collection}/new"
     else:
         url_part = f"/{collection}/{category}/new"
-    response = requests.get(APPBRAIN_BASE_URL + url_part, headers=HEADERS)
+    response = requests.get(APPBRAIN_BASE_URL + url_part, headers=HEADERS, timeout=2)
     if response.status_code == 200:
         packages = re.findall(HTML_PATTERN, response.content.decode("utf-8"))
     else:
