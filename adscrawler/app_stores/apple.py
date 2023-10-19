@@ -124,6 +124,8 @@ def clean_ios_app_df(df: pd.DataFrame) -> pd.DataFrame:
             "artistName": "developer_name",
             "userRatingCount": "rating_count",
             "artworkUrl512": "icon_url_512",
+            "screenshotUrls": "phone_image_urls",
+            "ipadScreenshotUrls": "tablet_image_urls",
         }
     )
     if "price" not in df.columns:
@@ -154,6 +156,24 @@ def clean_ios_app_df(df: pd.DataFrame) -> pd.DataFrame:
             df["release_date"], format="%Y-%m-%dT%H:%M:%SZ"
         ).dt.date,
     )
+    list_cols = ["phone_image_url", "tablet_image_url"]
+    for list_col in list_cols:
+        urls_empty = ((df[f"{list_col}s"].isnull()) | (df[f"{list_col}s"] == "")).all()
+        if not urls_empty:
+            columns = {x: f"{list_col}_{x+1}" for x in range(3)}
+            df = pd.concat(
+                [
+                    df,
+                    df[f"{list_col}s"]
+                    .str.split(",")
+                    .apply(pd.Series)
+                    .rename(columns=columns),
+                ],
+                axis=1,
+            )
+        else:
+            for x in range(3):
+                df[f"{list_col}_{x}"] = None
     try:
         df["histogram"] = df["user_ratings"].apply(
             lambda x: [int(num) for num in re.findall(r"\d+", x)[1::2]]

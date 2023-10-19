@@ -594,4 +594,11 @@ STORE_APP_COLUMNS = [
     "editors_choice",
     "crawl_result",
     "icon_url_512",
+    "featured_image_url",
+    "phone_image_url_1",
+    "phone_image_url_2",
+    "phone_image_url_3",
+    "tablet_image_url_1",
+    "tablet_image_url_2",
+    "tablet_image_url_3",
 ]

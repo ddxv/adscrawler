@@ -52,6 +52,8 @@ def clean_google_play_app_df(df: pd.DataFrame) -> pd.DataFrame:
             "developerId": "developer_id",
             "developer": "developer_name",
             "genreId": "category",
+            "headerImage": "featured_image_url",
+            "screenshots": "phone_image_urls",
         }
     )
     df.loc[df["min_installs"].isnull(), "min_installs"] = df.loc[
@@ -68,6 +70,21 @@ def clean_google_play_app_df(df: pd.DataFrame) -> pd.DataFrame:
         ).dt.strftime("%Y-%m-%d %H:%M"),
         release_date=pd.to_datetime(df["release_date"], format="%b %d, %Y").dt.date,
     )
+    list_cols = ["phone_image_url"]
+    for list_col in list_cols:
+        urls_empty = ((df[f"{list_col}s"].isnull()) | (df[f"{list_col}s"] == "")).all()
+        if not urls_empty:
+            columns = {x: f"{list_col}_{x+1}" for x in range(3)}
+            df = pd.concat(
+                [
+                    df,
+                    df[f"{list_col}s"].apply(pd.Series).rename(columns=columns),
+                ],
+                axis=1,
+            )
+        else:
+            for x in range(3):
+                df[f"{list_col}_{x}"] = None
     return df
 
 
