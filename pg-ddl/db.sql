@@ -781,6 +781,10 @@ ORDER BY
     my_dates.date DESC ;
 
 
+CREATE UNIQUE INDEX idx_store_apps_updated_at
+ON store_apps_updated_at (store, date);
+
+
 CREATE MATERIALIZED VIEW store_apps_created_at AS
 WITH my_dates AS
   (
@@ -829,6 +833,10 @@ LEFT JOIN created_dates ON
     my_dates.date = created_dates.created_date
     AND my_dates.store = created_dates.store
 ;
+
+CREATE UNIQUE INDEX idx_store_apps_created_at
+ON store_apps_created_at (store, date, crawl_source);
+
 
 
 -- public.network_counts source
