@@ -685,6 +685,9 @@ UPDATE
     public.app_urls_map FOR EACH ROW EXECUTE FUNCTION update_modified_column();
 
 
+
+
+
 -- public.app_ads_view source
 
 CREATE MATERIALIZED VIEW public.app_ads_view
@@ -729,6 +732,70 @@ WITH DATA;
 -- View indexes:
 CREATE UNIQUE INDEX audit_dates_updated_date_idx ON public.audit_dates USING btree (updated_date, table_name);
 
+--for internal dashboard checking last_updated_at and created_ats
+CREATE MATERIALIZED VIEW store_apps_updated_at AS
+WITH my_dates AS
+  (
+    SELECT
+        store,
+          generate_series(
+        CURRENT_DATE - INTERVAL '365 days',
+            CURRENT_DATE,
+            '1 day'::INTERVAL
+        )::date AS date
+    FROM
+        generate_series(
+            1,
+            2,
+            1
+        ) AS num_series(store)
+),
+     updated_dates AS
+  (
+    SELECT
+        store,
+          updated_at::date AS last_updated_date,
+          count(1) AS last_updated_count
+    FROM
+        store_apps
+    WHERE
+        updated_at >= CURRENT_DATE - INTERVAL '365 days'
+    GROUP BY
+        store,
+            updated_at::date
+),
+     created_dates AS
+  (
+    SELECT
+        store,
+          created_at::date AS created_date,
+          count(1) AS created_count
+    FROM
+        store_apps
+    WHERE
+        created_at >= CURRENT_DATE - INTERVAL '365 days'
+    GROUP BY
+        store,
+            created_at::date
+)
+SELECT
+    my_dates.store AS store,
+       my_dates.date AS date,
+       updated_dates.last_updated_count,
+       audit_dates.updated_count,
+       created_dates.created_count
+FROM
+    my_dates
+LEFT JOIN updated_dates ON
+    my_dates.date = updated_dates.last_updated_date
+    AND my_dates.store = updated_dates.store
+LEFT JOIN audit_dates ON
+    my_dates.date = audit_dates.updated_date
+LEFT JOIN created_dates ON
+    my_dates.date = created_dates.created_date
+    AND my_dates.store = created_dates.store
+ORDER BY
+    my_dates.date DESC ;
 
 -- public.metric_totals source
 
