@@ -1166,27 +1166,6 @@ ORDER BY
     cm.mapped_category
 ;
 
-
-CREATE MATERIALIZED VIEW mv_app_categories AS
-WITH RankedApps AS (
-                    SELECT
-                        *,
-                        ROW_NUMBER() OVER(PARTITION BY store 
-                        ORDER BY 
-                            installs DESC NULLS LAST, 
-                            review_count DESC NULLS LAST
-                    ) AS rn
-                    FROM store_apps sa
-                    WHERE
-                        sa.release_date >= '{my_date}'
-                        AND crawl_result = 1
-                )
-                SELECT *
-                FROM RankedApps
-                WHERE rn <= {limit}
-                ;
-
-
 --DROP MATERIALIZED VIEW new_weekly_apps;
 CREATE MATERIALIZED VIEW apps_new_weekly AS
 WITH RankedApps AS (
