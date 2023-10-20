@@ -733,13 +733,14 @@ WITH DATA;
 CREATE UNIQUE INDEX audit_dates_updated_date_idx ON public.audit_dates USING btree (updated_date, table_name);
 
 --for internal dashboard checking last_updated_at and created_ats
+--DROP MATERIALIZED VIEW store_apps_updated_at;
 CREATE MATERIALIZED VIEW store_apps_updated_at AS
 WITH my_dates AS
   (
     SELECT
         store,
           generate_series(
-        CURRENT_DATE - INTERVAL '365 days',
+            CURRENT_DATE - INTERVAL '365 days',
             CURRENT_DATE,
             '1 day'::INTERVAL
         )::date AS date
@@ -750,7 +751,7 @@ WITH my_dates AS
             1
         ) AS num_series(store)
 ),
-     updated_dates AS
+updated_dates AS
   (
     SELECT
         store,
@@ -763,27 +764,12 @@ WITH my_dates AS
     GROUP BY
         store,
             updated_at::date
-),
-     created_dates AS
-  (
-    SELECT
-        store,
-          created_at::date AS created_date,
-          count(1) AS created_count
-    FROM
-        store_apps
-    WHERE
-        created_at >= CURRENT_DATE - INTERVAL '365 days'
-    GROUP BY
-        store,
-            created_at::date
 )
 SELECT
     my_dates.store AS store,
        my_dates.date AS date,
        updated_dates.last_updated_count,
-       audit_dates.updated_count,
-       created_dates.created_count
+       audit_dates.updated_count
 FROM
     my_dates
 LEFT JOIN updated_dates ON
@@ -791,30 +777,58 @@ LEFT JOIN updated_dates ON
     AND my_dates.store = updated_dates.store
 LEFT JOIN audit_dates ON
     my_dates.date = audit_dates.updated_date
-LEFT JOIN created_dates ON
-    my_dates.date = created_dates.created_date
-    AND my_dates.store = created_dates.store
 ORDER BY
     my_dates.date DESC ;
 
--- public.metric_totals source
 
-CREATE MATERIALIZED VIEW public.metric_totals
-TABLESPACE pg_default
-AS SELECT pdwi.store,
-    pdwi.category,
-    count(DISTINCT pdwi.url) AS publisher_urls,
-    sum(pdwi.app_count) AS sc_app_count,
-    sum(pdwi.total_installs) AS sc_installs,
-    sum(pdwi.total_review) AS sc_reviews
-   FROM publisher_domain_with_installs pdwi
-  WHERE (pdwi.url::text IN ( SELECT DISTINCT pnv.publisher_domain_url
-           FROM publisher_network_view pnv))
-  GROUP BY pdwi.store, pdwi.category
-WITH DATA;
-
--- View indexes:
-CREATE UNIQUE INDEX metric_totals_idx ON public.metric_totals USING btree (store, category);
+CREATE MATERIALIZED VIEW store_apps_created_at AS
+WITH my_dates AS
+  (
+    SELECT
+        store,
+          generate_series(
+            CURRENT_DATE - INTERVAL '365 days',
+            CURRENT_DATE,
+            '1 day'::INTERVAL
+        )::date AS date
+    FROM
+        generate_series(
+            1,
+            2,
+            1
+        ) AS num_series(store)
+),
+created_dates AS
+  (
+    SELECT
+          sa.store,
+          sa.created_at::date AS created_date,
+          sas.crawl_source,
+          count(1) AS created_count
+    FROM
+        store_apps sa
+    LEFT JOIN logging.store_app_sources sas
+    ON
+        sas.store_app = sa.id
+        AND sas.store = sa.store
+    WHERE
+        created_at >= CURRENT_DATE - INTERVAL '365 days'
+    GROUP BY
+        sa.store,
+        sa.created_at::date,
+        sas.crawl_source
+)
+SELECT       
+    my_dates.store AS store,
+    my_dates.date AS date,
+    created_dates.crawl_source,
+    created_dates.created_count
+FROM
+    my_dates
+LEFT JOIN created_dates ON
+    my_dates.date = created_dates.created_date
+    AND my_dates.store = created_dates.store
+;
 
 
 -- public.network_counts source
