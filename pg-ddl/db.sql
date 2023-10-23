@@ -1250,19 +1250,23 @@ ON apps_new_yearly (store, store_id);
 
 
 
+        
+--DROP MATERIALIZED VIEW top_categories;
 CREATE MATERIALIZED VIEW top_categories AS
 WITH RankedApps AS (
     SELECT
-        *,
+        *, 
         ROW_NUMBER() OVER(
             PARTITION BY store,
-            category
+            mapped_category
         ORDER BY 
             installs DESC NULLS LAST, 
             rating_count DESC NULLS LAST
         ) AS rn
-    FROM
+    FROM    
         store_apps sa
+    JOIN category_mapping cm ON
+        sa.category = cm.original_category
     WHERE
         crawl_result = 1
 )
@@ -1271,8 +1275,17 @@ SELECT
 FROM
     RankedApps
 WHERE
-    rn <= 100
+    rn <= 50
 ;
+
+--REFRESH MATERIALIZED VIEW top_categories ;
+
+DROP INDEX IF EXISTS idx_top_categories;
+CREATE UNIQUE INDEX idx_top_categories
+ON top_categories (store, mapped_category, store_id);
+
+
+
 
 --REFRESH MATERIALIZED VIEW top_categories ;
 
