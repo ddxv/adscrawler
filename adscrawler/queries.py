@@ -254,7 +254,7 @@ def query_store_apps(
 ) -> pd.DataFrame:
     short_update_days = 6
     short_update_installs = 1000
-    short_update_reviews = 100
+    short_update_ratings = 100
     short_update_date = (
         datetime.datetime.today() - datetime.timedelta(days=short_update_days)
     ).strftime("%Y-%m-%d")
@@ -270,7 +270,7 @@ def query_store_apps(
                         (
                             (
                              installs >= {short_update_installs}
-                             OR review_count >= {short_update_reviews}
+                             OR rating_count >= {short_update_ratings}
                             )
                             AND sa.updated_at <= '{short_update_date}'
                             AND crawl_result = 1 OR crawl_result IS NULL
@@ -305,7 +305,7 @@ def query_store_apps(
                 ELSE 1
             END),
             --sa.updated_at
-            COALESCE (review_count,0) + COALESCE (installs,0) + COALESCE (rating_count,0) 
+            COALESCE (review_count,0) + max(COALESCE (installs,0), COALESCE (rating_count,0)*50)
                 DESC NULLS LAST
         {limit_str}
         """
