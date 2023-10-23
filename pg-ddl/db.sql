@@ -1232,6 +1232,35 @@ CREATE UNIQUE INDEX idx_apps_new_monthly
 ON apps_new_monthly (store, store_id);
 
 
+--DROP MATERIALIZED VIEW IF EXISTS apps_new_yearly;
+CREATE MATERIALIZED VIEW apps_new_yearly AS
+WITH RankedApps AS (
+SELECT
+        *,
+        ROW_NUMBER() OVER(PARTITION BY store
+ORDER BY 
+            installs DESC NULLS LAST, 
+            rating_count DESC NULLS LAST
+        ) AS rn
+FROM
+    store_apps sa
+WHERE
+        sa.release_date >= current_date - INTERVAL '365 days'
+    AND crawl_result = 1
+)
+SELECT
+    *
+FROM
+    RankedApps
+WHERE
+    rn <= 100
+;
+--DROP INDEX IF EXISTS idx_apps_new_monthly;
+CREATE UNIQUE INDEX idx_apps_new_yearly
+ON apps_new_yearly (store, store_id);
+
+
+
 
 
 CREATE OR REPLACE FUNCTION public.pg_stat_statements(showtext boolean, OUT userid oid, OUT dbid oid, OUT toplevel boolean, OUT queryid bigint, OUT query text, OUT plans bigint, OUT total_plan_time double precision, OUT min_plan_time double precision, OUT max_plan_time double precision, OUT mean_plan_time double precision, OUT stddev_plan_time double precision, OUT calls bigint, OUT total_exec_time double precision, OUT min_exec_time double precision, OUT max_exec_time double precision, OUT mean_exec_time double precision, OUT stddev_exec_time double precision, OUT rows bigint, OUT shared_blks_hit bigint, OUT shared_blks_read bigint, OUT shared_blks_dirtied bigint, OUT shared_blks_written bigint, OUT local_blks_hit bigint, OUT local_blks_read bigint, OUT local_blks_dirtied bigint, OUT local_blks_written bigint, OUT temp_blks_read bigint, OUT temp_blks_written bigint, OUT blk_read_time double precision, OUT blk_write_time double precision, OUT temp_blk_read_time double precision, OUT temp_blk_write_time double precision, OUT wal_records bigint, OUT wal_fpi bigint, OUT wal_bytes numeric, OUT jit_functions bigint, OUT jit_generation_time double precision, OUT jit_inlining_count bigint, OUT jit_inlining_time double precision, OUT jit_optimization_count bigint, OUT jit_optimization_time double precision, OUT jit_emission_count bigint, OUT jit_emission_time double precision)
