@@ -351,8 +351,6 @@ category)
     )
 
 
-
-
 CREATE TABLE app_rankings (
     id SERIAL PRIMARY KEY,
     crawled_date DATE NOT NULL,
@@ -1250,6 +1248,37 @@ WHERE
 CREATE UNIQUE INDEX idx_apps_new_yearly
 ON apps_new_yearly (store, store_id);
 
+
+
+CREATE MATERIALIZED VIEW top_categories AS
+WITH RankedApps AS (
+    SELECT
+        *,
+        ROW_NUMBER() OVER(
+            PARTITION BY store,
+            category
+        ORDER BY 
+            installs DESC NULLS LAST, 
+            rating_count DESC NULLS LAST
+        ) AS rn
+    FROM
+        store_apps sa
+    WHERE
+        crawl_result = 1
+)
+SELECT
+    *
+FROM
+    RankedApps
+WHERE
+    rn <= 100
+;
+
+--REFRESH MATERIALIZED VIEW top_categories ;
+
+DROP INDEX IF EXISTS top_categories;
+CREATE UNIQUE INDEX idx_top_categories
+ON top_categories (store, category, store_id);
 
 
 
