@@ -1166,18 +1166,23 @@ ORDER BY
 --DROP MATERIALIZED VIEW apps_new_weekly;
 CREATE MATERIALIZED VIEW apps_new_weekly AS
 WITH RankedApps AS (
-SELECT
+    SELECT
         *,
-        ROW_NUMBER() OVER(PARTITION BY store
-ORDER BY 
+        ROW_NUMBER() OVER(
+            PARTITION BY store,
+            mapped_category
+        ORDER BY 
             installs DESC NULLS LAST, 
             rating_count DESC NULLS LAST
         ) AS rn
-FROM
-    store_apps sa
-WHERE
+    FROM
+        store_apps sa
+    JOIN category_mapping cm 
+    ON
+        sa.category = cm.original_category
+    WHERE
         sa.release_date >= current_date - INTERVAL '7 days'
-    AND crawl_result = 1
+        AND crawl_result = 1
 )
 SELECT
     *
@@ -1188,26 +1193,31 @@ WHERE
 ;
 --REFRESH MATERIALIZED VIEW apps_new_weekly ;
 
-DROP INDEX IF EXISTS idx_apps_new_weekly;
+--DROP INDEX IF EXISTS idx_apps_new_weekly;
 CREATE UNIQUE INDEX idx_apps_new_weekly
-ON apps_new_weekly (store, store_id);
+ON apps_new_weekly (store, mapped_category, store_id);
 
 
 --DROP MATERIALIZED VIEW IF EXISTS apps_new_monthly;
 CREATE MATERIALIZED VIEW apps_new_monthly AS
 WITH RankedApps AS (
-SELECT
+    SELECT
         *,
-        ROW_NUMBER() OVER(PARTITION BY store
-ORDER BY 
+        ROW_NUMBER() OVER(
+            PARTITION BY store,
+            mapped_category
+        ORDER BY 
             installs DESC NULLS LAST, 
             rating_count DESC NULLS LAST
         ) AS rn
-FROM
-    store_apps sa
-WHERE
+    FROM
+        store_apps sa
+    JOIN category_mapping cm 
+    ON
+        sa.category = cm.original_category
+    WHERE
         sa.release_date >= current_date - INTERVAL '30 days'
-    AND crawl_result = 1
+        AND crawl_result = 1
 )
 SELECT
     *
@@ -1216,26 +1226,31 @@ FROM
 WHERE
     rn <= 100
 ;
---DROP INDEX IF EXISTS idx_apps_new_monthly;
+DROP INDEX IF EXISTS idx_apps_new_monthly;
 CREATE UNIQUE INDEX idx_apps_new_monthly
-ON apps_new_monthly (store, store_id);
+ON apps_new_monthly (store, mapped_category, store_id);
 
 
---DROP MATERIALIZED VIEW IF EXISTS apps_new_yearly;
+DROP MATERIALIZED VIEW IF EXISTS apps_new_yearly;
 CREATE MATERIALIZED VIEW apps_new_yearly AS
 WITH RankedApps AS (
-SELECT
+    SELECT
         *,
-        ROW_NUMBER() OVER(PARTITION BY store
-ORDER BY 
+        ROW_NUMBER() OVER(
+            PARTITION BY store,
+            mapped_category
+        ORDER BY 
             installs DESC NULLS LAST, 
             rating_count DESC NULLS LAST
         ) AS rn
-FROM
-    store_apps sa
-WHERE
+    FROM
+        store_apps sa
+    JOIN category_mapping cm 
+    ON
+        sa.category = cm.original_category
+    WHERE
         sa.release_date >= current_date - INTERVAL '365 days'
-    AND crawl_result = 1
+        AND crawl_result = 1
 )
 SELECT
     *
@@ -1244,10 +1259,9 @@ FROM
 WHERE
     rn <= 100
 ;
---DROP INDEX IF EXISTS idx_apps_new_monthly;
+DROP INDEX IF EXISTS idx_apps_new_yearly;
 CREATE UNIQUE INDEX idx_apps_new_yearly
-ON apps_new_yearly (store, store_id);
-
+ON apps_new_yearly (store, mapped_category, store_id);
 
 
         
