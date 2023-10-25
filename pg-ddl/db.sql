@@ -1117,7 +1117,7 @@ SELECT
     original_category,
        CASE
             WHEN mapped_category IN ('action', 'casual', 'adventure', 'arcade', 'board', 'card', 'casino', 'puzzle', 'racing', 'simulation' , 'strategy', 'trivia', 'word') THEN 'game_' || mapped_category
-        WHEN mapped_category = 'news' THEN 'magazines_and_newspapers'
+        WHEN mapped_category = 'news_and_magazines' THEN 'news'
         WHEN mapped_category = 'educational' THEN 'education'
         WHEN mapped_category = 'book' THEN 'books_and_reference'
         WHEN mapped_category = 'navigation' THEN 'maps_and_navigation'
@@ -1129,6 +1129,8 @@ SELECT
         WHEN mapped_category = 'travel' THEN 'travel_and_local'
         WHEN mapped_category = 'utilities' THEN 'tools'
         WHEN mapped_category = 'video players_and_editors' THEN 'video_players'
+        WHEN mapped_category = 'graphics_and_design' THEN 'art_and_design'
+        WHEN mapped_category = 'parenting' THEN 'family'
         WHEN mapped_category IS NULL THEN 'N/A'
         ELSE mapped_category
     END AS mapped_category
@@ -1190,6 +1192,7 @@ FROM
     RankedApps
 WHERE
     rn <= 100
+WITH DATA
 ;
 --REFRESH MATERIALIZED VIEW apps_new_weekly ;
 
@@ -1225,6 +1228,7 @@ FROM
     RankedApps
 WHERE
     rn <= 100
+WITH DATA
 ;
 DROP INDEX IF EXISTS idx_apps_new_monthly;
 CREATE UNIQUE INDEX idx_apps_new_monthly
@@ -1258,6 +1262,7 @@ FROM
     RankedApps
 WHERE
     rn <= 100
+WITH DATA
 ;
 DROP INDEX IF EXISTS idx_apps_new_yearly;
 CREATE UNIQUE INDEX idx_apps_new_yearly
@@ -1290,6 +1295,7 @@ FROM
     RankedApps
 WHERE
     rn <= 50
+WITH DATA
 ;
 
 --REFRESH MATERIALIZED VIEW top_categories ;
@@ -1297,15 +1303,6 @@ WHERE
 DROP INDEX IF EXISTS idx_top_categories;
 CREATE UNIQUE INDEX idx_top_categories
 ON top_categories (store, mapped_category, store_id);
-
-
-
-
---REFRESH MATERIALIZED VIEW top_categories ;
-
-DROP INDEX IF EXISTS top_categories;
-CREATE UNIQUE INDEX idx_top_categories
-ON top_categories (store, category, store_id);
 
 
 
