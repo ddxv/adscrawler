@@ -305,7 +305,12 @@ def query_store_apps(
                 ELSE 1
             END),
             --sa.updated_at
-            COALESCE(review_count, 0) + GREATEST(COALESCE(installs, 0), COALESCE(rating_count, 0) * 50)
+            COALESCE(review_count, 0
+                ) + 
+            GREATEST(
+                    COALESCE(installs, 0),
+                    COALESCE(CAST(rating_count AS bigint), 0)*50
+                )
             DESC NULLS LAST
         {limit_str}
         """
