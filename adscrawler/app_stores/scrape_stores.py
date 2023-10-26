@@ -394,6 +394,7 @@ def scrape_app(
     base_delay = 2
     retries = 0
 
+    logger.info(f"{scrape_info} scrape start")
     while retries <= max_retries:
         try:
             result_dict = scrape_from_store(
@@ -445,6 +446,7 @@ def scrape_app(
     if crawl_result == 1:
         df = clean_scraped_df(df=df, store=store)
 
+    logger.info(f"{scrape_info} scrape finished")
     return df
 
 
