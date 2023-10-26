@@ -488,9 +488,11 @@ def scrape_and_save_app(
     for country in country_list:
         info = f"{store=}, {store_id=}, {country=}"
         app_df = scrape_app(store=store, store_id=store_id, country=country)
+        logger.info(f"{info}  save to db start")
         app_df = save_apps_df(
             apps_df=app_df, database_connection=database_connection, country=country
         )
+        logger.info(f"{info} save to db finish")
     crawl_result = app_df["crawl_result"].values[0]
     logger.info(f"{info} {crawl_result=} scraped and saved app")
     return app_df
