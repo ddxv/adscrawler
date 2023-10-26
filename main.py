@@ -17,12 +17,17 @@ logger = get_logger(__name__)
 """
 
 
-def script_has_process() -> bool:
+def script_has_process(args: argparse.Namespace) -> bool:
     already_running = False
     processes = [x for x in os.popen("ps aux ww")]
     my_processes = [
         x for x in processes if "/adscrawler/main.py" in x and "/bin/sh" not in x
     ]
+    if args.platforms:
+        my_processes = [
+            x for x in my_processes if any([p in x for p in args.platforms])
+        ]
+
     if len(my_processes) > 1:
         logger.info(f"Already running {my_processes}")
         already_running = True
@@ -36,7 +41,7 @@ def manage_cli_args() -> argparse.Namespace:
         "--platforms",
         action="append",
         help="String as portion of android or ios",
-        default=["android", "ios"],
+        default=["google", "apple"],
     )
     parser.add_argument(
         "-t",
@@ -80,7 +85,7 @@ def manage_cli_args() -> argparse.Namespace:
         action="store_true",
     )
     args, leftovers = parser.parse_known_args()
-    if args.limit_processes and script_has_process():
+    if args.limit_processes and script_has_process(args):
         logger.info("Script already running, exiting")
         quit()
     return args
@@ -88,7 +93,7 @@ def manage_cli_args() -> argparse.Namespace:
 
 def main(args: argparse.Namespace) -> None:
     logger.info(f"Main starting with args: {args}")
-    platforms = args.platforms if "args" in locals() else ["android", "ios"]
+    platforms = args.platforms if "args" in locals() else ["google", "apple"]
     new_apps_check = args.new_apps_check if "args" in locals() else False
     no_limits = args.no_limits if "args" in locals() else False
     update_app_store_details = (
@@ -96,8 +101,8 @@ def main(args: argparse.Namespace) -> None:
     )
     app_ads_txt_scrape = args.app_ads_txt_scrape if "args" in locals() else False
     stores = []
-    stores.append(1) if "android" in platforms else None
-    stores.append(2) if "ios" in platforms else None
+    stores.append(1) if "google" in platforms else None
+    stores.append(2) if "apple" in platforms else None
 
     # Scrape Store for new apps
     if new_apps_check:
