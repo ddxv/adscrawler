@@ -298,13 +298,16 @@ def update_app_details(
     logger.info("Update App Details: start")
     df = query_store_apps(stores, database_connection=database_connection, limit=limit)
     crawl_stores_for_app_details(df, database_connection)
+    logger.info("Update App Details: finished")
 
 
 def crawl_stores_for_app_details(
     df: pd.DataFrame, database_connection: PostgresCon
 ) -> None:
-    logger.info(f"Update App Details: df: {df.shape}")
-    for _index, row in df.iterrows():
+    info = f"Update App Details {df.shape[0]}"
+    logger.info(info + " start!")
+    for index, row in df.iterrows():
+        logger.info(f"{info}/{index=} start")
         store_id = row.store_id
         store = row.store
         if "app_url_id" in row:
@@ -313,6 +316,8 @@ def crawl_stores_for_app_details(
         else:
             app_url_id = None
         update_all_app_info(store, store_id, database_connection, app_url_id)
+        logger.info(f"{info}/{index=} finished")
+    logger.info(info + " finished!")
 
 
 def update_all_app_info(
