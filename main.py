@@ -23,7 +23,7 @@ def script_has_process(args: argparse.Namespace) -> bool:
     my_processes = [
         x for x in processes if "/adscrawler/main.py" in x and "/bin/sh" not in x
     ]
-    if args.platforms:
+    if args.platforms and len(args.platforms) > 0:
         my_processes = [
             x for x in my_processes if any([p in x for p in args.platforms])
         ]
@@ -40,8 +40,8 @@ def manage_cli_args() -> argparse.Namespace:
         "-p",
         "--platforms",
         action="append",
-        help="String as portion of android or ios",
-        default=["google", "apple"],
+        help="String of google and/or apple",
+        default=[],
     )
     parser.add_argument(
         "-t",
