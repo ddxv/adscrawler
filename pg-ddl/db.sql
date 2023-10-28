@@ -1311,7 +1311,7 @@ SELECT
     store,
     store_collection,
     store_category,
-    RANK,
+    "rank",
     MAX(crawled_date) AS max_crawled_date
 FROM
     app_rankings ar
@@ -1320,13 +1320,13 @@ GROUP BY
     store,
     store_collection,
     store_category,
-    RANK
+    "rank"
 ORDER BY 
     country,
     store,
     store_collection,
     store_category,
-    RANK
+    "rank"
 ;
 DROP INDEX IF EXISTS idx_app_rankings_most_recent;
 CREATE UNIQUE INDEX idx_app_rankings_most_recent
@@ -1336,7 +1336,7 @@ app_rankings_most_recent (
     store,
     store_collection,
     store_category,
-    RANK,
+    "rank",
     max_crawled_date
 )
 ;
