@@ -561,6 +561,7 @@ CREATE TABLE public.store_apps (
 	CONSTRAINT store_apps_fk_1 FOREIGN KEY (developer) REFERENCES public.developers(id)
 );
 CREATE INDEX store_apps_updated_at_idx ON public.store_apps USING btree (updated_at);
+CREATE INDEX store_apps_store_id_idx ON public.store_apps USING btree (store_id);
 
 
 -- public.store_apps_history definition
@@ -1305,41 +1306,58 @@ CREATE UNIQUE INDEX idx_top_categories
 ON top_categories (store, mapped_category, store_id);
 
 
+DROP MATERIALIZED VIEW IF EXISTS app_rankings_most_recent;
 CREATE MATERIALIZED VIEW app_rankings_most_recent AS
-SELECT 
-    country,
-    store,
-    store_collection,
-    store_category,
-    "rank",
-    MAX(crawled_date) AS max_crawled_date
+WITH RankedData AS (
+    SELECT 
+        id, 
+        crawled_date, 
+        country, 
+        store, 
+        store_collection, 
+        store_category, 
+        RANK, 
+        store_app,
+        ROW_NUMBER() OVER(
+            PARTITION BY country,
+            store,
+            store_collection,
+            store_category
+        ORDER BY
+            crawled_date DESC
+        ) AS rnk
+    FROM
+        app_rankings
+)
+SELECT
+    rd.crawled_date AS rank_date,
+    c.alpha2 AS rank_country,
+    scol.collection AS rank_collection,
+    scat.category AS rank_category,
+    rd."rank",
+    rd.store_app
 FROM
-    app_rankings ar
-GROUP BY 
-    country,
-    store,
-    store_collection,
-    store_category,
-    "rank"
-ORDER BY 
-    country,
-    store,
-    store_collection,
-    store_category,
-    "rank"
+    RankedData rd
+LEFT JOIN countries c ON
+    c.id = rd.country
+LEFT JOIN store_collections scol ON
+    scol.id = rd.store_collection
+LEFT JOIN store_categories scat ON
+    scat.id = rd.store_category
+WITH DATA
 ;
 DROP INDEX IF EXISTS idx_app_rankings_most_recent;
 CREATE UNIQUE INDEX idx_app_rankings_most_recent
 ON
 app_rankings_most_recent (
-    country,
-    store,
-    store_collection,
-    store_category,
-    "rank",
-    max_crawled_date
+    rank_date,
+    rank_country,
+    rank_collection,
+    rank_category,
+    "rank"
 )
 ;
+
 
 
 
