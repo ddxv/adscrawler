@@ -1306,60 +1306,6 @@ CREATE UNIQUE INDEX idx_top_categories
 ON top_categories (store, mapped_category, store_id);
 
 
-DROP MATERIALIZED VIEW IF EXISTS app_rankings_most_recent;
-CREATE MATERIALIZED VIEW app_rankings_most_recent AS
-WITH RankedData AS (
-    SELECT 
-        id, 
-        crawled_date, 
-        country, 
-        store, 
-        store_collection, 
-        store_category, 
-        RANK, 
-        store_app,
-        ROW_NUMBER() OVER(
-            PARTITION BY country,
-            store,
-            store_collection,
-            store_category
-        ORDER BY
-            crawled_date DESC
-        ) AS rnk
-    FROM
-        app_rankings
-)
-SELECT
-    rd.crawled_date AS rank_date,
-    c.alpha2 AS rank_country,
-    scol.collection AS rank_collection,
-    scat.category AS rank_category,
-    rd."rank",
-    rd.store_app
-FROM
-    RankedData rd
-LEFT JOIN countries c ON
-    c.id = rd.country
-LEFT JOIN store_collections scol ON
-    scol.id = rd.store_collection
-LEFT JOIN store_categories scat ON
-    scat.id = rd.store_category
-WITH DATA
-;
-DROP INDEX IF EXISTS idx_app_rankings_most_recent;
-CREATE UNIQUE INDEX idx_app_rankings_most_recent
-ON
-app_rankings_most_recent (
-    rank_date,
-    rank_country,
-    rank_collection,
-    rank_category,
-    "rank"
-)
-;
-
-
-
 
 
 CREATE OR REPLACE FUNCTION public.pg_stat_statements(showtext boolean, OUT userid oid, OUT dbid oid, OUT toplevel boolean, OUT queryid bigint, OUT query text, OUT plans bigint, OUT total_plan_time double precision, OUT min_plan_time double precision, OUT max_plan_time double precision, OUT mean_plan_time double precision, OUT stddev_plan_time double precision, OUT calls bigint, OUT total_exec_time double precision, OUT min_exec_time double precision, OUT max_exec_time double precision, OUT mean_exec_time double precision, OUT stddev_exec_time double precision, OUT rows bigint, OUT shared_blks_hit bigint, OUT shared_blks_read bigint, OUT shared_blks_dirtied bigint, OUT shared_blks_written bigint, OUT local_blks_hit bigint, OUT local_blks_read bigint, OUT local_blks_dirtied bigint, OUT local_blks_written bigint, OUT temp_blks_read bigint, OUT temp_blks_written bigint, OUT blk_read_time double precision, OUT blk_write_time double precision, OUT temp_blk_read_time double precision, OUT temp_blk_write_time double precision, OUT wal_records bigint, OUT wal_fpi bigint, OUT wal_bytes numeric, OUT jit_functions bigint, OUT jit_generation_time double precision, OUT jit_inlining_count bigint, OUT jit_inlining_time double precision, OUT jit_optimization_count bigint, OUT jit_optimization_time double precision, OUT jit_emission_count bigint, OUT jit_emission_time double precision)
