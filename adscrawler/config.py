@@ -28,10 +28,10 @@ def check_config_dirs() -> None:
             pathlib.Path.mkdir(dir, exist_ok=True)
 
 
-def get_logger(mod_name: str) -> logging.Logger:
+def get_logger(mod_name: str, filename: str = "adscrawler") -> logging.Logger:
     format = "%(asctime)s: %(name)s: %(levelname)s: %(message)s"
     check_config_dirs()
-    filename = f"{LOG_DIR}/adscrawler.log"
+    filename = f"{LOG_DIR}/{filename}.log"
     # Writes to file
     rotate_handler = RotatingFileHandler(
         filename=filename, maxBytes=50000000, backupCount=10

@@ -3,7 +3,7 @@ import os
 
 from adscrawler.app_stores.scrape_stores import (
     crawl_developers_for_new_store_ids,
-    scrape_stores_frontpage,
+    scrape_store_ranks,
     update_app_details,
 )
 from adscrawler.config import get_logger
@@ -107,7 +107,7 @@ def main(args: argparse.Namespace) -> None:
     # Scrape Store for new apps
     if new_apps_check:
         try:
-            scrape_stores_frontpage(database_connection=PGCON, stores=stores)
+            scrape_store_ranks(database_connection=PGCON, stores=stores)
         except Exception:
             logger.exception("Crawling front pages failed")
         try:

@@ -97,11 +97,14 @@ def loop_categories() -> list[str]:
         )
         time.sleep(1)
         for category in APPBRAIN_CATEGORIES:
-            packages = scrape_for_ids(collection=collection, category=category)
-            all_packages = list(set(packages + all_packages))
-            logger.info(
-                f"AppBrain {collection=} {category=} total:{len(all_packages)} packages:{len(packages)}"
-            )
+            try:
+                packages = scrape_for_ids(collection=collection, category=category)
+                all_packages = list(set(packages + all_packages))
+                logger.info(
+                    f"AppBrain {collection=} {category=} total:{len(all_packages)} packages:{len(packages)}"
+                )
+            except Exception:
+                logger.exception(f"AppBrain failed for {collection=} {category=}")
             time.sleep(1)
     return all_packages
 

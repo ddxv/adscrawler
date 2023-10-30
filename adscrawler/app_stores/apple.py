@@ -10,11 +10,11 @@ from adscrawler.config import get_logger
 logger = get_logger(__name__)
 
 
-def scrape_ios_frontpage(
+def scrape_ios_ranks(
     category_keyword: str | None = None,
     collection_keyword: str | None = None,
 ) -> list[dict]:
-    logger.info(f"Scrape iOS frontpage for {collection_keyword=} {category_keyword=}")
+    logger.info(f"Scrape iOS ranks for {collection_keyword=} {category_keyword=}")
     country = "us"
     scraper = AppStoreScraper()
     # Eg: MAGAZINES_MEN, GAMES_ADVENTURE

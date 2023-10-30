@@ -14,13 +14,13 @@ from adscrawler.app_stores.apple import (
     clean_ios_app_df,
     crawl_ios_developers,
     scrape_app_ios,
-    scrape_ios_frontpage,
+    scrape_ios_ranks,
 )
 from adscrawler.app_stores.google import (
     clean_google_play_app_df,
     crawl_google_developers,
     scrape_app_gp,
-    scrape_gp_for_app_ids,
+    scrape_google_ranks,
 )
 from adscrawler.config import get_logger
 from adscrawler.connection import PostgresCon
@@ -39,42 +39,44 @@ from adscrawler.queries import (
 logger = get_logger(__name__)
 
 
-def scrape_stores_frontpage(
-    database_connection: PostgresCon, stores: list[int]
-) -> None:
+def scrape_store_ranks(database_connection: PostgresCon, stores: list[int]) -> None:
     collections_map = query_collections(database_connection)
     categories_map = query_categories(database_connection)
     countries_map = query_countries(database_connection)
     collections_map = collections_map.rename(columns={"id": "store_collection"})
     categories_map = categories_map.rename(columns={"id": "store_category"})
     if 2 in stores:
-        collection_keywords = ["TOP"]
-        for collection_keyword in collection_keywords:
-            try:
-                ranked_dicts = scrape_ios_frontpage(
-                    collection_keyword=collection_keyword,
-                )
-                process_scraped(
-                    database_connection=database_connection,
-                    ranked_dicts=ranked_dicts,
-                    crawl_source="scrape_frontpage_top",
-                    collections_map=collections_map,
-                    categories_map=categories_map,
-                    countries_map=countries_map,
-                )
-            except Exception:
-                logger.exception(f"collection={collection_keyword} hit error, skipping")
+        collection_keyword = "TOP"
+        try:
+            ranked_dicts = scrape_ios_ranks(
+                collection_keyword=collection_keyword,
+            )
+            process_scraped(
+                database_connection=database_connection,
+                ranked_dicts=ranked_dicts,
+                crawl_source="scrape_frontpage_top",
+                collections_map=collections_map,
+                categories_map=categories_map,
+                countries_map=countries_map,
+            )
+        except Exception:
+            logger.exception(
+                f"Srape iOS collection={collection_keyword} hit error, skipping"
+            )
 
     if 1 in stores:
-        ranked_dicts = scrape_gp_for_app_ids()
-        process_scraped(
-            database_connection=database_connection,
-            ranked_dicts=ranked_dicts,
-            crawl_source="scrape_frontpage_top",
-            collections_map=collections_map,
-            categories_map=categories_map,
-            countries_map=countries_map,
-        )
+        try:
+            ranked_dicts = scrape_google_ranks()
+            process_scraped(
+                database_connection=database_connection,
+                ranked_dicts=ranked_dicts,
+                crawl_source="scrape_frontpage_top",
+                collections_map=collections_map,
+                categories_map=categories_map,
+                countries_map=countries_map,
+            )
+        except Exception:
+            logger.exception("Scrape google ranks hit error, skipping")
         try:
             dicts = get_apkcombo_android_apps()
             process_scraped(
@@ -156,7 +158,7 @@ def process_scraped(
     all_scraped_ids = df["store_id"].unique().tolist()
     if "rank" not in df.columns or countries_map is None:
         return
-    logger.info("Store rankings start")
+    logger.info("Process and save rankings start")
     new_existing_ids_map = query_store_id_map(
         database_connection, store_ids=all_scraped_ids
     ).rename(columns={"id": "store_app"})

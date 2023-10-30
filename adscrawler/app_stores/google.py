@@ -88,7 +88,7 @@ def clean_google_play_app_df(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def js_update_ids_file(filepath: str, is_developers: bool = False) -> None:
+def call_js_to_update_file(filepath: str, is_developers: bool = False) -> None:
     if os.path.exists(filepath):
         os.remove(filepath)
     cmd = f"node {MODULE_DIR}/pullAppIds.js"
@@ -107,15 +107,15 @@ def get_js_data(filepath: str, is_json: bool = True) -> list[dict] | list:
     return data
 
 
-def scrape_gp_for_app_ids() -> list[dict]:
-    logger.info("Scrape GP frontpage for new apps start")
+def scrape_google_ranks() -> list[dict]:
+    logger.info("Scrape Google ranks start")
     filepath = "/tmp/googleplay_json.txt"
     try:
-        js_update_ids_file(filepath)
+        call_js_to_update_file(filepath)
     except Exception as error:
         logger.exception(f"JS pull failed with {error=}")
     ranked_dicts = get_js_data(filepath)
-    logger.info("Scrape GP frontpage for new apps finished")
+    logger.info(f"Scrape Google ranks finished: {len(ranked_dicts)}")
     return ranked_dicts
 
 
@@ -131,7 +131,7 @@ def scrape_gp_for_developer_app_ids(developer_ids: list[str]) -> list:
 
     app_ids_filepath = "/tmp/googleplay_developers_app_ids.txt"
     try:
-        js_update_ids_file(app_ids_filepath, is_developers=True)
+        call_js_to_update_file(app_ids_filepath, is_developers=True)
     except Exception as error:
         logger.exception(f"JS pull failed with {error=}")
     try:
@@ -139,7 +139,7 @@ def scrape_gp_for_developer_app_ids(developer_ids: list[str]) -> list:
     except Exception:
         logger.exception("Unable to load scraped js developer app file")
         app_ids = []
-    logger.info("Scrape GP developers for new apps finished")
+    logger.info("Scrape Google developers for new apps finished")
     return app_ids
 
 
