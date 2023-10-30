@@ -256,10 +256,7 @@ def crawl_developers_for_new_store_ids(
             row_info = f"{store=} {developer_id=}"
             logger.info(f"{row_info=} start")
             try:
-                if store == 2:
-                    apps_df = crawl_ios_developers(
-                        developer_db_id, developer_id, store_ids
-                    )
+                apps_df = crawl_ios_developers(developer_db_id, developer_id, store_ids)
 
                 if not apps_df.empty:
                     process_scraped(
