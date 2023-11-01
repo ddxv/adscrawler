@@ -24,12 +24,13 @@ def script_has_process(args: argparse.Namespace) -> bool:
         x for x in processes if "/adscrawler/main.py" in x and "/bin/sh" not in x
     ]
     if args.platforms and len(args.platforms) > 0:
+        logger.info(f"Checking processes for {args.platforms=}")
         my_processes = [
             x for x in my_processes if any([p in x for p in args.platforms])
         ]
 
     if len(my_processes) > 1:
-        logger.info(f"Already running {my_processes}")
+        logger.info(f"Already running {my_processes=}")
         already_running = True
     return already_running
 
