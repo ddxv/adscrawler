@@ -562,6 +562,7 @@ CREATE TABLE public.store_apps (
 );
 CREATE INDEX store_apps_updated_at_idx ON public.store_apps USING btree (updated_at);
 CREATE INDEX store_apps_store_id_idx ON public.store_apps USING btree (store_id);
+CREATE INDEX store_apps_name_idx ON store_apps USING GIN (to_tsvector('simple', name));
 
 
 -- public.store_apps_history definition
