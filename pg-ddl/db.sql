@@ -309,6 +309,7 @@ CREATE TABLE public.developers (
 	CONSTRAINT developers_fk FOREIGN KEY (store) REFERENCES public.stores(id)
 );
 CREATE INDEX developers_name_idx ON developers USING GIN (to_tsvector('simple', name));
+CREATE INDEX developers_developer_id_idx ON public.developers (developer_id);
 
 
 CREATE TABLE store_collections (
