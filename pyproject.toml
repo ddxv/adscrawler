@@ -24,10 +24,11 @@ requires = ["setuptools", "wheel"]
 
 [tool.ruff]
 # Enable flake8-bugbear (`B`) rules.
-select = ["E", "F", "B", "I", "N"]
+select = ["E", "W", "F", "B", "I", "N", "UP"]
 
-# Never enforce `E501` (line length violations).
-ignore = ["E501"]
+ignore = ["E501", # line length
+"W291" # trailing space at end of line
+]
 
 # Avoid trying to fix flake8-bugbear (`B`) violations.
 unfixable = ["B"]

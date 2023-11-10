@@ -99,7 +99,7 @@ def call_js_to_update_file(filepath: str, is_developers: bool = False) -> None:
 
 
 def get_js_data(filepath: str, is_json: bool = True) -> list[dict] | list:
-    with open(filepath, mode="r") as file:
+    with open(filepath) as file:
         if is_json:
             data = [json.loads(line) for line in file if line.strip()]
         else:
