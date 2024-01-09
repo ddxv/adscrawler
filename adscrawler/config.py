@@ -1,10 +1,9 @@
 import logging
 import pathlib
 import sys
+import tomllib
 import typing
 from logging.handlers import RotatingFileHandler
-
-import tomllib
 
 HOME = pathlib.Path.home()
 TOP_CONFIGDIR = pathlib.Path(HOME, pathlib.Path(".config"))
@@ -34,7 +33,9 @@ def get_logger(mod_name: str, filename: str = "adscrawler") -> logging.Logger:
     filename = f"{LOG_DIR}/{filename}.log"
     # Writes to file
     rotate_handler = RotatingFileHandler(
-        filename=filename, maxBytes=50000000, backupCount=10
+        filename=filename,
+        maxBytes=50000000,
+        backupCount=10,
     )
     # Stream handler for stdout
     logging.basicConfig(

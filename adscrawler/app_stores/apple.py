@@ -68,7 +68,7 @@ def scrape_ios_ranks(
                     "rank": rank + 1,
                     "store_id": app,
                     "crawled_date": datetime.datetime.now(
-                        tz=datetime.timezone.utc
+                        tz=datetime.UTC,
                     ).date(),
                 }
                 for rank, app in enumerate(scraped_ids)
@@ -126,7 +126,7 @@ def clean_ios_app_df(df: pd.DataFrame) -> pd.DataFrame:
             "artworkUrl512": "icon_url_512",
             "screenshotUrls": "phone_image_urls",
             "ipadScreenshotUrls": "tablet_image_urls",
-        }
+        },
     )
     if "price" not in df.columns:
         df["price"] = 0
@@ -134,15 +134,16 @@ def clean_ios_app_df(df: pd.DataFrame) -> pd.DataFrame:
         # Complicated way to get around many games having very random selections like "games + shopping"
         # TODO: Just store categories as list!
         df.loc[df["category"] == "Games", "category"] = "game_" + df.loc[
-            df["category"] == "Games", "genres"
+            df["category"] == "Games",
+            "genres",
         ].apply(
             lambda x: [
                 cat.lower() for cat in x.split(",") if cat.lower() in GAME_CATEGORIES
-            ][0]
+            ][0],
         )
     except Exception as e:
         logger.warning(
-            f"store_id={df['store_id'].values[0]} split genre IDs failed {e}"
+            f"store_id={df['store_id'].values[0]} split genre IDs failed {e}",
         )
     df = df.assign(
         free=df["price"] == 0,
@@ -150,10 +151,11 @@ def clean_ios_app_df(df: pd.DataFrame) -> pd.DataFrame:
         store_id=df["store_id"].astype(str),
         category=df["category"].str.lower().str.replace(" & ", "_and_"),
         store_last_updated=pd.to_datetime(df["store_last_updated"]).dt.strftime(
-            "%Y-%m-%d %H:%M"
+            "%Y-%m-%d %H:%M",
         ),
         release_date=pd.to_datetime(
-            df["release_date"], format="%Y-%m-%dT%H:%M:%SZ"
+            df["release_date"],
+            format="%Y-%m-%dT%H:%M:%SZ",
         ).dt.date,
     )
     list_cols = ["phone_image_url", "tablet_image_url"]
@@ -176,7 +178,7 @@ def clean_ios_app_df(df: pd.DataFrame) -> pd.DataFrame:
                 df[f"{list_col}_{x}"] = None
     try:
         df["histogram"] = df["user_ratings"].apply(
-            lambda x: [int(num) for num in re.findall(r"\d+", x)[1::2]]
+            lambda x: [int(num) for num in re.findall(r"\d+", x)[1::2]],
         )
     except Exception:
         logger.warning("Unable to parse histogram")

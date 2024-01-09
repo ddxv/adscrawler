@@ -41,7 +41,7 @@ class PostgresCon:
             )
         except Exception as error:
             logger.error(
-                f"Failed to connect {self.db_name} @ {self.db_ip}, error: {error}"
+                f"Failed to connect {self.db_name} @ {self.db_ip}, error: {error}",
             )
             self.db_name = None
 

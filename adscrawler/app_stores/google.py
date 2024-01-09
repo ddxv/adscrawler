@@ -26,7 +26,9 @@ def scrape_app_gp(store_id: str, country: str, language: str = "") -> dict:
     # In the case above NL and US both have very different number of ratings
 
     result: dict = google_play_scraper.app(
-        store_id, lang=language, country=country  # defaults to 'en'  # defaults to 'us'
+        store_id,
+        lang=language,
+        country=country,  # defaults to 'en'  # defaults to 'us'
     )
     return result
 
@@ -54,10 +56,11 @@ def clean_google_play_app_df(df: pd.DataFrame) -> pd.DataFrame:
             "genreId": "category",
             "headerImage": "featured_image_url",
             "screenshots": "phone_image_urls",
-        }
+        },
     )
     df.loc[df["min_installs"].isnull(), "min_installs"] = df.loc[
-        df["min_installs"].isnull(), "installs"
+        df["min_installs"].isnull(),
+        "installs",
     ].astype(str)
     df = df.assign(
         min_installs=df["min_installs"]
@@ -66,7 +69,8 @@ def clean_google_play_app_df(df: pd.DataFrame) -> pd.DataFrame:
         .astype(int),
         category=df["category"].str.lower(),
         store_last_updated=pd.to_datetime(
-            df["store_last_updated"], unit="s"
+            df["store_last_updated"],
+            unit="s",
         ).dt.strftime("%Y-%m-%d %H:%M"),
         release_date=pd.to_datetime(df["release_date"], format="%b %d, %Y").dt.date,
     )

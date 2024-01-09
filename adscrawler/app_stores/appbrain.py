@@ -66,7 +66,7 @@ HTML_PATTERN = r'href="/app/.*?/([^"/]+)"'
 
 
 HEADERS = {
-    "User-Agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/118.0"
+    "User-Agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/118.0",
 }
 
 
@@ -80,7 +80,7 @@ def scrape_for_ids(collection: str, category: str | None = None) -> list[str]:
         packages = re.findall(HTML_PATTERN, response.content.decode("utf-8"))
     else:
         logger.error(
-            f"Response code not 200: {response.status_code=} {response.content=}"
+            f"Response code not 200: {response.status_code=} {response.content=}",
         )
         packages = []
         time.sleep(1)
@@ -93,7 +93,7 @@ def loop_categories() -> list[str]:
         packages = scrape_for_ids(collection=collection)
         all_packages = list(set(packages + all_packages))
         logger.info(
-            f"AppBrain {collection=} total:{len(all_packages)} packages:{len(packages)}"
+            f"AppBrain {collection=} total:{len(all_packages)} packages:{len(packages)}",
         )
         time.sleep(1)
         for category in APPBRAIN_CATEGORIES:
@@ -101,7 +101,7 @@ def loop_categories() -> list[str]:
                 packages = scrape_for_ids(collection=collection, category=category)
                 all_packages = list(set(packages + all_packages))
                 logger.info(
-                    f"AppBrain {collection=} {category=} total:{len(all_packages)} packages:{len(packages)}"
+                    f"AppBrain {collection=} {category=} total:{len(all_packages)} packages:{len(packages)}",
                 )
             except Exception:
                 logger.exception(f"AppBrain failed for {collection=} {category=}")

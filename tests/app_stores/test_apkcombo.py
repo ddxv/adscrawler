@@ -11,7 +11,7 @@ class TestApkcombo(unittest.TestCase):
 
         if use_mock:
             with patch(
-                "adscrawler.app_stores.apkcombo.scrape_with_firefox"
+                "adscrawler.app_stores.apkcombo.scrape_with_firefox",
             ) as mock_scrape:
                 mock_scrape.return_value = ["sample_app_id_1", "sample_app_id_2"]
                 # Call the function

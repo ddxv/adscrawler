@@ -74,7 +74,7 @@ def upsert_df(
         conn.exec_driver_sql(f"DROP TABLE IF EXISTS {temp_table}")
         conn.exec_driver_sql(
             f"""CREATE TEMPORARY TABLE {temp_table} 
-            AS SELECT * FROM {table_spec} WHERE false"""
+            AS SELECT * FROM {table_spec} WHERE false""",
         )
         df[all_columns].to_sql(
             temp_table,
@@ -97,11 +97,13 @@ def upsert_df(
 
 
 def query_developers(
-    database_connection: PostgresCon, store: int, limit: int = 1000
+    database_connection: PostgresCon,
+    store: int,
+    limit: int = 1000,
 ) -> pd.DataFrame:
     logger.info(f"Query developers {store=} start")
     before_date = (datetime.datetime.today() - datetime.timedelta(days=15)).strftime(
-        "%Y-%m-%d"
+        "%Y-%m-%d",
     )
     sel_query = f"""SELECT 
             d.*,
@@ -190,10 +192,14 @@ def query_countries(database_connection: PostgresCon) -> pd.DataFrame:
 
 
 def query_store_ids(
-    database_connection: PostgresCon, store: int, store_ids: list[str] | None = None
+    database_connection: PostgresCon,
+    store: int,
+    store_ids: list[str] | None = None,
 ) -> list[str]:
     df = query_store_id_map(
-        database_connection=database_connection, store=store, store_ids=store_ids
+        database_connection=database_connection,
+        store=store,
+        store_ids=store_ids,
     )
     ids: list = []
     if not df.empty:
@@ -250,21 +256,26 @@ def delete_app_url_mapping(app_url_id: int, database_connection: PostgresCon) ->
 
 
 def query_store_apps(
-    stores: list[int], database_connection: PostgresCon, limit: int | None = 1000
+    stores: list[int],
+    database_connection: PostgresCon,
+    limit: int | None = 1000,
 ) -> pd.DataFrame:
     short_update_days = 6
     short_update_installs = 1000
     short_update_ratings = 100
     short_update_date = (
-        datetime.datetime.today() - datetime.timedelta(days=short_update_days)
+        datetime.datetime.now(tz=datetime.UTC)
+        - datetime.timedelta(days=short_update_days)
     ).strftime("%Y-%m-%d")
     long_update_days = 13
     long_update_date = (
-        datetime.datetime.today() - datetime.timedelta(days=long_update_days)
+        datetime.datetime.now(tz=datetime.UTC)
+        - datetime.timedelta(days=long_update_days)
     ).strftime("%Y-%m-%d")
     max_recrawl_days = 29
     max_recrawl_date = (
-        datetime.datetime.today() - datetime.timedelta(days=max_recrawl_days)
+        datetime.datetime.now(tz=datetime.UTC)
+        - datetime.timedelta(days=max_recrawl_days)
     ).strftime("%Y-%m-%d")
     installs_and_dates_str = f""" AND (
                         (
@@ -329,7 +340,7 @@ def query_all(
     wheres = []
     for key_col in key_cols:
         keys = df[key_col].unique().tolist()
-        if all([isinstance(x, (np.integer, int)) for x in keys]):
+        if all([isinstance(x, np.integer | int) for x in keys]):
             values_str = "(" + (", ").join([str(x) for x in keys]) + ")"
         else:
             values_str = "('" + ("', '").join(keys) + "')"

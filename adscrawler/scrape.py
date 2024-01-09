@@ -70,7 +70,7 @@ def get_app_ads_text(url: str) -> str:
     sub_domains_url = ""
     if ext_url.subdomain:
         # Note contains all subdomains, even m
-        # TODO parse & exclude for m subdomain
+        # TODO: parse & exclude for m subdomain
         sub_domains_url = ".".join(ext_url) + "/" + "app-ads.txt"
         sub_domains_url = "http://" + sub_domains_url
     top_domain_url = ".".join([ext_url.domain, ext_url.suffix]) + "/" + "app-ads.txt"
@@ -121,7 +121,7 @@ def parse_ads_txt(txt: str) -> pd.DataFrame:
                         row["publisher_id"],
                         row["relationship"],
                         row["certification_auth"],
-                    ]
+                    ],
                 )
             elif len(row) > 4:
                 rows.append(
@@ -131,7 +131,7 @@ def parse_ads_txt(txt: str) -> pd.DataFrame:
                         row["relationship"],
                         row["certification_auth"],
                         ",".join(row["notes"]),
-                    ]
+                    ],
                 )
             else:
                 rows.append([row["domain"], row["publisher_id"], row["relationship"]])
@@ -149,11 +149,15 @@ def clean_raw_txt_df(txt_df: pd.DataFrame) -> pd.DataFrame:
     # Domain
     txt_df["domain"] = txt_df["domain"].str.lower()
     txt_df["domain"] = txt_df["domain"].apply(
-        lambda x: ".".join([tldextract.extract(x).domain, tldextract.extract(x).suffix])
+        lambda x: ".".join(
+            [tldextract.extract(x).domain, tldextract.extract(x).suffix],
+        ),
     )
     standard_str_cols = ["domain", "publisher_id", "relationship", "certification_auth"]
     txt_df[standard_str_cols] = txt_df[standard_str_cols].replace(
-        "[^a-zA-Z0-9_\\-\\.]", "", regex=True
+        "[^a-zA-Z0-9_\\-\\.]",
+        "",
+        regex=True,
     )
     # Clean Relationship
     txt_df["relationship"] = txt_df["relationship"].str.upper()
@@ -242,7 +246,11 @@ def scrape_app_ads_url(url: str, database_connection: PostgresCon) -> None:
         return_rows=True,
     )
     app_df = pd.merge(
-        txt_df, domain_df, how="left", on=["domain"], validate="many_to_one"
+        txt_df,
+        domain_df,
+        how="left",
+        on=["domain"],
+        validate="many_to_one",
     ).rename(columns={"id": "ad_domain"})
     app_df["pub_domain"] = pub_domain_df["id"].astype(object)[0]
     insert_columns = [

@@ -32,7 +32,7 @@ def reinsert_from_csv(filename: str, database_connection: PostgresCon) -> None:
                         "primary_genre": "category",
                         "total_number_of_ratings": "rating_count",
                         "price_usd": "price",
-                    }
+                    },
                 )
                 insert_columns = [
                     "app_id",

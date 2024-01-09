@@ -61,7 +61,7 @@ def scrape_store_ranks(database_connection: PostgresCon, stores: list[int]) -> N
             )
         except Exception:
             logger.exception(
-                f"Srape iOS collection={collection_keyword} hit error, skipping"
+                f"Srape iOS collection={collection_keyword} hit error, skipping",
             )
 
     if 1 in stores:
@@ -99,12 +99,15 @@ def scrape_store_ranks(database_connection: PostgresCon, stores: list[int]) -> N
 
 
 def insert_new_apps(
-    dicts: list[dict], database_connection: PostgresCon, crawl_source: str
+    dicts: list[dict],
+    database_connection: PostgresCon,
+    crawl_source: str,
 ) -> None:
     df = pd.DataFrame(dicts)
     all_scraped_ids = df["store_id"].unique().tolist()
     existing_ids_map = query_store_id_map(
-        database_connection, store_ids=all_scraped_ids
+        database_connection,
+        store_ids=all_scraped_ids,
     )
     existing_store_ids = existing_ids_map["store_id"].tolist()
     new_apps_df = df[~(df["store_id"].isin(existing_store_ids))][
@@ -116,7 +119,7 @@ def insert_new_apps(
         return
     else:
         logger.info(
-            f"Scrape {crawl_source=} insert new apps to db {new_apps_df.shape=}"
+            f"Scrape {crawl_source=} insert new apps to db {new_apps_df.shape=}",
         )
         insert_columns = ["store", "store_id"]
         inserted_apps: pd.DataFrame = upsert_df(
@@ -160,16 +163,29 @@ def process_scraped(
         return
     logger.info("Process and save rankings start")
     new_existing_ids_map = query_store_id_map(
-        database_connection, store_ids=all_scraped_ids
+        database_connection,
+        store_ids=all_scraped_ids,
     ).rename(columns={"id": "store_app"})
     df = pd.merge(
-        df, new_existing_ids_map, how="left", on=["store", "store_id"], validate="m:1"
+        df,
+        new_existing_ids_map,
+        how="left",
+        on=["store", "store_id"],
+        validate="m:1",
     ).drop("store_id", axis=1)
     df = pd.merge(
-        df, collections_map, how="left", on=["store", "collection"], validate="m:1"
+        df,
+        collections_map,
+        how="left",
+        on=["store", "collection"],
+        validate="m:1",
     ).drop("collection", axis=1)
     df = pd.merge(
-        df, categories_map, how="left", on=["store", "category"], validate="m:1"
+        df,
+        categories_map,
+        how="left",
+        on=["store", "category"],
+        validate="m:1",
     ).drop("category", axis=1)
     df["country"] = df["country"].str.upper()
     df = (
@@ -203,7 +219,7 @@ def process_scraped(
 def extract_domains(x: str) -> str:
     ext = tldextract.extract(x)
     use_top_domain = any(
-        ["m" == ext.subdomain, "www" in ext.subdomain.split("."), ext.subdomain == ""]
+        ["m" == ext.subdomain, "www" in ext.subdomain.split("."), ext.subdomain == ""],
     )
     if use_top_domain:
         url = ".".join([ext.domain, ext.suffix])
@@ -214,7 +230,8 @@ def extract_domains(x: str) -> str:
 
 
 def crawl_developers_for_new_store_ids(
-    database_connection: PostgresCon, store: int
+    database_connection: PostgresCon,
+    store: int,
 ) -> None:
     logger.info(f"Crawl devevelopers for {store=} start")
     store_ids = query_store_ids(database_connection, store=store)
@@ -233,10 +250,10 @@ def crawl_developers_for_new_store_ids(
             [
                 {
                     "developer": id,
-                    "apps_crawled_at": datetime.datetime.now(tz=datetime.timezone.utc),
+                    "apps_crawled_at": datetime.datetime.now(tz=datetime.UTC),
                 }
                 for id in df["id"].tolist()
-            ]
+            ],
         )
         insert_columns = dev_df.columns.tolist()
         key_columns = ["developer"]
@@ -262,7 +279,7 @@ def crawl_developers_for_new_store_ids(
                     process_scraped(
                         database_connection=database_connection,
                         ranked_dicts=apps_df[["store", "store_id"]].to_dict(
-                            orient="records"
+                            orient="records",
                         ),
                         crawl_source="crawl_developers",
                     )
@@ -271,10 +288,10 @@ def crawl_developers_for_new_store_ids(
                         {
                             "developer": developer_db_id,
                             "apps_crawled_at": datetime.datetime.now(
-                                datetime.timezone.utc
+                                datetime.UTC,
                             ),
-                        }
-                    ]
+                        },
+                    ],
                 )
                 insert_columns = dev_df.columns.tolist()
                 key_columns = ["developer"]
@@ -292,7 +309,9 @@ def crawl_developers_for_new_store_ids(
 
 
 def update_app_details(
-    stores: list[int], database_connection: PostgresCon, limit: int | None = 1000
+    stores: list[int],
+    database_connection: PostgresCon,
+    limit: int | None = 1000,
 ) -> None:
     logger.info("Update App Details: start")
     df = query_store_apps(stores, database_connection=database_connection, limit=limit)
@@ -301,7 +320,8 @@ def update_app_details(
 
 
 def crawl_stores_for_app_details(
-    df: pd.DataFrame, database_connection: PostgresCon
+    df: pd.DataFrame,
+    database_connection: PostgresCon,
 ) -> None:
     info = f"Update App Details {df.shape[0]}"
     logger.info(info + " start!")
@@ -397,7 +417,9 @@ def scrape_app(
     while retries <= max_retries:
         try:
             result_dict = scrape_from_store(
-                store=store, store_id=store_id, country=country
+                store=store,
+                store_id=store_id,
+                country=country,
             )
             crawl_result = 1
             break  # If successful, break out of the retry loop
@@ -450,7 +472,8 @@ def scrape_app(
 
 
 def save_developer_info(
-    app_df: pd.DataFrame, database_connection: PostgresCon
+    app_df: pd.DataFrame,
+    database_connection: PostgresCon,
 ) -> pd.DataFrame:
     assert app_df["developer_id"].values[
         0
@@ -481,7 +504,9 @@ def save_developer_info(
 
 
 def scrape_and_save_app(
-    store: int, store_id: str, database_connection: PostgresCon
+    store: int,
+    store_id: str,
+    database_connection: PostgresCon,
 ) -> pd.DataFrame:
     country_list = ["us"]
     for country in country_list:
@@ -489,7 +514,9 @@ def scrape_and_save_app(
         app_df = scrape_app(store=store, store_id=store_id, country=country)
         logger.info(f"{info} save to db start")
         app_df = save_apps_df(
-            apps_df=app_df, database_connection=database_connection, country=country
+            apps_df=app_df,
+            database_connection=database_connection,
+            country=country,
         )
         logger.info(f"{info} save to db finish")
     crawl_result = app_df["crawl_result"].values[0]
@@ -536,7 +563,7 @@ def save_apps_df(
 
         store_apps_history["country"] = country.upper()
         store_apps_history["crawled_date"] = (
-            datetime.datetime.now(datetime.timezone.utc).date().strftime("%Y-%m-%d")
+            datetime.datetime.now(datetime.UTC).date().strftime("%Y-%m-%d")
         )
         table_name = "store_apps_country_history"
         insert_columns = [
@@ -568,7 +595,7 @@ def save_apps_df(
 
 
 def log_crawl_results(app_df: pd.DataFrame, database_connection: PostgresCon) -> None:
-    app_df["crawled_at"] = datetime.datetime.now(datetime.timezone.utc)
+    app_df["crawled_at"] = datetime.datetime.now(datetime.UTC)
     insert_columns = ["crawl_result", "store", "store_id", "store_app", "crawled_at"]
     app_df = app_df[insert_columns]
     app_df.to_sql(

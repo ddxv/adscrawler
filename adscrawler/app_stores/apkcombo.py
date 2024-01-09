@@ -16,7 +16,7 @@ def scrape_with_firefox() -> list[str]:
     options.add_argument("--headless")
 
     service = Service(
-        executable_path="/snap/bin/geckodriver"
+        executable_path="/snap/bin/geckodriver",
     )  # specify the path to your geckodriver
     driver = webdriver.Firefox(options=options, service=service)
     driver.get("https://apkcombo.com/new-releases/feed/")
