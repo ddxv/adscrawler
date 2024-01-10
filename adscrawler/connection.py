@@ -7,9 +7,11 @@ logger = get_logger(__name__)
 
 
 class PostgresCon:
+
     """Class for managing the connection to postgres
-    Parameters:
-    ----------------
+
+    Parameters
+    ----------
         my_db: String, passed on init, string name of db
     """
 

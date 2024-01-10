@@ -25,10 +25,10 @@ def upsert_df(
     schema: str | None = None,
     log: bool = False,
 ) -> pd.DataFrame | None:
-    """
-    Perform an "upsert" on a PostgreSQL table from a DataFrame.
+    """Perform an "upsert" on a PostgreSQL table from a DataFrame.
     Constructs an INSERT … ON CONFLICT statement, uploads the DataFrame to a
     temporary table, and then executes the INSERT.
+
     Parameters
     ----------
     data_frame : pandas.DataFrame
