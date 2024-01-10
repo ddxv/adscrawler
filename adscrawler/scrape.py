@@ -20,7 +20,7 @@ logger = get_logger(__name__)
 
 def request_app_ads(ads_url: str) -> str:
     max_bytes = 100000
-    if not "http" == ads_url[0:4]:
+    if ads_url[0:4] != "http":
         ads_url = "http://" + ads_url
     response = requests.get(ads_url, stream=True, timeout=2)
     if response.status_code == 403:
@@ -162,18 +162,18 @@ def clean_raw_txt_df(txt_df: pd.DataFrame) -> pd.DataFrame:
     # Clean Relationship
     txt_df["relationship"] = txt_df["relationship"].str.upper()
     txt_df.loc[
-        txt_df.relationship.notnull() & txt_df.relationship.str.contains("DIRECT"),
+        txt_df.relationship.notna() & txt_df.relationship.str.contains("DIRECT"),
         "relationship",
     ] = "DIRECT"
     txt_df.loc[
-        txt_df.relationship.notnull() & txt_df.relationship.str.contains("RESELLER"),
+        txt_df.relationship.notna() & txt_df.relationship.str.contains("RESELLER"),
         "relationship",
     ] = "RESELLER"
     # Drop unwanted rows
     keep_rows = (
-        (txt_df.domain.notnull())
+        (txt_df.domain.notna())
         & (txt_df.domain != "")
-        & (txt_df.publisher_id.notnull())
+        & (txt_df.publisher_id.notna())
         & (txt_df.publisher_id != "")
         & (txt_df.relationship.isin(["DIRECT", "RESELLER"]))
     )
@@ -214,13 +214,13 @@ def scrape_app_ads_url(url: str, database_connection: PostgresCon) -> None:
         logger.warning(f"{info} ads.txt not found {error}")
         result_dict["crawl_result"] = 3
     except AdsTxtEmptyError as error:
-        logger.error(f"{info} ads.txt parsing error {error}")
+        logger.exception(f"{info} ads.txt parsing ERROR {error}")
         result_dict["crawl_result"] = 2
     except requests.exceptions.ConnectionError as error:
         logger.warning(f"{info} domain not found {error}")
         result_dict["crawl_result"] = 3
     except Exception as error:
-        logger.error(f"{info} unknown error: {error}")
+        logger.exception(f"{info} unknown ERROR: {error}")
         result_dict["crawl_result"] = 4
     insert_columns = ["url", "crawl_result"]
     pub_domain_df = pd.DataFrame([result_dict])
@@ -287,7 +287,7 @@ def scrape_app_ads_url(url: str, database_connection: PostgresCon) -> None:
             validate="many_to_one",
         )
         insert_columns = ["pub_domain", "app_ads_entry"]
-        null_df = app_df_final[app_df_final.app_ads_entry.isnull()]
+        null_df = app_df_final[app_df_final.app_ads_entry.isna()]
         if not null_df.empty:
             logger.warning(f"{null_df=} NULLs in app_ads_entry")
         upsert_df(

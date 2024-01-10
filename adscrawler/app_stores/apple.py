@@ -143,7 +143,7 @@ def clean_ios_app_df(df: pd.DataFrame) -> pd.DataFrame:
         )
     except Exception as e:
         logger.warning(
-            f"store_id={df['store_id'].values[0]} split genre IDs failed {e}",
+            f"store_id={df['store_id'].to_numpy()[0]} split genre IDs failed {e}",
         )
     df = df.assign(
         free=df["price"] == 0,
@@ -160,7 +160,7 @@ def clean_ios_app_df(df: pd.DataFrame) -> pd.DataFrame:
     )
     list_cols = ["phone_image_url", "tablet_image_url"]
     for list_col in list_cols:
-        urls_empty = ((df[f"{list_col}s"].isnull()) | (df[f"{list_col}s"] == "")).all()
+        urls_empty = ((df[f"{list_col}s"].isna()) | (df[f"{list_col}s"] == "")).all()
         if not urls_empty:
             columns = {x: f"{list_col}_{x+1}" for x in range(3)}
             df = pd.concat(

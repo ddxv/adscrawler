@@ -22,13 +22,13 @@ def handle_exception(exc_type, exc_value, exc_traceback) -> None:
 
 def check_config_dirs() -> None:
     dirs = [TOP_CONFIGDIR, CONFIG_DIR, LOG_DIR]
-    for dir in dirs:
-        if not pathlib.Path.exists(dir):
-            pathlib.Path.mkdir(dir, exist_ok=True)
+    for _dir in dirs:
+        if not pathlib.Path.exists(_dir):
+            pathlib.Path.mkdir(_dir, exist_ok=True)
 
 
 def get_logger(mod_name: str, filename: str = "adscrawler") -> logging.Logger:
-    format = "%(asctime)s: %(name)s: %(levelname)s: %(message)s"
+    log_format = "%(asctime)s: %(name)s: %(levelname)s: %(message)s"
     check_config_dirs()
     filename = f"{LOG_DIR}/{filename}.log"
     # Writes to file
@@ -39,7 +39,7 @@ def get_logger(mod_name: str, filename: str = "adscrawler") -> logging.Logger:
     )
     # Stream handler for stdout
     logging.basicConfig(
-        format=format,
+        format=log_format,
         level=logging.INFO,
         handlers=[rotate_handler, logging.StreamHandler()],
     )

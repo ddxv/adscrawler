@@ -1,5 +1,6 @@
 import argparse
 import os
+import sys
 
 from adscrawler.app_stores.scrape_stores import (
     crawl_developers_for_new_store_ids,
@@ -91,7 +92,7 @@ def manage_cli_args() -> argparse.Namespace:
     args, leftovers = parser.parse_known_args()
     if args.limit_processes and script_has_process(args):
         logger.info("Script already running, exiting")
-        quit()
+        sys.exit()
     return args
 
 

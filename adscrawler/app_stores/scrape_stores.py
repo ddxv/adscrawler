@@ -95,7 +95,6 @@ def scrape_store_ranks(database_connection: PostgresCon, stores: list[int]) -> N
             )
         except Exception:
             logger.exception("ApkCombo RSS feed failed")
-    return
 
 
 def insert_new_apps(
@@ -219,7 +218,7 @@ def process_scraped(
 def extract_domains(x: str) -> str:
     ext = tldextract.extract(x)
     use_top_domain = any(
-        ["m" == ext.subdomain, "www" in ext.subdomain.split("."), ext.subdomain == ""],
+        [ext.subdomain == "m", "www" in ext.subdomain.split("."), ext.subdomain == ""],
     )
     if use_top_domain:
         url = ".".join([ext.domain, ext.suffix])
@@ -249,10 +248,10 @@ def crawl_developers_for_new_store_ids(
         dev_df = pd.DataFrame(
             [
                 {
-                    "developer": id,
+                    "developer": _id,
                     "apps_crawled_at": datetime.datetime.now(tz=datetime.UTC),
                 }
-                for id in df["id"].tolist()
+                for _id in df["id"].tolist()
             ],
         )
         insert_columns = dev_df.columns.tolist()
@@ -331,7 +330,7 @@ def crawl_stores_for_app_details(
         store = row.store
         if "app_url_id" in row:
             app_url_id = row.app_url_id
-            app_url_id = None if pd.isnull(app_url_id) else int(app_url_id)
+            app_url_id = None if pd.isna(app_url_id) else int(app_url_id)
         else:
             app_url_id = None
         update_all_app_info(store, store_id, database_connection, app_url_id)
@@ -351,14 +350,14 @@ def update_all_app_info(
         logger.error(f"{info} store_app db id not in app_df columns")
         return
     if (
-        "url" not in app_df.columns or not app_df["url"].values
+        "url" not in app_df.columns or not app_df["url"].to_numpy()
     ) and app_url_id is not None:
         delete_app_url_mapping(app_url_id, database_connection)
         return
-    if app_df["crawl_result"].values[0] != 1:
+    if app_df["crawl_result"].to_numpy()[0] != 1:
         logger.info(f"{info} crawl not successful, don't update further")
         return
-    if "url" not in app_df.columns or not app_df["url"].values:
+    if "url" not in app_df.columns or not app_df["url"].to_numpy():
         logger.info(f"{info} no app url, finished")
         return
     app_df["url"] = app_df["url"].apply(lambda x: extract_domains(x))
@@ -475,7 +474,7 @@ def save_developer_info(
     app_df: pd.DataFrame,
     database_connection: PostgresCon,
 ) -> pd.DataFrame:
-    assert app_df["developer_id"].values[
+    assert app_df["developer_id"].to_numpy()[
         0
     ], f"{app_df['store_id']} Missing Developer ID"
     df = (
@@ -519,7 +518,7 @@ def scrape_and_save_app(
             country=country,
         )
         logger.info(f"{info} save to db finish")
-    crawl_result = app_df["crawl_result"].values[0]
+    crawl_result = app_df["crawl_result"].to_numpy()[0]
     logger.info(f"{info} {crawl_result=} scraped and saved app")
     return app_df
 
@@ -534,7 +533,7 @@ def save_apps_df(
     key_columns = ["store", "store_id"]
     if (
         (apps_df["crawl_result"] == 1).all()
-        and apps_df["developer_id"].notnull().all()
+        and apps_df["developer_id"].notna().all()
         and update_developer
     ):
         apps_df = save_developer_info(apps_df, database_connection)
