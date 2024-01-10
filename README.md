@@ -1,7 +1,6 @@
-# adscrawler project
+# Crawl App-Adst.txt and App Store Apps
 
-The ultimate goal is to crawl app-ads.txt files, as based on the Interactive Advertising Bureau's Tech Lab specs. 
-
+This crawls the Google Play and Apple App Stores for as many apps as it can and also checks for their app-ads.txt files. App-ads.txt files are crawled based on the Interactive Advertising Bureau's Tech Lab specs. 
 https://iabtechlab.com/ads-txt/
 
 To get app-ads.txt files, there are several additional steps that need to be taken when compared to regular ads.txt files.
@@ -12,16 +11,17 @@ To get app-ads.txt files, there are several additional steps that need to be tak
 These steps make it a bit more challenging to collect app-ads.txt, as the first step is to have your list of store_ids to check. Thus this project comes bunded with two crawlers for both Apple iTunes and Google Play stores to discover new ids. If you do not need to discover new ids, then these steps are not needed and you can directly inject your store_ids into the database's store_apps table.
 
 # Setup and Installation
- - Python environment: Python 3.11
+ - Python environment: Python 3.11/3.12
  - Requires: NodeJS
  - PostgreSQL: 15
  - Init db using pg-ddl/db.sql
+ - Setup python environment `python3.12 -m venv .virtualenv` & `source .virtualenv/bin/activate`
  - `pip install -r requirements.txt`
  - `npm install --save google-play-scraper`
 
 
 # Prep before running (optional)
- - App discovery is quite slow, to speed things up you can inject store_ids to postgresql public.store_apps by finding a pre-existing list of store_ids
+ - App discovery is quite slow, to speed things up you can inject store_ids to postgresql public.store_apps by finding a pre-existing list of store_ids.
 
 # Run
  - From your environment run `python main.py` to check setup. This will also help verify the database connection is working.
