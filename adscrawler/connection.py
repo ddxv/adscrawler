@@ -7,7 +7,6 @@ logger = get_logger(__name__)
 
 
 class PostgresCon:
-
     """Class for managing the connection to postgres
 
     Parameters
