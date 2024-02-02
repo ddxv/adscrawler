@@ -2,6 +2,10 @@
 config.yml
 store-data/
 
+# directory for downloaded apks
+apks/
+
+
 .vscode
 .virtualenv/
 node_modules/
