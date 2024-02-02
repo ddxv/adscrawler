@@ -1,0 +1,49 @@
+# Edit this file to introduce tasks to be run by cron.
+# 
+# Each task to run has to be defined through a single line
+# indicating with different fields when the task will be run
+# and what command to run for the task
+# 
+# To define the time you can provide concrete values for
+# minute (m), hour (h), day of month (dom), month (mon),
+# and day of week (dow) or use '*' in these fields (for 'any').
+# 
+# Notice that tasks will be started based on the cron's system
+# daemon's notion of time and timezones.
+# 
+# Output of the crontab jobs (including errors) is sent through
+# email to the user the crontab file belongs to (unless redirected).
+# 
+# For example, you can run a backup of all your user accounts
+# at 5 a.m every week with:
+# 0 5 * * 1 tar -zcf /var/backups/home.tgz /home/
+# 
+# For more information see the manual pages of crontab(5) and cron(8)
+# 
+# m h  dom mon dow   command
+
+
+# Hourly
+5 * * * * psql -d madrone -c "SELECT snapshot_store_apps();"
+7 * * * * psql -d madrone -c "SELECT snapshot_pub_domains();"
+43 * * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW CONCURRENTLY store_apps_updated_at"
+53 * * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW CONCURRENTLY store_apps_created_at"
+
+# Multiple Per Day
+0 */4 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW CONCURRENTLY audit_dates"
+10 */3 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW CONCURRENTLY network_counts"
+13 */5 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW CONCURRENTLY networks_with_app_metrics"
+15 */3 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW CONCURRENTLY network_counts_top"
+20 */3 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW CONCURRENTLY category_mapping"
+25 */3 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW CONCURRENTLY mv_app_categories"
+33 */11 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW CONCURRENTLY apps_new_weekly"
+35 */11 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW CONCURRENTLY apps_new_monthly"
+45 */9 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW CONCURRENTLY publisher_network_view"
+
+# Daily
+#30 0 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW CONCURRENTLY publisher_domain_apps_view"
+33 */11 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW CONCURRENTLY top_categories"
+30 1 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW CONCURRENTLY publisher_domain_with_installs"
+30 2 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW app_ads_view"
+
+
