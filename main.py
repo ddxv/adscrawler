@@ -10,6 +10,7 @@ from adscrawler.app_stores.scrape_stores import (
 from adscrawler.config import get_logger
 from adscrawler.connection import get_db_connection
 from adscrawler.scrape import crawl_app_ads
+from adscrawler.tools import get_manifest
 
 logger = get_logger(__name__)
 
@@ -70,6 +71,13 @@ def manage_cli_args() -> argparse.Namespace:
         action="store_true",
     )
     parser.add_argument(
+        "-m",
+        "--manifests",
+        help="Scrape the iTunes and Play Store front pages to find new apps",
+        default=False,
+        action="store_true",
+    )
+    parser.add_argument(
         "-u",
         "--update-app-store-details",
         help="Scrape app stores for app details, ie downloads",
@@ -100,6 +108,7 @@ def main(args: argparse.Namespace) -> None:
     logger.info(f"Main starting with args: {args}")
     platforms = args.platforms if "args" in locals() else ["google", "apple"]
     new_apps_check = args.new_apps_check if "args" in locals() else False
+    do_manifest_scrape = args.manifests if "args" in locals() else False
     no_limits = args.no_limits if "args" in locals() else False
     update_app_store_details = (
         args.update_app_store_details if "args" in locals() else False
@@ -139,6 +148,11 @@ def main(args: argparse.Namespace) -> None:
         else:
             limit = 5000
         crawl_app_ads(PGCON, limit=limit)
+
+    # Get Android Manifest Files
+    if do_manifest_scrape:
+        get_manifest()
+
     logger.info("Adscrawler exiting main")
 
 
