@@ -10,7 +10,7 @@ from adscrawler.app_stores.scrape_stores import (
 from adscrawler.config import get_logger
 from adscrawler.connection import get_db_connection
 from adscrawler.scrape import crawl_app_ads
-from adscrawler.tools import get_manifest
+from adscrawler.tools.get_manifest import extract_manifest
 
 logger = get_logger(__name__)
 
@@ -151,7 +151,8 @@ def main(args: argparse.Namespace) -> None:
 
     # Get Android Manifest Files
     if do_manifest_scrape:
-        get_manifest()
+
+extract_manifest()
 
     logger.info("Adscrawler exiting main")
 
