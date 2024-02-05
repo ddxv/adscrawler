@@ -24,25 +24,26 @@ def check_dirs() -> None:
             pathlib.Path.mkdir(_dir, exist_ok=True)
 
 
+def empty_folder(pth):
+    for sub in pth.iterdir():
+        if sub.is_dir():
+            empty_folder(sub)
+        else:
+            sub.unlink()
+
+
 def extract_manifest(apk: str):
     if UNZIPPED_DIR.exists():
-        pathlib.Path.rmdir(UNZIPPED_DIR)
+        empty_folder(UNZIPPED_DIR.as_posix())
     apk_path = f"apks/{apk}"
     # apk_path = 'apks/com.thirdgate.rts.eg.apk'
     check_dirs()
     # https://apktool.org/docs/the-basics/decoding
-    command = f"apktool decode {apk_path} -f -o apksunzipped"
-    # Execute the command
-    try:
-        # Run the command
-        result = os.system(command)
-        # Print the standard output of the command
-        logger.info(f"Output: {result}")
-    except FileNotFoundError:
-        # Handle case where apktool is not installed or not in PATH
-        logger.exception(
-            "apktool not found. Please ensure it is installed and in your PATH."
-        )
+    command = f"apktool decode {apk_path} -f -o {UNZIPPED_DIR.as_posix()}"
+    # Run the command
+    result = os.system(command)
+    # Print the standard output of the command
+    logger.info(f"Output: {result}")
 
 
 def get_parsed_manifest() -> tuple[str, pd.DataFrame]:
