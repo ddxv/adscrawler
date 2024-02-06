@@ -2,7 +2,7 @@
 
 import os
 import pathlib
-import xml.etree.ElementTree as ET
+from xml.etree import ElementTree
 
 import pandas as pd
 import yaml
@@ -28,7 +28,7 @@ def check_dirs() -> None:
             pathlib.Path.mkdir(_dir, exist_ok=True)
 
 
-def empty_folder(pth):
+def empty_folder(pth: pathlib.Path) -> None:
     for sub in pth.iterdir():
         if sub.is_dir():
             empty_folder(sub)
@@ -36,11 +36,11 @@ def empty_folder(pth):
             sub.unlink()
 
 
-def unzip_apk(apk: str):
+def unzip_apk(apk: str) -> None:
     if UNZIPPED_DIR.exists():
         empty_folder(UNZIPPED_DIR)
     apk_path = pathlib.Path(APKS_DIR, apk)
-    if not apk_path.exists:
+    if not apk_path.exists():
         logger.error(f"path: {apk_path.as_posix()} file not found")
         raise FileNotFoundError
     # apk_path = 'apks/com.thirdgate.rts.eg.apk'
@@ -58,7 +58,7 @@ def get_parsed_manifest() -> tuple[str, pd.DataFrame]:
     # Load the XML file
     with manifest_filename.open("r") as f:
         manifest_str = f.read()
-    tree = ET.parse(manifest_filename)
+    tree = ElementTree.parse(manifest_filename)
     root = tree.getroot()
     df = xml_to_dataframe(root)
     return manifest_str, df
@@ -69,11 +69,11 @@ def get_version() -> int:
     # Open and read the YAML file
     with tool_filename.open("r") as file:
         data = yaml.safe_load(file)
-    version_int = data["versionInfo"]["versionCode"]
+    version_int: int = data["versionInfo"]["versionCode"]
     return version_int
 
 
-def xml_to_dataframe(root):
+def xml_to_dataframe(root: ElementTree.Element) -> pd.DataFrame:
     """Flawed process of taking xml and making a dataframe.
     This will not have an accurate portrayal of nested XML. For example:
 
@@ -94,7 +94,9 @@ def xml_to_dataframe(root):
 
     """
 
-    def extract_data(element, path="", data=None):
+    def extract_data(
+        element: ElementTree.Element, path: str = "", data: list | None = None
+    ) -> list:
         if data is None:
             data = []
         for child in element:
@@ -119,7 +121,7 @@ def xml_to_dataframe(root):
     return df
 
 
-def manifest_main(database_connection: PostgresCon):
+def manifest_main(database_connection: PostgresCon) -> None:
 
     store = 1
     collection_id = 1
@@ -142,9 +144,8 @@ def manifest_main(database_connection: PostgresCon):
     apps = pd.concat([top_apps, top_games]).drop_duplicates()
     for _id, row in apps.iterrows():
         store_id = row.store_id
-        store_id = "com.einnovation.temu"
         logger.info(f"{store_id=} start")
-        download(store_id=store_id, do_redownload=True)
+        download(store_id=store_id, do_redownload=False)
         try:
             unzip_apk(apk=f"{store_id}.apk")
         except FileNotFoundError:
@@ -157,7 +158,7 @@ def manifest_main(database_connection: PostgresCon):
         df["version_code"] = version_int
         version_code_df = df[["store_app", "version_code"]].drop_duplicates()
         logger.info(f"{store_id=} inserts")
-        upserted = upsert_df(
+        upserted: pd.DataFrame = upsert_df(
             df=version_code_df,
             table_name="version_codes",
             database_connection=database_connection,

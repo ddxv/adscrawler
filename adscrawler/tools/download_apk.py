@@ -35,7 +35,7 @@ def download(store_id: str, do_redownload: bool = False) -> None:
 
     """
 
-    logger.info(f"Start download {store_id}")
+    logger.info(f"{store_id=} download start")
     filepath = pathlib.Path(APKS_DIR, f"{store_id}.apk")
     exists = filepath.exists()
     if exists:
@@ -58,7 +58,8 @@ def download(store_id: str, do_redownload: bool = False) -> None:
                 if chunk:
                     file.write(chunk)
     else:
-        logger.error(f"{store_id=} Request failed with {r.status_code=} {r.content}")
+        logger.error(f"{store_id=} Request failed with {r.status_code=} {r.text}")
+    logger.info(f"{store_id=} download finished")
 
 
 def main(args: argparse.Namespace) -> None:
