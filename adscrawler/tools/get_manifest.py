@@ -148,12 +148,12 @@ def manifest_main(database_connection: PostgresCon) -> None:
         download(store_id=store_id, do_redownload=False)
         try:
             unzip_apk(apk=f"{store_id}.apk")
+            version_int = get_version()
+            manifest_str, df = get_parsed_manifest()
+            logger.info(f"{store_id=} unzipped finished")
         except FileNotFoundError:
             logger.warning(f"{store_id=} unable to finish processing")
             continue
-        logger.info(f"{store_id=} unzipped")
-        version_int = get_version()
-        manifest_str, df = get_parsed_manifest()
         df["store_app"] = row.store_app
         df["version_code"] = version_int
         version_code_df = df[["store_app", "version_code"]].drop_duplicates()
