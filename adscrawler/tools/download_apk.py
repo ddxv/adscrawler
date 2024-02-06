@@ -36,6 +36,7 @@ def download(store_id: str, do_redownload: bool = False) -> None:
     """
 
     logger.info(f"{store_id=} download start")
+    check_apk_dir_created()
     filepath = pathlib.Path(APKS_DIR, f"{store_id}.apk")
     exists = filepath.exists()
     if exists:
@@ -64,7 +65,6 @@ def download(store_id: str, do_redownload: bool = False) -> None:
 
 def main(args: argparse.Namespace) -> None:
     """Download APK to local directory and exit."""
-    check_apk_dir_created()
     store_id = args.store_id
     download(store_id=store_id)
 
