@@ -5,8 +5,12 @@ import pathlib
 import xml.etree.ElementTree as ET
 
 import pandas as pd
+import yaml
 
 from adscrawler.config import MODULE_DIR, get_logger
+from adscrawler.connection import PostgresCon
+from adscrawler.queries import get_most_recent_top_ranks, upsert_df
+from adscrawler.tools.download_apk import download
 
 logger = get_logger(__name__)
 
@@ -32,14 +36,17 @@ def empty_folder(pth):
             sub.unlink()
 
 
-def extract_manifest(apk: str):
+def unzip_apk(apk: str):
     if UNZIPPED_DIR.exists():
-        empty_folder(UNZIPPED_DIR.as_posix())
-    apk_path = f"apks/{apk}"
+        empty_folder(UNZIPPED_DIR)
+    apk_path = pathlib.Path(APKS_DIR, apk)
+    if not apk_path.exists:
+        logger.error(f"path: {apk_path.as_posix()} file not found")
+        raise FileNotFoundError
     # apk_path = 'apks/com.thirdgate.rts.eg.apk'
     check_dirs()
     # https://apktool.org/docs/the-basics/decoding
-    command = f"apktool decode {apk_path} -f -o {UNZIPPED_DIR.as_posix()}"
+    command = f"apktool decode {apk_path.as_posix()} -f -o {UNZIPPED_DIR.as_posix()}"
     # Run the command
     result = os.system(command)
     # Print the standard output of the command
@@ -55,6 +62,15 @@ def get_parsed_manifest() -> tuple[str, pd.DataFrame]:
     root = tree.getroot()
     df = xml_to_dataframe(root)
     return manifest_str, df
+
+
+def get_version() -> int:
+    tool_filename = pathlib.Path(MODULE_DIR, "apksunzipped/apktool.yml")
+    # Open and read the YAML file
+    with tool_filename.open("r") as file:
+        data = yaml.safe_load(file)
+    version_int = data["versionInfo"]["versionCode"]
+    return version_int
 
 
 def xml_to_dataframe(root):
@@ -103,7 +119,80 @@ def xml_to_dataframe(root):
     return df
 
 
-def main():
-    apk = "com.zhiliaoapp.musically.apk"
-    extract_manifest(apk)
-    manifest_str, df = get_parsed_manifest()
+def manifest_main(database_connection: PostgresCon):
+
+    store = 1
+    collection_id = 1
+    apps_category_id = 1
+    games_category_id = 36
+    top_apps = get_most_recent_top_ranks(
+        database_connection=database_connection,
+        store=store,
+        collection_id=collection_id,
+        category_id=apps_category_id,
+        limit=10,
+    )
+    top_games = get_most_recent_top_ranks(
+        database_connection=database_connection,
+        store=store,
+        collection_id=collection_id,
+        category_id=games_category_id,
+        limit=10,
+    )
+    apps = pd.concat([top_apps, top_games]).drop_duplicates()
+    for _id, row in apps.iterrows():
+        store_id = row.store_id
+        store_id = "com.einnovation.temu"
+        logger.info(f"{store_id=} start")
+        download(store_id=store_id, do_redownload=True)
+        try:
+            unzip_apk(apk=f"{store_id}.apk")
+        except FileNotFoundError:
+            logger.warning(f"{store_id=} unable to finish processing")
+            continue
+        logger.info(f"{store_id=} unzipped")
+        version_int = get_version()
+        manifest_str, df = get_parsed_manifest()
+        df["store_app"] = row.store_app
+        df["version_code"] = version_int
+        version_code_df = df[["store_app", "version_code"]].drop_duplicates()
+        logger.info(f"{store_id=} inserts")
+        upserted = upsert_df(
+            df=version_code_df,
+            table_name="version_codes",
+            database_connection=database_connection,
+            key_columns=["store_app", "version_code"],
+            return_rows=True,
+            insert_columns=["store_app", "version_code"],
+        )
+        upserted = upserted.rename(
+            columns={"version_code": "original_version_code", "id": "version_code"}
+        ).drop("store_app", axis=1)
+        df = df.rename(
+            columns={"path": "xml_path", "version_code": "original_version_code"}
+        )
+        df = pd.merge(
+            left=df,
+            right=upserted,
+            how="left",
+            on=["original_version_code"],
+            validate="m:1",
+        )
+        key_insert_columns = ["version_code", "xml_path", "tag", "android_name"]
+        df = df[key_insert_columns].drop_duplicates()
+        upsert_df(
+            df=df,
+            table_name="version_details",
+            database_connection=database_connection,
+            key_columns=key_insert_columns,
+            insert_columns=key_insert_columns,
+        )
+        df["manifest_string"] = manifest_str
+        manifest_df = df[["version_code", "manifest_string"]].drop_duplicates()
+        upsert_df(
+            df=manifest_df,
+            table_name="version_manifests",
+            database_connection=database_connection,
+            key_columns=["version_code"],
+            insert_columns=["version_code", "manifest_string"],
+        )
