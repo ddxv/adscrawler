@@ -355,3 +355,35 @@ def query_all(
     # logger.info(sel_query)
     df = pd.read_sql(sel_query, database_connection.engine)
     return df
+
+
+def get_most_recent_top_ranks(
+    database_connection: PostgresCon,
+    store: int,
+    collection_id: int,
+    category_id: int,
+    limit: int = 25,
+) -> pd.DataFrame:
+    sel_query = f"""SELECT
+                ar.rank,
+                sa.id as store_app,
+                sa.name,
+                sa.store_id,
+                sa.icon_url_512
+            FROM
+                app_rankings ar
+            LEFT JOIN
+                stores s
+                    ON s.id = ar.store
+            LEFT JOIN
+                store_apps sa ON sa.id = ar.store_app
+            WHERE
+                crawled_date = (SELECT max(crawled_date) FROM app_rankings WHERE store={store})
+                AND ar.store = {store}
+                AND ar.store_collection = {collection_id}
+                AND ar.store_category = {category_id}
+            LIMIT {limit}
+            ;
+        """
+    df = pd.read_sql(sel_query, con=database_connection.engine)
+    return df

@@ -11,8 +11,11 @@ import pathlib
 
 import requests
 
+from adscrawler.config import MODULE_DIR, get_logger
+
+logger = get_logger(__name__)
+
 URL = "https://d.apkpure.net/b/APK/{store_id}?version=latest"
-MODULE_DIR = pathlib.Path(__file__).resolve().parent
 APKS_DIR = pathlib.Path(MODULE_DIR, "apks")
 
 
@@ -21,16 +24,25 @@ def check_apk_dir_created() -> None:
     dirs = [APKS_DIR]
     for _dir in dirs:
         if not pathlib.Path.exists(_dir):
-            print("creating apks directory")
+            logger.info("creating apks directory")
             pathlib.Path.mkdir(_dir, exist_ok=True)
 
 
-def download(store_id: str) -> None:
+def download(store_id: str, do_redownload: bool = False) -> None:
     """Download the apk file.
 
     store_id: str the id of the android apk
 
     """
+
+    logger.info(f"{store_id=} download start")
+    filepath = pathlib.Path(APKS_DIR, f"{store_id}.apk")
+    exists = filepath.exists()
+    if exists:
+        if not do_redownload:
+            logger.info(f"apk already exists {filepath=}, skipping")
+            return
+
     r = requests.get(
         URL.format(store_id=store_id),
         headers={
@@ -39,25 +51,22 @@ def download(store_id: str) -> None:
         stream=True,
         timeout=10,
     )
-    filepath = pathlib.Path(APKS_DIR, f"{store_id}.apk")
-    with filepath.open("wb") as file:
-        for chunk in r.iter_content(chunk_size=1024):
-            if chunk:
-                file.write(chunk)
+    if r.status_code == 200:
+        filepath = pathlib.Path(APKS_DIR, f"{store_id}.apk")
+        with filepath.open("wb") as file:
+            for chunk in r.iter_content(chunk_size=1024):
+                if chunk:
+                    file.write(chunk)
+    else:
+        logger.error(f"{store_id=} Request failed with {r.status_code=} {r.text}")
+    logger.info(f"{store_id=} download finished")
 
 
 def main(args: argparse.Namespace) -> None:
     """Download APK to local directory and exit."""
     check_apk_dir_created()
     store_id = args.store_id
-    print(f"Start download {store_id}")
-    filepath = pathlib.Path(APKS_DIR, f"{store_id}.apk")
-    exists = filepath.exists()
-    if exists:
-        print(f"apk already exists {filepath=}")
-    else:
-        print(f"download from apkpure {store_id=}")
-        download(store_id=store_id)
+    download(store_id=store_id)
 
 
 def parse_args() -> argparse.Namespace:
