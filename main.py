@@ -151,7 +151,7 @@ def main(args: argparse.Namespace) -> None:
 
     # Get Android Manifest Files
     if do_manifest_scrape:
-        manifest_main(database_connection=PGCON)
+        manifest_main(database_connection=PGCON, number_of_apps_to_pull=20)
 
     logger.info("Adscrawler exiting main")
 
