@@ -143,7 +143,6 @@ def manifest_main(
         limit=number_of_apps_to_pull,
     )
     apps = pd.concat([top_apps, top_games]).drop_duplicates()
-    apps = apps[apps.store_id == "com.facebook.katana"]
     for _id, row in apps.iterrows():
         store_id = row.store_id
         logger.info(f"{store_id=} start")
