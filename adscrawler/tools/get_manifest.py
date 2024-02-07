@@ -121,8 +121,9 @@ def xml_to_dataframe(root: ElementTree.Element) -> pd.DataFrame:
     return df
 
 
-def manifest_main(database_connection: PostgresCon) -> None:
-
+def manifest_main(
+    database_connection: PostgresCon, number_of_apps_to_pull: int = 20
+) -> None:
     store = 1
     collection_id = 1
     apps_category_id = 1
@@ -132,16 +133,17 @@ def manifest_main(database_connection: PostgresCon) -> None:
         store=store,
         collection_id=collection_id,
         category_id=apps_category_id,
-        limit=10,
+        limit=number_of_apps_to_pull,
     )
     top_games = get_most_recent_top_ranks(
         database_connection=database_connection,
         store=store,
         collection_id=collection_id,
         category_id=games_category_id,
-        limit=10,
+        limit=number_of_apps_to_pull,
     )
     apps = pd.concat([top_apps, top_games]).drop_duplicates()
+    apps = apps[apps.store_id == "com.facebook.katana"]
     for _id, row in apps.iterrows():
         store_id = row.store_id
         logger.info(f"{store_id=} start")
