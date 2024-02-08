@@ -139,7 +139,7 @@ def manifest_main(
         version_int = -1
         store_id = row.store_id
         logger.info(f"{store_id=} start")
-        details_df = pd.DataFrame()
+        details_df = row.to_frame().T
         apk_path = pathlib.Path(APKS_DIR, f"{store_id}.apk")
         try:
             download(store_id=store_id, do_redownload=False)
@@ -149,6 +149,8 @@ def manifest_main(
             crawl_result = 1
             logger.info(f"{store_id=} unzipped finished")
         except requests.exceptions.HTTPError:
+            crawl_result = 3  # 404s etc
+        except requests.exceptions.ConnectionError:
             crawl_result = 3  # 404s etc
         except FileNotFoundError:
             logger.exception(f"{store_id=} unable to unpack apk")
