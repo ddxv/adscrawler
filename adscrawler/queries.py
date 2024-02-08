@@ -365,52 +365,57 @@ def get_most_recent_top_ranks(
 ) -> pd.DataFrame:
     sel_query = f"""WITH topranks AS(
                 SELECT
-                                    ar.RANK,
-                                    ar.store_category,
-                                    sa.id AS store_app,
-                                    sa.name,
-                                    sa.installs,
-                                    sa.store_id
+                     ar.RANK,
+                     ar.store_category,
+                     sa.id AS store_app,
+                     sa.name,
+                     sa.installs,
+                     sa.store_id
                 FROM
-                                    app_rankings ar
+                     app_rankings ar
                 LEFT JOIN
-                                    stores s ON
-                                        s.id = ar.store
+                     stores s ON
+                     s.id = ar.store
                 LEFT JOIN
-                                    store_apps sa ON
-                                        sa.id = ar.store_app
+                     store_apps sa ON
+                     sa.id = ar.store_app
                 WHERE
-                                    crawled_date = (
+                     crawled_date = (
                         SELECT
-                                            max(crawled_date)
+                            max(crawled_date)
                         FROM
-                                            app_rankings
+                            app_rankings
                         WHERE
-                                            store = {store}
+                            store = {store}
                     )
                     AND ar.store = {store}
                     AND ar.store_collection = {collection_id}
                 ORDER BY
-                                    RANK,
-                                    store_category
+                    ar.rank,
+                        store_category
             ),
-                            distinctapps AS (
+                    distinctapps AS (
                 SELECT
-                                DISTINCT topranks.store_app,
-                                topranks.name,
-                                topranks.store_id,
-                                topranks.installs
+                    DISTINCT topranks.store_app,
+                    topranks.name,
+                    topranks.store_id,
+                    topranks.installs
                 FROM
-                                topranks
+                    topranks
             )
-                            SELECT
-                *
+            SELECT
+                dc.store_app,
+                dc.store_id,
+                dc.name,
+                dc.installs,
+                vc.crawl_result as last_crawl_result,
+                vc.updated_at
             FROM
                 distinctapps dc
             LEFT JOIN version_codes vc ON
-                                vc.store_app = dc.store_app
+                vc.store_app = dc.store_app
             WHERE
-                                vc.updated_at IS NULL
+                vc.updated_at IS NULL
                 OR updated_at < current_date - INTERVAL '30 days'
             ORDER BY
                 installs DESC
