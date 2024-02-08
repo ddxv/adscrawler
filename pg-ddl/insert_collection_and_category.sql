@@ -1,10 +1,8 @@
-
--- Insert for Store: Google Play
 INSERT INTO store_collections (store, collection) VALUES
 (1, 'TOP_FREE'),
 (1, 'TOP_PAID'),
-(1, 'GROSSING')
-;
+(1, 'GROSSING');
+
 
 -- Insert for Store: Apple
 INSERT INTO store_collections (store, collection) VALUES
@@ -16,12 +14,11 @@ INSERT INTO store_collections (store, collection) VALUES
 (2, 'TOP_PAID_IPAD'),
 (2, 'NEW_IOS'),
 (2, 'NEW_PAID_IOS'),
-(2, 'NEW_FREE_IOS')
-;
+(2, 'NEW_FREE_IOS');
 
 
 
-	-- Insert for Store: 1
+-- Insert for Store: 1
 INSERT INTO store_categories (store, category) VALUES
 (1, 'APPLICATION'),
 (1, 'ANDROID_WEAR'),
@@ -149,6 +146,4 @@ INSERT INTO store_categories (store, category) VALUES
 (2, 'SPORTS'),
 (2, 'TRAVEL'),
 (2, 'UTILITIES'),
-(2, 'WEATHER')
-;
-
+(2, 'WEATHER');
