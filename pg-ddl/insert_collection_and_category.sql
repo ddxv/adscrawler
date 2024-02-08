@@ -3,7 +3,6 @@ INSERT INTO store_collections (store, collection) VALUES
 (1, 'TOP_PAID'),
 (1, 'GROSSING');
 
-
 -- Insert for Store: Apple
 INSERT INTO store_collections (store, collection) VALUES
 (2, 'TOP_FREE_IOS'),
