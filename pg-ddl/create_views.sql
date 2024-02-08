@@ -1,5 +1,3 @@
--- public.app_ads_view source
-
 CREATE MATERIALIZED VIEW public.app_ads_view
 TABLESPACE pg_default
 AS SELECT DISTINCT pd.url AS developer_domain_url,
@@ -19,7 +17,9 @@ AS SELECT DISTINCT pd.url AS developer_domain_url,
 WITH DATA;
 
 -- View indexes:
-CREATE UNIQUE INDEX app_ads_view_developer_domain_url_idx ON public.app_ads_view USING btree (developer_domain_url, ad_domain, publisher_id, ad_domain_url, relationship);
+CREATE UNIQUE INDEX app_ads_view_developer_domain_url_idx 
+ON public.app_ads_view USING btree (developer_domain_url, ad_domain, publisher_id, ad_domain_url, relationship
+);
 
 
 -- public.audit_dates source
@@ -559,14 +559,12 @@ FROM
     RankedApps
 WHERE
     rn <= 50
-WITH DATA
-;
+WITH DATA;
 
 --REFRESH MATERIALIZED VIEW top_categories ;
 
 DROP INDEX IF EXISTS idx_top_categories;
 CREATE UNIQUE INDEX idx_top_categories
 ON top_categories (store, mapped_category, store_id);
-
 
 
