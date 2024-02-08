@@ -37,10 +37,9 @@ def empty_folder(pth: pathlib.Path) -> None:
             sub.unlink()
 
 
-def unzip_apk(apk: str) -> None:
+def unzip_apk(apk_path: pathlib.Path) -> None:
     if UNZIPPED_DIR.exists():
         empty_folder(UNZIPPED_DIR)
-    apk_path = pathlib.Path(APKS_DIR, apk)
     if not apk_path.exists():
         logger.error(f"path: {apk_path.as_posix()} file not found")
         raise FileNotFoundError
@@ -139,9 +138,10 @@ def manifest_main(
         store_id = row.store_id
         logger.info(f"{store_id=} start")
         details_df = pd.DataFrame()
+        apk_path = pathlib.Path(APKS_DIR, f"{store_id}.apk")
         try:
             download(store_id=store_id, do_redownload=False)
-            unzip_apk(apk=f"{store_id}.apk")
+            unzip_apk(apk_path=apk_path)
             version_int = get_version()
             manifest_str, details_df = get_parsed_manifest()
             crawl_result = 1
@@ -167,6 +167,7 @@ def manifest_main(
             return_rows=True,
             insert_columns=["store_app", "version_code"],
         )
+        apk_path.unlink(missing_ok=True)
         if crawl_result != 1:
             continue
         upserted = upserted.rename(
