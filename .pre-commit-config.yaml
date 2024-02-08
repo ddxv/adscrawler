@@ -25,7 +25,7 @@ repos:
         stages: [commit]
     ## SQL ##
   - repo: https://github.com/sqlfluff/sqlfluff
-    rev: 2.3.5
+    rev: 3.0.0a5
     hooks:
       - id: sqlfluff-lint
         args: [--dialect=postgres]
