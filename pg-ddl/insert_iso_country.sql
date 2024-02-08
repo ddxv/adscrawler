@@ -1,20 +1,3 @@
--- Insert ISO 3166 countries to PostgreSQL
-
-CREATE TABLE IF NOT EXISTS countries (
-  id int4 NOT NULL,
-  alpha2 varchar(2) NOT NULL,
-  alpha3 varchar(3) NOT NULL,
-  langCS varchar(45) NOT NULL,
-  langDE varchar(45) NOT NULL,
-  langEN varchar(45) NOT NULL,
-  langES varchar(45) NOT NULL,
-  langFR varchar(45) NOT NULL,
-  langIT varchar(45) NOT NULL,
-  langNL varchar(45) NOT NULL,
-  CONSTRAINT countries_pk PRIMARY KEY (id),
-  CONSTRAINT countries_al2 UNIQUE (alpha2),
-  CONSTRAINT countries_al3 UNIQUE (alpha3)
-) 
 
 INSERT INTO countries (id, alpha2, alpha3, langCS, langDE, langEN, langES, langFR, langIT, langNL) VALUES
 (4, 'AF', 'AFG', 'Afghanistán', 'Afghanistan', 'Afghanistan', 'Afganistán', 'Afghanistan', 'Afghanistan', 'Afghanistan'),
