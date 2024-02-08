@@ -365,48 +365,57 @@ def get_most_recent_top_ranks(
 ) -> pd.DataFrame:
     sel_query = f"""WITH topranks AS(
                 SELECT
-                        ar.RANK,
-                        ar.store_category,
-                        sa.id AS store_app,
-                        sa.name,
-                        sa.store_id
+                                    ar.RANK,
+                                    ar.store_category,
+                                    sa.id AS store_app,
+                                    sa.name,
+                                    sa.installs,
+                                    sa.store_id
                 FROM
-                        app_rankings ar
+                                    app_rankings ar
                 LEFT JOIN
-                        stores s ON
-                            s.id = ar.store
+                                    stores s ON
+                                        s.id = ar.store
                 LEFT JOIN
-                        store_apps sa ON
-                            sa.id = ar.store_app
+                                    store_apps sa ON
+                                        sa.id = ar.store_app
                 WHERE
-                        crawled_date = (
-                            SELECT
-                                max(crawled_date)
-                            FROM
-                                app_rankings
-                            WHERE
-                                store = {store}
-                        )
-                        AND ar.store = {store}
-                        AND ar.store_collection = {collection_id}
-                ORDER BY
-                        RANK,
-                        store_category
-                LIMIT {limit}
-                )
-                SELECT
-                    DISTINCT topranks.store_app,
-                    topranks.name,
-                    topranks.store_id
-                FROM
-                    topranks
-                LEFT JOIN version_codes vc ON
-                    vc.store_app = topranks.store_app
-                WHERE
-                    ( updated_at IS NULL
-                            OR updated_at < current_date - INTERVAL '30 days'
+                                    crawled_date = (
+                        SELECT
+                                            max(crawled_date)
+                        FROM
+                                            app_rankings
+                        WHERE
+                                            store = {store}
                     )
-                ;
-        """
+                    AND ar.store = {store}
+                    AND ar.store_collection = {collection_id}
+                ORDER BY
+                                    RANK,
+                                    store_category
+            ),
+                            distinctapps AS (
+                SELECT
+                                DISTINCT topranks.store_app,
+                                topranks.name,
+                                topranks.store_id,
+                                topranks.installs
+                FROM
+                                topranks
+            )
+                            SELECT
+                *
+            FROM
+                distinctapps dc
+            LEFT JOIN version_codes vc ON
+                                vc.store_app = dc.store_app
+            WHERE
+                                vc.updated_at IS NULL
+                OR updated_at < current_date - INTERVAL '30 days'
+            ORDER BY
+                installs DESC
+            LIMIT {limit}
+            ;
+    """
     df = pd.read_sql(sel_query, con=database_connection.engine)
     return df

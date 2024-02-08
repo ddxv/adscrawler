@@ -126,12 +126,14 @@ def manifest_main(
 ) -> None:
     store = 1
     collection_id = 1  # 'Top' Collection
+    logger.info("Start APK processing")
     apps = get_most_recent_top_ranks(
         database_connection=database_connection,
         store=store,
         collection_id=collection_id,
         limit=number_of_apps_to_pull,
     )
+    logger.info(f"Start APK processing: {apps.shape=}")
     for _id, row in apps.iterrows():
         crawl_result = 4
         version_int = -1
