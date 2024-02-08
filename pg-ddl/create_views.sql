@@ -1,6 +1,7 @@
 CREATE MATERIALIZED VIEW public.app_ads_view
 TABLESPACE pg_default
-AS SELECT DISTINCT pd.url AS developer_domain_url,
+AS SELECT DISTINCT
+    pd.url AS developer_domain_url,
     aae.ad_domain,
     aae.publisher_id,
     ad.domain AS ad_domain_url,
@@ -9,11 +10,11 @@ AS SELECT DISTINCT pd.url AS developer_domain_url,
     pd.crawled_at AS developer_domain_crawled_at,
     ad.updated_at AS ad_domain_updated_at,
     aam.updated_at AS txt_entry_crawled_at
-   FROM app_ads_entrys aae
-     LEFT JOIN ad_domains ad ON ad.id = aae.ad_domain
-     LEFT JOIN app_ads_map aam ON aam.app_ads_entry = aae.id
-     LEFT JOIN pub_domains pd ON pd.id = aam.pub_domain
-  WHERE pd.crawled_at::date = aam.updated_at::date AND pd.crawl_result = 1
+FROM app_ads_entrys aae
+LEFT JOIN ad_domains ad ON aae.ad_domain = ad.id
+LEFT JOIN app_ads_map aam ON aam.app_ads_entry = aae.id
+LEFT JOIN pub_domains pd ON pd.id = aam.pub_domain
+WHERE pd.crawled_at::date = aam.updated_at::date AND pd.crawl_result = 1
 WITH DATA;
 
 -- View indexes:
@@ -27,16 +28,18 @@ ON public.app_ads_view USING btree (developer_domain_url, ad_domain, publisher_i
 CREATE MATERIALIZED VIEW public.audit_dates
 TABLESPACE pg_default
 AS WITH sa AS (
-         SELECT store_apps_audit.stamp::date AS updated_date,
-            'store_apps'::text AS table_name,
-            count(1) AS updated_count
-           FROM logging.store_apps_audit
-          GROUP BY (store_apps_audit.stamp::date)
-        )
- SELECT sa.updated_date,
+    SELECT
+        store_apps_audit.stamp::date AS updated_date,
+        'store_apps'::text AS table_name,
+        count(1) AS updated_count
+    FROM logging.store_apps_audit
+    GROUP BY (store_apps_audit.stamp::date)
+)
+SELECT
+    sa.updated_date,
     sa.table_name,
     sa.updated_count
-   FROM sa
+FROM sa
 WITH DATA;
 
 -- View indexes:
@@ -536,7 +539,7 @@ ON apps_new_yearly (store, mapped_category, store_id);
         
 --DROP MATERIALIZED VIEW top_categories;
 CREATE MATERIALIZED VIEW top_categories AS
-WITH RankedApps AS (
+WITH rankedapps AS (
     SELECT
         *, 
         ROW_NUMBER() OVER(
@@ -548,15 +551,15 @@ WITH RankedApps AS (
         ) AS rn
     FROM    
         store_apps sa
-    JOIN category_mapping cm ON
-        sa.category = cm.original_category
+    JOIN category_mapping cm
+        ON
+            sa.category = cm.original_category
     WHERE
-        crawl_result = 1
+        sa.crawl_result = 1
 )
-SELECT
-    *
-FROM
-    RankedApps
+
+SELECT * FROM
+    rankedapps
 WHERE
     rn <= 50
 WITH DATA;
@@ -566,5 +569,3 @@ WITH DATA;
 DROP INDEX IF EXISTS idx_top_categories;
 CREATE UNIQUE INDEX idx_top_categories
 ON top_categories (store, mapped_category, store_id);
-
-
