@@ -25,18 +25,29 @@ def script_has_process(args: argparse.Namespace) -> bool:
     my_processes = [
         x for x in processes if "/adscrawler/main.py" in x and "/bin/sh" not in x
     ]
-    # Also limit only for app updates -u
-    my_processes = [x for x in my_processes if " -u" in x]
-    logger.info(f"Found {len(my_processes)=}")
-    if args.platforms and len(args.platforms) > 0:
-        logger.info(f"Checking {len(my_processes)=} for {args.platforms=}")
-        my_processes = [
-            x for x in my_processes if any([p in x for p in args.platforms])
-        ]
-
-    if len(my_processes) > 1:
-        logger.info(f"Already running {my_processes=}")
-        already_running = True
+    # Limit only for app updates -u
+    if args.update_app_store_details:
+        app_update_processes = [x for x in my_processes if " -u" in x]
+        if args.platforms and len(args.platforms) > 0:
+            logger.info(f"Checking {len(app_update_processes)=} for {args.platforms=}")
+            app_update_processes = [
+                x for x in app_update_processes if any([p in x for p in args.platforms])
+            ]
+            # Note: > 1 due to the searched always return at least 1
+            if len(app_update_processes) > 1:
+                logger.info(f"Already running {app_update_processes=}")
+                already_running = True
+            return already_running
+        return already_running
+    # Limit only for app updates -m (apk downloads)
+    if args.manifests:
+        apk_download_processes = [x for x in my_processes if " -m" in x]
+        logger.info(f"Found {len(apk_download_processes)=}")
+        # Note: > 1 due to the searched always return at least 1
+        if len(apk_download_processes) > 1:
+            logger.info(f"Already running {apk_download_processes=}")
+            already_running = True
+        return already_running
     return already_running
 
 
