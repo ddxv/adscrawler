@@ -5,6 +5,7 @@ import pathlib
 from xml.etree import ElementTree
 
 import pandas as pd
+import requests
 import yaml
 
 from adscrawler.config import MODULE_DIR, get_logger
@@ -125,39 +126,38 @@ def manifest_main(
     database_connection: PostgresCon, number_of_apps_to_pull: int = 20
 ) -> None:
     store = 1
-    collection_id = 1
-    apps_category_id = 1
-    games_category_id = 36
-    top_apps = get_most_recent_top_ranks(
+    collection_id = 1  # 'Top' Collection
+    apps = get_most_recent_top_ranks(
         database_connection=database_connection,
         store=store,
         collection_id=collection_id,
-        category_id=apps_category_id,
         limit=number_of_apps_to_pull,
     )
-    top_games = get_most_recent_top_ranks(
-        database_connection=database_connection,
-        store=store,
-        collection_id=collection_id,
-        category_id=games_category_id,
-        limit=number_of_apps_to_pull,
-    )
-    apps = pd.concat([top_apps, top_games]).drop_duplicates()
     for _id, row in apps.iterrows():
+        crawl_result = 4
+        version_int = -1
         store_id = row.store_id
         logger.info(f"{store_id=} start")
-        download(store_id=store_id, do_redownload=False)
+        details_df = pd.DataFrame()
         try:
+            download(store_id=store_id, do_redownload=False)
             unzip_apk(apk=f"{store_id}.apk")
             version_int = get_version()
-            manifest_str, df = get_parsed_manifest()
+            manifest_str, details_df = get_parsed_manifest()
+            crawl_result = 1
             logger.info(f"{store_id=} unzipped finished")
+        except requests.exceptions.HTTPError:
+            crawl_result = 3  # 404s etc
         except FileNotFoundError:
-            logger.warning(f"{store_id=} unable to finish processing")
-            continue
-        df["store_app"] = row.store_app
-        df["version_code"] = version_int
-        version_code_df = df[["store_app", "version_code"]].drop_duplicates()
+            logger.exception(f"{store_id=} unable to unpack apk")
+            crawl_result = 2
+        except Exception as e:
+            logger.exception(f"Unexpected error for {store_id=}: {str(e)}")
+            crawl_result = 4  # Unexpected errors
+        details_df["store_app"] = row.store_app
+        details_df["version_code"] = version_int
+        version_code_df = details_df[["store_app", "version_code"]].drop_duplicates()
+        version_code_df["crawl_result"] = crawl_result
         logger.info(f"{store_id=} inserts")
         upserted: pd.DataFrame = upsert_df(
             df=version_code_df,
@@ -167,30 +167,32 @@ def manifest_main(
             return_rows=True,
             insert_columns=["store_app", "version_code"],
         )
+        if crawl_result != 1:
+            continue
         upserted = upserted.rename(
             columns={"version_code": "original_version_code", "id": "version_code"}
         ).drop("store_app", axis=1)
-        df = df.rename(
+        details_df = details_df.rename(
             columns={"path": "xml_path", "version_code": "original_version_code"}
         )
-        df = pd.merge(
-            left=df,
+        details_df = pd.merge(
+            left=details_df,
             right=upserted,
             how="left",
             on=["original_version_code"],
             validate="m:1",
         )
         key_insert_columns = ["version_code", "xml_path", "tag", "android_name"]
-        df = df[key_insert_columns].drop_duplicates()
+        details_df = details_df[key_insert_columns].drop_duplicates()
         upsert_df(
-            df=df,
+            df=details_df,
             table_name="version_details",
             database_connection=database_connection,
             key_columns=key_insert_columns,
             insert_columns=key_insert_columns,
         )
-        df["manifest_string"] = manifest_str
-        manifest_df = df[["version_code", "manifest_string"]].drop_duplicates()
+        details_df["manifest_string"] = manifest_str
+        manifest_df = details_df[["version_code", "manifest_string"]].drop_duplicates()
         upsert_df(
             df=manifest_df,
             table_name="version_manifests",
