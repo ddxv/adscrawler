@@ -165,7 +165,7 @@ def manifest_main(
             database_connection=database_connection,
             key_columns=["store_app", "version_code"],
             return_rows=True,
-            insert_columns=["store_app", "version_code"],
+            insert_columns=["store_app", "version_code", "crawl_result"],
         )
         apk_path.unlink(missing_ok=True)
         if crawl_result != 1:
