@@ -569,3 +569,47 @@ WITH DATA;
 DROP INDEX IF EXISTS idx_top_categories;
 CREATE UNIQUE INDEX idx_top_categories
 ON top_categories (store, mapped_category, store_id);
+
+
+
+CREATE MATERIALIZED VIEW top_trackers AS
+WITH latest_version_codes AS (
+    SELECT
+        id,
+        store_app,
+        MAX(version_code) AS version_code
+    FROM
+        version_codes
+    GROUP BY
+        id,
+        store_app
+),
+trackers_per_app AS (
+    SELECT
+        DISTINCT vc.store_app,
+        vc.version_code AS version_code,
+        tm.tracker
+    FROM
+        version_details vd
+    LEFT JOIN latest_version_codes vc ON
+        vc.id = vd.version_code
+    LEFT JOIN tracker_package_map tm ON
+        vd.android_name ~* tm.package_pattern
+),
+tracker_counts AS (
+    SELECT
+        tracker,
+        count(DISTINCT store_app)
+    FROM
+        trackers_per_app
+    GROUP BY
+        tracker
+)
+SELECT
+    t.name,
+    tc.count
+FROM
+    tracker_counts tc
+LEFT JOIN trackers t ON
+    t.id = tc.tracker
+WITH DATA;
