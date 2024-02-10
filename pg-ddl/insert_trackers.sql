@@ -7,7 +7,8 @@ INSERT INTO trackers (id, name) VALUES
 (6, 'Google Analytics'),
 (7, 'IAB Open Measurement'),
 (8, 'Tenjin'),
-(9, 'AirBridge');
+(9, 'AirBridge'),
+(10, 'No Trackers Found');
 
 INSERT INTO networks (id, name) VALUES
 (1, 'Google AdMob'),
