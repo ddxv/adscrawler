@@ -606,10 +606,16 @@ tracker_counts AS (
         tracker
 )
 SELECT
-    t.name,
+    t.id as tracker,
+    t.name as tracker_name,
     tc.count
 FROM
     tracker_counts tc
 LEFT JOIN trackers t ON
     t.id = tc.tracker
 WITH DATA;
+
+DROP INDEX IF EXISTS idx_top_trackers;
+CREATE UNIQUE INDEX idx_top_trackers
+ON top_trackers (tracker);
+

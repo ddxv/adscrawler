@@ -28,6 +28,7 @@
 7 * * * * psql -d madrone -c "SELECT snapshot_pub_domains();"
 43 * * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW CONCURRENTLY store_apps_updated_at"
 53 * * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW CONCURRENTLY store_apps_created_at"
+58 * * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW CONCURRENTLY top_trackers"
 
 # Multiple Per Day
 0 */4 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW CONCURRENTLY audit_dates"
