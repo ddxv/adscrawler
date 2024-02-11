@@ -76,7 +76,8 @@ templater = 'placeholder'
 verbose = 2
 dialect = 'postgres'
 large_file_skip_byte_limit = 0
-exclude_rules = 'AM04'
+exclude_rules = ['AM04', # using *, agreed this should be TODO, 
+'']
 
 [tool.sqlfluff.templater.placeholder]
 param_style = 'colon'

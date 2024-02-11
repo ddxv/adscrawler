@@ -26,7 +26,8 @@ INSERT INTO networks (id, name) VALUES
 (13, 'Mintegral'),
 (14, 'ChartBoost'),
 (15, 'TapJoy'),
-(16, 'Fyber');
+(16, 'Fyber'),
+(17, 'No Ad Network Detected');
 
 
 INSERT INTO public.tracker_package_map (tracker, package_pattern) VALUES
