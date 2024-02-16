@@ -30,7 +30,8 @@ INSERT INTO networks (id, name) VALUES
 (16, 'Fyber'),
 (17, 'No Ad Network Detected'),
 (18, 'VK'),
-(19, 'AdJoe');
+(19, 'AdJoe'),
+(20, 'Digital Turbine');
 
 
 INSERT INTO public.tracker_package_map (tracker, package_pattern) VALUES
@@ -94,4 +95,6 @@ INSERT INTO public.network_package_map (network, package_pattern) VALUES
 (16, 'com.fyber'),
 (18, 'com.vk.sdk'),
 (18, 'com.vk.api.sdk'),
-(19, 'io.adjoe.sdk');
+(19, 'io.adjoe.sdk'),
+(8, 'com.vungle.ads'),
+(20, 'com.digitalturbine');
