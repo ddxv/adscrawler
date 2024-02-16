@@ -9,7 +9,12 @@ INSERT INTO trackers (id, name) VALUES
 (8, 'Tenjin'),
 (9, 'AirBridge'),
 (10, 'No Trackers Found'),
-(11, 'WanMei 完美');
+(11, 'WanMei 完美'),
+(12, 'Branch'),
+(13, 'Salesforce'),
+(14, 'Singular'),
+(15, 'GameAnalytics'),
+(16, 'Ogury');
 
 INSERT INTO networks (id, name) VALUES
 (1, 'Google AdMob'),
@@ -31,7 +36,15 @@ INSERT INTO networks (id, name) VALUES
 (17, 'No Ad Network Detected'),
 (18, 'VK'),
 (19, 'AdJoe'),
-(20, 'Digital Turbine');
+(20, 'Digital Turbine'),
+(21, 'BIGO Ads'),
+(22, 'Tempo Platform'),
+(23, 'VOODOO'),
+(24, 'Smaato'),
+(25, 'Appodeal'),
+(26, 'LiftOff'),
+(27, 'PubNative'),
+(28, 'BidMachine');
 
 
 INSERT INTO public.tracker_package_map (tracker, package_pattern) VALUES
@@ -44,7 +57,11 @@ INSERT INTO public.tracker_package_map (tracker, package_pattern) VALUES
 (4, 'com.adjust.android.sdk'),
 (5, 'com.facebook.appevents'),
 (5, 'com.facebook.marketing'),
-(5, 'com.facebook.CampaignTrackingReceiver');
+(5, 'com.facebook.CampaignTrackingReceiver'),
+(12, 'io.branch.sdk'),
+(13, 'com.salesforce.marketingcloud'),
+(15, 'com.gameanalytics.sdk'),
+(16, 'com.ogury');
 
 INSERT INTO public.tracker_package_map (tracker, package_pattern) VALUES
 (6, 'com.google.android.apps.analytics'),
@@ -56,7 +73,8 @@ INSERT INTO public.tracker_package_map (tracker, package_pattern) VALUES
 (8, 'com.tenjin.android'),
 (9, 'io.airbridge'),
 (11, 'com.wpsdk'),
-(1, 'com.google.firebase');
+(1, 'com.google.firebase'),
+(14, 'com.singular.sdk');
 
 
 INSERT INTO public.network_package_map (network, package_pattern) VALUES
@@ -69,7 +87,15 @@ INSERT INTO public.network_package_map (network, package_pattern) VALUES
 (2, 'com.ironsource'),
 (3, 'com.unity3d.services'),
 (3, 'com.unity3d.ads'),
-(4, 'com.applovin');
+(4, 'com.applovin'),
+(21, 'sg.bigo.ads.'),
+(22, 'com.tempoplatform.ads'),
+(23, 'io.voodoo.adn'),
+(24, 'com.smaato.sdk'),
+(25, 'io.presage'),
+(26, 'io.liftoff.liftoffads'),
+(27, 'net.pubnative'),
+(28, 'io.bidmachine');
 
 INSERT INTO public.network_package_map (network, package_pattern) VALUES
 (5, 'com.facebook.ads'),
@@ -80,6 +106,8 @@ INSERT INTO public.network_package_map (network, package_pattern) VALUES
 (8, 'com.vungle.publisher'),
 (8, 'com.vungle.warren'),
 (9, 'com.amazon.device.ads'),
+(9, 'com.amazon.aps.ads'),
+(4, 'applovin.sdk.key'),
 (10, 'com.onesignal'),
 (11, 'com.flurry'),
 (5, 'com.facebook.sdk.ApplicationId');
