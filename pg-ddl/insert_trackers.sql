@@ -14,7 +14,9 @@ INSERT INTO trackers (id, name) VALUES
 (13, 'Salesforce'),
 (14, 'Singular'),
 (15, 'GameAnalytics'),
-(16, 'Ogury');
+(16, 'Ogury'),
+(17, 'Airship'),
+(18, 'InMarket');
 
 INSERT INTO networks (id, name) VALUES
 (1, 'Google AdMob'),
@@ -44,7 +46,8 @@ INSERT INTO networks (id, name) VALUES
 (25, 'Appodeal'),
 (26, 'LiftOff'),
 (27, 'PubNative'),
-(28, 'BidMachine');
+(28, 'BidMachine'),
+(29, 'AyeT Studios');
 
 
 INSERT INTO public.tracker_package_map (tracker, package_pattern) VALUES
@@ -61,7 +64,9 @@ INSERT INTO public.tracker_package_map (tracker, package_pattern) VALUES
 (12, 'io.branch.sdk'),
 (13, 'com.salesforce.marketingcloud'),
 (15, 'com.gameanalytics.sdk'),
-(16, 'com.ogury');
+(16, 'com.ogury'),
+(17, 'com.urbanairship'),
+(18, 'com.inmarket.m2m');
 
 INSERT INTO public.tracker_package_map (tracker, package_pattern) VALUES
 (6, 'com.google.android.apps.analytics'),
@@ -95,7 +100,9 @@ INSERT INTO public.network_package_map (network, package_pattern) VALUES
 (25, 'io.presage'),
 (26, 'io.liftoff.liftoffads'),
 (27, 'net.pubnative'),
-(28, 'io.bidmachine');
+(28, 'io.bidmachine'),
+(6, 'com.aerserv.sdk'),
+(29, 'com.ayetstudios');
 
 INSERT INTO public.network_package_map (network, package_pattern) VALUES
 (5, 'com.facebook.ads'),
