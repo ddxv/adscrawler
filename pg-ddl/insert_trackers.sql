@@ -14,9 +14,9 @@ INSERT INTO trackers (id, name) VALUES
 (13, 'Salesforce'),
 (14, 'Singular'),
 (15, 'GameAnalytics'),
-(16, 'Ogury'),
 (17, 'Airship'),
-(18, 'InMarket');
+(18, 'InMarket'),
+(19, 'SFBX');
 
 INSERT INTO networks (id, name) VALUES
 (1, 'Google AdMob'),
@@ -47,7 +47,11 @@ INSERT INTO networks (id, name) VALUES
 (26, 'LiftOff'),
 (27, 'PubNative'),
 (28, 'BidMachine'),
-(29, 'AyeT Studios');
+(29, 'AyeT Studios'),
+(30, 'Super Awesome'),
+(31, 'Kidoz'),
+(32, 'Yandex'),
+(33, 'Ogury');
 
 
 INSERT INTO public.tracker_package_map (tracker, package_pattern) VALUES
@@ -64,9 +68,9 @@ INSERT INTO public.tracker_package_map (tracker, package_pattern) VALUES
 (12, 'io.branch.sdk'),
 (13, 'com.salesforce.marketingcloud'),
 (15, 'com.gameanalytics.sdk'),
-(16, 'com.ogury'),
 (17, 'com.urbanairship'),
-(18, 'com.inmarket.m2m');
+(18, 'com.inmarket.m2m'),
+(19, 'com.sfbx.appconsentv3');
 
 INSERT INTO public.tracker_package_map (tracker, package_pattern) VALUES
 (6, 'com.google.android.apps.analytics'),
@@ -79,7 +83,8 @@ INSERT INTO public.tracker_package_map (tracker, package_pattern) VALUES
 (9, 'io.airbridge'),
 (11, 'com.wpsdk'),
 (1, 'com.google.firebase'),
-(14, 'com.singular.sdk');
+(14, 'com.singular.sdk'),
+(14, 'com.singular.preinstall');
 
 
 INSERT INTO public.network_package_map (network, package_pattern) VALUES
@@ -102,7 +107,13 @@ INSERT INTO public.network_package_map (network, package_pattern) VALUES
 (27, 'net.pubnative'),
 (28, 'io.bidmachine'),
 (6, 'com.aerserv.sdk'),
-(29, 'com.ayetstudios');
+(29, 'com.ayetstudios'),
+(30, 'tv.superawesome.sdk'),
+(31, 'com.kidoz.sdk.api'),
+(32, 'com.yandex.mobile.ads'),
+(33, 'io.presage.interstitial'),
+(33, 'com.ogury');
+
 
 INSERT INTO public.network_package_map (network, package_pattern) VALUES
 (5, 'com.facebook.ads'),
