@@ -43,3 +43,5 @@ CREATE TABLE adtech.sdk_packages (
         REFERENCES adtech.companies(id),
     CONSTRAINT unique_package_pattern UNIQUE (package_pattern)
 );
+
+CREATE INDEX ON adtech.sdk_packages (package_pattern);
