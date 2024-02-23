@@ -244,4 +244,4 @@ WITH DATA;
 
 DROP INDEX IF EXISTS idx_store_apps_history_change;
 CREATE UNIQUE INDEX idx_store_apps_history_change
-ON store_apps_country_history (week_start, store_app, country);
+ON store_apps_history_change (week_start, store_app, country);
