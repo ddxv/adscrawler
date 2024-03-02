@@ -142,7 +142,7 @@ ON
 adtech.companies_by_d30_counts (company_name);
 
 
-CREATE MATERIALIZED VIEW companies_parent_by_d30_counts AS
+CREATE MATERIALIZED VIEW adtech.companies_parent_by_d30_counts AS
 WITH totals AS (
     SELECT
         SUM(avg_daily_installs_diff * 7) AS installs,
