@@ -1,5 +1,6 @@
 """Download an APK and extract it's manifest."""
 
+import argparse
 import os
 import pathlib
 from xml.etree import ElementTree
@@ -121,6 +122,12 @@ def xml_to_dataframe(root: ElementTree.Element) -> pd.DataFrame:
     return df
 
 
+def download_and_unpack(store_id: str) -> None:
+    apk_path = pathlib.Path(APKS_DIR, f"{store_id}.apk")
+    download(store_id=store_id, do_redownload=False)
+    unzip_apk(apk_path=apk_path)
+
+
 def manifest_main(
     database_connection: PostgresCon, number_of_apps_to_pull: int = 20
 ) -> None:
@@ -142,8 +149,7 @@ def manifest_main(
         details_df = row.to_frame().T
         apk_path = pathlib.Path(APKS_DIR, f"{store_id}.apk")
         try:
-            download(store_id=store_id, do_redownload=False)
-            unzip_apk(apk_path=apk_path)
+            download_and_unpack(store_id=store_id)
             version_int = get_version()
             manifest_str, details_df = get_parsed_manifest()
             crawl_result = 1
@@ -205,3 +211,29 @@ def manifest_main(
             key_columns=["version_code"],
             insert_columns=["version_code", "manifest_string"],
         )
+
+
+def parse_args() -> argparse.Namespace:
+    """Check passed args.
+
+    will check for command line --store-id in the form of com.example.app
+    """
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "-s",
+        "--store-id",
+        help="Store id to download, ie -s 'org.moire.opensudoku'",
+    )
+    args, leftovers = parser.parse_known_args()
+    return args
+
+
+def main(args: argparse.Namespace) -> None:
+    """Download APK to local directory and exit."""
+    store_id = args.store_id
+    download_and_unpack(store_id=store_id)
+
+
+if __name__ == "__main__":
+    args = parse_args()
+    main(args)
