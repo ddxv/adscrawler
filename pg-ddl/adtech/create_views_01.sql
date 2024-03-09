@@ -161,7 +161,7 @@ WITH totals AS (
 company_installs AS (
     SELECT
         COALESCE(
-            pc.parent_company_id,
+            pc.id,
             c.id
         ) AS self_or_parent_id,
         SUM(hist.avg_daily_installs_diff * 7) AS installs,
