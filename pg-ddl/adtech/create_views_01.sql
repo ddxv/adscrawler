@@ -160,6 +160,7 @@ WITH totals AS (
 
 company_installs AS (
     SELECT
+        cats.category_id,
         COALESCE(
             pc.id,
             c.id
@@ -192,10 +193,14 @@ company_installs AS (
     LEFT JOIN adtech.companies AS pc
         ON
             c.parent_company_id = pc.id
+    LEFT JOIN adtech.company_categories AS cats
+        ON
+            sac.company_id = cats.company_id
     WHERE
         hist.week_start >= CURRENT_DATE - INTERVAL '30 days'
     GROUP BY
-        self_or_parent_id
+        self_or_parent_id,
+        cats.category_id
     ORDER BY
         installs DESC
 )
@@ -203,8 +208,8 @@ company_installs AS (
 SELECT
     ci.self_or_parent_id AS company_id,
     com.name AS company_name,
-    ccat.category_id,
-    cat.name AS category_name,
+    ci.category_id,
+    --    ci.name AS category_name,
     ci.installs,
     ci.ratings,
     ci.total_installs,
@@ -215,9 +220,6 @@ FROM
 LEFT JOIN adtech.company_categories AS ccat
     ON
         ci.self_or_parent_id = ccat.company_id
-LEFT JOIN adtech.categories AS cat
-    ON
-        ccat.category_id = cat.id
 LEFT JOIN adtech.companies AS com
     ON
         ci.self_or_parent_id = com.id
