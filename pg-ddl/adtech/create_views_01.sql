@@ -16,26 +16,35 @@ WITH latest_version_codes AS (
 apps_with_companies AS (
     SELECT DISTINCT
         vc.store_app,
-        tm.company_id
+        tm.company_id,
+        COALESCE(
+            pc.parent_company_id,
+            tm.company_id
+        ) AS parent_id
     FROM
         latest_version_codes AS vc
     LEFT JOIN public.version_details AS vd
         ON
             vc.id = vd.version_code
-    INNER JOIN adtech.sdk_packages AS tm ON
-        vd.android_name ILIKE tm.package_pattern || '%'
+    INNER JOIN adtech.sdk_packages AS tm
+        ON
+            vd.android_name ILIKE tm.package_pattern || '%'
+    LEFT JOIN adtech.companies AS pc ON
+        tm.company_id = pc.id
 )
 
 SELECT
     awc.store_app,
-    awc.company_id
+    awc.company_id,
+    awc.parent_id
 FROM
     apps_with_companies AS awc
 UNION ALL
 SELECT
     vc.store_app,
     -- Note: 10 is tracker db id for no network found
-    10 AS company_id
+    10 AS company_id,
+    NULL AS parent_id
 FROM
     latest_version_codes AS vc
 WHERE
@@ -47,10 +56,10 @@ WHERE
 WITH DATA;
 
 
+
 DROP INDEX IF EXISTS idx_store_apps_companies;
 CREATE UNIQUE INDEX idx_store_apps_companies
 ON adtech.store_apps_companies (store_app, company_id);
-
 
 
 CREATE MATERIALIZED VIEW adtech.companies_by_d30_counts AS
@@ -142,6 +151,7 @@ ON
 adtech.companies_by_d30_counts (company_name);
 
 
+
 CREATE MATERIALIZED VIEW adtech.companies_parent_by_d30_counts AS
 WITH totals AS (
     SELECT
@@ -158,13 +168,22 @@ WITH totals AS (
         )
 ),
 
+store_apps_parent_companies AS (
+    SELECT DISTINCT
+        sac.store_app,
+        sac.parent_id,
+        cats.category_id
+    FROM
+        adtech.store_apps_companies AS sac
+    LEFT JOIN adtech.company_categories AS cats
+        ON
+            sac.company_id = cats.company_id
+),
+
 company_installs AS (
     SELECT
-        cats.category_id,
-        COALESCE(
-            pc.id,
-            c.id
-        ) AS self_or_parent_id,
+        sac.category_id,
+        sac.parent_id,
         SUM(hist.avg_daily_installs_diff * 7) AS installs,
         SUM(hist.rating_count_diff * 7) AS ratings,
         (
@@ -184,29 +203,23 @@ company_installs AS (
         ) AS total_installs_percent
     FROM
         store_apps_history_change AS hist
-    INNER JOIN adtech.store_apps_companies AS sac
+    INNER JOIN store_apps_parent_companies AS sac
         ON
             hist.store_app = sac.store_app
-    LEFT JOIN adtech.companies AS c
-        ON
-            sac.company_id = c.id
-    LEFT JOIN adtech.companies AS pc
-        ON
-            c.parent_company_id = pc.id
-    LEFT JOIN adtech.company_categories AS cats
-        ON
-            sac.company_id = cats.company_id
+    --    LEFT JOIN adtech.company_categories AS cats
+    --        ON
+    --            sac.company_id = cats.company_id
     WHERE
         hist.week_start >= CURRENT_DATE - INTERVAL '30 days'
     GROUP BY
-        self_or_parent_id,
-        cats.category_id
+        sac.parent_id,
+        sac.category_id
     ORDER BY
         installs DESC
 )
 
 SELECT
-    ci.self_or_parent_id AS company_id,
+    ci.parent_id AS company_id,
     com.name AS company_name,
     ci.category_id,
     --    ci.name AS category_name,
@@ -217,13 +230,11 @@ SELECT
     ci.total_ratings_percent
 FROM
     company_installs AS ci
-LEFT JOIN adtech.company_categories AS ccat
-    ON
-        ci.self_or_parent_id = ccat.company_id
 LEFT JOIN adtech.companies AS com
     ON
-        ci.self_or_parent_id = com.id
+        ci.parent_id = com.id
 WITH DATA;
+
 
 -- DROP INDEX IF EXISTS adtech.companies_d30_counts_idx;
 CREATE UNIQUE INDEX companies_parent_d30_counts_idx
