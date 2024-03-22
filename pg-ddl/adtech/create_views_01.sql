@@ -80,6 +80,7 @@ WITH totals AS (
 
 company_installs AS (
     SELECT
+        cm.mapped_category,
         sac.company_id,
         c.name,
         c.parent_company_id,
@@ -112,9 +113,16 @@ company_installs AS (
     LEFT JOIN adtech.companies AS pc
         ON
             c.parent_company_id = pc.id
+    LEFT JOIN store_apps AS sa
+        ON
+            sac.store_app = sa.id
+    LEFT JOIN category_mapping AS cm
+        ON
+            sa.category = cm.original_category
     WHERE
         hist.week_start >= CURRENT_DATE - INTERVAL '30 days'
     GROUP BY
+        cm.mapped_category,
         sac.company_id,
         c.name,
         c.parent_company_id,
@@ -124,6 +132,7 @@ company_installs AS (
 )
 
 SELECT
+    ci.mapped_category,
     ci.company_id,
     ci.name AS company_name,
     ci.parent_company_name,
@@ -182,6 +191,7 @@ store_apps_parent_companies AS (
 
 company_installs AS (
     SELECT
+        cm.mapped_category,
         sac.category_id,
         sac.parent_id,
         SUM(hist.avg_daily_installs_diff * 7) AS installs,
@@ -209,9 +219,16 @@ company_installs AS (
     --    LEFT JOIN adtech.company_categories AS cats
     --        ON
     --            sac.company_id = cats.company_id
+    LEFT JOIN store_apps AS sa
+        ON
+            sac.store_app = sa.id
+    LEFT JOIN category_mapping AS cm
+        ON
+            sa.category = cm.original_category
     WHERE
         hist.week_start >= CURRENT_DATE - INTERVAL '30 days'
     GROUP BY
+        cm.mapped_category,
         sac.parent_id,
         sac.category_id
     ORDER BY
@@ -219,6 +236,7 @@ company_installs AS (
 )
 
 SELECT
+    ci.mapped_category,
     ci.parent_id AS company_id,
     com.name AS company_name,
     ci.category_id,
