@@ -62,46 +62,45 @@ CREATE UNIQUE INDEX idx_store_apps_companies
 ON adtech.store_apps_companies (store_app, company_id);
 
 
+
 CREATE MATERIALIZED VIEW adtech.companies_by_d30_counts AS
 WITH totals AS (
     SELECT
+        cm.mapped_category,
         SUM(avg_daily_installs_diff * 7) AS installs,
         SUM(rating_count_diff * 7) AS ratings
     FROM
-        store_apps_history_change
+        store_apps_history_change sahc
+    LEFT JOIN store_apps AS sa
+        ON
+            sahc.store_app = sa.id
+    LEFT JOIN category_mapping AS cm
+        ON
+            sa.category = cm.original_category
     WHERE
         week_start >= CURRENT_DATE - INTERVAL '30 days'
         AND store_app IN (
-            SELECT DISTINCT store_app
+            SELECT
+                DISTINCT store_app
             FROM
                 adtech.store_apps_companies
         )
+    GROUP BY
+        mapped_category
 ),
-
 company_installs AS (
     SELECT
         cm.mapped_category,
         sac.company_id,
         c.name,
         c.parent_company_id,
-        pc.name AS parent_company_name,
+        COALESCE (
+            pc.name,
+            c.name
+        ) AS parent_company_name,
         SUM(hist.avg_daily_installs_diff * 7) AS installs,
         SUM(hist.rating_count_diff * 7) AS ratings,
-        (
-            SELECT installs
-            FROM
-                totals
-        ) AS total_installs,
-        SUM(hist.rating_count_diff * 7) / (
-            SELECT ratings
-            FROM
-                totals
-        ) AS total_ratings_percent,
-        SUM(hist.avg_daily_installs_diff * 7) / (
-            SELECT installs
-            FROM
-                totals
-        ) AS total_installs_percent
+        COUNT(DISTINCT sac.store_app) AS app_count
     FROM
         store_apps_history_change AS hist
     INNER JOIN adtech.store_apps_companies AS sac
@@ -130,7 +129,6 @@ company_installs AS (
     ORDER BY
         installs DESC
 )
-
 SELECT
     ci.mapped_category,
     ci.company_id,
@@ -140,9 +138,10 @@ SELECT
     cat.name AS category_name,
     ci.installs,
     ci.ratings,
-    ci.total_installs,
-    ci.total_installs_percent,
-    ci.total_ratings_percent
+    ci.app_count,
+    t.installs AS total_installs,
+    ci.ratings / t.ratings AS total_ratings_percent,
+    ci.installs / t.installs AS total_installs_percent
 FROM
     company_installs AS ci
 LEFT JOIN adtech.company_categories AS ccat
@@ -151,7 +150,11 @@ LEFT JOIN adtech.company_categories AS ccat
 LEFT JOIN adtech.categories AS cat
     ON
         ccat.category_id = cat.id
-WITH DATA;
+LEFT JOIN totals t ON
+    ci.mapped_category = t.mapped_category
+        WITH DATA;
+
+
 
 
 -- DROP INDEX IF EXISTS adtech.companies_d30_counts_idx;
@@ -159,26 +162,34 @@ CREATE UNIQUE INDEX companies_d30_counts_idx
 ON
 adtech.companies_by_d30_counts (company_name);
 
-
-
 CREATE MATERIALIZED VIEW adtech.companies_parent_by_d30_counts AS
 WITH totals AS (
     SELECT
+        cm.mapped_category,
         SUM(avg_daily_installs_diff * 7) AS installs,
         SUM(rating_count_diff * 7) AS ratings
     FROM
-        store_apps_history_change
+        store_apps_history_change sahc
+    LEFT JOIN store_apps AS sa
+        ON
+            sahc.store_app = sa.id
+    LEFT JOIN category_mapping AS cm
+        ON
+            sa.category = cm.original_category
     WHERE
         week_start >= CURRENT_DATE - INTERVAL '30 days'
         AND store_app IN (
-            SELECT DISTINCT store_app
+            SELECT
+                DISTINCT store_app
             FROM
                 adtech.store_apps_companies
         )
+    GROUP BY
+        mapped_category
 ),
-
 store_apps_parent_companies AS (
-    SELECT DISTINCT
+    SELECT
+        DISTINCT
         sac.store_app,
         sac.parent_id,
         cats.category_id
@@ -188,7 +199,6 @@ store_apps_parent_companies AS (
         ON
             sac.company_id = cats.company_id
 ),
-
 company_installs AS (
     SELECT
         cm.mapped_category,
@@ -196,45 +206,30 @@ company_installs AS (
         sac.parent_id,
         SUM(hist.avg_daily_installs_diff * 7) AS installs,
         SUM(hist.rating_count_diff * 7) AS ratings,
-        (
-            SELECT installs
-            FROM
-                totals
-        ) AS total_installs,
-        SUM(hist.rating_count_diff * 7) / (
-            SELECT ratings
-            FROM
-                totals
-        ) AS total_ratings_percent,
-        SUM(hist.avg_daily_installs_diff * 7) / (
-            SELECT installs
-            FROM
-                totals
-        ) AS total_installs_percent
-    FROM
+        COUNT(DISTINCT sac.store_app) AS app_count
+FROM
         store_apps_history_change AS hist
-    INNER JOIN store_apps_parent_companies AS sac
+INNER JOIN store_apps_parent_companies AS sac
         ON
             hist.store_app = sac.store_app
-    --    LEFT JOIN adtech.company_categories AS cats
-    --        ON
-    --            sac.company_id = cats.company_id
-    LEFT JOIN store_apps AS sa
+--    LEFT JOIN adtech.company_categories AS cats
+--        ON
+--            sac.company_id = cats.company_id
+LEFT JOIN store_apps AS sa
         ON
             sac.store_app = sa.id
-    LEFT JOIN category_mapping AS cm
+LEFT JOIN category_mapping AS cm
         ON
             sa.category = cm.original_category
-    WHERE
+WHERE
         hist.week_start >= CURRENT_DATE - INTERVAL '30 days'
-    GROUP BY
+GROUP BY
         cm.mapped_category,
         sac.parent_id,
         sac.category_id
-    ORDER BY
+ORDER BY
         installs DESC
 )
-
 SELECT
     ci.mapped_category,
     ci.parent_id AS company_id,
@@ -243,15 +238,19 @@ SELECT
     --    ci.name AS category_name,
     ci.installs,
     ci.ratings,
-    ci.total_installs,
-    ci.total_installs_percent,
-    ci.total_ratings_percent
+    ci.app_count,
+    t.installs AS total_installs,
+    ci.ratings / t.ratings AS total_ratings_percent,
+    ci.installs / t.installs AS total_installs_percent
 FROM
     company_installs AS ci
 LEFT JOIN adtech.companies AS com
     ON
         ci.parent_id = com.id
+LEFT JOIN totals t ON
+    ci.mapped_category = t.mapped_category
 WITH DATA;
+
 
 
 -- DROP INDEX IF EXISTS adtech.companies_d30_counts_idx;
