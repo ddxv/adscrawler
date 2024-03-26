@@ -126,6 +126,9 @@ CREATE INDEX store_apps_store_id_idx ON public.store_apps USING btree (
 CREATE INDEX store_apps_name_idx ON store_apps USING gin (
     to_tsvector('simple', name)
 );
+CREATE INDEX store_apps_developer_idx ON public.store_apps USING btree (
+    developer
+);
 
 
 
