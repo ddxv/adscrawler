@@ -89,8 +89,9 @@ INSERT INTO adtech.companies (id, "name", parent_company_id) VALUES
 (83, 'Didomi', NULL),
 (84, 'Amplitude', NULL),
 (85, 'Mixpanel', NULL),
-(86, 'Mopub', 4),
-(87, 'Sentry.io');
+(86, 'Mopub', 4, NULL),
+(87, 'Sentry.io', NULL),
+(88, 'RevenueCat', NULL);
 
 
 
@@ -176,7 +177,8 @@ INSERT INTO adtech.company_categories (company_id, category_id) VALUES
 (79, 2),
 (80, 2),
 (86, 1),
-(87, 2);
+(87, 2),
+(88, 2);
 
 
 
@@ -292,4 +294,5 @@ INSERT INTO adtech.sdk_packages (company_id, package_pattern) VALUES
 (60, 'com.huawei.hms.location'),
 (86, 'com.mopub'),
 (87, 'io.sentry'),
-(87, 'com.joshdholtz.sentry');
+(87, 'com.joshdholtz.sentry'),
+(88, 'com.revenuecat');
