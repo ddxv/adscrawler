@@ -81,7 +81,16 @@ INSERT INTO adtech.companies (id, "name", parent_company_id) VALUES
 (75, 'Gimbal', NULL),
 (76, 'AppLike', NULL),
 (77, 'JustTrack', 76),
-(78, 'LeanPlum', 72);
+(78, 'LeanPlum', 72),
+(79, 'LiveRamp', NULL),
+(80, 'Dynata', NULL),
+(81, 'InBrain', 80),
+(82, 'RenRen', NULL),
+(83, 'Didomi', NULL),
+(84, 'Amplitude', NULL),
+(85, 'Mixpanel', NULL),
+(86, 'Mopub', 4),
+(87, 'Sentry.io');
 
 
 
@@ -163,7 +172,11 @@ INSERT INTO adtech.company_categories (company_id, category_id) VALUES
 (75, 2),
 (76, 1),
 (77, 2),
-(78, 2);
+(78, 2),
+(79, 2),
+(80, 2),
+(86, 1),
+(87, 2);
 
 
 
@@ -273,4 +286,10 @@ INSERT INTO adtech.sdk_packages (company_id, package_pattern) VALUES
 (75, 'com.gimbal'),
 (76, 'de.mcoins.applike'),
 (77, 'io.justtrack'),
-(78, 'com.leanplum');
+(78, 'com.leanplum'),
+(84, 'com.amplitude'),
+(85, 'com.mixpanel'),
+(60, 'com.huawei.hms.location'),
+(86, 'com.mopub'),
+(87, 'io.sentry'),
+(87, 'com.joshdholtz.sentry');
