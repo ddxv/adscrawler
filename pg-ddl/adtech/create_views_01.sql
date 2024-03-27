@@ -79,21 +79,21 @@ WITH cat_hist_totals AS (
     WHERE
         sahc.week_start >= CURRENT_DATE - INTERVAL '30 days'
         AND sahc.store_app IN (
-            SELECT
-                DISTINCT store_app
+            SELECT DISTINCT store_app
             FROM
                 adtech.store_apps_companies
         )
     GROUP BY
         cm.mapped_category
 ),
+
 cat_app_totals AS (
     SELECT
-        count(DISTINCT sac.store_app) category_total_apps,
-        sum(sa.installs) AS alltime_installs,
-        cm.mapped_category
+        cm.mapped_category,
+        COUNT(DISTINCT sac.store_app) AS category_total_apps,
+        SUM(sa.installs) AS alltime_installs
     FROM
-        adtech.store_apps_companies sac
+        adtech.store_apps_companies AS sac
     LEFT JOIN store_apps AS sa
         ON
             sac.store_app = sa.id
@@ -103,6 +103,7 @@ cat_app_totals AS (
     GROUP BY
         mapped_category
 ),
+
 company_installs AS (
     SELECT
         cm.mapped_category,
@@ -121,7 +122,7 @@ company_installs AS (
     LEFT JOIN
         store_apps_history_change AS hist
         ON
-            hist.store_app = sac.store_app
+            sac.store_app = hist.store_app
     LEFT JOIN adtech.companies AS c
         ON
             sac.company_id = c.id
@@ -146,6 +147,7 @@ company_installs AS (
     ORDER BY
         installs DESC
 )
+
 SELECT
     ci.mapped_category,
     ci.company_id,
@@ -157,8 +159,8 @@ SELECT
     ci.ratings,
     ci.app_count,
     ct.category_total_apps,
-    ci.app_count::float / ct.category_total_apps AS app_count_percent,
     t.installs AS total_installs,
+    ci.app_count::FLOAT / ct.category_total_apps AS app_count_percent,
     ci.ratings / t.ratings AS total_ratings_percent,
     ci.installs / t.installs AS total_installs_percent
 FROM
@@ -176,7 +178,7 @@ LEFT JOIN cat_app_totals AS ct
     ON
         ci.mapped_category = ct.mapped_category
 WHERE
-    ci.installs IS NOT NULL 
+    ci.installs IS NOT NULL
 WITH DATA;
 
 
@@ -210,6 +212,7 @@ WITH cat_hist_totals AS (
     GROUP BY
         cm.mapped_category
 ),
+
 cat_app_totals AS (
     SELECT
         cm.mapped_category,
@@ -226,9 +229,9 @@ cat_app_totals AS (
     GROUP BY
         cm.mapped_category
 ),
+
 store_apps_parent_companies AS (
-    SELECT
-        DISTINCT
+    SELECT DISTINCT
         sac.store_app,
         sac.parent_id,
         cats.category_id
@@ -238,6 +241,7 @@ store_apps_parent_companies AS (
         ON
             sac.company_id = cats.company_id
 ),
+
 company_installs AS (
     SELECT
         cm.mapped_category,
@@ -251,7 +255,7 @@ company_installs AS (
     LEFT JOIN
         store_apps_history_change AS hist
         ON
-            hist.store_app = sac.store_app
+            sac.store_app = hist.store_app
     LEFT JOIN store_apps AS sa
         ON
             sac.store_app = sa.id
@@ -268,6 +272,7 @@ company_installs AS (
     ORDER BY
         installs DESC
 )
+
 SELECT
     ci.mapped_category,
     ci.parent_id AS company_id,
