@@ -39,7 +39,7 @@ SELECT
     awc.parent_id
 FROM
     apps_with_companies AS awc
-UNION ALL
+UNION
 SELECT
     vc.store_app,
     -- Note: 10 is tracker db id for no network found
@@ -59,7 +59,7 @@ WITH DATA;
 
 DROP INDEX IF EXISTS idx_store_apps_companies;
 CREATE UNIQUE INDEX idx_store_apps_companies
-ON adtech.store_apps_companies (store_app, company_id);
+ON adtech.store_apps_companies (store_app, company_id, parent_id);
 
 
 CREATE MATERIALIZED VIEW adtech.companies_by_d30_counts AS
@@ -101,7 +101,7 @@ cat_app_totals AS (
         ON
             sa.category = cm.original_category
     GROUP BY
-        mapped_category
+        cm.mapped_category
 ),
 
 company_installs AS (
@@ -185,7 +185,8 @@ WITH DATA;
 -- DROP INDEX IF EXISTS adtech.companies_d30_counts_idx;
 CREATE UNIQUE INDEX companies_d30_counts_idx
 ON
-adtech.companies_by_d30_counts (company_name);
+adtech.companies_by_d30_counts (mapped_category, category_id, company_name);
+
 
 
 CREATE MATERIALIZED VIEW adtech.companies_parent_by_d30_counts AS
@@ -303,7 +304,8 @@ WITH DATA;
 
 
 
--- DROP INDEX IF EXISTS adtech.companies_d30_counts_idx;
 CREATE UNIQUE INDEX companies_parent_d30_counts_idx
 ON
-adtech.companies_parent_by_d30_counts (company_name);
+adtech.companies_parent_by_d30_counts (
+    mapped_category, category_id, company_name
+);
