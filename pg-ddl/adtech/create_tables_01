@@ -45,3 +45,11 @@ CREATE TABLE adtech.sdk_packages (
 );
 
 CREATE INDEX ON adtech.sdk_packages (package_pattern);
+
+
+CREATE TABLE adtech.company_developers (
+    company_id int4 NOT NULL,
+    developer_id int4 NOT NULL,
+    CONSTRAINT company_developers_pkey PRIMARY KEY (company_id, developer_id),
+    CONSTRAINT fk_company_developers_category FOREIGN KEY (developer_id) REFERENCES public.developers(id)
+);

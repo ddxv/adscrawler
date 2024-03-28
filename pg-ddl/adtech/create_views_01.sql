@@ -13,7 +13,7 @@ WITH latest_version_codes AS (
         store_app
 ),
 
-apps_with_companies AS (
+sdk_apps_with_companies AS (
     SELECT DISTINCT
         vc.store_app,
         tm.company_id,
@@ -31,14 +31,38 @@ apps_with_companies AS (
             vd.android_name ILIKE tm.package_pattern || '%'
     LEFT JOIN adtech.companies AS pc ON
         tm.company_id = pc.id
+),
+
+dev_apps_with_companies AS (
+    SELECT DISTINCT
+        sa.id AS store_app,
+        cd.company_id,
+        COALESCE(
+            pc.parent_company_id,
+            cd.company_id
+        ) AS parent_id
+    FROM
+        adtech.company_developers AS cd
+    LEFT JOIN public.store_apps AS sa
+        ON
+            cd.developer_id = sa.developer
+    LEFT JOIN adtech.companies AS pc ON
+        cd.company_id = pc.id
 )
 
 SELECT
-    awc.store_app,
-    awc.company_id,
-    awc.parent_id
+    sawc.store_app,
+    sawc.company_id,
+    sawc.parent_id
 FROM
-    apps_with_companies AS awc
+    sdk_apps_with_companies AS sawc
+UNION
+SELECT
+    dawc.store_app,
+    dawc.company_id,
+    dawc.parent_id
+FROM
+    dev_apps_with_companies AS dawc
 UNION
 SELECT
     vc.store_app,
@@ -51,10 +75,15 @@ WHERE
     vc.store_app NOT IN (
         SELECT store_app
         FROM
-            apps_with_companies
+            sdk_apps_with_companies
+    )
+    OR
+    vc.store_app NOT IN (
+        SELECT store_app
+        FROM
+            dev_apps_with_companies
     )
 WITH DATA;
-
 
 
 DROP INDEX IF EXISTS idx_store_apps_companies;

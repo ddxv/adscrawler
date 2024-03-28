@@ -296,3 +296,8 @@ INSERT INTO adtech.sdk_packages (company_id, package_pattern) VALUES
 (87, 'io.sentry'),
 (87, 'com.joshdholtz.sentry'),
 (88, 'com.revenuecat');
+
+
+INSERT INTO adtech.company_developers (company_id, developer_id) VALUES
+(25953, 1),
+(4593191, 1);
