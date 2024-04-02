@@ -18,9 +18,9 @@ def lookupby_id(app_id: str) -> dict:
     if response.status_code != 200:
         logger.error(f"Response code not 200: {response.text}")
     try:
-        resp_dict = response.json()["results"][0]
+        resp_dict:dict = response.json()["results"][0]
     except Exception:
-        logger.error(f"Unable to parse response")
+        logger.error("Unable to parse response")
         resp_dict = {}
     return resp_dict
 
