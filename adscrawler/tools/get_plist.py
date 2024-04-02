@@ -74,7 +74,7 @@ def get_parsed_plist() -> tuple[int, str, pd.DataFrame]:
     return version_int, plist_str, df
 
 
-def get_version_number(root: ElementTree) -> str:
+def get_version_number(root: ElementTree.Element) -> str:
     cf_bundle_version = ""
     for dict_element in root.findall("dict"):
         elements = list(dict_element)  # Convert the iterator to a list to use indexes
@@ -180,6 +180,7 @@ def plist_main(
         store_id = row.store_id
         logger.info(f"{store_id=} start")
         details_df = row.to_frame().T
+        ipa_path = ""
         try:
             bundle_id = download_and_unpack(store_id=store_id)
             ipa_path = pathlib.Path(IPAS_DIR, f"{bundle_id}.ipa")
@@ -209,7 +210,8 @@ def plist_main(
             return_rows=True,
             insert_columns=["store_app", "version_code", "crawl_result"],
         )
-        ipa_path.unlink(missing_ok=True)
+        if ipa_path:
+            ipa_path.unlink(missing_ok=True)
         if crawl_result != 1:
             continue
         upserted = upserted.rename(
