@@ -5,13 +5,13 @@ import os
 import pathlib
 from xml.etree import ElementTree
 
+import numpy as np
 import pandas as pd
 import requests
-import numpy as np
 
+from adscrawler.app_stores.apple import lookupby_id
 from adscrawler.config import MODULE_DIR, get_logger
 from adscrawler.connection import PostgresCon
-from adscrawler.app_stores.apple import lookupby_id
 from adscrawler.queries import get_most_recent_top_ranks, upsert_df
 from adscrawler.tools.download_ipa import download
 
@@ -54,7 +54,7 @@ def unzip_ipa(ipa_path: pathlib.Path) -> None:
     logger.info(f"Output: {result}")
 
 
-def get_parsed_plist() -> tuple[str, pd.DataFrame]:
+def get_parsed_plist() -> tuple[int, str, pd.DataFrame]:
     payload_dir = pathlib.Path(MODULE_DIR, "ipasunzipped/Payload")
     for app_dir in payload_dir.glob("*"):  # '*' will match any directory inside Payload
         plist_info_path = app_dir / "Info.plist"  # Construct the path to plist.Info
@@ -70,33 +70,38 @@ def get_parsed_plist() -> tuple[str, pd.DataFrame]:
     version_int = get_version_number(root)
     df = ipa_xml_to_dataframe(root)
     frameworks_df = ipa_frameworks()
-    df = pd.concat([df,frameworks_df])
+    df = pd.concat([df, frameworks_df])
     return version_int, plist_str, df
 
-def get_version_number(root:ElementTree) -> str:
+
+def get_version_number(root: ElementTree) -> str:
     cf_bundle_version = ""
-    for dict_element in root.findall('dict'):
+    for dict_element in root.findall("dict"):
         elements = list(dict_element)  # Convert the iterator to a list to use indexes
         for i, element in enumerate(elements):
-            if element.tag == 'key' and element.text == 'CFBundleVersion':
+            if element.tag == "key" and element.text == "CFBundleVersion":
                 # Assuming the next element after the key contains the value
                 cf_bundle_version = elements[i + 1].text
-                print('Found CFBundleVersion:', cf_bundle_version)
+                print("Found CFBundleVersion:", cf_bundle_version)
                 break
-    logger.info(f'CFBundleVersion: {cf_bundle_version}')
+    logger.info(f"CFBundleVersion: {cf_bundle_version}")
+
     def version_to_integer(version_str):
-            # Split the version string into its major, minor, and patch components
-            parts = version_str.split('.')
-            if len(parts) != 3:
-                raise ValueError("Version string must have three parts separated by dots (e.g., '1.2.3')")
+        # Split the version string into its major, minor, and patch components
+        parts = version_str.split(".")
+        if len(parts) != 3:
+            raise ValueError(
+                "Version string must have three parts separated by dots (e.g., '1.2.3')"
+            )
 
-            # Convert each part to an integer
-            major, minor, patch = map(int, parts)
+        # Convert each part to an integer
+        major, minor, patch = map(int, parts)
 
-            # Calculate the unique integer representation
-            # Assuming the maximum is 99 for major, 999 for minor, and 999 for patch as discussed
-            # These can be adjusted based on the actual expected range of version numbers
-            return major * 1000000 + minor * 1000 + patch
+        # Calculate the unique integer representation
+        # Assuming the maximum is 99 for major, 999 for minor, and 999 for patch as discussed
+        # These can be adjusted based on the actual expected range of version numbers
+        return major * 1000000 + minor * 1000 + patch
+
     try:
         version_int = int(cf_bundle_version)
     except Exception:
@@ -104,19 +109,22 @@ def get_version_number(root:ElementTree) -> str:
     return version_int
 
 
-def ipa_frameworks()->pd.DataFrame:
+def ipa_frameworks() -> pd.DataFrame:
     """Check for frameworks based on directory names."""
     framework_dirs = []
-    payload_dir = pathlib.Path(UNZIPPED_DIR, 'Payload')
+    payload_dir = pathlib.Path(UNZIPPED_DIR, "Payload")
     if payload_dir.exists():
-        for app_dir in payload_dir.iterdir():  # Assuming the next directory is the app directory
-            frameworks_path = app_dir / 'Frameworks'
+        for (
+            app_dir
+        ) in payload_dir.iterdir():  # Assuming the next directory is the app directory
+            frameworks_path = app_dir / "Frameworks"
             if frameworks_path.exists() and frameworks_path.is_dir():
                 for framework_dir in frameworks_path.iterdir():
                     if framework_dir.is_dir():  # Add only directories
                         framework_dirs.append(framework_dir.name)
-    df = pd.DataFrame({'path':"frameworks", 'value':framework_dirs})
+    df = pd.DataFrame({"path": "frameworks", "value": framework_dirs})
     return df
+
 
 def ipa_xml_to_dataframe(root: ElementTree.Element) -> pd.DataFrame:
     """Flawed process of taking xml and making a dataframe.
@@ -208,7 +216,11 @@ def plist_main(
             columns={"version_code": "original_version_code", "id": "version_code"}
         ).drop("store_app", axis=1)
         details_df = details_df.rename(
-            columns={"path": "xml_path", "version_code": "original_version_code", "value":"value_name"}
+            columns={
+                "path": "xml_path",
+                "version_code": "original_version_code",
+                "value": "value_name",
+            }
         )
         details_df = pd.merge(
             left=details_df,
@@ -217,7 +229,7 @@ def plist_main(
             on=["original_version_code"],
             validate="m:1",
         )
-        details_df['tag'] = np.nan
+        details_df["tag"] = np.nan
         key_insert_columns = ["version_code", "xml_path", "tag", "value_name"]
         details_df = details_df[key_insert_columns].drop_duplicates()
         upsert_df(

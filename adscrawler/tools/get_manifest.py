@@ -185,7 +185,11 @@ def manifest_main(
             columns={"version_code": "original_version_code", "id": "version_code"}
         ).drop("store_app", axis=1)
         details_df = details_df.rename(
-            columns={"path": "xml_path", "version_code": "original_version_code", "android_name":"value_name"}
+            columns={
+                "path": "xml_path",
+                "version_code": "original_version_code",
+                "android_name": "value_name",
+            }
         )
         details_df = pd.merge(
             left=details_df,
