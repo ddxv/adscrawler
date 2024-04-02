@@ -30,6 +30,11 @@ def check_ipa_dir_created() -> None:
             pathlib.Path.mkdir(_dir, exist_ok=True)
 
 
+def ipatool_auth():
+    command = f"ipatool auth login --email {EMAIL} --password {PASSWORD} --non-interactive --keychain-passphrase '{KEYCHAIN_PASSPHRASE}'"
+    result = os.system(command)
+    logger.info(f"ipatool auth result: {result}")
+
 def download(bundle_id: str, do_redownload: bool = False) -> None:
     check_ipa_dir_created()
     filepath = pathlib.Path(IPAS_DIR, f"{bundle_id}.ipa")
@@ -41,4 +46,4 @@ def download(bundle_id: str, do_redownload: bool = False) -> None:
     logger.info(f"Will download {bundle_id}")
     command = f"ipatool download -b '{bundle_id}' -o ipas/{bundle_id}.ipa --keychain-passphrase '{KEYCHAIN_PASSPHRASE}' --non-interactive --purchase"
     result = os.system(command)
-    logger.info(result)
+    logger.info(f"ipatool download result: {result}")
