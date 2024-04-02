@@ -15,6 +15,7 @@ logger = get_logger(__name__)
 # Replace with your email and password
 EMAIL = CONFIG["apple"]["email"]
 PASSWORD = CONFIG["apple"]["password"]
+KEYCHAIN_PASSPHRASE = CONFIG["apple"]["keychain_passphrase"]
 
 
 IPAS_DIR = pathlib.Path(MODULE_DIR, "ipas")
@@ -38,6 +39,6 @@ def download(bundle_id: str, do_redownload: bool = False) -> None:
             logger.info(f"ipa already exists {filepath=}, skipping")
             return
     logger.info(f"Will download {bundle_id}")
-    command = f"ipatool download -b '{bundle_id}' -o ipas/{bundle_id}.ipa"
+    command = f"ipatool download -b '{bundle_id}' -o ipas/{bundle_id}.ipa --keychain-passphrase '{KEYCHAIN_PASSPHRASE}' --non-interactive"
     result = os.system(command)
     logger.info(result)
