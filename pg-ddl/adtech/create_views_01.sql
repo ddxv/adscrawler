@@ -28,7 +28,7 @@ sdk_apps_with_companies AS (
             vc.id = vd.version_code
     INNER JOIN adtech.sdk_packages AS tm
         ON
-            vd.android_name ILIKE tm.package_pattern || '%'
+            vd.value_name ILIKE tm.package_pattern || '%'
     LEFT JOIN adtech.companies AS pc ON
         tm.company_id = pc.id
 ),

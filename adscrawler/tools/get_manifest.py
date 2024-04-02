@@ -34,6 +34,7 @@ def empty_folder(pth: pathlib.Path) -> None:
     for sub in pth.iterdir():
         if sub.is_dir():
             empty_folder(sub)
+            os.rmdir(sub)
         else:
             sub.unlink()
 
@@ -184,7 +185,7 @@ def manifest_main(
             columns={"version_code": "original_version_code", "id": "version_code"}
         ).drop("store_app", axis=1)
         details_df = details_df.rename(
-            columns={"path": "xml_path", "version_code": "original_version_code"}
+            columns={"path": "xml_path", "version_code": "original_version_code", "android_name":"value_name"}
         )
         details_df = pd.merge(
             left=details_df,
@@ -193,7 +194,7 @@ def manifest_main(
             on=["original_version_code"],
             validate="m:1",
         )
-        key_insert_columns = ["version_code", "xml_path", "tag", "android_name"]
+        key_insert_columns = ["version_code", "xml_path", "tag", "value_name"]
         details_df = details_df[key_insert_columns].drop_duplicates()
         upsert_df(
             df=details_df,
