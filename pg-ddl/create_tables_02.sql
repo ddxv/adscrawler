@@ -290,7 +290,7 @@ CREATE TABLE version_details (
     version_code integer NOT NULL,
     xml_path text NOT NULL,
     tag text,
-    android_name text,
+    value_name text,
     CONSTRAINT version_details_pkey PRIMARY KEY (id),
     CONSTRAINT fk_vd_version_code FOREIGN KEY (
         version_code

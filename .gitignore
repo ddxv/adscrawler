@@ -5,6 +5,8 @@ store-data/
 # directory for downloaded apks
 apks/
 apksunzipped/
+ipas/
+ipasunzipped/
 
 .vscode
 .virtualenv/

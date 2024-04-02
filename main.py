@@ -11,6 +11,7 @@ from adscrawler.config import get_logger
 from adscrawler.connection import get_db_connection
 from adscrawler.scrape import crawl_app_ads
 from adscrawler.tools.get_manifest import manifest_main
+from adscrawler.tools.get_plist import plist_main
 
 logger = get_logger(__name__)
 
@@ -160,9 +161,16 @@ def main(args: argparse.Namespace) -> None:
             limit = 5000
         crawl_app_ads(PGCON, limit=limit)
 
-    # Get Android Manifest Files
+    # Get Apple & Android Manifest Files
     if do_manifest_scrape:
-        manifest_main(database_connection=PGCON, number_of_apps_to_pull=20)
+        try:
+            plist_main(database_connection=PGCON, number_of_apps_to_pull=20)
+        except Exception:
+            logger.exception("iTunes scrape plist failing")
+        try:
+            manifest_main(database_connection=PGCON, number_of_apps_to_pull=20)
+        except Exception:
+            logger.exception("Android scrape manifests failing")
 
     logger.info("Adscrawler exiting main")
 

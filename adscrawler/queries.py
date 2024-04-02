@@ -370,6 +370,7 @@ def get_most_recent_top_ranks(
                      sa.id AS store_app,
                      sa.name,
                      sa.installs,
+                     sa.rating_count,
                      sa.store_id
                 FROM
                      app_rankings ar
@@ -399,7 +400,8 @@ def get_most_recent_top_ranks(
                     DISTINCT topranks.store_app,
                     topranks.name,
                     topranks.store_id,
-                    topranks.installs
+                    topranks.installs,
+                    topranks.rating_count
                 FROM
                     topranks
             )
@@ -408,6 +410,7 @@ def get_most_recent_top_ranks(
                 dc.store_id,
                 dc.name,
                 dc.installs,
+                dc.rating_count,
                 vc.crawl_result as last_crawl_result,
                 vc.updated_at
             FROM
@@ -418,7 +421,7 @@ def get_most_recent_top_ranks(
                 vc.updated_at IS NULL
                 OR updated_at < current_date - INTERVAL '30 days'
             ORDER BY
-                installs DESC
+                installs DESC, rating_count DESC
             LIMIT {limit}
             ;
     """
