@@ -74,19 +74,19 @@ def get_parsed_plist() -> tuple[int, str, pd.DataFrame]:
     return version_int, plist_str, df
 
 
-def get_version_number(root: ElementTree.Element) -> str:
+def get_version_number(root: ElementTree.Element) -> int:
     cf_bundle_version = ""
     for dict_element in root.findall("dict"):
         elements = list(dict_element)  # Convert the iterator to a list to use indexes
         for i, element in enumerate(elements):
             if element.tag == "key" and element.text == "CFBundleVersion":
                 # Assuming the next element after the key contains the value
-                cf_bundle_version = elements[i + 1].text
+                cf_bundle_version: str = elements[i + 1].text
                 print("Found CFBundleVersion:", cf_bundle_version)
                 break
     logger.info(f"CFBundleVersion: {cf_bundle_version}")
 
-    def version_to_integer(version_str):
+    def version_to_integer(version_str: str) -> int:
         # Split the version string into its major, minor, and patch components
         parts = version_str.split(".")
         if len(parts) != 3:
@@ -153,14 +153,13 @@ def ipa_xml_to_dataframe(root: ElementTree.Element) -> pd.DataFrame:
     return df
 
 
-def download_and_unpack(store_id: str) -> None:
+def download_and_unpack(store_id: str) -> str:
     r = lookupby_id(app_id=store_id)
-    bundle_id = r["bundleId"]
+    bundle_id: str = r["bundleId"]
     ipa_path = pathlib.Path(IPAS_DIR, f"{bundle_id}.ipa")
     download(bundle_id=bundle_id, do_redownload=False)
     unzip_ipa(ipa_path=ipa_path)
-
-
+    return bundle_id
 
 
 def plist_main(

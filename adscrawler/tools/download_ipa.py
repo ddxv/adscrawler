@@ -30,10 +30,11 @@ def check_ipa_dir_created() -> None:
             pathlib.Path.mkdir(_dir, exist_ok=True)
 
 
-def ipatool_auth():
-    command = f"ipatool auth login --email {EMAIL} --password {PASSWORD} --non-interactive --keychain-passphrase '{KEYCHAIN_PASSPHRASE}'"
+def ipatool_auth() -> None:
+    command = f"ipatool auth login --email {EMAIL} --password '{PASSWORD}' --non-interactive --keychain-passphrase '{KEYCHAIN_PASSPHRASE}'"
     result = os.system(command)
     logger.info(f"ipatool auth result: {result}")
+
 
 def download(bundle_id: str, do_redownload: bool = False) -> None:
     check_ipa_dir_created()
