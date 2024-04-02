@@ -5,7 +5,8 @@ CONFIG will expect apple: email, password
 """
 
 import pathlib
-from adscrawler.config import CONFIG, get_logger, MODULE_DIR
+
+from adscrawler.config import CONFIG, MODULE_DIR, get_logger
 
 logger = get_logger(__name__)
 
@@ -27,8 +28,7 @@ def check_ipa_dir_created() -> None:
             pathlib.Path.mkdir(_dir, exist_ok=True)
 
 
-
-def download(bundle_id: str, do_redownload:bool=False) -> None:
+def download(bundle_id: str, do_redownload: bool = False) -> None:
 
     check_ipa_dir_created()
     filepath = pathlib.Path(IPAS_DIR, f"{bundle_id}.ipa")
@@ -37,6 +37,3 @@ def download(bundle_id: str, do_redownload:bool=False) -> None:
         if not do_redownload:
             logger.info(f"apk already exists {filepath=}, skipping")
             return
-    
-
-

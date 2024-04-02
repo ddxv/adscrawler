@@ -2,27 +2,23 @@ import datetime
 import re
 
 import pandas as pd
+import requests
 from itunes_app_scraper.scraper import AppStoreScraper
 from itunes_app_scraper.util import AppStoreCategories, AppStoreCollections
 
 from adscrawler.config import get_logger
 
-import requests
-
-import json
-
 logger = get_logger(__name__)
 
-ITUNES_LOOKUP_API = 'https://itunes.apple.com/lookup'
+ITUNES_LOOKUP_API = "https://itunes.apple.com/lookup"
 
-def lookupby_id(app_id:str)->dict:
-    response = requests.get(ITUNES_LOOKUP_API, params={'id':app_id})
+
+def lookupby_id(app_id: str) -> dict:
+    response = requests.get(ITUNES_LOOKUP_API, params={"id": app_id})
     if response.status_code != 200:
-        logger.error(f'Response code not 200: {response.content}')
-    resp_dict = response.json()['results'][0]
+        logger.error(f"Response code not 200: {response.content}")
+    resp_dict = response.json()["results"][0]
     return resp_dict
-
-
 
 
 def scrape_ios_ranks(

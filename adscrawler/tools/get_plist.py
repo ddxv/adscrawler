@@ -9,24 +9,17 @@ import pandas as pd
 import requests
 import yaml
 
+from adscrawler.app_stores.apple import lookupby_id
 from adscrawler.config import MODULE_DIR, get_logger
 from adscrawler.connection import PostgresCon
 from adscrawler.queries import get_most_recent_top_ranks, upsert_df
 from adscrawler.tools.download_ipa import download
-
-from adscrawler.app_stores.apple import lookupby_id
-
-
 
 logger = get_logger(__name__)
 
 
 IPAS_DIR = pathlib.Path(MODULE_DIR, "ipas/")
 UNZIPPED_DIR = pathlib.Path(MODULE_DIR, "ipasunzipped/")
-
-
-
-
 
 
 def check_dirs() -> None:
@@ -65,9 +58,8 @@ def unzip_ipa(ipa_path: pathlib.Path) -> None:
 def get_parsed_plist() -> tuple[str, pd.DataFrame]:
     payload_dir = pathlib.Path(MODULE_DIR, "ipasunzipped/Payload")
 
-
-    for app_dir in payload_dir.glob('*'):  # '*' will match any directory inside Payload
-        plist_info_path = app_dir / 'Info.plist'  # Construct the path to plist.Info
+    for app_dir in payload_dir.glob("*"):  # '*' will match any directory inside Payload
+        plist_info_path = app_dir / "Info.plist"  # Construct the path to plist.Info
         if plist_info_path.exists():
             logger.info(f"Found plist.Info at: {plist_info_path}")
             # Add your processing logic here
@@ -140,9 +132,9 @@ def ipa_xml_to_dataframe(root: ElementTree.Element) -> pd.DataFrame:
 
 def download_and_unpack(store_id: str) -> None:
     r = lookupby_id(app_id=store_id)
-    bundle_id = r['bundleId']
+    bundle_id = r["bundleId"]
     ipa_path = pathlib.Path(IPAS_DIR, f"{bundle_id}.ipa")
-    download(store_id=store_id, do_redownload=False)
+    download(bundle_id=bundle_id, do_redownload=False)
     unzip_ipa(ipa_path=ipa_path)
 
 
@@ -165,11 +157,11 @@ def manifest_main(
         store_id = row.store_id
         logger.info(f"{store_id=} start")
         details_df = row.to_frame().T
-        apk_path = pathlib.Path(APKS_DIR, f"{store_id}.apk")
+        apk_path = pathlib.Path(IPAS_DIR, f"{store_id}.apk")
         try:
             download_and_unpack(store_id=store_id)
             version_int = get_version()
-            manifest_str, details_df = get_parsed_manifest()
+            # manifest_str, details_df = get_parsed_manifest()
             crawl_result = 1
             logger.info(f"{store_id=} unzipped finished")
         except requests.exceptions.HTTPError:
@@ -249,7 +241,7 @@ def parse_args() -> argparse.Namespace:
 def main(args: argparse.Namespace) -> None:
     """Download APK to local directory and exit."""
     store_id = args.store_id
-    
+
     download_and_unpack(store_id=store_id)
 
 
