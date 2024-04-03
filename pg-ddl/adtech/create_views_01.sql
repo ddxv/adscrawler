@@ -109,8 +109,7 @@ WITH cat_hist_totals AS (
     WHERE
         sahc.week_start >= CURRENT_DATE - INTERVAL '30 days'
         AND sahc.store_app IN (
-            SELECT
-                DISTINCT store_app
+            SELECT DISTINCT store_app
             FROM
                 adtech.store_apps_companies
         )
@@ -118,6 +117,7 @@ WITH cat_hist_totals AS (
         sa.store,
         cm.mapped_category
 ),
+
 cat_app_totals AS (
     SELECT
         sa.store,
@@ -136,6 +136,7 @@ cat_app_totals AS (
         sa.store,
         cm.mapped_category
 ),
+
 company_installs AS (
     SELECT
         sa.store,
@@ -181,6 +182,7 @@ company_installs AS (
     ORDER BY
         installs DESC
 )
+
 SELECT
     ci.store,
     ci.mapped_category,
@@ -207,24 +209,26 @@ LEFT JOIN adtech.categories AS cat
         ccat.category_id = cat.id
 LEFT JOIN cat_hist_totals AS t
     ON
-    ci.store = t.store
-    AND
+        ci.store = t.store
+        AND
         ci.mapped_category = t.mapped_category
 LEFT JOIN cat_app_totals AS ct
     ON
-    ci.store = ct.store
-    AND
+        ci.store = ct.store
+        AND
         ci.mapped_category = ct.mapped_category
 WHERE
     ci.installs IS NOT NULL
     OR ci.ratings IS NOT NULL
-    WITH DATA;
+WITH DATA;
 
 
 -- DROP INDEX IF EXISTS adtech.companies_d30_counts_idx;
 CREATE UNIQUE INDEX companies_d30_counts_idx
 ON
-adtech.companies_by_d30_counts (store, mapped_category, category_id, company_name);
+adtech.companies_by_d30_counts (
+    store, mapped_category, category_id, company_name
+);
 
 
 CREATE MATERIALIZED VIEW adtech.companies_parent_by_d30_counts AS
@@ -245,8 +249,7 @@ WITH cat_hist_totals AS (
     WHERE
         sahc.week_start >= CURRENT_DATE - INTERVAL '30 days'
         AND sahc.store_app IN (
-            SELECT
-                DISTINCT store_app
+            SELECT DISTINCT store_app
             FROM
                 adtech.store_apps_companies
         )
@@ -254,6 +257,7 @@ WITH cat_hist_totals AS (
         sa.store,
         cm.mapped_category
 ),
+
 cat_app_totals AS (
     SELECT
         sa.store,
@@ -272,9 +276,9 @@ cat_app_totals AS (
         sa.store,
         cm.mapped_category
 ),
+
 store_apps_parent_companies AS (
-    SELECT
-        DISTINCT
+    SELECT DISTINCT
         sac.store_app,
         sac.parent_id,
         cats.category_id
@@ -284,6 +288,7 @@ store_apps_parent_companies AS (
         ON
             sac.company_id = cats.company_id
 ),
+
 company_installs AS (
     SELECT
         sa.store,
@@ -316,6 +321,7 @@ company_installs AS (
     ORDER BY
         installs DESC
 )
+
 SELECT
     ci.store,
     ci.mapped_category,
@@ -337,16 +343,16 @@ LEFT JOIN adtech.companies AS com
         ci.parent_id = com.id
 LEFT JOIN cat_hist_totals AS t
     ON
-    ci.store = t.store
-    AND
+        ci.store = t.store
+        AND
         ci.mapped_category = t.mapped_category
 LEFT JOIN cat_app_totals AS tc
     ON
-    ci.store = tc.store
-    AND
+        ci.store = tc.store
+        AND
         ci.mapped_category = tc.mapped_category
 WHERE
-    ci.installs IS NOT NULL OR ci.ratings IS NOT NULL    
+    ci.installs IS NOT NULL OR ci.ratings IS NOT NULL
 WITH DATA;
 
 
