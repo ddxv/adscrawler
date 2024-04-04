@@ -21,6 +21,12 @@ logger = get_logger(__name__)
 IPAS_DIR = pathlib.Path(MODULE_DIR, "ipas/")
 UNZIPPED_DIR = pathlib.Path(MODULE_DIR, "ipasunzipped/")
 
+class IPANotFoundError(Exception):
+    """Exception raised when an IPA file is not found."""
+    def __init__(self, message="IPA file not found"):
+        self.message = message
+        super().__init__(self.message)
+
 
 def check_dirs() -> None:
     """Create if not exists for ipas directory."""
@@ -45,7 +51,7 @@ def unzip_ipa(ipa_path: pathlib.Path) -> None:
         empty_folder(UNZIPPED_DIR)
     if not ipa_path.exists():
         logger.error(f"path: {ipa_path.as_posix()} file not found")
-        raise FileNotFoundError
+        raise IPANotFoundError
     check_dirs()
     command = f"unzip {ipa_path.as_posix()} -d {UNZIPPED_DIR.as_posix()}"
     # Run the command
@@ -172,11 +178,17 @@ def plist_main(
         except requests.exceptions.ConnectionError:
             crawl_result = 3  # 404s etc
         except FileNotFoundError:
-            logger.exception(f"{store_id=} unable to unpack ipa")
+            logger.exception(f"{store_id=} unable to unpack IPA or unpack failed")
             crawl_result = 2
+        except IPANotFoundError:
+            logger.exception(f"{store_id=} seems download failed, ipa file not found")
+            crawl_result = -1
         except Exception as e:
             logger.exception(f"Unexpected error for {store_id=}: {str(e)}")
             crawl_result = 4  # Unexpected errors
+        # Prevent unnecessary downloading attempts if downloads fail
+        if crawl_result == -1:
+            break
         details_df["store_app"] = row.store_app
         details_df["version_code"] = version_str
         version_code_df = details_df[["store_app", "version_code"]].drop_duplicates()

@@ -404,6 +404,21 @@ def get_most_recent_top_ranks(
                     topranks.rating_count
                 FROM
                     topranks
+            ),
+            latest_version_codes AS (
+                SELECT
+                    DISTINCT ON
+                    (store_app)
+                id,
+                    store_app,
+                    version_code,
+                    updated_at,
+                    crawl_result
+                FROM
+                    version_codes vc
+                ORDER BY
+                    store_app,
+                    updated_at DESC
             )
             SELECT
                 dc.store_app,
@@ -415,7 +430,7 @@ def get_most_recent_top_ranks(
                 vc.updated_at
             FROM
                 distinctapps dc
-            LEFT JOIN version_codes vc ON
+            LEFT JOIN latest_version_codes vc ON
                 vc.store_app = dc.store_app
             WHERE
                 vc.updated_at IS NULL
