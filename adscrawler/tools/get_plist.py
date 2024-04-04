@@ -26,7 +26,7 @@ UNZIPPED_DIR = pathlib.Path(MODULE_DIR, "ipasunzipped/")
 class IPANotFoundError(Exception):
     """Exception raised when an IPA file is not found."""
 
-    def __init__(self: Self, message:str="IPA file not found") -> None:
+    def __init__(self: Self, message: str = "IPA file not found") -> None:
         self.message = message
         super().__init__(self.message)
 
