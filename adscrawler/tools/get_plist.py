@@ -4,6 +4,7 @@ import argparse
 import os
 import pathlib
 from xml.etree import ElementTree
+import plistlib
 
 import numpy as np
 import pandas as pd
@@ -54,6 +55,40 @@ def unzip_ipa(ipa_path: pathlib.Path) -> None:
     logger.info(f"Unzip output: {result}")
 
 
+
+
+
+
+def unpack_and_attach(
+    df: pd.DataFrame, column_to_unpack: str, rename_columns_dict: dict | None = None
+) -> pd.DataFrame:
+    info = f"Unpack column: {column_to_unpack}"
+    if column_to_unpack not in df.columns:
+        logger.warning(f"{info} df does not contain column")
+        return df
+    original_shape = df.shape
+    unpacked = df[column_to_unpack].apply(pd.Series)
+    if rename_columns_dict:
+        unpacked = unpacked.rename(columns=rename_columns_dict)
+    unpacked_columns = unpacked.columns
+    duplicated_columns = [x for x in unpacked_columns if x in df.columns]
+    if len(duplicated_columns) > 0:
+        logger.warning(f"{info} contains {duplicated_columns=}")
+    combined = pd.concat([df.drop(column_to_unpack, axis=1), unpacked], axis=1)
+    combined_shape = combined.shape
+    rows = combined_shape[0] - original_shape[0]
+    cols = combined_shape[1] - original_shape[1]
+    if rows > 0 or cols > 0:
+        logger.info(f"{info} df shape changed: new rows: {rows}, new cols: {cols}")
+    else:
+        logger.info(f"{info} df shape not changed")
+    return combined
+
+
+
+
+
+
 def get_parsed_plist() -> tuple[int, str, pd.DataFrame]:
     payload_dir = pathlib.Path(MODULE_DIR, "ipasunzipped/Payload")
     for app_dir in payload_dir.glob("*"):  # '*' will match any directory inside Payload
@@ -63,50 +98,38 @@ def get_parsed_plist() -> tuple[int, str, pd.DataFrame]:
             # Add your processing logic here
             ipa_filename = pathlib.Path(plist_info_path)
     # Load the XML file
-    with ipa_filename.open("r") as f:
-        plist_str = f.read()
-    tree = ElementTree.parse(ipa_filename)
-    root = tree.getroot()
-    version_int = get_version_number(root)
-    df = ipa_xml_to_dataframe(root)
-    frameworks_df = ipa_frameworks()
-    df = pd.concat([df, frameworks_df])
-    return version_int, plist_str, df
-
-
-def get_version_number(root: ElementTree.Element) -> int:
-    cf_bundle_version = ""
-    for dict_element in root.findall("dict"):
-        elements = list(dict_element)  # Convert the iterator to a list to use indexes
-        for i, element in enumerate(elements):
-            if element.tag == "key" and element.text == "CFBundleVersion":
-                # Assuming the next element after the key contains the value
-                cf_bundle_version: str = elements[i + 1].text
-                print("Found CFBundleVersion:", cf_bundle_version)
-                break
-    logger.info(f"CFBundleVersion: {cf_bundle_version}")
-
-    def version_to_integer(version_str: str) -> int:
-        # Split the version string into its major, minor, and patch components
-        parts = version_str.split(".")
-        if len(parts) != 3:
-            raise ValueError(
-                "Version string must have three parts separated by dots (e.g., '1.2.3')"
-            )
-
-        # Convert each part to an integer
-        major, minor, patch = map(int, parts)
-
-        # Calculate the unique integer representation
-        # Assuming the maximum is 99 for major, 999 for minor, and 999 for patch as discussed
-        # These can be adjusted based on the actual expected range of version numbers
-        return major * 1000000 + minor * 1000 + patch
-
+    with ipa_filename.open("rb") as f:
+        plist_bytes = f.read()
+    data = plistlib.loads(plist_bytes)
+    plist_str = str(data)
+    df = pd.json_normalize(data, sep='/').T.explode(0).reset_index().rename(columns={'index':'path', 0:'value'})
+    ddf = unpack_and_attach(df, column_to_unpack='value', rename_columns_dict={0:'value'})
+    ddf['value'] = ddf[[x for x in ddf.columns if x != 'path']].fillna('').apply(lambda row: ''.join([str(x) for x in row]), axis=1)
+    ddf = ddf[['path', 'value']]
+    version = data['CFBundleVersion']
+    version_int = -1
     try:
-        version_int = int(cf_bundle_version)
+        version_int = int(version)
     except Exception:
-        version_int = version_to_integer(cf_bundle_version)
-    return version_int
+        logger.exception(f"Version {version=} is not int")
+        if '.' in version:
+            # Split the version string into its major, minor, and patch components
+            parts = version.split(".")
+            if len(parts) != 3:
+                raise ValueError from Exception(
+                    "Version string must have three parts separated by dots (e.g., '1.2.3')"
+                )
+            # Convert each part to an integer
+            major, minor, patch = map(int, parts)
+            # Calculate the unique integer representation
+            # Assuming the maximum is 99 for major, 999 for minor, and 999 for patch as discussed
+            # These can be adjusted based on the actual expected range of version numbers
+            version_int = major * 1000000 + minor * 1000 + patch
+        else:
+            logger.exception(f"Unable to parse Version {version=} is not int")
+    frameworks_df = ipa_frameworks()
+    df = pd.concat([ddf, frameworks_df])
+    return version_int, plist_str, df
 
 
 def ipa_frameworks() -> pd.DataFrame:
