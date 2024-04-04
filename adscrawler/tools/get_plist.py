@@ -4,6 +4,7 @@ import argparse
 import os
 import pathlib
 import plistlib
+from typing import Self
 
 import numpy as np
 import pandas as pd
@@ -21,9 +22,11 @@ logger = get_logger(__name__)
 IPAS_DIR = pathlib.Path(MODULE_DIR, "ipas/")
 UNZIPPED_DIR = pathlib.Path(MODULE_DIR, "ipasunzipped/")
 
+
 class IPANotFoundError(Exception):
     """Exception raised when an IPA file is not found."""
-    def __init__(self, message="IPA file not found"):
+
+    def __init__(self: Self, message:str="IPA file not found") -> None:
         self.message = message
         super().__init__(self.message)
 
