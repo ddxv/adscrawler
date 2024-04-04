@@ -3,7 +3,6 @@
 import argparse
 import os
 import pathlib
-from xml.etree import ElementTree
 import plistlib
 
 import numpy as np
@@ -55,10 +54,6 @@ def unzip_ipa(ipa_path: pathlib.Path) -> None:
     logger.info(f"Unzip output: {result}")
 
 
-
-
-
-
 def unpack_and_attach(
     df: pd.DataFrame, column_to_unpack: str, rename_columns_dict: dict | None = None
 ) -> pd.DataFrame:
@@ -85,10 +80,6 @@ def unpack_and_attach(
     return combined
 
 
-
-
-
-
 def get_parsed_plist() -> tuple[int, str, pd.DataFrame]:
     payload_dir = pathlib.Path(MODULE_DIR, "ipasunzipped/Payload")
     for app_dir in payload_dir.glob("*"):  # '*' will match any directory inside Payload
@@ -102,17 +93,28 @@ def get_parsed_plist() -> tuple[int, str, pd.DataFrame]:
         plist_bytes = f.read()
     data = plistlib.loads(plist_bytes)
     plist_str = str(data)
-    df = pd.json_normalize(data, sep='/').T.explode(0).reset_index().rename(columns={'index':'path', 0:'value'})
-    ddf = unpack_and_attach(df, column_to_unpack='value', rename_columns_dict={0:'value'})
-    ddf['value'] = ddf[[x for x in ddf.columns if x != 'path']].fillna('').apply(lambda row: ''.join([str(x) for x in row]), axis=1)
-    ddf = ddf[['path', 'value']]
-    version = data['CFBundleVersion']
+    df = (
+        pd.json_normalize(data, sep="/")
+        .T.explode(0)
+        .reset_index()
+        .rename(columns={"index": "path", 0: "value"})
+    )
+    ddf = unpack_and_attach(
+        df, column_to_unpack="value", rename_columns_dict={0: "value"}
+    )
+    ddf["value"] = (
+        ddf[[x for x in ddf.columns if x != "path"]]
+        .fillna("")
+        .apply(lambda row: "".join([str(x) for x in row]), axis=1)
+    )
+    ddf = ddf[["path", "value"]]
+    version = data["CFBundleVersion"]
     version_int = -1
     try:
         version_int = int(version)
     except Exception:
         logger.exception(f"Version {version=} is not int")
-        if '.' in version:
+        if "." in version:
             # Split the version string into its major, minor, and patch components
             parts = version.split(".")
             if len(parts) != 3:
@@ -148,32 +150,6 @@ def ipa_frameworks() -> pd.DataFrame:
     df = pd.DataFrame({"path": "frameworks", "value": framework_dirs})
     return df
 
-
-def ipa_xml_to_dataframe(root: ElementTree.Element) -> pd.DataFrame:
-    """Flawed process of taking xml and making a dataframe.
-    This will not have an accurate portrayal of nested XML.
-
-    """
-
-    def extract_data(element: ElementTree.Element, path: str = "") -> list:
-        data = []
-        if element.text and element.text.strip():
-            data.append({"path": path, "value": element.text.strip()})
-        for child in element:
-            tag = child.tag
-            # Construct the new path for the current element
-            new_path = f"{path}/{tag}" if path else tag
-            # Recursively extract data for child elements, passing the updated path
-            data.extend(extract_data(child, new_path))
-        return data
-
-    # Then call extract_data with the root element of your XML document
-    data = extract_data(root)
-
-    # Convert the list to a pandas DataFrame
-    df = pd.DataFrame(data)
-    df = df.drop_duplicates()
-    return df
 
 
 def download_and_unpack(store_id: str) -> str:
