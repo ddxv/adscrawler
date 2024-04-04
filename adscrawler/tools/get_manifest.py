@@ -66,13 +66,13 @@ def get_parsed_manifest() -> tuple[str, pd.DataFrame]:
     return manifest_str, df
 
 
-def get_version() -> int:
+def get_version() -> str:
     tool_filename = pathlib.Path(MODULE_DIR, "apksunzipped/apktool.yml")
     # Open and read the YAML file
     with tool_filename.open("r") as file:
         data = yaml.safe_load(file)
-    version_int: int = data["versionInfo"]["versionCode"]
-    return version_int
+    version = str(data["versionInfo"]["versionCode"])
+    return version
 
 
 def xml_to_dataframe(root: ElementTree.Element) -> pd.DataFrame:
@@ -144,14 +144,14 @@ def manifest_main(
     logger.info(f"Start APK processing: {apps.shape=}")
     for _id, row in apps.iterrows():
         crawl_result = 4
-        version_int = -1
         store_id = row.store_id
         logger.info(f"{store_id=} start")
         details_df = row.to_frame().T
+        version_str = "-1"
         apk_path = pathlib.Path(APKS_DIR, f"{store_id}.apk")
         try:
             download_and_unpack(store_id=store_id)
-            version_int = get_version()
+            version_str = get_version()
             manifest_str, details_df = get_parsed_manifest()
             crawl_result = 1
             logger.info(f"{store_id=} unzipped finished")
@@ -166,7 +166,7 @@ def manifest_main(
             logger.exception(f"Unexpected error for {store_id=}: {str(e)}")
             crawl_result = 4  # Unexpected errors
         details_df["store_app"] = row.store_app
-        details_df["version_code"] = version_int
+        details_df["version_code"] = version_str
         version_code_df = details_df[["store_app", "version_code"]].drop_duplicates()
         version_code_df["crawl_result"] = crawl_result
         logger.info(f"{store_id=} inserts")

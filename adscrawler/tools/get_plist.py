@@ -80,7 +80,7 @@ def unpack_and_attach(
     return combined
 
 
-def get_parsed_plist() -> tuple[int, str, pd.DataFrame]:
+def get_parsed_plist() -> tuple[str, str, pd.DataFrame]:
     payload_dir = pathlib.Path(MODULE_DIR, "ipasunzipped/Payload")
     for app_dir in payload_dir.glob("*"):  # '*' will match any directory inside Payload
         plist_info_path = app_dir / "Info.plist"  # Construct the path to plist.Info
@@ -109,29 +109,9 @@ def get_parsed_plist() -> tuple[int, str, pd.DataFrame]:
     )
     ddf = ddf[["path", "value"]]
     version = data["CFBundleVersion"]
-    version_int = -1
-    try:
-        version_int = int(version)
-    except Exception:
-        logger.exception(f"Version {version=} is not int")
-        if "." in version:
-            # Split the version string into its major, minor, and patch components
-            parts = version.split(".")
-            if len(parts) != 3:
-                raise ValueError from Exception(
-                    "Version string must have three parts separated by dots (e.g., '1.2.3')"
-                )
-            # Convert each part to an integer
-            major, minor, patch = map(int, parts)
-            # Calculate the unique integer representation
-            # Assuming the maximum is 99 for major, 999 for minor, and 999 for patch as discussed
-            # These can be adjusted based on the actual expected range of version numbers
-            version_int = major * 1000000 + minor * 1000 + patch
-        else:
-            logger.exception(f"Unable to parse Version {version=} is not int")
     frameworks_df = ipa_frameworks()
     df = pd.concat([ddf, frameworks_df])
-    return version_int, plist_str, df
+    return version, plist_str, df
 
 
 def ipa_frameworks() -> pd.DataFrame:
@@ -149,7 +129,6 @@ def ipa_frameworks() -> pd.DataFrame:
                         framework_dirs.append(framework_dir.name)
     df = pd.DataFrame({"path": "frameworks", "value": framework_dirs})
     return df
-
 
 
 def download_and_unpack(store_id: str) -> str:
@@ -177,15 +156,15 @@ def plist_main(
     logger.info(f"Start iTunes Info.plist: {apps.shape=}")
     for _id, row in apps.iterrows():
         crawl_result = 4
-        version_int = -1
         store_id = row.store_id
         logger.info(f"{store_id=} start")
         details_df = row.to_frame().T
+        version_str = "-1"
         ipa_path = ""
         try:
             bundle_id = download_and_unpack(store_id=store_id)
             ipa_path = pathlib.Path(IPAS_DIR, f"{bundle_id}.ipa")
-            version_int, plist_str, details_df = get_parsed_plist()
+            version_str, plist_str, details_df = get_parsed_plist()
             crawl_result = 1
             logger.info(f"{store_id=} unzipped finished")
         except requests.exceptions.HTTPError:
@@ -199,7 +178,7 @@ def plist_main(
             logger.exception(f"Unexpected error for {store_id=}: {str(e)}")
             crawl_result = 4  # Unexpected errors
         details_df["store_app"] = row.store_app
-        details_df["version_code"] = version_int
+        details_df["version_code"] = version_str
         version_code_df = details_df[["store_app", "version_code"]].drop_duplicates()
         version_code_df["crawl_result"] = crawl_result
         logger.info(f"{store_id=} inserts")
