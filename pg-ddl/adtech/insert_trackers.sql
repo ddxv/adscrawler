@@ -219,7 +219,7 @@ INSERT INTO adtech.company_categories (company_id, category_id) VALUES
 (80, 2),
 (86, 1),
 (87, 2),
-(88, 2);
+(88, 2),
 (89, 1),
 (90, 1),
 (91, 1),
