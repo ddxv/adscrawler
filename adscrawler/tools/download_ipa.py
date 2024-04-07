@@ -45,6 +45,6 @@ def download(bundle_id: str, do_redownload: bool = False) -> None:
             logger.info(f"ipa already exists {filepath=}, skipping")
             return
     logger.info(f"Will download {bundle_id}")
-    command = f"ipatool download -b '{bundle_id}' -o ipas/{bundle_id}.ipa --keychain-passphrase '{KEYCHAIN_PASSPHRASE}' --non-interactive --purchase --verbose"
+    command = f"ipatool download -b '{bundle_id}' -o ipas/{bundle_id}.ipa --keychain-passphrase '{KEYCHAIN_PASSPHRASE}' --non-interactive --purchase --verbose >> ~/.config/adscrawler/logs/ipatool.log 2>&1"
     result = os.system(command)
     logger.info(f"ipatool download result: {result}")
