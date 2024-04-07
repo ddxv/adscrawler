@@ -1,3 +1,4 @@
+DROP MATERIALIZED VIEW IF EXISTS adtech.store_apps_companies CASCADE;
 CREATE MATERIALIZED VIEW adtech.store_apps_companies AS
 WITH latest_version_codes AS (
     SELECT
@@ -77,7 +78,7 @@ WHERE
         FROM
             sdk_apps_with_companies
     )
-    OR
+    AND
     vc.store_app NOT IN (
         SELECT store_app
         FROM
@@ -196,6 +197,7 @@ SELECT
     ci.app_count,
     ct.category_total_apps,
     t.installs AS total_installs,
+    t.ratings AS total_ratings,
     ci.app_count::FLOAT / ct.category_total_apps AS app_count_percent,
     ci.ratings / t.ratings AS total_ratings_percent,
     ci.installs / t.installs AS total_installs_percent
@@ -333,6 +335,7 @@ SELECT
     ci.app_count,
     tc.category_total_apps,
     t.installs AS total_installs,
+    t.ratings AS total_ratings,
     ci.app_count::FLOAT / tc.category_total_apps AS app_count_percent,
     ci.ratings / t.ratings AS total_ratings_percent,
     ci.installs / t.installs AS total_installs_percent
