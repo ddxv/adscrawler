@@ -134,7 +134,9 @@ INSERT INTO adtech.companies (id, "name", parent_company_id) VALUES
 (129, 'YouAppi', NULL),
 (130, 'New Relic', NULL),
 (131, 'Qualtrics', NULL),
-(132, 'Nimbus', NULL);
+(132, 'Nimbus', NULL),
+(133, 'devtodev', 3),
+(134, 'Localytics', NULL);
 
 
 
@@ -262,7 +264,10 @@ INSERT INTO adtech.company_categories (company_id, category_id) VALUES
 (129, 1),
 (130, 2),
 (131, 2),
-(132, 1);
+(132, 1),
+(133, 2),
+(134, 2);
+
 
 
 
