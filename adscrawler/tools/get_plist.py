@@ -185,10 +185,10 @@ def plist_main(
             crawl_result = 2
         except IPANotFoundError:
             logger.exception(f"{store_id=} seems download failed, ipa file not found")
-            crawl_result = -1
+            crawl_result = 4
         except Exception as e:
             logger.exception(f"Unexpected error for {store_id=}: {str(e)}")
-            crawl_result = 4  # Unexpected errors
+            crawl_result = -1  # Unexpected errors
         # Prevent unnecessary downloading attempts if downloads fail
         if crawl_result == -1:
             break
