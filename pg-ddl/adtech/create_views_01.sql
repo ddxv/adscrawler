@@ -364,3 +364,45 @@ ON
 adtech.companies_parent_by_d30_counts (
     store, mapped_category, category_id, company_name
 );
+
+
+CREATE MATERIALIZED VIEW adtech.store_crawl_results AS
+WITH latest_version_codes AS (
+    SELECT
+        id,
+        store_app,
+        crawl_result,
+        MAX(version_code) AS version_code
+    FROM
+        version_codes
+    GROUP BY
+        id,
+        store_app
+)
+
+SELECT
+    sa.store,
+    CASE
+        WHEN vc.crawl_result = 1 THEN 1
+        ELSE 2
+    END AS crawl_result,
+    COUNT(*) AS count
+FROM
+    latest_version_codes AS vc
+LEFT JOIN store_apps AS sa
+    ON
+        vc.store_app = sa.id
+GROUP BY
+    sa.store,
+    CASE
+        WHEN vc.crawl_result = 1 THEN 1
+        ELSE 2
+    END
+WITH DATA;
+
+CREATE INDEX store_crawl_results_idx ON
+adtech.store_crawl_results
+USING btree (
+    store,
+    crawl_result
+);
