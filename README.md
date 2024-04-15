@@ -1,7 +1,16 @@
 # Crawl App-Adst.txt and App Store Apps
 
-This crawls the Google Play and Apple App Stores for as many apps as it can and also checks for their app-ads.txt files. App-ads.txt files are crawled based on the Interactive Advertising Bureau's Tech Lab specs. 
-https://iabtechlab.com/ads-txt/
+Various tools used for https://appgoblin.info. Mostly scripts for crawling the Google Play and Apple App Stores for as many apps as it can and also checks for their app-ads.txt files. 
+
+Scrapers:
+ - pull apps from app store and google play store top lists
+ - pull apps from some 3rd party stores
+ - unzip/decompile Android APKs and iOS IPAs to look for 3rd party tracking/advertising tools
+ - Various SQL ddl for https://github.com/ddxv/app-store-dash
+
+App-ads.txt files are crawled based on the Interactive Advertising Bureau's Tech Lab specs. https://iabtechlab.com/ads-txt/
+
+
 
 To get app-ads.txt files, there are several additional steps that need to be taken when compared to regular ads.txt files.
  - Get store ids
