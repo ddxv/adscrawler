@@ -13,6 +13,7 @@ WITH latest_version_codes AS (
         id,
         store_app
 ),
+
 sdk_apps_with_companies AS (
     SELECT DISTINCT
         vc.store_app,
@@ -32,6 +33,7 @@ sdk_apps_with_companies AS (
     LEFT JOIN adtech.companies AS pc ON
         tm.company_id = pc.id
 ),
+
 sdk_paths_with_companies AS (
     SELECT DISTINCT
         vc.store_app,
@@ -51,6 +53,7 @@ sdk_paths_with_companies AS (
     LEFT JOIN adtech.companies AS pc ON
         ptm.company_id = pc.id
 ),
+
 dev_apps_with_companies AS (
     SELECT DISTINCT
         sa.id AS store_app,
@@ -67,6 +70,7 @@ dev_apps_with_companies AS (
     LEFT JOIN adtech.companies AS pc ON
         cd.company_id = pc.id
 )
+
 SELECT
     sawc.store_app,
     sawc.company_id,
@@ -141,6 +145,7 @@ WITH cat_hist_totals AS (
         sa.store,
         cm.mapped_category
 ),
+
 cat_app_totals AS (
     SELECT
         sa.store,
@@ -159,6 +164,7 @@ cat_app_totals AS (
         sa.store,
         cm.mapped_category
 ),
+
 company_installs AS (
     SELECT
         sa.store,
@@ -204,6 +210,7 @@ company_installs AS (
     ORDER BY
         installs DESC
 )
+
 SELECT
     ci.store,
     ci.mapped_category,
@@ -279,6 +286,7 @@ WITH cat_hist_totals AS (
         sa.store,
         cm.mapped_category
 ),
+
 cat_app_totals AS (
     SELECT
         sa.store,
@@ -297,6 +305,7 @@ cat_app_totals AS (
         sa.store,
         cm.mapped_category
 ),
+
 store_apps_parent_companies AS (
     SELECT DISTINCT
         sac.store_app,
@@ -308,6 +317,7 @@ store_apps_parent_companies AS (
         ON
             sac.company_id = cats.company_id
 ),
+
 company_installs AS (
     SELECT
         sa.store,
@@ -340,6 +350,7 @@ company_installs AS (
     ORDER BY
         installs DESC
 )
+
 SELECT
     ci.store,
     ci.mapped_category,
@@ -395,6 +406,7 @@ WITH latest_version_codes AS (
         id,
         store_app
 )
+
 SELECT
     sa.store,
     CASE
