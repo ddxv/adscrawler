@@ -1,6 +1,8 @@
 const yargs = require('yargs/yargs');
 const fs = require('fs');
-var gplay = require('google-play-scraper');
+
+(async () => {
+    const gplay = await import('google-play-scraper');
 
 
 const { hideBin } = require('yargs/helpers');
@@ -15,7 +17,7 @@ const argv = yargs(hideBin(process.argv))
 
 async function pullRank(category, collection, country, numApps) {
     try {
-        let result = await gplay.list({ category: category, collection: collection, num: numApps, country: country });
+        let result = await gplay.default.list({ category: category, collection: collection, num: numApps, country: country });
 
         if (!Array.isArray(result)) {
             console.warn(`No results for Category: ${category}, Collection: ${collection}, Country: ${country}`);
@@ -74,10 +76,10 @@ async function loopLists(categories, collections, country, numApps) {
     // Loop over each keys in categories and collections
     for (const categoryKey in categories) {
         let collectedAppRanks = [];
-        const category = gplay.category[categoryKey]
+        const category = categories[categoryKey]
         for (const collectionKey in collections) {
 
-            const collection = gplay.collection[collectionKey]
+            const collection = collections[collectionKey]
             const logString = "Category:" + category + ", Collection: " + collection
             console.log(logString)
 
@@ -116,10 +118,12 @@ async function main() {
         loopDevelopers(country, numApps = 60)
     }
     else {
+        var categories = gplay.default.category;
+        var collections = gplay.default.collection;
         // 54 Categories: GAME_TRIVIA, EVENTS, TRAVEL
-        var categories = gplay.category
+        // var categories = gplay.category
         // 3 Collections: TOP_FREE, TOP_PAID, GROSSING
-        var collections = gplay.collection
+        // var collections = gplay.collection
         console.log("Starting %i categories and %i collections", Object.keys(categories).length, Object.keys(collections).length)
 
         // nested for loop for two iterables
@@ -129,3 +133,5 @@ async function main() {
 }
 
 main()
+
+})();
