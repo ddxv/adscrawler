@@ -52,7 +52,7 @@ def get_db_connection(use_ssh_tunnel: bool = False) -> PostgresCon:
     host = CONFIG[server_name]["host"]  # Remote server
     if use_ssh_tunnel:
         ssh_username = CONFIG[server_name]["os_user"]
-        server = open_ssh_tunnel(host, ssh_username)
+        server = open_ssh_tunnel(host, ssh_username, ssh_pkey=CONFIG[server_name].get("ssh_pkey", None), ssh_private_key_password=CONFIG[server_name].get("ssh_pkey_password", None))
         server.start()
         db_port = str(server.local_bind_port)
         host = "127.0.0.1"
