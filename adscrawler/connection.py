@@ -51,8 +51,7 @@ def get_db_connection(use_ssh_tunnel: bool = False) -> PostgresCon:
     server_name = "madrone"
     host = CONFIG[server_name]["host"]  # Remote server
     if use_ssh_tunnel:
-        ssh_username = CONFIG[server_name]["os_user"]
-        server = open_ssh_tunnel(host, ssh_username, ssh_pkey=CONFIG[server_name].get("ssh_pkey", None), ssh_private_key_password=CONFIG[server_name].get("ssh_pkey_password", None))
+        server = open_ssh_tunnel(host, server_name)
         server.start()
         db_port = str(server.local_bind_port)
         host = "127.0.0.1"
@@ -62,11 +61,13 @@ def get_db_connection(use_ssh_tunnel: bool = False) -> PostgresCon:
     return conn
 
 
-def open_ssh_tunnel(remote_host: str, ssh_username: str) -> SSHTunnelForwarder:
+def open_ssh_tunnel(remote_host: str, server_name: str) -> SSHTunnelForwarder:
     with SSHTunnelForwarder(
         (remote_host, 22),  # Remote server IP and SSH port
-        ssh_username=ssh_username,
+        ssh_username=CONFIG[server_name]["os_user"],
         remote_bind_address=("127.0.0.1", 5432),
+        ssh_pkey=CONFIG[server_name].get("ssh_pkey", None),
+        ssh_private_key_password=CONFIG[server_name].get("ssh_pkey_password", None),
     ) as server:  # PostgreSQL server IP and sever port on remote machine
         server.start()  # start ssh sever
         logger.info("Connecting via SSH")
