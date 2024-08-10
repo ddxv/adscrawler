@@ -223,7 +223,7 @@ def extract_domains(x: str) -> str:
     if use_top_domain:
         url = ".".join([ext.domain, ext.suffix])
     else:
-        url = ".".join(part for part in ext if part)
+        url = '.'.join([ext.subdomain, ext.domain, ext.suffix])
     url = url.lower()
     return url
 
@@ -360,7 +360,9 @@ def update_all_app_info(
     if "url" not in app_df.columns or not app_df["url"].to_numpy():
         logger.info(f"{info} no app url, finished")
         return
+    
     app_df["url"] = app_df["url"].apply(lambda x: extract_domains(x))
+
     insert_columns = ["url"]
     app_urls_df = upsert_df(
         table_name="pub_domains",
