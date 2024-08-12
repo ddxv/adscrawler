@@ -188,7 +188,9 @@ def clean_raw_txt_df(txt_df: pd.DataFrame) -> pd.DataFrame:
 
 
 def crawl_app_ads(database_connection: PostgresCon, limit: int | None = 5000) -> None:
-    df = query_pub_domains(database_connection=database_connection, limit=limit, exclude_recent_days=30)
+    df = query_pub_domains(
+        database_connection=database_connection, limit=limit, exclude_recent_days=30
+    )
     logger.info("Crawl app-ads from pub domains")
     for _i, row in df.iterrows():
         url = row.url
