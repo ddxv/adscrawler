@@ -65,15 +65,17 @@ class AdsTxtEmptyError(Exception):
     pass
 
 
+
 def get_app_ads_text(url: str) -> str:
-    ext_url = tldextract.extract(url)
+    ext = tldextract.extract(url)
+    use_top_domain = any(
+        [ext.subdomain == "m", "www" in ext.subdomain.split("."), ext.subdomain == ""],
+    )
     sub_domains_url = ""
-    if ext_url.subdomain:
-        # Note contains all subdomains, even m
-        # TODO: parse & exclude for m subdomain
-        sub_domains_url = ".".join(ext_url) + "/" + "app-ads.txt"
-        sub_domains_url = "http://" + sub_domains_url
-    top_domain_url = ".".join([ext_url.domain, ext_url.suffix]) + "/" + "app-ads.txt"
+    if ext.subdomain and not use_top_domain:
+        sub_domains_url = ".".join([ext.subdomain, ext.domain, ext.suffix])
+        sub_domains_url = "http://" + sub_domains_url + "/" + "app-ads.txt"
+    top_domain_url = ".".join([ext.domain, ext.suffix]) + "/" + "app-ads.txt"
     top_domain_url = "http://" + top_domain_url
     if sub_domains_url:
         try:
