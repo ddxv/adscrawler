@@ -434,3 +434,8 @@ FROM
         FROM
             store_apps
     ) AS sub;
+-- View indexes:
+CREATE UNIQUE INDEX category_mapping_idx
+ON public.category_mapping USING btree (
+    original_category, mapped_category
+);

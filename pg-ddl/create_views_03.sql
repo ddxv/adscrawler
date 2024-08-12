@@ -15,6 +15,10 @@ ORDER BY
     sa.store,
     cm.mapped_category;
 
+--DROP INDEX IF EXISTS idx_mv_app_categories;
+CREATE UNIQUE INDEX idx_mv_app_categories
+ON mv_app_categories (store, category);
+
 --DROP MATERIALIZED VIEW apps_new_weekly;
 CREATE MATERIALIZED VIEW apps_new_weekly AS
 WITH rankedapps AS (
