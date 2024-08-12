@@ -136,14 +136,13 @@ def main(args: argparse.Namespace) -> None:
             scrape_store_ranks(database_connection=PGCON, stores=stores)
         except Exception:
             logger.exception("Crawling front pages failed")
-        try:
-            crawl_developers_for_new_store_ids(database_connection=PGCON, store=2)
-        except Exception:
-            logger.exception("Crawling developers for Apple failed")
-        try:
-            crawl_developers_for_new_store_ids(database_connection=PGCON, store=1)
-        except Exception:
-            logger.exception("Crawling developers for Google failed")
+        for store in stores:
+            try:
+                crawl_developers_for_new_store_ids(
+                    database_connection=PGCON, store=store
+                )
+            except Exception:
+                logger.exception("Crawling developers for {store=} failed")
 
     # Update the app details
     if update_app_store_details:
