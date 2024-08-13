@@ -59,7 +59,7 @@ def download(store_id: str, do_redownload: bool = False) -> None:
                 if chunk:
                     file.write(chunk)
     else:
-        logger.error(f"{store_id=} Request failed with {r.status_code=} {r.text}")
+        logger.error(f"{store_id=} Request failed with {r.status_code=} {r.text[:50]}")
         raise requests.exceptions.HTTPError
     logger.info(f"{store_id=} download finished")
 
