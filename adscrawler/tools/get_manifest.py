@@ -14,7 +14,7 @@ from adscrawler.connection import PostgresCon
 from adscrawler.queries import get_most_recent_top_ranks, upsert_df
 from adscrawler.tools.download_apk import download
 
-logger = get_logger(__name__)
+logger = get_logger(__name__, "download_apk")
 
 
 APKS_DIR = pathlib.Path(MODULE_DIR, "apks/")
