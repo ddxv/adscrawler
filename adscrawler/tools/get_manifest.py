@@ -5,6 +5,8 @@ import os
 import pathlib
 from xml.etree import ElementTree
 
+import time
+
 import pandas as pd
 import requests
 import yaml
@@ -132,6 +134,7 @@ def download_and_unpack(store_id: str) -> None:
 def manifest_main(
     database_connection: PostgresCon, number_of_apps_to_pull: int = 20
 ) -> None:
+    error_count = 0
     store = 1
     collection_id = 1  # 'Top' Collection
     logger.info("Start APK processing")
@@ -143,6 +146,10 @@ def manifest_main(
     )
     logger.info(f"Start APK processing: {apps.shape=}")
     for _id, row in apps.iterrows():
+        if error_count > 5:
+            continue
+        if error_count > 0:
+            time.sleep(error_count * error_count * 10)
         crawl_result = 4
         store_id = row.store_id
         logger.info(f"{store_id=} start")
@@ -165,6 +172,8 @@ def manifest_main(
         except Exception as e:
             logger.exception(f"Unexpected error for {store_id=}: {str(e)}")
             crawl_result = 4  # Unexpected errors
+        if crawl_result in [3,4]:
+            error_count +=1
         details_df["store_app"] = row.store_app
         details_df["version_code"] = version_str
         version_code_df = details_df[["store_app", "version_code"]].drop_duplicates()
