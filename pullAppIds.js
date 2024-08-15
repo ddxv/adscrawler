@@ -53,7 +53,7 @@ async function loopDevelopers(country, numApps) {
     for (const devId of developerIds) {
         try {
             console.info(`devId=${devId}: start`);
-            const apps = await gplay.developer({ devId: devId, country: country, num: numApps });
+            const apps = await gplay.default.developer({ devId: devId, country: country, num: numApps });
 
             // Extract the appId from each app and add it to the allAppIds array
             const appIds = apps.map(app => app.appId);
