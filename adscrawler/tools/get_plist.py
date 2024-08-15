@@ -16,7 +16,7 @@ from adscrawler.connection import PostgresCon
 from adscrawler.queries import get_most_recent_top_ranks, upsert_df
 from adscrawler.tools.download_ipa import download, ipatool_auth
 
-logger = get_logger(__name__)
+logger = get_logger("download_ipa")
 
 
 IPAS_DIR = pathlib.Path(MODULE_DIR, "ipas/")
@@ -169,7 +169,7 @@ def plist_main(
         logger.info(f"{store_id=} start")
         details_df = row.to_frame().T
         version_str = "-1"
-        ipa_path = ""
+        ipa_path:None|pathlib.Path = None
         try:
             bundle_id = download_and_unpack(store_id=store_id)
             ipa_path = pathlib.Path(IPAS_DIR, f"{bundle_id}.ipa")
@@ -267,7 +267,6 @@ def main(args: argparse.Namespace) -> None:
     store_id = args.store_id
 
     download_and_unpack(store_id=store_id)
-
 
 if __name__ == "__main__":
     args = parse_args()
