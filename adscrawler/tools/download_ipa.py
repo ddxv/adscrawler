@@ -9,7 +9,7 @@ import pathlib
 
 from adscrawler.config import CONFIG, MODULE_DIR, get_logger
 
-logger = get_logger("download_ipa")
+logger = get_logger(__name__)
 
 
 # Replace with your email and password
