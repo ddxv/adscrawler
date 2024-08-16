@@ -6,7 +6,7 @@ import pandas as pd
 
 from adscrawler.config import MODULE_DIR, get_logger
 
-logger = get_logger(__name__)
+logger = get_logger("scrape_google")
 
 
 def scrape_app_gp(store_id: str, country: str, language: str = "") -> dict:

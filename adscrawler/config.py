@@ -33,18 +33,28 @@ def get_logger(mod_name: str) -> logging.Logger:
     filename = f"{LOG_DIR}/{mod_name}.log"
     # Writes to file
     rotate_handler = RotatingFileHandler(
-        filename=filename,
-        maxBytes=50000000,
-        backupCount=10,
-    )
+            filename=filename,
+            maxBytes=50000000,
+            backupCount=10,
+        )
+    if mod_name != 'adscrawler':
+        filename = f"{LOG_DIR}/adscrawler.log"
+        # Writes to file
+        specific_rotate_handler = RotatingFileHandler(
+            filename=filename,
+            maxBytes=50000000,
+            backupCount=10,
+        )
     # Stream handler for stdout
     logging.basicConfig(
         format=log_format,
         level=logging.INFO,
-        handlers=[rotate_handler, logging.StreamHandler()],
+        handlers=[rotate_handler, logging.StreamHandler(), specific_rotate_handler],
     )
     logger = logging.getLogger(mod_name)
     return logger
+
+
 
 
 # Set global handling of uncaught exceptions
