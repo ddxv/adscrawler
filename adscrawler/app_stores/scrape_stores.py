@@ -22,7 +22,6 @@ from adscrawler.app_stores.google import (
     scrape_app_gp,
     scrape_google_ranks,
 )
-from config import get_logger
 from adscrawler.connection import PostgresCon
 from adscrawler.queries import (
     delete_app_url_mapping,
@@ -35,6 +34,7 @@ from adscrawler.queries import (
     query_store_ids,
     upsert_df,
 )
+from config import get_logger
 
 logger = get_logger(__name__)
 

@@ -1,7 +1,7 @@
 import pandas as pd
 
-from config import MODULE_DIR, get_logger
 from adscrawler.queries import PostgresCon, upsert_df
+from config import MODULE_DIR, get_logger
 
 logger = get_logger(__name__)
 

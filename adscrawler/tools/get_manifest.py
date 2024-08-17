@@ -10,10 +10,10 @@ import pandas as pd
 import requests
 import yaml
 
-from config import MODULE_DIR, get_logger
 from adscrawler.connection import PostgresCon
 from adscrawler.queries import get_most_recent_top_ranks, upsert_df
 from adscrawler.tools.download_apk import download
+from config import MODULE_DIR, get_logger
 
 logger = get_logger("download_apk")
 
