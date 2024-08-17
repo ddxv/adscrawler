@@ -7,11 +7,11 @@ from adscrawler.app_stores.scrape_stores import (
     scrape_store_ranks,
     update_app_details,
 )
-from config import get_logger
 from adscrawler.connection import get_db_connection
 from adscrawler.scrape import crawl_app_ads
 from adscrawler.tools.get_manifest import manifest_main
 from adscrawler.tools.get_plist import plist_main
+from config import get_logger
 
 logger = get_logger(__name__)
 

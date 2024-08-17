@@ -1,14 +1,12 @@
 import logging
-from logging.handlers import RotatingFileHandler
-
 import os
-
-from logging import Formatter
-
 import pathlib
 import sys
 import tomllib
 import typing
+from logging import Formatter
+from logging.handlers import RotatingFileHandler
+from typing import Self
 
 HOME = pathlib.Path.home()
 TOP_CONFIGDIR = pathlib.Path(HOME, pathlib.Path(".config"))
@@ -42,7 +40,7 @@ class ColorFormatter(Formatter):
         'RESET': '\033[0m'  # Reset color
     }
 
-    def format(self, record):
+    def format(self:Self, record:logging.LogRecord) -> str:
         log_message = super().format(record)
         return f"{self.COLORS.get(record.levelname, self.COLORS['RESET'])}{log_message}{self.COLORS['RESET']}"
 
@@ -61,7 +59,7 @@ FORMATTER = ColorFormatter(MYFORMAT)
 FORMATTER.datefmt = "%Y-%m-%d %H:%M:%S"
 
 
-def get_logger(mod_name: str, sep_file='main') -> logging.Logger:
+def get_logger(mod_name: str, sep_file:str|None='main') -> logging.Logger:
 
     check_config_dirs()
 
