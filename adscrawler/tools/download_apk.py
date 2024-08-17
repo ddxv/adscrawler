@@ -11,7 +11,7 @@ import pathlib
 
 import requests
 
-from adscrawler.config import MODULE_DIR, get_logger
+from config import MODULE_DIR, get_logger
 
 logger = get_logger("download_apk")
 

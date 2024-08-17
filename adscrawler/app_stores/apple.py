@@ -6,7 +6,7 @@ import requests
 from itunes_app_scraper.scraper import AppStoreScraper
 from itunes_app_scraper.util import AppStoreCategories, AppStoreCollections
 
-from adscrawler.config import get_logger
+from config import get_logger
 
 logger = get_logger("scrape_apple")
 

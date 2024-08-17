@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 from sqlalchemy import text
 
-from adscrawler.config import get_logger
+from config import get_logger
 from adscrawler.connection import PostgresCon
 
 logger = get_logger(__name__)
