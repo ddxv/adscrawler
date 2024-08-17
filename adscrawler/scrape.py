@@ -6,7 +6,7 @@ import pandas as pd
 import requests
 import tldextract
 
-from adscrawler.config import get_logger
+from config import get_logger
 from adscrawler.connection import PostgresCon
 from adscrawler.queries import query_pub_domains, upsert_df
 

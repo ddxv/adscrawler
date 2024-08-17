@@ -22,7 +22,7 @@ from adscrawler.app_stores.google import (
     scrape_app_gp,
     scrape_google_ranks,
 )
-from adscrawler.config import get_logger
+from config import get_logger
 from adscrawler.connection import PostgresCon
 from adscrawler.queries import (
     delete_app_url_mapping,

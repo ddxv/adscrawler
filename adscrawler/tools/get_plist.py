@@ -11,7 +11,7 @@ import pandas as pd
 import requests
 
 from adscrawler.app_stores.apple import lookupby_id
-from adscrawler.config import MODULE_DIR, get_logger
+from config import MODULE_DIR, get_logger
 from adscrawler.connection import PostgresCon
 from adscrawler.queries import get_most_recent_top_ranks, upsert_df
 from adscrawler.tools.download_ipa import download, ipatool_auth
