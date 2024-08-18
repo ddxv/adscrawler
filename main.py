@@ -28,7 +28,7 @@ def script_has_process(args: argparse.Namespace) -> bool:
     ]
     # Limit only for app updates -u
     if args.update_app_store_details:
-        app_update_processes = [x for x in my_processes if x in [" -u", "--update-app-store-details"]]
+        app_update_processes = [x for x in my_processes if any([ " -u " in x or " --update-app-store-details" in x])]
         if args.platforms and len(args.platforms) > 0:
             logger.info(f"Checking {len(app_update_processes)=} for {args.platforms=}")
             app_update_processes = [
@@ -42,7 +42,7 @@ def script_has_process(args: argparse.Namespace) -> bool:
         return already_running
     # Limit only for app updates -m (apk downloads)
     if args.manifests:
-        apk_download_processes = [x for x in my_processes if x in ['-m', '--manifests']]
+        apk_download_processes = [x for x in my_processes if x in [' -m', ' --manifests']]
         logger.info(f"Found {len(apk_download_processes)=}")
         # Note: > 1 due to the searched always return at least 1
         if len(apk_download_processes) > 1:
