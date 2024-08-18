@@ -118,8 +118,10 @@ def crawl_ios_developers(
 
 def scrape_app_ios(store_id: str, country: str) -> dict:
     # NOTE: averageUserRating, Rating_count, Histogram are country specific
+    logger.info(f"Scrape app start {store_id=} {country=}")
     scraper = AppStoreScraper()
     result: dict = scraper.get_app_details(store_id, country=country, add_ratings=True)
+    logger.info(f"Scrape app finish {store_id=} {country=}")
     return result
 
 

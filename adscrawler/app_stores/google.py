@@ -24,12 +24,13 @@ def scrape_app_gp(store_id: str, country: str, language: str = "") -> dict:
     # paw_us = scrape_app_gp('com.originatorkids.paw', 'us')
     # paw_us['ratings']==paw_nl['ratings']
     # In the case above NL and US both have very different number of ratings
-
+    logger.info(f'scrape app start: {store_id=}, {country=}, {language=} scrape app start')
     result: dict = google_play_scraper.app(
         store_id,
         lang=language,
         country=country,  # defaults to 'en'  # defaults to 'us'
     )
+    logger.info(f'scrape app finish: {store_id=}, {country=}, {language=} scrape app start')
     return result
 
 
@@ -98,6 +99,7 @@ def call_js_to_update_file(filepath: str, is_developers: bool = False) -> None:
     cmd = f"node {MODULE_DIR}/pullAppIds.js"
     if is_developers:
         cmd += " --developers"
+    logger.info("Js pull start")
     os.system(cmd)
     logger.info("Js pull finished")
 

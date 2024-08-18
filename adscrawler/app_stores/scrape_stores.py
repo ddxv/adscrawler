@@ -36,7 +36,7 @@ from adscrawler.queries import (
 )
 from config import get_logger
 
-logger = get_logger(__name__)
+logger = get_logger(__name__, "scrape_stores")
 
 
 def scrape_store_ranks(database_connection: PostgresCon, stores: list[int]) -> None:
