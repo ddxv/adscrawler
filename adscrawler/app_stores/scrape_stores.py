@@ -312,10 +312,13 @@ def update_app_details(
     database_connection: PostgresCon,
     limit: int | None = 1000,
 ) -> None:
-    logger.info("Update App Details: start")
+    logger.info(f"{stores=} Update App Details: start")
     df = query_store_apps(stores, database_connection=database_connection, limit=limit)
+    if df.empty:
+        logger.info(f"{stores=} Update App Details: no apps to update no apps to update")
+        return
     crawl_stores_for_app_details(df, database_connection)
-    logger.info("Update App Details: finished")
+    logger.info(f"{stores=} Update App Details: finished")
 
 
 def crawl_stores_for_app_details(
@@ -325,16 +328,16 @@ def crawl_stores_for_app_details(
     info = f"Update App Details {df.shape[0]}"
     logger.info(info + " start!")
     for index, row in df.iterrows():
-        logger.info(f"{info}/{index=} start")
         store_id = row.store_id
         store = row.store
+        logger.info(f"{store=} {info}/{index=} start")
         if "app_url_id" in row:
             app_url_id = row.app_url_id
             app_url_id = None if pd.isna(app_url_id) else int(app_url_id)
         else:
             app_url_id = None
         update_all_app_info(store, store_id, database_connection, app_url_id)
-        logger.info(f"{info}/{index=} finished")
+        logger.info(f"{store=} {info}/{index=} finished")
     logger.info(info + " finished!")
 
 
