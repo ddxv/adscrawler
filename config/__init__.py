@@ -6,7 +6,6 @@ import tomllib
 import typing
 from logging import Formatter
 from logging.handlers import RotatingFileHandler
-from typing import Self
 
 HOME = pathlib.Path.home()
 TOP_CONFIGDIR = pathlib.Path(HOME, pathlib.Path(".config"))
@@ -31,29 +30,12 @@ def check_config_dirs() -> None:
 
 
 
-class ColorFormatter(Formatter):
-    COLORS = {
-        'DEBUG': '\033[94m',  # Blue
-        'WARNING': '\033[93m',  # Yellow
-        'ERROR': '\033[91m',  # Red
-        'CRITICAL': '\033[95m',  # Magenta
-        'RESET': '\033[0m'  # Reset color
-    }
 
-    def format(self:Self, record:logging.LogRecord) -> str:
-        log_message = super().format(record)
-        return f"{self.COLORS.get(record.levelname, self.COLORS['RESET'])}{log_message}{self.COLORS['RESET']}"
-
-
-MYFORMAT = ("%(asctime)s.%(msecs)03d | "
+FORMATTER = Formatter("%(asctime)s.%(msecs)03d | "
     "%(process)d | "
     "%(levelname)-5s | "
     "%(filename)s:%(lineno)d | "
     "%(message)s")
-
-
-# Create a formatter with the custom format
-FORMATTER = ColorFormatter(MYFORMAT)
 
 
 FORMATTER.datefmt = "%Y-%m-%d %H:%M:%S"
