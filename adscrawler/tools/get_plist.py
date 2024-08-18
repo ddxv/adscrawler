@@ -16,7 +16,7 @@ from adscrawler.queries import get_most_recent_top_ranks, upsert_df
 from adscrawler.tools.download_ipa import download, ipatool_auth
 from config import MODULE_DIR, get_logger
 
-logger = get_logger("download_ipa")
+logger = get_logger(__name__, "download_ipa")
 
 
 IPAS_DIR = pathlib.Path(MODULE_DIR, "ipas/")

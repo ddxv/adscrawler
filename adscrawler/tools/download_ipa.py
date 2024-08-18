@@ -9,7 +9,7 @@ import pathlib
 
 from config import CONFIG, MODULE_DIR, get_logger
 
-logger = get_logger("download_ipa")
+logger = get_logger(__name__, "download_ipa")
 
 
 # Replace with your email and password

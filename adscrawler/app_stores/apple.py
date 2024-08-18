@@ -8,7 +8,7 @@ from itunes_app_scraper.util import AppStoreCategories, AppStoreCollections
 
 from config import get_logger
 
-logger = get_logger("scrape_apple")
+logger = get_logger(__name__, "scrape_apple")
 
 ITUNES_LOOKUP_API = "https://itunes.apple.com/lookup"
 
