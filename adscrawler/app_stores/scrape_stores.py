@@ -59,9 +59,9 @@ def scrape_store_ranks(database_connection: PostgresCon, stores: list[int]) -> N
                 categories_map=categories_map,
                 countries_map=countries_map,
             )
-        except Exception:
+        except Exception as e:
             logger.exception(
-                f"Srape iOS collection={collection_keyword} hit error, skipping",
+                f"Srape iOS collection={collection_keyword} hit error={e}, skipping",
             )
 
     if 1 in stores:
@@ -75,8 +75,8 @@ def scrape_store_ranks(database_connection: PostgresCon, stores: list[int]) -> N
                 categories_map=categories_map,
                 countries_map=countries_map,
             )
-        except Exception:
-            logger.exception("Scrape google ranks hit error, skipping")
+        except Exception as e:
+            logger.exception(f"Scrape google ranks hit error={e}, skipping")
         try:
             dicts = get_apkcombo_android_apps()
             process_scraped(

@@ -151,6 +151,7 @@ def manifest_main(
             time.sleep(error_count * error_count * 10)
         crawl_result = 4
         store_id = row.store_id
+        #store_id = 'com.facebook.katana'
         logger.info(f"{store_id=} start")
         details_df = row.to_frame().T
         version_str = "-1"
@@ -177,7 +178,7 @@ def manifest_main(
         details_df["version_code"] = version_str
         version_code_df = details_df[["store_app", "version_code"]].drop_duplicates()
         version_code_df["crawl_result"] = crawl_result
-        logger.info(f"{store_id=} inserts")
+        logger.info(f"{store_id=} insert to db")
         upserted: pd.DataFrame = upsert_df(
             df=version_code_df,
             table_name="version_codes",

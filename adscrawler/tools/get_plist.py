@@ -141,6 +141,7 @@ def ipa_frameworks() -> pd.DataFrame:
 
 
 def download_and_unpack(store_id: str) -> str:
+    #store_id = '835599320'
     r = lookupby_id(app_id=store_id)
     bundle_id: str = r["bundleId"]
     ipa_path = pathlib.Path(IPAS_DIR, f"{bundle_id}.ipa")
