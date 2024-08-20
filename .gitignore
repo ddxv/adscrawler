@@ -2,6 +2,9 @@
 config.yml
 store-data/
 
+# check-testing
+mycheck.py
+
 # directory for downloaded apks
 apks/
 apksunzipped/
