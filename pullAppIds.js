@@ -1,6 +1,36 @@
 const yargs = require('yargs/yargs');
 const fs = require('fs');
 
+const yargs = require('yargs/yargs');
+const fs = require('fs');
+const path = require('path');
+
+// Ensure the log directory exists
+const logDir = path.join(process.env.HOME, '.config/adscrawler/logs');
+if (!fs.existsSync(logDir)) {
+    fs.mkdirSync(logDir, { recursive: true });
+}
+
+// Create a write stream for logging
+const logFile = path.join(logDir, 'pulljs.log');
+const logStream = fs.createWriteStream(logFile, { flags: 'a' });
+
+// Override console methods
+console.log = function (message, ...optionalParams) {
+    logStream.write(`[LOG ${new Date().toISOString()}] ${message} ${optionalParams.join(' ')}\n`);
+    process.stdout.write(`[LOG ${new Date().toISOString()}] ${message} ${optionalParams.join(' ')}\n`);
+};
+
+console.error = function (message, ...optionalParams) {
+    logStream.write(`[ERROR ${new Date().toISOString()}] ${message} ${optionalParams.join(' ')}\n`);
+    process.stderr.write(`[ERROR ${new Date().toISOString()}] ${message} ${optionalParams.join(' ')}\n`);
+};
+
+console.warn = function (message, ...optionalParams) {
+    logStream.write(`[WARN ${new Date().toISOString()}] ${message} ${optionalParams.join(' ')}\n`);
+    process.stderr.write(`[WARN ${new Date().toISOString()}] ${message} ${optionalParams.join(' ')}\n`);
+};
+
 (async () => {
     const gplay = await import('google-play-scraper');
 
