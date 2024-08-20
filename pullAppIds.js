@@ -1,8 +1,5 @@
 const yargs = require('yargs/yargs');
 const fs = require('fs');
-
-const yargs = require('yargs/yargs');
-const fs = require('fs');
 const path = require('path');
 
 // Ensure the log directory exists
