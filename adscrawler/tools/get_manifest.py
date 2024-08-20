@@ -151,7 +151,6 @@ def manifest_main(
             time.sleep(error_count * error_count * 10)
         crawl_result = 4
         store_id = row.store_id
-        #store_id = 'com.facebook.katana'
         logger.info(f"{store_id=} start")
         details_df = row.to_frame().T
         version_str = "-1"
