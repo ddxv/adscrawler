@@ -58,7 +58,7 @@ def get_logger(mod_name: str, sep_file:str|None='main') -> logging.Logger:
     indiv_handler = RotatingFileHandler(
         filename=os.path.join(LOG_DIR, f'{sep_file}.log'),
         maxBytes=50*1024*1024,
-        backupCount=5
+        backupCount=10
     )
     indiv_handler.setFormatter(FORMATTER)
     logger.addHandler(indiv_handler)
@@ -70,7 +70,7 @@ def get_logger(mod_name: str, sep_file:str|None='main') -> logging.Logger:
             main_handler = RotatingFileHandler(
                 filename=os.path.join(LOG_DIR, 'main.log'),
                 maxBytes=50*1024*1024,
-                backupCount=20
+                backupCount=10
             )
             main_handler.setFormatter(FORMATTER)
             root_logger.addHandler(main_handler)

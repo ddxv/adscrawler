@@ -34,7 +34,7 @@ def script_has_process(args: argparse.Namespace) -> bool:
             app_update_processes = [
                 x for x in app_update_processes if any([p in x for p in args.platforms])
             ]
-            # Note: > 1 due to the searched always return at least 1
+            # Note: > 1 due to the current process always return at least 1
             if len(app_update_processes) > 1:
                 logger.info(f"Already running {app_update_processes=}")
                 already_running = True
@@ -44,7 +44,7 @@ def script_has_process(args: argparse.Namespace) -> bool:
     if args.manifests:
         apk_download_processes = [x for x in my_processes if any([' -m' in x or ' --manifests' in x])]
         logger.info(f"Found {len(apk_download_processes)=}")
-        # Note: > 1 due to the searched always return at least 1
+        # Note: > 1 due to the current process always return at least 1
         if len(apk_download_processes) > 1:
             logger.info(f"Already running {apk_download_processes=}")
             already_running = True
