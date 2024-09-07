@@ -98,7 +98,7 @@ def crawl_ios_developers(
 ) -> pd.DataFrame:
     store = 2
     ios_scraper = AppStoreScraper()
-    apps = ios_scraper.get_apps_for_developer(developer_id=developer_id)
+    apps = ios_scraper.get_apps_for_developer(developer_id=developer_id, timeout=10)
     my_devices = ["iphone", "ipad"]
     apps = [
         x
@@ -120,7 +120,7 @@ def scrape_app_ios(store_id: str, country: str) -> dict:
     # NOTE: averageUserRating, Rating_count, Histogram are country specific
     logger.info(f"Scrape app start {store_id=} {country=}")
     scraper = AppStoreScraper()
-    result: dict = scraper.get_app_details(store_id, country=country, add_ratings=True)
+    result: dict = scraper.get_app_details(store_id, country=country, add_ratings=True, timeout=10)
     logger.info(f"Scrape app finish {store_id=} {country=}")
     return result
 
