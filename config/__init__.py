@@ -57,7 +57,7 @@ def get_logger(mod_name: str, sep_file:str|None='main') -> logging.Logger:
     # Add file handler for individual log file
     indiv_handler = RotatingFileHandler(
         filename=os.path.join(LOG_DIR, f'{sep_file}.log'),
-        maxBytes=50*1024*1024,  # 10MB
+        maxBytes=50*1024*1024,
         backupCount=5
     )
     indiv_handler.setFormatter(FORMATTER)
@@ -69,8 +69,8 @@ def get_logger(mod_name: str, sep_file:str|None='main') -> logging.Logger:
             # Add main file handler if it doesn't exist
             main_handler = RotatingFileHandler(
                 filename=os.path.join(LOG_DIR, 'main.log'),
-                maxBytes=50*1024*1024,  # 10MB
-                backupCount=5
+                maxBytes=50*1024*1024,
+                backupCount=20
             )
             main_handler.setFormatter(FORMATTER)
             root_logger.addHandler(main_handler)
