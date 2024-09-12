@@ -293,11 +293,12 @@ def query_store_apps(
                             AND crawl_result = 1 OR crawl_result IS NULL
                         )
                         """
+        group_time_str += " OR "
     else:
         group_time_str = ""
     installs_and_dates_str = f""" AND (
                         {group_time_str}
-                        OR sa.updated_at <= '{max_recrawl_date}'
+                        sa.updated_at <= '{max_recrawl_date}'
                         OR crawl_result IS NULL
                         )
                         """
