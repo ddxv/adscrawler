@@ -142,14 +142,14 @@ def main(args: argparse.Namespace) -> None:
                     database_connection=PGCON, store=store
                 )
             except Exception:
-                logger.exception("Crawling developers for {store=} failed")
+                logger.exception(f"Crawling developers for {store=} failed")
 
     # Update the app details
     if update_app_store_details:
         if no_limits:
             limit = None
         else:
-            limit = 20000
+            limit = 5000
         update_app_details(stores, PGCON, limit=limit)
 
     # Crawl developwer websites to check for app ads
