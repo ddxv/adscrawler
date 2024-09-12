@@ -34,8 +34,15 @@ def script_has_process(args: argparse.Namespace) -> bool:
             app_update_processes = [
                 x for x in app_update_processes if any([p in x for p in args.platforms])
             ]
+            if args.update_app_store_details_group:
+                logger.info(f"Checking {len(app_update_processes)=} for {args.platforms=}")
+                app_update_groups = [
+                x for x in app_update_processes if args.update_app_store_details_group in x
+            ]
+            else:
+                app_update_groups = []
             # Note: > 1 due to the current process always return at least 1
-            if len(app_update_processes) > 1:
+            if len(app_update_processes) + len(app_update_groups) > 1:
                 logger.info(f"Already running {app_update_processes=}")
                 already_running = True
             return already_running
@@ -97,6 +104,13 @@ def manage_cli_args() -> argparse.Namespace:
         action="store_true",
     )
     parser.add_argument(
+        "-g",
+        "--update-app-store-details-group",
+        default="",
+        type=str,
+        help="Interval group to update, string of short or long, if left blank updates all",
+    )
+    parser.add_argument(
         "-a",
         "--app-ads-txt-scrape",
         help="Scrape app stores for app details, ie downloads",
@@ -125,6 +139,9 @@ def main(args: argparse.Namespace) -> None:
     update_app_store_details = (
         args.update_app_store_details if "args" in locals() else False
     )
+    update_app_group = (
+        args.update_app_store_details_group if "args" in locals() else ""
+    )
     app_ads_txt_scrape = args.app_ads_txt_scrape if "args" in locals() else False
     stores = []
     stores.append(1) if "google" in platforms else None
@@ -150,7 +167,7 @@ def main(args: argparse.Namespace) -> None:
             limit = None
         else:
             limit = 5000
-        update_app_details(stores, PGCON, limit=limit)
+        update_app_details(stores, PGCON, group=update_app_group, limit=limit)
 
     # Crawl developwer websites to check for app ads
     if app_ads_txt_scrape:

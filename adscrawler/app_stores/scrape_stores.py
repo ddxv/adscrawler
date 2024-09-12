@@ -310,10 +310,11 @@ def crawl_developers_for_new_store_ids(
 def update_app_details(
     stores: list[int],
     database_connection: PostgresCon,
+    group:str,
     limit: int | None = 1000,
 ) -> None:
     logger.info(f"{stores=} Update App Details: start")
-    df = query_store_apps(stores, database_connection=database_connection, limit=limit)
+    df = query_store_apps(stores, database_connection=database_connection, group=group, limit=limit)
     if df.empty:
         logger.info(f"{stores=} Update App Details: no apps to update no apps to update")
         return

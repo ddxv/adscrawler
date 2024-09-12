@@ -258,6 +258,7 @@ def delete_app_url_mapping(app_url_id: int, database_connection: PostgresCon) ->
 def query_store_apps(
     stores: list[int],
     database_connection: PostgresCon,
+    group: str = "short",
     limit: int | None = 1000,
 ) -> pd.DataFrame:
     short_update_days = 6
@@ -277,19 +278,25 @@ def query_store_apps(
         datetime.datetime.now(tz=datetime.UTC)
         - datetime.timedelta(days=max_recrawl_days)
     ).strftime("%Y-%m-%d")
-    installs_and_dates_str = f""" AND (
-                        (
+    if group == 'long':
+        group_time_str = f"""(
+                            sa.updated_at <= '{long_update_date}'
+                            AND crawl_result = 1
+                           )"""
+    elif group == 'short':
+        group_time_str = f"""(
                             (
                              installs >= {short_update_installs}
                              OR rating_count >= {short_update_ratings}
                             )
                             AND sa.updated_at <= '{short_update_date}'
                             AND crawl_result = 1 OR crawl_result IS NULL
-                        ) 
-                        OR (
-                            sa.updated_at <= '{long_update_date}'
-                            AND crawl_result = 1
-                           )
+                        )
+                        """
+    else:
+        group_time_str = ""
+    installs_and_dates_str = f""" AND (
+                        {group_time_str}
                         OR sa.updated_at <= '{max_recrawl_date}'
                         OR crawl_result IS NULL
                         )
