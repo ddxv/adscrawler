@@ -36,13 +36,11 @@ def script_has_process(args: argparse.Namespace) -> bool:
             ]
             if args.update_app_store_details_group:
                 logger.info(f"Checking {len(app_update_processes)=} for {args.platforms=}")
-                app_update_groups = [
+                app_update_processes = [
                 x for x in app_update_processes if args.update_app_store_details_group in x
             ]
-            else:
-                app_update_groups = []
             # Note: > 1 due to the current process always return at least 1
-            if len(app_update_processes) + len(app_update_groups) > 1:
+            if len(app_update_processes) > 1:
                 logger.info(f"Already running {app_update_processes=}")
                 already_running = True
             return already_running
