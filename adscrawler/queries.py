@@ -281,6 +281,10 @@ def query_store_apps(
     if group == 'long':
         group_time_str = f"""(
                             sa.updated_at <= '{long_update_date}'
+                            AND (
+                                installs < {short_update_installs} 
+                                OR rating_count < {short_update_ratings}
+                            )
                             AND crawl_result = 1
                            )"""
     elif group == 'short':
