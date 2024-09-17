@@ -278,32 +278,39 @@ def query_store_apps(
         datetime.datetime.now(tz=datetime.UTC)
         - datetime.timedelta(days=max_recrawl_days)
     ).strftime("%Y-%m-%d")
-    if group == 'long':
-        group_time_str = f"""(
+    long_group = f"""(
                             sa.updated_at <= '{long_update_date}'
                             AND (
                                 installs < {short_update_installs} 
                                 OR rating_count < {short_update_ratings}
                             )
-                            AND crawl_result = 1
-                           )"""
-    elif group == 'short':
-        group_time_str = f"""(
+                            AND (crawl_result = 1 OR crawl_result IS NULL)
+                           )
+                    """
+    short_group = f"""(
                             (
                              installs >= {short_update_installs}
                              OR rating_count >= {short_update_ratings}
                             )
                             AND sa.updated_at <= '{short_update_date}'
-                            AND crawl_result = 1 OR crawl_result IS NULL
+                            AND (crawl_result = 1 OR crawl_result IS NULL)
                         )
                         """
-        group_time_str += " OR "
-    else:
-        group_time_str = ""
-    installs_and_dates_str = f""" AND (
-                        {group_time_str}
-                        sa.updated_at <= '{max_recrawl_date}'
+    max_group = f"""sa.updated_at <= '{max_recrawl_date}'
                         OR crawl_result IS NULL
+                        )
+        """
+    if group == 'short':
+        installs_and_dates_str = f""" AND {short_group} """
+    elif group == 'long':
+        installs_and_dates_str = f""" AND {long_group}"""
+    elif group == 'max':
+        installs_and_dates_str = f""" AND {max_group}"""
+    else:
+        installs_and_dates_str = f""" AND (
+                        {short_group}
+                        OR {long_group}
+                        OR {max_group}
                         )
                         """
     where_str = "store IN (" + (", ").join([str(x) for x in stores]) + ")"
