@@ -296,7 +296,8 @@ def query_store_apps(
                             AND (crawl_result = 1 OR crawl_result IS NULL)
                         )
                         """
-    max_group = f"""sa.updated_at <= '{max_recrawl_date}'
+    max_group = f"""(
+                        sa.updated_at <= '{max_recrawl_date}'
                         OR crawl_result IS NULL
                         )
         """
