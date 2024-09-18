@@ -301,20 +301,20 @@ def query_store_apps(
                         )
         """
     if group == 'short':
-        installs_and_dates_str = f""" AND {short_group} """
+        installs_and_dates_str = short_group
     elif group == 'long':
-        installs_and_dates_str = f""" AND {long_group}"""
+        installs_and_dates_str = long_group
     elif group == 'max':
-        installs_and_dates_str = f""" AND {max_group}"""
+        installs_and_dates_str = max_group
     else:
-        installs_and_dates_str = f""" AND (
+        installs_and_dates_str = f"""(
                         {short_group}
                         OR {long_group}
                         OR {max_group}
                         )
                         """
     where_str = "store IN (" + (", ").join([str(x) for x in stores]) + ")"
-    where_str += installs_and_dates_str
+    where_str += f""" AND {installs_and_dates_str}"""
     limit_str = ""
     if limit:
         limit_str = f"LIMIT {limit}"
