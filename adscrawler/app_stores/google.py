@@ -29,6 +29,7 @@ def scrape_app_gp(store_id: str, country: str, language: str = "") -> dict:
         store_id,
         lang=language,
         country=country,  # defaults to 'en'  # defaults to 'us'
+        timeout=10
     )
     logger.info(f'scrape app finish: {store_id=}, {country=}, {language=} scrape app start')
     return result

@@ -11,7 +11,8 @@ dependencies = [
     'requests',
     'pandas',
     'sqlalchemy',
-    'google-play-scraper',
+    # 'google-play-scraper',
+    'git+https://github.com/ddxv/google-play-scraper.git',
     'tldextract',
     'git+https://github.com/ddxv/itunes-app-scraper.git',
     'sshtunnel',
@@ -76,8 +77,9 @@ templater = 'placeholder'
 verbose = 2
 dialect = 'postgres'
 large_file_skip_byte_limit = 0
-exclude_rules = ['AM04', # using *, agreed this should be TODO, 
-'']
+exclude_rules = [
+    'AM04', # using *, agreed this should be TODO, 
+]
 
 [tool.sqlfluff.templater.placeholder]
 param_style = 'colon'
