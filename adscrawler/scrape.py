@@ -22,7 +22,11 @@ def request_app_ads(ads_url: str) -> str:
     max_bytes = 100000
     if ads_url[0:4] != "http":
         ads_url = "http://" + ads_url
-    response = requests.get(ads_url, stream=True, timeout=2)
+    try:
+        response = requests.get(ads_url, stream=True, timeout=2)
+    except requests.exceptions.ConnectionError:
+        err = f"{ads_url} type: requests ConnectionError"
+        raise NoAdsTxtError(err) from ConnectionError
     if response.status_code == 403:
         headers = {
             "User-Agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:84.0)",
