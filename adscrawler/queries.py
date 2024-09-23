@@ -453,8 +453,12 @@ def get_most_recent_top_ranks(
             LEFT JOIN latest_version_codes vc ON
                 vc.store_app = dc.store_app
             WHERE
-                vc.updated_at IS NULL
-                OR vc.updated_at < current_date - INTERVAL '45 days'
+                vc.updated_at IS NULL OR
+                (
+                (vc.crawl_result = 1 AND vc.updated_at < current_date - INTERVAL '60 days')
+                OR
+                (vc.crawl_result IN (2,3,4) AND vc.updated_at < current_date - INTERVAL '30 days')
+                )
             ORDER BY
                 installs DESC, rating_count DESC
             LIMIT {limit}
