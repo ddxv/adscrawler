@@ -19,7 +19,7 @@ logger = get_logger(__name__)
 
 
 def request_app_ads(ads_url: str) -> str:
-    max_bytes = 100000
+    max_bytes = 1000000
     if ads_url[0:4] != "http":
         ads_url = "http://" + ads_url
     try:
