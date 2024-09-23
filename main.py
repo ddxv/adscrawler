@@ -58,7 +58,11 @@ class ProcessManager:
         processes = self.get_running_processes()
         my_processes = self.filter_processes(processes, "/adscrawler/main.py")
         apk_download_processes = [x for x in my_processes if any([' -m' in x, ' --manifests' in x])]
+        if self.args.platforms:
+            apk_download_processes = [x for x in apk_download_processes if any(p in x for p in self.args.platforms)]
 
+        if self.args.update_app_store_details_group:
+            apk_download_processes = [x for x in apk_download_processes if self.args.update_app_store_details_group in x]
         return len(apk_download_processes) > 1
 
     def check_ads_txt_download_processes(self) -> bool:
@@ -98,7 +102,7 @@ class ProcessManager:
             self.crawl_app_ads()
 
         if self.args.manifests:
-            self.scrape_manifests()
+            self.scrape_manifests(stores)
 
         logger.info("Adscrawler exiting main")
 
@@ -121,15 +125,17 @@ class ProcessManager:
         limit: int | None = None if self.args.no_limits else 5000
         crawl_app_ads(self.pgcon, limit=limit)
 
-    def scrape_manifests(self) -> None:
-        try:
-            plist_main(database_connection=self.pgcon, number_of_apps_to_pull=20)
-        except Exception:
-            logger.exception("iTunes scrape plist failing")
-        try:
-            manifest_main(database_connection=self.pgcon, number_of_apps_to_pull=20)
-        except Exception:
-            logger.exception("Android scrape manifests failing")
+    def scrape_manifests(self, stores: list[int]) -> None:
+        if 2 in stores:
+            try:
+                plist_main(database_connection=self.pgcon, number_of_apps_to_pull=20)
+            except Exception:
+                logger.exception("iTunes scrape plist failing")
+        if 1 in stores:
+            try:
+                manifest_main(database_connection=self.pgcon, number_of_apps_to_pull=20)
+            except Exception:
+                logger.exception("Android scrape manifests failing")
 
     def run(self) -> None:
         if self.args.limit_processes and self.is_script_already_running():
