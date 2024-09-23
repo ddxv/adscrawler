@@ -42,7 +42,7 @@ def check_dirs() -> None:
 
 def empty_folder(pth: pathlib.Path) -> None:
     for sub in pth.iterdir():
-        if sub.is_dir():
+        if sub.is_dir() and not sub.is_symlink():
             empty_folder(sub)
             os.rmdir(sub)
         else:
