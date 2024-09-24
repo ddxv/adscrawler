@@ -460,7 +460,15 @@ def get_most_recent_top_ranks(
                 (vc.crawl_result IN (2,3,4) AND vc.updated_at < current_date - INTERVAL '30 days')
                 )
             ORDER BY
-                installs DESC, rating_count DESC
+            (CASE
+                WHEN crawl_result IS NULL THEN 0
+                ELSE 1
+            END),
+            GREATEST(
+                    COALESCE(installs, 0),
+                    COALESCE(CAST(rating_count AS bigint), 0)*50
+                )
+            DESC NULLS LAST
             LIMIT {limit}
             ;
     """
