@@ -16,7 +16,9 @@ ITUNES_LOOKUP_API = "https://itunes.apple.com/lookup"
 def lookupby_id(app_id: str) -> dict:
     response = requests.get(ITUNES_LOOKUP_API, params={"id": app_id})
     if response.status_code != 200:
-        logger.error(f"Response code not 200: {response.text}")
+        msg = "Response code not 200: {response.text}"
+        logger.error(msg)
+        raise requests.HTTPError(msg)
     try:
         resp_dict: dict = response.json()["results"][0]
     except Exception:
