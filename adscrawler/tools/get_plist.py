@@ -91,12 +91,14 @@ def unpack_and_attach(
 
 def get_parsed_plist() -> tuple[str, str, pd.DataFrame]:
     payload_dir = pathlib.Path(MODULE_DIR, "ipasunzipped/Payload")
+    ipa_filename = None
     for app_dir in payload_dir.glob("*"):  # '*' will match any directory inside Payload
         plist_info_path = app_dir / "Info.plist"  # Construct the path to plist.Info
         if plist_info_path.exists():
             logger.info(f"Found plist.Info at: {plist_info_path}")
-            # Add your processing logic here
             ipa_filename = pathlib.Path(plist_info_path)
+    if ipa_filename is None:
+        raise FileNotFoundError
     # Load the XML file
     with ipa_filename.open("rb") as f:
         plist_bytes = f.read()
