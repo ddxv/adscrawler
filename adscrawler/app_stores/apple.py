@@ -21,9 +21,9 @@ def lookupby_id(app_id: str) -> dict:
         raise requests.HTTPError(msg)
     try:
         resp_dict: dict = response.json()["results"][0]
-    except Exception:
-        logger.error("Unable to parse response")
-        resp_dict = {}
+    except Exception as err:
+        logger.exception("Unable to parse response")
+        raise requests.HTTPError(err) from err
     return resp_dict
 
 
