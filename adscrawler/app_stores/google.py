@@ -1,5 +1,6 @@
 import json
 import os
+import subprocess
 
 import google_play_scraper
 import pandas as pd
@@ -162,3 +163,18 @@ def crawl_google_developers(
     else:
         apps_df = pd.DataFrame(columns=["store", "store_id"])
     return apps_df
+
+def search_play_store(search_term:str)-> dict:
+    """Search store for new apps or keyword rankings.
+    """
+
+    # Call the Node.js script that runs google-play-scraper
+    process = subprocess.Popen(['node', 'searchApps.js', search_term, '20'], stdout=subprocess.PIPE)
+    output, error = process.communicate()
+
+    if error:
+        logger.error(f'failed to search: {error!r}')
+
+    result:dict = json.loads(output)
+    return result
+
