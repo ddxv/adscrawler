@@ -228,6 +228,7 @@ def extract_domains(x: str) -> str:
     return url
 
 
+
 def crawl_developers_for_new_store_ids(
     database_connection: PostgresCon,
     store: int,
