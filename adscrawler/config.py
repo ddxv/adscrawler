@@ -11,7 +11,7 @@ HOME = pathlib.Path.home()
 TOP_CONFIGDIR = pathlib.Path(HOME, pathlib.Path(".config"))
 CONFIG_DIR = pathlib.Path(TOP_CONFIGDIR, pathlib.Path("adscrawler"))
 LOG_DIR = pathlib.Path(CONFIG_DIR, pathlib.Path("logs"))
-MODULE_DIR = pathlib.Path(__file__).resolve().parent.parent.parent
+MODULE_DIR = pathlib.Path(__file__).resolve().parent
 
 
 @typing.no_type_check

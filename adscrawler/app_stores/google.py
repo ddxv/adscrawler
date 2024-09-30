@@ -174,9 +174,9 @@ def search_play_store(search_term:str)-> list[dict]:
     if 'local-dev' in CONFIG.keys():
         node_path = CONFIG['local-dev'].get('node_env')
 
-    logger.info(f"Will try calling node with {node_path} {MODULE_DIR}/searchApps.js")
+    logger.info(f"Will try calling node with {node_path} {MODULE_DIR}/static/searchApps.js")
 
-    process = subprocess.Popen([node_path, f'{MODULE_DIR}/searchApps.js', search_term, '20'], stdout=subprocess.PIPE)
+    process = subprocess.Popen([node_path, f'{MODULE_DIR}/static/searchApps.js', search_term, '20'], stdout=subprocess.PIPE)
     output, error = process.communicate()
 
     if error:

@@ -28,6 +28,9 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools.packages]
 find = {}
 
+[tool.setuptools.package-data]
+adscrawler = ["static/*"]
+
 [tool.ruff]
 target-version = "py312"
 lint.select = [
