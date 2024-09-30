@@ -169,7 +169,12 @@ def search_play_store(search_term:str)-> list[dict]:
     """
     logger.info("adscrawler to call playstore search")
     # Call the Node.js script that runs google-play-scraper
-    process = subprocess.Popen(['node', f'{MODULE_DIR}/searchApps.js', search_term, '20'], stdout=subprocess.PIPE)
+    node_path_loc = subprocess.run(['which', 'node'], capture_output=True, text=True, check=True)
+    node_path:str = node_path_loc.stdout.strip()
+
+    logger.info(f"Will try calling node with {node_path} {MODULE_DIR}/searchApps.js")
+
+    process = subprocess.Popen([node_path, f'{MODULE_DIR}/searchApps.js', search_term, '20'], stdout=subprocess.PIPE)
     output, error = process.communicate()
 
     if error:
@@ -185,7 +190,7 @@ def search_play_store(search_term:str)-> list[dict]:
             result['name'] = result.pop('title')
             result['developer_name'] = result.pop('developer')
             result['icon_url_512'] = result.pop('icon')
-            result['store']=1
+            result['store'] = 1
 
     return results
 
