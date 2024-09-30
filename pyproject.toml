@@ -2,7 +2,10 @@
 authors = [{ name = "James O'Claire" }]
 name = "adscrawler"
 description = "project description adscrawler"
-version = "0.1.25"
+#version = "0.1.25"
+dynamic = ["version"]
+
+[tool.setuptools_scm]
 
 dependencies = [
     'requests',
@@ -20,8 +23,9 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pre-commit", "bump2version"]
 
+
 [build-system]
-requires = ["setuptools", "wheel"]
+requires = ["setuptools>=64", "setuptools_scm>=8"]
 build-backend = "setuptools.build_meta"
 
 
