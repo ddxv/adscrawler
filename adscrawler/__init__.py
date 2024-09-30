@@ -1,3 +1,3 @@
-from . import app_stores, config, connection
+from . import config, connection
 
-__all__ = ['config', 'connection', 'app_stores']
+__all__ = ['config', 'connection']
