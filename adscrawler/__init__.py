@@ -1,3 +1,3 @@
-from . import app_stores
+# from . import app_stores
 
-__all__ = ['app_stores']
+# __all__ = ['app_stores']
