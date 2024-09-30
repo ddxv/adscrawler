@@ -1,6 +1,6 @@
 # adscrawler/app_stores/__init__.py
 
 # Import google from google.py
-from .google import google
+import adscrawler.app_stores.google as google
 
 __all__ = ['google']
