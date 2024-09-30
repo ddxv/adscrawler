@@ -4,21 +4,22 @@ name = "adscrawler"
 description = "project description adscrawler"
 version = "0.1.2"
 
-[project.optional-dependencies]
-dev = ["pre-commit", "bump2version"]
-
 dependencies = [
     'requests',
     'pandas',
     'sqlalchemy',
-    'google-play-scraper @ git+https://github.com/ddxv/google-play-scraper@main',
+    'google-play-scraper @ git+https://github.com/ddxv/google-play-scraper',
     'tldextract',
-    'itunes-app-scraper @ git+https://github.com/ddxv/itunes-app-scraper@main',
+    'itunes-app-scraper-dmi @ git+https://github.com/ddxv/itunes-app-scraper.git',
     'sshtunnel',
     'selenium',
     'pyyaml',
     "psycopg2-binary",
 ]
+
+[project.optional-dependencies]
+dev = ["pre-commit", "bump2version"]
+
 
 [build-system]
 requires = ["setuptools", "wheel"]

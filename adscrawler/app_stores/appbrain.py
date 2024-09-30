@@ -3,7 +3,7 @@ import time
 
 import requests
 
-from config import get_logger
+from adscrawler.config import get_logger
 
 logger = get_logger(__name__)
 

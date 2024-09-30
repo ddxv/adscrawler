@@ -7,7 +7,7 @@ CONFIG will expect apple: email, password
 import os
 import pathlib
 
-from config import CONFIG, MODULE_DIR, get_logger
+from adscrawler.config import CONFIG, MODULE_DIR, get_logger
 
 logger = get_logger(__name__, "download_ipa")
 

@@ -1,7 +1,7 @@
 import sqlalchemy
 from sshtunnel import SSHTunnelForwarder
 
-from config import CONFIG, get_logger
+from adscrawler.config import CONFIG, get_logger
 
 logger = get_logger(__name__)
 
@@ -35,7 +35,7 @@ class PostgresCon:
         try:
             db_login = f"postgresql://{self.db_user}:{self.db_pass}"
             db_uri = f"{db_login}@{self.db_ip}:{self.db_port}/{self.db_name}"
-            logger.info(f"Connecting to PostgreSQL {self.db_name}")
+            logger.info(f"Adscrawler connecting to PostgreSQL {self.db_name}")
             self.engine = sqlalchemy.create_engine(
                 db_uri,
                 connect_args={"connect_timeout": 10, "application_name": "adscrawler"},
@@ -51,7 +51,8 @@ def get_db_connection(use_ssh_tunnel: bool = False) -> PostgresCon:
     server_name = "madrone"
     host = CONFIG[server_name]["host"]  # Remote server
     if use_ssh_tunnel:
-        server = open_ssh_tunnel(host, server_name)
+        ssh_port = CONFIG[server_name].get("ssh_port", 22)  # Remote ssh port, default 22
+        server = open_ssh_tunnel(host, server_name, ssh_port)
         server.start()
         db_port = str(server.local_bind_port)
         host = "127.0.0.1"
@@ -61,15 +62,15 @@ def get_db_connection(use_ssh_tunnel: bool = False) -> PostgresCon:
     return conn
 
 
-def open_ssh_tunnel(remote_host: str, server_name: str) -> SSHTunnelForwarder:
+def open_ssh_tunnel(remote_host: str, server_name: str, ssh_port:str) -> SSHTunnelForwarder:
     with SSHTunnelForwarder(
-        (remote_host, 22),  # Remote server IP and SSH port
+        (remote_host, ssh_port),  # Remote server IP and SSH port
         ssh_username=CONFIG[server_name]["os_user"],
         remote_bind_address=("127.0.0.1", 5432),
         ssh_pkey=CONFIG[server_name].get("ssh_pkey", None),
         ssh_private_key_password=CONFIG[server_name].get("ssh_pkey_password", None),
     ) as server:  # PostgreSQL server IP and sever port on remote machine
         server.start()  # start ssh sever
-        logger.info("Connecting via SSH")
+        logger.info(f"Connecting via SSH {remote_host=}")
         # connect to PostgreSQL
     return server

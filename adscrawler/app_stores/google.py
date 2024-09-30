@@ -5,7 +5,7 @@ import subprocess
 import google_play_scraper
 import pandas as pd
 
-from config import MODULE_DIR, get_logger
+from adscrawler.config import MODULE_DIR, get_logger
 
 logger = get_logger(__name__, "scrape_google")
 
@@ -164,17 +164,28 @@ def crawl_google_developers(
         apps_df = pd.DataFrame(columns=["store", "store_id"])
     return apps_df
 
-def search_play_store(search_term:str)-> dict:
+def search_play_store(search_term:str)-> list[dict]:
     """Search store for new apps or keyword rankings.
     """
-
+    logger.info("adscrawler to call playstore search")
     # Call the Node.js script that runs google-play-scraper
-    process = subprocess.Popen(['node', 'searchApps.js', search_term, '20'], stdout=subprocess.PIPE)
+    process = subprocess.Popen(['node', f'{MODULE_DIR}/searchApps.js', search_term, '20'], stdout=subprocess.PIPE)
     output, error = process.communicate()
 
     if error:
         logger.error(f'failed to search: {error!r}')
 
-    result:dict = json.loads(output)
-    return result
+    results:list[dict] = json.loads(output)
+
+    if len(results) > 0 and 'appId' in results[0]:
+        for result in results:
+            result['store_id'] = result['appId'] #needed by backend
+            result['id'] = result.pop('appId') # needed for response to frontend
+            result['store_link'] = result.pop('url')
+            result['name'] = result.pop('title')
+            result['developer_name'] = result.pop('developer')
+            result['icon_url_512'] = result.pop('icon')
+            result['store']=1
+
+    return results
 
