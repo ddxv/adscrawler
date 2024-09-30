@@ -8,12 +8,12 @@ import pandas as pd
 import tldextract
 from itunes_app_scraper.util import AppStoreException
 
-# from adscrawler.app_stores.apple import (
-#     clean_ios_app_df,
-#     crawl_ios_developers,
-#     scrape_app_ios,
-#     scrape_ios_ranks,
-# )
+from adscrawler.app_stores.apple import (
+    clean_ios_app_df,
+    crawl_ios_developers,
+    scrape_app_ios,
+    scrape_ios_ranks,
+)
 from adscrawler.app_stores.google import (
     clean_google_play_app_df,
     crawl_google_developers,
@@ -46,9 +46,9 @@ def scrape_store_ranks(database_connection: PostgresCon, stores: list[int]) -> N
     if 2 in stores:
         collection_keyword = "TOP"
         try:
-            # ranked_dicts = scrape_ios_ranks(
-            #     collection_keyword=collection_keyword,
-            # )
+            ranked_dicts = scrape_ios_ranks(
+                collection_keyword=collection_keyword,
+            )
             ranked_dicts = {}
             process_scraped(
                 database_connection=database_connection,
@@ -274,7 +274,7 @@ def crawl_developers_for_new_store_ids(
             row_info = f"{store=} {developer_id=}"
             logger.info(f"{row_info=} start")
             try:
-                # apps_df = crawl_ios_developers(developer_db_id, developer_id, store_ids)
+                apps_df = crawl_ios_developers(developer_db_id, developer_id, store_ids)
 
                 if not apps_df.empty:
                     process_scraped(
@@ -395,8 +395,8 @@ def update_all_app_info(
 def scrape_from_store(store: int, store_id: str, country: str) -> dict:
     if store == 1:
         result_dict = scrape_app_gp(store_id, country=country)
-    # elif store == 2:
-        # result_dict = scrape_app_ios(store_id, country=country)
+    elif store == 2:
+        result_dict = scrape_app_ios(store_id, country=country)
     else:
         logger.error(f"Store not supported {store=}")
     return result_dict
@@ -405,8 +405,8 @@ def scrape_from_store(store: int, store_id: str, country: str) -> dict:
 def clean_scraped_df(df: pd.DataFrame, store: int) -> pd.DataFrame:
     if store == 1:
         df = clean_google_play_app_df(df)
-    # if store == 2:
-        # df = clean_ios_app_df(df)
+    if store == 2:
+        df = clean_ios_app_df(df)
     return df
 
 
