@@ -3,6 +3,7 @@ authors = [{ name = "James O'Claire" }]
 name = "adscrawler"
 description = "project description adscrawler"
 version = "0.1.15"
+
 dependencies = [
     'requests',
     'pandas',
@@ -15,13 +16,20 @@ dependencies = [
     'pyyaml',
     "psycopg2-binary",
 ]
+
 [project.optional-dependencies]
 dev = ["pre-commit", "bump2version"]
+
 [build-system]
 requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
-[tool.setuptools]
-packages = ['adscrawler']
+
+# [tool.setuptools]
+# packages = ['adscrawler']
+
+[tool.setuptools.packages.find]
+where = ['adscrawler']
+
 [tool.ruff]
 target-version = "py312"
 lint.select = [
@@ -56,10 +64,12 @@ lint.ignore = [
 ]
 lint.unfixable = ["B"]
 lint.fixable = ["ALL"]
+
 [tool.mypy]
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
+
 [tool.sqlfluff.core]
 templater = 'placeholder'
 verbose = 2
@@ -68,5 +78,6 @@ large_file_skip_byte_limit = 0
 exclude_rules = [
     'AM04', # using *, agreed this should be TODO, 
 ]
+
 [tool.sqlfluff.templater.placeholder]
 param_style = 'colon'
