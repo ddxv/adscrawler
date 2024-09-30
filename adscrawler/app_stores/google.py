@@ -5,7 +5,7 @@ import subprocess
 import google_play_scraper
 import pandas as pd
 
-from adscrawler.config import MODULE_DIR, get_logger
+from adscrawler.config import CONFIG, MODULE_DIR, get_logger
 
 logger = get_logger(__name__, "scrape_google")
 
@@ -169,8 +169,10 @@ def search_play_store(search_term:str)-> list[dict]:
     """
     logger.info("adscrawler to call playstore search")
     # Call the Node.js script that runs google-play-scraper
-    node_path_loc = subprocess.run(['which', 'node'], capture_output=True, text=True, check=True)
-    node_path:str = node_path_loc.stdout.strip()
+
+    node_path = 'node'
+    if 'local-dev' in CONFIG.keys():
+        node_path = CONFIG['local-dev'].get('node_env')
 
     logger.info(f"Will try calling node with {node_path} {MODULE_DIR}/searchApps.js")
 
