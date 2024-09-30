@@ -2,7 +2,7 @@
 authors = [{ name = "James O'Claire" }]
 name = "adscrawler"
 description = "project description adscrawler"
-version = "0.1.2"
+version = "0.1.3"
 
 dependencies = [
     'requests',
