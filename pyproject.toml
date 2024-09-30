@@ -3,7 +3,6 @@ authors = [{ name = "James O'Claire" }]
 name = "adscrawler"
 description = "project description adscrawler"
 version = "0.1.4"
-
 dependencies = [
     'requests',
     'pandas',
@@ -16,21 +15,15 @@ dependencies = [
     'pyyaml',
     "psycopg2-binary",
 ]
-
 [project.optional-dependencies]
 dev = ["pre-commit", "bump2version"]
-
-
 [build-system]
 requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
-
 [tool.setuptools]
 packages = ['adscrawler']
-
 [tool.ruff]
 target-version = "py312"
-# Rules, see: https://docs.astral.sh/ruff/rules/ 
 lint.select = [
     "A",   # flake8 builtins 
     "E",   # errors 
@@ -44,10 +37,7 @@ lint.select = [
     "PLC", # pyflake
     "PLE", # pyflake
     "PD",  # pandas-vet
-    #"D", # pydocstyle, all funcs have docstring 
 ]
-#select = ["ALL"]
-
 lint.ignore = [
     "E501",    # line length
     "W291",    # trailing space at end of line
@@ -64,18 +54,12 @@ lint.ignore = [
     "RET504",  # Unnecessary assignment to variable for returning, I prefer it for readability
     "PD015",   # Use df.merge instead of pd.merge, I prefer the latter for readability
 ]
-
-# Avoid trying to fix flake8-bugbear (`B`) violations. 
 lint.unfixable = ["B"]
-
 lint.fixable = ["ALL"]
-
-
 [tool.mypy]
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
-
 [tool.sqlfluff.core]
 templater = 'placeholder'
 verbose = 2
@@ -84,6 +68,5 @@ large_file_skip_byte_limit = 0
 exclude_rules = [
     'AM04', # using *, agreed this should be TODO, 
 ]
-
 [tool.sqlfluff.templater.placeholder]
 param_style = 'colon'
