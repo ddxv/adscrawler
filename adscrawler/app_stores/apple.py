@@ -204,6 +204,24 @@ def clean_ios_app_df(df: pd.DataFrame) -> pd.DataFrame:
         df["histogram"] = None
     return df
 
+def search_app_store_for_ids(search_term:str)-> list[str]:
+    """Search store for new apps or keyword rankings.
+    """
+    logger.info("adscrawler appple search start")
+    # Call the Node.js script that runs google-play-scraper
+
+    scraper = AppStoreScraper()
+    ids: list[str] = scraper.get_app_ids_for_query('hi',country='us',lang='en',timeout=5, num=None)
+    logger.info(f"adscralwer apple search {len(ids)=}")
+
+    return ids
+
+def app_details_for_ids(ids:list[str])->list[dict]:
+    logger.info(f"get details for apple {len(ids)=}")
+    scraper = AppStoreScraper()
+    full_results = scraper.get_multiple_app_details(ids[:15])
+    results = list(full_results)
+    return results
 
 GAME_CATEGORIES = [
     "arcade",
