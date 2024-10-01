@@ -213,7 +213,7 @@ def search_app_store_for_ids(search_term:str)-> list[str]:
     # Call the Node.js script that runs google-play-scraper
 
     scraper = AppStoreScraper()
-    ids: list[str] = scraper.get_app_ids_for_query('hi',country='us',lang='en',timeout=5, num=None)
+    ids: list[str] = scraper.get_app_ids_for_query(search_term,country='us',lang='en',timeout=5, num=None)
     logger.info(f"adscralwer apple search {len(ids)=}")
 
     return ids
