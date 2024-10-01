@@ -128,6 +128,8 @@ def scrape_app_ios(store_id: str, country: str) -> dict:
 
 
 def clean_ios_app_df(df: pd.DataFrame) -> pd.DataFrame:
+    if 'store_id' not in df.columns:
+        df = df.rename(columns={"trackId": "store_id"})
     df = df.rename(
         columns={
             # "trackId": "store_id",
