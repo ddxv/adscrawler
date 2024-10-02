@@ -171,9 +171,7 @@ def clean_ios_app_df(df: pd.DataFrame) -> pd.DataFrame:
         developer_id=df["developer_id"].astype(str),
         store_id=df["store_id"].astype(str),
         category=df["category"].str.lower().str.replace(" & ", "_and_"),
-        store_last_updated=pd.to_datetime(df["store_last_updated"]).dt.strftime(
-            "%Y-%m-%d %H:%M",
-        ),
+        store_last_updated=pd.to_datetime(df["store_last_updated"]),
         release_date=pd.to_datetime(
             df["release_date"],
             format="%Y-%m-%dT%H:%M:%SZ",
