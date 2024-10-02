@@ -3,7 +3,7 @@ requires-python = ">=3.12"
 
 [[package]]
 name = "adscrawler"
-version = "0.1.dev560+ge88d0f3.d20241002"
+version = "0.1.dev564+g72bd593.d20241002"
 source = { editable = "." }
 dependencies = [
     { name = "google-play-scraper" },
@@ -21,14 +21,12 @@ dependencies = [
 
 [package.optional-dependencies]
 dev = [
-    { name = "bump2version" },
     { name = "pre-commit" },
     { name = "pytest" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "bump2version", marker = "extra == 'dev'" },
     { name = "google-play-scraper", git = "https://github.com/ddxv/google-play-scraper" },
     { name = "itunes-app-scraper-dmi", git = "https://github.com/ddxv/itunes-app-scraper.git" },
     { name = "numpy" },
@@ -81,15 +79,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/1a/d4/586b9c18a327561ea4cd336ff4586cca1a7aa0f5ee04e23a8a8bb9ca64f1/bcrypt-4.2.0-cp39-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:cb2a8ec2bc07d3553ccebf0746bbf3d19426d1c6d1adbd4fa48925f66af7b9e8", size = 335685 },
     { url = "https://files.pythonhosted.org/packages/24/55/1a7127faf4576138bb278b91e9c75307490178979d69c8e6e273f74b974f/bcrypt-4.2.0-cp39-abi3-win32.whl", hash = "sha256:77800b7147c9dc905db1cba26abe31e504d8247ac73580b4aa179f98e6608f34", size = 155857 },
     { url = "https://files.pythonhosted.org/packages/1c/2a/c74052e54162ec639266d91539cca7cbf3d1d3b8b36afbfeaee0ea6a1702/bcrypt-4.2.0-cp39-abi3-win_amd64.whl", hash = "sha256:61ed14326ee023917ecd093ee6ef422a72f3aec6f07e21ea5f10622b735538a9", size = 151717 },
-]
-
-[[package]]
-name = "bump2version"
-version = "1.0.1"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/29/2a/688aca6eeebfe8941235be53f4da780c6edee05dbbea5d7abaa3aab6fad2/bump2version-1.0.1.tar.gz", hash = "sha256:762cb2bfad61f4ec8e2bdf452c7c267416f8c70dd9ecb1653fd0bbb01fa936e6", size = 36236 }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/1d/e3/fa60c47d7c344533142eb3af0b73234ef8ea3fb2da742ab976b947e717df/bump2version-1.0.1-py2.py3-none-any.whl", hash = "sha256:37f927ea17cde7ae2d7baf832f8e80ce3777624554a653006c9144f8017fe410", size = 22030 },
 ]
 
 [[package]]

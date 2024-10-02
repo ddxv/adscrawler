@@ -1,8 +1,9 @@
 import datetime
-import uuid
 
 import numpy as np
 import pandas as pd
+from psycopg import Connection
+from psycopg.sql import SQL, Composed, Identifier
 from sqlalchemy import text
 
 from .config import get_logger
@@ -10,15 +11,10 @@ from .connection import PostgresCon
 
 logger = get_logger(__name__)
 
-"""Database Quries
-Most queries attempt to stay simple without significant processing
-"""
-
-
 def upsert_df(
     df: pd.DataFrame,
     table_name: str,
-    database_connection: PostgresCon,
+    database_connection: Connection,
     key_columns: list[str],
     insert_columns: list[str],
     return_rows: bool = False,
@@ -43,60 +39,73 @@ def upsert_df(
         A list of the column name(s) on which to match. If omitted, the
         primary key columns of the target table will be used.
     """
-    table_spec = ""
-    if schema:
-        table_spec += '"' + schema.replace('"', '""') + '".'
-    table_spec += '"' + table_name.replace('"', '""') + '"'
+
+    raw_conn = database_connection.engine.raw_connection()
 
     if 'crawled_date' in df.columns:
-        df['crawled_date'] =pd.to_datetime(df['crawled_date']).dt.date
+        df['crawled_date'] = pd.to_datetime(df['crawled_date']).dt.date
 
     all_columns = list(set(key_columns + insert_columns))
+    table_identifier = Identifier(table_name)
+    if schema:
+        table_identifier = Composed([Identifier(schema), SQL('.'), table_identifier])
 
-    insert_col_list = ", ".join([f'"{col_name}"' for col_name in all_columns])
-    match_col_list = ", ".join([f'"{col}"' for col in key_columns])
-    update_on = ", ".join([f'"{col}" = EXCLUDED."{col}"' for col in all_columns])
+    columns = SQL(', ').join(map(Identifier, all_columns))
+    placeholders = SQL(', ').join(SQL('%s') for _ in all_columns)
+    conflict_columns = SQL(', ').join(map(Identifier, key_columns))
+    update_set = SQL(', ').join(
+        SQL('{0} = EXCLUDED.{0}').format(Identifier(col))
+        for col in all_columns
+    )
 
-    if return_rows:
-        returning_str = " RETURNING * ;"
-    else:
-        returning_str = ""
-    temp_table = f"temp_{uuid.uuid4().hex[:6]}"
-    sql_query = f"""INSERT INTO {table_spec} ({insert_col_list})
-                SELECT {insert_col_list} FROM {temp_table}
-                ON CONFLICT ({match_col_list}) 
-                DO UPDATE SET
-                    {update_on}
-                {returning_str}
-    """
+    # Upsert query without RETURNING clause
+    upsert_query = SQL("""
+        INSERT INTO {table} ({columns})
+        VALUES ({placeholders})
+        ON CONFLICT ({conflict_columns})
+        DO UPDATE SET {update_set}
+    """).format(
+        table=table_identifier,
+        columns=columns,
+        placeholders=placeholders,
+        conflict_columns=conflict_columns,
+        update_set=update_set
+    )
 
+    where_conditions = SQL(' AND ').join(
+        SQL('{0} = %s').format(Identifier(col))
+        for col in key_columns
+    )
+
+    select_query = SQL("""
+        SELECT * FROM {table}
+        WHERE {where_conditions}
+    """).format(
+        table=table_identifier,
+        where_conditions=where_conditions
+    )
     if log:
-        logger.info(sql_query)
+        logger.info(f"Upsert query: {upsert_query.as_string(raw_conn)}")
+        logger.info(f"Select query: {select_query.as_string(raw_conn)}")
 
-    with database_connection.engine.begin() as conn:
-        conn.exec_driver_sql(f"DROP TABLE IF EXISTS {temp_table}")
-        conn.exec_driver_sql(
-            f"""CREATE TEMPORARY TABLE {temp_table} 
-            AS SELECT * FROM {table_spec} WHERE false""",
-        )
-        df[all_columns].to_sql(
-            temp_table,
-            con=conn,
-            if_exists="append",
-            index=False,
-        )
-        result = conn.exec_driver_sql(sql_query)
+    with raw_conn.cursor() as cur:
+        # Perform upsert
+        data = [tuple(row) for row in df[all_columns].itertuples(index=False, name=None)]
+        cur.executemany(upsert_query, data)
+
+        # Fetch affected rows if required
         if return_rows:
-            if result.returns_rows:
-                get_df = pd.DataFrame(result.mappings().all())
-            else:
-                logger.warning("Sqlalchemy result did not have rows")
-                get_df = pd.DataFrame()
-        conn.execute(text(f'DROP TABLE "{temp_table}";'))
-    if return_rows:
-        return get_df
-    else:
-        return None
+            select_params = [row[all_columns.index(col)] for row in data for col in key_columns]
+            cur.execute(select_query, select_params)
+            result = cur.fetchall()
+            column_names = [desc[0] for desc in cur.description]
+            return_df = pd.DataFrame(result, columns=column_names)
+        else:
+            return_df = None
+
+    raw_conn.commit()
+    return return_df
+
 
 
 def query_developers(
@@ -133,6 +142,7 @@ def query_developers(
     df = pd.read_sql(sel_query, database_connection.engine)
     logger.info(f"Query developers {store=} returning rows:{df.shape[0]}")
     return df
+
 
 
 def query_store_id_map(
