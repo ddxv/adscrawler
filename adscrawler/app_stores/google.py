@@ -5,7 +5,7 @@ import subprocess
 import google_play_scraper
 import pandas as pd
 
-from adscrawler.config import CONFIG, MODULE_DIR, get_logger
+from adscrawler.config import CONFIG, MODULE_DIR, PACKAGE_DIR, get_logger
 
 logger = get_logger(__name__, "scrape_google")
 
@@ -98,7 +98,7 @@ def clean_google_play_app_df(df: pd.DataFrame) -> pd.DataFrame:
 def call_js_to_update_file(filepath: str, is_developers: bool = False) -> None:
     if os.path.exists(filepath):
         os.remove(filepath)
-    cmd = f"node {MODULE_DIR}/pullAppIds.js"
+    cmd = f"node {PACKAGE_DIR}/pullAppIds.js"
     if is_developers:
         cmd += " --developers"
     logger.info("Js pull start")

@@ -2,6 +2,7 @@
 authors = [{ name = "James O'Claire" }]
 name = "adscrawler"
 description = "project description adscrawler"
+requires-python = ">= 3.12"
 #version = "0.1.25"
 dynamic = ["version"]
 
@@ -9,6 +10,7 @@ dynamic = ["version"]
 dependencies = [
     'requests',
     'pandas',
+    'numpy',
     'sqlalchemy',
     'google-play-scraper @ git+https://github.com/ddxv/google-play-scraper',
     'tldextract',
@@ -16,12 +18,13 @@ dependencies = [
     'sshtunnel',
     'selenium',
     'pyyaml',
-    "psycopg2-binary",
+    # "psycopg2-binary",
+    "psycopg[binary]",
 ]
 
 
 [project.optional-dependencies]
-dev = ["pre-commit", "bump2version"]
+dev = ["pre-commit", "bump2version", "pytest"]
 
 
 [build-system]
@@ -38,7 +41,7 @@ find = {}
 adscrawler = ["*.js"]
 
 [tool.ruff]
-target-version = "py312"
+target-version = "py313"
 lint.select = [
     "A",   # flake8 builtins 
     "E",   # errors 

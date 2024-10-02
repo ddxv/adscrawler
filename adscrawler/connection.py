@@ -33,7 +33,7 @@ class PostgresCon:
 
     def set_engine(self) -> None:
         try:
-            db_login = f"postgresql://{self.db_user}:{self.db_pass}"
+            db_login = f"postgresql+psycopg://{self.db_user}:{self.db_pass}"
             db_uri = f"{db_login}@{self.db_ip}:{self.db_port}/{self.db_name}"
             logger.info(f"Adscrawler connecting to PostgreSQL {self.db_name}")
             self.engine = sqlalchemy.create_engine(

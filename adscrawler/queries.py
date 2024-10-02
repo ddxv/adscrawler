@@ -48,6 +48,9 @@ def upsert_df(
         table_spec += '"' + schema.replace('"', '""') + '".'
     table_spec += '"' + table_name.replace('"', '""') + '"'
 
+    if 'crawled_date' in df.columns:
+        df['crawled_date'] =pd.to_datetime(df['crawled_date']).dt.date
+
     all_columns = list(set(key_columns + insert_columns))
 
     insert_col_list = ", ".join([f'"{col_name}"' for col_name in all_columns])
