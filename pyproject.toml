@@ -3,7 +3,6 @@ authors = [{ name = "James O'Claire" }]
 name = "adscrawler"
 description = "project description adscrawler"
 requires-python = ">= 3.12"
-#version = "0.1.25"
 dynamic = ["version"]
 
 
@@ -24,7 +23,7 @@ dependencies = [
 
 
 [project.optional-dependencies]
-dev = ["pre-commit", "bump2version", "pytest"]
+dev = ["pre-commit", "pytest"]
 
 
 [build-system]
