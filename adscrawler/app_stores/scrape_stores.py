@@ -77,6 +77,7 @@ def scrape_store_ranks(database_connection: PostgresCon, stores: list[int]) -> N
             logger.exception(f"Scrape google ranks hit error={e}, skipping")
         try:
             from adscrawler.app_stores.apkcombo import get_apkcombo_android_apps
+
             dicts = get_apkcombo_android_apps()
             process_scraped(
                 database_connection=database_connection,
@@ -87,6 +88,7 @@ def scrape_store_ranks(database_connection: PostgresCon, stores: list[int]) -> N
             logger.exception("ApkCombo RSS feed failed")
         try:
             from adscrawler.app_stores.appbrain import get_appbrain_android_apps
+
             dicts = get_appbrain_android_apps()
             process_scraped(
                 database_connection=database_connection,
@@ -228,7 +230,6 @@ def extract_domains(x: str) -> str:
     return url
 
 
-
 def crawl_developers_for_new_store_ids(
     database_connection: PostgresCon,
     store: int,
@@ -236,6 +237,7 @@ def crawl_developers_for_new_store_ids(
     logger.info(f"Crawl devevelopers for {store=} start")
     store_ids = query_store_ids(database_connection, store=store)
     df = query_developers(database_connection, store=store, limit=10000)
+
     if store == 1:
         developer_ids = df["developer_id"].unique().tolist()
         developer_ids = [unquote_plus(x) for x in developer_ids]
@@ -311,13 +313,17 @@ def crawl_developers_for_new_store_ids(
 def update_app_details(
     stores: list[int],
     database_connection: PostgresCon,
-    group:str,
+    group: str,
     limit: int | None = 1000,
 ) -> None:
     logger.info(f"{stores=} Update App Details: start")
-    df = query_store_apps(stores, database_connection=database_connection, group=group, limit=limit)
+    df = query_store_apps(
+        stores, database_connection=database_connection, group=group, limit=limit
+    )
     if df.empty:
-        logger.info(f"{stores=} Update App Details: no apps to update no apps to update")
+        logger.info(
+            f"{stores=} Update App Details: no apps to update no apps to update"
+        )
         return
     crawl_stores_for_app_details(df, database_connection)
     logger.info(f"{stores=} Update App Details: finished")
@@ -537,10 +543,7 @@ def save_apps_df(
 ) -> pd.DataFrame:
     table_name = "store_apps"
     key_columns = ["store", "store_id"]
-    if (
-        (apps_df["crawl_result"] == 1).all()
-        and apps_df["developer_id"].notna().all()
-    ):
+    if (apps_df["crawl_result"] == 1).all() and apps_df["developer_id"].notna().all():
         apps_df = save_developer_info(apps_df, database_connection)
     insert_columns = [x for x in STORE_APP_COLUMNS if x in apps_df.columns]
     store_apps_df = upsert_df(
