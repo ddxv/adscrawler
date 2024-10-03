@@ -1,37 +1,38 @@
+
 import sqlalchemy
+from sqlalchemy.engine import Engine
 from sshtunnel import SSHTunnelForwarder
 
 from .config import CONFIG, get_logger
 
 logger = get_logger(__name__)
 
-
 class PostgresCon:
-    """Class for managing the connection to postgres
+    """Class for managing the connection to PostgreSQL."""
 
-    Parameters
-    ----------
-        my_db: String, passed on init, string name of db
-    """
+    def __init__(self, db_name: str, db_ip: str, db_port: str) -> None:
+        """
+        Initialize the PostgreSQL connection.
 
-    engine = sqlalchemy.engine
-    db_name = None
-    db_pass = None
-    db_uri = None
-    db_user = None
-    db_ip = None
-
-    def __init__(self, my_db: str, db_ip: str, db_port: str) -> None:
-        self.db_name = my_db
+        Args:
+            db_name (str): Name of the database.
+            db_ip (str): IP address of the database server.
+            db_port (str): Port number of the database server.
+        """
+        self.db_name = db_name
         self.db_ip = db_ip
         self.db_port = db_port
+        self.engine: Engine | None = None
+
         try:
             self.db_pass = CONFIG[self.db_name]["db_password"]
             self.db_user = CONFIG[self.db_name]["db_user"]
-        except Exception as error:
+        except KeyError as error:
             logger.error(f"Loading db_auth for {self.db_name}, error: {error}")
+            raise
 
     def set_engine(self) -> None:
+        """Set up the SQLAlchemy engine."""
         try:
             db_login = f"postgresql+psycopg://{self.db_user}:{self.db_pass}"
             db_uri = f"{db_login}@{self.db_ip}:{self.db_port}/{self.db_name}"
@@ -44,33 +45,50 @@ class PostgresCon:
             logger.error(
                 f"Failed to connect {self.db_name} @ {self.db_ip}, error: {error}",
             )
-            self.db_name = None
-
+            raise
 
 def get_db_connection(use_ssh_tunnel: bool = False) -> PostgresCon:
+    """
+    Get a database connection, optionally using an SSH tunnel.
+
+    Args:
+        use_ssh_tunnel (bool): Whether to use an SSH tunnel for the connection.
+
+    Returns:
+        PostgresCon: A PostgreSQL connection object.
+    """
     server_name = "madrone"
-    host = CONFIG[server_name]["host"]  # Remote server
+    host = CONFIG[server_name]["host"]
+
     if use_ssh_tunnel:
-        ssh_port = CONFIG[server_name].get("ssh_port", 22)  # Remote ssh port, default 22
+        ssh_port = CONFIG[server_name].get("ssh_port", 22)
         server = open_ssh_tunnel(host, server_name, ssh_port)
         server.start()
         db_port = str(server.local_bind_port)
         host = "127.0.0.1"
     else:
-        db_port = str(5432)
+        db_port = "5432"
+
     conn = PostgresCon(server_name, host, db_port)
+    conn.set_engine()
     return conn
 
+def open_ssh_tunnel(remote_host: str, server_name: str, ssh_port: int) -> SSHTunnelForwarder:
+    """
+    Open an SSH tunnel to the remote server.
 
-def open_ssh_tunnel(remote_host: str, server_name: str, ssh_port:str) -> SSHTunnelForwarder:
-    with SSHTunnelForwarder(
-        (remote_host, ssh_port),  # Remote server IP and SSH port
+    Args:
+        remote_host (str): The remote host to connect to.
+        server_name (str): The name of the server in the configuration.
+        ssh_port (int): The SSH port to use.
+
+    Returns:
+        SSHTunnelForwarder: An SSH tunnel object.
+    """
+    return SSHTunnelForwarder(
+        (remote_host, ssh_port),
         ssh_username=CONFIG[server_name]["os_user"],
         remote_bind_address=("127.0.0.1", 5432),
-        ssh_pkey=CONFIG[server_name].get("ssh_pkey", None),
-        ssh_private_key_password=CONFIG[server_name].get("ssh_pkey_password", None),
-    ) as server:  # PostgreSQL server IP and sever port on remote machine
-        server.start()  # start ssh sever
-        logger.info(f"Connecting via SSH {remote_host=}")
-        # connect to PostgreSQL
-    return server
+        ssh_pkey=CONFIG[server_name].get("ssh_pkey"),
+        ssh_private_key_password=CONFIG[server_name].get("ssh_pkey_password"),
+    )

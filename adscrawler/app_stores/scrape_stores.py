@@ -49,7 +49,6 @@ def scrape_store_ranks(database_connection: PostgresCon, stores: list[int]) -> N
             ranked_dicts = scrape_ios_ranks(
                 collection_keyword=collection_keyword,
             )
-            ranked_dicts = {}
             process_scraped(
                 database_connection=database_connection,
                 ranked_dicts=ranked_dicts,
@@ -535,14 +534,12 @@ def save_apps_df(
     apps_df: pd.DataFrame,
     database_connection: PostgresCon,
     country: str,
-    update_developer: bool = True,
 ) -> pd.DataFrame:
     table_name = "store_apps"
     key_columns = ["store", "store_id"]
     if (
         (apps_df["crawl_result"] == 1).all()
         and apps_df["developer_id"].notna().all()
-        and update_developer
     ):
         apps_df = save_developer_info(apps_df, database_connection)
     insert_columns = [x for x in STORE_APP_COLUMNS if x in apps_df.columns]
