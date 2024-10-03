@@ -25,14 +25,18 @@ def scrape_app_gp(store_id: str, country: str, language: str = "") -> dict:
     # paw_us = scrape_app_gp('com.originatorkids.paw', 'us')
     # paw_us['ratings']==paw_nl['ratings']
     # In the case above NL and US both have very different number of ratings
-    logger.info(f'scrape app start: {store_id=}, {country=}, {language=} scrape app start')
+    logger.info(
+        f"scrape app start: {store_id=}, {country=}, {language=} scrape app start"
+    )
     result: dict = google_play_scraper.app(
         store_id,
         lang=language,
         country=country,  # defaults to 'en'  # defaults to 'us'
-        timeout=10
+        timeout=10,
     )
-    logger.info(f'scrape app finish: {store_id=}, {country=}, {language=} scrape app start')
+    logger.info(
+        f"scrape app finish: {store_id=}, {country=}, {language=} scrape app start"
+    )
     return result
 
 
@@ -132,12 +136,12 @@ def scrape_gp_for_developer_app_ids(developer_ids: list[str]) -> list:
     developers_filepath = "/tmp/googleplay_developers.txt"
     if os.path.exists(developers_filepath):
         os.remove(developers_filepath)
-
     with open(developers_filepath, "w") as file:
         for dev_id in developer_ids:
             file.write(f"{dev_id}\n")
-
     app_ids_filepath = "/tmp/googleplay_developers_app_ids.txt"
+    if os.path.exists(app_ids_filepath):
+        os.remove(app_ids_filepath)
     try:
         call_js_to_update_file(app_ids_filepath, is_developers=True)
     except Exception as error:
@@ -158,41 +162,45 @@ def crawl_google_developers(
     store = 1
     app_ids = scrape_gp_for_developer_app_ids(developer_ids=developer_ids)
     new_app_ids = [x for x in app_ids if x not in store_ids]
-    if len(new_app_ids) > 1:
+    if len(new_app_ids) > 0:
         apps_df = pd.DataFrame({"store": store, "store_id": new_app_ids})
     else:
         apps_df = pd.DataFrame(columns=["store", "store_id"])
     return apps_df
 
-def search_play_store(search_term:str)-> list[dict]:
-    """Search store for new apps or keyword rankings.
-    """
+
+def search_play_store(search_term: str) -> list[dict]:
+    """Search store for new apps or keyword rankings."""
     logger.info("adscrawler to call playstore search")
     # Call the Node.js script that runs google-play-scraper
 
-    node_path = 'node'
-    if 'local-dev' in CONFIG.keys():
-        node_path = CONFIG['local-dev'].get('node_env')
+    node_path = "node"
+    if "local-dev" in CONFIG.keys():
+        node_path = CONFIG["local-dev"].get("node_env")
 
-    logger.info(f"Will try calling node with {node_path} {MODULE_DIR}/static/searchApps.js")
+    logger.info(
+        f"Will try calling node with {node_path} {MODULE_DIR}/static/searchApps.js"
+    )
 
-    process = subprocess.Popen([node_path, f'{MODULE_DIR}/static/searchApps.js', search_term, '20'], stdout=subprocess.PIPE)
+    process = subprocess.Popen(
+        [node_path, f"{MODULE_DIR}/static/searchApps.js", search_term, "20"],
+        stdout=subprocess.PIPE,
+    )
     output, error = process.communicate()
 
     if error:
-        logger.error(f'failed to search: {error!r}')
+        logger.error(f"failed to search: {error!r}")
 
-    results:list[dict] = json.loads(output)
+    results: list[dict] = json.loads(output)
 
-    if len(results) > 0 and 'appId' in results[0]:
+    if len(results) > 0 and "appId" in results[0]:
         for result in results:
-            result['store_id'] = result['appId'] #needed by backend
-            result['id'] = result.pop('appId') # needed for response to frontend
-            result['store_link'] = result.pop('url')
-            result['name'] = result.pop('title')
-            result['developer_name'] = result.pop('developer')
-            result['icon_url_512'] = result.pop('icon')
-            result['store'] = 1
+            result["store_id"] = result["appId"]  # needed by backend
+            result["id"] = result.pop("appId")  # needed for response to frontend
+            result["store_link"] = result.pop("url")
+            result["name"] = result.pop("title")
+            result["developer_name"] = result.pop("developer")
+            result["icon_url_512"] = result.pop("icon")
+            result["store"] = 1
 
     return results
-

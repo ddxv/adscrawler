@@ -88,6 +88,10 @@ async function loopDevelopers(country, numApps) {
                 allAppIds = allAppIds.concat(appIds);
                 console.info(`devId=${devId}: added ${appIds.length}`);
             }
+            else {
+
+            console.info(`devId=${devId}: no appIds found`);
+            }
         } catch (error) {
             console.error(`Error fetching apps for developer ${devId}:`, error);
         }
