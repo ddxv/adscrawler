@@ -37,7 +37,8 @@ def get_app_ids_with_retry(scraper: AppStoreScraper, coll_value:str, cat_value:s
     app_ids: list[str] = []
     while len(app_ids) == 0 and retries < max_retries:
         try:
-            app_ids = scraper.get_app_ids_for_collection(collection=coll_value, category=cat_value, country=country,
+            app_ids = scraper.get_app_ids_for_collection(collection=coll_value, 
+                                                         category=cat_value, country=country,
                     num=200,
                     timeout=10)
         except Exception as e:
