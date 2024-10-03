@@ -42,11 +42,11 @@ def upsert_df(
 
     raw_conn = database_connection.engine.raw_connection()
 
-    if 'crawled_date' in df.columns:
+    if 'crawled_date' in df.columns and df['crawled_date'].isna().all():
         df['crawled_date'] = pd.to_datetime(df['crawled_date']).dt.date
-        df.loc[df['crawled_date'].isna(), 'crawled_date'] = None
-    if 'release_date' in df.columns:
-        df.loc[df['release_date'].isna(), 'release_date'] = None
+        df['crawled_date'] = None
+    if 'release_date' in df.columns and df['release_date'].isna().all():
+        df['release_date']= None
 
     all_columns = list(set(key_columns + insert_columns))
     table_identifier = Identifier(table_name)
