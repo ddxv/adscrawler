@@ -267,10 +267,10 @@ def query_pub_domains(
 def delete_app_url_mapping(app_url_id: int, database_connection: PostgresCon) -> None:
     del_query = text("DELETE FROM app_urls_map WHERE id = :app_url_id")
     logger.info(f"{app_url_id=} delete app_urls_map start")
-    raw_conn = database_connection.engine.raw_connection()
-    with raw_conn.cursor() as cur:
-        cur.execute(del_query, {"app_url_id": app_url_id})
 
+    with database_connection.engine.connect() as conn:
+        conn.execute(del_query, {"app_url_id": app_url_id})
+        conn.commit()
 
 
 def query_store_apps(

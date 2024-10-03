@@ -22,7 +22,7 @@ class PostgresCon:
         self.db_name = db_name
         self.db_ip = db_ip
         self.db_port = db_port
-        self.engine: Engine | None = None
+        self.engine: Engine
 
         try:
             self.db_pass = CONFIG[self.db_name]["db_password"]
