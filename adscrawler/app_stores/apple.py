@@ -29,27 +29,36 @@ def lookupby_id(app_id: str) -> dict:
     return resp_dict
 
 
-def get_app_ids_with_retry(scraper: AppStoreScraper, coll_value:str, cat_value:str, country:str) -> list[str]:
+def get_app_ids_with_retry(
+    scraper: AppStoreScraper, coll_value: str, cat_value: str, country: str
+) -> list[str]:
     max_retries = 3
     base_delay = 2
-    max_delay =30
+    max_delay = 30
     retries = 0
     app_ids: list[str] = []
     while len(app_ids) == 0 and retries < max_retries:
         try:
-            app_ids = scraper.get_app_ids_for_collection(collection=coll_value, 
-                                                         category=cat_value, country=country,
-                    num=200,
-                    timeout=10)
+            app_ids = scraper.get_app_ids_for_collection(
+                collection=coll_value,
+                category=cat_value,
+                country=country,
+                num=200,
+                timeout=10,
+            )
         except Exception as e:
             retries += 1
             if retries == max_retries:
                 raise e
-            delay = min(base_delay * (2 ** retries) + random.uniform(0, 1), max_delay)
-            logger.warning(f"Attempt {retries} failed. Retrying in {delay:.2f} seconds...")
+            delay = min(base_delay * (2**retries) + random.uniform(0, 1), max_delay)
+            logger.warning(
+                f"Attempt {retries} failed. Retrying in {delay:.2f} seconds..."
+            )
             time.sleep(delay)
     if len(app_ids) == 0:
-        logger.info(f"Collection: {coll_value}, category: {cat_value} failed to load apps!")
+        logger.info(
+            f"Collection: {coll_value}, category: {cat_value} failed to load apps!"
+        )
     return app_ids
 
 
@@ -97,10 +106,7 @@ def scrape_ios_ranks(
             logger.info(f"Collection: {_coll_key}, category: {cat_key}")
             try:
                 scraped_ids = get_app_ids_with_retry(
-                    scraper,
-                    coll_value=coll_value,
-                    cat_value=cat_value,
-                    country=country
+                    scraper, coll_value=coll_value, cat_value=cat_value, country=country
                 )
                 ranked_dicts += [
                     {
@@ -117,7 +123,9 @@ def scrape_ios_ranks(
                     for rank, app in enumerate(scraped_ids)
                 ]
             except Exception as e:
-                logger.error(f"Failed to scrape collection {_coll_key}, category {cat_key} after multiple retries: {str(e)}")
+                logger.error(
+                    f"Failed to scrape collection {_coll_key}, category {cat_key} after multiple retries: {str(e)}"
+                )
     return ranked_dicts
 
 
@@ -150,13 +158,15 @@ def scrape_app_ios(store_id: str, country: str) -> dict:
     # NOTE: averageUserRating, Rating_count, Histogram are country specific
     logger.info(f"Scrape app start {store_id=} {country=}")
     scraper = AppStoreScraper()
-    result: dict = scraper.get_app_details(store_id, country=country, add_ratings=True, timeout=10)
+    result: dict = scraper.get_app_details(
+        store_id, country=country, add_ratings=True, timeout=10
+    )
     logger.info(f"Scrape app finish {store_id=} {country=}")
     return result
 
 
 def clean_ios_app_df(df: pd.DataFrame) -> pd.DataFrame:
-    if 'store_id' not in df.columns:
+    if "store_id" not in df.columns:
         df = df.rename(columns={"trackId": "store_id"})
     df = df.rename(
         columns={
@@ -232,24 +242,28 @@ def clean_ios_app_df(df: pd.DataFrame) -> pd.DataFrame:
         df["histogram"] = None
     return df
 
-def search_app_store_for_ids(search_term:str)-> list[str]:
-    """Search store for new apps or keyword rankings.
-    """
+
+def search_app_store_for_ids(search_term: str) -> list[str]:
+    """Search store for new apps or keyword rankings."""
     logger.info("adscrawler appple search start")
     # Call the Node.js script that runs google-play-scraper
 
     scraper = AppStoreScraper()
-    ids: list[str] = scraper.get_app_ids_for_query(search_term,country='us',lang='en',timeout=5, num=None)
+    ids: list[str] = scraper.get_app_ids_for_query(
+        search_term, country="us", lang="en", timeout=5, num=None
+    )
     logger.info(f"adscralwer apple search {len(ids)=}")
 
     return ids
 
-def app_details_for_ids(ids:list[str])->list[dict]:
+
+def app_details_for_ids(ids: list[str]) -> list[dict]:
     logger.info(f"get details for apple {len(ids)=}")
     scraper = AppStoreScraper()
     full_results = scraper.get_multiple_app_details(ids[:15])
     results = list(full_results)
     return results
+
 
 GAME_CATEGORIES = [
     "arcade",

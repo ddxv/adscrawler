@@ -2,7 +2,7 @@
 authors = [{ name = "James O'Claire" }]
 name = "adscrawler"
 description = "project description adscrawler"
-requires-python = ">= 3.12"
+requires-python = ">= 3.11"
 dynamic = ["version"]
 
 
@@ -40,7 +40,7 @@ find = {}
 adscrawler = ["*.js"]
 
 [tool.ruff]
-target-version = "py313"
+target-version = "py311"
 lint.select = [
     "A",   # flake8 builtins 
     "E",   # errors 
