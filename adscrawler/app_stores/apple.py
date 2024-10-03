@@ -47,7 +47,6 @@ def get_app_ids_with_retry(
                 timeout=10,
             )
         except Exception as e:
-            retries += 1
             if retries == max_retries:
                 raise e
             delay = min(base_delay * (2**retries) + random.uniform(0, 1), max_delay)
@@ -55,6 +54,7 @@ def get_app_ids_with_retry(
                 f"Attempt {retries} failed. Retrying in {delay:.2f} seconds..."
             )
             time.sleep(delay)
+        retries += 1
     if len(app_ids) == 0:
         logger.info(
             f"Collection: {coll_value}, category: {cat_value} failed to load apps!"

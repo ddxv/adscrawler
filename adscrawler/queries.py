@@ -11,6 +11,7 @@ from .connection import PostgresCon
 
 logger = get_logger(__name__)
 
+
 def upsert_df(
     df: pd.DataFrame,
     table_name: str,
@@ -42,23 +43,22 @@ def upsert_df(
 
     raw_conn = database_connection.engine.raw_connection()
 
-    if 'crawled_date' in df.columns and df['crawled_date'].isna().all():
-        df['crawled_date'] = pd.to_datetime(df['crawled_date']).dt.date
-        df['crawled_date'] = None
-    if 'release_date' in df.columns and df['release_date'].isna().all():
-        df['release_date']= None
+    if "crawled_date" in df.columns and df["crawled_date"].isna().all():
+        df["crawled_date"] = pd.to_datetime(df["crawled_date"]).dt.date
+        df["crawled_date"] = None
+    if "release_date" in df.columns and df["release_date"].isna().all():
+        df["release_date"] = None
 
     all_columns = list(set(key_columns + insert_columns))
     table_identifier = Identifier(table_name)
     if schema:
-        table_identifier = Composed([Identifier(schema), SQL('.'), table_identifier])
+        table_identifier = Composed([Identifier(schema), SQL("."), table_identifier])
 
-    columns = SQL(', ').join(map(Identifier, all_columns))
-    placeholders = SQL(', ').join(SQL('%s') for _ in all_columns)
-    conflict_columns = SQL(', ').join(map(Identifier, key_columns))
-    update_set = SQL(', ').join(
-        SQL('{0} = EXCLUDED.{0}').format(Identifier(col))
-        for col in all_columns
+    columns = SQL(", ").join(map(Identifier, all_columns))
+    placeholders = SQL(", ").join(SQL("%s") for _ in all_columns)
+    conflict_columns = SQL(", ").join(map(Identifier, key_columns))
+    update_set = SQL(", ").join(
+        SQL("{0} = EXCLUDED.{0}").format(Identifier(col)) for col in all_columns
     )
 
     # Upsert query without RETURNING clause
@@ -72,34 +72,32 @@ def upsert_df(
         columns=columns,
         placeholders=placeholders,
         conflict_columns=conflict_columns,
-        update_set=update_set
+        update_set=update_set,
     )
 
-    where_conditions = SQL(' AND ').join(
-        SQL('{0} = %s').format(Identifier(col))
-        for col in key_columns
+    sel_where_conditions = SQL(" AND ").join(
+        SQL("{} = ANY(%s)").format(Identifier(col)) for col in key_columns
     )
 
     select_query = SQL("""
         SELECT * FROM {table}
         WHERE {where_conditions}
-    """).format(
-        table=table_identifier,
-        where_conditions=where_conditions
-    )
+    """).format(table=table_identifier, where_conditions=sel_where_conditions)
     if log:
         logger.info(f"Upsert query: {upsert_query.as_string(raw_conn)}")
         logger.info(f"Select query: {select_query.as_string(raw_conn)}")
 
     with raw_conn.cursor() as cur:
         # Perform upsert
-        data = [tuple(row) for row in df[all_columns].itertuples(index=False, name=None)]
+        data = [
+            tuple(row) for row in df[all_columns].itertuples(index=False, name=None)
+        ]
         cur.executemany(upsert_query, data)
 
         # Fetch affected rows if required
         if return_rows:
-            select_params = [row[all_columns.index(col)] for row in data for col in key_columns]
-            cur.execute(select_query, select_params)
+            where_values = [df[col].tolist() for col in key_columns]
+            cur.execute(select_query, where_values)
             result = cur.fetchall()
             column_names = [desc[0] for desc in cur.description]
             return_df = pd.DataFrame(result, columns=column_names)
@@ -108,7 +106,6 @@ def upsert_df(
 
     raw_conn.commit()
     return return_df
-
 
 
 def query_developers(
@@ -145,7 +142,6 @@ def query_developers(
     df = pd.read_sql(sel_query, database_connection.engine)
     logger.info(f"Query developers {store=} returning rows:{df.shape[0]}")
     return df
-
 
 
 def query_store_id_map(
@@ -319,11 +315,11 @@ def query_store_apps(
                         OR crawl_result IS NULL
                         )
         """
-    if group == 'short':
+    if group == "short":
         installs_and_dates_str = short_group
-    elif group == 'long':
+    elif group == "long":
         installs_and_dates_str = long_group
-    elif group == 'max':
+    elif group == "max":
         installs_and_dates_str = max_group
     else:
         installs_and_dates_str = f"""(
