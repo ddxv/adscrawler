@@ -1,5 +1,7 @@
 import datetime
+import random
 import re
+import time
 
 import pandas as pd
 import requests
@@ -25,6 +27,29 @@ def lookupby_id(app_id: str) -> dict:
         logger.exception("Unable to parse response")
         raise requests.HTTPError(err) from err
     return resp_dict
+
+
+def get_app_ids_with_retry(scraper: AppStoreScraper, coll_value:str, cat_value:str, country:str) -> list[str]:
+    max_retries = 3
+    base_delay = 2
+    max_delay =30
+    retries = 0
+    app_ids: list[str] = []
+    while len(app_ids) == 0 and retries < max_retries:
+        try:
+            app_ids = scraper.get_app_ids_for_collection(collection=coll_value, category=cat_value, country=country,
+                    num=200,
+                    timeout=10)
+        except Exception as e:
+            retries += 1
+            if retries == max_retries:
+                raise e
+            delay = min(base_delay * (2 ** retries) + random.uniform(0, 1), max_delay)
+            logger.warning(f"Attempt {retries} failed. Retrying in {delay:.2f} seconds...")
+            time.sleep(delay)
+    if len(app_ids) == 0:
+        logger.info(f"Collection: {coll_value}, category: {cat_value} failed to load apps!")
+    return app_ids
 
 
 def scrape_ios_ranks(
@@ -69,27 +94,29 @@ def scrape_ios_ranks(
         logger.info(f"Collection: {_coll_key}")
         for cat_key, cat_value in categories.items():
             logger.info(f"Collection: {_coll_key}, category: {cat_key}")
-            scraped_ids = scraper.get_app_ids_for_collection(
-                collection=coll_value,
-                category=cat_value,
-                country=country,
-                num=200,
-                timeout=10,
-            )
-            ranked_dicts += [
-                {
-                    "store": 2,
-                    "country": country,
-                    "collection": _coll_key,
-                    "category": cat_key,
-                    "rank": rank + 1,
-                    "store_id": app,
-                    "crawled_date": datetime.datetime.now(
-                        tz=datetime.UTC,
-                    ).date(),
-                }
-                for rank, app in enumerate(scraped_ids)
-            ]
+            try:
+                scraped_ids = get_app_ids_with_retry(
+                    scraper,
+                    coll_value=coll_value,
+                    cat_value=cat_value,
+                    country=country
+                )
+                ranked_dicts += [
+                    {
+                        "store": 2,
+                        "country": country,
+                        "collection": _coll_key,
+                        "category": cat_key,
+                        "rank": rank + 1,
+                        "store_id": app,
+                        "crawled_date": datetime.datetime.now(
+                            tz=datetime.UTC,
+                        ).date(),
+                    }
+                    for rank, app in enumerate(scraped_ids)
+                ]
+            except Exception as e:
+                logger.error(f"Failed to scrape collection {_coll_key}, category {cat_key} after multiple retries: {str(e)}")
     return ranked_dicts
 
 
