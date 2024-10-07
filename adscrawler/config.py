@@ -8,8 +8,9 @@ from logging import Formatter
 from logging.handlers import RotatingFileHandler
 
 HOME = pathlib.Path.home()
+PROJECT_NAME = "adscrawler"
 TOP_CONFIGDIR = pathlib.Path(HOME, pathlib.Path(".config"))
-CONFIG_DIR = pathlib.Path(TOP_CONFIGDIR, pathlib.Path("adscrawler"))
+CONFIG_DIR = pathlib.Path(TOP_CONFIGDIR, pathlib.Path(PROJECT_NAME))
 LOG_DIR = pathlib.Path(CONFIG_DIR, pathlib.Path("logs"))
 MODULE_DIR = pathlib.Path(__file__).resolve().parent
 PACKAGE_DIR = pathlib.Path(__file__).resolve().parent.parent
@@ -30,20 +31,19 @@ def check_config_dirs() -> None:
             pathlib.Path.mkdir(_dir, exist_ok=True)
 
 
-
-
-FORMATTER = Formatter("%(asctime)s.%(msecs)03d | "
+FORMATTER = Formatter(
+    "%(asctime)s.%(msecs)03d | "
     "%(process)d | "
     "%(levelname)-5s | "
     "%(filename)s:%(lineno)d | "
-    "%(message)s")
+    "%(message)s"
+)
 
 
 FORMATTER.datefmt = "%Y-%m-%d %H:%M:%S"
 
 
-def get_logger(mod_name: str, sep_file:str|None='main') -> logging.Logger:
-
+def get_logger(mod_name: str, sep_file: str | None = "main") -> logging.Logger:
     check_config_dirs()
 
     # Get or create logger
@@ -57,21 +57,21 @@ def get_logger(mod_name: str, sep_file:str|None='main') -> logging.Logger:
 
     # Add file handler for individual log file
     indiv_handler = RotatingFileHandler(
-        filename=os.path.join(LOG_DIR, f'{sep_file}.log'),
-        maxBytes=50*1024*1024,
-        backupCount=10
+        filename=os.path.join(LOG_DIR, f"{sep_file}.log"),
+        maxBytes=50 * 1024 * 1024,
+        backupCount=10,
     )
     indiv_handler.setFormatter(FORMATTER)
     logger.addHandler(indiv_handler)
 
-    if sep_file != 'main':
-        root_logger = logging.getLogger()
+    if sep_file != "main":
+        root_logger = logging.getLogger(PROJECT_NAME)
         if not root_logger.handlers:
             # Add main file handler if it doesn't exist
             main_handler = RotatingFileHandler(
-                filename=os.path.join(LOG_DIR, 'main.log'),
-                maxBytes=50*1024*1024,
-                backupCount=10
+                filename=os.path.join(LOG_DIR, "main.log"),
+                maxBytes=50 * 1024 * 1024,
+                backupCount=10,
             )
             main_handler.setFormatter(FORMATTER)
             root_logger.addHandler(main_handler)
@@ -94,6 +94,7 @@ def get_logger(mod_name: str, sep_file:str|None='main') -> logging.Logger:
         logger.propagate = False  # Main logger shouldn't propagate
 
     return logger
+
 
 # Set global handling of uncaught exceptions
 sys.excepthook = handle_exception
