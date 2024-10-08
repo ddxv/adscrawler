@@ -50,3 +50,9 @@ CREATE TABLE public.network_package_map (
         network
     ) REFERENCES networks (id)
 );
+
+CREATE TABLE adtech.company_domain_mapping (
+    company_id int REFERENCES adtech.companies (id),
+    domain_id int REFERENCES public.ad_domains (id),
+    PRIMARY KEY (company_id, domain_id)
+);
