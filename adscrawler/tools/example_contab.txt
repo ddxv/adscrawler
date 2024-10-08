@@ -22,14 +22,19 @@
 # 
 # m h  dom mon dow   command
 
-
 # Hourly
 5 * * * * psql -d madrone -c "SELECT snapshot_store_apps();"
 7 * * * * psql -d madrone -c "SELECT snapshot_pub_domains();"
+25 * * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW CONCURRENTLY adtech.companies_by_d30_counts"
+28 * * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW CONCURRENTLY adtech.companies_parent_by_d30_counts"
 43 * * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW CONCURRENTLY store_apps_updated_at"
 53 * * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW CONCURRENTLY store_apps_created_at"
 55 * * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW CONCURRENTLY adtech.store_apps_companies"
 
+# NEW companies from app-ads-txt, to be run hourly for now
+22 * * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW adtech.app_ads_store_apps_companies"
+32 * * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW CONCURRENTLY adtech.combined_store_apps_companies"
+42 * * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW CONCURRENTLY adtech.companies_app_counts"
 
 # Multiple Per Day
 0 */4 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW CONCURRENTLY audit_dates"
@@ -48,7 +53,5 @@
 30 1 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW CONCURRENTLY publisher_domain_with_installs"
 30 2 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW app_ads_view"
 30 8 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW CONCURRENTLY store_apps_history_change"
-22 8 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW CONCURRENTLY adtech.companies_by_d30_counts"
-28 8 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW CONCURRENTLY adtech.companies_parent_by_d30_counts"
 
 
