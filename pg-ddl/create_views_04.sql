@@ -222,7 +222,8 @@ ON adtech.company_top_apps (
     company, store, tag_source, name, store_id, category
 );
 
-CREATE MATERIALIZED VIEW adtech.companies_categories_app_counts AS
+
+CREATE MATERIALIZED VIEW adtech.companies_parent_categories_app_counts AS
 SELECT
     parent_id,
     app_category,
@@ -235,5 +236,5 @@ ORDER BY parent_id ASC, app_count DESC
 WITH DATA;
 
 DROP INDEX IF EXISTS idx_companies_categories_app_counts;
-CREATE UNIQUE INDEX idx_companies_categories_app_counts
-ON adtech.companies_categories_app_counts (parent_id, app_category);
+CREATE UNIQUE INDEX idx_companies_parent_categories_app_counts
+ON adtech.companies_parent_categories_app_counts (parent_id, app_category);
