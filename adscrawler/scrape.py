@@ -18,23 +18,48 @@ from .queries import query_pub_domains, upsert_df
 logger = get_logger(__name__)
 
 
+class NoAdsTxtError(Exception):
+    pass
+
+
+class AdsTxtEmptyError(Exception):
+    pass
+
+
 def request_app_ads(ads_url: str) -> str:
     max_bytes = 1000000
-    if ads_url[0:4] != "http":
+    if not ads_url.startswith("http"):
         ads_url = "http://" + ads_url
     try:
+        # First attempt with HTTP
         response = requests.get(ads_url, stream=True, timeout=2)
-    except requests.exceptions.ConnectionError:
-        err = f"{ads_url} type: requests ConnectionError"
-        raise NoAdsTxtError(err) from ConnectionError
+    except Exception:
+        try:
+            # If HTTP fails, try HTTPS
+            ads_url = ads_url.replace("http://", "https://", 1)
+            response = requests.get(ads_url, stream=True, timeout=2)
+        except requests.exceptions.ConnectionError:
+            err = f"{ads_url} type: requests ConnectionError"
+            raise NoAdsTxtError(err) from ConnectionError
+
+    # Handle 403 (Forbidden) by modifying the User-Agent
     if response.status_code == 403:
         headers = {
-            "User-Agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:84.0)",
+            "User-Agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:131.0) Gecko/20100101 Firefox/131.0",
         }
         response = requests.get(ads_url, headers=headers, timeout=2, stream=True)
+
+    # If still not successful, raise an error for non-200 status codes
     if response.status_code != 200:
         err = f"{ads_url} status_code: {response.status_code}"
         raise NoAdsTxtError(err)
+
+    # Check the content length
+    content_length = response.headers.get("Content-Length")
+    if content_length and int(content_length) > max_bytes:
+        err = f"{ads_url} content exceeds maximum allowed size of {max_bytes} bytes"
+        raise NoAdsTxtError(err)
+
     # Maximum amount we want to read
     content_bytes = response.headers.get("Content-Length")
     if content_bytes and int(content_bytes) < max_bytes:
@@ -59,14 +84,6 @@ def request_app_ads(ads_url: str) -> str:
         err = "DIRECT, RESELLER not in ads.txt"
         raise NoAdsTxtError(err)
     return text
-
-
-class NoAdsTxtError(Exception):
-    pass
-
-
-class AdsTxtEmptyError(Exception):
-    pass
 
 
 def get_app_ads_text(url: str) -> str:
