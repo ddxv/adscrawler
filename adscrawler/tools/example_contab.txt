@@ -35,6 +35,8 @@
 22 * * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW adtech.app_ads_store_apps_companies"
 32 * * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW CONCURRENTLY adtech.combined_store_apps_companies"
 42 * * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW CONCURRENTLY adtech.companies_app_counts"
+48 */2 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW CONCURRENTLY adtech.company_top_apps"
+
 
 # Multiple Per Day
 0 */4 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW CONCURRENTLY audit_dates"

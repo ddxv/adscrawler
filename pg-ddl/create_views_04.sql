@@ -54,7 +54,7 @@ WITH sdk_based_companies AS (
         adtech.store_apps_companies AS sac
     LEFT JOIN adtech.company_domain_mapping AS cdm
         ON
-            sac.parent_id = cdm.company_id
+            COALESCE(sac.company_id, sac.parent_id) = cdm.company_id
     LEFT JOIN ad_domains AS ad
         ON
             cdm.domain_id = ad.id
@@ -110,6 +110,63 @@ WITH my_counts AS (
         adtech.combined_store_apps_companies AS csac
     LEFT JOIN adtech.companies AS c
         ON
+            csac.company_id = c.id
+    LEFT JOIN store_apps AS sa
+        ON
+            csac.store_app = sa.id
+    LEFT JOIN category_mapping AS cm ON
+        sa.category = cm.original_category
+),
+
+app_counts AS (
+    SELECT
+        store,
+        app_category,
+        tag_source,
+        ad_network,
+        COUNT(*) AS app_count
+    FROM
+        my_counts
+    GROUP BY
+        store,
+        app_category,
+        tag_source,
+        ad_network
+)
+
+SELECT
+    ac.app_count,
+    ac.store,
+    ac.app_category,
+    ac.tag_source,
+    ac.ad_network
+FROM
+    app_counts AS ac
+ORDER BY
+    ac.app_count DESC
+WITH DATA;
+
+
+DROP INDEX IF EXISTS idx_companies_app_counts;
+CREATE UNIQUE INDEX idx_companies_app_counts
+ON adtech.companies_app_counts (store, app_category, tag_source, ad_network);
+
+DROP MATERIALIZED VIEW adtech.companies_parent_app_counts;
+CREATE MATERIALIZED VIEW adtech.companies_parent_app_counts AS
+WITH my_counts AS (
+    SELECT DISTINCT
+        csac.store_app,
+        sa.store,
+        cm.mapped_category AS app_category,
+        csac.tag_source,
+        COALESCE(
+            c.name,
+            csac.ad_domain
+        ) AS ad_network
+    FROM
+        adtech.combined_store_apps_companies AS csac
+    LEFT JOIN adtech.companies AS c
+        ON
             csac.parent_id = c.id
     LEFT JOIN store_apps AS sa
         ON
@@ -142,17 +199,16 @@ SELECT
     ac.ad_network
 FROM
     app_counts AS ac
-WHERE
-    ac.app_count > 5
 ORDER BY
     ac.app_count DESC
 WITH DATA;
 
 
-DROP INDEX IF EXISTS idx_companies_app_counts;
-CREATE UNIQUE INDEX idx_companies_app_counts
-ON adtech.companies_app_counts (store, app_category, tag_source, ad_network);
-
+DROP INDEX IF EXISTS idx_companies_parent_app_counts;
+CREATE UNIQUE INDEX idx_companies_parent_app_counts
+ON adtech.companies_parent_app_counts (
+    store, app_category, tag_source, ad_network
+);
 
 
 -- DROP MATERIALIZED VIEW adtech.company_top_apps CASCADE ;
@@ -223,18 +279,39 @@ ON adtech.company_top_apps (
 );
 
 
+-- DROP MATERIALIZED VIEW adtech.companies_parent_categories_app_counts;
 CREATE MATERIALIZED VIEW adtech.companies_parent_categories_app_counts AS
 SELECT
-    parent_id,
-    app_category,
-    COUNT(DISTINCT store_app) AS app_count
+    c.name AS company_name,
+    csac.app_category,
+    COUNT(DISTINCT csac.store_app) AS app_count
 FROM
-    adtech.combined_store_apps_companies
+    adtech.combined_store_apps_companies AS csac
+LEFT JOIN adtech.companies AS c ON csac.parent_id = c.id
 GROUP BY
-    parent_id, app_category
-ORDER BY parent_id ASC, app_count DESC
+    c.name, csac.app_category
+ORDER BY c.name ASC, app_count DESC
+WITH DATA;
+
+DROP INDEX IF EXISTS idx_companies_parent_categories_app_counts;
+CREATE UNIQUE INDEX idx_companies_parent_categories_app_counts
+ON adtech.companies_parent_categories_app_counts (company_name, app_category);
+
+
+
+CREATE MATERIALIZED VIEW adtech.companies_categories_app_counts AS
+SELECT
+    c.name AS company_name,
+    csac.app_category,
+    COUNT(DISTINCT csac.store_app) AS app_count
+FROM
+    adtech.combined_store_apps_companies AS csac
+LEFT JOIN adtech.companies AS c ON csac.company_id = c.id
+GROUP BY
+    c.name, csac.app_category
+ORDER BY c.name ASC, app_count DESC
 WITH DATA;
 
 DROP INDEX IF EXISTS idx_companies_categories_app_counts;
-CREATE UNIQUE INDEX idx_companies_parent_categories_app_counts
-ON adtech.companies_parent_categories_app_counts (parent_id, app_category);
+CREATE UNIQUE INDEX idx_companies_categories_app_counts
+ON adtech.companies_categories_app_counts (company_name, app_category);
