@@ -121,7 +121,9 @@ def get_parsed_plist() -> tuple[str, str, pd.DataFrame]:
     ddf = ddf[["path", "value"]]
     version = data["CFBundleVersion"]
     frameworks_df = ipa_frameworks()
-    df = pd.concat([ddf, frameworks_df])
+    bundles_df = ipa_bundles()
+    paths_df = pd.concat([frameworks_df, bundles_df])
+    df = pd.concat([ddf, paths_df])
     return version, plist_str, df
 
 
@@ -142,8 +144,28 @@ def ipa_frameworks() -> pd.DataFrame:
     return df
 
 
+def ipa_bundles() -> pd.DataFrame:
+    """Check for frameworks based on directory names."""
+    bundle_dirs = []
+    payload_dir = pathlib.Path(UNZIPPED_DIR, "Payload")
+    if payload_dir.exists():
+        for (
+            app_dir
+        ) in payload_dir.iterdir():  # Assuming the next directory is the app directory
+            print("APP", app_dir)
+            for mydir in app_dir.iterdir():
+                print("MY", mydir)
+                if mydir.is_dir() and mydir.name.endswith(
+                    ".bundle"
+                ):  # Add only directories
+                    print("ADD", mydir)
+                    bundle_dirs.append(mydir.name)
+    df = pd.DataFrame({"path": "bundles", "value": bundle_dirs})
+    return df
+
+
 def download_and_unpack(store_id: str) -> str:
-    #store_id = '835599320'
+    # store_id = '835599320'
     r = lookupby_id(app_id=store_id)
     bundle_id: str = r["bundleId"]
     ipa_path = pathlib.Path(IPAS_DIR, f"{bundle_id}.ipa")
@@ -172,7 +194,7 @@ def plist_main(
         logger.info(f"{store_id=} start")
         details_df = row.to_frame().T
         version_str = "-1"
-        ipa_path:None|pathlib.Path = None
+        ipa_path: None | pathlib.Path = None
         try:
             bundle_id = download_and_unpack(store_id=store_id)
             ipa_path = pathlib.Path(IPAS_DIR, f"{bundle_id}.ipa")
@@ -270,6 +292,7 @@ def main(args: argparse.Namespace) -> None:
     store_id = args.store_id
 
     download_and_unpack(store_id=store_id)
+
 
 if __name__ == "__main__":
     args = parse_args()
