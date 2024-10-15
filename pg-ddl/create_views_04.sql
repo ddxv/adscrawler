@@ -195,13 +195,15 @@ WITH my_counts AS (
         sa.store,
         cm.mapped_category AS app_category,
         csac.tag_source,
-        csac.ad_domain AS company_domain,
+        ad.domain AS company_domain,
         c.name AS company_name
     FROM
         adtech.combined_store_apps_companies AS csac
     LEFT JOIN adtech.companies AS c
         ON
             csac.parent_id = c.id
+    LEFT JOIN adtech.company_domain_mapping AS cdm ON c.id = cdm.company_id
+    LEFT JOIN ad_domains AS ad ON cdm.domain_id = ad.id
     LEFT JOIN store_apps AS sa
         ON
             csac.store_app = sa.id
