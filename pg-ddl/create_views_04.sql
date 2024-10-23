@@ -357,3 +357,22 @@ CREATE UNIQUE INDEX idx_companies_categories_app_counts
 ON adtech.companies_categories_app_counts (
     company_domain, company_name, app_category
 );
+
+
+DROP MATERIALIZED VIEW adtech.total_categories_app_counts;
+CREATE MATERIALIZED VIEW adtech.total_categories_app_counts AS
+SELECT
+    sa.store,
+    tag_source,
+    csac.app_category,
+    COUNT(DISTINCT csac.store_app) AS app_count
+FROM
+    adtech.combined_store_apps_companies AS csac
+LEFT JOIN store_apps sa ON
+    csac.store_app = sa.id
+GROUP BY
+    sa.store,
+    tag_source,
+    csac.app_category
+WITH DATA
+;
