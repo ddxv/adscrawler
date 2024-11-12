@@ -33,7 +33,7 @@ appads_url_count AS (
         pub_domains pd
 )
 SELECT
-    CURRENT_DATE AS date,
+    CURRENT_DATE AS on_date,
     app_count.android_apps,
     app_count.ios_apps,
     app_count.success_android_apps,
