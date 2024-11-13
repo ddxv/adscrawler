@@ -28,7 +28,7 @@ appads_url_count AS (
         COUNT(DISTINCT url) AS appads_urls,
         count(DISTINCT CASE WHEN pd.crawl_result = 1 THEN pd.url END) appads_success_urls,
         count(DISTINCT CASE WHEN pd.crawl_result = 1 AND pd.updated_at >= CURRENT_DATE - INTERVAL '7 days' THEN pd.url END) appads_weekly_success_urls,
-        count(DISTINCT CASE WHEN pd.created_at >= CURRENT_DATE - INTERVAL '7 days' THEN pd.url END) appads_weekly_urls
+        count(DISTINCT CASE WHEN pd.updated_at >= CURRENT_DATE - INTERVAL '7 days' THEN pd.url END) appads_weekly_urls
     FROM
         pub_domains pd
 )
