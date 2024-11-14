@@ -77,44 +77,46 @@ WITH latest_version_codes AS (
         sa.store,
         vc.store_app,
         tm.company_id,
-        COALESCE(
-            pc.parent_company_id,
-            tm.company_id
-    ) AS parent_id
-FROM
-        latest_version_codes AS vc
+        c.name AS company_name,
+        ad."domain" AS company_domain,
+        cats.name AS category_name
+FROM 
+    latest_version_codes AS vc
 LEFT JOIN public.version_details AS vd
         ON
             vc.id = vd.version_code
 LEFT JOIN adtech.sdk_packages AS tm
         ON
             vd.value_name ILIKE tm.package_pattern || '%'
-LEFT JOIN adtech.companies AS pc ON
-        tm.company_id = pc.id
-LEFT JOIN store_apps sa ON vc.store_app = sa.id
+LEFT JOIN adtech.companies AS c ON
+    tm.company_id = c.id
+LEFT JOIN adtech.company_categories cc ON
+    c.id = cc.company_id
+LEFT JOIN adtech.categories cats ON
+    cc.category_id = cats.id
+LEFT JOIN adtech.company_domain_mapping cdm ON
+    tm.company_id = cdm.company_id
+LEFT JOIN ad_domains ad ON
+    cdm.domain_id = ad.id
+LEFT JOIN store_apps sa ON
+    vc.store_app = sa.id
 ;
 
 
 CREATE MATERIALIZED VIEW companies_version_details_count AS
 SELECT
     cavd.store,
-    c.name AS company_name,
-    ad."domain" AS company_domain,
+    cavd.company_name,
+    cavd.company_domain,
     cavd.xml_path,
     cavd.value_name,
     count(DISTINCT store_app) AS app_count
 FROM
     companies_apps_version_details cavd
-LEFT JOIN adtech.companies c ON
-    cavd.company_id = c.id
-LEFT JOIN adtech.company_domain_mapping cdm ON
-    cavd.company_id = cdm.company_id
-LEFT JOIN ad_domains ad ON
-    cdm.domain_id = ad.id
 GROUP BY
     cavd.store,
-    c.name,
-    ad."domain",
+    cavd.company_name,
+    cavd.company_domain,
     cavd.xml_path,
     cavd.value_name
 ;
