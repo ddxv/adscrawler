@@ -17,7 +17,6 @@ dependencies = [
     'sshtunnel',
     'selenium',
     'pyyaml',
-    # "psycopg2-binary",
     "psycopg[binary]",
 ]
 

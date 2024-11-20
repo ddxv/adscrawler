@@ -64,7 +64,39 @@ def get_parsed_manifest() -> tuple[str, pd.DataFrame]:
     tree = ElementTree.parse(manifest_filename)
     root = tree.getroot()
     df = xml_to_dataframe(root)
+    smali_df = get_smali_df()
+    df = pd.concat([df, smali_df])
     return manifest_str, df
+
+
+
+def unzipped_apk_paths(mypath: pathlib.Path) -> pd.DataFrame:
+    """Collect all unzipped APK paths recursively and return as a DataFrame."""
+    unzipped_paths = []
+
+    def collect_paths(directory: pathlib.Path):
+        for path in directory.iterdir():
+            if path.is_dir():
+                unzipped_paths.append(str(path))
+                collect_paths(path)  # Recursive call
+
+    # Start collecting paths
+    collect_paths(mypath)
+    
+    # Create a DataFrame
+    return pd.DataFrame(unzipped_paths, columns=["path"])
+
+
+def get_smali_df() -> pd.DataFrame:
+    mydf = unzipped_apk_paths(UNZIPPED_DIR)
+    smali_df = mydf[mydf['path'].str.lower().str.contains('smali')].copy()
+    smali_df['path'] = smali_df['path'].str.replace(MODULE_DIR.as_posix() + "/apksunzipped/", "").str.replace('smali/', '').str.replace("/", ".")
+    smali_df = smali_df.rename(columns={'path': 'android_name'})
+    smali_df['path'] = 'smali'
+    return smali_df
+
+
+
 
 
 def get_version() -> str:
