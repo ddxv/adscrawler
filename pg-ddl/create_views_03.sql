@@ -1,19 +1,15 @@
-CREATE MATERIALIZED VIEW mv_app_categories AS
-SELECT
-    sa.store,
+CREATE MATERIALIZED VIEW public.mv_app_categories
+TABLESPACE pg_default
+AS 
+SELECT sa.store,
     cm.mapped_category AS category,
-    COUNT(*) AS app_count
-FROM
-    store_apps AS sa
-INNER JOIN category_mapping AS cm
-    ON
-        sa.category = cm.original_category
-GROUP BY
-    sa.store,
-    cm.mapped_category
-ORDER BY
-    sa.store,
-    cm.mapped_category;
+    count(*) AS app_count
+   FROM store_apps sa
+     JOIN category_mapping cm ON sa.category::text = cm.original_category::text
+   WHERE sa.crawl_result = 1 AND sa.category IS NOT NULL 
+  GROUP BY sa.store, cm.mapped_category
+  ORDER BY sa.store, cm.mapped_category
+;
 
 --DROP INDEX IF EXISTS idx_mv_app_categories;
 CREATE UNIQUE INDEX idx_mv_app_categories
