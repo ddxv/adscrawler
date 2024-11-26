@@ -268,6 +268,17 @@ WITH ranked_apps AS (
         ROW_NUMBER() OVER (
             PARTITION BY
                 sa.store,
+                cac.ad_domain,
+                c.name,
+                cac.tag_source
+            ORDER BY
+                GREATEST(
+                    COALESCE(sa.rating_count, 0), COALESCE(sa.installs, 0)
+                ) DESC
+        ) AS app_company_rank,
+        ROW_NUMBER() OVER (
+            PARTITION BY
+                sa.store,
                 cac.app_category,
                 cac.ad_domain,
                 c.name,
@@ -276,7 +287,7 @@ WITH ranked_apps AS (
                 GREATEST(
                     COALESCE(sa.rating_count, 0), COALESCE(sa.installs, 0)
                 ) DESC
-        ) AS row_num
+        ) AS app_company_category_rank
     FROM
         adtech.combined_store_apps_companies AS cac
     LEFT JOIN store_apps AS sa
@@ -285,7 +296,6 @@ WITH ranked_apps AS (
     LEFT JOIN adtech.companies AS c ON
         cac.company_id = c.id
 )
-
 SELECT
     company_domain,
     company_name,
@@ -294,17 +304,23 @@ SELECT
     name,
     store_id,
     category,
+    app_company_rank,
+    app_company_category_rank,
     rating_count,
     installs
 FROM
     ranked_apps
 WHERE
-    row_num <= 100
+    app_company_category_rank <= 100
 ORDER BY
     store,
     tag_source,
-    row_num
+    app_company_category_rank
 WITH DATA;
+
+
+CREATE INDEX idx_company_top_apps_category
+ON adtech.company_top_apps (company_domain, category);
 
 
 DROP INDEX IF EXISTS idx_company_top_apps;
