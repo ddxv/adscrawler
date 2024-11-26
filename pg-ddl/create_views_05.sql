@@ -142,6 +142,10 @@ FROM
 WITH DATA;
 
 
+CREATE INDEX companies_apps_version_details_store_id_idx ON
+public.companies_apps_version_details (store_id);
+
+
 
 CREATE MATERIALIZED VIEW companies_apps_version_details AS
 WITH latest_version_codes AS (
@@ -163,11 +167,11 @@ WITH latest_version_codes AS (
         vd.tag,
         vd.value_name,
         sa.store,
-        vc.store_app,
+        sa.store_id,
         tm.company_id,
         c.name AS company_name,
         ad."domain" AS company_domain,
-        cats.name AS category_name
+        cats.url_slug AS category_slug
 FROM 
     latest_version_codes AS vc
 LEFT JOIN public.version_details AS vd
@@ -188,7 +192,13 @@ LEFT JOIN ad_domains ad ON
     cdm.domain_id = ad.id
 LEFT JOIN store_apps sa ON
     vc.store_app = sa.id
+WITH DATA
 ;
+
+CREATE INDEX companies_apps_version_details_store_id_idx ON
+public.companies_apps_version_details (store_id);
+
+
 
 
 CREATE MATERIALIZED VIEW companies_version_details_count AS
@@ -198,7 +208,7 @@ SELECT
     cavd.company_domain,
     cavd.xml_path,
     cavd.value_name,
-    count(DISTINCT store_app) AS app_count
+    count(DISTINCT store_id) AS app_count
 FROM
     companies_apps_version_details cavd
 GROUP BY
@@ -207,4 +217,94 @@ GROUP BY
     cavd.company_domain,
     cavd.xml_path,
     cavd.value_name
+WITH DATA
+;
+
+
+
+
+CREATE MATERIALIZED VIEW store_apps_rankings AS
+SELECT
+    ar.crawled_date,
+    ar.country,
+    ar.store,
+    sa.store_id,
+    ar.rank,
+    scol.collection,
+    scat.category
+FROM
+    app_rankings AS ar
+LEFT JOIN
+    store_apps AS sa
+    ON
+    ar.store_app = sa.id
+LEFT JOIN store_collections AS scol
+    ON
+    ar.store_collection = scol.id
+LEFT JOIN store_categories AS scat
+    ON
+    ar.store_category = scat.id
+WHERE
+    ar.crawled_date >= CURRENT_DATE - INTERVAL '1 year'
+WITH DATA
+;
+
+
+
+CREATE INDEX store_apps_rankings_idx ON
+public.store_apps_rankings (store_id, crawled_date);
+
+
+CREATE MATERIALIZED VIEW adstxt_entries_store_apps AS
+WITH parent_companies AS (
+    SELECT
+        c.id AS company_id,
+        c.name AS company_name,
+        COALESCE(
+            c.parent_company_id,
+            c.id
+        ) AS parent_company_id,
+        COALESCE(
+            pc.name,
+            c.name
+        ) AS parent_company_name
+    FROM
+        adtech.companies AS c
+    LEFT JOIN adtech.companies AS pc ON
+        c.parent_company_id = pc.id
+)
+SELECT
+    DISTINCT
+    sa.store_id,
+    d.developer_id,
+    myc.parent_company_name AS company_name,
+    aav.ad_domain_url,
+    aav.publisher_id,
+    aav.relationship,
+    aav.developer_domain_crawled_at
+FROM
+    app_ads_view AS aav
+LEFT JOIN pub_domains AS pd
+    ON
+    aav.developer_domain_url = pd.url
+LEFT JOIN app_urls_map AS aum
+    ON
+    pd.id = aum.pub_domain
+LEFT JOIN store_apps AS sa
+    ON
+    aum.store_app = sa.id
+LEFT JOIN developers AS d
+    ON
+    sa.developer = d.id
+LEFT JOIN adtech.company_domain_mapping AS cdm ON
+    aav.ad_domain = cdm.domain_id
+LEFT JOIN parent_companies AS myc
+    ON
+    cdm.company_id = myc.company_id
+WITH DATA
+;
+
+
+CREATE INDEX adstxt_entries_store_apps_idx ON
+public.adstxt_entries_store_apps (store_id)
 ;
