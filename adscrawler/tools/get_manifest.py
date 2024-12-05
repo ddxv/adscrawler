@@ -90,7 +90,7 @@ def unzipped_apk_paths(mypath: pathlib.Path) -> pd.DataFrame:
 def get_smali_df() -> pd.DataFrame:
     mydf = unzipped_apk_paths(UNZIPPED_DIR)
     smali_df = mydf[mydf['path'].str.lower().str.contains('smali')].copy()
-    smali_df['path'] = smali_df['path'].str.replace(MODULE_DIR.as_posix() + "/apksunzipped/", "").str.replace('smali/', '').str.replace("/", ".")
+    smali_df['path'] = smali_df['path'].str.replace(MODULE_DIR.as_posix() + "/apksunzipped/", "").str.replace('smali/', '').str.replace("/", ".").str.replace(r'smali_classes_\d+/', '', regex=True)
     smali_df = smali_df.rename(columns={'path': 'android_name'})
     smali_df['path'] = 'smali'
     return smali_df

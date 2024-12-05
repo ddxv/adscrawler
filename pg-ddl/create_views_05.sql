@@ -306,5 +306,5 @@ WITH DATA
 
 
 CREATE INDEX adstxt_entries_store_apps_idx ON
-public.adstxt_entries_store_apps (store_id)
+public.adstxt_entries_store_apps (store_id);
 ;
