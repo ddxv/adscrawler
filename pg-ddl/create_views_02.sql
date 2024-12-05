@@ -41,7 +41,7 @@ nwm AS (
         publisher_domain_with_installs AS pdwi
         ON pnv.publisher_domain_url::text = pdwi.url::text
     GROUP BY
-        cube(pnv.ad_domain_url, pnv.relationship, pdwi.store, pdwi.category)
+        cube (pnv.ad_domain_url, pnv.relationship, pdwi.store, pdwi.category)
 )
 
 SELECT

@@ -1,4 +1,3 @@
-
 import sqlalchemy
 from sqlalchemy.engine import Engine
 from sshtunnel import SSHTunnelForwarder
@@ -6,6 +5,7 @@ from sshtunnel import SSHTunnelForwarder
 from .config import CONFIG, get_logger
 
 logger = get_logger(__name__)
+
 
 class PostgresCon:
     """Class for managing the connection to PostgreSQL."""
@@ -47,6 +47,7 @@ class PostgresCon:
             )
             raise
 
+
 def get_db_connection(use_ssh_tunnel: bool = False) -> PostgresCon:
     """
     Get a database connection, optionally using an SSH tunnel.
@@ -73,7 +74,10 @@ def get_db_connection(use_ssh_tunnel: bool = False) -> PostgresCon:
     conn.set_engine()
     return conn
 
-def open_ssh_tunnel(remote_host: str, server_name: str, ssh_port: int) -> SSHTunnelForwarder:
+
+def open_ssh_tunnel(
+    remote_host: str, server_name: str, ssh_port: int
+) -> SSHTunnelForwarder:
     """
     Open an SSH tunnel to the remote server.
 

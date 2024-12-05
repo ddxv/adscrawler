@@ -1,15 +1,17 @@
 CREATE MATERIALIZED VIEW public.mv_app_categories
 TABLESPACE pg_default
-AS 
-SELECT sa.store,
+AS
+SELECT
+    sa.store,
     cm.mapped_category AS category,
     count(*) AS app_count
-   FROM store_apps sa
-     JOIN category_mapping cm ON sa.category::text = cm.original_category::text
-   WHERE sa.crawl_result = 1 AND sa.category IS NOT NULL 
-  GROUP BY sa.store, cm.mapped_category
-  ORDER BY sa.store, cm.mapped_category
-;
+FROM store_apps AS sa
+INNER JOIN
+    category_mapping AS cm
+    ON sa.category::text = cm.original_category::text
+WHERE sa.crawl_result = 1 AND sa.category IS NOT NULL
+GROUP BY sa.store, cm.mapped_category
+ORDER BY sa.store, cm.mapped_category;
 
 --DROP INDEX IF EXISTS idx_mv_app_categories;
 CREATE UNIQUE INDEX idx_mv_app_categories
@@ -20,7 +22,7 @@ CREATE MATERIALIZED VIEW apps_new_weekly AS
 WITH rankedapps AS (
     SELECT
         *,-- noqa: RF02
-        ROW_NUMBER() OVER (
+        row_number() OVER (
             PARTITION BY
                 sa.store,
                 cm.mapped_category
@@ -34,7 +36,7 @@ WITH rankedapps AS (
         ON
             sa.category = cm.original_category
     WHERE
-        sa.release_date >= CURRENT_DATE - INTERVAL '7 days'
+        sa.release_date >= current_date - interval '7 days'
         AND sa.crawl_result = 1
 )
 
@@ -56,7 +58,7 @@ CREATE MATERIALIZED VIEW apps_new_monthly AS
 WITH rankedapps AS (
     SELECT
         *,-- noqa: RF02
-        ROW_NUMBER() OVER (
+        row_number() OVER (
             PARTITION BY
                 sa.store,
                 cm.mapped_category
@@ -70,7 +72,7 @@ WITH rankedapps AS (
         ON
             sa.category = cm.original_category
     WHERE
-        sa.release_date >= CURRENT_DATE - INTERVAL '30 days'
+        sa.release_date >= current_date - interval '30 days'
         AND sa.crawl_result = 1
 )
 
@@ -90,7 +92,7 @@ CREATE MATERIALIZED VIEW apps_new_yearly AS
 WITH rankedapps AS (
     SELECT
         *,-- noqa: RF02
-        ROW_NUMBER() OVER (
+        row_number() OVER (
             PARTITION BY
                 sa.store,
                 cm.mapped_category
@@ -104,7 +106,7 @@ WITH rankedapps AS (
         ON
             sa.category = cm.original_category
     WHERE
-        sa.release_date >= CURRENT_DATE - INTERVAL '365 days'
+        sa.release_date >= current_date - interval '365 days'
         AND sa.crawl_result = 1
 )
 
@@ -125,7 +127,7 @@ CREATE MATERIALIZED VIEW top_categories AS
 WITH rankedapps AS (
     SELECT
         *, -- noqa: RF02
-        ROW_NUMBER() OVER (
+        row_number() OVER (
             PARTITION BY
                 sa.store,
                 cm.mapped_category
@@ -163,26 +165,26 @@ WITH date_diffs AS (
         crawled_date,
         installs,
         rating_count,
-        MAX(crawled_date) OVER (
+        max(crawled_date) OVER (
             PARTITION BY
                 store_app,
                 country
         ) AS last_date,
-        installs - LEAD(installs) OVER (
+        installs - lead(installs) OVER (
             PARTITION BY
                 store_app,
                 country
             ORDER BY
                 crawled_date DESC
         ) AS installs_diff,
-        rating_count - LEAD(rating_count) OVER (
+        rating_count - lead(rating_count) OVER (
             PARTITION BY
                 store_app,
                 country
             ORDER BY
                 crawled_date DESC
         ) AS rating_count_diff,
-        crawled_date - LEAD(crawled_date) OVER (
+        crawled_date - lead(crawled_date) OVER (
             PARTITION BY
                 store_app,
                 country
@@ -198,22 +200,22 @@ WITH date_diffs AS (
 
 weekly_averages AS (
     SELECT
-        DATE_TRUNC(
+        date_trunc(
             'week',
             crawled_date
-        )::DATE AS week_start,
+        )::date AS week_start,
         store_app,
         country,
-        SUM(installs_diff) AS total_installs_diff,
-        SUM(rating_count) AS rating_count_diff,
-        SUM(days_diff) AS total_days
+        sum(installs_diff) AS total_installs_diff,
+        sum(rating_count) AS rating_count_diff,
+        sum(days_diff) AS total_days
     FROM
         date_diffs
     GROUP BY
-        DATE_TRUNC(
+        date_trunc(
             'week',
             crawled_date
-        )::DATE,
+        )::date,
         store_app,
         country
 )
@@ -222,14 +224,14 @@ SELECT
     week_start,
     store_app,
     country,
-    ROUND(
-        total_installs_diff / NULLIF(
+    round(
+        total_installs_diff / nullif(
             total_days,
             0
         )
     ) AS avg_daily_installs_diff,
-    ROUND(
-        rating_count_diff / NULLIF(
+    round(
+        rating_count_diff / nullif(
             total_days,
             0
         )

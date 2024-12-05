@@ -69,7 +69,6 @@ def get_parsed_manifest() -> tuple[str, pd.DataFrame]:
     return manifest_str, df
 
 
-
 def unzipped_apk_paths(mypath: pathlib.Path) -> pd.DataFrame:
     """Collect all unzipped APK paths recursively and return as a DataFrame."""
     unzipped_paths = []
@@ -82,21 +81,25 @@ def unzipped_apk_paths(mypath: pathlib.Path) -> pd.DataFrame:
 
     # Start collecting paths
     collect_paths(mypath)
-    
+
     # Create a DataFrame
     return pd.DataFrame(unzipped_paths, columns=["path"])
 
 
 def get_smali_df() -> pd.DataFrame:
     mydf = unzipped_apk_paths(UNZIPPED_DIR)
-    smali_df = mydf[mydf['path'].str.lower().str.contains('smali')].copy()
-    smali_df['path'] = smali_df['path'].str.replace(MODULE_DIR.as_posix() + "/apksunzipped/", "").str.replace('smali/', '').str.replace("/", ".").str.replace(r'smali_classes_\d+/', '', regex=True)
-    smali_df = smali_df.rename(columns={'path': 'android_name'})
-    smali_df['path'] = 'smali'
+    smali_df = mydf[mydf["path"].str.lower().str.contains("smali")].copy()
+    smali_df["path"] = (
+        smali_df["path"]
+        .str.replace(MODULE_DIR.as_posix() + "/apksunzipped/", "")
+        .str.replace("smali/", "")
+        .str.replace("/", ".")
+        .str.replace(r"smali_classes_\d+/", "", regex=True)
+        .str.replace("smali_assets/", "")
+    )
+    smali_df = smali_df.rename(columns={"path": "android_name"})
+    smali_df["path"] = "smali"
     return smali_df
-
-
-
 
 
 def get_version() -> str:
@@ -203,8 +206,8 @@ def manifest_main(
         except Exception as e:
             logger.exception(f"Unexpected error for {store_id=}: {str(e)}")
             crawl_result = 4  # Unexpected errors
-        if crawl_result in [3,4]:
-            error_count +=1
+        if crawl_result in [3, 4]:
+            error_count += 1
         details_df["store_app"] = row.store_app
         details_df["version_code"] = version_str
         version_code_df = details_df[["store_app", "version_code"]].drop_duplicates()

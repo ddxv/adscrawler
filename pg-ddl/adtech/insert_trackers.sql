@@ -4,7 +4,7 @@ INSERT INTO adtech.categories (id, name) VALUES
 (3, 'Analytics');
 
 
-INSERT INTO adtech.companies (id, "name", parent_company_id) VALUES
+INSERT INTO adtech.companies (id, name, parent_company_id) VALUES
 (1, 'Google', NULL),
 (2, 'Facebook', NULL),
 (3, 'AppsFlyer', NULL),

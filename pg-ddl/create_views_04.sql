@@ -296,6 +296,7 @@ WITH ranked_apps AS (
     LEFT JOIN adtech.companies AS c ON
         cac.company_id = c.id
 )
+
 SELECT
     company_domain,
     company_name,
@@ -384,41 +385,45 @@ SELECT
     COUNT(DISTINCT csac.store_app) AS app_count
 FROM
     adtech.combined_store_apps_companies AS csac
-LEFT JOIN store_apps sa ON
-    csac.store_app = sa.id
+LEFT JOIN store_apps AS sa
+    ON
+        csac.store_app = sa.id
 GROUP BY
     sa.store,
     tag_source,
     csac.app_category
-WITH DATA
-;
+WITH DATA;
 
 
 DROP MATERIALIZED VIEW adtech.companies_categories_types_app_counts;
 CREATE MATERIALIZED VIEW adtech.companies_categories_types_app_counts AS
 SELECT
-	count(DISTINCT store_app) AS app_count,
-	sa.store,
-	csac.app_category,	
-	csac.tag_source,
-	csac.ad_domain AS company_domain,
-	c.name AS company_name,
-	cats.url_slug AS type_url_slug
+    sa.store,
+    csac.app_category,
+    csac.tag_source,
+    csac.ad_domain AS company_domain,
+    c.name AS company_name,
+    cats.url_slug AS type_url_slug,
+    COUNT(DISTINCT store_app) AS app_count
 FROM
-	adtech.combined_store_apps_companies csac
-LEFT JOIN adtech.company_categories ccats ON
-	csac.company_id = ccats.company_id
-LEFT JOIN adtech.categories cats ON
-	ccats.category_id = cats.id
-LEFT JOIN adtech.companies c ON
-	csac.company_id = c.id
-LEFT JOIN store_apps sa ON
-	csac.store_app = sa.id
+    adtech.combined_store_apps_companies AS csac
+LEFT JOIN adtech.company_categories AS ccats
+    ON
+        csac.company_id = ccats.company_id
+LEFT JOIN adtech.categories AS cats
+    ON
+        ccats.category_id = cats.id
+LEFT JOIN adtech.companies AS c
+    ON
+        csac.company_id = c.id
+LEFT JOIN store_apps AS sa
+    ON
+        csac.store_app = sa.id
 GROUP BY
-	sa.store,
-	csac.app_category,
-	csac.tag_source,
-	csac.ad_domain,
-	c.name,
-	cats.url_slug
+    sa.store,
+    csac.app_category,
+    csac.tag_source,
+    csac.ad_domain,
+    c.name,
+    cats.url_slug
 WITH DATA;
