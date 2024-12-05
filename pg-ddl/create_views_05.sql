@@ -208,11 +208,6 @@ FROM
 WITH DATA;
 
 
-CREATE INDEX companies_apps_version_details_store_id_idx ON
-public.companies_apps_version_details (store_id);
-
-
-
 CREATE MATERIALIZED VIEW companies_apps_version_details AS
 WITH latest_version_codes AS (
     SELECT
@@ -271,7 +266,6 @@ public.companies_apps_version_details (store_id);
 
 
 
-
 CREATE MATERIALIZED VIEW companies_version_details_count AS
 SELECT
     cavd.store,
@@ -289,8 +283,6 @@ GROUP BY
     cavd.xml_path,
     cavd.value_name
 WITH DATA;
-
-
 
 
 CREATE MATERIALIZED VIEW store_apps_rankings AS
