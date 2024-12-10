@@ -93,9 +93,11 @@ def get_smali_df() -> pd.DataFrame:
         smali_df["path"]
         .str.replace(MODULE_DIR.as_posix() + "/apksunzipped/", "")
         .str.replace("smali/", "")
-        .str.replace("/", ".")
         .str.replace(r"smali_classes_\d+/", "", regex=True)
+        .str.replace(r"smali_classes\d+/", "", regex=True)
+        .str.replace(r"smali_assets\d+/", "", regex=True)
         .str.replace("smali_assets/", "")
+        .str.replace("/", ".")
     )
     smali_df = smali_df.rename(columns={"path": "android_name"})
     smali_df["path"] = "smali"
