@@ -451,8 +451,6 @@ def get_most_recent_top_ranks(
                     version_codes.crawl_result
                 FROM
                     version_codes
-                WHERE
-                    version_codes.crawl_result = 1
                 ORDER BY
                     version_codes.store_app,
                     -- Group rows by store_app
