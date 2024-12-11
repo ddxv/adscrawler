@@ -442,18 +442,23 @@ def get_most_recent_top_ranks(
             latest_version_codes AS (
                 SELECT
                     DISTINCT ON
-                    (store_app)
-                id,
-                    store_app,
-                    version_code,
-                    updated_at,
-                    crawl_result
+                    (version_codes.store_app)
+                    -- Ensures one row per store_app WHEN combined WITH ORDER BY 
+                    version_codes.id,
+                    version_codes.store_app,
+                    version_codes.version_code,
+                    version_codes.updated_at,
+                    version_codes.crawl_result
                 FROM
-                    version_codes vc
+                    version_codes
+                WHERE
+                    version_codes.crawl_result = 1
                 ORDER BY
-                    store_app,
-                    updated_at DESC
-            )
+                    version_codes.store_app,
+                    -- Group rows by store_app
+                    version_codes.version_code::TEXT DESC
+                    -- Pick the latest version_code
+            ),
             SELECT
                 dc.store_app,
                 dc.store_id,

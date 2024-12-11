@@ -45,7 +45,6 @@
 15 */3 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW CONCURRENTLY network_counts_top"
 20 */3 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW CONCURRENTLY category_mapping"
 25 */3 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW CONCURRENTLY mv_app_categories"
-55 */6 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW adtech.store_crawl_results"
 33 */11 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW CONCURRENTLY apps_new_weekly"
 35 */11 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW CONCURRENTLY apps_new_monthly"
 45 */9 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW CONCURRENTLY publisher_network_view"
