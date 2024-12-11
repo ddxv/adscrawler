@@ -210,17 +210,20 @@ WITH DATA;
 
 CREATE MATERIALIZED VIEW companies_apps_version_details AS
 WITH latest_version_codes AS (
-    SELECT
-        id,
-        store_app,
-        max(version_code) AS version_code
+    SELECT DISTINCT ON
+    (vc.store_app)
+        -- Ensures one row per store_app WHEN combined WITH ORDER BY 
+        vc.id,
+        vc.store_app,
+        vc.version_code
     FROM
-        public.version_codes
+        version_codes AS vc
     WHERE
-        crawl_result = 1
-    GROUP BY
-        id,
-        store_app
+        vc.crawl_result = 1
+    ORDER BY
+        vc.store_app,
+        vc.version_code::text DESC
+-- Pick the latest version_code
 )
 
 SELECT DISTINCT
