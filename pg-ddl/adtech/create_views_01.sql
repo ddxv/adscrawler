@@ -1,17 +1,21 @@
 DROP MATERIALIZED VIEW IF EXISTS adtech.store_apps_companies CASCADE;
 CREATE MATERIALIZED VIEW adtech.store_apps_companies AS
 WITH latest_version_codes AS (
-    SELECT
-        id,
-        store_app,
-        MAX(version_code) AS version_code
+    SELECT DISTINCT ON
+    (version_codes.store_app)
+        -- Ensures one row per store_app WHEN combined WITH ORDER BY 
+        version_codes.id,
+        version_codes.store_app,
+        version_codes.version_code
     FROM
-        public.version_codes
+        version_codes
     WHERE
-        crawl_result = 1
-    GROUP BY
-        id,
-        store_app
+        version_codes.crawl_result = 1
+    ORDER BY
+        version_codes.store_app,
+        -- Group rows by store_app
+        version_codes.version_code::TEXT DESC
+        -- Pick the latest version_code
 ),
 
 sdk_apps_with_companies AS (
@@ -24,12 +28,14 @@ sdk_apps_with_companies AS (
         ) AS parent_id
     FROM
         latest_version_codes AS vc
-    LEFT JOIN public.version_details AS vd
+    LEFT JOIN version_details AS vd
         ON
             vc.id = vd.version_code
     INNER JOIN adtech.sdk_packages AS tm
         ON
-            vd.value_name ILIKE tm.package_pattern || '%'
+            vd.value_name ~~* (
+                tm.package_pattern::TEXT || '%'::TEXT
+            )
     LEFT JOIN adtech.companies AS pc ON
         tm.company_id = pc.id
 ),
@@ -44,12 +50,14 @@ sdk_paths_with_companies AS (
         ) AS parent_id
     FROM
         latest_version_codes AS vc
-    LEFT JOIN public.version_details AS vd
+    LEFT JOIN version_details AS vd
         ON
             vc.id = vd.version_code
     INNER JOIN adtech.sdk_paths AS ptm
         ON
-            vd.value_name ILIKE ptm.path_pattern || '%'
+            vd.value_name ~~* (
+                ptm.path_pattern::TEXT || '%'::TEXT
+            )
     LEFT JOIN adtech.companies AS pc ON
         ptm.company_id = pc.id
 ),
@@ -64,53 +72,104 @@ dev_apps_with_companies AS (
         ) AS parent_id
     FROM
         adtech.company_developers AS cd
-    LEFT JOIN public.store_apps AS sa
+    LEFT JOIN store_apps AS sa
         ON
             cd.developer_id = sa.developer
     LEFT JOIN adtech.companies AS pc ON
         cd.company_id = pc.id
+),
+
+all_apps_with_companies AS (
+    SELECT
+        sawc.store_app,
+        sawc.company_id,
+        sawc.parent_id
+    FROM
+        sdk_apps_with_companies AS sawc
+    UNION
+    SELECT
+        spwc.store_app,
+        spwc.company_id,
+        spwc.parent_id
+    FROM
+        sdk_paths_with_companies AS spwc
+    UNION
+    SELECT
+        dawc.store_app,
+        dawc.company_id,
+        dawc.parent_id
+    FROM
+        dev_apps_with_companies AS dawc
+),
+
+distinct_apps_with_cats AS (
+    SELECT DISTINCT
+        aawc.store_app,
+        c.id AS category_id
+    FROM
+        all_apps_with_companies AS aawc
+    LEFT JOIN adtech.company_categories AS cc
+        ON
+            aawc.company_id = cc.company_id
+    LEFT JOIN adtech.categories AS c ON
+        cc.category_id = c.id
+),
+
+distinct_store_apps AS (
+    SELECT DISTINCT lvc.store_app
+    FROM
+        latest_version_codes AS lvc
+),
+
+all_combinations AS (
+    SELECT
+        sa.store_app,
+        c.id AS category_id
+    FROM
+        distinct_store_apps AS sa
+    CROSS JOIN adtech.categories AS c
+),
+
+unmatched_apps AS (
+    SELECT DISTINCT
+        ac.store_app,
+        -ac.category_id AS company_id,
+        -- NOTE: the negative category id IS SET AS a special company
+        -ac.category_id AS parent_id
+        -- NOTE: the negative category id IS SET AS a special company
+    FROM
+        all_combinations AS ac
+    LEFT JOIN distinct_apps_with_cats AS dawc
+        ON
+            ac.store_app = dawc.store_app
+            AND ac.category_id = dawc.category_id
+    WHERE
+        dawc.store_app IS NULL
+        --ONLY unmatched apps
+),
+
+final_union AS (
+    SELECT
+        aawc.store_app,
+        aawc.company_id,
+        aawc.parent_id
+    FROM
+        all_apps_with_companies AS aawc
+    UNION
+    SELECT
+        ua.store_app,
+        ua.company_id,
+        ua.parent_id
+    FROM
+        unmatched_apps AS ua
 )
 
 SELECT
-    sawc.store_app,
-    sawc.company_id,
-    sawc.parent_id
+    store_app,
+    company_id,
+    parent_id
 FROM
-    sdk_apps_with_companies AS sawc
-UNION
-SELECT
-    spwc.store_app,
-    spwc.company_id,
-    spwc.parent_id
-FROM
-    sdk_paths_with_companies AS spwc
-UNION
-SELECT
-    dawc.store_app,
-    dawc.company_id,
-    dawc.parent_id
-FROM
-    dev_apps_with_companies AS dawc
-UNION
-SELECT
-    vc.store_app,
-    -- Note: 10 is tracker db id for no network found
-    10 AS company_id,
-    10 AS parent_id
-FROM
-    latest_version_codes AS vc
-WHERE
-    vc.store_app NOT IN (
-        SELECT store_app
-        FROM
-            sdk_apps_with_companies
-    )
-    AND
-    vc.store_app NOT IN (
-        SELECT store_app
-        FROM
-            dev_apps_with_companies
-    )
+    final_union
 WITH DATA;
 
 
@@ -137,9 +196,9 @@ WITH cat_hist_totals AS (
     WHERE
         sahc.week_start >= CURRENT_DATE - INTERVAL '30 days'
         AND sahc.store_app IN (
-            SELECT DISTINCT store_app
+            SELECT DISTINCT sac.store_app
             FROM
-                adtech.store_apps_companies
+                adtech.store_apps_companies AS sac
         )
     GROUP BY
         sa.store,
@@ -278,9 +337,9 @@ WITH cat_hist_totals AS (
     WHERE
         sahc.week_start >= CURRENT_DATE - INTERVAL '30 days'
         AND sahc.store_app IN (
-            SELECT DISTINCT store_app
+            SELECT DISTINCT sac.store_app
             FROM
-                adtech.store_apps_companies
+                adtech.store_apps_companies AS sac
         )
     GROUP BY
         sa.store,
