@@ -121,11 +121,11 @@ FROM
 WITH DATA;
 
 
-DROP INDEX IF EXISTS idx_combined_store_apps_companies;
-CREATE UNIQUE INDEX idx_combined_store_apps_companies
-ON adtech.combined_store_apps_companies (
-    store_app, app_category, company_id, parent_id, ad_domain, tag_source
-);
+-- DROP INDEX IF EXISTS idx_combined_store_apps_companies;
+-- CREATE UNIQUE INDEX idx_combined_store_apps_companies
+-- ON adtech.combined_store_apps_companies (
+--     store_app, app_category, company_id, parent_id, ad_domain, tag_source
+-- );
 
 --DROP MATERIALIZED VIEW adtech.companies_app_counts ;
 -- A FINAL TABLE FOR company_overviews
@@ -195,22 +195,19 @@ WITH my_counts AS (
         sa.store,
         cm.mapped_category AS app_category,
         csac.tag_source,
-        ad.domain AS company_domain,
+        csac.ad_domain AS company_domain,
         c.name AS company_name
     FROM
         adtech.combined_store_apps_companies AS csac
     LEFT JOIN adtech.companies AS c
         ON
             csac.parent_id = c.id
-    LEFT JOIN adtech.company_domain_mapping AS cdm ON c.id = cdm.company_id
-    LEFT JOIN ad_domains AS ad ON cdm.domain_id = ad.id
     LEFT JOIN store_apps AS sa
         ON
             csac.store_app = sa.id
     LEFT JOIN category_mapping AS cm ON
         sa.category = cm.original_category
 ),
-
 app_counts AS (
     SELECT
         store,
