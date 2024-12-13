@@ -456,7 +456,7 @@ def get_most_recent_top_ranks(
                     -- Group rows by store_app
                     version_codes.version_code::TEXT DESC
                     -- Pick the latest version_code
-            ),
+            )
             SELECT
                 dc.store_app,
                 dc.store_id,

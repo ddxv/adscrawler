@@ -9,6 +9,27 @@ WITH latest_version_codes AS (
         vc.crawl_result
     FROM
         version_codes AS vc
+    ORDER BY
+        vc.store_app,
+        -- Group rows by store_app
+        vc.version_code::TEXT DESC
+),
+
+latest_successful_version_codes AS (
+    SELECT DISTINCT ON
+    (vc.store_app)
+        vc.id,
+        vc.store_app,
+        vc.version_code,
+        vc.updated_at,
+        vc.crawl_result
+    FROM
+        version_codes AS vc
+    WHERE
+        vc.crawl_result = 1
+    ORDER BY
+        vc.store_app,
+        vc.version_code::TEXT DESC
 )
 
 SELECT
@@ -39,9 +60,10 @@ SELECT
     pd.url AS developer_url,
     pd.updated_at AS adstxt_last_crawled,
     pd.crawl_result AS adstxt_crawl_result,
-    lvc.version_code,
     lvc.updated_at AS sdk_last_crawled,
-    lvc.crawl_result AS sdk_crawl_result
+    lvc.crawl_result AS sdk_crawl_result,
+    lsvc.updated_at AS sdk_successful_last_crawled,
+    lvc.version_code
 FROM
     store_apps AS sa
 LEFT JOIN developers AS d
@@ -56,6 +78,10 @@ LEFT JOIN pub_domains AS pd
 LEFT JOIN latest_version_codes AS lvc
     ON
         sa.id = lvc.store_app
+LEFT JOIN latest_successful_version_codes AS lsvc
+    ON
+        sa.id = lsvc.store_app
 WITH DATA;
+
 
 CREATE INDEX store_apps_overview_idx ON store_apps_overview (store_id);
