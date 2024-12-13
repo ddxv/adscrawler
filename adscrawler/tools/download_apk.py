@@ -53,15 +53,35 @@ def download(store_id: str, do_redownload: bool = False) -> None:
         timeout=10,
     )
     if r.status_code == 200:
-        filepath = pathlib.Path(APKS_DIR, f"{store_id}.apk")
+        # Try to get extension from Content-Type header
+        content_type = r.headers.get("Content-Type", "")
+        logger.info(f"Received file with Content-Type: {content_type}")
+
+        # Try different methods to determine extension
+        extension = ".apk"  # default fallback
+
+        # Method 1: Check Content-Disposition for filename
+        content_disposition = r.headers.get("Content-Disposition", "")
+        if "filename=" in content_disposition:
+            filename = content_disposition.split("filename=")[-1].strip("\"'")
+            ext = pathlib.Path(filename).suffix
+            if ext:
+                extension = ext
+                logger.info(f"Found extension in Content-Disposition: {extension}")
+
+        filepath = pathlib.Path(APKS_DIR, f"{store_id}{extension}")
+        logger.info(f"Saving to: {filepath}")
+
         with filepath.open("wb") as file:
-            for chunk in r.iter_content(chunk_size=1024):
+            for chunk in r.iter_content(chunk_size=1024 * 1024):
                 if chunk:
                     file.write(chunk)
+
     else:
         logger.error(f"{store_id=} Request failed with {r.status_code=} {r.text[:50]}")
         raise requests.exceptions.HTTPError
     logger.info(f"{store_id=} download finished")
+    return extension
 
 
 def main(args: argparse.Namespace) -> None:

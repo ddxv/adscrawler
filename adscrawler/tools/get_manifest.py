@@ -40,14 +40,22 @@ def empty_folder(pth: pathlib.Path) -> None:
             sub.unlink()
 
 
-def unzip_apk(apk_path: pathlib.Path) -> None:
+def unzip_apk(store_id: str, extension: str) -> None:
+    apk_path = pathlib.Path(APKS_DIR, f"{store_id}{extension}")
     if UNZIPPED_DIR.exists():
         empty_folder(UNZIPPED_DIR)
+    check_dirs()
+    if extension == ".xapk":
+        xapk_path = apk_path
+        apk_path = pathlib.Path(APKS_DIR, f"{store_id}.apk")
+        command = (
+            f"unzip -o {xapk_path.as_posix()} {store_id}.apk -d {APKS_DIR.as_posix()}"
+        )
+        result = os.system(command)
+        logger.info(f"Output unzipped from xapk to apk: {result}")
     if not apk_path.exists():
         logger.error(f"path: {apk_path.as_posix()} file not found")
         raise FileNotFoundError
-    # apk_path = 'apks/com.thirdgate.rts.eg.apk'
-    check_dirs()
     # https://apktool.org/docs/the-basics/decoding
     command = f"apktool decode {apk_path.as_posix()} -f -o {UNZIPPED_DIR.as_posix()}"
     # Run the command
@@ -66,6 +74,7 @@ def get_parsed_manifest() -> tuple[str, pd.DataFrame]:
     df = xml_to_dataframe(root)
     smali_df = get_smali_df()
     df = pd.concat([df, smali_df])
+    df = df.drop_duplicates()
     return manifest_str, df
 
 
@@ -99,6 +108,7 @@ def get_smali_df() -> pd.DataFrame:
         .str.replace("smali_assets/", "")
         .str.replace("/", ".")
     )
+    smali_df = smali_df[smali_df["path"].str.len() > 2]
     smali_df = smali_df.rename(columns={"path": "android_name"})
     smali_df["path"] = "smali"
     return smali_df
@@ -162,9 +172,8 @@ def xml_to_dataframe(root: ElementTree.Element) -> pd.DataFrame:
 
 
 def download_and_unpack(store_id: str) -> None:
-    apk_path = pathlib.Path(APKS_DIR, f"{store_id}.apk")
-    download(store_id=store_id, do_redownload=False)
-    unzip_apk(apk_path=apk_path)
+    extension = download(store_id=store_id, do_redownload=False)
+    unzip_apk(store_id=store_id, extension=extension)
 
 
 def manifest_main(
