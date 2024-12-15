@@ -3,6 +3,7 @@
 import argparse
 import os
 import pathlib
+import subprocess
 import time
 from xml.etree import ElementTree
 
@@ -48,20 +49,53 @@ def unzip_apk(store_id: str, extension: str) -> None:
     if extension == ".xapk":
         xapk_path = apk_path
         apk_path = pathlib.Path(APKS_DIR, f"{store_id}.apk")
-        command = (
+        unzip_command = (
             f"unzip -o {xapk_path.as_posix()} {store_id}.apk -d {APKS_DIR.as_posix()}"
         )
-        result = os.system(command)
-        logger.info(f"Output unzipped from xapk to apk: {result}")
+        unzip_result = os.system(unzip_command)
+        logger.info(f"Output unzipped from xapk to apk: {unzip_result}")
     if not apk_path.exists():
         logger.error(f"path: {apk_path.as_posix()} file not found")
         raise FileNotFoundError
-    # https://apktool.org/docs/the-basics/decoding
-    command = f"apktool decode {apk_path.as_posix()} -f -o {UNZIPPED_DIR.as_posix()}"
-    # Run the command
-    result = os.system(command)
-    # Print the standard output of the command
-    logger.info(f"Output: {result}")
+    try:
+        # https://apktool.org/docs/the-basics/decoding
+        command = [
+            "apktool",
+            "decode",
+            apk_path.as_posix(),
+            "-f",
+            "-o",
+            UNZIPPED_DIR.as_posix(),
+        ]
+        # Run the command and capture output
+        result = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            check=False,  # Don't raise exception on non-zero exit
+        )
+
+        if "java.lang.OutOfMemoryError" in result.stderr:
+            # Possibly related: https://github.com/iBotPeaches/Apktool/issues/3736
+            logger.error("Java heap space error occurred, try with -j 1")
+            # Handle the error as needed
+            result = subprocess.run(
+                command + ["-j", "1"],
+                capture_output=True,
+                text=True,
+                check=False,  # Don't raise exception on non-zero exit
+            )
+
+        if result.stderr:
+            logger.error(f"Error: {result.stderr}")
+
+        # Check return code
+        if result.returncode != 0:
+            raise subprocess.CalledProcessError(result.returncode, command)
+
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Command failed with return code {e.returncode}")
+        raise
 
 
 def get_parsed_manifest() -> tuple[str, pd.DataFrame]:
@@ -82,7 +116,7 @@ def unzipped_apk_paths(mypath: pathlib.Path) -> pd.DataFrame:
     """Collect all unzipped APK paths recursively and return as a DataFrame."""
     unzipped_paths = []
 
-    def collect_paths(directory: pathlib.Path):
+    def collect_paths(directory: pathlib.Path) -> None:
         for path in directory.iterdir():
             if path.is_dir():
                 unzipped_paths.append(str(path))
@@ -214,6 +248,9 @@ def manifest_main(
         except FileNotFoundError:
             logger.exception(f"{store_id=} unable to unpack apk")
             crawl_result = 2
+        except subprocess.CalledProcessError as e:
+            logger.exception(f"Unexpected error for {store_id=}: {str(e)}")
+            crawl_result = 4  # Unexpected error
         except Exception as e:
             logger.exception(f"Unexpected error for {store_id=}: {str(e)}")
             crawl_result = 4  # Unexpected errors

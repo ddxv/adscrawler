@@ -54,8 +54,8 @@ def download(store_id: str, do_redownload: bool = False) -> str:
     )
     if r.status_code == 200:
         # Try to get extension from Content-Type header
-        content_type = r.headers.get("Content-Type", "")
-        logger.info(f"Received file with Content-Type: {content_type}")
+        # content_type = r.headers.get("Content-Type", "")
+        # logger.info(f"Received file with Content-Type: {content_type}")
 
         # Try different methods to determine extension
         extension = ".apk"  # default fallback
