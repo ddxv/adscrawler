@@ -28,7 +28,7 @@ def check_apk_dir_created() -> None:
             pathlib.Path.mkdir(_dir, exist_ok=True)
 
 
-def download(store_id: str, do_redownload: bool = False) -> None:
+def download(store_id: str, do_redownload: bool = False) -> str:
     """Download the apk file.
 
     store_id: str the id of the android apk
@@ -42,7 +42,7 @@ def download(store_id: str, do_redownload: bool = False) -> None:
     if exists:
         if not do_redownload:
             logger.info(f"apk already exists {filepath=}, skipping")
-            return
+            return filepath.suffix
 
     r = requests.get(
         URL.format(store_id=store_id),
