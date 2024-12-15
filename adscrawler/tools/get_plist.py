@@ -13,7 +13,7 @@ import requests
 from adscrawler.app_stores.apple import lookupby_id
 from adscrawler.config import MODULE_DIR, get_logger
 from adscrawler.connection import PostgresCon
-from adscrawler.queries import get_most_recent_top_ranks, upsert_df
+from adscrawler.queries import get_top_ranks_for_unpacking, upsert_df
 from adscrawler.tools.download_ipa import download, ipatool_auth
 
 logger = get_logger(__name__, "download_ipa")
@@ -178,7 +178,7 @@ def plist_main(
     collection_id = 4  # 'Top' Collection
     logger.info("Start iTunes Info.plist")
     ipatool_auth()
-    apps = get_most_recent_top_ranks(
+    apps = get_top_ranks_for_unpacking(
         database_connection=database_connection,
         store=store,
         collection_id=collection_id,

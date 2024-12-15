@@ -13,7 +13,7 @@ import yaml
 
 from adscrawler.config import MODULE_DIR, get_logger
 from adscrawler.connection import PostgresCon
-from adscrawler.queries import get_most_recent_top_ranks, upsert_df
+from adscrawler.queries import get_top_ranks_for_unpacking, upsert_df
 from adscrawler.tools.download_apk import download
 
 logger = get_logger(__name__, "download_apk")
@@ -217,7 +217,7 @@ def manifest_main(
     store = 1
     collection_id = 1  # 'Top' Collection
     logger.info("Start APK processing")
-    apps = get_most_recent_top_ranks(
+    apps = get_top_ranks_for_unpacking(
         database_connection=database_connection,
         store=store,
         collection_id=collection_id,

@@ -391,7 +391,7 @@ def query_all(
     return df
 
 
-def get_most_recent_top_ranks(
+def get_top_ranks_for_unpacking(
     database_connection: PostgresCon,
     store: int,
     collection_id: int,
