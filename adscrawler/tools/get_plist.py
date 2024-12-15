@@ -152,13 +152,10 @@ def ipa_bundles() -> pd.DataFrame:
         for (
             app_dir
         ) in payload_dir.iterdir():  # Assuming the next directory is the app directory
-            print("APP", app_dir)
             for mydir in app_dir.iterdir():
-                print("MY", mydir)
                 if mydir.is_dir() and mydir.name.endswith(
                     ".bundle"
                 ):  # Add only directories
-                    print("ADD", mydir)
                     bundle_dirs.append(mydir.name)
     df = pd.DataFrame({"path": "bundles", "value": bundle_dirs})
     return df

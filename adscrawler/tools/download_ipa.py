@@ -45,6 +45,8 @@ def download(bundle_id: str, do_redownload: bool = False) -> None:
             logger.info(f"ipa already exists {filepath=}, skipping")
             return
     logger.info(f"Will download {bundle_id}")
-    command = f"ipatool download -b '{bundle_id}' -o  {filepath.as_posix()} --keychain-passphrase '{KEYCHAIN_PASSPHRASE}' --non-interactive --purchase --verbose >> ~/.config/adscrawler/logs/ipatool.log 2>&1"
+    # Note: 2024-12-13 remove --purchase as it is not working:
+    # https://github.com/majd/ipatool/issues/284
+    command = f"ipatool download -b '{bundle_id}' -o  {filepath.as_posix()} --keychain-passphrase '{KEYCHAIN_PASSPHRASE}' --non-interactive --verbose >> ~/.config/adscrawler/logs/ipatool.log 2>&1"
     result = os.system(command)
     logger.info(f"ipatool download result: {result}")

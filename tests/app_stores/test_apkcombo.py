@@ -20,7 +20,6 @@ class TestApkcombo(unittest.TestCase):
             # Call the function without mocking
             results = apkcombo.get_apkcombo_android_apps()
 
-        print(f"Scrape found results length:{len(results)}")
         # Assert that the returned list has length greater than 0
         self.assertTrue(len(results) > 0)
 
