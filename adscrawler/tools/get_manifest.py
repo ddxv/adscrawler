@@ -260,7 +260,7 @@ def manifest_main(
         details_df["version_code"] = version_str
         version_code_df = details_df[["store_app", "version_code"]].drop_duplicates()
         version_code_df["crawl_result"] = crawl_result
-        logger.info(f"{store_id=} insert to db")
+        logger.info(f"{store_id=} insert version_code to db")
         upserted: pd.DataFrame = upsert_df(
             df=version_code_df,
             table_name="version_codes",
@@ -291,6 +291,7 @@ def manifest_main(
         )
         key_insert_columns = ["version_code", "xml_path", "tag", "value_name"]
         details_df = details_df[key_insert_columns].drop_duplicates()
+        logger.info(f"{store_id=} insert version_details to db")
         upsert_df(
             df=details_df,
             table_name="version_details",
@@ -307,6 +308,7 @@ def manifest_main(
             key_columns=["version_code"],
             insert_columns=["version_code", "manifest_string"],
         )
+        logger.info(f"{store_id=} finished")
 
 
 def parse_args() -> argparse.Namespace:
