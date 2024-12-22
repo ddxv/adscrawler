@@ -237,8 +237,8 @@ def manifest_main(
         apk_path = pathlib.Path(APKS_DIR, f"{store_id}.apk")
         try:
             download_and_unpack(store_id=store_id)
-            version_str = get_version()
             manifest_str, details_df = get_parsed_manifest()
+            version_str = get_version()
             crawl_result = 1
             logger.info(f"{store_id=} unzipped finished")
         except requests.exceptions.HTTPError:
@@ -257,7 +257,10 @@ def manifest_main(
         if crawl_result in [3, 4]:
             error_count += 1
         details_df["store_app"] = row.store_app
-        details_df["version_code"] = version_str
+        if version_str:
+            details_df["version_code"] = version_str
+        else:
+            details_df["version_code"] = "-1"
         version_code_df = details_df[["store_app", "version_code"]].drop_duplicates()
         version_code_df["crawl_result"] = crawl_result
         logger.info(f"{store_id=} insert version_code to db")
