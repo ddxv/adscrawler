@@ -443,7 +443,6 @@ def get_top_ranks_for_unpacking(
                 SELECT
                     DISTINCT ON
                     (version_codes.store_app)
-                    -- Ensures one row per store_app WHEN combined WITH ORDER BY 
                     version_codes.id,
                     version_codes.store_app,
                     version_codes.version_code,
@@ -453,9 +452,7 @@ def get_top_ranks_for_unpacking(
                     version_codes
                 ORDER BY
                     version_codes.store_app,
-                    -- Group rows by store_app
-                    version_codes.version_code::TEXT DESC
-                    -- Pick the latest version_code
+                    string_to_array(version_codes.version_code, '.')::bigint[] DESC
             )
             SELECT
                 dc.store_app,
