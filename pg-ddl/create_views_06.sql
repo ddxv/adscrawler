@@ -11,8 +11,7 @@ WITH latest_version_codes AS (
         version_codes AS vc
     ORDER BY
         vc.store_app,
-        -- Group rows by store_app
-        vc.version_code::TEXT DESC
+        string_to_array(vc.version_code, '.')::bigint [] DESC
 ),
 
 latest_successful_version_codes AS (
@@ -29,7 +28,7 @@ latest_successful_version_codes AS (
         vc.crawl_result = 1
     ORDER BY
         vc.store_app,
-        vc.version_code::TEXT DESC
+        vc.version_code::text DESC
 )
 
 SELECT

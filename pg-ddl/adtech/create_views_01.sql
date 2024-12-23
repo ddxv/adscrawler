@@ -13,16 +13,14 @@ WITH latest_version_codes AS (
         version_codes.crawl_result = 1
     ORDER BY
         version_codes.store_app,
-        -- Group rows by store_app
-        version_codes.version_code::TEXT DESC
-        -- Pick the latest version_code
+        string_to_array(version_codes.version_code, '.')::bigint [] DESC
 ),
 
 sdk_apps_with_companies AS (
     SELECT DISTINCT
         vc.store_app,
         tm.company_id,
-        COALESCE(
+        coalesce(
             pc.parent_company_id,
             tm.company_id
         ) AS parent_id
@@ -34,7 +32,7 @@ sdk_apps_with_companies AS (
     INNER JOIN adtech.sdk_packages AS tm
         ON
             vd.value_name ~~* (
-                tm.package_pattern::TEXT || '%'::TEXT
+                tm.package_pattern::text || '%'::text
             )
     LEFT JOIN adtech.companies AS pc ON
         tm.company_id = pc.id
@@ -44,7 +42,7 @@ sdk_paths_with_companies AS (
     SELECT DISTINCT
         vc.store_app,
         ptm.company_id,
-        COALESCE(
+        coalesce(
             pc.parent_company_id,
             ptm.company_id
         ) AS parent_id
@@ -56,7 +54,7 @@ sdk_paths_with_companies AS (
     INNER JOIN adtech.sdk_paths AS ptm
         ON
             vd.value_name ~~* (
-                ptm.path_pattern::TEXT || '%'::TEXT
+                ptm.path_pattern::text || '%'::text
             )
     LEFT JOIN adtech.companies AS pc ON
         ptm.company_id = pc.id
@@ -66,7 +64,7 @@ dev_apps_with_companies AS (
     SELECT DISTINCT
         sa.id AS store_app,
         cd.company_id,
-        COALESCE(
+        coalesce(
             pc.parent_company_id,
             cd.company_id
         ) AS parent_id
@@ -183,8 +181,8 @@ WITH cat_hist_totals AS (
     SELECT
         sa.store,
         cm.mapped_category,
-        SUM(sahc.avg_daily_installs_diff * 7) AS installs,
-        SUM(sahc.rating_count_diff * 7) AS ratings
+        sum(sahc.avg_daily_installs_diff * 7) AS installs,
+        sum(sahc.rating_count_diff * 7) AS ratings
     FROM
         store_apps_history_change AS sahc
     LEFT JOIN store_apps AS sa
@@ -194,7 +192,7 @@ WITH cat_hist_totals AS (
         ON
             sa.category = cm.original_category
     WHERE
-        sahc.week_start >= CURRENT_DATE - INTERVAL '30 days'
+        sahc.week_start >= current_date - interval '30 days'
         AND sahc.store_app IN (
             SELECT DISTINCT sac.store_app
             FROM
@@ -209,8 +207,8 @@ cat_app_totals AS (
     SELECT
         sa.store,
         cm.mapped_category,
-        COUNT(DISTINCT sac.store_app) AS category_total_apps,
-        SUM(sa.installs) AS alltime_installs
+        count(DISTINCT sac.store_app) AS category_total_apps,
+        sum(sa.installs) AS alltime_installs
     FROM
         adtech.store_apps_companies AS sac
     LEFT JOIN store_apps AS sa
@@ -231,13 +229,13 @@ company_installs AS (
         sac.company_id,
         c.name,
         c.parent_company_id,
-        COALESCE(
+        coalesce(
             pc.name,
             c.name
         ) AS parent_company_name,
-        SUM(hist.avg_daily_installs_diff * 7) AS installs,
-        SUM(hist.rating_count_diff * 7) AS ratings,
-        COUNT(DISTINCT sac.store_app) AS app_count
+        sum(hist.avg_daily_installs_diff * 7) AS installs,
+        sum(hist.rating_count_diff * 7) AS ratings,
+        count(DISTINCT sac.store_app) AS app_count
     FROM
         adtech.store_apps_companies AS sac
     LEFT JOIN
@@ -257,7 +255,7 @@ company_installs AS (
         ON
             sa.category = cm.original_category
     WHERE
-        hist.week_start >= CURRENT_DATE - INTERVAL '30 days'
+        hist.week_start >= current_date - interval '30 days'
         OR hist.week_start IS NULL
     GROUP BY
         sa.store,
@@ -284,7 +282,7 @@ SELECT
     ct.category_total_apps,
     t.installs AS total_installs,
     t.ratings AS total_ratings,
-    ci.app_count::FLOAT / ct.category_total_apps AS app_count_percent,
+    ci.app_count::float / ct.category_total_apps AS app_count_percent,
     ci.ratings / t.ratings AS total_ratings_percent,
     ci.installs / t.installs AS total_installs_percent
 FROM
@@ -324,8 +322,8 @@ WITH cat_hist_totals AS (
     SELECT
         sa.store,
         cm.mapped_category,
-        SUM(sahc.avg_daily_installs_diff * 7) AS installs,
-        SUM(sahc.rating_count_diff * 7) AS ratings
+        sum(sahc.avg_daily_installs_diff * 7) AS installs,
+        sum(sahc.rating_count_diff * 7) AS ratings
     FROM
         store_apps_history_change AS sahc
     LEFT JOIN store_apps AS sa
@@ -335,7 +333,7 @@ WITH cat_hist_totals AS (
         ON
             sa.category = cm.original_category
     WHERE
-        sahc.week_start >= CURRENT_DATE - INTERVAL '30 days'
+        sahc.week_start >= current_date - interval '30 days'
         AND sahc.store_app IN (
             SELECT DISTINCT sac.store_app
             FROM
@@ -350,8 +348,8 @@ cat_app_totals AS (
     SELECT
         sa.store,
         cm.mapped_category,
-        COUNT(DISTINCT sac.store_app) AS category_total_apps,
-        SUM(sa.installs) AS alltime_installs
+        count(DISTINCT sac.store_app) AS category_total_apps,
+        sum(sa.installs) AS alltime_installs
     FROM
         adtech.store_apps_companies AS sac
     LEFT JOIN store_apps AS sa
@@ -383,9 +381,9 @@ company_installs AS (
         cm.mapped_category,
         sac.category_id,
         sac.parent_id,
-        SUM(hist.avg_daily_installs_diff * 7) AS installs,
-        SUM(hist.rating_count_diff * 7) AS ratings,
-        COUNT(DISTINCT sac.store_app) AS app_count
+        sum(hist.avg_daily_installs_diff * 7) AS installs,
+        sum(hist.rating_count_diff * 7) AS ratings,
+        count(DISTINCT sac.store_app) AS app_count
     FROM
         store_apps_parent_companies AS sac
     LEFT JOIN
@@ -399,7 +397,7 @@ company_installs AS (
         ON
             sa.category = cm.original_category
     WHERE
-        hist.week_start >= CURRENT_DATE - INTERVAL '30 days'
+        hist.week_start >= current_date - interval '30 days'
         OR hist.week_start IS NULL
     GROUP BY
         sa.store,
@@ -422,7 +420,7 @@ SELECT
     tc.category_total_apps,
     t.installs AS total_installs,
     t.ratings AS total_ratings,
-    ci.app_count::FLOAT / tc.category_total_apps AS app_count_percent,
+    ci.app_count::float / tc.category_total_apps AS app_count_percent,
     ci.ratings / t.ratings AS total_ratings_percent,
     ci.installs / t.installs AS total_installs_percent
 FROM

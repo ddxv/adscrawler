@@ -208,8 +208,21 @@ FROM
 WITH DATA;
 
 
-CREATE MATERIALIZED VIEW companies_apps_version_details AS
-
+CREATE MATERIALIZED VIEW public.companies_apps_version_details
+AS WITH latest_version_codes AS (
+    SELECT DISTINCT ON
+    (version_codes.store_app)
+        version_codes.id,
+        version_codes.store_app,
+        version_codes.version_code,
+        version_codes.updated_at,
+        version_codes.crawl_result
+    FROM
+        version_codes
+    ORDER BY
+        version_codes.store_app,
+        string_to_array(version_codes.version_code, '.')::bigint [] DESC
+)
 
 SELECT DISTINCT
     vd.xml_path,
@@ -221,32 +234,17 @@ SELECT DISTINCT
     c.name AS company_name,
     ad.domain AS company_domain,
     cats.url_slug AS category_slug
-FROM
-    latest_version_codes AS vc
-LEFT JOIN public.version_details AS vd
-    ON
-        vc.id = vd.version_code
-LEFT JOIN adtech.sdk_packages AS tm
-    ON
-        vd.value_name ILIKE tm.package_pattern || '%'
-LEFT JOIN adtech.companies AS c
-    ON
-        tm.company_id = c.id
-LEFT JOIN adtech.company_categories AS cc
-    ON
-        c.id = cc.company_id
-LEFT JOIN adtech.categories AS cats
-    ON
-        cc.category_id = cats.id
-LEFT JOIN adtech.company_domain_mapping AS cdm
-    ON
-        tm.company_id = cdm.company_id
-LEFT JOIN ad_domains AS ad
-    ON
-        cdm.domain_id = ad.id
-LEFT JOIN store_apps AS sa
-    ON
-        vc.store_app = sa.id
+FROM latest_version_codes AS vc
+LEFT JOIN version_details AS vd ON vc.id = vd.version_code
+LEFT JOIN
+    adtech.sdk_packages AS tm
+    ON vd.value_name ~~* (tm.package_pattern::text || '%'::text)
+LEFT JOIN adtech.companies AS c ON tm.company_id = c.id
+LEFT JOIN adtech.company_categories AS cc ON c.id = cc.company_id
+LEFT JOIN adtech.categories AS cats ON cc.category_id = cats.id
+LEFT JOIN adtech.company_domain_mapping AS cdm ON tm.company_id = cdm.company_id
+LEFT JOIN ad_domains AS ad ON cdm.domain_id = ad.id
+LEFT JOIN store_apps AS sa ON vc.store_app = sa.id
 WITH DATA;
 
 CREATE INDEX companies_apps_version_details_store_id_idx ON
@@ -356,32 +354,3 @@ WITH DATA;
 
 CREATE INDEX adstxt_entries_store_apps_idx ON
 public.adstxt_entries_store_apps (store_id);
-
-CREATE MATERIALIZED VIEW latest_version_codes_mv AS
-WITH latest_version_codes AS (
-    SELECT DISTINCT ON
-    (vc.store_app)
-        vc.id,
-        vc.store_app,
-        vc.version_code,
-        vc.updated_at,
-        vc.crawl_result
-    FROM
-        version_codes AS vc
-    ORDER BY
-        vc.store_app,
-        vc.version_code::text DESC
-)
-
-SELECT
-    sa.id AS store_app,
-    sa.store_id,
-    lvc.updated_at AS crawled_at,
-    lvc.version_code,
-    lvc.crawl_result
-FROM
-    latest_version_codes AS lvc
-LEFT JOIN
-    store_apps AS sa
-    ON
-        lvc.store_app = sa.id;
