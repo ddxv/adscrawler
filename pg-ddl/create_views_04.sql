@@ -188,62 +188,58 @@ ON adtech.companies_app_counts (
 );
 
 DROP MATERIALIZED VIEW adtech.companies_parent_app_counts;
-CREATE MATERIALIZED VIEW adtech.companies_parent_app_counts AS
+CREATE MATERIALIZED VIEW adtech.companies_parent_app_counts
+TABLESPACE pg_default
+AS
 WITH my_counts AS (
     SELECT DISTINCT
         csac.store_app,
         sa.store,
         cm.mapped_category AS app_category,
         csac.tag_source,
-        csac.ad_domain AS company_domain,
+        ad.domain AS company_domain,
         c.name AS company_name
-    FROM
-        adtech.combined_store_apps_companies AS csac
-    LEFT JOIN adtech.companies AS c
-        ON
-            csac.parent_id = c.id
-    LEFT JOIN store_apps AS sa
-        ON
-            csac.store_app = sa.id
-    LEFT JOIN category_mapping AS cm ON
-        sa.category = cm.original_category
+    FROM adtech.combined_store_apps_companies AS csac
+    LEFT JOIN adtech.companies AS c ON csac.parent_id = c.id
+    LEFT JOIN store_apps AS sa ON csac.store_app = sa.id
+    LEFT JOIN
+        category_mapping AS cm
+        ON sa.category::text = cm.original_category::text
+    LEFT JOIN adtech.company_domain_mapping AS cdm ON c.id = cdm.company_id
+    LEFT JOIN ad_domains AS ad ON cdm.domain_id = ad.id
 ),
+
 app_counts AS (
     SELECT
-        store,
-        app_category,
-        tag_source,
-        company_domain,
-        company_name,
+        my_counts.store,
+        my_counts.app_category,
+        my_counts.tag_source,
+        my_counts.company_domain,
+        my_counts.company_name,
         COUNT(*) AS app_count
-    FROM
-        my_counts
+    FROM my_counts
     GROUP BY
-        store,
-        app_category,
-        tag_source,
-        company_domain,
-        company_name
+        my_counts.store,
+        my_counts.app_category,
+        my_counts.tag_source,
+        my_counts.company_domain,
+        my_counts.company_name
 )
 
 SELECT
-    ac.app_count,
-    ac.store,
-    ac.app_category,
-    ac.tag_source,
-    ac.company_domain,
-    ac.company_name
-FROM
-    app_counts AS ac
-ORDER BY
-    ac.app_count DESC
+    app_count,
+    store,
+    app_category,
+    tag_source,
+    company_domain,
+    company_name
+FROM app_counts
+ORDER BY app_count DESC
 WITH DATA;
 
-
-DROP INDEX IF EXISTS idx_companies_parent_app_counts;
-CREATE UNIQUE INDEX idx_companies_parent_app_counts
-ON adtech.companies_parent_app_counts (
-    store, app_category, tag_source, company_domain, company_name
+-- View indexes:
+CREATE INDEX idx_companies_parent_app_counts ON adtech.companies_parent_app_counts USING btree (
+    app_category, tag_source
 );
 
 DROP MATERIALIZED VIEW adtech.company_top_apps;
@@ -330,15 +326,17 @@ ON adtech.company_top_apps (
 -- DROP MATERIALIZED VIEW adtech.companies_parent_categories_app_counts;
 CREATE MATERIALIZED VIEW adtech.companies_parent_categories_app_counts AS
 SELECT
-    csac.ad_domain AS company_domain,
+    ad.domain AS company_domain,
     c.name AS company_name,
     csac.app_category,
     COUNT(DISTINCT csac.store_app) AS app_count
 FROM
     adtech.combined_store_apps_companies AS csac
 LEFT JOIN adtech.companies AS c ON csac.parent_id = c.id
+LEFT JOIN adtech.company_domain_mapping AS cdm ON c.id = cdm.company_id
+LEFT JOIN ad_domains AS ad ON cdm.domain_id = ad.id
 GROUP BY
-    csac.ad_domain, c.name, csac.app_category
+    ad.domain, c.name, csac.app_category
 ORDER BY c.name ASC, app_count DESC
 WITH DATA;
 
