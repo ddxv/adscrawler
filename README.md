@@ -6,7 +6,7 @@ Scrapers:
  - pull apps from app store and google play store top lists
  - pull apps from some 3rd party stores
  - unzip/decompile Android APKs and iOS IPAs to look for 3rd party tracking/advertising tools
- - Various SQL ddl for https://github.com/ddxv/app-store-dash
+ - Various SQL ddl for https://github.com/ddxv/appgoblin
 
 App-ads.txt files are crawled based on the Interactive Advertising Bureau's Tech Lab specs. https://iabtechlab.com/ads-txt/
 
