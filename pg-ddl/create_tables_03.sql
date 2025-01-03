@@ -56,3 +56,9 @@ CREATE TABLE adtech.company_domain_mapping (
     domain_id int REFERENCES public.ad_domains (id),
     PRIMARY KEY (company_id, domain_id)
 );
+
+CREATE TABLE user_requested_scan (
+    id serial PRIMARY KEY,
+    store_id varchar NOT NULL,
+    created_at timestamp DEFAULT CURRENT_TIMESTAMP
+);
