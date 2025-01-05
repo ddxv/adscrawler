@@ -453,7 +453,8 @@ def get_top_ranks_for_unpacking(
                 ORDER BY
                     version_codes.store_app,
                     string_to_array(version_codes.version_code, '.')::bigint[] DESC
-            )
+            ),
+            scheduled_apps_crawl AS (
             SELECT
                 dc.store_app,
                 dc.store_id,
@@ -483,8 +484,37 @@ def get_top_ranks_for_unpacking(
                     COALESCE(CAST(rating_count AS bigint), 0)*50
                 )
             DESC NULLS LAST
-            LIMIT {limit}
-            ;
+            ),
+            user_requested_apps_crawl AS (
+            SELECT
+                DISTINCT sa.id AS store_app,
+                sa.store_id,
+                sa.name,
+                sa.installs,
+                sa.rating_count,
+                lvs.crawl_result AS last_crawl_result,
+                lvs.updated_at
+            FROM
+                user_requested_scan urs
+            LEFT JOIN store_apps sa ON
+                urs.store_id = sa.store_id
+            LEFT JOIN latest_version_codes lvs ON
+                sa.id = lvs.id
+            WHERE
+                lvs.updated_at > urs.created_at
+                    OR lvs.updated_at IS NULL
+            )
+        SELECT
+            *
+        FROM
+            user_requested_apps_crawl
+        UNION ALL
+        SELECT
+            *
+        FROM
+            scheduled_apps_crawl
+        LIMIT {limit}
+        ;
     """
     df = pd.read_sql(sel_query, con=database_connection.engine)
     return df
