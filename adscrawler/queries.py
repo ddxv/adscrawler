@@ -499,9 +499,9 @@ def get_top_ranks_for_unpacking(
             LEFT JOIN store_apps sa ON
                 urs.store_id = sa.store_id
             LEFT JOIN latest_version_codes lvs ON
-                sa.id = lvs.id
+                sa.id = lvs.store_app
             WHERE
-                lvs.updated_at > urs.created_at
+                lvs.updated_at < urs.created_at
                     OR lvs.updated_at IS NULL
             )
         SELECT
