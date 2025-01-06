@@ -254,7 +254,9 @@ def manifest_main(
         except Exception as e:
             logger.exception(f"Unexpected error for {store_id=}: {str(e)}")
             crawl_result = 4  # Unexpected errors
-        if crawl_result in [3, 4]:
+        if crawl_result in [3]:
+            error_count += 3
+        if crawl_result in [2, 4]:
             error_count += 1
         details_df["store_app"] = row.store_app
         if version_str:

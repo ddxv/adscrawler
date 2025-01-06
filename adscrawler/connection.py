@@ -1,3 +1,5 @@
+from socket import gethostbyname
+
 import sqlalchemy
 from sqlalchemy.engine import Engine
 from sshtunnel import SSHTunnelForwarder
@@ -59,7 +61,7 @@ def get_db_connection(use_ssh_tunnel: bool = False) -> PostgresCon:
         PostgresCon: A PostgreSQL connection object.
     """
     server_name = "madrone"
-    host = CONFIG[server_name]["host"]
+    host = get_host_ip(CONFIG[server_name]["host"])
 
     if use_ssh_tunnel:
         ssh_port = CONFIG[server_name].get("ssh_port", 22)
@@ -96,3 +98,13 @@ def open_ssh_tunnel(
         ssh_pkey=CONFIG[server_name].get("ssh_pkey"),
         ssh_private_key_password=CONFIG[server_name].get("ssh_pkey_password"),
     )
+
+
+def get_host_ip(hostname: str) -> str:
+    """Convert hostname to IPv4 address if needed."""
+    # Check if hostname is already an IPv4 address
+    if all(part.isdigit() and 0 <= int(part) <= 255 for part in hostname.split(".")):  # noqa: PLR2004
+        return hostname
+    ip_address = gethostbyname(hostname)
+    logger.info(f"Resolved {hostname} to {ip_address}")
+    return ip_address
