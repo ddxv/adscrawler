@@ -452,6 +452,7 @@ def get_top_ranks_for_unpacking(
                     version_codes
                 ORDER BY
                     version_codes.store_app,
+                    version_codes.updated_at DESC,
                     string_to_array(version_codes.version_code, '.')::bigint[] DESC
             ),
             scheduled_apps_crawl AS (
