@@ -11,12 +11,11 @@ import pathlib
 
 import requests
 
-from adscrawler.config import MODULE_DIR, get_logger
+from adscrawler.config import APKS_DIR, get_logger
 
 logger = get_logger(__name__, "download_apk")
 
 URL = "https://d.apkpure.net/b/XAPK/{store_id}?version=latest"
-APKS_DIR = pathlib.Path(MODULE_DIR, "apks")
 
 
 def check_apk_dir_created() -> None:

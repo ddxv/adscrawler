@@ -11,7 +11,7 @@ import pandas as pd
 import requests
 import yaml
 
-from adscrawler.config import MODULE_DIR, get_logger
+from adscrawler.config import APKS_DIR, MODULE_DIR, get_logger
 from adscrawler.connection import PostgresCon
 from adscrawler.queries import get_top_ranks_for_unpacking, upsert_df
 from adscrawler.tools.download_apk import download
@@ -19,7 +19,6 @@ from adscrawler.tools.download_apk import download
 logger = get_logger(__name__, "download_apk")
 
 
-APKS_DIR = pathlib.Path(MODULE_DIR, "apks/")
 UNZIPPED_DIR = pathlib.Path(MODULE_DIR, "apksunzipped/")
 
 
