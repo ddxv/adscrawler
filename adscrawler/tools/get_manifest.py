@@ -204,9 +204,10 @@ def xml_to_dataframe(root: ElementTree.Element) -> pd.DataFrame:
     return df
 
 
-def download_and_unpack(store_id: str) -> None:
+def download_and_unpack(store_id: str) -> str:
     extension = download(store_id=store_id, do_redownload=False)
     unzip_apk(store_id=store_id, extension=extension)
+    return extension
 
 
 def manifest_main(
@@ -235,7 +236,8 @@ def manifest_main(
         version_str = "-1"
         apk_path = pathlib.Path(APKS_DIR, f"{store_id}.apk")
         try:
-            download_and_unpack(store_id=store_id)
+            extension = download_and_unpack(store_id=store_id)
+            apk_path = pathlib.Path(APKS_DIR, f"{store_id}.{extension}")
             manifest_str, details_df = get_parsed_manifest()
             version_str = get_version()
             crawl_result = 1
