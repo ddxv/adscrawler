@@ -237,7 +237,7 @@ def manifest_main(
         apk_path = pathlib.Path(APKS_DIR, f"{store_id}.apk")
         try:
             extension = download_and_unpack(store_id=store_id)
-            apk_path = pathlib.Path(APKS_DIR, f"{store_id}.{extension}")
+            apk_path = pathlib.Path(APKS_DIR, f"{store_id}{extension}")
             manifest_str, details_df = get_parsed_manifest()
             version_str = get_version()
             crawl_result = 1
