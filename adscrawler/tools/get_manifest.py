@@ -275,6 +275,7 @@ def manifest_main(
             return_rows=True,
             insert_columns=["store_app", "version_code", "crawl_result"],
         )
+        logger.info(f"{store_id=} delete apk {apk_path.as_posix()}")
         apk_path.unlink(missing_ok=True)
         if crawl_result != 1:
             continue
