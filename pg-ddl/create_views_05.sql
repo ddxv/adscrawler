@@ -270,6 +270,20 @@ GROUP BY
     cavd.value_name
 WITH DATA;
 
+CREATE MATERIALIZED VIEW public.companies_apps_overview
+AS
+SELECT DISTINCT
+    store_id,
+    company_id,
+    company_name,
+    company_domain,
+    category_slug
+FROM
+    public.companies_apps_version_details
+WHERE
+    company_id IS NOT NULL
+WITH DATA;
+
 
 CREATE MATERIALIZED VIEW store_apps_rankings AS
 SELECT
