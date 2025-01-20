@@ -141,7 +141,7 @@ def get_smali_df() -> pd.DataFrame:
         .str.replace("smali_assets/", "")
         .str.replace("/", ".")
     )
-    smali_df = smali_df[smali_df["path"].str.len() > 2]
+    smali_df = smali_df[smali_df["path"].str.len() > 4]
     smali_df = smali_df.rename(columns={"path": "android_name"})
     smali_df["path"] = "smali"
     return smali_df
