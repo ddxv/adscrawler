@@ -177,7 +177,6 @@ def plist_main(
     store = 2
     collection_id = 4  # 'Top' Collection
     logger.info("Start iTunes Info.plist")
-    ipatool_auth()
     apps = get_top_ranks_for_unpacking(
         database_connection=database_connection,
         store=store,
@@ -185,6 +184,8 @@ def plist_main(
         limit=number_of_apps_to_pull,
     )
     logger.info(f"Start iTunes Info.plist: {apps.shape=}")
+    if not apps.empty:
+        ipatool_auth()
     for _id, row in apps.iterrows():
         crawl_result = 4
         store_id = row.store_id
