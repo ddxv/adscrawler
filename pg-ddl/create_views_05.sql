@@ -336,6 +336,7 @@ WITH parent_companies AS (
 )
 
 SELECT DISTINCT
+    sa.store,
     sa.store_id,
     d.developer_id,
     myc.parent_company_name AS company_name,
