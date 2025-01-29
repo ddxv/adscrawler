@@ -369,3 +369,27 @@ WITH DATA;
 
 CREATE INDEX adstxt_entries_store_apps_idx ON
 public.adstxt_entries_store_apps (store_id);
+
+
+CREATE MATERIALIZED VIEW adstxt_publishers_overview AS
+SELECT
+    ad_domain_url,
+    relationship,
+    store,
+    publisher_id,
+    count(DISTINCT developer_id) AS developer_count,
+    count(DISTINCT store_id) AS app_count
+FROM
+    adstxt_entries_store_apps
+GROUP BY
+    ad_domain_url,
+    relationship,
+    store,
+    publisher_id
+WITH DATA;
+
+
+CREATE INDEX adstxt_publishers_overview_ad_domain_idx
+ON public.adstxt_publishers_overview USING btree (
+    ad_domain_url
+);
