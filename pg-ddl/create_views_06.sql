@@ -88,21 +88,6 @@ CREATE INDEX store_apps_overview_idx ON store_apps_overview (store_id);
 -- for querying developers' apps
 CREATE MATERIALIZED VIEW developer_store_apps
 AS
-WITH
-developer_domain_ids AS (
-    SELECT DISTINCT pd.id AS domain_id
-    FROM
-        app_urls_map AS aum
-    LEFT JOIN pub_domains AS pd
-        ON
-            aum.pub_domain = pd.id
-    LEFT JOIN store_apps AS sa
-        ON
-            aum.store_app = sa.id
-    LEFT JOIN developers AS d ON
-        sa.developer = d.id
-)
-
 SELECT
     sa.store,
     sa.store_id,

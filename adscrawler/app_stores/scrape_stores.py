@@ -487,9 +487,9 @@ def save_developer_info(
     app_df: pd.DataFrame,
     database_connection: PostgresCon,
 ) -> pd.DataFrame:
-    assert app_df["developer_id"].to_numpy()[
-        0
-    ], f"{app_df['store_id']} Missing Developer ID"
+    assert app_df["developer_id"].to_numpy()[0], (
+        f"{app_df['store_id']} Missing Developer ID"
+    )
     df = (
         app_df[["store", "developer_id", "developer_name"]]
         .rename(columns={"developer_name": "name"})

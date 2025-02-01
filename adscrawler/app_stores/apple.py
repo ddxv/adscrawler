@@ -219,7 +219,7 @@ def clean_ios_app_df(df: pd.DataFrame) -> pd.DataFrame:
     for list_col in list_cols:
         urls_empty = ((df[f"{list_col}s"].isna()) | (df[f"{list_col}s"] == "")).all()
         if not urls_empty:
-            columns = {x: f"{list_col}_{x+1}" for x in range(3)}
+            columns = {x: f"{list_col}_{x + 1}" for x in range(3)}
             df = pd.concat(
                 [
                     df,
