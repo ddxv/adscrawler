@@ -82,8 +82,12 @@ LEFT JOIN latest_successful_version_codes AS lsvc
         sa.id = lsvc.store_app
 WITH DATA;
 
-
-CREATE INDEX store_apps_overview_idx ON store_apps_overview (store_id);
+CREATE UNIQUE INDEX store_apps_overview_unique_idx ON public.store_apps_overview USING btree (
+    store, store_id
+);
+CREATE INDEX store_apps_overview_idx ON store_apps_overview USING btree (
+    store_id
+);
 
 -- for querying developers' apps
 CREATE MATERIALIZED VIEW developer_store_apps
