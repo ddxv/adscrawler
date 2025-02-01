@@ -137,8 +137,10 @@ def get_smali_df() -> pd.DataFrame:
         .str.replace("smali/", "")
         .str.replace(r"smali_classes_\d+/", "", regex=True)
         .str.replace(r"smali_classes\d+/", "", regex=True)
+        .str.replace(r"smali_classes\d+", "", regex=True)
         .str.replace(r"smali_assets\d+/", "", regex=True)
         .str.replace("smali_assets/", "")
+        .str.replace("smali_assets", "")
         .str.replace("/", ".")
     )
     smali_df = smali_df[smali_df["path"].str.len() > 4]
