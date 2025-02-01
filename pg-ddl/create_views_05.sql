@@ -315,17 +315,16 @@ WITH DATA;
 CREATE INDEX store_apps_rankings_idx ON
 public.store_apps_rankings (store_id, crawled_date);
 
-
-CREATE MATERIALIZED VIEW adstxt_entries_store_apps AS
+CREATE MATERIALIZED VIEW adstxt_entries_store_apps_new AS
 WITH parent_companies AS (
     SELECT
         c.id AS company_id,
         c.name AS company_name,
-        coalesce(
+        COALESCE(
             c.parent_company_id,
             c.id
         ) AS parent_company_id,
-        coalesce(
+        COALESCE(
             pc.name,
             c.name
         ) AS parent_company_name
@@ -334,13 +333,19 @@ WITH parent_companies AS (
     LEFT JOIN adtech.companies AS pc ON
         c.parent_company_id = pc.id
 )
-
-SELECT DISTINCT
+SELECT
+    DISTINCT
     sa.store,
     sa.store_id,
+    sa.name AS app_name,
+    sa.installs,
+    sa.rating_count,
+    cm.mapped_category AS app_category,
     d.developer_id,
-    myc.parent_company_name AS company_name,
+    d.name AS developer_name,
+    aav.developer_domain_url,
     aav.ad_domain_url,
+    myc.parent_company_name AS company_name,
     aav.publisher_id,
     aav.relationship,
     aav.developer_domain_crawled_at
@@ -364,11 +369,17 @@ LEFT JOIN adtech.company_domain_mapping AS cdm
 LEFT JOIN parent_companies AS myc
     ON
         cdm.company_id = myc.company_id
+LEFT JOIN category_mapping AS cm ON
+    sa.category = cm.original_category
 WITH DATA;
 
 
 CREATE INDEX adstxt_entries_store_apps_idx ON
 public.adstxt_entries_store_apps (store_id);
+
+CREATE INDEX adstxt_entries_store_apps_idx USING btree  
+public.adstxt_entries_store_apps (ad_domain_url, publisher_id);
+
 
 
 CREATE MATERIALIZED VIEW adstxt_publishers_overview AS
@@ -393,3 +404,27 @@ CREATE INDEX adstxt_publishers_overview_ad_domain_idx
 ON public.adstxt_publishers_overview USING btree (
     ad_domain_url
 );
+
+
+CREATE MATERIALIZED VIEW adstxt_ad_domain_overview AS
+SELECT
+    ad_domain_url,
+    relationship,
+    store,
+    count(DISTINCT publisher_id) AS publisher_id_count,
+    count(DISTINCT developer_id) AS developer_count,
+    count(DISTINCT store_id) AS app_count
+FROM
+    adstxt_entries_store_apps
+GROUP BY
+    ad_domain_url,
+    relationship,
+    store
+WITH DATA;
+
+
+CREATE INDEX adstxt_ad_domain_overview_idx
+ON public.adstxt_ad_domain_overview USING btree (
+    ad_domain_url
+);
+
