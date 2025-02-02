@@ -208,83 +208,8 @@ FROM
 WITH DATA;
 
 
-CREATE MATERIALIZED VIEW public.companies_apps_version_details
-AS WITH latest_version_codes AS (
-    SELECT DISTINCT ON
-    (version_codes.store_app)
-        version_codes.id,
-        version_codes.store_app,
-        version_codes.version_code,
-        version_codes.updated_at,
-        version_codes.crawl_result
-    FROM
-        version_codes
-    ORDER BY
-        version_codes.store_app,
-        string_to_array(version_codes.version_code, '.')::bigint [] DESC
-)
-
-SELECT DISTINCT
-    vd.xml_path,
-    vd.tag,
-    vd.value_name,
-    sa.store,
-    sa.store_id,
-    tm.company_id,
-    c.name AS company_name,
-    ad.domain AS company_domain,
-    cats.url_slug AS category_slug
-FROM latest_version_codes AS vc
-LEFT JOIN version_details AS vd ON vc.id = vd.version_code
-LEFT JOIN
-    adtech.sdk_packages AS tm
-    ON vd.value_name ~~* (tm.package_pattern::text || '%'::text)
-LEFT JOIN adtech.companies AS c ON tm.company_id = c.id
-LEFT JOIN adtech.company_categories AS cc ON c.id = cc.company_id
-LEFT JOIN adtech.categories AS cats ON cc.category_id = cats.id
-LEFT JOIN adtech.company_domain_mapping AS cdm ON tm.company_id = cdm.company_id
-LEFT JOIN ad_domains AS ad ON cdm.domain_id = ad.id
-LEFT JOIN store_apps AS sa ON vc.store_app = sa.id
-WITH DATA;
-
-CREATE INDEX companies_apps_version_details_store_id_idx ON
-public.companies_apps_version_details (store_id);
-
-CREATE UNIQUE INDEX companies_apps_version_details_unique_idx ON
-public.companies_apps_version_details (xml_path, value_name, store, store_id);
 
 
-CREATE MATERIALIZED VIEW companies_version_details_count AS
-SELECT
-    cavd.store,
-    cavd.company_name,
-    cavd.company_domain,
-    cavd.xml_path,
-    cavd.value_name,
-    count(DISTINCT cavd.store_id) AS app_count
-FROM
-    companies_apps_version_details AS cavd
-GROUP BY
-    cavd.store,
-    cavd.company_name,
-    cavd.company_domain,
-    cavd.xml_path,
-    cavd.value_name
-WITH DATA;
-
-CREATE MATERIALIZED VIEW public.companies_apps_overview
-AS
-SELECT DISTINCT
-    store_id,
-    company_id,
-    company_name,
-    company_domain,
-    category_slug
-FROM
-    public.companies_apps_version_details
-WHERE
-    company_id IS NOT NULL
-WITH DATA;
 
 
 CREATE MATERIALIZED VIEW store_apps_rankings AS
