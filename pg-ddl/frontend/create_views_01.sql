@@ -78,7 +78,7 @@ AS SELECT DISTINCT
     company_name,
     company_domain,
     category_slug
-FROM companies_apps_version_details
+FROM frontend.companies_apps_version_details
 WHERE company_id IS NOT NULL
 WITH DATA;
 
@@ -114,7 +114,9 @@ latest_successful_version_codes AS (
         vc.crawl_result
     FROM version_codes AS vc
     WHERE vc.crawl_result = 1
-    ORDER BY vc.store_app, (string_to_array(vc.version_code::text, '.'::text)::bigint []) DESC
+    ORDER BY
+        vc.store_app,
+        (string_to_array(vc.version_code::text, '.'::text)::bigint []) DESC
 )
 
 SELECT
