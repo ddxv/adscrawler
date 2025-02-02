@@ -114,7 +114,7 @@ latest_successful_version_codes AS (
         vc.crawl_result
     FROM version_codes AS vc
     WHERE vc.crawl_result = 1
-    ORDER BY vc.store_app, (vc.version_code::text) DESC
+    ORDER BY vc.store_app, (string_to_array(vc.version_code::text, '.'::text)::bigint []) DESC
 )
 
 SELECT
