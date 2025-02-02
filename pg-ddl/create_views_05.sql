@@ -250,6 +250,8 @@ WITH DATA;
 CREATE INDEX companies_apps_version_details_store_id_idx ON
 public.companies_apps_version_details (store_id);
 
+CREATE UNIQUE INDEX companies_apps_version_details_unique_idx ON
+public.companies_apps_version_details (xml_path, value_name, store, store_id);
 
 
 CREATE MATERIALIZED VIEW companies_version_details_count AS
