@@ -166,3 +166,108 @@ CREATE INDEX store_apps_overview_idx ON frontend.store_apps_overview USING btree
 CREATE UNIQUE INDEX store_apps_overview_unique_idx ON frontend.store_apps_overview USING btree (
     store, store_id
 );
+
+
+CREATE MATERIALIZED VIEW frontend.companies_parent_app_counts
+TABLESPACE pg_default
+AS
+WITH my_counts AS (
+    SELECT DISTINCT
+        csac.store_app,
+        sa.store,
+        cm.mapped_category AS app_category,
+        csac.tag_source,
+        c.name AS company_name,
+        coalesce(ad.domain, csac.ad_domain) AS company_domain
+    FROM adtech.combined_store_apps_companies AS csac
+    LEFT JOIN adtech.companies AS c ON csac.parent_id = c.id
+    LEFT JOIN store_apps AS sa ON csac.store_app = sa.id
+    LEFT JOIN
+        category_mapping AS cm
+        ON sa.category::text = cm.original_category::text
+    LEFT JOIN adtech.company_domain_mapping AS cdm ON c.id = cdm.company_id
+    LEFT JOIN ad_domains AS ad ON cdm.domain_id = ad.id
+),
+
+app_counts AS (
+    SELECT
+        my_counts.store,
+        my_counts.app_category,
+        my_counts.tag_source,
+        my_counts.company_domain,
+        my_counts.company_name,
+        count(*) AS app_count
+    FROM my_counts
+    GROUP BY
+        my_counts.store,
+        my_counts.app_category,
+        my_counts.tag_source,
+        my_counts.company_domain,
+        my_counts.company_name
+)
+
+SELECT
+    app_count,
+    store,
+    app_category,
+    tag_source,
+    company_domain,
+    company_name
+FROM app_counts
+ORDER BY app_count DESC
+WITH DATA;
+
+-- View indexes:
+CREATE INDEX idx_companies_parent_app_counts ON frontend.companies_parent_app_counts USING btree (
+    app_category, tag_source
+);
+
+
+CREATE MATERIALIZED VIEW frontend.companies_categories_types_app_counts
+TABLESPACE pg_default
+AS
+SELECT
+    sa.store,
+    csac.app_category,
+    csac.tag_source,
+    csac.ad_domain AS company_domain,
+    c.name AS company_name,
+    CASE
+        WHEN csac.tag_source LIKE 'app_ads%' THEN 'ad-networks'
+        ELSE cats.url_slug
+    END AS type_url_slug,
+    count(DISTINCT csac.store_app) AS app_count
+FROM
+    adtech.combined_store_apps_companies AS csac
+LEFT JOIN adtech.company_categories AS ccats
+    ON
+        csac.company_id = ccats.company_id
+LEFT JOIN adtech.categories AS cats
+    ON
+        ccats.category_id = cats.id
+LEFT JOIN adtech.companies AS c
+    ON
+        csac.company_id = c.id
+LEFT JOIN store_apps AS sa
+    ON
+        csac.store_app = sa.id
+GROUP BY
+    sa.store,
+    csac.app_category,
+    csac.tag_source,
+    csac.ad_domain,
+    c.name,
+    cats.url_slug
+WITH DATA;
+
+CREATE UNIQUE INDEX idx_unique_companies_categories_types_app_counts ON frontend.companies_categories_types_app_counts USING btree (
+    store, tag_source, app_category, company_domain, type_url_slug
+);
+
+CREATE INDEX idx_companies_categories_types_app_counts ON frontend.companies_categories_types_app_counts USING btree (
+    type_url_slug, app_category
+);
+
+CREATE INDEX idx_companies_categories_types_app_counts_types ON frontend.companies_categories_types_app_counts USING btree (
+    type_url_slug
+);

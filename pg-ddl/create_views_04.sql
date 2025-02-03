@@ -187,55 +187,7 @@ ON adtech.companies_app_counts (
     store, app_category, tag_source, company_domain, company_name
 );
 
-DROP MATERIALIZED VIEW adtech.companies_parent_app_counts;
-CREATE MATERIALIZED VIEW adtech.companies_parent_app_counts
-TABLESPACE pg_default
-AS
-WITH my_counts AS (
-    SELECT DISTINCT
-        csac.store_app,
-        sa.store,
-        cm.mapped_category AS app_category,
-        csac.tag_source,
-        ad.domain AS company_domain,
-        c.name AS company_name
-    FROM adtech.combined_store_apps_companies AS csac
-    LEFT JOIN adtech.companies AS c ON csac.parent_id = c.id
-    LEFT JOIN store_apps AS sa ON csac.store_app = sa.id
-    LEFT JOIN
-        category_mapping AS cm
-        ON sa.category::text = cm.original_category::text
-    LEFT JOIN adtech.company_domain_mapping AS cdm ON c.id = cdm.company_id
-    LEFT JOIN ad_domains AS ad ON cdm.domain_id = ad.id
-),
 
-app_counts AS (
-    SELECT
-        my_counts.store,
-        my_counts.app_category,
-        my_counts.tag_source,
-        my_counts.company_domain,
-        my_counts.company_name,
-        COUNT(*) AS app_count
-    FROM my_counts
-    GROUP BY
-        my_counts.store,
-        my_counts.app_category,
-        my_counts.tag_source,
-        my_counts.company_domain,
-        my_counts.company_name
-)
-
-SELECT
-    app_count,
-    store,
-    app_category,
-    tag_source,
-    company_domain,
-    company_name
-FROM app_counts
-ORDER BY app_count DESC
-WITH DATA;
 
 -- View indexes:
 CREATE INDEX idx_companies_parent_app_counts ON adtech.companies_parent_app_counts USING btree (
@@ -387,38 +339,4 @@ GROUP BY
     sa.store,
     tag_source,
     csac.app_category
-WITH DATA;
-
-
-DROP MATERIALIZED VIEW adtech.companies_categories_types_app_counts;
-CREATE MATERIALIZED VIEW adtech.companies_categories_types_app_counts AS
-SELECT
-    sa.store,
-    csac.app_category,
-    csac.tag_source,
-    csac.ad_domain AS company_domain,
-    c.name AS company_name,
-    cats.url_slug AS type_url_slug,
-    COUNT(DISTINCT store_app) AS app_count
-FROM
-    adtech.combined_store_apps_companies AS csac
-LEFT JOIN adtech.company_categories AS ccats
-    ON
-        csac.company_id = ccats.company_id
-LEFT JOIN adtech.categories AS cats
-    ON
-        ccats.category_id = cats.id
-LEFT JOIN adtech.companies AS c
-    ON
-        csac.company_id = c.id
-LEFT JOIN store_apps AS sa
-    ON
-        csac.store_app = sa.id
-GROUP BY
-    sa.store,
-    csac.app_category,
-    csac.tag_source,
-    csac.ad_domain,
-    c.name,
-    cats.url_slug
 WITH DATA;
