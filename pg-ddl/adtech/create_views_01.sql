@@ -448,3 +448,28 @@ ON
 adtech.companies_parent_by_d30_counts (
     store, mapped_category, category_id, company_name
 );
+
+
+
+CREATE MATERIALIZED VIEW adtech.combined_store_apps_parent_companies
+TABLESPACE pg_default
+AS
+SELECT DISTINCT
+    csac.store_app,
+    csac.app_category,
+    csac.parent_id AS company_id,
+    csac.tag_source,
+    coalesce(
+        ad.domain,
+        csac.ad_domain
+    ) AS ad_domain
+FROM
+    adtech.combined_store_apps_companies AS csac
+LEFT JOIN adtech.companies AS c
+    ON
+        csac.parent_id = c.id
+LEFT JOIN adtech.company_domain_mapping AS cdm
+    ON
+        c.id = cdm.company_id
+LEFT JOIN ad_domains AS ad ON
+    cdm.domain_id = ad.id;

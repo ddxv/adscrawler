@@ -189,91 +189,7 @@ ON adtech.companies_app_counts (
 
 
 
--- View indexes:
-CREATE INDEX idx_companies_parent_app_counts ON adtech.companies_parent_app_counts USING btree (
-    app_category, tag_source
-);
 
-DROP MATERIALIZED VIEW adtech.company_top_apps;
--- THIS IS ONLY FOR FRONTEND QUERIES
-CREATE MATERIALIZED VIEW adtech.company_top_apps
-TABLESPACE pg_default
-AS
-WITH ranked_apps AS (
-    SELECT
-        sa.store,
-        cac.tag_source,
-        sa.name,
-        sa.store_id,
-        cac.app_category AS category,
-        sa.rating_count,
-        sa.installs,
-        cac.ad_domain AS company_domain,
-        c.name AS company_name,
-        ROW_NUMBER() OVER (
-            PARTITION BY
-                sa.store,
-                cac.ad_domain,
-                c.name,
-                cac.tag_source
-            ORDER BY
-                GREATEST(
-                    COALESCE(sa.rating_count, 0), COALESCE(sa.installs, 0)
-                ) DESC
-        ) AS app_company_rank,
-        ROW_NUMBER() OVER (
-            PARTITION BY
-                sa.store,
-                cac.app_category,
-                cac.ad_domain,
-                c.name,
-                cac.tag_source
-            ORDER BY
-                GREATEST(
-                    COALESCE(sa.rating_count, 0), COALESCE(sa.installs, 0)
-                ) DESC
-        ) AS app_company_category_rank
-    FROM
-        adtech.combined_store_apps_companies AS cac
-    LEFT JOIN store_apps AS sa
-        ON
-            cac.store_app = sa.id
-    LEFT JOIN adtech.companies AS c ON
-        cac.company_id = c.id
-)
-
-SELECT
-    company_domain,
-    company_name,
-    store,
-    tag_source,
-    name,
-    store_id,
-    category,
-    app_company_rank,
-    app_company_category_rank,
-    rating_count,
-    installs
-FROM
-    ranked_apps
-WHERE
-    app_company_category_rank <= 100
-ORDER BY
-    store,
-    tag_source,
-    app_company_category_rank
-WITH DATA;
-
-
-CREATE INDEX idx_company_top_apps_category
-ON adtech.company_top_apps (company_domain, category);
-
-
-DROP INDEX IF EXISTS idx_company_top_apps;
-CREATE UNIQUE INDEX idx_company_top_apps
-ON adtech.company_top_apps (
-    company_domain, company_name, store, tag_source, name, store_id, category
-);
 
 -- DROP MATERIALIZED VIEW adtech.companies_parent_categories_app_counts;
 CREATE MATERIALIZED VIEW adtech.companies_parent_categories_app_counts AS
@@ -327,7 +243,7 @@ DROP MATERIALIZED VIEW adtech.total_categories_app_counts;
 CREATE MATERIALIZED VIEW adtech.total_categories_app_counts AS
 SELECT
     sa.store,
-    tag_source,
+    csac.tag_source,
     csac.app_category,
     COUNT(DISTINCT csac.store_app) AS app_count
 FROM
