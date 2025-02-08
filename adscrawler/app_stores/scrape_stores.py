@@ -36,9 +36,53 @@ from adscrawler.queries import (
 
 logger = get_logger(__name__, "scrape_stores")
 
+COUNTRY_LIST = [
+    "us",
+    "cn",
+    "de",
+    "in",
+    "ca",
+    "gb",
+    "au",
+    "fr",
+    "es",
+    "it",
+    "vn",
+    "kr",
+    "jp",
+    "ru",
+    "mx",
+    "nl",
+    "pl",
+    "pt",
+    "ro",
+    "sa",
+    "tr",
+    "ua",
+    "za",
+    "br",
+    "be",
+    "ch",
+    "cz",
+    "dk",
+    "gr",
+    "hu",
+    "id",
+    "ie",
+    "il",
+    "it",
+    "my",
+    "no",
+    "nz",
+    "ph",
+    "ro",
+    "se",
+    "sg",
+    "za",
+]
+
 
 def scrape_store_ranks(database_connection: PostgresCon, stores: list[int]) -> None:
-    country_list = ["us", "cn", "de", "in"]
     collections_map = query_collections(database_connection)
     categories_map = query_categories(database_connection)
     countries_map = query_countries(database_connection)
@@ -46,7 +90,7 @@ def scrape_store_ranks(database_connection: PostgresCon, stores: list[int]) -> N
     categories_map = categories_map.rename(columns={"id": "store_category"})
     if 2 in stores:
         collection_keyword = "TOP"
-        for country in country_list:
+        for country in COUNTRY_LIST:
             try:
                 ranked_dicts = scrape_ios_ranks(
                     collection_keyword=collection_keyword, country=country
@@ -65,7 +109,7 @@ def scrape_store_ranks(database_connection: PostgresCon, stores: list[int]) -> N
                 )
 
     if 1 in stores:
-        for country in country_list:
+        for country in COUNTRY_LIST:
             try:
                 ranked_dicts = scrape_google_ranks(country=country)
                 process_scraped(
@@ -523,8 +567,8 @@ def scrape_and_save_app(
     store_id: str,
     database_connection: PostgresCon,
 ) -> pd.DataFrame:
-    country_list = ["us"]
-    for country in country_list:
+    app_country_list = ["us"]
+    for country in app_country_list:
         info = f"{store=}, {store_id=}, {country=}"
         app_df = scrape_app(store=store, store_id=store_id, country=country)
         logger.info(f"{info} save to db start")
