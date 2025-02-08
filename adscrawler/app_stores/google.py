@@ -99,10 +99,12 @@ def clean_google_play_app_df(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def call_js_to_update_file(filepath: str, is_developers: bool = False) -> None:
+def call_js_to_update_file(
+    filepath: str, country: str = "us", is_developers: bool = False
+) -> None:
     if os.path.exists(filepath):
         os.remove(filepath)
-    cmd = f"node {PACKAGE_DIR}/pullAppIds.js"
+    cmd = f"node {PACKAGE_DIR}/pullAppIds.js -c {country}"
     if is_developers:
         cmd += " --developers"
     logger.info("Js pull start")
@@ -119,11 +121,11 @@ def get_js_data(filepath: str, is_json: bool = True) -> list[dict] | list:
     return data
 
 
-def scrape_google_ranks() -> list[dict]:
+def scrape_google_ranks(country: str) -> list[dict]:
     logger.info("Scrape Google ranks start")
-    filepath = "/tmp/googleplay_json.txt"
+    filepath = f"/tmp/googleplay_json_{country}.txt"
     try:
-        call_js_to_update_file(filepath)
+        call_js_to_update_file(filepath, country)
     except Exception as error:
         logger.exception(f"JS pull failed with {error=}")
     ranked_dicts = get_js_data(filepath)

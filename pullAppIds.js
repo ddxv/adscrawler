@@ -40,6 +40,12 @@ const argv = yargs(hideBin(process.argv))
         type: 'boolean',
         description: 'Set to true or false to include developers'
     })
+    .option('country', {
+        alias: 'c',
+        type: 'string',
+        default: 'us',
+        description: 'Set the country to pull from'
+    })
     .argv;
 
 async function pullRank(category, collection, country, numApps) {
@@ -106,30 +112,30 @@ async function loopDevelopers(country, numApps) {
 async function loopLists(categories, collections, country, numApps) {
     // Loop over each keys in categories and collections
     for (const categoryKey in categories) {
-        let collectedAppRanks = [];
-        const category = categories[categoryKey]
-        for (const collectionKey in collections) {
+            let collectedAppRanks = [];
+            const category = categories[categoryKey]
+            for (const collectionKey in collections) {
 
-            const collection = collections[collectionKey]
-            const logString = "Category:" + category + ", Collection: " + collection
-            console.log(logString)
+                const collection = collections[collectionKey]
+                const logString = "Category:" + category + ", Collection: " + collection
+                console.log(logString)
 
-            let appRanks = await pullRank(category, collection, country, numApps)
-            collectedAppRanks = collectedAppRanks.concat(appRanks);
+                let appRanks = await pullRank(category, collection, country, numApps)
+                collectedAppRanks = collectedAppRanks.concat(appRanks);
 
+            }
+            appendToFile(collectedAppRanks, country)
         }
-        appendToFile(collectedAppRanks)
-    }
 }
 
-async function appendToFile(collectedAppRanks) {
+async function appendToFile(collectedAppRanks, country) {
     const fs = require('fs');
 
     // Convert each JSON object to a string and join them with newline characters
     const dataString = collectedAppRanks.map(rank => JSON.stringify(rank)).join('\n');
 
     // Append the data string to the file with an additional newline at the end
-    fs.appendFile('/tmp/googleplay_json.txt', dataString + '\n', (err) => {
+    fs.appendFile('/tmp/googleplay_json_' + country + '.txt', dataString + '\n', (err) => {
         if (err) throw err;
     });
 
@@ -140,22 +146,22 @@ async function appendToFile(collectedAppRanks) {
 
 // Apps pulled per category per collection
 var numApps = 500
-var country = "us"
 
 async function main() {
 
 
     if (argv.developers) {
-        loopDevelopers(country, numApps = 60)
+        loopDevelopers(argv.country, numApps = 60)
     }
     else {
         var categories = gplay.default.category;
         var collections = gplay.default.collection;
+        var country = argv.country;
         // 54 Categories: GAME_TRIVIA, EVENTS, TRAVEL
         // var categories = gplay.category
         // 3 Collections: TOP_FREE, TOP_PAID, GROSSING
         // var collections = gplay.collection
-        console.log("Starting %i categories and %i collections", Object.keys(categories).length, Object.keys(collections).length)
+        console.log(`Starting country=${country}, ${Object.keys(categories).length} categories and ${Object.keys(collections).length} collections`)
 
         // nested for loop for two iterables
         loopLists(categories, collections, country, numApps)

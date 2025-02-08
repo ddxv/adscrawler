@@ -65,9 +65,9 @@ def get_app_ids_with_retry(
 def scrape_ios_ranks(
     category_keyword: str | None = None,
     collection_keyword: str | None = None,
+    country: str = "us",
 ) -> list[dict]:
     logger.info(f"Scrape iOS ranks for {collection_keyword=} {category_keyword=}")
-    country = "us"
     scraper = AppStoreScraper()
     # Eg: MAGAZINES_MEN, GAMES_ADVENTURE
     if category_keyword:

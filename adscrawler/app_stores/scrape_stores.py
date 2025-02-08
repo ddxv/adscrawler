@@ -38,6 +38,7 @@ logger = get_logger(__name__, "scrape_stores")
 
 
 def scrape_store_ranks(database_connection: PostgresCon, stores: list[int]) -> None:
+    country_list = ["us", "cn", "de", "in"]
     collections_map = query_collections(database_connection)
     categories_map = query_categories(database_connection)
     countries_map = query_countries(database_connection)
@@ -45,36 +46,38 @@ def scrape_store_ranks(database_connection: PostgresCon, stores: list[int]) -> N
     categories_map = categories_map.rename(columns={"id": "store_category"})
     if 2 in stores:
         collection_keyword = "TOP"
-        try:
-            ranked_dicts = scrape_ios_ranks(
-                collection_keyword=collection_keyword,
-            )
-            process_scraped(
-                database_connection=database_connection,
-                ranked_dicts=ranked_dicts,
-                crawl_source="scrape_frontpage_top",
-                collections_map=collections_map,
-                categories_map=categories_map,
-                countries_map=countries_map,
-            )
-        except Exception as e:
-            logger.exception(
-                f"Srape iOS collection={collection_keyword} hit error={e}, skipping",
-            )
+        for country in country_list:
+            try:
+                ranked_dicts = scrape_ios_ranks(
+                    collection_keyword=collection_keyword, country=country
+                )
+                process_scraped(
+                    database_connection=database_connection,
+                    ranked_dicts=ranked_dicts,
+                    crawl_source="scrape_frontpage_top",
+                    collections_map=collections_map,
+                    categories_map=categories_map,
+                    countries_map=countries_map,
+                )
+            except Exception as e:
+                logger.exception(
+                    f"Srape iOS collection={collection_keyword} hit error={e}, skipping",
+                )
 
     if 1 in stores:
-        try:
-            ranked_dicts = scrape_google_ranks()
-            process_scraped(
-                database_connection=database_connection,
-                ranked_dicts=ranked_dicts,
-                crawl_source="scrape_frontpage_top",
-                collections_map=collections_map,
-                categories_map=categories_map,
-                countries_map=countries_map,
-            )
-        except Exception as e:
-            logger.exception(f"Scrape google ranks hit error={e}, skipping")
+        for country in country_list:
+            try:
+                ranked_dicts = scrape_google_ranks(country=country)
+                process_scraped(
+                    database_connection=database_connection,
+                    ranked_dicts=ranked_dicts,
+                    crawl_source="scrape_frontpage_top",
+                    collections_map=collections_map,
+                    categories_map=categories_map,
+                    countries_map=countries_map,
+                )
+            except Exception as e:
+                logger.exception(f"Scrape google ranks hit error={e}, skipping")
         try:
             from adscrawler.app_stores.apkcombo import get_apkcombo_android_apps
 
