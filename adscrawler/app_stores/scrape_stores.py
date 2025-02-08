@@ -47,7 +47,6 @@ COUNTRY_LIST = [
     "fr",
     "es",
     "it",
-    "vn",
     "kr",
     "jp",
     "ru",
@@ -55,7 +54,6 @@ COUNTRY_LIST = [
     "nl",
     "pl",
     "pt",
-    "ro",
     "sa",
     "tr",
     "ua",
@@ -70,7 +68,6 @@ COUNTRY_LIST = [
     "id",
     "ie",
     "il",
-    "it",
     "my",
     "no",
     "nz",
@@ -78,7 +75,7 @@ COUNTRY_LIST = [
     "ro",
     "se",
     "sg",
-    "za",
+    "vn",
 ]
 
 
