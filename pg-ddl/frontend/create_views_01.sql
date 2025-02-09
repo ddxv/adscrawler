@@ -476,3 +476,106 @@ adtech.company_top_apps (
     store,
     tag_source
 );
+
+
+
+CREATE MATERIALIZED VIEW frontend.app_rankings_latest_by_week
+AS
+WITH RECURSIVE latest_date AS (
+    SELECT max(crawled_date) AS max_date
+    FROM
+        app_rankings
+),
+
+my_dates AS (
+    SELECT ld.max_date AS crawled_date
+    FROM
+        latest_date AS ld
+    UNION ALL
+    SELECT
+        (
+            md.crawled_date - interval '7 days'
+        )::date
+    FROM
+        my_dates AS md
+    WHERE
+        md.crawled_date - interval '7 days' >= current_date - interval '45 days'
+),
+
+top_apps_newer AS (
+    SELECT DISTINCT ar.store_app
+    FROM
+        app_rankings AS ar
+    INNER JOIN countries AS c
+        ON
+            ar.country = c.id
+    WHERE
+        ar.crawled_date = (
+            SELECT ld.max_date
+            FROM
+                latest_date AS ld
+        )
+        AND ar.rank <= 50
+),
+
+top_apps_older AS (
+    SELECT DISTINCT ar.store_app
+    FROM
+        app_rankings AS ar
+    INNER JOIN countries AS c ON
+        ar.country = c.id
+        AND ar.rank <= 50
+)
+
+SELECT
+    arr.crawled_date,
+    arr.store_collection,
+    arr.store_category,
+    arr.rank,
+    sa.store,
+    c.alpha2 AS country,
+    sa.name,
+    sa.store_id
+FROM
+    app_rankings AS arr
+LEFT JOIN store_apps AS sa
+    ON
+        arr.store_app = sa.id
+LEFT JOIN countries AS c
+    ON
+        arr.country = c.id
+WHERE
+    arr.store_app IN (
+        SELECT tan.store_app
+        FROM
+            top_apps_newer AS tan
+        UNION
+        SELECT tao.store_app
+        FROM
+            top_apps_older AS tao
+    )
+    AND arr.crawled_date >= current_date - interval '45 days'
+    AND arr.crawled_date IN (
+        SELECT md.crawled_date
+        FROM
+            my_dates AS md
+    );
+
+CREATE UNIQUE INDEX idx_unique_app_ranking_latest_by_week ON
+frontend.app_rankings_latest_by_week
+USING btree (
+    crawled_date,
+    store_collection,
+    store_category,
+    rank,
+    store,
+    country,
+    store_id
+);
+
+
+
+CREATE INDEX idx_app_rankings_latest_by_week_query ON
+frontend.app_rankings_latest_by_week USING btree (
+    store, store_collection, country, crawled_date
+);
