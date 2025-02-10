@@ -28,3 +28,9 @@ LEFT JOIN pub_domains AS pd
 WITH DATA;
 
 CREATE INDEX developer_store_apps_idx ON developer_store_apps (developer_id);
+
+CREATE INDEX idx_developer_store_apps_domain_id
+ON developer_store_apps (domain_id);
+
+CREATE INDEX idx_developer_store_apps_developer_domain
+ON developer_store_apps (developer_id, domain_id);
