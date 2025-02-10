@@ -279,6 +279,8 @@ def manifest_main(
         )
         logger.info(f"{store_id=} delete apk {apk_path.as_posix()}")
         apk_path.unlink(missing_ok=True)
+        if extension == ".xapk":
+            pathlib.Path(APKS_DIR, f"{store_id}.apk").unlink(missing_ok=True)
         if crawl_result != 1:
             continue
         upserted = upserted.rename(
