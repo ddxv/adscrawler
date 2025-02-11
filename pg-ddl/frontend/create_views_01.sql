@@ -1,7 +1,6 @@
 CREATE MATERIALIZED VIEW frontend.companies_apps_version_details
 TABLESPACE pg_default
-AS
-WITH latest_version_codes AS (
+AS WITH latest_version_codes AS (
     SELECT DISTINCT ON (version_codes.store_app)
         version_codes.id,
         version_codes.store_app,
@@ -30,24 +29,25 @@ SELECT DISTINCT
 FROM latest_version_codes AS vc
 LEFT JOIN version_details AS vd ON vc.id = vd.version_code
 LEFT JOIN
-    company_value_name_package_mapping AS vnpm
+    adtech.company_value_name_package_mapping AS vnpm
     ON vd.value_name = vnpm.value_name
 LEFT JOIN adtech.companies AS c ON vnpm.company_id = c.id
 LEFT JOIN adtech.company_categories AS cc ON c.id = cc.company_id
 LEFT JOIN adtech.categories AS cats ON cc.category_id = cats.id
 LEFT JOIN adtech.company_domain_mapping AS cdm ON c.id = cdm.company_id
 LEFT JOIN ad_domains AS ad ON cdm.domain_id = ad.id
-LEFT JOIN store_apps AS sa ON vc.store_app = sa.id;
+LEFT JOIN store_apps AS sa ON vc.store_app = sa.id
+WITH DATA;
 
 
-
-
+-- View indexes:
 CREATE INDEX companies_apps_version_details_store_id_idx ON frontend.companies_apps_version_details USING btree (
     store_id
 );
+CREATE UNIQUE INDEX companies_apps_version_details_unique_idx ON frontend.companies_apps_version_details USING btree (
+    xml_path, value_name, store, store_id
+);
 
-CREATE UNIQUE INDEX companies_apps_version_details_unique_idx ON
-frontend.companies_apps_version_details (xml_path, value_name, store, store_id);
 
 
 CREATE MATERIALIZED VIEW frontend.companies_version_details_count
@@ -578,4 +578,118 @@ USING btree (
 CREATE INDEX idx_app_rankings_latest_by_week_query ON
 frontend.app_rankings_latest_by_week USING btree (
     store, store_collection, country, crawled_date
+);
+
+
+
+
+CREATE MATERIALIZED VIEW frontend.companies_app_counts
+TABLESPACE pg_default
+AS WITH my_counts AS (
+    SELECT DISTINCT
+        csac.store_app,
+        sa.store,
+        cm.mapped_category AS app_category,
+        csac.tag_source,
+        csac.ad_domain AS company_domain,
+        c.name AS company_name
+    FROM adtech.combined_store_apps_companies AS csac
+    LEFT JOIN adtech.companies AS c ON csac.company_id = c.id
+    LEFT JOIN store_apps AS sa ON csac.store_app = sa.id
+    LEFT JOIN
+        category_mapping AS cm
+        ON sa.category::text = cm.original_category::text
+),
+
+app_counts AS (
+    SELECT
+        my_counts.store,
+        my_counts.app_category,
+        my_counts.tag_source,
+        my_counts.company_domain,
+        my_counts.company_name,
+        count(*) AS app_count
+    FROM my_counts
+    GROUP BY
+        my_counts.store,
+        my_counts.app_category,
+        my_counts.tag_source,
+        my_counts.company_domain,
+        my_counts.company_name
+)
+
+SELECT
+    app_count,
+    store,
+    app_category,
+    tag_source,
+    company_domain,
+    company_name
+FROM app_counts
+ORDER BY app_count DESC
+WITH DATA;
+
+-- View indexes:
+CREATE UNIQUE INDEX idx_companies_app_counts ON frontend.companies_app_counts USING btree (
+    store, app_category, tag_source, company_domain, company_name
+);
+
+
+
+CREATE MATERIALIZED VIEW frontend.companies_categories_app_counts
+TABLESPACE pg_default
+AS SELECT
+    csac.ad_domain AS company_domain,
+    c.name AS company_name,
+    csac.app_category,
+    count(DISTINCT csac.store_app) AS app_count
+FROM adtech.combined_store_apps_companies AS csac
+LEFT JOIN adtech.companies AS c ON csac.company_id = c.id
+GROUP BY csac.ad_domain, c.name, csac.app_category
+ORDER BY c.name, (count(DISTINCT csac.store_app)) DESC
+WITH DATA;
+
+-- View indexes:
+CREATE UNIQUE INDEX idx_companies_categories_app_counts ON frontend.companies_categories_app_counts USING btree (
+    company_domain, company_name, app_category
+);
+
+
+CREATE MATERIALIZED VIEW frontend.total_categories_app_counts
+TABLESPACE pg_default
+AS SELECT
+    sa.store,
+    csac.tag_source,
+    csac.app_category,
+    count(DISTINCT csac.store_app) AS app_count
+FROM adtech.combined_store_apps_companies AS csac
+LEFT JOIN store_apps AS sa ON csac.store_app = sa.id
+GROUP BY sa.store, csac.tag_source, csac.app_category
+WITH DATA;
+
+CREATE UNIQUE INDEX idx_total_categories_app_counts ON frontend.total_categories_app_counts USING btree (
+    store, tag_source, app_category
+);
+
+
+CREATE MATERIALIZED VIEW frontend.companies_parent_categories_app_counts
+TABLESPACE pg_default
+AS SELECT
+    ad.domain AS company_domain,
+    c.name AS company_name,
+    csac.app_category,
+    count(DISTINCT csac.store_app) AS app_count
+FROM adtech.combined_store_apps_companies AS csac
+LEFT JOIN adtech.companies AS c ON csac.parent_id = c.id
+LEFT JOIN adtech.company_domain_mapping AS cdm ON c.id = cdm.company_id
+LEFT JOIN ad_domains AS ad ON cdm.domain_id = ad.id
+GROUP BY ad.domain, c.name, csac.app_category
+ORDER BY c.name, (count(DISTINCT csac.store_app)) DESC
+WITH DATA;
+
+
+
+-- View indexes:
+CREATE UNIQUE INDEX idx_companies_parent_categories_app_counts ON frontend.companies_parent_categories_app_counts USING btree (
+    company_domain, company_name, app_category
 );

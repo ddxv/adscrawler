@@ -307,17 +307,3 @@ CREATE EXTENSION IF NOT EXISTS pg_trgm;
 CREATE INDEX idx_value_name_trgm ON version_details USING gin (
     value_name gin_trgm_ops
 );
-
-
-CREATE MATERIALIZED VIEW company_value_name_package_mapping AS
-SELECT DISTINCT
-    vd.value_name,
-    tm.company_id,
-    tm.package_pattern
-FROM version_details AS vd
-INNER JOIN
-    adtech.sdk_packages AS tm
-    ON vd.value_name ~~* (tm.package_pattern::text || '%'::text);
-
-CREATE INDEX ON company_value_name_package_mapping (value_name);
-CREATE INDEX ON company_value_name_package_mapping (company_id);

@@ -13,38 +13,44 @@ WITH latest_version_codes AS (
         version_codes.crawl_result = 1
     ORDER BY
         version_codes.store_app,
-        string_to_array(version_codes.version_code, '.')::bigint [] DESC
+        string_to_array(
+            version_codes.version_code,
+            '.'
+        )::bigint [] DESC
 ),
 
 sdk_apps_with_companies AS (
     SELECT DISTINCT
         vc.store_app,
-        tm.company_id,
+        sd.company_id,
         coalesce(
             pc.parent_company_id,
-            tm.company_id
+            sd.company_id
         ) AS parent_id
     FROM
         latest_version_codes AS vc
     LEFT JOIN version_details AS vd
         ON
             vc.id = vd.version_code
-    INNER JOIN adtech.sdk_packages AS tm
+    INNER JOIN adtech.sdk_packages AS sp
         ON
             vd.value_name ~~* (
-                tm.package_pattern::text || '%'::text
+                sp.package_pattern::text || '%'::text
             )
+    LEFT JOIN adtech.sdks AS sd
+        ON
+            sp.sdk_id = sd.id
     LEFT JOIN adtech.companies AS pc ON
-        tm.company_id = pc.id
+        sd.company_id = pc.id
 ),
 
 sdk_paths_with_companies AS (
     SELECT DISTINCT
         vc.store_app,
-        ptm.company_id,
+        sd.company_id,
         coalesce(
             pc.parent_company_id,
-            ptm.company_id
+            sd.company_id
         ) AS parent_id
     FROM
         latest_version_codes AS vc
@@ -56,8 +62,11 @@ sdk_paths_with_companies AS (
             vd.value_name ~~* (
                 ptm.path_pattern::text || '%'::text
             )
+    LEFT JOIN adtech.sdks AS sd
+        ON
+            ptm.sdk_id = sd.id
     LEFT JOIN adtech.companies AS pc ON
-        ptm.company_id = pc.id
+        sd.company_id = pc.id
 ),
 
 dev_apps_with_companies AS (
@@ -473,3 +482,28 @@ LEFT JOIN adtech.company_domain_mapping AS cdm
         c.id = cdm.company_id
 LEFT JOIN ad_domains AS ad ON
     cdm.domain_id = ad.id;
+
+
+
+
+CREATE MATERIALIZED VIEW adtech.company_value_name_package_mapping
+TABLESPACE pg_default
+AS SELECT DISTINCT
+    vd.value_name,
+    sd.company_id,
+    sp.package_pattern
+FROM version_details AS vd
+INNER JOIN
+    adtech.sdk_packages AS sp
+    ON vd.value_name ~~* (sp.package_pattern::text || '%'::text)
+LEFT JOIN adtech.sdks AS sd
+    ON sp.sdk_id = sd.id
+WITH DATA;
+
+-- View indexes:
+CREATE INDEX company_value_name_package_mapping_company_id_idx ON adtech.company_value_name_package_mapping USING btree (
+    company_id
+);
+CREATE INDEX company_value_name_package_mapping_value_name_idx ON adtech.company_value_name_package_mapping USING btree (
+    value_name
+);

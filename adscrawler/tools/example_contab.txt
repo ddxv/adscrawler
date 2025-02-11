@@ -45,9 +45,9 @@
 
 48 */9 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW store_apps_rankings"
 
-48 */10 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW adtech.companies_categories_app_counts"
+48 */10 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW frontend.companies_categories_app_counts"
 52 */10 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW adtech.companies_parent_categories_app_counts"
-55 */10 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW adtech.total_categories_app_counts"
+55 */10 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW frontend.total_categories_app_counts"
 58 */10 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW adtech.store_crawl_results"
 
 
