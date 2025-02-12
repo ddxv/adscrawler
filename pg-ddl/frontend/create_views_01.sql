@@ -1,3 +1,4 @@
+DROP MATERIALIZED VIEW IF EXISTS frontend.companies_apps_version_details;
 CREATE MATERIALIZED VIEW frontend.companies_apps_version_details
 TABLESPACE pg_default
 AS WITH latest_version_codes AS (
@@ -49,7 +50,7 @@ CREATE UNIQUE INDEX companies_apps_version_details_unique_idx ON frontend.compan
 );
 
 
-
+DROP MATERIALIZED VIEW IF EXISTS frontend.companies_version_details_count;
 CREATE MATERIALIZED VIEW frontend.companies_version_details_count
 TABLESPACE pg_default
 AS SELECT
@@ -70,6 +71,7 @@ frontend.companies_version_details_count (
 );
 
 
+DROP MATERIALIZED VIEW IF EXISTS frontend.companies_apps_overview;
 CREATE MATERIALIZED VIEW frontend.companies_apps_overview
 TABLESPACE pg_default
 AS SELECT DISTINCT
@@ -90,6 +92,7 @@ CREATE INDEX companies_apps_overview_idx ON frontend.companies_apps_overview USI
 );
 
 
+DROP MATERIALIZED VIEW IF EXISTS frontend.store_apps_overview;
 CREATE MATERIALIZED VIEW frontend.store_apps_overview
 TABLESPACE pg_default
 AS WITH latest_version_codes AS (
@@ -169,6 +172,7 @@ CREATE UNIQUE INDEX store_apps_overview_unique_idx ON frontend.store_apps_overvi
 
 
 
+DROP MATERIALIZED VIEW IF EXISTS frontend.companies_parent_app_counts;
 CREATE MATERIALIZED VIEW frontend.companies_parent_app_counts
 TABLESPACE pg_default
 AS
@@ -214,6 +218,7 @@ USING btree (
 );
 
 
+DROP MATERIALIZED VIEW IF EXISTS frontend.companies_categories_types_app_counts;
 CREATE MATERIALIZED VIEW frontend.companies_categories_types_app_counts
 TABLESPACE pg_default
 AS
@@ -264,6 +269,7 @@ CREATE INDEX idx_companies_categories_types_app_counts_types ON frontend.compani
 );
 
 
+DROP MATERIALIZED VIEW IF EXISTS frontend.company_parent_top_apps;
 CREATE MATERIALIZED VIEW frontend.company_parent_top_apps
 TABLESPACE pg_default
 AS
@@ -365,6 +371,7 @@ USING btree (
 
 
 
+DROP MATERIALIZED VIEW IF EXISTS frontend.company_top_apps;
 CREATE MATERIALIZED VIEW frontend.company_top_apps
 TABLESPACE pg_default
 AS WITH ranked_apps AS (
@@ -469,7 +476,7 @@ CREATE INDEX idx_company_top_apps ON frontend.company_top_apps USING btree (
 
 CREATE INDEX idx_query_company_top_apps
 ON
-adtech.company_top_apps (
+frontend.company_top_apps (
     company_domain,
     category,
     app_company_category_rank,
@@ -479,6 +486,7 @@ adtech.company_top_apps (
 
 
 
+DROP MATERIALIZED VIEW IF EXISTS frontend.app_rankings_latest_by_week;
 CREATE MATERIALIZED VIEW frontend.app_rankings_latest_by_week
 AS
 WITH RECURSIVE latest_date AS (
@@ -582,7 +590,7 @@ frontend.app_rankings_latest_by_week USING btree (
 
 
 
-
+DROP MATERIALIZED VIEW IF EXISTS frontend.companies_app_counts;
 CREATE MATERIALIZED VIEW frontend.companies_app_counts
 TABLESPACE pg_default
 AS WITH my_counts AS (
@@ -636,6 +644,7 @@ CREATE UNIQUE INDEX idx_companies_app_counts ON frontend.companies_app_counts US
 
 
 
+DROP MATERIALIZED VIEW IF EXISTS frontend.companies_categories_app_counts;
 CREATE MATERIALIZED VIEW frontend.companies_categories_app_counts
 TABLESPACE pg_default
 AS SELECT
@@ -655,6 +664,7 @@ CREATE UNIQUE INDEX idx_companies_categories_app_counts ON frontend.companies_ca
 );
 
 
+DROP MATERIALIZED VIEW IF EXISTS frontend.total_categories_app_counts;
 CREATE MATERIALIZED VIEW frontend.total_categories_app_counts
 TABLESPACE pg_default
 AS SELECT
@@ -672,6 +682,7 @@ CREATE UNIQUE INDEX idx_total_categories_app_counts ON frontend.total_categories
 );
 
 
+DROP MATERIALIZED VIEW IF EXISTS frontend.companies_parent_categories_app_counts;
 CREATE MATERIALIZED VIEW frontend.companies_parent_categories_app_counts
 TABLESPACE pg_default
 AS SELECT

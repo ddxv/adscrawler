@@ -1,6 +1,6 @@
 -- DROP MATERIALIZED VIEW adtech.app_ads_store_apps_companies;
 -- store_apps that were found connected to app_ads txt files
--- PARTNER to adtech.store_apps_companies (from SDK)
+-- PARTNER to adtech.store_apps_companies_sdk (from SDK)
 CREATE MATERIALIZED VIEW adtech.app_ads_store_apps_companies
 TABLESPACE pg_default
 AS SELECT DISTINCT
@@ -66,7 +66,7 @@ WITH sdk_based_companies AS (
         ad.domain AS ad_domain,
         'sdk' AS tag_source
     FROM
-        adtech.store_apps_companies AS sac
+        adtech.store_apps_companies_sdk AS sac
     LEFT JOIN adtech.company_domain_mapping AS cdm
         ON
             COALESCE(sac.company_id, sac.parent_id) = cdm.company_id

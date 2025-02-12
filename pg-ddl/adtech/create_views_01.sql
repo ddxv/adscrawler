@@ -1,5 +1,5 @@
-DROP MATERIALIZED VIEW IF EXISTS adtech.store_apps_companies CASCADE;
-CREATE MATERIALIZED VIEW adtech.store_apps_companies AS
+DROP MATERIALIZED VIEW IF EXISTS adtech.store_apps_companies_sdk CASCADE;
+CREATE MATERIALIZED VIEW adtech.store_apps_companies_sdk AS
 WITH latest_version_codes AS (
     SELECT DISTINCT ON
     (version_codes.store_app)
@@ -22,26 +22,19 @@ WITH latest_version_codes AS (
 sdk_apps_with_companies AS (
     SELECT DISTINCT
         vc.store_app,
-        sd.company_id,
+        vnpm.company_id,
         coalesce(
             pc.parent_company_id,
-            sd.company_id
+            vnpm.company_id
         ) AS parent_id
     FROM
         latest_version_codes AS vc
-    LEFT JOIN version_details AS vd
-        ON
-            vc.id = vd.version_code
-    INNER JOIN adtech.sdk_packages AS sp
-        ON
-            vd.value_name ~~* (
-                sp.package_pattern::text || '%'::text
-            )
-    LEFT JOIN adtech.sdks AS sd
-        ON
-            sp.sdk_id = sd.id
+    LEFT JOIN version_details AS vd ON vc.id = vd.version_code
+    INNER JOIN
+        adtech.company_value_name_package_mapping AS vnpm
+        ON vd.value_name = vnpm.value_name
     LEFT JOIN adtech.companies AS pc ON
-        sd.company_id = pc.id
+        vnpm.company_id = pc.id
 ),
 
 sdk_paths_with_companies AS (
@@ -181,8 +174,8 @@ WITH DATA;
 
 
 DROP INDEX IF EXISTS idx_store_apps_companies;
-CREATE UNIQUE INDEX idx_store_apps_companies
-ON adtech.store_apps_companies (store_app, company_id, parent_id);
+CREATE UNIQUE INDEX idx_store_apps_companies_sdk
+ON adtech.store_apps_companies_sdk (store_app, company_id, parent_id);
 
 
 CREATE MATERIALIZED VIEW adtech.companies_by_d30_counts AS
@@ -205,7 +198,7 @@ WITH cat_hist_totals AS (
         AND sahc.store_app IN (
             SELECT DISTINCT sac.store_app
             FROM
-                adtech.store_apps_companies AS sac
+                adtech.store_apps_companies_sdk AS sac
         )
     GROUP BY
         sa.store,
@@ -219,7 +212,7 @@ cat_app_totals AS (
         count(DISTINCT sac.store_app) AS category_total_apps,
         sum(sa.installs) AS alltime_installs
     FROM
-        adtech.store_apps_companies AS sac
+        adtech.store_apps_companies_sdk AS sac
     LEFT JOIN store_apps AS sa
         ON
             sac.store_app = sa.id
@@ -246,7 +239,7 @@ company_installs AS (
         sum(hist.rating_count_diff * 7) AS ratings,
         count(DISTINCT sac.store_app) AS app_count
     FROM
-        adtech.store_apps_companies AS sac
+        adtech.store_apps_companies_sdk AS sac
     LEFT JOIN
         store_apps_history_change AS hist
         ON
@@ -346,7 +339,7 @@ WITH cat_hist_totals AS (
         AND sahc.store_app IN (
             SELECT DISTINCT sac.store_app
             FROM
-                adtech.store_apps_companies AS sac
+                adtech.store_apps_companies_sdk AS sac
         )
     GROUP BY
         sa.store,
@@ -360,7 +353,7 @@ cat_app_totals AS (
         count(DISTINCT sac.store_app) AS category_total_apps,
         sum(sa.installs) AS alltime_installs
     FROM
-        adtech.store_apps_companies AS sac
+        adtech.store_apps_companies_sdk AS sac
     LEFT JOIN store_apps AS sa
         ON
             sac.store_app = sa.id
@@ -378,7 +371,7 @@ store_apps_parent_companies AS (
         sac.parent_id,
         cats.category_id
     FROM
-        adtech.store_apps_companies AS sac
+        adtech.store_apps_companies_sdk AS sac
     LEFT JOIN adtech.company_categories AS cats
         ON
             sac.company_id = cats.company_id

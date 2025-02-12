@@ -74,7 +74,7 @@
 
 01 22 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW company_value_name_package_mapping"
 
-12 22 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW adtech.store_apps_companies"
+12 22 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW adtech.store_apps_companies_sdk"
 22 0 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW adtech.app_ads_store_apps_companies"
 
 52 23 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW adtech.combined_store_apps_companies"
