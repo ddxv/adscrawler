@@ -45,9 +45,17 @@ WITH DATA;
 CREATE INDEX companies_apps_version_details_store_id_idx ON frontend.companies_apps_version_details USING btree (
     store_id
 );
-CREATE UNIQUE INDEX companies_apps_version_details_unique_idx ON frontend.companies_apps_version_details USING btree (
-    xml_path, value_name, store, store_id
+CREATE UNIQUE INDEX companies_apps_version_details_unique_idx
+ON frontend.companies_apps_version_details USING btree (
+    xml_path,
+    value_name,
+    store,
+    store_id,
+    company_id,
+    company_domain,
+    category_slug
 );
+
 
 
 DROP MATERIALIZED VIEW IF EXISTS frontend.companies_version_details_count;
@@ -84,8 +92,12 @@ FROM frontend.companies_apps_version_details
 WHERE company_id IS NOT NULL
 WITH DATA;
 
+
 CREATE UNIQUE INDEX companies_apps_overview_unique_idx ON
-frontend.companies_apps_overview (store_id, company_id);
+frontend.companies_apps_overview USING btree (
+    store_id, company_id, category_slug
+);
+
 
 CREATE INDEX companies_apps_overview_idx ON frontend.companies_apps_overview USING btree (
     store_id
@@ -229,7 +241,9 @@ SELECT
     csac.ad_domain AS company_domain,
     c.name AS company_name,
     CASE
-        WHEN csac.tag_source LIKE 'app_ads%' THEN 'ad-networks'
+        WHEN
+            csac.tag_source ~~ 'app_ads%'::text
+            THEN 'ad-networks'::character varying
         ELSE cats.url_slug
     END AS type_url_slug,
     count(DISTINCT csac.store_app) AS app_count
@@ -253,8 +267,16 @@ GROUP BY
     csac.tag_source,
     csac.ad_domain,
     c.name,
-    cats.url_slug
+    CASE
+        WHEN
+            csac.tag_source ~~ 'app_ads%'::text
+            THEN 'ad-networks'::character varying
+        ELSE cats.url_slug
+    END
 WITH DATA;
+
+
+
 
 CREATE UNIQUE INDEX idx_unique_companies_categories_types_app_counts ON frontend.companies_categories_types_app_counts USING btree (
     store, tag_source, app_category, company_domain, type_url_slug

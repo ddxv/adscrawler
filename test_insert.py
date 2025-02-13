@@ -151,3 +151,20 @@ def insert_sdk_with_package_patterns(
 
 
 main()
+
+
+
+REFRESH MATERIALIZED VIEW CONCURRENTLY frontend.companies_apps_version_details;
+REFRESH MATERIALIZED VIEW CONCURRENTLY frontend.companies_version_details_count;
+
+REFRESH MATERIALIZED VIEW CONCURRENTLY frontend.company_parent_top_apps;
+REFRESH MATERIALIZED VIEW CONCURRENTLY frontend.company_top_apps;
+REFRESH MATERIALIZED VIEW CONCURRENTLY frontend.companies_parent_app_counts;
+REFRESH MATERIALIZED VIEW CONCURRENTLY frontend.companies_apps_overview;
+REFRESH MATERIALIZED VIEW CONCURRENTLY frontend.companies_app_counts;
+
+REFRESH MATERIALIZED VIEW CONCURRENTLY frontend.app_rankings_latest_by_week;
+REFRESH MATERIALIZED VIEW CONCURRENTLY frontend.companies_categories_app_counts;
+REFRESH MATERIALIZED VIEW CONCURRENTLY frontend.companies_categories_types_app_counts;
+REFRESH MATERIALIZED VIEW CONCURRENTLY frontend.companies_parent_categories_app_counts;
+REFRESH MATERIALIZED VIEW CONCURRENTLY frontend.total_categories_app_counts;
