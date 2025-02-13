@@ -1,3 +1,4 @@
+from contextlib import contextmanager
 from socket import gethostbyname
 
 import sqlalchemy
@@ -10,12 +11,11 @@ logger = get_logger(__name__)
 
 
 class PostgresCon:
-    """Class for managing the connection to PostgreSQL."""
+    """Class for managing the connection to PostgreSQL with extended database operations."""
 
     def __init__(self, db_name: str, db_ip: str, db_port: str) -> None:
         """
         Initialize the PostgreSQL connection.
-
         Args:
             db_name (str): Name of the database.
             db_ip (str): IP address of the database server.
@@ -48,6 +48,22 @@ class PostgresCon:
                 f"Failed to connect {self.db_name} @ {self.db_ip}, error: {error}",
             )
             raise
+
+    @contextmanager
+    def get_cursor(self):
+        """Context manager for database connection and cursor."""
+        conn = self.engine.raw_connection()
+        try:
+            cursor = conn.cursor()
+            yield cursor
+            conn.commit()
+        except Exception as e:
+            conn.rollback()
+            logger.error(f"Database operation error: {str(e)}")
+            raise
+        finally:
+            cursor.close()
+            conn.close()
 
 
 def get_db_connection(use_ssh_tunnel: bool = False) -> PostgresCon:
