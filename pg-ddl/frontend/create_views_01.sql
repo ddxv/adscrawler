@@ -276,8 +276,6 @@ GROUP BY
 WITH DATA;
 
 
-
-
 CREATE UNIQUE INDEX idx_unique_companies_categories_types_app_counts ON frontend.companies_categories_types_app_counts USING btree (
     store, tag_source, app_category, company_domain, type_url_slug
 );
@@ -725,4 +723,56 @@ WITH DATA;
 -- View indexes:
 CREATE UNIQUE INDEX idx_companies_parent_categories_app_counts ON frontend.companies_parent_categories_app_counts USING btree (
     company_domain, company_name, app_category
+);
+
+
+DROP MATERIALIZED VIEW IF EXISTS frontend.companies_sdks_overview;
+CREATE MATERIALIZED VIEW frontend.companies_sdks_overview
+AS
+SELECT
+    c.name AS company_name,
+    ad.domain AS company_domain,
+    parad.domain AS parent_company_domain,
+    sdk.sdk_name,
+    sp.package_pattern,
+    sp2.path_pattern,
+    coalesce(
+        cc.name,
+        c.name
+    ) AS parent_company_name
+FROM
+    adtech.companies AS c
+LEFT JOIN adtech.companies AS cc
+    ON
+        c.parent_company_id = cc.id
+LEFT JOIN adtech.company_domain_mapping AS cdm
+    ON
+        c.id = cdm.company_id
+LEFT JOIN adtech.company_domain_mapping AS pcdm
+    ON
+        cc.id = pcdm.company_id
+LEFT JOIN ad_domains AS ad
+    ON
+        cdm.domain_id = ad.id
+LEFT JOIN ad_domains AS parad
+    ON
+        pcdm.domain_id = parad.id
+LEFT JOIN adtech.sdks AS sdk
+    ON
+        c.id = sdk.company_id
+LEFT JOIN adtech.sdk_packages AS sp
+    ON
+        sdk.id = sp.sdk_id
+LEFT JOIN adtech.sdk_paths AS sp2
+    ON
+        sdk.id = sp2.sdk_id;
+
+CREATE UNIQUE INDEX companies_sdks_overview_unique_idx ON
+frontend.companies_sdks_overview (
+    company_name,
+    company_domain,
+    parent_company_domain,
+    sdk_name,
+    package_pattern,
+    path_pattern
 );
