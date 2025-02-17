@@ -13,18 +13,19 @@ adtech.categories:
 3	Analytics: Product	product-analytics
 """
 
-domain = "reactivex.io"
-company_name = "ReactiveX"
-sdk_name = "ReactiveX Cocoa SDK"
-sdk_slug = "reactivex-cocoa-sdk"
+domain = "mongodb.com"
+company_name = "MongoDB"
+sdk_name = "MongoDB Realm SDK"
+sdk_slug = "mongodb-realm-sdk"
 is_open_source = True
-has_third_party_tracking = False
+has_third_party_tracking = True
 category_id = 4
 
 sdk_package_patterns = [
-    # "RxSwift.framework",
-    # "RxRelay.framework",
-    "RxCocoa.framework",
+    "io.realm",
+    "RealmSwift.framework",
+    "Realm.framework",
+    "Realm_Realm.bundle",
 ]
 
 

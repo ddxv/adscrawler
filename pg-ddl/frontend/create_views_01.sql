@@ -782,7 +782,7 @@ CREATE MATERIALIZED VIEW frontend.companies_open_source_percent
 AS
 SELECT
     ad.domain AS company_domain,
-    avg(CASE WHEN sd.is_open_source THEN 1 ELSE 0 END) AS percent_os
+    avg(CASE WHEN sd.is_open_source THEN 1 ELSE 0 END) AS percent_open_source
 FROM
     adtech.sdks AS sd
 LEFT JOIN adtech.company_domain_mapping AS cdm
