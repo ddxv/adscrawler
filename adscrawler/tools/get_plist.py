@@ -4,6 +4,7 @@ import argparse
 import os
 import pathlib
 import plistlib
+import time
 from typing import Self
 
 import numpy as np
@@ -186,7 +187,12 @@ def plist_main(
     logger.info(f"Start iTunes Info.plist: {apps.shape=}")
     if not apps.empty:
         ipatool_auth()
+    error_count = 0
     for _id, row in apps.iterrows():
+        if error_count > 5:
+            continue
+        if error_count > 0:
+            time.sleep(error_count * error_count * 10)
         crawl_result = 4
         store_id = row.store_id
         logger.info(f"{store_id=} start")
@@ -212,14 +218,17 @@ def plist_main(
         except Exception as e:
             logger.exception(f"Unexpected error for {store_id=}: {str(e)}")
             crawl_result = -1  # Unexpected errors
-        # Prevent unnecessary downloading attempts if downloads fail
+        if crawl_result in [3]:
+            error_count += 3
+        if crawl_result in [2, 4]:
+            error_count += 1
         if crawl_result == -1:
             break
         details_df["store_app"] = row.store_app
         details_df["version_code"] = version_str
         version_code_df = details_df[["store_app", "version_code"]].drop_duplicates()
         version_code_df["crawl_result"] = crawl_result
-        logger.info(f"{store_id=} inserts")
+        logger.info(f"{store_id=} insert {crawl_result=}")
         upserted: pd.DataFrame = upsert_df(
             df=version_code_df,
             table_name="version_codes",
