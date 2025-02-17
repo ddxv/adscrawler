@@ -776,3 +776,25 @@ frontend.companies_sdks_overview (
     package_pattern,
     path_pattern
 );
+
+
+CREATE MATERIALIZED VIEW frontend.companies_open_source_percent
+AS
+SELECT
+    ad.domain AS company_domain,
+    avg(CASE WHEN sd.is_open_source THEN 1 ELSE 0 END) AS percent_os
+FROM
+    adtech.sdks AS sd
+LEFT JOIN adtech.company_domain_mapping AS cdm
+    ON
+        sd.company_id = cdm.company_id
+LEFT JOIN ad_domains AS ad
+    ON
+        cdm.domain_id = ad.id
+GROUP BY
+    ad.domain;
+
+CREATE UNIQUE INDEX companies_open_source_percent_unique ON
+frontend.companies_open_source_percent (
+    company_domain
+);

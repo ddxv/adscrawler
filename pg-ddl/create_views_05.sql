@@ -242,7 +242,7 @@ WITH DATA;
 CREATE INDEX store_apps_rankings_idx ON
 public.store_apps_rankings (store_id, crawled_date);
 
-CREATE MATERIALIZED VIEW adstxt_entries_store_apps_new AS
+CREATE MATERIALIZED VIEW adstxt_entries_store_apps AS
 WITH parent_companies AS (
     SELECT
         c.id AS company_id,
@@ -306,6 +306,20 @@ public.adstxt_entries_store_apps (store_id);
 
 CREATE INDEX adstxt_entries_store_apps_idx USING btree  
 public.adstxt_entries_store_apps (ad_domain_url, publisher_id);
+
+CREATE UNIQUE INDEX adstxt_entries_store_apps_unique_idx 
+ON
+public.adstxt_entries_store_apps
+    USING btree(
+    store,
+    store_id,
+    app_category,
+    developer_id,
+    developer_domain_url,
+    ad_domain_url,
+    publisher_id,
+    relationship
+);
 
 
 
