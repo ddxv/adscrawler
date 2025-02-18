@@ -839,8 +839,11 @@ ranked_apps AS (
         ) AS updated_rank
     FROM
         latest_version_codes AS lvc
-    LEFT JOIN store_apps AS sa ON
-        lvc.store_app = sa.id
+    LEFT JOIN store_apps AS sa
+        ON
+            lvc.store_app = sa.id
+    WHERE
+        lvc.updated_at <= current_date - interval '1 day'
 )
 
 SELECT *
