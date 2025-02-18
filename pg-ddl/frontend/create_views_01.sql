@@ -800,6 +800,7 @@ frontend.companies_open_source_percent (
 );
 
 
+DROP MATERIALIZED VIEW frontend.latest_sdk_scanned_apps;
 CREATE MATERIALIZED VIEW frontend.latest_sdk_scanned_apps
 AS
 WITH latest_version_codes AS (
@@ -833,7 +834,7 @@ ranked_apps AS (
         sa.installs,
         sa.rating_count,
         row_number() OVER (
-            PARTITION BY sa.store
+            PARTITION BY sa.store, lvc.crawl_result
             ORDER BY
                 lvc.updated_at DESC
         ) AS updated_rank
@@ -852,6 +853,7 @@ FROM
 WHERE
     ra.updated_rank <= 100
 WITH DATA;
+
 
 CREATE UNIQUE INDEX latest_sdk_scanned_apps_unique_index
 ON

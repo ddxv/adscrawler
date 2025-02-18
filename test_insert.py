@@ -13,16 +13,16 @@ adtech.categories:
 3	Analytics: Product	product-analytics
 """
 
-domain = "github.com/vanniktech"
-company_name = "Vanniktech"
-sdk_name = "Emoji"
-sdk_slug = "vanniktech-emoji-compat-sdk"
+domain = "eclipse.org"
+company_name = "Eclipse"
+sdk_name = "Eclipse"
+sdk_slug = "eclipse-sdk"
 is_open_source = True
 has_third_party_tracking = False
 category_id = 4
 
 sdk_package_patterns = [
-    "com.vanniktech.emoji",
+    "org.eclipse",
 ]
 
 

@@ -123,7 +123,8 @@ def get_parsed_plist() -> tuple[str, str, pd.DataFrame]:
     version = data["CFBundleVersion"]
     frameworks_df = ipa_frameworks()
     bundles_df = ipa_bundles()
-    paths_df = pd.concat([frameworks_df, bundles_df])
+    special_files_df = special_files()
+    paths_df = pd.concat([frameworks_df, bundles_df, special_files_df])
     df = pd.concat([ddf, paths_df])
     return version, plist_str, df
 
@@ -140,6 +141,10 @@ def ipa_frameworks() -> pd.DataFrame:
             if frameworks_path.exists() and frameworks_path.is_dir():
                 for framework_dir in frameworks_path.iterdir():
                     if framework_dir.is_dir():  # Add only directories
+                        framework_dirs.append(framework_dir.name)
+                    elif framework_dir.is_file() and framework_dir.name.endswith(
+                        ".dylib"
+                    ):
                         framework_dirs.append(framework_dir.name)
     df = pd.DataFrame({"path": "frameworks", "value": framework_dirs})
     return df
@@ -159,6 +164,27 @@ def ipa_bundles() -> pd.DataFrame:
                 ):  # Add only directories
                     bundle_dirs.append(mydir.name)
     df = pd.DataFrame({"path": "bundles", "value": bundle_dirs})
+    return df
+
+
+def special_files() -> pd.DataFrame:
+    """Check for frameworks based on directory names."""
+    bundle_dirs = []
+    payload_dir = pathlib.Path(UNZIPPED_DIR, "Payload")
+    if payload_dir.exists():
+        for (
+            app_dir
+        ) in payload_dir.iterdir():  # Assuming the next directory is the app directory
+            for mydir in app_dir.iterdir():
+                if mydir.is_dir() and mydir.name.endswith(
+                    "cookeddata"
+                ):  # Add only directories
+                    bundle_dirs.append(mydir.name)
+                elif mydir.is_file() and mydir.name.endswith(
+                    "ue4commandline.txt"
+                ):  # Add only directories
+                    bundle_dirs.append(mydir.name)
+    df = pd.DataFrame({"path": "Payload", "value": bundle_dirs})
     return df
 
 

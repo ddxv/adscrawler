@@ -46,5 +46,6 @@ def download(bundle_id: str, do_redownload: bool = False) -> None:
             return
     logger.info(f"Will download {bundle_id}")
     command = f"ipatool download -b '{bundle_id}' -o  {filepath.as_posix()} --keychain-passphrase '{KEYCHAIN_PASSPHRASE}' --non-interactive --purchase --verbose >> ~/.config/adscrawler/logs/ipatool.log 2>&1"
+    command = f"ipatool download -b '{bundle_id}' -o  {filepath.as_posix()} --keychain-passphrase '{KEYCHAIN_PASSPHRASE}' --non-interactive --purchase --verbose >> ~/.config/adscrawler/logs/ipatool.log 2>&1"
     result = os.system(command)
     logger.info(f"ipatool download result: {result}")
