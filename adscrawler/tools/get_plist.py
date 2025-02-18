@@ -218,9 +218,9 @@ def plist_main(
         except Exception as e:
             logger.exception(f"Unexpected error for {store_id=}: {str(e)}")
             crawl_result = -1  # Unexpected errors
-        if crawl_result in [3]:
+        if crawl_result in [3, 4]:
             error_count += 3
-        if crawl_result in [2, 4]:
+        if crawl_result in [2]:
             error_count += 1
         if crawl_result == -1:
             break

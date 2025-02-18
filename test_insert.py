@@ -13,19 +13,16 @@ adtech.categories:
 3	Analytics: Product	product-analytics
 """
 
-domain = "mongodb.com"
-company_name = "MongoDB"
-sdk_name = "MongoDB Realm SDK"
-sdk_slug = "mongodb-realm-sdk"
+domain = "github.com/vanniktech"
+company_name = "Vanniktech"
+sdk_name = "Emoji"
+sdk_slug = "vanniktech-emoji-compat-sdk"
 is_open_source = True
-has_third_party_tracking = True
+has_third_party_tracking = False
 category_id = 4
 
 sdk_package_patterns = [
-    "io.realm",
-    "RealmSwift.framework",
-    "Realm.framework",
-    "Realm_Realm.bundle",
+    "com.vanniktech.emoji",
 ]
 
 

@@ -798,3 +798,64 @@ CREATE UNIQUE INDEX companies_open_source_percent_unique ON
 frontend.companies_open_source_percent (
     company_domain
 );
+
+
+CREATE MATERIALIZED VIEW frontend.latest_sdk_scanned_apps
+AS
+WITH latest_version_codes AS (
+    SELECT DISTINCT ON
+    (version_codes.store_app)
+        version_codes.id,
+        version_codes.store_app,
+        version_codes.version_code,
+        version_codes.updated_at,
+        version_codes.crawl_result
+    FROM
+        version_codes
+    ORDER BY
+        version_codes.store_app,
+        (
+            string_to_array(
+                version_codes.version_code::text,
+                '.'::text
+            )::bigint []
+        ) DESC
+),
+
+ranked_apps AS (
+    SELECT
+        lvc.updated_at AS sdk_crawled_at,
+        lvc.version_code,
+        lvc.crawl_result,
+        sa.store,
+        sa.store_id,
+        sa.name,
+        sa.installs,
+        sa.rating_count,
+        row_number() OVER (
+            PARTITION BY sa.store
+            ORDER BY
+                lvc.updated_at DESC
+        ) AS updated_rank
+    FROM
+        latest_version_codes AS lvc
+    LEFT JOIN store_apps AS sa ON
+        lvc.store_app = sa.id
+)
+
+SELECT *
+FROM
+    ranked_apps AS ra
+WHERE
+    ra.updated_rank <= 100
+WITH DATA;
+
+CREATE UNIQUE INDEX latest_sdk_scanned_apps_unique_index
+ON
+frontend.latest_sdk_scanned_apps
+USING btree (
+    version_code,
+    crawl_result,
+    store,
+    store_id
+);
