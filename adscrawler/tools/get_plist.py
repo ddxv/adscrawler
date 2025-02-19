@@ -1,9 +1,11 @@
 """Download an IPA and extract it's Info.plist file."""
 
 import argparse
+import json
 import os
 import pathlib
 import plistlib
+import subprocess
 import time
 from typing import Self
 
@@ -90,8 +92,34 @@ def unpack_and_attach(
     return combined
 
 
+def get_macho_info(app_dir: pathlib.Path) -> pd.DataFrame:
+    try:
+        result = subprocess.run(
+            ["ipsw", "macho", "info", str(app_dir), "--json"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        macho_info = json.loads(result.stdout)
+        logger.info("Successfully captured macho info")
+    except (subprocess.CalledProcessError, json.JSONDecodeError) as e:
+        logger.error(f"Failed to get macho info: {e}")
+        return pd.DataFrame()
+
+    df = pd.json_normalize(macho_info["loads"])
+    df = df[["name"]].drop_duplicates()
+    df = df[~df["name"].isna()]
+    df[["path", "extension"]] = df["name"].str.split(".", expand=True, n=1)
+    df["value"] = df["path"].apply(lambda x: x.split("/")[-1])
+    df["extension"] = df["extension"].str.replace("\\/.*$", "", regex=True)
+    df["path"] = df["path"].apply(lambda x: "/".join(x.split("/")[:-1]))
+    df["value"] = df["value"] + "." + df["extension"]
+    df = df[~df["value"].isna()][["path", "value"]].drop_duplicates()
+    return df
+
+
 def get_parsed_plist() -> tuple[str, str, pd.DataFrame]:
-    payload_dir = pathlib.Path(MODULE_DIR, "XXXipasunzipped/Payload")
+    payload_dir = pathlib.Path(MODULE_DIR, "ipasunzipped/Payload")
     ipa_filename = None
     for app_dir in payload_dir.glob("*"):  # '*' will match any directory inside Payload
         plist_info_path = app_dir / "Info.plist"  # Construct the path to plist.Info
@@ -124,7 +152,8 @@ def get_parsed_plist() -> tuple[str, str, pd.DataFrame]:
     frameworks_df = ipa_frameworks()
     bundles_df = ipa_bundles()
     special_files_df = special_files()
-    paths_df = pd.concat([frameworks_df, bundles_df, special_files_df])
+    macho_df = get_macho_info(app_dir=app_dir)
+    paths_df = pd.concat([frameworks_df, bundles_df, special_files_df, macho_df])
     df = pd.concat([ddf, paths_df])
     return version, plist_str, df
 
