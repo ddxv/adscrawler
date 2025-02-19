@@ -91,7 +91,7 @@ def unpack_and_attach(
 
 
 def get_parsed_plist() -> tuple[str, str, pd.DataFrame]:
-    payload_dir = pathlib.Path(MODULE_DIR, "ipasunzipped/Payload")
+    payload_dir = pathlib.Path(MODULE_DIR, "XXXipasunzipped/Payload")
     ipa_filename = None
     for app_dir in payload_dir.glob("*"):  # '*' will match any directory inside Payload
         plist_info_path = app_dir / "Info.plist"  # Construct the path to plist.Info
