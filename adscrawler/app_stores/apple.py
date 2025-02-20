@@ -197,7 +197,9 @@ def clean_ios_app_df(df: pd.DataFrame) -> pd.DataFrame:
             "genres",
         ].apply(
             lambda x: [
-                cat.lower() for cat in x.split(",") if cat.lower() in GAME_CATEGORIES
+                cat.lower().replace(" ", "_")
+                for cat in x.split(",")
+                if cat.lower().replace(" ", "_") in GAME_CATEGORIES
             ][0],
         )
     except Exception as e:

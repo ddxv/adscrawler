@@ -13,17 +13,15 @@ adtech.categories:
 3	Analytics: Product	product-analytics
 """
 
-domain = "eclipse.org"
-company_name = "Eclipse"
-sdk_name = "Eclipse"
-sdk_slug = "eclipse-sdk"
-is_open_source = True
-has_third_party_tracking = False
-category_id = 4
+domain = "juspay.io"
+company_name = "JUSPAY"
+sdk_name = "JUSPAY SDK"
+sdk_slug = "juspay-sdk"
+is_open_source = False
+has_third_party_tracking = True
+category_id = 5
 
-sdk_package_patterns = [
-    "org.eclipse",
-]
+sdk_package_patterns = ["in.juspay"]
 
 
 def main():
