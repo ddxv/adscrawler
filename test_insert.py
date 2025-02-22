@@ -13,15 +13,18 @@ adtech.categories:
 3	Analytics: Product	product-analytics
 """
 
-domain = "juspay.io"
-company_name = "JUSPAY"
-sdk_name = "JUSPAY SDK"
-sdk_slug = "juspay-sdk"
+domain = "prove.com"
+company_name = "Prove"
+sdk_name = "Prove SDK"
+sdk_slug = "prove-sdk"
 is_open_source = False
 has_third_party_tracking = True
 category_id = 5
 
-sdk_package_patterns = ["in.juspay"]
+sdk_package_patterns = [
+    "ProveMobileAuth.framework",
+    "ProveAuth.framework",
+]
 
 
 def main():
