@@ -864,3 +864,158 @@ USING btree (
     store,
     store_id
 );
+
+
+
+
+CREATE MATERIALIZED VIEW frontend.adstxt_entries_store_apps
+TABLESPACE pg_default
+AS WITH parent_companies AS (
+    SELECT
+        c.id AS company_id,
+        c.name AS company_name,
+        coalesce(
+            c.parent_company_id,
+            c.id
+        ) AS parent_company_id,
+        coalesce(
+            pc.name,
+            c.name
+        ) AS parent_company_name
+    FROM
+        adtech.companies AS c
+    LEFT JOIN adtech.companies AS pc ON
+        c.parent_company_id = pc.id
+)
+
+SELECT DISTINCT
+    aav.ad_domain_url,
+    myc.parent_company_name AS company_name,
+    aav.publisher_id,
+    aav.relationship,
+    sa.id AS store_app,
+    aav.developer_domain_url,
+    aav.developer_domain_crawled_at
+FROM
+    app_ads_view AS aav
+LEFT JOIN pub_domains AS pd
+    ON
+        aav.developer_domain_url::text = pd.url::text
+LEFT JOIN app_urls_map AS aum
+    ON
+        pd.id = aum.pub_domain
+LEFT JOIN store_apps AS sa
+    ON
+        aum.store_app = sa.id
+LEFT JOIN adtech.company_domain_mapping AS cdm
+    ON
+        aav.ad_domain = cdm.domain_id
+LEFT JOIN parent_companies AS myc
+    ON
+        cdm.company_id = myc.company_id
+WITH DATA;
+
+
+-- View indexes:
+CREATE INDEX adstxt_entries_store_apps_domain_pub_idx ON frontend.adstxt_entries_store_apps USING btree (
+    ad_domain_url, publisher_id
+);
+CREATE INDEX adstxt_entries_store_apps_idx ON frontend.adstxt_entries_store_apps USING btree (
+    store_app
+);
+CREATE UNIQUE INDEX adstxt_entries_store_apps_unique_idx ON frontend.adstxt_entries_store_apps USING btree (
+    ad_domain_url, publisher_id, relationship, store_app
+);
+
+
+-- frontend.adstxt_publishers_overview source
+CREATE MATERIALIZED VIEW frontend.adstxt_publishers_overview
+TABLESPACE pg_default
+AS
+WITH ranked_data AS (
+    SELECT
+        aesa.ad_domain_url,
+        aesa.relationship,
+        sa.store,
+        aesa.publisher_id,
+        count(DISTINCT sa.developer) AS developer_count,
+        count(DISTINCT aesa.store_app) AS app_count,
+        row_number() OVER (
+            PARTITION BY
+                aesa.ad_domain_url,
+                aesa.relationship,
+                sa.store
+            ORDER BY
+                count(DISTINCT aesa.store_app) DESC
+        ) AS pubrank
+    FROM
+        frontend.adstxt_entries_store_apps AS aesa
+    LEFT JOIN store_apps AS sa
+        ON
+            aesa.store_app = sa.id
+    GROUP BY
+        aesa.ad_domain_url,
+        aesa.relationship,
+        sa.store,
+        aesa.publisher_id
+)
+
+SELECT
+    rd.ad_domain_url,
+    rd.relationship,
+    rd.store,
+    rd.publisher_id,
+    rd.developer_count,
+    rd.app_count,
+    rd.pubrank
+FROM
+    ranked_data AS rd
+WHERE
+    rd.pubrank <= 50
+WITH DATA;
+
+
+-- View indexes:
+CREATE INDEX adstxt_publishers_overview_ad_domain_idx ON frontend.adstxt_publishers_overview USING btree (
+    ad_domain_url
+);
+CREATE UNIQUE INDEX adstxt_publishers_overview_ad_domain_unique_idx ON frontend.adstxt_publishers_overview USING btree (
+    ad_domain_url, relationship, store, publisher_id
+);
+
+
+
+-- public.adstxt_ad_domain_overview source
+
+CREATE MATERIALIZED VIEW frontend.adstxt_ad_domain_overview
+TABLESPACE pg_default
+AS
+SELECT
+    aesa.ad_domain_url,
+    aesa.relationship,
+    sa.store,
+    count(DISTINCT aesa.publisher_id) AS publisher_id_count,
+    count(DISTINCT sa.developer) AS developer_count,
+    count(DISTINCT aesa.store_app) AS app_count
+FROM
+    frontend.adstxt_entries_store_apps AS aesa
+LEFT JOIN store_apps AS sa
+    ON
+        aesa.store_app = sa.id
+GROUP BY
+    ad_domain_url,
+    relationship,
+    store
+WITH DATA;
+
+-- View indexes:
+CREATE INDEX adstxt_ad_domain_overview_idx ON
+frontend.adstxt_ad_domain_overview
+USING btree (ad_domain_url);
+CREATE UNIQUE INDEX adstxt_ad_domain_overview_unique_idx ON
+frontend.adstxt_ad_domain_overview
+USING btree (
+    ad_domain_url,
+    relationship,
+    store
+);
