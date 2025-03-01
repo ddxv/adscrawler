@@ -40,7 +40,6 @@
 20 */8 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW category_mapping"
 25 */8 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW mv_app_categories"
 42 */9 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW adtech.companies_app_counts"
-45 */9 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW publisher_network_view"
 
 48 */9 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW store_apps_rankings"
 
@@ -63,15 +62,12 @@
 38 11 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW apps_new_yearly"
 
 
-34 2 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW app_ads_view"
-
 01 5 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW adstxt_ad_domain_overview"
 31 5 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW adstxt_publishers_overview"
 
 01 22 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW company_value_name_package_mapping"
 
 12 22 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW adtech.store_apps_companies_sdk"
-22 0 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW adtech.app_ads_store_apps_companies"
 
 52 23 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW adtech.combined_store_apps_companies"
 

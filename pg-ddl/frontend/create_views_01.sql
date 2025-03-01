@@ -868,6 +868,7 @@ USING btree (
 
 
 
+
 CREATE MATERIALIZED VIEW frontend.adstxt_entries_store_apps
 TABLESPACE pg_default
 AS WITH parent_companies AS (
@@ -889,18 +890,24 @@ AS WITH parent_companies AS (
 )
 
 SELECT DISTINCT
-    aav.ad_domain_url,
+    ad.domain AS ad_domain_url,
     myc.parent_company_name AS company_name,
-    aav.publisher_id,
-    aav.relationship,
+    aae.publisher_id,
+    aae.relationship,
     sa.id AS store_app,
-    aav.developer_domain_url,
-    aav.developer_domain_crawled_at
+    pd.url AS developer_domain_url,
+    pd.crawled_at AS developer_domain_crawled_at
 FROM
-    app_ads_view AS aav
+    app_ads_entrys AS aae
+LEFT JOIN ad_domains AS ad
+    ON
+        aae.ad_domain = ad.id
+LEFT JOIN app_ads_map AS aam
+    ON
+        aae.id = aam.app_ads_entry
 LEFT JOIN pub_domains AS pd
     ON
-        aav.developer_domain_url::text = pd.url::text
+        aam.pub_domain = pd.id
 LEFT JOIN app_urls_map AS aum
     ON
         pd.id = aum.pub_domain
@@ -909,10 +916,12 @@ LEFT JOIN store_apps AS sa
         aum.store_app = sa.id
 LEFT JOIN adtech.company_domain_mapping AS cdm
     ON
-        aav.ad_domain = cdm.domain_id
+        ad.id = cdm.domain_id
 LEFT JOIN parent_companies AS myc
     ON
         cdm.company_id = myc.company_id
+WHERE
+    pd.crawled_at - aam.updated_at < interval '1 hour'
 WITH DATA;
 
 

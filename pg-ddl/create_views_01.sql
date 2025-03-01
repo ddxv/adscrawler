@@ -1,29 +1,3 @@
-CREATE MATERIALIZED VIEW public.app_ads_view
-TABLESPACE pg_default
-AS SELECT DISTINCT
-    pd.url AS developer_domain_url,
-    aae.ad_domain,
-    aae.publisher_id,
-    ad.domain AS ad_domain_url,
-    aae.relationship,
-    pd.crawl_result,
-    pd.crawled_at AS developer_domain_crawled_at,
-    ad.updated_at AS ad_domain_updated_at,
-    aam.updated_at AS txt_entry_crawled_at
-FROM app_ads_entrys AS aae
-LEFT JOIN ad_domains AS ad ON aae.ad_domain = ad.id
-LEFT JOIN app_ads_map AS aam ON aae.id = aam.app_ads_entry
-LEFT JOIN pub_domains AS pd ON aam.pub_domain = pd.id
-WHERE pd.crawled_at::date = aam.updated_at::date AND pd.crawl_result = 1
-WITH DATA;
-
--- View indexes:
-CREATE UNIQUE INDEX app_ads_view_developer_domain_url_idx
-ON public.app_ads_view USING btree (
-    developer_domain_url, ad_domain, publisher_id, ad_domain_url, relationship
-);
-
-
 -- public.audit_dates source
 
 CREATE MATERIALIZED VIEW public.audit_dates

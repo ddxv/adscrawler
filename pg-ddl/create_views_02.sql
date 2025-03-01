@@ -1,23 +1,3 @@
--- public.publisher_network_view source
-
-CREATE MATERIALIZED VIEW public.publisher_network_view
-TABLESPACE pg_default
-AS SELECT DISTINCT
-    av.developer_domain_url AS publisher_domain_url,
-    av.ad_domain_url,
-    av.relationship
-FROM app_ads_view AS av
-WHERE av.developer_domain_crawled_at::date = av.txt_entry_crawled_at::date
-WITH DATA;
-
--- View indexes:
-CREATE UNIQUE INDEX publisher_network_view_uniq_idx
-ON public.publisher_network_view USING btree (
-    publisher_domain_url, ad_domain_url, relationship
-);
-
-
-
 CREATE MATERIALIZED VIEW category_mapping AS
 SELECT DISTINCT
     original_category,
