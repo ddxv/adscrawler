@@ -17,65 +17,6 @@ ON public.publisher_network_view USING btree (
 );
 
 
--- public.publisher_url_developer_ids_uniques source
-
-CREATE MATERIALIZED VIEW public.publisher_url_developer_ids_uniques
-TABLESPACE pg_default
-AS WITH uniq_pub_urls AS (
-    SELECT
-        app_ads_view.ad_domain_url,
-        app_ads_view.publisher_id,
-        count(
-            DISTINCT app_ads_view.developer_domain_url
-        ) AS unique_publisher_urls
-    FROM app_ads_view
-    WHERE app_ads_view.relationship::text = 'DIRECT'::text
-    GROUP BY app_ads_view.ad_domain_url, app_ads_view.publisher_id
-),
-
-dev_url_map AS (
-    SELECT DISTINCT
-        d.developer_id,
-        pd.url AS pub_domain_url
-    FROM store_apps AS sa
-    LEFT JOIN developers AS d ON sa.developer = d.id
-    LEFT JOIN app_urls_map AS aum ON sa.id = aum.store_app
-    LEFT JOIN pub_domains AS pd ON aum.pub_domain = pd.id
-    WHERE sa.crawl_result = 1 AND pd.crawl_result = 1
-),
-
-uniq_dev_ids AS (
-    SELECT
-        aav.ad_domain_url,
-        aav.publisher_id,
-        count(DISTINCT dum.developer_id) AS unique_developer_ids
-    FROM app_ads_view AS aav
-    LEFT JOIN
-        dev_url_map AS dum
-        ON dum.pub_domain_url::text = aav.developer_domain_url::text
-    WHERE aav.relationship::text = 'DIRECT'::text
-    GROUP BY aav.ad_domain_url, aav.publisher_id
-)
-
-SELECT
-    upu.ad_domain_url,
-    upu.publisher_id,
-    upu.unique_publisher_urls,
-    udi.unique_developer_ids,
-    CASE
-        WHEN
-            upu.unique_publisher_urls <= 1 OR udi.unique_developer_ids <= 1
-            THEN 1
-        ELSE 0
-    END AS is_unique
-FROM uniq_pub_urls AS upu
-FULL JOIN
-    uniq_dev_ids AS udi
-    ON
-        upu.ad_domain_url::text = udi.ad_domain_url::text
-        AND upu.publisher_id::text = udi.publisher_id::text
-WITH DATA;
-
 
 CREATE MATERIALIZED VIEW category_mapping AS
 SELECT DISTINCT
