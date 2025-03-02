@@ -5,6 +5,7 @@ import time
 
 import pandas as pd
 import requests
+from bs4 import BeautifulSoup
 from itunes_app_scraper.scraper import AppStoreScraper
 from itunes_app_scraper.util import AppStoreCategories, AppStoreCollections
 
@@ -152,6 +153,33 @@ def crawl_ios_developers(
         apps_df["store"] = store
         apps_df["developer"] = developer_db_id
     return apps_df
+
+
+def scrape_store_html(store_id: str, country: str) -> dict:
+    url = f"https://apps.apple.com/{country}/app/-/id{store_id}"
+    headers = {"User-Agent": "Mozilla/5.0"}  # Prevent blocking by some websites
+    response = requests.get(url, headers=headers)
+
+    if response.status_code != 200:
+        print(f"Failed to retrieve the page: {response.status_code}")
+        return {}
+
+    soup = BeautifulSoup(response.text, "html.parser")
+    urls = {}
+
+    # Find all links and look for relevant ones
+    for link in soup.find_all("a", href=True):
+        text = link.get_text(strip=True).lower()
+        href = link["href"]
+
+        if "app support" in text:
+            urls["app_support"] = href
+        elif "developer" in text:
+            urls["developer_site"] = href
+        elif "privacy policy" in text and "apple.com" not in href:
+            urls["privacy_policy"] = href
+        print(text, href)
+    return urls
 
 
 def scrape_app_ios(store_id: str, country: str) -> dict:
