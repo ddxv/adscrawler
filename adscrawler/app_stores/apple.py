@@ -5,11 +5,12 @@ import time
 
 import pandas as pd
 import requests
+import tldextract
 from bs4 import BeautifulSoup
 from itunes_app_scraper.scraper import AppStoreScraper
 from itunes_app_scraper.util import AppStoreCategories, AppStoreCollections
 
-from adscrawler.config import get_logger
+from adscrawler.config import DEVLEOPER_IGNORE_TLDS, get_logger
 
 logger = get_logger(__name__, "scrape_apple")
 
@@ -156,6 +157,12 @@ def crawl_ios_developers(
 
 
 def scrape_store_html(store_id: str, country: str) -> dict:
+    """
+    Scrape the store html for the developer site.
+    """
+    logger.info(
+        f"Scrape store html for {store_id=} {country=} looking for developer site"
+    )
     url = f"https://apps.apple.com/{country}/app/-/id{store_id}"
     headers = {"User-Agent": "Mozilla/5.0"}  # Prevent blocking by some websites
     response = requests.get(url, headers=headers)
@@ -178,8 +185,44 @@ def scrape_store_html(store_id: str, country: str) -> dict:
             urls["developer_site"] = href
         elif "privacy policy" in text and "apple.com" not in href:
             urls["privacy_policy"] = href
-        print(text, href)
     return urls
+
+
+def get_developer_url(result: dict, store_id: str, country: str) -> str:
+    """
+    Decide if we should crawl the store html for the developer url.
+    """
+    should_crawl_html = False
+    if "sellerUrl" not in result.keys():
+        should_crawl_html = True
+    else:
+        dev_tld = tldextract.extract(result["sellerUrl"])
+        dev_tld_str = ".".join([dev_tld.domain, dev_tld.suffix])
+        if dev_tld_str in DEVLEOPER_IGNORE_TLDS:
+            should_crawl_html = True
+    if should_crawl_html:
+        urls = scrape_store_html(store_id, country)
+        found_tlds = []
+        for url_type, url in urls.items():
+            print(url_type, url)
+            tld = tldextract.extract(url)
+            tld_str = ".".join([tld.domain, tld.suffix])
+            if tld_str not in DEVLEOPER_IGNORE_TLDS and tld_str not in found_tlds:
+                found_tlds.append(tld_str)
+        if len(found_tlds) == 0:
+            if "sellerUrl" not in result.keys():
+                raise Exception(f"No developer url found for {store_id=} {country=}")
+            final_url = result["sellerUrl"]
+        elif len(found_tlds) == 1:
+            final_url = found_tlds[0]
+        else:
+            logger.warning(
+                f"Multiple developer sites found for {store_id=} {country=} {found_tlds=}"
+            )
+            final_url = result["sellerUrl"]
+    else:
+        final_url = result["sellerUrl"]
+    return final_url
 
 
 def scrape_app_ios(store_id: str, country: str) -> dict:
@@ -189,6 +232,10 @@ def scrape_app_ios(store_id: str, country: str) -> dict:
     result: dict = scraper.get_app_details(
         store_id, country=country, add_ratings=True, timeout=10
     )
+    try:
+        result["sellerUrl"] = get_developer_url(result, store_id, country)
+    except Exception as e:
+        logger.warning(f"Failed to get developer url for {store_id=} {country=} {e}")
     logger.info(f"Scrape app finish {store_id=} {country=}")
     return result
 

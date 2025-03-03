@@ -120,3 +120,28 @@ DATE_FORMAT = "%Y-%m-%d"
 
 
 logger.info("Logger and Config loaded")
+
+
+DEVLEOPER_IGNORE_TLDS = [
+    "00webhostapp.com",
+    "bitballoon.com",
+    "blogger.com",
+    "linkedin.com",
+    "blogspot.com",
+    "blogspot.co.id",
+    "blogspot.in",
+    "bytehost6.com",
+    "facebook.com",
+    "flycricket.io",
+    "github.io",
+    "netlify.com",
+    "page.link",
+    "site123.me",
+    "simplesite.com",
+    "tumblr.com",
+    "weebly.com",
+    "wix.com",
+    "wixsite.com",
+    "wordpress.com",
+    "youtube.com",
+]

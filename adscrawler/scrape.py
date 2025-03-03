@@ -6,7 +6,7 @@ import pandas as pd
 import requests
 import tldextract
 
-from .config import get_logger
+from .config import DEVLEOPER_IGNORE_TLDS, get_logger
 from .connection import PostgresCon
 from .queries import query_pub_domains, upsert_df
 
@@ -104,7 +104,9 @@ def get_app_ads_text(url: str) -> str:
         except NoAdsTxtError as error:
             info = f"{top_domain_url=}, {sub_domains_url=} {error=}"
             logger.warning(f"Subdomain has no ads.txt {info}")
-    tld_dont_run = any([True if x in top_domain_url else False for x in IGNORE_TLDS])
+    tld_dont_run = any(
+        [True if x in top_domain_url else False for x in DEVLEOPER_IGNORE_TLDS]
+    )
     if tld_dont_run:
         raise NoAdsTxtError
     text = request_app_ads(ads_url=top_domain_url)
@@ -322,27 +324,3 @@ def scrape_app_ads_url(url: str, database_connection: PostgresCon) -> None:
             database_connection=database_connection,
         )
         logger.info(f"{info} finished")
-
-
-IGNORE_TLDS = [
-    "00webhostapp.com",
-    "bitballoon.com",
-    "blogger.com",
-    "linkedin.com",
-    "blogspot.com",
-    "blogspot.co.id",
-    "blogspot.in",
-    "bytehost6.com",
-    "facebook.com",
-    "flycricket.io",
-    "github.io",
-    "netlify.com",
-    "page.link",
-    "site123.me",
-    "simplesite.com",
-    "tumblr.com",
-    "weebly.com",
-    "wix.com",
-    "wixsite.com",
-    "wordpress.com",
-]
