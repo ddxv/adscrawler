@@ -564,6 +564,7 @@ def scrape_and_save_app(
     store_id: str,
     database_connection: PostgresCon,
 ) -> pd.DataFrame:
+    # Pulling for more countries will want to track rating, review count, and histogram
     app_country_list = ["us"]
     for country in app_country_list:
         info = f"{store=}, {store_id=}, {country=}"
