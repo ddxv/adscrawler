@@ -617,6 +617,15 @@ def save_apps_df(
             datetime.datetime.now(datetime.UTC).date().strftime("%Y-%m-%d")
         )
         table_name = "store_apps_country_history"
+        countries_map = query_countries(database_connection)
+        store_apps_history = pd.merge(
+            store_apps_history,
+            countries_map[["id", "alpha2"]],
+            how="left",
+            left_on="country",
+            right_on="alpha2",
+            validate="m:1",
+        ).rename(columns={"id": "country_id"})
         insert_columns = [
             "installs",
             "review_count",
@@ -624,7 +633,7 @@ def save_apps_df(
             "rating_count",
             "histogram",
         ]
-        key_columns = ["store_app", "country", "crawled_date"]
+        key_columns = ["store_app", "country_id", "crawled_date"]
         upsert_df(
             table_name=table_name,
             df=store_apps_history,
