@@ -10,33 +10,31 @@ from adscrawler.config import CONFIG, MODULE_DIR, PACKAGE_DIR, get_logger
 logger = get_logger(__name__, "scrape_google")
 
 
-def scrape_app_gp(store_id: str, country: str, language: str = "") -> dict:
-    # Note language seems not to change the number of reviews, but country does
-    # Note country does not change number of installs
-    # NOTE: Histogram, Ratings, score are SOMETIMES country specific
-    # NOTE: Reviews are always country specific?
-    # NOTE: Installs are never country specific
-    # Example: 'ratings'
-    # dom_nl = scrape_app_gp('com.nexonm.dominations.adk', 'nl')
-    # dom_us = scrape_app_gp('com.nexonm.dominations.adk', 'us')
-    # dom_us['ratings']==dom_nl['ratings']
-    # In the case above NL and US both have the same number of ratings
-    # paw_nl = scrape_app_gp('com.originatorkids.paw', 'nl')
-    # paw_us = scrape_app_gp('com.originatorkids.paw', 'us')
-    # paw_us['ratings']==paw_nl['ratings']
-    # In the case above NL and US both have very different number of ratings
-    logger.info(
-        f"scrape app start: {store_id=}, {country=}, {language=} scrape app start"
-    )
+def scrape_app_gp(store_id: str, country: str, language: str = "en") -> dict:
+    """
+    yt_us = scrape_app_gp("com.google.android.youtube", "us", language="en")
+    yt_de = scrape_app_gp("com.google.android.youtube", "de", language="de")
+
+    # SAME FOR ALL COUNTRIES
+    yt_us["ratings"] == yt_de["ratings"]
+    yt_us["realInstalls"] == yt_de["realInstalls"]
+
+
+    ## UNIQUE PER COUNTRY
+    yt_us["reviews"] == yt_de["reviews"]
+    yt_us["score"] == yt_de["score"]
+    yt_us["histogram"] == yt_de["histogram"]
+
+    ## UNIQUE PER LANGUAGE
+    yt_us["description"] == yt_de["description"]
+    """
     result: dict = google_play_scraper.app(
         store_id,
         lang=language,
-        country=country,  # defaults to 'en'  # defaults to 'us'
+        country=country,
         timeout=10,
     )
-    logger.info(
-        f"scrape app finish: {store_id=}, {country=}, {language=} scrape app start"
-    )
+    logger.info(f"{store_id=}, {country=}, {language=} play store scraped")
     return result
 
 
