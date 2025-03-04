@@ -13,17 +13,23 @@ adtech.categories:
 3	Analytics: Product	product-analytics
 """
 
-domain = "prove.com"
-company_name = "Prove"
-sdk_name = "Prove SDK"
-sdk_slug = "prove-sdk"
+domain = "verint.com"
+company_name = "Verint"
+sdk_name = "Verint SDK"
+sdk_slug = "verint-sdk"
 is_open_source = False
 has_third_party_tracking = True
 category_id = 5
 
 sdk_package_patterns = [
-    "ProveMobileAuth.framework",
-    "ProveAuth.framework",
+    "com.verint.xm.sdk.predictive.tracker",
+    "com.verint",
+    "com.foresee",
+    "ForeSeeCxMeasure.framework",
+    "react_native_foresee_sdk.framework",
+    "ForeSee.framework",
+    "ForeSeeLegacy.framework",
+    "ForeSeeUtilities.framework",
 ]
 
 
