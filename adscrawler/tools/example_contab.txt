@@ -52,7 +52,7 @@
 
 # Daily
 08 1 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW top_categories"
-38 8 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW store_apps_history_change"
+38 8 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW store_apps_history_weekly"
 22 23 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW total_count_overview"
 
 

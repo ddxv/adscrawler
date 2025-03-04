@@ -157,93 +157,91 @@ CREATE UNIQUE INDEX idx_top_categories
 ON top_categories (store, mapped_category, store_id);
 
 
-CREATE MATERIALIZED VIEW store_apps_history_change AS
+CREATE MATERIALIZED VIEW public.store_apps_history_weekly
+TABLESPACE pg_default
+AS
 WITH date_diffs AS (
     SELECT
-        store_app,
-        country,
-        crawled_date,
-        installs,
-        rating_count,
-        max(crawled_date) OVER (
+        sach.store_app,
+        sach.country_id,
+        sach.crawled_date,
+        sach.installs,
+        sach.rating_count,
+        max(sach.crawled_date) OVER (
             PARTITION BY
-                store_app,
-                country
+                sach.store_app,
+                sach.country_id
         ) AS last_date,
-        installs - lead(installs) OVER (
+        sach.installs - lead(sach.installs) OVER (
             PARTITION BY
-                store_app,
-                country
+                sach.store_app,
+                sach.country_id
             ORDER BY
-                crawled_date DESC
+                sach.crawled_date DESC
         ) AS installs_diff,
-        rating_count - lead(rating_count) OVER (
+        sach.rating_count - lead(sach.rating_count) OVER (
             PARTITION BY
-                store_app,
-                country
+                sach.store_app,
+                sach.country_id
             ORDER BY
-                crawled_date DESC
+                sach.crawled_date DESC
         ) AS rating_count_diff,
-        crawled_date - lead(crawled_date) OVER (
+        sach.crawled_date - lead(sach.crawled_date) OVER (
             PARTITION BY
-                store_app,
-                country
+                sach.store_app,
+                sach.country_id
             ORDER BY
-                crawled_date DESC
+                sach.crawled_date DESC
         ) AS days_diff
     FROM
-        store_apps_country_history
+        store_apps_country_history AS sach
     WHERE
-        installs > 1000
-        OR rating_count > 20
+        (
+            sach.store_app IN (
+                SELECT sa.id
+                FROM
+                    store_apps AS sa
+                WHERE
+                    sa.crawl_result = 1
+            )
+            AND sach.crawled_date > current_date - interval '375 days'
+        )
 ),
 
-weekly_averages AS (
+weekly_totals AS (
     SELECT
         date_trunc(
-            'week',
-            crawled_date
+            'week'::text,
+            date_diffs.crawled_date::timestamp with time zone
         )::date AS week_start,
-        store_app,
-        country,
-        sum(installs_diff) AS total_installs_diff,
-        sum(rating_count) AS rating_count_diff,
-        sum(days_diff) AS total_days
+        date_diffs.store_app,
+        date_diffs.country_id,
+        sum(date_diffs.installs_diff) AS installs_diff,
+        sum(date_diffs.rating_count_diff) AS rating_count_diff,
+        sum(date_diffs.days_diff) AS days_diff
     FROM
         date_diffs
     GROUP BY
-        date_trunc(
-            'week',
-            crawled_date
-        )::date,
-        store_app,
-        country
+        (
+            date_trunc(
+                'week'::text,
+                date_diffs.crawled_date::timestamp with time zone
+            )::date
+        ),
+        date_diffs.store_app,
+        date_diffs.country_id
 )
 
 SELECT
     week_start,
     store_app,
-    country,
-    round(
-        total_installs_diff / nullif(
-            total_days,
-            0
-        )
-    ) AS avg_daily_installs_diff,
-    round(
-        rating_count_diff / nullif(
-            total_days,
-            0
-        )
-    ) AS rating_count_diff
+    country_id,
+    installs_diff,
+    rating_count_diff
 FROM
-    weekly_averages
+    weekly_totals
 ORDER BY
     week_start DESC,
     store_app ASC,
-    country ASC
+    country_id ASC
 WITH DATA;
-
-DROP INDEX IF EXISTS idx_store_apps_history_change;
-CREATE UNIQUE INDEX idx_store_apps_history_change
-ON store_apps_history_change (week_start, store_app, country);
