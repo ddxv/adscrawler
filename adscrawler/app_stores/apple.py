@@ -219,9 +219,9 @@ def get_developer_url(result: dict, store_id: str, country: str) -> str:
             logger.warning(
                 f"Multiple developer sites found for {store_id=} {country=} {found_tlds=}"
             )
-            final_url = result["sellerUrl"]
+            final_url: str = result["sellerUrl"]
     else:
-        final_url = result["sellerUrl"]
+        final_url: str = result["sellerUrl"]
     return final_url
 
 

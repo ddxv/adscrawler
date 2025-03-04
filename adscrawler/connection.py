@@ -50,7 +50,7 @@ class PostgresCon:
             raise
 
     @contextmanager
-    def get_cursor(self):
+    def get_cursor(self) -> None:
         """Context manager for database connection and cursor."""
         conn = self.engine.raw_connection()
         try:
