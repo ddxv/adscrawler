@@ -28,6 +28,12 @@
 43 * * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW store_apps_updated_at"
 53 * * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW store_apps_created_at"
 
+# Weekly Cleanup
+2 0 * * 1 psql -d madrone -c "DELETE FROM logging.store_apps_crawl WHERE crawled_at < CURRENT_DATE - INTERVAL '365 days';"
+3 0 * * 1 psql -d madrone -c "DELETE FROM logging.store_apps_audit WHERE stamp < CURRENT_DATE - INTERVAL '365 days';"
+
+
+
 
 
 # Multiple Per Day
