@@ -62,3 +62,47 @@ CREATE TABLE user_requested_scan (
     store_id varchar NOT NULL,
     created_at timestamp DEFAULT CURRENT_TIMESTAMP
 );
+
+-- public.keywords definition
+
+-- Drop table
+
+-- DROP TABLE public.keywords;
+
+CREATE TABLE public.keywords (
+    id serial4 NOT NULL,
+    keyword_text varchar(255) NOT NULL,
+    CONSTRAINT keywords_pkey PRIMARY KEY (id),
+    CONSTRAINT unique_keyword UNIQUE (keyword_text)
+);
+
+CREATE TABLE public.languages (
+    id serial2 NOT NULL,
+    language_slug varchar(5),
+    CONSTRAINT language_pkey PRIMARY KEY (id),
+    CONSTRAINT language_unique_key UNIQUE (language_slug)
+);
+
+CREATE TABLE public.app_keyword_rankings (
+    id serial4 NOT NULL,
+    crawled_date date NOT NULL,
+    country int4 NOT NULL,
+    lang int2 NOT NULL,
+    keyword int4 NOT NULL,
+    rank int4 NOT NULL,
+    store_app int4 NOT NULL,
+    CONSTRAINT app_keyword_rankings_pkey PRIMARY KEY (id),
+    CONSTRAINT unique_keyword_ranking UNIQUE (
+        crawled_date, country, lang, rank, store_app, keyword
+    ),
+    CONSTRAINT fk_country FOREIGN KEY (country) REFERENCES public.countries (
+        id
+    ),
+    CONSTRAINT fk_language FOREIGN KEY (lang) REFERENCES public.languages (id),
+    CONSTRAINT fk_store_app FOREIGN KEY (
+        store_app
+    ) REFERENCES public.store_apps (id),
+    CONSTRAINT fk_store_keyword FOREIGN KEY (
+        keyword
+    ) REFERENCES public.keywords (id)
+);
