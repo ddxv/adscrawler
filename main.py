@@ -5,6 +5,7 @@ import sys
 
 from adscrawler.app_stores.scrape_stores import (
     crawl_developers_for_new_store_ids,
+    crawl_keyword_cranks,
     scrape_store_ranks,
     update_app_details,
 )
@@ -77,6 +78,12 @@ class ProcessManager:
             "-a",
             "--app-ads-txt-scrape",
             help="Scrape app stores for app details, ie downloads",
+            action="store_true",
+        )
+        parser.add_argument(
+            "-k",
+            "--crawl-keywords",
+            help="Crawl keywords",
             action="store_true",
         )
         parser.add_argument(
@@ -184,6 +191,9 @@ class ProcessManager:
         if self.args.manifests:
             self.scrape_manifests(stores)
 
+        if self.args.crawl_keywords:
+            self.crawl_keywords()
+
         logger.info("Adscrawler exiting main")
 
     def scrape_new_apps(self, stores: list[int]) -> None:
@@ -225,6 +235,9 @@ class ProcessManager:
                 manifest_main(database_connection=self.pgcon, number_of_apps_to_pull=20)
             except Exception:
                 logger.exception("Android scrape manifests failing")
+
+    def crawl_keywords(self) -> None:
+        crawl_keyword_cranks(database_connection=self.pgcon)
 
     def run(self) -> None:
         if self.args.limit_processes and self.is_script_already_running():

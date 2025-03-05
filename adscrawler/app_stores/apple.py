@@ -320,17 +320,17 @@ def clean_ios_app_df(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def search_app_store_for_ids(search_term: str) -> list[str]:
+def search_app_store_for_ids(
+    search_term: str, country: str = "us", language: str = "en"
+) -> list[str]:
     """Search store for new apps or keyword rankings."""
-    logger.info("adscrawler appple search start")
+    logger.info("adscrawler apple search start")
     # Call the Node.js script that runs google-play-scraper
-
     scraper = AppStoreScraper()
     ids: list[str] = scraper.get_app_ids_for_query(
-        search_term, country="us", lang="en", timeout=5, num=None
+        search_term, country=country, lang=language, timeout=5, num=None
     )
     logger.info(f"adscralwer apple search {len(ids)=}")
-
     return ids
 
 

@@ -203,6 +203,17 @@ def query_countries(database_connection: PostgresCon) -> pd.DataFrame:
     return df
 
 
+def query_languages(database_connection: PostgresCon) -> pd.DataFrame:
+    sel_query = """SELECT
+        *
+        FROM
+        languages
+        ;
+        """
+    df = pd.read_sql(sel_query, database_connection.engine)
+    return df
+
+
 def query_store_ids(
     database_connection: PostgresCon,
     store: int,
@@ -359,6 +370,34 @@ def query_store_apps(
             DESC NULLS LAST
         {limit_str}
         """
+    df = pd.read_sql(sel_query, database_connection.engine)
+    return df
+
+
+def query_keywords_to_crawl(
+    database_connection: PostgresCon,
+    limit: int | None = None,
+) -> pd.DataFrame:
+    limit_str = ""
+    if limit:
+        limit_str = f"LIMIT {limit}"
+    sel_query = f"""WITH crawled_keywords AS (
+                        SELECT
+                            DISTINCT akr.keyword
+                        FROM
+                            app_keyword_rankings akr
+                        WHERE
+                            akr.crawled_date > CURRENT_DATE - INTERVAL '1 days'
+                    )
+                    SELECT
+                        *
+                    FROM
+                        keywords k
+                    WHERE
+                        k.id NOT IN (SELECT keyword FROM crawled_keywords)
+                    {limit_str}
+                    ;
+                """
     df = pd.read_sql(sel_query, database_connection.engine)
     return df
 

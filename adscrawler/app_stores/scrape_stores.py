@@ -13,12 +13,14 @@ from adscrawler.app_stores.apple import (
     crawl_ios_developers,
     scrape_app_ios,
     scrape_ios_ranks,
+    search_app_store_for_ids,
 )
 from adscrawler.app_stores.google import (
     clean_google_play_app_df,
     crawl_google_developers,
     scrape_app_gp,
     scrape_google_ranks,
+    search_play_store,
 )
 from adscrawler.config import get_logger
 from adscrawler.connection import PostgresCon
@@ -28,6 +30,8 @@ from adscrawler.queries import (
     query_collections,
     query_countries,
     query_developers,
+    query_keywords_to_crawl,
+    query_languages,
     query_store_apps,
     query_store_id_map,
     query_store_ids,
@@ -77,6 +81,33 @@ COUNTRY_LIST = [
     "sg",
     "vn",
 ]
+
+
+def crawl_keyword_cranks(database_connection: PostgresCon) -> None:
+    countries_map = query_countries(database_connection)
+    languages_map = query_languages(database_connection)
+    country = "us"
+    language = "en"
+    language_dict = languages_map.set_index("language_slug")["id"].to_dict()
+    language_key = language_dict[language]
+    kdf = query_keywords_to_crawl(database_connection)
+    for _id, row in kdf.iterrows():
+        logger.info(f"Crawling {_id}/{kdf.shape[0]} keyword={row.keyword_text}")
+        keyword = row.keyword_text
+        keyword_id = row.id
+        df = scrape_keyword(
+            country=country,
+            language=language,
+            language_key=language_key,
+            keyword=keyword,
+            keyword_id=keyword_id,
+        )
+        process_scraped(
+            database_connection=database_connection,
+            ranked_dicts=df.to_dict(orient="records"),
+            crawl_source="scrape_keywords",
+            countries_map=countries_map,
+        )
 
 
 def scrape_store_ranks(database_connection: PostgresCon, stores: list[int]) -> None:
@@ -189,6 +220,48 @@ def insert_new_apps(
             )
 
 
+def scrape_keyword(
+    country: str,
+    language: str,
+    language_key: int,
+    keyword: str,
+    keyword_id: int,
+) -> pd.DataFrame:
+    logger.info(f"{keyword=} start")
+    try:
+        google_apps = search_play_store(keyword, country=country, language=language)
+        gdf = pd.DataFrame(google_apps)
+        gdf["store"] = 1
+        gdf["rank"] = range(1, len(gdf) + 1)
+    except Exception:
+        gdf = pd.DataFrame()
+        logger.exception(f"{keyword=} google failed")
+    try:
+        apple_apps = search_app_store_for_ids(
+            keyword, country=country, language=language
+        )
+        adf = pd.DataFrame(
+            {
+                "store": 2,
+                "store_id": apple_apps,
+                "rank": range(1, len(apple_apps) + 1),
+            }
+        )
+    except Exception:
+        adf = pd.DataFrame()
+        logger.exception(f"{keyword=} apple failed")
+    df = pd.concat([gdf, adf])
+    logger.info(
+        f"{keyword=} apple_apps:{adf.shape[0]} google_apps:{gdf.shape[0]} finished"
+    )
+    df["keyword"] = keyword_id
+    df["lang"] = language_key
+    df["country"] = country
+    df["crawled_date"] = datetime.datetime.now(tz=datetime.UTC).date()
+    df = df[["store_id", "store", "country", "lang", "rank", "keyword", "crawled_date"]]
+    return df
+
+
 def process_scraped(
     database_connection: PostgresCon,
     ranked_dicts: list[dict],
@@ -203,10 +276,9 @@ def process_scraped(
         crawl_source=crawl_source,
     )
     df = pd.DataFrame(ranked_dicts)
-    all_scraped_ids = df["store_id"].unique().tolist()
-    if "rank" not in df.columns or countries_map is None:
+    if "rank" not in df.columns:
         return
-    logger.info("Process and save rankings start")
+    all_scraped_ids = df["store_id"].unique().tolist()
     new_existing_ids_map = query_store_id_map(
         database_connection,
         store_ids=all_scraped_ids,
@@ -218,6 +290,54 @@ def process_scraped(
         on=["store", "store_id"],
         validate="m:1",
     ).drop("store_id", axis=1)
+    df["country"] = df["country"].str.upper()
+    df = (
+        pd.merge(
+            df,
+            countries_map[["id", "alpha2"]],
+            how="left",
+            left_on=["country"],
+            right_on="alpha2",
+            validate="m:1",
+        )
+        .drop(["country", "alpha2"], axis=1)
+        .rename(columns={"id": "country"})
+    )
+    if collections_map is not None and categories_map is not None:
+        process_store_rankings(
+            df=df,
+            database_connection=database_connection,
+            collections_map=collections_map,
+            categories_map=categories_map,
+        )
+    if "keyword" in df.columns:
+        process_keyword_rankings(
+            df=df,
+            database_connection=database_connection,
+        )
+
+
+def process_keyword_rankings(
+    df: pd.DataFrame,
+    database_connection: PostgresCon,
+) -> None:
+    upsert_df(
+        database_connection=database_connection,
+        df=df,
+        table_name="app_keyword_rankings",
+        key_columns=["crawled_date", "country", "lang", "keyword", "rank", "store_app"],
+        insert_columns=[],
+    )
+    logger.info("keyword rankings inserted")
+
+
+def process_store_rankings(
+    df: pd.DataFrame,
+    database_connection: PostgresCon,
+    collections_map: pd.DataFrame,
+    categories_map: pd.DataFrame,
+) -> None:
+    logger.info("Process and save rankings start")
     df = pd.merge(
         df,
         collections_map,
@@ -232,19 +352,6 @@ def process_scraped(
         on=["store", "category"],
         validate="m:1",
     ).drop("category", axis=1)
-    df["country"] = df["country"].str.upper()
-    df = (
-        pd.merge(
-            df,
-            countries_map[["id", "alpha2"]],
-            how="left",
-            left_on=["country"],
-            right_on="alpha2",
-            validate="m:1",
-        )
-        .drop(["country", "alpha2"], axis=1)
-        .rename(columns={"id": "country"})
-    )
     upsert_df(
         database_connection=database_connection,
         df=df,

@@ -169,7 +169,9 @@ def crawl_google_developers(
     return apps_df
 
 
-def search_play_store(search_term: str) -> list[dict]:
+def search_play_store(
+    search_term: str, country: str = "us", language: str = "en"
+) -> list[dict]:
     """Search store for new apps or keyword rankings."""
     logger.info("adscrawler to call playstore search")
     # Call the Node.js script that runs google-play-scraper
@@ -183,7 +185,14 @@ def search_play_store(search_term: str) -> list[dict]:
     )
 
     process = subprocess.Popen(
-        [node_path, f"{MODULE_DIR}/static/searchApps.js", search_term, "20"],
+        [
+            node_path,
+            f"{MODULE_DIR}/static/searchApps.js",
+            search_term,
+            "200",
+            country,
+            language,
+        ],
         stdout=subprocess.PIPE,
     )
     output, error = process.communicate()
@@ -195,12 +204,14 @@ def search_play_store(search_term: str) -> list[dict]:
 
     if len(results) > 0 and "appId" in results[0]:
         for result in results:
-            result["store_id"] = result["appId"]  # needed by backend
+            result["store_id"] = result["appId"]
             result["id"] = result.pop("appId")  # needed for response to frontend
             result["store_link"] = result.pop("url")
             result["name"] = result.pop("title")
             result["developer_name"] = result.pop("developer")
             result["icon_url_512"] = result.pop("icon")
             result["store"] = 1
+            result["country"] = country
+            result["language"] = language
 
     return results
