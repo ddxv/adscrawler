@@ -448,9 +448,6 @@ def get_top_ranks_for_unpacking(
                 FROM
                      app_rankings ar
                 LEFT JOIN
-                     stores s ON
-                     s.id = ar.store
-                LEFT JOIN
                      store_apps sa ON
                      sa.id = ar.store_app
                 WHERE

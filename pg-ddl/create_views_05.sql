@@ -206,38 +206,3 @@ FROM
     sdk_app_count,
     appads_url_count
 WITH DATA;
-
-
-
-
-
-
-CREATE MATERIALIZED VIEW store_apps_rankings AS
-SELECT
-    ar.crawled_date,
-    ar.country,
-    ar.store,
-    sa.store_id,
-    ar.rank,
-    scol.collection,
-    scat.category
-FROM
-    app_rankings AS ar
-LEFT JOIN
-    store_apps AS sa
-    ON
-        ar.store_app = sa.id
-LEFT JOIN store_collections AS scol
-    ON
-        ar.store_collection = scol.id
-LEFT JOIN store_categories AS scat
-    ON
-        ar.store_category = scat.id
-WHERE
-    ar.crawled_date >= current_date - interval '1 year'
-WITH DATA;
-
-
-
-CREATE INDEX store_apps_rankings_idx ON
-public.store_apps_rankings (store_id, crawled_date);

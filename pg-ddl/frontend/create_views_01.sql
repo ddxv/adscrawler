@@ -506,53 +506,38 @@ frontend.company_top_apps (
 
 
 
-DROP MATERIALIZED VIEW IF EXISTS frontend.app_rankings_latest_by_week;
 CREATE MATERIALIZED VIEW frontend.app_rankings_latest_by_week
-AS
-WITH RECURSIVE latest_date AS (
-    SELECT max(crawled_date) AS max_date
-    FROM
-        app_rankings
+TABLESPACE pg_default
+AS WITH RECURSIVE latest_date AS (
+    SELECT max(app_rankings.crawled_date) AS max_date
+    FROM app_rankings
 ),
 
 my_dates AS (
     SELECT ld.max_date AS crawled_date
-    FROM
-        latest_date AS ld
+    FROM latest_date AS ld
     UNION ALL
-    SELECT
-        (
-            md.crawled_date - interval '7 days'
-        )::date
-    FROM
-        my_dates AS md
+    SELECT (md.crawled_date - '7 days'::interval)::date AS date
+    FROM my_dates AS md
     WHERE
-        md.crawled_date - interval '7 days' >= current_date - interval '45 days'
+        (md.crawled_date - '7 days'::interval)
+        >= (current_date - '45 days'::interval)
 ),
 
 top_apps_newer AS (
     SELECT DISTINCT ar.store_app
-    FROM
-        app_rankings AS ar
-    INNER JOIN countries AS c
-        ON
-            ar.country = c.id
-    WHERE
-        ar.crawled_date = (
-            SELECT ld.max_date
-            FROM
-                latest_date AS ld
-        )
-        AND ar.rank <= 50
+    FROM app_rankings AS ar
+    INNER JOIN countries AS c_1 ON ar.country = c_1.id
+    WHERE ar.crawled_date = ((
+        SELECT ld.max_date
+        FROM latest_date AS ld
+    )) AND ar.rank <= 50
 ),
 
 top_apps_older AS (
     SELECT DISTINCT ar.store_app
-    FROM
-        app_rankings AS ar
-    INNER JOIN countries AS c ON
-        ar.country = c.id
-        AND ar.rank <= 50
+    FROM app_rankings AS ar
+    INNER JOIN countries AS c_1 ON ar.country = c_1.id AND ar.rank <= 50
 )
 
 SELECT
@@ -564,34 +549,28 @@ SELECT
     c.alpha2 AS country,
     sa.name,
     sa.store_id
-FROM
-    app_rankings AS arr
-LEFT JOIN store_apps AS sa
-    ON
-        arr.store_app = sa.id
-LEFT JOIN countries AS c
-    ON
-        arr.country = c.id
-WHERE
-    arr.store_app IN (
-        SELECT tan.store_app
-        FROM
-            top_apps_newer AS tan
-        UNION
-        SELECT tao.store_app
-        FROM
-            top_apps_older AS tao
-    )
-    AND arr.crawled_date >= current_date - interval '45 days'
-    AND arr.crawled_date IN (
-        SELECT md.crawled_date
-        FROM
-            my_dates AS md
-    );
+FROM app_rankings AS arr
+LEFT JOIN store_apps AS sa ON arr.store_app = sa.id
+LEFT JOIN countries AS c ON arr.country = c.id
+WHERE (arr.store_app IN (
+    SELECT tan.store_app
+    FROM top_apps_newer AS tan
+    UNION
+    SELECT tao.store_app
+    FROM top_apps_older AS tao
+))
+AND arr.crawled_date >= (current_date - '45 days'::interval)
+AND (arr.crawled_date IN (
+    SELECT md.crawled_date
+    FROM my_dates AS md
+))
+WITH DATA;
 
-CREATE UNIQUE INDEX idx_unique_app_ranking_latest_by_week ON
-frontend.app_rankings_latest_by_week
-USING btree (
+-- View indexes:
+CREATE INDEX idx_app_rankings_latest_by_week_query ON frontend.app_rankings_latest_by_week USING btree (
+    store, store_collection, country, crawled_date
+);
+CREATE UNIQUE INDEX idx_unique_app_ranking_latest_by_week ON frontend.app_rankings_latest_by_week USING btree (
     crawled_date,
     store_collection,
     store_category,
@@ -1027,4 +1006,24 @@ USING btree (
     ad_domain_url,
     relationship,
     store
+);
+
+
+
+CREATE MATERIALIZED VIEW frontend.store_apps_rankings
+TABLESPACE pg_default
+AS SELECT
+    ar.crawled_date,
+    ar.country,
+    ar.store_app,
+    ar.rank,
+    ar.store_collection,
+    ar.store_category
+FROM app_rankings AS ar
+WHERE ar.crawled_date >= (current_date - '120 days'::interval)
+WITH DATA;
+
+
+CREATE INDEX idx_store_apps_rankings_store_app_date ON frontend.store_apps_rankings (
+    store_app, crawled_date
 );
