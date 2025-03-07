@@ -459,7 +459,6 @@ def get_top_ranks_for_unpacking(
                         WHERE
                             store = {store}
                     )
-                    AND ar.store = {store}
                     AND ar.store_collection = {collection_id}
                 ORDER BY
                     ar.rank,
