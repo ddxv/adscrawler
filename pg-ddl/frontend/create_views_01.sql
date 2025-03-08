@@ -230,70 +230,139 @@ USING btree (
 );
 
 
-DROP MATERIALIZED VIEW IF EXISTS frontend.companies_categories_types_app_counts;
+
+
 CREATE MATERIALIZED VIEW frontend.companies_categories_types_app_counts
 TABLESPACE pg_default
 AS
+WITH
+d30_counts AS (
+    SELECT
+        sahw.store_app,
+        sum(sahw.installs_diff) AS d30_installs,
+        sum(sahw.rating_count_diff) AS d30_rating_count
+    FROM
+        store_apps_history_weekly AS sahw
+    WHERE
+        sahw.week_start > (
+            current_date - '30 days'::interval
+        )
+        AND sahw.country_id = 840
+        AND (
+            sahw.installs_diff > 0::numeric
+            OR sahw.rating_count_diff > 0
+        )
+    GROUP BY
+        sahw.store_app
+),
+
+app_company_counts AS (
+    SELECT
+        sa.store,
+        cm.mapped_category AS app_category,
+        csac.tag_source,
+        csac.ad_domain AS company_domain,
+        c.name AS company_name,
+        CASE
+            WHEN
+                csac.tag_source ~~ 'app_ads%'::text
+                THEN 'ad-networks'::character varying
+            ELSE cats.url_slug
+        END AS type_url_slug,
+        count(DISTINCT csac.store_app) AS app_count,
+        sum(dc.d30_installs) AS installs_d30,
+        sum(dc.d30_rating_count) AS rating_count_d30,
+        sum(sa.installs) AS installs_total,
+        sum(sa.rating_count) AS rating_count_total
+    FROM
+        adtech.combined_store_apps_companies AS csac
+    LEFT JOIN adtech.companies AS c
+        ON
+            csac.company_id = c.id
+    LEFT JOIN store_apps AS sa
+        ON
+            csac.store_app = sa.id
+    LEFT JOIN category_mapping AS cm
+        ON
+            sa.category::text = cm.original_category::text
+    LEFT JOIN d30_counts AS dc
+        ON
+            csac.store_app = dc.store_app
+    LEFT JOIN adtech.company_categories AS ccats
+        ON
+            csac.company_id = ccats.company_id
+    LEFT JOIN adtech.categories AS cats
+        ON
+            ccats.category_id = cats.id
+    GROUP BY
+        sa.store,
+        cm.mapped_category,
+        csac.tag_source,
+        csac.ad_domain,
+        c.name,
+        (
+            CASE
+                WHEN
+                    csac.tag_source ~~ 'app_ads%'::text
+                    THEN 'ad-networks'::character varying
+                ELSE cats.url_slug
+            END
+        )
+)
+
 SELECT
-    sa.store,
-    csac.app_category,
-    csac.tag_source,
-    csac.ad_domain AS company_domain,
-    c.name AS company_name,
-    CASE
-        WHEN
-            csac.tag_source ~~ 'app_ads%'::text
-            THEN 'ad-networks'::character varying
-        ELSE cats.url_slug
-    END AS type_url_slug,
-    count(DISTINCT csac.store_app) AS app_count
+    store,
+    app_category,
+    tag_source,
+    company_domain,
+    company_name,
+    type_url_slug,
+    app_count,
+    installs_d30,
+    installs_total,
+    rating_count_d30,
+    rating_count_total
 FROM
-    adtech.combined_store_apps_companies AS csac
-LEFT JOIN adtech.company_categories AS ccats
-    ON
-        csac.company_id = ccats.company_id
-LEFT JOIN adtech.categories AS cats
-    ON
-        ccats.category_id = cats.id
-LEFT JOIN adtech.companies AS c
-    ON
-        csac.company_id = c.id
-LEFT JOIN store_apps AS sa
-    ON
-        csac.store_app = sa.id
-GROUP BY
-    sa.store,
-    csac.app_category,
-    csac.tag_source,
-    csac.ad_domain,
-    c.name,
-    CASE
-        WHEN
-            csac.tag_source ~~ 'app_ads%'::text
-            THEN 'ad-networks'::character varying
-        ELSE cats.url_slug
-    END
-WITH DATA;
+    app_company_counts;
 
 
+
+-- View indexes:
+CREATE INDEX idx_companies_categories_types_app_counts ON frontend.companies_categories_types_app_counts USING btree (
+    type_url_slug, app_category
+);
+CREATE INDEX idx_companies_categories_types_app_counts_types ON frontend.companies_categories_types_app_counts USING btree (
+    type_url_slug
+);
 CREATE UNIQUE INDEX idx_unique_companies_categories_types_app_counts ON frontend.companies_categories_types_app_counts USING btree (
     store, tag_source, app_category, company_domain, type_url_slug
 );
 
-CREATE INDEX idx_companies_categories_types_app_counts ON frontend.companies_categories_types_app_counts USING btree (
-    type_url_slug, app_category
-);
 
-CREATE INDEX idx_companies_categories_types_app_counts_types ON frontend.companies_categories_types_app_counts USING btree (
-    type_url_slug
-);
-
-
-DROP MATERIALIZED VIEW IF EXISTS frontend.company_parent_top_apps;
 CREATE MATERIALIZED VIEW frontend.company_parent_top_apps
 TABLESPACE pg_default
-AS
-WITH ranked_apps AS (
+AS WITH
+d30_counts AS (
+    SELECT
+        sahw.store_app,
+        sum(sahw.installs_diff) AS installs_d30,
+        sum(sahw.rating_count_diff) AS rating_count_d30
+    FROM
+        store_apps_history_weekly AS sahw
+    WHERE
+        sahw.week_start > (
+            current_date - '30 days'::interval
+        )
+        AND sahw.country_id = 840
+        AND (
+            sahw.installs_diff > 0::numeric
+            OR sahw.rating_count_diff > 0
+        )
+    GROUP BY
+        sahw.store_app
+),
+
+ranked_apps AS (
     SELECT
         sa.store,
         csapc.tag_source,
@@ -302,56 +371,43 @@ WITH ranked_apps AS (
         csapc.app_category AS category,
         sa.rating_count,
         sa.installs,
+        dc.installs_d30,
+        dc.rating_count_d30,
         csapc.ad_domain AS company_domain,
         c.name AS company_name,
-        row_number() OVER (
-            PARTITION BY
-                sa.store,
-                csapc.ad_domain,
-                c.name,
-                csapc.tag_source
-            ORDER BY
-                (
-                    greatest(
-                        coalesce(
-                            sa.rating_count,
-                            0
-                        )::double precision,
-                        coalesce(
-                            sa.installs,
-                            0::double precision
+        row_number()
+            OVER (
+                PARTITION BY sa.store, csapc.ad_domain, c.name, csapc.tag_source
+                ORDER BY
+                    (
+                        greatest(
+                            coalesce(dc.rating_count_d30, 0)::double precision,
+                            coalesce(dc.installs_d30, 0::double precision)
                         )
-                    )
-                ) DESC
-        ) AS app_company_rank,
-        row_number() OVER (
-            PARTITION BY
-                sa.store,
-                csapc.app_category,
-                csapc.ad_domain,
-                c.name,
-                csapc.tag_source
-            ORDER BY
-                (
-                    greatest(
-                        coalesce(
-                            sa.rating_count,
-                            0
-                        )::double precision,
-                        coalesce(
-                            sa.installs,
-                            0::double precision
+                    ) DESC
+            )
+        AS app_company_rank,
+        row_number()
+            OVER (
+                PARTITION BY
+                    sa.store,
+                    csapc.app_category,
+                    csapc.ad_domain,
+                    c.name,
+                    csapc.tag_source
+                ORDER BY
+                    (
+                        greatest(
+                            coalesce(dc.rating_count_d30, 0)::double precision,
+                            coalesce(dc.installs_d30, 0::double precision)
                         )
-                    )
-                ) DESC
-        ) AS app_company_category_rank
-    FROM
-        adtech.combined_store_apps_parent_companies AS csapc
-    LEFT JOIN store_apps AS sa
-        ON
-            csapc.store_app = sa.id
-    LEFT JOIN adtech.companies AS c ON
-        csapc.company_id = c.id
+                    ) DESC
+            )
+        AS app_company_category_rank
+    FROM adtech.combined_store_apps_parent_companies AS csapc
+    LEFT JOIN store_apps AS sa ON csapc.store_app = sa.id
+    LEFT JOIN adtech.companies AS c ON csapc.company_id = c.id
+    LEFT JOIN d30_counts AS dc ON csapc.store_app = dc.store_app
 )
 
 SELECT
@@ -364,43 +420,57 @@ SELECT
     category,
     app_company_rank,
     app_company_category_rank,
+    installs_d30,
+    rating_count_d30,
     rating_count,
     installs
-FROM
-    ranked_apps
-WHERE
-    app_company_category_rank <= 100
-ORDER BY
-    store,
-    tag_source,
-    app_company_category_rank
+FROM ranked_apps
+WHERE app_company_category_rank <= 100
+ORDER BY store, tag_source, app_company_category_rank
 WITH DATA;
 
-
-CREATE UNIQUE INDEX idx_company_parent_top_apps ON
-frontend.company_parent_top_apps
-USING btree (
-    company_domain,
-    company_name,
-    store,
-    tag_source,
-    name,
-    store_id,
-    category
+-- View indexes:
+CREATE INDEX idx_company_parent_top_apps ON frontend.company_parent_top_apps USING btree (
+    company_domain
+);
+CREATE UNIQUE INDEX idx_company_parent_top_apps_unique ON frontend.company_parent_top_apps USING btree (
+    company_domain, company_name, store, tag_source, name, store_id, category
 );
 
 
 
-DROP MATERIALIZED VIEW IF EXISTS frontend.company_top_apps;
 CREATE MATERIALIZED VIEW frontend.company_top_apps
 TABLESPACE pg_default
-AS WITH ranked_apps AS (
+AS WITH
+d30_counts AS (
+    SELECT
+        sahw.store_app,
+        sum(sahw.installs_diff) AS installs_d30,
+        sum(sahw.rating_count_diff) AS rating_count_d30
+    FROM
+        store_apps_history_weekly AS sahw
+    WHERE
+        sahw.week_start > (
+            current_date - '30 days'::interval
+        )
+        AND sahw.country_id = 840
+        AND (
+            sahw.installs_diff > 0::numeric
+            OR sahw.rating_count_diff > 0
+        )
+    GROUP BY
+        sahw.store_app
+),
+
+ranked_apps AS (
     SELECT
         sa.store,
         cac.tag_source,
         sa.name,
         sa.store_id,
         cac.app_category AS category,
+        dc.installs_d30,
+        dc.rating_count_d30,
         sa.rating_count,
         sa.installs,
         cac.ad_domain AS company_domain,
@@ -415,11 +485,11 @@ AS WITH ranked_apps AS (
                 (
                     greatest(
                         coalesce(
-                            sa.rating_count,
+                            dc.rating_count_d30,
                             0
                         )::double precision,
                         coalesce(
-                            sa.installs,
+                            dc.installs_d30,
                             0::double precision
                         )
                     )
@@ -436,11 +506,11 @@ AS WITH ranked_apps AS (
                 (
                     greatest(
                         coalesce(
-                            sa.rating_count,
+                            dc.rating_count_d30,
                             0
                         )::double precision,
                         coalesce(
-                            sa.installs,
+                            dc.installs_d30,
                             0::double precision
                         )
                     )
@@ -451,8 +521,11 @@ AS WITH ranked_apps AS (
     LEFT JOIN store_apps AS sa
         ON
             cac.store_app = sa.id
-    LEFT JOIN adtech.companies AS c ON
-        cac.company_id = c.id
+    LEFT JOIN adtech.companies AS c
+        ON
+            cac.company_id = c.id
+    LEFT JOIN d30_counts AS dc ON
+        cac.store_app = dc.store_app
 )
 
 SELECT
@@ -465,8 +538,10 @@ SELECT
     category,
     app_company_rank,
     app_company_category_rank,
-    rating_count,
-    installs
+    installs_d30,
+    rating_count_d30,
+    installs,
+    rating_count
 FROM
     ranked_apps
 WHERE
@@ -478,30 +553,14 @@ ORDER BY
 WITH DATA;
 
 -- View indexes:
-CREATE UNIQUE INDEX idx_unique_company_top_apps ON
-frontend.company_top_apps
-USING btree (
-    company_domain,
-    company_name,
-    store,
-    tag_source,
-    name,
-    store_id,
-    category
-);
-
 CREATE INDEX idx_company_top_apps ON frontend.company_top_apps USING btree (
     company_domain
 );
-
-CREATE INDEX idx_query_company_top_apps
-ON
-frontend.company_top_apps (
-    company_domain,
-    category,
-    app_company_category_rank,
-    store,
-    tag_source
+CREATE INDEX idx_query_company_top_apps ON frontend.company_top_apps USING btree (
+    company_domain, category, app_company_category_rank, store, tag_source
+);
+CREATE UNIQUE INDEX idx_unique_company_top_apps ON frontend.company_top_apps USING btree (
+    company_domain, company_name, store, tag_source, name, store_id, category
 );
 
 
@@ -589,56 +648,96 @@ frontend.app_rankings_latest_by_week USING btree (
 
 
 
-DROP MATERIALIZED VIEW IF EXISTS frontend.companies_app_counts;
 CREATE MATERIALIZED VIEW frontend.companies_app_counts
 TABLESPACE pg_default
-AS WITH my_counts AS (
+AS
+WITH d30_counts AS (
+    SELECT
+        sahw.store_app,
+        sum(sahw.installs_diff) AS d30_installs,
+        sum(sahw.rating_count_diff) AS d30_rating_count
+    FROM
+        store_apps_history_weekly AS sahw
+    WHERE
+        sahw.week_start > current_date - interval '30 days'
+        AND sahw.country_id = 840
+        AND (
+            sahw.installs_diff > 0
+            OR sahw.rating_count_diff > 0
+        )
+    GROUP BY
+        sahw.store_app
+),
+
+my_counts AS (
     SELECT DISTINCT
         csac.store_app,
         sa.store,
         cm.mapped_category AS app_category,
         csac.tag_source,
         csac.ad_domain AS company_domain,
-        c.name AS company_name
-    FROM adtech.combined_store_apps_companies AS csac
-    LEFT JOIN adtech.companies AS c ON csac.company_id = c.id
-    LEFT JOIN store_apps AS sa ON csac.store_app = sa.id
-    LEFT JOIN
-        category_mapping AS cm
-        ON sa.category::text = cm.original_category::text
+        c.name AS company_name,
+        sa.installs,
+        sa.rating_count,
+        dc.d30_installs,
+        dc.d30_rating_count
+    FROM
+        adtech.combined_store_apps_companies AS csac
+    LEFT JOIN adtech.companies AS c
+        ON
+            csac.company_id = c.id
+    LEFT JOIN store_apps AS sa
+        ON
+            csac.store_app = sa.id
+    LEFT JOIN category_mapping AS cm
+        ON
+            sa.category::text = cm.original_category::text
+    LEFT JOIN d30_counts AS dc ON
+        csac.store_app = dc.store_app
 ),
 
 app_counts AS (
     SELECT
-        my_counts.store,
-        my_counts.app_category,
-        my_counts.tag_source,
-        my_counts.company_domain,
-        my_counts.company_name,
-        count(*) AS app_count
-    FROM my_counts
+        mc.store,
+        mc.app_category,
+        mc.tag_source,
+        mc.company_domain,
+        mc.company_name,
+        count(*) AS app_count,
+        sum(mc.d30_installs) AS installs_d30,
+        sum(mc.d30_rating_count) AS rating_count_d30,
+        sum(mc.rating_count) AS rating_count_total,
+        sum(mc.installs) AS installs_total
+    FROM
+        my_counts AS mc
     GROUP BY
-        my_counts.store,
-        my_counts.app_category,
-        my_counts.tag_source,
-        my_counts.company_domain,
-        my_counts.company_name
+        mc.store,
+        mc.app_category,
+        mc.tag_source,
+        mc.company_domain,
+        mc.company_name
 )
 
 SELECT
-    app_count,
     store,
     app_category,
     tag_source,
     company_domain,
     company_name
-FROM app_counts
-ORDER BY app_count DESC
+    AS app_count,
+    installs_d30,
+    installs_total,
+    rating_count_d30,
+    rating_count_total
+FROM
+    app_counts
+ORDER BY
+    app_count DESC
 WITH DATA;
 
 -- View indexes:
 CREATE UNIQUE INDEX idx_companies_app_counts ON frontend.companies_app_counts USING btree (
-    store, app_category, tag_source, company_domain, company_name
+    store, app_category, tag_source, company_domainc
 );
 
 
