@@ -102,29 +102,3 @@ SELECT *
 FROM
     adstxt_based_companies
 WITH DATA;
-
-
-
-
--- DROP MATERIALIZED VIEW adtech.companies_parent_categories_app_counts;
-CREATE MATERIALIZED VIEW adtech.companies_parent_categories_app_counts AS
-SELECT
-    ad.domain AS company_domain,
-    c.name AS company_name,
-    csac.app_category,
-    COUNT(DISTINCT csac.store_app) AS app_count
-FROM
-    adtech.combined_store_apps_companies AS csac
-LEFT JOIN adtech.companies AS c ON csac.parent_id = c.id
-LEFT JOIN adtech.company_domain_mapping AS cdm ON c.id = cdm.company_id
-LEFT JOIN ad_domains AS ad ON cdm.domain_id = ad.id
-GROUP BY
-    ad.domain, c.name, csac.app_category
-ORDER BY c.name ASC, app_count DESC
-WITH DATA;
-
-DROP INDEX IF EXISTS idx_companies_parent_categories_app_counts;
-CREATE UNIQUE INDEX idx_companies_parent_categories_app_counts
-ON adtech.companies_parent_categories_app_counts (
-    company_domain, company_name, app_category
-);
