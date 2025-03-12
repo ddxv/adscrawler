@@ -26,40 +26,13 @@ class AdsTxtEmptyError(Exception):
     pass
 
 
-def request_app_ads(ads_url: str) -> str:
+def get_text_from_response(response: requests.Response) -> str:
     max_bytes = 1000000
-    if not ads_url.startswith("http"):
-        ads_url = "http://" + ads_url
-    try:
-        # First attempt with HTTP
-        response = requests.get(ads_url, stream=True, timeout=2)
-    except Exception:
-        try:
-            # If HTTP fails, try HTTPS
-            ads_url = ads_url.replace("http://", "https://", 1)
-            response = requests.get(ads_url, stream=True, timeout=2)
-        except requests.exceptions.ConnectionError:
-            err = f"{ads_url} type: requests ConnectionError"
-            raise NoAdsTxtError(err) from ConnectionError
-
-    # Handle 403 (Forbidden) by modifying the User-Agent
-    if response.status_code == 403:
-        headers = {
-            "User-Agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:131.0) Gecko/20100101 Firefox/131.0",
-        }
-        response = requests.get(ads_url, headers=headers, timeout=2, stream=True)
-
-    # If still not successful, raise an error for non-200 status codes
-    if response.status_code != 200:
-        err = f"{ads_url} status_code: {response.status_code}"
-        raise NoAdsTxtError(err)
-
     # Check the content length
     content_length = response.headers.get("Content-Length")
     if content_length and int(content_length) > max_bytes:
-        err = f"{ads_url} content exceeds maximum allowed size of {max_bytes} bytes"
+        err = f"content exceeds maximum allowed size of {max_bytes} bytes"
         raise NoAdsTxtError(err)
-
     # Maximum amount we want to read
     content_bytes = response.headers.get("Content-Length")
     if content_bytes and int(content_bytes) < max_bytes:
@@ -77,8 +50,40 @@ def request_app_ads(ads_url: str) -> str:
                 logger.warning("Encountered large file, quitting")
                 raise NoAdsTxtError("File too large")
         text = mybytes.decode("utf-8")
+    return text
+
+
+def request_app_ads(ads_url: str) -> str:
+    if not ads_url.startswith("http"):
+        ads_url = "http://" + ads_url
+    try:
+        # First attempt with HTTP
+        response = requests.get(ads_url, stream=True, timeout=4)
+    except Exception:
+        try:
+            # If HTTP fails, try HTTPS
+            ads_url = ads_url.replace("http://", "https://", 1)
+            response = requests.get(ads_url, stream=True, timeout=4)
+        except requests.exceptions.ConnectionError:
+            err = f"{ads_url} type: requests ConnectionError"
+            raise NoAdsTxtError(err) from ConnectionError
+    # Handle 403 (Forbidden) by modifying the User-Agent
+    if response.status_code == 403:
+        headers = {
+            "User-Agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:131.0) Gecko/20100101 Firefox/131.0",
+        }
+        response = requests.get(ads_url, headers=headers, timeout=4, stream=True)
+    # If still not successful, raise an error for non-200 status codes
+    if response.status_code != 200:
+        err = f"{ads_url} status_code: {response.status_code}"
+        raise NoAdsTxtError(err)
+    text = get_text_from_response(response)
     if "<head>" in text:
         err = f"{ads_url} HTML in adstxt"
+        if ads_url.startswith("http://"):
+            ads_url = ads_url.replace("http://", "https://", 1)
+            response = requests.get(ads_url, stream=True, timeout=4)
+            text = get_text_from_response(response)
         raise NoAdsTxtError(err)
     if not any(term in text.upper() for term in ["DIRECT", "RESELLER"]):
         err = "DIRECT, RESELLER not in ads.txt"
