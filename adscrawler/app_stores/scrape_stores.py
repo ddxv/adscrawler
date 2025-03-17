@@ -471,8 +471,9 @@ def process_store_rankings(
             "rank",
             "store_category",
             "store_collection",
+            "store_app",
         ],
-        insert_columns=["store_app"],
+        insert_columns=[],
     )
 
 
