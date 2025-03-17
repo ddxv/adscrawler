@@ -832,6 +832,10 @@ WHERE ar.crawled_date >= (current_date - '120 days'::interval)
 WITH DATA;
 
 
+CREATE UNIQUE INDEX idx_store_apps_rankings_unique ON frontend.store_apps_rankings (
+    crawled_date, country, store_app, rank, store_collection, store_category
+);
+
 CREATE INDEX idx_store_apps_rankings_store_app_date ON frontend.store_apps_rankings (
     store_app, crawled_date
 );

@@ -39,9 +39,7 @@
 # Multiple Per Day
 
 0 */4 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW audit_dates"
-28 */9 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW adtech.companies_parent_by_d30_counts"
 
-25 */8 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW adtech.companies_by_d30_counts"
 
 20 */8 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW category_mapping"
 25 */8 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW mv_app_categories"
@@ -49,7 +47,6 @@
 48 */9 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW store_apps_rankings"
 
 55 */10 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW frontend.total_categories_app_counts"
-58 */10 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW adtech.store_crawl_results"
 
 
 
