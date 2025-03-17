@@ -53,30 +53,73 @@ def get_text_from_response(response: requests.Response) -> str:
     return text
 
 
-def request_app_ads(ads_url: str) -> str:
+def try_http_request(ads_url: str, headers: dict | None = None) -> requests.Response:
     if not ads_url.startswith("http"):
         ads_url = "http://" + ads_url
+    if ads_url.startswith("https://"):
+        ads_url = ads_url.replace("https://", "http://", 1)
     try:
-        # First attempt with HTTP
-        response = requests.get(ads_url, stream=True, timeout=4)
-    except Exception:
-        try:
-            # If HTTP fails, try HTTPS
-            ads_url = ads_url.replace("http://", "https://", 1)
+        if headers:
+            response = requests.get(ads_url, headers=headers, stream=True, timeout=4)
+        else:
             response = requests.get(ads_url, stream=True, timeout=4)
-        except requests.exceptions.ConnectionError:
-            err = f"{ads_url} type: requests ConnectionError"
-            raise NoAdsTxtError(err) from ConnectionError
-    # Handle 403 (Forbidden) by modifying the User-Agent
-    if response.status_code == 403:
-        headers = {
-            "User-Agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:131.0) Gecko/20100101 Firefox/131.0",
-        }
-        response = requests.get(ads_url, headers=headers, timeout=4, stream=True)
-    # If still not successful, raise an error for non-200 status codes
+    except requests.exceptions.ConnectionError:
+        err = f"{ads_url} type: requests ConnectionError"
+        raise NoAdsTxtError(err) from ConnectionError
     if response.status_code != 200:
         err = f"{ads_url} status_code: {response.status_code}"
         raise NoAdsTxtError(err)
+    return response
+
+
+def try_https_request(ads_url: str, headers: dict | None = None) -> requests.Response:
+    if not ads_url.startswith("http"):
+        ads_url = "http://" + ads_url
+    ads_url = ads_url.replace("http://", "https://", 1)
+    try:
+        if headers:
+            response = requests.get(ads_url, headers=headers, stream=True, timeout=4)
+        else:
+            response = requests.get(ads_url, stream=True, timeout=4)
+    except Exception:
+        err = f"{ads_url} type: requests Exception"
+        raise NoAdsTxtError(err) from Exception
+    if response.status_code != 200:
+        err = f"{ads_url} status_code: {response.status_code}"
+        logger.error(err)
+    return response
+
+
+def request_app_ads(ads_url: str) -> str:
+    try:
+        response = try_http_request(ads_url)
+    except Exception:
+        try:
+            response = try_https_request(ads_url)
+        except Exception:
+            err = f"{ads_url} type: requests Exception"
+            raise NoAdsTxtError(err) from Exception
+    # Handle 403/406 (Forbidden) by modifying the User-Agent
+    if response.status_code >= 400 and response.status_code < 500:
+        headers = {
+            "User-Agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:131.0) Gecko/20100101 Firefox/131.0",
+        }
+        try:
+            response = try_http_request(ads_url, headers=headers)
+        except Exception:
+            try:
+                response = try_https_request(ads_url, headers=headers)
+            except Exception:
+                err = f"{ads_url} type: requests Exception"
+                raise NoAdsTxtError(err) from Exception
+    # If still not successful, raise an error for non-200 status codes
+    if response.status_code != 200:
+        err = f"{response.status_code}"
+        try:
+            response = try_https_request(ads_url)
+        except Exception:
+            err = f"{ads_url} status_code: {response.status_code}"
+            raise NoAdsTxtError(err) from Exception
     text = get_text_from_response(response)
     if "<head>" in text:
         err = f"{ads_url} HTML in adstxt"
