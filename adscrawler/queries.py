@@ -506,7 +506,7 @@ def get_top_ranks_for_unpacking(
             WHERE
                 vc.updated_at IS NULL OR
                 (
-                (vc.crawl_result = 1 AND vc.updated_at < current_date - INTERVAL '90 days')
+                (vc.crawl_result = 1 AND vc.updated_at < current_date - INTERVAL '180 days')
                 OR
                 (vc.crawl_result IN (2,3,4) AND vc.updated_at < current_date - INTERVAL '30 days')
                 )
