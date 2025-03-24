@@ -494,21 +494,51 @@ frontend.app_rankings_latest_by_week USING btree (
 
 
 
-DROP MATERIALIZED VIEW IF EXISTS frontend.total_categories_app_counts;
-CREATE MATERIALIZED VIEW frontend.total_categories_app_counts
+CREATE MATERIALIZED VIEW frontend.category_tag_stats
 TABLESPACE pg_default
-AS SELECT
-    sa.store,
-    csac.tag_source,
-    csac.app_category,
-    count(DISTINCT csac.store_app) AS app_count
-FROM adtech.combined_store_apps_companies AS csac
-LEFT JOIN store_apps AS sa ON csac.store_app = sa.id
-GROUP BY sa.store, csac.tag_source, csac.app_category
+AS WITH d30_counts AS (
+    SELECT
+        sahw.store_app,
+        sum(sahw.installs_diff) AS d30_installs,
+        sum(sahw.rating_count_diff) AS d30_rating_count
+    FROM store_apps_history_weekly AS sahw
+    WHERE
+        sahw.week_start > (current_date - '31 days'::interval)
+        AND sahw.country_id = 840
+        AND (sahw.installs_diff > 0::numeric OR sahw.rating_count_diff > 0)
+    GROUP BY sahw.store_app
+),
+
+distinct_apps_group AS (
+    SELECT
+        sa.store,
+        csac.store_app,
+        csac.app_category,
+        csac.tag_source,
+        sa.installs,
+        sa.rating_count
+    FROM adtech.combined_store_apps_companies AS csac
+    LEFT JOIN store_apps AS sa ON csac.store_app = sa.id
+)
+
+SELECT
+    dag.store,
+    dag.app_category,
+    dag.tag_source,
+    count(DISTINCT dag.store_app) AS app_count,
+    sum(dc.d30_installs) AS installs_d30,
+    sum(dc.d30_rating_count) AS rating_count_d30,
+    sum(dag.installs) AS installs_total,
+    sum(dag.rating_count) AS rating_count_total
+FROM distinct_apps_group AS dag
+LEFT JOIN d30_counts AS dc ON dag.store_app = dc.store_app
+GROUP BY dag.store, dag.app_category, dag.tag_source
 WITH DATA;
 
-CREATE UNIQUE INDEX idx_total_categories_app_counts ON frontend.total_categories_app_counts USING btree (
-    store, tag_source, app_category
+
+-- View indexes:
+CREATE UNIQUE INDEX idx_category_tag_stats ON frontend.category_tag_stats USING btree (
+    store, app_category, tag_source
 );
 
 

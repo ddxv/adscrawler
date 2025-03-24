@@ -79,12 +79,9 @@ def clean_google_play_app_df(df: pd.DataFrame) -> pd.DataFrame:
         ),
         release_date=pd.to_datetime(df["release_date"], format="%b %d, %Y").dt.date,
     )
-
     if "developer_name" in df.columns:
         df["developer_name"] = df["developer_name"].str.replace("\t", " ")
-
     list_cols = ["phone_image_url"]
-
     for list_col in list_cols:
         urls_empty = ((df[f"{list_col}s"].isna()) | (df[f"{list_col}s"] == "")).all()
         if not urls_empty:
