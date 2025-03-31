@@ -102,3 +102,20 @@ SELECT *
 FROM
     adstxt_based_companies
 WITH DATA;
+
+
+-- Used for the crawler when checking which apps to download
+-- This is called very often, hence the need for an MV
+CREATE MATERIALIZED VIEW public.store_apps_in_latest_rankings
+TABLESPACE pg_default
+AS SELECT DISTINCT ON (ar.store_app)
+    ar.store_app,
+    sa.store,
+    sa.name,
+    sa.installs,
+    sa.rating_count,
+    sa.store_id
+FROM app_rankings AS ar
+LEFT JOIN store_apps AS sa ON ar.store_app = sa.id
+WHERE ar.crawled_date > (CURRENT_DATE - '15 days'::INTERVAL)
+WITH DATA;
