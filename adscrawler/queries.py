@@ -436,44 +436,7 @@ def get_top_ranks_for_unpacking(
     collection_id: int,
     limit: int = 25,
 ) -> pd.DataFrame:
-    sel_query = f"""WITH topranks AS(
-                SELECT
-                     ar.RANK,
-                     ar.store_category,
-                     sa.id AS store_app,
-                     sa.name,
-                     sa.installs,
-                     sa.rating_count,
-                     sa.store_id
-                FROM
-                     app_rankings ar
-                LEFT JOIN
-                     store_apps sa ON
-                     sa.id = ar.store_app
-                WHERE
-                     crawled_date = (
-                        SELECT
-                            max(crawled_date)
-                        FROM
-                            app_rankings
-                        WHERE
-                            store = {store}
-                    )
-                    AND ar.store_collection = {collection_id}
-                ORDER BY
-                    ar.rank,
-                        store_category
-            ),
-                    distinctapps AS (
-                SELECT
-                    DISTINCT topranks.store_app,
-                    topranks.name,
-                    topranks.store_id,
-                    topranks.installs,
-                    topranks.rating_count
-                FROM
-                    topranks
-            ),
+    sel_query = f"""WITH
             latest_version_codes AS (
                 SELECT
                     DISTINCT ON
@@ -500,10 +463,11 @@ def get_top_ranks_for_unpacking(
                 vc.crawl_result as last_crawl_result,
                 vc.updated_at
             FROM
-                distinctapps dc
+                store_apps_in_latest_rankings dc
             LEFT JOIN latest_version_codes vc ON
                 vc.store_app = dc.store_app
             WHERE
+                dc.store = {store}
                 vc.updated_at IS NULL OR
                 (
                 (vc.crawl_result = 1 AND vc.updated_at < current_date - INTERVAL '180 days')
