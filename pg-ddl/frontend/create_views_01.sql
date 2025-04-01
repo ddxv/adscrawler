@@ -684,26 +684,16 @@ USING btree (
 
 
 
-
-
 CREATE MATERIALIZED VIEW frontend.adstxt_entries_store_apps
 TABLESPACE pg_default
 AS WITH parent_companies AS (
     SELECT
         c.id AS company_id,
         c.name AS company_name,
-        coalesce(
-            c.parent_company_id,
-            c.id
-        ) AS parent_company_id,
-        coalesce(
-            pc.name,
-            c.name
-        ) AS parent_company_name
-    FROM
-        adtech.companies AS c
-    LEFT JOIN adtech.companies AS pc ON
-        c.parent_company_id = pc.id
+        coalesce(c.parent_company_id, c.id) AS parent_company_id,
+        coalesce(pc.name, c.name) AS parent_company_name
+    FROM adtech.companies AS c
+    LEFT JOIN adtech.companies AS pc ON c.parent_company_id = pc.id
 )
 
 SELECT DISTINCT
@@ -714,31 +704,15 @@ SELECT DISTINCT
     sa.id AS store_app,
     pd.url AS developer_domain_url,
     pd.crawled_at AS developer_domain_crawled_at
-FROM
-    app_ads_entrys AS aae
-LEFT JOIN ad_domains AS ad
-    ON
-        aae.ad_domain = ad.id
-LEFT JOIN app_ads_map AS aam
-    ON
-        aae.id = aam.app_ads_entry
-LEFT JOIN pub_domains AS pd
-    ON
-        aam.pub_domain = pd.id
-LEFT JOIN app_urls_map AS aum
-    ON
-        pd.id = aum.pub_domain
-LEFT JOIN store_apps AS sa
-    ON
-        aum.store_app = sa.id
-LEFT JOIN adtech.company_domain_mapping AS cdm
-    ON
-        ad.id = cdm.domain_id
-LEFT JOIN parent_companies AS myc
-    ON
-        cdm.company_id = myc.company_id
-WHERE
-    pd.crawled_at - aam.updated_at < interval '1 hour'
+FROM app_ads_entrys AS aae
+LEFT JOIN ad_domains AS ad ON aae.ad_domain = ad.id
+LEFT JOIN app_ads_map AS aam ON aae.id = aam.app_ads_entry
+LEFT JOIN pub_domains AS pd ON aam.pub_domain = pd.id
+LEFT JOIN app_urls_map AS aum ON pd.id = aum.pub_domain
+INNER JOIN store_apps AS sa ON aum.store_app = sa.id
+LEFT JOIN adtech.company_domain_mapping AS cdm ON ad.id = cdm.domain_id
+LEFT JOIN parent_companies AS myc ON cdm.company_id = myc.company_id
+WHERE (pd.crawled_at - aam.updated_at) < '01:00:00'::interval
 WITH DATA;
 
 
@@ -752,6 +726,7 @@ CREATE INDEX adstxt_entries_store_apps_idx ON frontend.adstxt_entries_store_apps
 CREATE UNIQUE INDEX adstxt_entries_store_apps_unique_idx ON frontend.adstxt_entries_store_apps USING btree (
     ad_domain_url, publisher_id, relationship, store_app
 );
+
 
 
 -- frontend.adstxt_publishers_overview source
