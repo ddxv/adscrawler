@@ -657,11 +657,11 @@ def update_all_app_info(
     logger.info(f"{info} finished")
 
 
-def scrape_from_store(store: int, store_id: str, country: str) -> dict:
+def scrape_from_store(store: int, store_id: str, country: str, language: str) -> dict:
     if store == 1:
-        result_dict = scrape_app_gp(store_id, country=country)
+        result_dict = scrape_app_gp(store_id, country=country, language=language)
     elif store == 2:
-        result_dict = scrape_app_ios(store_id, country=country)
+        result_dict = scrape_app_ios(store_id, country=country, language=language)
     else:
         logger.error(f"Store not supported {store=}")
     return result_dict
@@ -679,8 +679,9 @@ def scrape_app(
     store: int,
     store_id: str,
     country: str,
+    language: str,
 ) -> pd.DataFrame:
-    scrape_info = f"{store=}, {store_id=}, {country=}"
+    scrape_info = f"{store=}, {store_id=}, {country=}, {language=}"
     max_retries = 2
     base_delay = 2
     retries = 0
@@ -692,6 +693,7 @@ def scrape_app(
                 store=store,
                 store_id=store_id,
                 country=country,
+                language=language,
             )
             crawl_result = 1
             break  # If successful, break out of the retry loop
@@ -734,6 +736,11 @@ def scrape_app(
     result_dict["crawl_result"] = crawl_result
     result_dict["store"] = store
     result_dict["store_id"] = store_id
+    result_dict["language"] = language.lower()
+    result_dict["country"] = country.upper()
+
+    if "description_short" not in result_dict.keys():
+        result_dict["description_short"] = ""
 
     df = pd.DataFrame([result_dict])
     if crawl_result == 1:
@@ -782,16 +789,20 @@ def scrape_and_save_app(
 ) -> pd.DataFrame:
     # Pulling for more countries will want to track rating, review count, and histogram
     app_country_list = ["us"]
+    # Pulling for more languages to track descriptions, reviews, titles, etc.
+    app_language_list = ["en"]
     for country in app_country_list:
-        info = f"{store=}, {store_id=}, {country=}"
-        app_df = scrape_app(store=store, store_id=store_id, country=country)
-        logger.info(f"{info} save to db start")
-        app_df = save_apps_df(
-            apps_df=app_df,
-            database_connection=database_connection,
-            country=country,
-        )
-        logger.info(f"{info} save to db finish")
+        for language in app_language_list:
+            info = f"{store=}, {store_id=}, {country=}, {language}"
+            app_df = scrape_app(
+                store=store, store_id=store_id, country=country, language=language
+            )
+            logger.info(f"{info} save to db start")
+            app_df = save_apps_df(
+                apps_df=app_df,
+                database_connection=database_connection,
+            )
+            logger.info(f"{info} save to db finish")
     crawl_result = app_df["crawl_result"].to_numpy()[0]
     logger.info(f"{info} {crawl_result=} scraped and saved app")
     return app_df
@@ -800,7 +811,6 @@ def scrape_and_save_app(
 def save_apps_df(
     apps_df: pd.DataFrame,
     database_connection: PostgresCon,
-    country: str,
 ) -> pd.DataFrame:
     table_name = "store_apps"
     key_columns = ["store", "store_id"]
@@ -822,43 +832,21 @@ def save_apps_df(
     ):
         store_apps_df = store_apps_df.rename(columns={"id": "store_app"})
         store_apps_history = store_apps_df[store_apps_df["crawl_result"] == 1].copy()
-
         store_apps_history = pd.merge(
             store_apps_history,
-            apps_df[["store_id", "histogram"]],
+            apps_df[["store_id", "histogram", "country"]],
             on="store_id",
         )
-
-        store_apps_history["country"] = country.upper()
-        store_apps_history["crawled_date"] = (
-            datetime.datetime.now(datetime.UTC).date().strftime("%Y-%m-%d")
+        upsert_store_apps_history(store_apps_history, database_connection)
+        store_apps_descriptions = store_apps_df[
+            store_apps_df["crawl_result"] == 1
+        ].copy()
+        store_apps_descriptions = pd.merge(
+            store_apps_descriptions,
+            apps_df[["store_id", "description", "description_short", "language"]],
+            on="store_id",
         )
-        table_name = "store_apps_country_history"
-        countries_map = query_countries(database_connection)
-        store_apps_history = pd.merge(
-            store_apps_history,
-            countries_map[["id", "alpha2"]],
-            how="left",
-            left_on="country",
-            right_on="alpha2",
-            validate="m:1",
-        ).rename(columns={"id": "country_id"})
-        insert_columns = [
-            "installs",
-            "review_count",
-            "rating",
-            "rating_count",
-            "histogram",
-        ]
-        key_columns = ["store_app", "country_id", "crawled_date"]
-        upsert_df(
-            table_name=table_name,
-            df=store_apps_history,
-            insert_columns=insert_columns,
-            key_columns=key_columns,
-            database_connection=database_connection,
-        )
-
+        upsert_store_apps_descriptions(store_apps_descriptions, database_connection)
     if store_apps_df is not None and not store_apps_df.empty:
         store_apps_df = store_apps_df.rename(columns={"id": "store_app"})
         apps_df = pd.merge(
@@ -869,6 +857,65 @@ def save_apps_df(
         )
     log_crawl_results(apps_df, database_connection=database_connection)
     return apps_df
+
+
+def upsert_store_apps_descriptions(
+    store_apps_descriptions: pd.DataFrame,
+    database_connection: PostgresCon,
+) -> None:
+    table_name = "store_apps_descriptions"
+    languages_map = query_languages(database_connection)
+    store_apps_descriptions = pd.merge(
+        store_apps_descriptions,
+        languages_map[["id", "language_slug"]],
+        how="left",
+        left_on="language",
+        right_on="language_slug",
+        validate="m:1",
+    ).rename(columns={"id": "language_id"})
+    if "description_short" not in store_apps_descriptions.columns:
+        store_apps_descriptions["description_short"] = ""
+    key_columns = ["store_app", "language_id", "description", "description_short"]
+    upsert_df(
+        table_name=table_name,
+        df=store_apps_descriptions,
+        insert_columns=key_columns,
+        key_columns=key_columns,
+        database_connection=database_connection,
+    )
+
+
+def upsert_store_apps_history(
+    store_apps_history: pd.DataFrame, database_connection: PostgresCon
+) -> None:
+    store_apps_history["crawled_date"] = (
+        datetime.datetime.now(datetime.UTC).date().strftime("%Y-%m-%d")
+    )
+    table_name = "store_apps_country_history"
+    countries_map = query_countries(database_connection)
+    store_apps_history = pd.merge(
+        store_apps_history,
+        countries_map[["id", "alpha2"]],
+        how="left",
+        left_on="country",
+        right_on="alpha2",
+        validate="m:1",
+    ).rename(columns={"id": "country_id"})
+    insert_columns = [
+        "installs",
+        "review_count",
+        "rating",
+        "rating_count",
+        "histogram",
+    ]
+    key_columns = ["store_app", "country_id", "crawled_date"]
+    upsert_df(
+        table_name=table_name,
+        df=store_apps_history,
+        insert_columns=insert_columns,
+        key_columns=key_columns,
+        database_connection=database_connection,
+    )
 
 
 def log_crawl_results(app_df: pd.DataFrame, database_connection: PostgresCon) -> None:

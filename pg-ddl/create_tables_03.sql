@@ -141,3 +141,16 @@ CREATE TABLE public.version_details_map (
 ALTER TABLE public.version_details_map ADD CONSTRAINT version_details_map_string_id_fkey FOREIGN KEY (
     string_id
 ) REFERENCES public.version_strings (id);
+
+
+
+CREATE TABLE store_apps_descriptions (
+    id serial PRIMARY KEY,
+    store_app integer NOT NULL REFERENCES store_apps (id) ON DELETE CASCADE,
+    language_id integer NOT NULL REFERENCES languages (id) ON DELETE CASCADE,
+    description text NOT NULL,
+    description_short text NOT NULL,
+    title text NULL,
+    updated_at timestamp DEFAULT NOW() NOT NULL,
+    UNIQUE (store_app, language_id, description, description_short)
+);

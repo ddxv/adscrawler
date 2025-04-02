@@ -225,12 +225,12 @@ def get_developer_url(result: dict, store_id: str, country: str) -> str:
     return final_url
 
 
-def scrape_app_ios(store_id: str, country: str) -> dict:
+def scrape_app_ios(store_id: str, country: str, language: str) -> dict:
     # NOTE: averageUserRating, Rating_count, Histogram are country specific
-    logger.info(f"Scrape app start {store_id=} {country=}")
+    logger.info(f"Scrape app start {store_id=} {country=} {language=}")
     scraper = AppStoreScraper()
     result: dict = scraper.get_app_details(
-        store_id, country=country, add_ratings=True, timeout=10
+        store_id, country=country, add_ratings=True, timeout=10, lang=language
     )
     try:
         result["sellerUrl"] = get_developer_url(result, store_id, country)

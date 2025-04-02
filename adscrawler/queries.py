@@ -1,4 +1,5 @@
 import datetime
+from functools import lru_cache
 
 import numpy as np
 import pandas as pd
@@ -273,6 +274,7 @@ def query_categories(database_connection: PostgresCon) -> pd.DataFrame:
     return df
 
 
+@lru_cache(maxsize=1)
 def query_countries(database_connection: PostgresCon) -> pd.DataFrame:
     sel_query = """SELECT
         *
@@ -284,6 +286,7 @@ def query_countries(database_connection: PostgresCon) -> pd.DataFrame:
     return df
 
 
+@lru_cache(maxsize=1)
 def query_languages(database_connection: PostgresCon) -> pd.DataFrame:
     sel_query = """SELECT
         *

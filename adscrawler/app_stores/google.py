@@ -49,7 +49,7 @@ def clean_google_play_app_df(df: pd.DataFrame) -> pd.DataFrame:
             "updated": "store_last_updated",
             "reviews": "review_count",
             "ratings": "rating_count",
-            "summary": "short_description",
+            "summary": "description_short",
             "released": "release_date",
             "containsAds": "ad_supported",
             "offersIAP": "in_app_purchases",
