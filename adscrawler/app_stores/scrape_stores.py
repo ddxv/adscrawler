@@ -825,7 +825,6 @@ def save_apps_df(
         database_connection=database_connection,
         return_rows=True,
     )
-
     if (
         store_apps_df is not None
         and not store_apps_df[store_apps_df["crawl_result"] == 1].empty
