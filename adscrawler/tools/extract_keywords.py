@@ -71,7 +71,7 @@ def extract_keywords(text: str, top_n: int = 10) -> list[str]:
         + extract_keywords_nltk(text, top_n)
         + extract_keywords_rake(text, top_n)
     )
-    keywords = [x.lower() for x in keywords if len(x) <= 255]
+    keywords = [x.lower() for x in keywords if len(x) <= 100]
 
     return list(sorted(set(keywords)))
 
