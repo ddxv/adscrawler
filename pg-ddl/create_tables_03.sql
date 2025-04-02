@@ -154,3 +154,14 @@ CREATE TABLE store_apps_descriptions (
     updated_at timestamp DEFAULT NOW() NOT NULL,
     UNIQUE (store_app, language_id, description, description_short)
 );
+
+
+CREATE TABLE public.description_keywords (
+    id serial PRIMARY KEY,
+    description_id integer NOT NULL REFERENCES store_apps_descriptions (
+        id
+    ) ON DELETE CASCADE,
+    keyword_id integer NOT NULL REFERENCES keywords (id) ON DELETE CASCADE,
+    extracted_at timestamp DEFAULT NOW() NOT NULL,
+    UNIQUE (description_id, keyword_id)
+);

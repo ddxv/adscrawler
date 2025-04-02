@@ -18,7 +18,10 @@ dependencies = [
     'selenium',
     'pyyaml',
     "psycopg[binary]",
-    "beautifulsoup4"
+    "beautifulsoup4",
+    "nltk",
+    "rake_nltk",
+    "spacy",
 ]
 
 

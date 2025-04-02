@@ -37,6 +37,7 @@ from adscrawler.queries import (
     query_store_ids,
     upsert_df,
 )
+from adscrawler.tools.extract_keywords import extract_keywords
 
 logger = get_logger(__name__, "scrape_stores")
 
@@ -875,10 +876,54 @@ def upsert_store_apps_descriptions(
     if "description_short" not in store_apps_descriptions.columns:
         store_apps_descriptions["description_short"] = ""
     key_columns = ["store_app", "language_id", "description", "description_short"]
-    upsert_df(
+    description_df = upsert_df(
         table_name=table_name,
         df=store_apps_descriptions,
         insert_columns=key_columns,
+        key_columns=key_columns,
+        database_connection=database_connection,
+        return_rows=True,
+    ).rename(columns={"id": "description_id"})
+    if description_df is not None and not description_df.empty:
+        for _i, row in description_df.iterrows():
+            description = row["description"]
+            description_short = row["description_short"]
+            language_id = row["language_id"]
+            description_id = row["description_id"]
+            keywords = extract_keywords(description_short + " " + description)
+            keywords_df = pd.DataFrame(keywords, columns=["keyword_text"])
+            keywords_df["language_id"] = language_id
+            keywords_df["description_id"] = description_id
+            upsert_keywords(keywords_df, database_connection)
+
+
+def upsert_keywords(keywords_df: pd.DataFrame, database_connection: PostgresCon):
+    table_name = "keywords"
+    insert_columns = ["keyword_text"]
+    key_columns = ["keyword_text"]
+    upserted_keywords = upsert_df(
+        table_name=table_name,
+        df=keywords_df,
+        insert_columns=insert_columns,
+        key_columns=key_columns,
+        database_connection=database_connection,
+        return_rows=True,
+    )
+    keywords_df = pd.merge(
+        keywords_df,
+        upserted_keywords,
+        on=["keyword_text"],
+        how="left",
+        validate="m:1",
+    ).rename(columns={"id": "keyword_id"})
+    keywords_df = keywords_df[["keyword_id", "description_id"]]
+    table_name = "description_keywords"
+    insert_columns = ["description_id", "keyword_id"]
+    key_columns = ["description_id", "keyword_id"]
+    upsert_df(
+        table_name=table_name,
+        df=keywords_df,
+        insert_columns=insert_columns,
         key_columns=key_columns,
         database_connection=database_connection,
     )
