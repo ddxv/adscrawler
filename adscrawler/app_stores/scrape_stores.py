@@ -740,12 +740,13 @@ def scrape_app(
     result_dict["language"] = language.lower()
     result_dict["country"] = country.upper()
 
-    if "description_short" not in result_dict.keys():
-        result_dict["description_short"] = ""
-
     df = pd.DataFrame([result_dict])
     if crawl_result == 1:
         df = clean_scraped_df(df=df, store=store)
+
+    if "description_short" not in df.columns:
+        df["description_short"] = ""
+    df.loc[df["description_short"].isna(), "description_short"] = ""
 
     logger.info(f"{scrape_info} scrape finished")
     return df
