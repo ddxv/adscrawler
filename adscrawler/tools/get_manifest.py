@@ -13,7 +13,7 @@ import yaml
 
 from adscrawler.config import APKS_DIR, MODULE_DIR, get_logger
 from adscrawler.connection import PostgresCon
-from adscrawler.queries import get_top_ranks_for_unpacking, upsert_df
+from adscrawler.queries import get_top_ranks_for_unpacking, upsert_details_df
 from adscrawler.tools.download_apk import download
 
 logger = get_logger(__name__, "download_apk")
@@ -236,10 +236,8 @@ def manifest_main(
         logger.info(f"{store_id=} start")
         details_df = row.to_frame().T
         version_str = "-1"
-        apk_path = pathlib.Path(APKS_DIR, f"{store_id}.apk")
         try:
             extension = download_and_unpack(store_id=store_id)
-            apk_path = pathlib.Path(APKS_DIR, f"{store_id}{extension}")
             manifest_str, details_df = get_parsed_manifest()
             version_str = get_version()
             crawl_result = 1
@@ -266,60 +264,32 @@ def manifest_main(
             details_df["version_code"] = version_str
         else:
             details_df["version_code"] = "-1"
-        version_code_df = details_df[["store_app", "version_code"]].drop_duplicates()
-        version_code_df["crawl_result"] = crawl_result
-        logger.info(f"{store_id=} insert version_code to db")
-        upserted: pd.DataFrame = upsert_df(
-            df=version_code_df,
-            table_name="version_codes",
-            database_connection=database_connection,
-            key_columns=["store_app", "version_code"],
-            return_rows=True,
-            insert_columns=["store_app", "version_code", "crawl_result"],
-        )
-        logger.info(f"{store_id=} delete apk {apk_path.as_posix()}")
+        try:
+            upsert_details_df(
+                details_df=details_df,
+                crawl_result=crawl_result,
+                database_connection=database_connection,
+                store_id=store_id,
+                raw_txt_str=manifest_str,
+            )
+        except Exception as e:
+            logger.exception(f"DB INSERT ERROR for {store_id=}: {str(e)}")
+        remove_apks(store_id=store_id, extension=extension)
+
+
+def remove_apks(store_id: str) -> None:
+    apk_path = pathlib.Path(APKS_DIR, f"{store_id}.apk")
+    try:
         apk_path.unlink(missing_ok=True)
-        if extension == ".xapk":
-            pathlib.Path(APKS_DIR, f"{store_id}.apk").unlink(missing_ok=True)
-        if crawl_result != 1:
-            continue
-        upserted = upserted.rename(
-            columns={"version_code": "original_version_code", "id": "version_code"}
-        ).drop("store_app", axis=1)
-        details_df = details_df.rename(
-            columns={
-                "path": "xml_path",
-                "version_code": "original_version_code",
-                "android_name": "value_name",
-            }
-        )
-        details_df = pd.merge(
-            left=details_df,
-            right=upserted,
-            how="left",
-            on=["original_version_code"],
-            validate="m:1",
-        )
-        key_insert_columns = ["version_code", "xml_path", "tag", "value_name"]
-        details_df = details_df[key_insert_columns].drop_duplicates()
-        logger.info(f"{store_id=} insert version_details to db")
-        upsert_df(
-            df=details_df,
-            table_name="version_details",
-            database_connection=database_connection,
-            key_columns=key_insert_columns,
-            insert_columns=key_insert_columns,
-        )
-        details_df["manifest_string"] = manifest_str
-        manifest_df = details_df[["version_code", "manifest_string"]].drop_duplicates()
-        upsert_df(
-            df=manifest_df,
-            table_name="version_manifests",
-            database_connection=database_connection,
-            key_columns=["version_code"],
-            insert_columns=["version_code", "manifest_string"],
-        )
-        logger.info(f"{store_id=} finished")
+        logger.info(f"{store_id=} deleted apk {apk_path.as_posix()}")
+    except FileNotFoundError:
+        pass
+    xapk_path = pathlib.Path(APKS_DIR, f"{store_id}.xapk")
+    try:
+        xapk_path.unlink(missing_ok=True)
+        logger.info(f"{store_id=} deleted xapk {xapk_path.as_posix()}")
+    except FileNotFoundError:
+        pass
 
 
 def parse_args() -> argparse.Namespace:

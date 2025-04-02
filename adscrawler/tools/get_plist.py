@@ -9,14 +9,13 @@ import subprocess
 import time
 from typing import Self
 
-import numpy as np
 import pandas as pd
 import requests
 
 from adscrawler.app_stores.apple import lookupby_id
 from adscrawler.config import MODULE_DIR, get_logger
 from adscrawler.connection import PostgresCon
-from adscrawler.queries import get_top_ranks_for_unpacking, upsert_df
+from adscrawler.queries import get_top_ranks_for_unpacking, upsert_details_df
 from adscrawler.tools.download_ipa import download, ipatool_auth
 
 logger = get_logger(__name__, "download_ipa")
@@ -281,57 +280,20 @@ def plist_main(
             break
         details_df["store_app"] = row.store_app
         details_df["version_code"] = version_str
-        version_code_df = details_df[["store_app", "version_code"]].drop_duplicates()
-        version_code_df["crawl_result"] = crawl_result
-        logger.info(f"{store_id=} insert {crawl_result=}")
-        upserted: pd.DataFrame = upsert_df(
-            df=version_code_df,
-            table_name="version_codes",
-            database_connection=database_connection,
-            key_columns=["store_app", "version_code"],
-            return_rows=True,
-            insert_columns=["store_app", "version_code", "crawl_result"],
-        )
+
+        try:
+            upsert_details_df(
+                details_df=details_df,
+                crawl_result=crawl_result,
+                database_connection=database_connection,
+                store_id=store_id,
+                raw_txt_str=plist_str,
+            )
+        except Exception as e:
+            logger.exception(f"DB INSERT ERROR for {store_id=}: {str(e)}")
+
         if ipa_path:
             ipa_path.unlink(missing_ok=True)
-        if crawl_result != 1:
-            continue
-        upserted = upserted.rename(
-            columns={"version_code": "original_version_code", "id": "version_code"}
-        ).drop("store_app", axis=1)
-        details_df = details_df.rename(
-            columns={
-                "path": "xml_path",
-                "version_code": "original_version_code",
-                "value": "value_name",
-            }
-        )
-        details_df = pd.merge(
-            left=details_df,
-            right=upserted,
-            how="left",
-            on=["original_version_code"],
-            validate="m:1",
-        )
-        details_df["tag"] = np.nan
-        key_insert_columns = ["version_code", "xml_path", "tag", "value_name"]
-        details_df = details_df[key_insert_columns].drop_duplicates()
-        upsert_df(
-            df=details_df,
-            table_name="version_details",
-            database_connection=database_connection,
-            key_columns=key_insert_columns,
-            insert_columns=key_insert_columns,
-        )
-        details_df["manifest_string"] = plist_str
-        manifest_df = details_df[["version_code", "manifest_string"]].drop_duplicates()
-        upsert_df(
-            df=manifest_df,
-            table_name="version_manifests",
-            database_connection=database_connection,
-            key_columns=["version_code"],
-            insert_columns=["version_code", "manifest_string"],
-        )
 
 
 def parse_args() -> argparse.Namespace:

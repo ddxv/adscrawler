@@ -144,6 +144,87 @@ def query_developers(
     return df
 
 
+def upsert_details_df(
+    details_df: pd.DataFrame,
+    crawl_result: int,
+    database_connection: PostgresCon,
+    store_id: str,
+    raw_txt_str: str,
+) -> None:
+    version_code_df = details_df[["store_app", "version_code"]].drop_duplicates()
+    version_code_df["crawl_result"] = crawl_result
+    logger.info(f"{store_id=} insert version_code to db")
+    upserted: pd.DataFrame = upsert_df(
+        df=version_code_df,
+        table_name="version_codes",
+        database_connection=database_connection,
+        key_columns=["store_app", "version_code"],
+        return_rows=True,
+        insert_columns=["store_app", "version_code", "crawl_result"],
+    )
+
+    if crawl_result != 1:
+        return
+    upserted = upserted.rename(
+        columns={"version_code": "original_version_code", "id": "version_code"}
+    ).drop("store_app", axis=1)
+    details_df = details_df.rename(
+        columns={
+            "path": "xml_path",
+            "version_code": "original_version_code",
+            "android_name": "value_name",
+        }
+    )
+    details_df = pd.merge(
+        left=details_df,
+        right=upserted,
+        how="left",
+        on=["original_version_code"],
+        validate="m:1",
+    )
+    key_insert_columns = ["xml_path", "tag", "value_name"]
+    strings_df = details_df[key_insert_columns + ["version_code"]].drop_duplicates()
+    logger.info(f"{store_id=} insert version_strings to db")
+    strings_df.loc[strings_df["tag"].isna(), "tag"] = ""
+    version_strings_df = upsert_df(
+        df=strings_df,
+        table_name="version_strings",
+        database_connection=database_connection,
+        key_columns=key_insert_columns,
+        insert_columns=key_insert_columns,
+        return_rows=True,
+    )
+    version_strings_df = version_strings_df.rename(columns={"id": "string_id"})
+    strings_map_df = pd.merge(
+        strings_df,
+        version_strings_df,
+        how="left",
+        on=["xml_path", "tag", "value_name"],
+        validate="many_to_one",
+    )
+    if strings_map_df["string_id"].isna().any():
+        logger.error(f"{store_id=} insert strings_map to db")
+        logger.error(strings_map_df[strings_map_df["string_id"].isna()])
+    insert_columns = ["version_code", "string_id"]
+    upsert_df(
+        table_name="version_details_map",
+        insert_columns=insert_columns,
+        df=strings_map_df,
+        key_columns=insert_columns,
+        database_connection=database_connection,
+    )
+    strings_map_df["manifest_string"] = raw_txt_str
+    manifest_df = strings_map_df[["version_code", "manifest_string"]].drop_duplicates()
+    upsert_df(
+        df=manifest_df,
+        table_name="version_manifests",
+        database_connection=database_connection,
+        key_columns=["version_code"],
+        insert_columns=["version_code", "manifest_string"],
+    )
+    logger.info(f"{store_id=} finished")
+
+
 def query_store_id_map(
     database_connection: PostgresCon,
     store: int | None = None,
@@ -468,11 +549,15 @@ def get_top_ranks_for_unpacking(
                 vc.store_app = dc.store_app
             WHERE
                 dc.store = {store}
-                vc.updated_at IS NULL OR
-                (
-                (vc.crawl_result = 1 AND vc.updated_at < current_date - INTERVAL '180 days')
-                OR
-                (vc.crawl_result IN (2,3,4) AND vc.updated_at < current_date - INTERVAL '30 days')
+                AND
+                (   
+                    vc.updated_at IS NULL 
+                    OR
+                        (
+                        (vc.crawl_result = 1 AND vc.updated_at < current_date - INTERVAL '180 days')
+                        OR
+                        (vc.crawl_result IN (2,3,4) AND vc.updated_at < current_date - INTERVAL '30 days')
+                        )
                 )
             ORDER BY
             (CASE
@@ -501,8 +586,10 @@ def get_top_ranks_for_unpacking(
             LEFT JOIN latest_version_codes lvs ON
                 sa.id = lvs.store_app
             WHERE
-                lvs.updated_at < urs.created_at
+                (lvs.updated_at < urs.created_at
                     OR lvs.updated_at IS NULL
+                )
+                AND sa.store = {store}
             )
         SELECT
             *
