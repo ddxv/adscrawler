@@ -139,9 +139,11 @@ CREATE UNIQUE INDEX companies_apps_overview_unique_idx ON frontend.companies_app
 
 
 DROP MATERIALIZED VIEW IF EXISTS frontend.store_apps_overview;
+
 CREATE MATERIALIZED VIEW frontend.store_apps_overview
 TABLESPACE pg_default
-AS WITH latest_version_codes AS (
+AS
+WITH latest_version_codes AS (
     SELECT DISTINCT ON (vc.store_app)
         vc.id,
         vc.store_app,
@@ -166,6 +168,16 @@ latest_successful_version_codes AS (
     ORDER BY
         vc.store_app,
         (string_to_array(vc.version_code::text, '.'::text)::bigint []) DESC
+),
+
+latest_en_descriptions AS (
+    SELECT DISTINCT ON (store_app)
+        store_app,
+        description,
+        description_short
+    FROM store_apps_descriptions
+    WHERE language_id = 1
+    ORDER BY store_app ASC, updated_at DESC
 )
 
 SELECT
@@ -199,14 +211,18 @@ SELECT
     lvc.updated_at AS sdk_last_crawled,
     lvc.crawl_result AS sdk_crawl_result,
     lsvc.updated_at AS sdk_successful_last_crawled,
-    lvc.version_code
+    lvc.version_code,
+    ld.description,
+    ld.description_short
 FROM store_apps AS sa
 LEFT JOIN developers AS d ON sa.developer = d.id
 LEFT JOIN app_urls_map AS aum ON sa.id = aum.store_app
 LEFT JOIN pub_domains AS pd ON aum.pub_domain = pd.id
 LEFT JOIN latest_version_codes AS lvc ON sa.id = lvc.store_app
 LEFT JOIN latest_successful_version_codes AS lsvc ON sa.id = lsvc.store_app
+LEFT JOIN latest_en_descriptions AS ld ON sa.id = ld.store_app
 WITH DATA;
+
 
 -- View indexes:
 CREATE INDEX store_apps_overview_idx ON frontend.store_apps_overview USING btree (
