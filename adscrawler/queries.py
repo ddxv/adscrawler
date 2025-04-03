@@ -93,6 +93,8 @@ def upsert_df(
         data = [
             tuple(row) for row in df[all_columns].itertuples(index=False, name=None)
         ]
+        if log:
+            logger.info(f"Upsert data: {data}")
         cur.executemany(upsert_query, data)
 
         # Fetch affected rows if required
