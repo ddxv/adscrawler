@@ -110,7 +110,9 @@ def extract_keywords_rake(text: str, top_n: int = 10, max_tokens: int = 3) -> li
     for phrase in r.get_ranked_phrases():
         if count_tokens(phrase) <= max_tokens:
             filtered_phrases.append(phrase)
-
+    filtered_phrases = [
+        phrase for phrase in filtered_phrases if phrase not in STOPWORDS
+    ]
     return filtered_phrases[:top_n]
 
 
@@ -129,6 +131,9 @@ def extract_keywords(text: str, top_n: int = 10, max_tokens: int = 3) -> list[st
         kw = kw.lower()
         if count_tokens(kw) <= max_tokens:
             filtered_keywords.append(kw)
+
+    # Remove stopwords from filtered keywords
+    filtered_keywords = [kw for kw in filtered_keywords if kw not in STOPWORDS]
 
     return list(sorted(set(filtered_keywords)))
 
