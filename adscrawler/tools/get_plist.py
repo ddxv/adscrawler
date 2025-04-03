@@ -252,6 +252,7 @@ def plist_main(
         logger.info(f"{store_id=} start")
         details_df = row.to_frame().T
         version_str = "-1"
+        plist_str = ""
         ipa_path: None | pathlib.Path = None
         try:
             bundle_id = download_and_unpack(store_id=store_id)
