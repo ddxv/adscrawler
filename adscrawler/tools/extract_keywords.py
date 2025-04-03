@@ -53,6 +53,7 @@ STOPWORDS = set(stopwords.words("english")).union(CUSTOM_STOPWORDS)
 
 def clean_text(text: str) -> str:
     """Lowercases text and removes non-alphabetic characters except spaces."""
+    text = text.replace("\r", ". ").replace("\n", ". ")
     return re.sub(r"[^a-zA-Z\s]", "", text.lower())
 
 
