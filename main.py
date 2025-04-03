@@ -153,6 +153,14 @@ class ProcessManager:
         ]
         return len(download_processes) > 1
 
+    def check_crawl_keywords_processes(self) -> bool:
+        processes = self.get_running_processes()
+        my_processes = self.filter_processes(processes, "/adscrawler/main.py")
+        crawl_processes = [
+            x for x in my_processes if any([" -k" in x, " --crawl-keywords" in x])
+        ]
+        return len(crawl_processes) > 1
+
     def is_script_already_running(self) -> bool:
         if self.args.update_app_store_details:
             return self.check_app_update_processes()
@@ -160,6 +168,8 @@ class ProcessManager:
             return self.check_apk_download_processes()
         elif self.args.app_ads_txt_scrape:
             return self.check_ads_txt_download_processes()
+        elif self.args.crawl_keywords:
+            return self.check_crawl_keywords_processes()
         return False
 
     def setup_database_connection(self) -> None:
