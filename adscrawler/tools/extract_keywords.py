@@ -39,7 +39,7 @@ def count_tokens(phrase: str) -> int:
 
 
 def extract_keywords_spacy(
-    text: str, top_n: int = 10, max_tokens: int = 4
+    text: str, top_n: int = 10, max_tokens: int = 3
 ) -> list[str]:
     """Extracts noun phrase keywords using spaCy with token limit."""
     doc = nlp(text)
@@ -67,7 +67,7 @@ def extract_keywords_nltk(text: str, top_n: int = 10) -> list[str]:
     return list(keywords)[:top_n]
 
 
-def extract_keywords_rake(text: str, top_n: int = 10, max_tokens: int = 4) -> list[str]:
+def extract_keywords_rake(text: str, top_n: int = 10, max_tokens: int = 3) -> list[str]:
     """Extracts keywords using RAKE with token limit."""
     r = Rake()
     r.extract_keywords_from_text(text)
@@ -81,7 +81,7 @@ def extract_keywords_rake(text: str, top_n: int = 10, max_tokens: int = 4) -> li
     return filtered_phrases[:top_n]
 
 
-def extract_keywords(text: str, top_n: int = 10, max_tokens: int = 4) -> list[str]:
+def extract_keywords(text: str, top_n: int = 10, max_tokens: int = 3) -> list[str]:
     """Extracts keywords using spaCy, NLTK, and RAKE, then returns a unique set."""
     text = clean_text(text)
     keywords = (
