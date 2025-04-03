@@ -46,9 +46,7 @@ CUSTOM_STOPWORDS = {
     "use",
     "need",
     "get",
-    "de",
     "who",
-    "us",
 }
 STOPWORDS = set(stopwords.words("english")).union(CUSTOM_STOPWORDS)
 
