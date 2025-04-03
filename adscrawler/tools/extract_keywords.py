@@ -63,6 +63,7 @@ def clean_text(text: str) -> str:
     """Lowercases text and removes non-alphabetic characters except spaces."""
     text = text.replace("\r", ". ").replace("\n", ". ").replace("\xa0", ". ")
     text = re.sub(r"\bhttp\S*", "", text)
+    text = re.sub(r"\bwww\S*", "", text)
     return re.sub(r"[^a-zA-Z\s]", ". ", text.lower())
 
 
