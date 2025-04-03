@@ -40,13 +40,21 @@ CUSTOM_STOPWORDS = {
     "app",
     "we",
     "the app",
+    "this app",
     "application",
+    "this application",
     "one",
     "them",
     "use",
     "need",
     "get",
     "who",
+    "i",
+    "also",
+    "our app",
+    "the game",
+    "youll",
+    "youre",
 }
 STOPWORDS = set(stopwords.words("english")).union(CUSTOM_STOPWORDS)
 
