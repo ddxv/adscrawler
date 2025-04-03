@@ -24,7 +24,32 @@ nltk.download("stopwords", quiet=True)
 nltk.download("wordnet", quiet=True)
 
 # Custom stopwords to remove personal pronouns & other irrelevant words
-CUSTOM_STOPWORDS = {"your", "our", "my", "their", "his", "her", "its", "what", "which"}
+CUSTOM_STOPWORDS = {
+    "your",
+    "our",
+    "my",
+    "their",
+    "his",
+    "her",
+    "its",
+    "what",
+    "which",
+    "you",
+    "it",
+    "that",
+    "app",
+    "we",
+    "the app",
+    "application",
+    "one",
+    "them",
+    "use",
+    "need",
+    "get",
+    "de",
+    "who",
+    "us",
+}
 STOPWORDS = set(stopwords.words("english")).union(CUSTOM_STOPWORDS)
 
 
