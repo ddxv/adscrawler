@@ -13,23 +13,18 @@ adtech.categories:
 3	Analytics: Product	product-analytics
 """
 
-domain = "verint.com"
-company_name = "Verint"
-sdk_name = "Verint SDK"
-sdk_slug = "verint-sdk"
+domain = "nefta.io"
+company_name = "Nefta"
+sdk_name = "Nefta SDK"
+sdk_slug = "nefta-sdk"
 is_open_source = False
 has_third_party_tracking = True
-category_id = 5
+category_id = 1
 
 sdk_package_patterns = [
-    "com.verint.xm.sdk.predictive.tracker",
-    "com.verint",
-    "com.foresee",
-    "ForeSeeCxMeasure.framework",
-    "react_native_foresee_sdk.framework",
-    "ForeSee.framework",
-    "ForeSeeLegacy.framework",
-    "ForeSeeUtilities.framework",
+    "NeftaSDKVersion",
+    "com.nefta",
+    "NeftaSDK.framework",
 ]
 
 

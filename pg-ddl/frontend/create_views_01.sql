@@ -1219,3 +1219,87 @@ CREATE UNIQUE INDEX companies_parent_category_tag_stats_idx ON frontend.companie
 CREATE INDEX companies_parent_category_tag_stats_query_idx ON frontend.companies_parent_category_tag_stats USING btree (
     company_domain
 );
+
+
+
+CREATE MATERIALIZED VIEW frontend.keyword_scores AS
+WITH latest_en_descriptions AS (
+    SELECT DISTINCT ON
+    (store_app)
+        sad.store_app,
+        sad.id AS description_id
+    FROM
+        store_apps_descriptions AS sad
+    INNER JOIN description_keywords AS dk
+        ON
+            sad.id = dk.description_id
+    WHERE
+        sad.language_id = 1
+    ORDER BY
+        sad.store_app ASC,
+        sad.updated_at DESC
+),
+
+keyword_app_counts AS (
+    SELECT
+        sa.store,
+        k.keyword_text,
+        dk.keyword_id,
+        count(DISTINCT led.store_app) AS app_count
+    FROM
+        latest_en_descriptions AS led
+    LEFT JOIN description_keywords AS dk
+        ON
+            led.description_id = dk.description_id
+    LEFT JOIN keywords AS k
+        ON
+            dk.keyword_id = k.id
+    LEFT JOIN store_apps AS sa
+        ON
+            led.store_app = sa.id
+    WHERE
+        dk.keyword_id IS NOT NULL
+    GROUP BY
+        sa.store,
+        k.keyword_text,
+        dk.keyword_id
+),
+
+total_app_count AS (
+    SELECT
+        sa.store,
+        count(*) AS total_apps
+    FROM
+        latest_en_descriptions AS led
+    LEFT JOIN store_apps AS sa
+        ON
+            led.store_app = sa.id
+    GROUP BY sa.store
+)
+
+SELECT
+    kac.store,
+    kac.keyword_text,
+    kac.keyword_id,
+    kac.app_count,
+    tac.total_apps,
+    round(
+        100
+        * (
+            1
+            - ln(tac.total_apps::float / (kac.app_count + 1))
+            / ln(tac.total_apps::float)
+        )::numeric,
+        2
+    ) AS competitiveness_score
+FROM
+    keyword_app_counts AS kac
+LEFT JOIN total_app_count AS tac
+    ON kac.store = tac.store
+ORDER BY
+    competitiveness_score DESC
+WITH DATA;
+
+CREATE UNIQUE INDEX keyword_scores_unique ON frontend.keyword_scores USING btree (
+    store, keyword_id
+)
