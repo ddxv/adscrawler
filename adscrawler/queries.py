@@ -473,14 +473,16 @@ def query_keywords_to_crawl(
                         FROM
                             app_keyword_rankings akr
                         WHERE
-                            akr.crawled_date > CURRENT_DATE - INTERVAL '1 days'
+                            akr.crawled_date > CURRENT_DATE - INTERVAL '7 days'
                     )
                     SELECT
                         *
                     FROM
-                        keywords k
+                        frontend.keyword_scores ks
                     WHERE
-                        k.id NOT IN (SELECT keyword FROM crawled_keywords)
+                        ks.keyword_id NOT IN (SELECT keyword FROM crawled_keywords)
+                        ORDER BY ks.competitiveness_score
+                        DESC  
                     {limit_str}
                     ;
                 """

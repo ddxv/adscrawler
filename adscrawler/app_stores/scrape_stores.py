@@ -200,7 +200,7 @@ def crawl_keyword_cranks(database_connection: PostgresCon) -> None:
     language = "en"
     language_dict = languages_map.set_index("language_slug")["id"].to_dict()
     language_key = language_dict[language]
-    kdf = query_keywords_to_crawl(database_connection)
+    kdf = query_keywords_to_crawl(database_connection, limit=80000)
     for _id, row in kdf.iterrows():
         logger.info(f"Crawling {_id}/{kdf.shape[0]} keyword={row.keyword_text}")
         keyword = row.keyword_text
