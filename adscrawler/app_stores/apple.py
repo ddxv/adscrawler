@@ -212,9 +212,9 @@ def get_developer_url(result: dict, store_id: str, country: str) -> str:
         if len(found_tlds) == 0:
             if "sellerUrl" not in result.keys():
                 raise Exception(f"No developer url found for {store_id=} {country=}")
-            final_url = result["sellerUrl"]
+            final_url: str = result["sellerUrl"]
         elif len(found_tlds) == 1:
-            final_url = found_tlds[0]
+            final_url: str = found_tlds[0]
         else:
             logger.warning(
                 f"Multiple developer sites found for {store_id=} {country=} {found_tlds=}"
@@ -317,6 +317,8 @@ def clean_ios_app_df(df: pd.DataFrame) -> pd.DataFrame:
     except Exception:
         logger.warning("Unable to parse histogram")
         df["histogram"] = None
+    if "description" in df.columns:
+        df["description"] = df["description"].str.slice(0, 5000)
     return df
 
 

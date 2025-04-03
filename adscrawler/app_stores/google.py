@@ -96,6 +96,8 @@ def clean_google_play_app_df(df: pd.DataFrame) -> pd.DataFrame:
         else:
             for x in range(3):
                 df[f"{list_col}_{x}"] = None
+    if "description" in df.columns:
+        df["description"] = df["description"].str.slice(0, 5000)
     return df
 
 
