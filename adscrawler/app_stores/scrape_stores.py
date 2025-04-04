@@ -893,7 +893,8 @@ def upsert_store_apps_descriptions(
             description_short = row["description_short"]
             language_id = row["language_id"]
             description_id = row["description_id"]
-            keywords = extract_keywords(description_short + ". " + description)
+            text = description_short + ". " + description
+            keywords = extract_keywords(text)
             keywords_df = pd.DataFrame(keywords, columns=["keyword_text"])
             keywords_df["language_id"] = language_id
             keywords_df["description_id"] = description_id

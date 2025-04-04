@@ -3,7 +3,7 @@ from collections import Counter
 
 import nltk
 import spacy
-from nltk.corpus import stopwords
+from nltk.corpus import stopwords, wordnet
 from nltk.stem import WordNetLemmatizer
 from nltk.tokenize import word_tokenize
 from rake_nltk import Rake
@@ -22,6 +22,7 @@ except OSError:
 nltk.download("punkt", quiet=True)
 nltk.download("stopwords", quiet=True)
 nltk.download("wordnet", quiet=True)
+nltk.download("averaged_perceptron_tagger_eng", quiet=True)
 
 # Custom stopwords to remove personal pronouns & other irrelevant words
 CUSTOM_STOPWORDS = {
@@ -61,7 +62,14 @@ STOPWORDS = set(stopwords.words("english")).union(CUSTOM_STOPWORDS)
 
 def clean_text(text: str) -> str:
     """Lowercases text and removes non-alphabetic characters except spaces."""
-    text = text.replace("\r", ". ").replace("\n", ". ").replace("\xa0", ". ")
+    text = (
+        text.replace("\r", ". ")
+        .replace("\n", ". ")
+        .replace("\t", ". ")
+        .replace("\xa0", ". ")
+        .replace("•", ". ")
+        .replace("'", "")
+    )
     text = re.sub(r"\bhttp\S*", "", text)
     text = re.sub(r"\bwww\S*", "", text)
     return re.sub(r"[^a-zA-Z\s]", ". ", text.lower())
@@ -83,22 +91,35 @@ def extract_keywords_spacy(
         if chunk.root.text.isalpha():
             # Check token count
             if count_tokens(chunk.text) <= max_tokens:
-                keywords.append(chunk.text)
+                if not any(token.is_stop or token in STOPWORDS for token in chunk):
+                    keywords.append(chunk.text)
 
     keyword_freq = Counter(keywords)
     return [kw for kw, _ in keyword_freq.most_common(top_n)]
 
 
 def extract_keywords_nltk(text: str, top_n: int = 10) -> list[str]:
-    """Extracts lemmatized keywords using NLTK."""
+    """Extracts lemmatized keywords using NLTK with frequency ranking."""
     words = word_tokenize(text)
+    pos_tags = nltk.pos_tag(words)
     lemmatizer = WordNetLemmatizer()
-    keywords = {
-        lemmatizer.lemmatize(word)
-        for word in words
-        if word.isalpha() and word not in STOPWORDS
-    }
-    return list(keywords)[:top_n]
+    processed_words = []
+    for word, tag in pos_tags:
+        # Only process alphabetic words that aren't stopwords
+        if word.isalpha() and word.lower() not in STOPWORDS:
+            # Convert POS tag to WordNet format for better lemmatization
+            tag_first_char = tag[0].lower()
+            wordnet_pos = {
+                "n": wordnet.NOUN,
+                "v": wordnet.VERB,
+                "a": wordnet.ADJ,
+                "r": wordnet.ADV,
+            }.get(tag_first_char, wordnet.NOUN)
+            lemma = lemmatizer.lemmatize(word.lower(), wordnet_pos)
+            if len(lemma) > 2:
+                processed_words.append(lemma)
+    word_freq = Counter(processed_words)
+    return [word for word, freq in word_freq.most_common(top_n)]
 
 
 def extract_keywords_rake(text: str, top_n: int = 10, max_tokens: int = 3) -> list[str]:
@@ -120,11 +141,10 @@ def extract_keywords_rake(text: str, top_n: int = 10, max_tokens: int = 3) -> li
 def extract_keywords(text: str, top_n: int = 10, max_tokens: int = 3) -> list[str]:
     """Extracts keywords using spaCy, NLTK, and RAKE, then returns a unique set."""
     text = clean_text(text)
-    keywords = (
-        extract_keywords_spacy(text, top_n, max_tokens)
-        + extract_keywords_nltk(text, top_n)
-        + extract_keywords_rake(text, top_n, max_tokens)
-    )
+    words_spacy = extract_keywords_spacy(text, top_n, max_tokens)
+    words_nltk = extract_keywords_nltk(text, top_n)
+    words_rake = extract_keywords_rake(text, top_n, max_tokens)
+    keywords = words_spacy + words_nltk + words_rake
 
     # Additional check to filter by token count
     filtered_keywords = []
