@@ -467,25 +467,45 @@ def query_keywords_to_crawl(
     limit_str = ""
     if limit:
         limit_str = f"LIMIT {limit}"
-    sel_query = f"""WITH crawled_keywords AS (
-                        SELECT
-                            DISTINCT akr.keyword
-                        FROM
-                            app_keyword_rankings akr
-                        WHERE
-                            akr.crawled_date > CURRENT_DATE - INTERVAL '7 days'
-                    )
+    sel_query = f"""WITH rank_crawled_keywords AS (
+                SELECT
+                    DISTINCT akr.keyword
+                FROM
+                    app_keyword_rankings akr
+                WHERE
+                    akr.crawled_date > CURRENT_DATE - INTERVAL '7 days'
+            ),
+            log_crawled_keywords AS (
+                SELECT
+                    DISTINCT keyword
+                FROM
+                    logging.keywords_crawled_at
+                WHERE
+                    crawled_at > CURRENT_DATE - INTERVAL '7 days'
+            )
+            SELECT
+                *
+            FROM
+                frontend.keyword_scores ks
+            WHERE
+                ks.keyword_id NOT IN (
                     SELECT
-                        *
+                        keyword
                     FROM
-                        frontend.keyword_scores ks
-                    WHERE
-                        ks.keyword_id NOT IN (SELECT keyword FROM crawled_keywords)
-                        ORDER BY ks.competitiveness_score
-                        DESC  
-                    {limit_str}
-                    ;
-                """
+                        rank_crawled_keywords
+                )
+                OR ks.keyword_id NOT IN (
+                    SELECT
+                        keyword
+                    FROM
+                        log_crawled_keywords
+                )
+            ORDER BY
+                ks.competitiveness_score
+            DESC
+            {limit_str}
+            ;
+            """
     df = pd.read_sql(sel_query, database_connection.engine)
     return df
 

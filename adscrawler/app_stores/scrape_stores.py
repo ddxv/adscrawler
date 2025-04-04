@@ -207,18 +207,36 @@ def crawl_keyword_cranks(database_connection: PostgresCon) -> None:
         )
         keyword = row.keyword_text
         keyword_id = row.keyword_id
-        df = scrape_keyword(
-            country=country,
-            language=language,
-            language_key=language_key,
-            keyword=keyword,
-            keyword_id=keyword_id,
-        )
-        process_scraped(
+
+        try:
+            df = scrape_keyword(
+                country=country,
+                language=language,
+                language_key=language_key,
+                keyword=keyword,
+                keyword_id=keyword_id,
+            )
+            process_scraped(
+                database_connection=database_connection,
+                ranked_dicts=df.to_dict(orient="records"),
+                crawl_source="scrape_keywords",
+                countries_map=countries_map,
+            )
+        except Exception:
+            logger.exception(f"Scrape keyword={keyword} hit error, skipping")
+        key_columns = ["keyword"]
+        upsert_df(
+            table_name="keywords_crawled_at",
+            schema="logging",
+            insert_columns=["keyword", "crawled_at"],
+            df=pd.DataFrame(
+                {
+                    "keyword": [keyword],
+                    "crawled_at": datetime.datetime.now(tz=datetime.UTC),
+                }
+            ),
+            key_columns=key_columns,
             database_connection=database_connection,
-            ranked_dicts=df.to_dict(orient="records"),
-            crawl_source="scrape_keywords",
-            countries_map=countries_map,
         )
 
 

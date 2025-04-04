@@ -186,11 +186,6 @@ CREATE INDEX store_apps_country_history_store_app_idx ON public.store_apps_count
 );
 
 
--- logging.developers_crawled_at definition
-
--- Drop table
-
--- DROP TABLE logging.developers_crawled_at;
 
 CREATE TABLE logging.developers_crawled_at (
     developer int4 NOT NULL,
@@ -201,11 +196,6 @@ CREATE TABLE logging.developers_crawled_at (
     ) REFERENCES public.developers (id)
 );
 
--- logging.developers_crawled_at definition
-
--- Drop table
-
--- DROP TABLE logging.developers_crawled_at;
 
 CREATE TABLE logging.store_app_sources (
     store int2 NOT NULL,

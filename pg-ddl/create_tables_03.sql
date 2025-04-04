@@ -165,3 +165,13 @@ CREATE TABLE public.description_keywords (
     extracted_at timestamp DEFAULT NOW() NOT NULL,
     UNIQUE (description_id, keyword_id)
 );
+
+
+CREATE TABLE logging.keywords_crawled_at (
+    keyword int4 NOT NULL,
+    apps_crawled_at timestamp NULL,
+    CONSTRAINT keywords_crawled_at_pk PRIMARY KEY (keyword),
+    CONSTRAINT keywords_crawled_at_fk FOREIGN KEY (
+        keyword
+    ) REFERENCES public.keywords (id)
+);
