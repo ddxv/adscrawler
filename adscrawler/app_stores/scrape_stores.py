@@ -231,7 +231,7 @@ def crawl_keyword_cranks(database_connection: PostgresCon) -> None:
             insert_columns=["keyword", "crawled_at"],
             df=pd.DataFrame(
                 {
-                    "keyword": [keyword],
+                    "keyword": [keyword_id],
                     "crawled_at": datetime.datetime.now(tz=datetime.UTC),
                 }
             ),
