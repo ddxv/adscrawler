@@ -230,7 +230,6 @@ def plist_main(
     database_connection: PostgresCon, number_of_apps_to_pull: int = 20
 ) -> None:
     store = 2
-    collection_id = 4  # 'Top' Collection
     logger.info("Start iTunes Info.plist")
     apps = get_top_ranks_for_unpacking(
         database_connection=database_connection,

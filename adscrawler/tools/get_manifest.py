@@ -217,7 +217,6 @@ def manifest_main(
 ) -> None:
     error_count = 0
     store = 1
-    collection_id = 1  # 'Top' Collection
     logger.info("Start APK processing")
     apps = get_top_ranks_for_unpacking(
         database_connection=database_connection,
@@ -274,7 +273,7 @@ def manifest_main(
             )
         except Exception as e:
             logger.exception(f"DB INSERT ERROR for {store_id=}: {str(e)}")
-        remove_apks(store_id=store_id, extension=extension)
+        remove_apks(store_id=store_id)
 
 
 def remove_apks(store_id: str) -> None:
