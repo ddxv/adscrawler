@@ -37,7 +37,7 @@ from adscrawler.queries import (
     query_store_ids,
     upsert_df,
 )
-from adscrawler.tools.extract_keywords import extract_keywords
+from adscrawler.tools.extract_keywords import extract_keywords, get_global_keywords
 
 logger = get_logger(__name__, "scrape_stores")
 
@@ -905,14 +905,25 @@ def upsert_store_apps_descriptions(
         database_connection=database_connection,
         return_rows=True,
     ).rename(columns={"id": "description_id"})
+    description_df = pd.merge(
+        description_df,
+        store_apps_descriptions[["store_app", "name"]],
+        how="left",
+        on="store_app",
+        validate="1:1",
+    )
     if description_df is not None and not description_df.empty:
         for _i, row in description_df.iterrows():
             description = row["description"]
             description_short = row["description_short"]
             language_id = row["language_id"]
             description_id = row["description_id"]
-            text = description_short + ". " + description
-            keywords = extract_keywords(text)
+            app_name = row["name"]
+            text = ". ".join([app_name, description_short, description])
+            keywords = extract_keywords(text, database_connection=database_connection)
+
+            keywords
+
             keywords_df = pd.DataFrame(keywords, columns=["keyword_text"])
             keywords_df["language_id"] = language_id
             keywords_df["description_id"] = description_id
@@ -948,6 +959,37 @@ def upsert_keywords(keywords_df: pd.DataFrame, database_connection: PostgresCon)
         insert_columns=insert_columns,
         key_columns=key_columns,
         database_connection=database_connection,
+    )
+
+
+def insert_global_keywords(database_connection: PostgresCon):
+    """Insert global keywords into the database.
+    NOTE: This takes about ~5-8GB of RAM for 50k keywords and 200k descriptions. For now run manually.
+    """
+    global_keywords = get_global_keywords(database_connection)
+    global_keywords_df = pd.DataFrame(global_keywords, columns=["keyword_text"])
+    table_name = "keywords"
+    insert_columns = ["keyword_text"]
+    key_columns = ["keyword_text"]
+    keywords_df = upsert_df(
+        table_name=table_name,
+        df=global_keywords_df,
+        insert_columns=insert_columns,
+        key_columns=key_columns,
+        database_connection=database_connection,
+        return_rows=True,
+    )
+    keywords_df = keywords_df.rename(columns={"id": "keyword_id"})
+    keywords_df = keywords_df[["keyword_id"]]
+    table_name = "keywords_base"
+    insert_columns = ["keyword_id"]
+    key_columns = ["keyword_id"]
+    keywords_df.to_sql(
+        name=table_name,
+        con=database_connection.engine,
+        if_exists="replace",
+        index=False,
+        schema="public",
     )
 
 

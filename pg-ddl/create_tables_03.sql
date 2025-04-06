@@ -175,3 +175,9 @@ CREATE TABLE logging.keywords_crawled_at (
         keyword
     ) REFERENCES public.keywords (id)
 );
+
+
+CREATE TABLE keywords_base (
+    id serial PRIMARY KEY,
+    keyword_id int REFERENCES keywords (id)
+);

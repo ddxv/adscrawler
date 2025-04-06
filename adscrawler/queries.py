@@ -631,3 +631,33 @@ def get_top_ranks_for_unpacking(
     """
     df = pd.read_sql(sel_query, con=database_connection.engine)
     return df
+
+
+def query_all_store_app_descriptions(
+    database_connection: PostgresCon,
+) -> pd.DataFrame:
+    sel_query = """SELECT
+    DISTINCT ON (store_app)
+        description
+    FROM
+        store_apps_descriptions
+        ORDER BY store_app, updated_at desc
+    ;
+    """
+    df = pd.read_sql(sel_query, con=database_connection.engine)
+    return df
+
+
+@lru_cache(maxsize=1)
+def query_keywords_base(database_connection: PostgresCon) -> pd.DataFrame:
+    sel_query = """SELECT
+    k.keyword_text
+    FROM
+    keywords_base kb
+    LEFT JOIN keywords k ON
+        k.id = kb.keyword_id
+    ;
+    """
+    df = pd.read_sql(sel_query, con=database_connection.engine)
+    df["keyword_text"] = " " + df["keyword_text"] + " "
+    return df

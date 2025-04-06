@@ -7,6 +7,13 @@ from nltk.corpus import stopwords, wordnet
 from nltk.stem import WordNetLemmatizer
 from nltk.tokenize import word_tokenize
 from rake_nltk import Rake
+from sklearn.feature_extraction.text import TfidfVectorizer
+
+from adscrawler.connection import PostgresCon
+from adscrawler.queries import (
+    query_all_store_app_descriptions,
+    query_keywords_base,
+)
 
 # Load spaCy model
 try:
@@ -56,6 +63,12 @@ CUSTOM_STOPWORDS = {
     "the game",
     "youll",
     "youre",
+    "whos",
+    "whatsway",
+    "lets",
+    "let",
+    "set",
+    "com",
 }
 STOPWORDS = set(stopwords.words("english")).union(CUSTOM_STOPWORDS)
 
@@ -138,13 +151,18 @@ def extract_keywords_rake(text: str, top_n: int = 10, max_tokens: int = 3) -> li
     return filtered_phrases[:top_n]
 
 
-def extract_keywords(text: str, top_n: int = 10, max_tokens: int = 3) -> list[str]:
+def extract_keywords(
+    text: str,
+    database_connection: PostgresCon,
+    top_n: int = 5,
+    max_tokens: int = 2,
+) -> list[str]:
     """Extracts keywords using spaCy, NLTK, and RAKE, then returns a unique set."""
     text = clean_text(text)
     words_spacy = extract_keywords_spacy(text, top_n, max_tokens)
     words_nltk = extract_keywords_nltk(text, top_n)
-    words_rake = extract_keywords_rake(text, top_n, max_tokens)
-    keywords = words_spacy + words_nltk + words_rake
+    # words_rake = extract_keywords_rake(text, top_n, max_tokens)
+    keywords = words_spacy + words_nltk
 
     # Additional check to filter by token count
     filtered_keywords = []
@@ -156,7 +174,44 @@ def extract_keywords(text: str, top_n: int = 10, max_tokens: int = 3) -> list[st
     # Remove stopwords from filtered keywords
     filtered_keywords = [kw for kw in filtered_keywords if kw not in STOPWORDS]
 
-    return list(sorted(set(filtered_keywords)))
+    keywords_base = query_keywords_base(database_connection)
+
+    matched_base_keywords = keywords_base[
+        keywords_base["keyword_text"].apply(lambda x: x in text)
+    ]
+    matched_base_keywords = matched_base_keywords["keyword_text"].str.strip().tolist()
+    combined_keywords = list(sorted(set(filtered_keywords + matched_base_keywords)))
+
+    return combined_keywords
+
+
+def get_global_keywords(database_connection: PostgresCon) -> list[str]:
+    """Get the global keywords from the database.
+    NOTE: This takes about ~5-8GB of RAM for 50k keywords and 200k descriptions. For now run manually.
+    """
+    df = query_all_store_app_descriptions(database_connection=database_connection)
+    descriptions = df["description"].tolist()
+    cleaned_texts = [clean_text(description) for description in descriptions]
+
+    vectorizer = TfidfVectorizer(
+        ngram_range=(1, 3),  # Include 1-grams, 2-grams, and 3-grams
+        stop_words=list(STOPWORDS),
+        max_df=0.8,  # Ignore terms in >80% of docs (too common)
+        min_df=20,  # Ignore terms in <10 docs (too rare)
+        max_features=50000,  # Limit to top 10K terms for memory
+    )
+
+    tfidf_matrix = vectorizer.fit_transform(cleaned_texts)
+
+    feature_names = vectorizer.get_feature_names_out()
+    global_scores = tfidf_matrix.sum(axis=0).A1  # Sum scores per term
+
+    keyword_scores = list(zip(feature_names, global_scores, strict=False))
+    keyword_scores.sort(key=lambda x: x[1], reverse=True)
+
+    global_keywords = [kw for kw, score in keyword_scores if kw not in STOPWORDS]
+
+    return global_keywords
 
 
 if __name__ == "__main__":
