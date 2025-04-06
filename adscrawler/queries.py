@@ -541,7 +541,6 @@ def query_all(
 def get_top_ranks_for_unpacking(
     database_connection: PostgresCon,
     store: int,
-    collection_id: int,
     limit: int = 25,
 ) -> pd.DataFrame:
     sel_query = f"""WITH

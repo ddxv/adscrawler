@@ -235,7 +235,6 @@ def plist_main(
     apps = get_top_ranks_for_unpacking(
         database_connection=database_connection,
         store=store,
-        collection_id=collection_id,
         limit=number_of_apps_to_pull,
     )
     logger.info(f"Start iTunes Info.plist: {apps.shape=}")
