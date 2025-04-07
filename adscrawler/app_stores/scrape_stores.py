@@ -207,15 +207,14 @@ def crawl_keyword_cranks(database_connection: PostgresCon) -> None:
         )
         keyword = row.keyword_text
         keyword_id = row.keyword_id
-
         try:
             df = scrape_keyword(
                 country=country,
                 language=language,
-                language_key=language_key,
                 keyword=keyword,
-                keyword_id=keyword_id,
             )
+            df["keyword"] = keyword_id
+            df["lang"] = language_key
             process_scraped(
                 database_connection=database_connection,
                 ranked_dicts=df.to_dict(orient="records"),
@@ -353,9 +352,7 @@ def insert_new_apps(
 def scrape_keyword(
     country: str,
     language: str,
-    language_key: int,
     keyword: str,
-    keyword_id: int,
 ) -> pd.DataFrame:
     logger.info(f"{keyword=} start")
     try:
@@ -384,11 +381,9 @@ def scrape_keyword(
     logger.info(
         f"{keyword=} apple_apps:{adf.shape[0]} google_apps:{gdf.shape[0]} finished"
     )
-    df["keyword"] = keyword_id
-    df["lang"] = language_key
     df["country"] = country
     df["crawled_date"] = datetime.datetime.now(tz=datetime.UTC).date()
-    df = df[["store_id", "store", "country", "lang", "rank", "keyword", "crawled_date"]]
+    df = df[["store_id", "store", "country", "rank", "crawled_date"]]
     return df
 
 
@@ -921,9 +916,6 @@ def upsert_store_apps_descriptions(
             app_name = row["name"]
             text = ". ".join([app_name, description_short, description])
             keywords = extract_keywords(text, database_connection=database_connection)
-
-            keywords
-
             keywords_df = pd.DataFrame(keywords, columns=["keyword_text"])
             keywords_df["language_id"] = language_id
             keywords_df["description_id"] = description_id
