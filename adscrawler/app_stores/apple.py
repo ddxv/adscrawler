@@ -10,6 +10,7 @@ from bs4 import BeautifulSoup
 from itunes_app_scraper.scraper import AppStoreScraper
 from itunes_app_scraper.util import AppStoreCategories, AppStoreCollections
 
+from adscrawler.app_stores.utils import truncate_utf8_bytes
 from adscrawler.config import DEVLEOPER_IGNORE_TLDS, get_logger
 
 logger = get_logger(__name__, "scrape_apple")
@@ -260,6 +261,7 @@ def clean_ios_app_df(df: pd.DataFrame) -> pd.DataFrame:
             "artworkUrl512": "icon_url_512",
             "screenshotUrls": "phone_image_urls",
             "ipadScreenshotUrls": "tablet_image_urls",
+            "languageCodesISO2A": "store_language_code",
         },
     )
     if "price" not in df.columns:
@@ -318,7 +320,9 @@ def clean_ios_app_df(df: pd.DataFrame) -> pd.DataFrame:
         logger.warning("Unable to parse histogram")
         df["histogram"] = None
     if "description" in df.columns:
-        df["description"] = df["description"].str.slice(0, 4900)
+        df["description"] = df["description"].apply(truncate_utf8_bytes)
+    if "store_language_code" in df.columns:
+        df["store_language_code"] = df["store_language_code"].str.lower()
     return df
 
 

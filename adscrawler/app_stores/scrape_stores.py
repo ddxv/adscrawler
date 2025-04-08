@@ -752,7 +752,7 @@ def scrape_app(
     result_dict["crawl_result"] = crawl_result
     result_dict["store"] = store
     result_dict["store_id"] = store_id
-    result_dict["language"] = language.lower()
+    result_dict["queried_language"] = language.lower()
     result_dict["country"] = country.upper()
 
     df = pd.DataFrame([result_dict])
@@ -859,7 +859,15 @@ def save_apps_df(
         ].copy()
         store_apps_descriptions = pd.merge(
             store_apps_descriptions,
-            apps_df[["store_id", "description", "description_short", "language"]],
+            apps_df[
+                [
+                    "store_id",
+                    "description",
+                    "description_short",
+                    "queried_language",
+                    "store_language_code",
+                ]
+            ],
             on="store_id",
         )
         upsert_store_apps_descriptions(store_apps_descriptions, database_connection)
@@ -885,10 +893,21 @@ def upsert_store_apps_descriptions(
         store_apps_descriptions,
         languages_map[["id", "language_slug"]],
         how="left",
-        left_on="language",
+        left_on="store_language_code",
         right_on="language_slug",
         validate="m:1",
     ).rename(columns={"id": "language_id"})
+    if store_apps_descriptions["language_id"].isna().any():
+        logger.error(
+            f"Store apps descriptions language id is NA {store_apps_descriptions[['store_id', 'store_language_code']]}"
+        )
+        store_apps_descriptions = store_apps_descriptions[
+            ~store_apps_descriptions["language_id"].isna()
+        ]
+        if store_apps_descriptions.empty:
+            logger.error("Dropped all descriptions, no language id found")
+            return
+
     if "description_short" not in store_apps_descriptions.columns:
         store_apps_descriptions["description_short"] = ""
     key_columns = ["store_app", "language_id", "description", "description_short"]

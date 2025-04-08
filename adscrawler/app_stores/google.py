@@ -3,8 +3,10 @@ import os
 import subprocess
 
 import google_play_scraper
+import langdetect
 import pandas as pd
 
+from adscrawler.app_stores.utils import truncate_utf8_bytes
 from adscrawler.config import CONFIG, MODULE_DIR, PACKAGE_DIR, get_logger
 
 logger = get_logger(__name__, "scrape_google")
@@ -97,7 +99,10 @@ def clean_google_play_app_df(df: pd.DataFrame) -> pd.DataFrame:
             for x in range(3):
                 df[f"{list_col}_{x}"] = None
     if "description" in df.columns:
-        df["description"] = df["description"].str.slice(0, 4900)
+        df["description"] = df["description"].apply(truncate_utf8_bytes)
+        df["store_language_code"] = df["description"].apply(
+            lambda x: langdetect.detect(x)
+        )
     return df
 
 
