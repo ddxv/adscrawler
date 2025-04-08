@@ -3,6 +3,7 @@ import random
 import re
 import time
 
+import langdetect
 import pandas as pd
 import requests
 import tldextract
@@ -321,8 +322,15 @@ def clean_ios_app_df(df: pd.DataFrame) -> pd.DataFrame:
         df["histogram"] = None
     if "description" in df.columns:
         df["description"] = df["description"].apply(truncate_utf8_bytes)
-    if "store_language_code" in df.columns:
+    if (
+        "store_language_code" in df.columns
+        and df["store_language_code"].str.len().all() == 2
+    ):
         df["store_language_code"] = df["store_language_code"].str.lower()
+    else:
+        df["store_language_code"] = df["description"].apply(
+            lambda x: langdetect.detect(x)
+        )
     return df
 
 
