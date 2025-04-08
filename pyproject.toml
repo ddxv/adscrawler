@@ -22,6 +22,7 @@ dependencies = [
     "nltk",
     "rake_nltk",
     "spacy",
+    "langdetect",
 ]
 
 
