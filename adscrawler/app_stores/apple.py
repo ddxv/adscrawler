@@ -318,7 +318,7 @@ def clean_ios_app_df(df: pd.DataFrame) -> pd.DataFrame:
         logger.warning("Unable to parse histogram")
         df["histogram"] = None
     if "description" in df.columns:
-        df["description"] = df["description"].str.slice(0, 5000)
+        df["description"] = df["description"].str.slice(0, 4900)
     return df
 
 
