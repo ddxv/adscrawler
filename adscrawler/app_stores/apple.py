@@ -331,6 +331,9 @@ def clean_ios_app_df(df: pd.DataFrame) -> pd.DataFrame:
         df["store_language_code"] = df["description"].apply(
             lambda x: langdetect.detect(x)
         )
+        df.loc[
+            df["store_language_code"].str.startswith("zh-"), "store_language_code"
+        ] = "zh"
     return df
 
 
