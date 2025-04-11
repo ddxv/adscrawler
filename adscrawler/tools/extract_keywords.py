@@ -82,6 +82,8 @@ def clean_text(text: str) -> str:
         .replace("\xa0", ". ")
         .replace("•", ". ")
         .replace("'", "")
+        .replace("’", "")
+        .replace("-", " ")
     )
     text = re.sub(r"\bhttp\S*", "", text)
     text = re.sub(r"\bwww\S*", "", text)
@@ -212,10 +214,3 @@ def get_global_keywords(database_connection: PostgresCon) -> list[str]:
     global_keywords = [kw for kw, score in keyword_scores if kw not in STOPWORDS]
 
     return global_keywords
-
-
-if __name__ == "__main__":
-    # Example usage
-    description = """Example description of a store app and it's keywords in the really exciting game and marketing description."""
-    keywords = extract_keywords(description)
-    print(keywords)
