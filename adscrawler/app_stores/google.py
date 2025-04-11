@@ -100,9 +100,16 @@ def clean_google_play_app_df(df: pd.DataFrame) -> pd.DataFrame:
                 df[f"{list_col}_{x}"] = None
     if "description" in df.columns:
         df["description"] = df["description"].apply(truncate_utf8_bytes)
-        df["store_language_code"] = df["description"].apply(
-            lambda x: langdetect.detect(x)
-        )
+        try:
+            df["store_language_code"] = df["description"].apply(
+                lambda x: langdetect.detect(x)
+            )
+        except langdetect.lang_detect_exception.LangDetectException:
+            logger.warning(
+                f"Unable to detect language for {df['store_id'].to_numpy()[0]}"
+            )
+            # This is not a language code, so later join will fail and description keywords ignored
+            df["store_language_code"] = "zz"
         df.loc[
             df["store_language_code"].str.startswith("zh-"), "store_language_code"
         ] = "zh"
