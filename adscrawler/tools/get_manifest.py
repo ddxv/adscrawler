@@ -236,7 +236,7 @@ def manifest_main(
         version_str = "-1"
         manifest_str = ""
         try:
-            extension = download_and_unpack(store_id=store_id)
+            _extension = download_and_unpack(store_id=store_id)
             manifest_str, details_df = get_parsed_manifest()
             version_str = get_version()
             crawl_result = 1
