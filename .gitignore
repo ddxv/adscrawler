@@ -1,6 +1,7 @@
 *.csv
 config.yml
 store-data/
+new_company.yml
 
 # check-testing
 mycheck.py
