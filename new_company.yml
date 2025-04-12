@@ -1,9 +1,16 @@
+# Note this file is in gitignore
+# If you have permanent changes please commit manually
 domain: example.com
 company_name: Example Company
 sdk_name: Example SDK
 sdk_slug: example-sdk
 is_open_source: false
 has_third_party_tracking: true
+# 1: Ad Networks
+# 2: Analytics: Attribution
+# 3: Analytics: Product
+# 4: Development Tools
+# 5: Business Tools
 category_id: 1
 sdk_package_patterns:
   - ExampleA
