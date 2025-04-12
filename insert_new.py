@@ -13,18 +13,17 @@ adtech.categories:
 3	Analytics: Product	product-analytics
 """
 
-domain = "nefta.io"
-company_name = "Nefta"
-sdk_name = "Nefta SDK"
-sdk_slug = "nefta-sdk"
+domain = "example.com"
+company_name = "Example Company"
+sdk_name = "Example SDK"
+sdk_slug = "example-sdk"
 is_open_source = False
 has_third_party_tracking = True
 category_id = 1
 
 sdk_package_patterns = [
-    "NeftaSDKVersion",
-    "com.nefta",
-    "NeftaSDK.framework",
+    "ExampleA",
+    "com.example",
 ]
 
 
