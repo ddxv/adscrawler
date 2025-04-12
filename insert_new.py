@@ -1,14 +1,15 @@
 """Insert a new company and SDK into the database."""
 
-from adscrawler.connection import get_db_connection
 import yaml
+
+from adscrawler.connection import get_db_connection
 
 use_tunnel = True
 database_connection = get_db_connection(use_ssh_tunnel=use_tunnel)
 
 
 def load_yaml_file(file_path: str) -> dict:
-    with open(file_path, "r") as file:
+    with open(file_path) as file:
         return yaml.safe_load(file)
 
 
