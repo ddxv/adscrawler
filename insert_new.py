@@ -1,33 +1,27 @@
+"""Insert a new company and SDK into the database."""
+
 from adscrawler.connection import get_db_connection
+import yaml
 
 use_tunnel = True
 database_connection = get_db_connection(use_ssh_tunnel=use_tunnel)
 
 
-""" 
-adtech.categories:
-4	Development Tools	development-tools
-2	Analytics: Attribution	ad-attribution
-1	Ad Networks	ad-networks
-5	Business Tools	business-tools
-3	Analytics: Product	product-analytics
-"""
-
-domain = "example.com"
-company_name = "Example Company"
-sdk_name = "Example SDK"
-sdk_slug = "example-sdk"
-is_open_source = False
-has_third_party_tracking = True
-category_id = 1
-
-sdk_package_patterns = [
-    "ExampleA",
-    "com.example",
-]
+def load_yaml_file(file_path: str) -> dict:
+    with open(file_path, "r") as file:
+        return yaml.safe_load(file)
 
 
 def main():
+    data = load_yaml_file("new_company.yml")
+    company_name = data["company_name"]
+    domain = data["domain"]
+    sdk_name = data["sdk_name"]
+    sdk_slug = data["sdk_slug"]
+    is_open_source = data["is_open_source"]
+    has_third_party_tracking = data["has_third_party_tracking"]
+    category_id = data["category_id"]
+    sdk_package_patterns = data["sdk_package_patterns"]
     try:
         with database_connection.get_cursor() as cur:
             company_id = insert_company_with_domain(cur, company_name, domain)
@@ -149,4 +143,5 @@ def insert_sdk_with_package_patterns(
         )
 
 
-main()
+if __name__ == "__main__":
+    main()
