@@ -169,11 +169,38 @@ def scrape_store_html(store_id: str, country: str) -> dict:
     headers = {"User-Agent": "Mozilla/5.0"}  # Prevent blocking by some websites
     response = requests.get(url, headers=headers)
 
+    html = response.text
+
     if response.status_code != 200:
-        print(f"Failed to retrieve the page: {response.status_code}")
+        logger.error(f"Failed to retrieve the page: {response.status_code}")
         return {}
 
     soup = BeautifulSoup(response.text, "html.parser")
+
+    in_app_purchase_element = soup.find(
+        "li", class_="inline-list__item--bulleted", string="Offers In-App Purchases"
+    )
+
+    has_in_app_purchases = in_app_purchase_element is not None
+
+    try:
+        privacy_details = get_privacy_details(html, country, store_id)
+    except Exception as e:
+        logger.error(f"Failed to get privacy details for {store_id=} {country=} {e}")
+        privacy_details = None
+
+    has_third_party_advertising = "THIRD_PARTY_ADVERTISING" in str(privacy_details)
+
+    urls = get_urls_from_html(soup)
+
+    return {
+        "in_app_purchases": has_in_app_purchases,
+        "ad_supported": has_third_party_advertising,
+        "urls": urls,
+    }
+
+
+def get_urls_from_html(soup: BeautifulSoup) -> dict:
     urls = {}
 
     # Find all links and look for relevant ones
@@ -190,7 +217,68 @@ def scrape_store_html(store_id: str, country: str) -> dict:
     return urls
 
 
-def get_developer_url(result: dict, store_id: str, country: str) -> str:
+def get_privacy_details(html: str, country: str, store_id: str) -> bool:
+    """
+    Get privacy details for an iOS app from the App Store.
+
+    Args:
+        html: HTML of the App Store page
+        country: Country code (default: 'US')
+        store_id: App Store ID of the app
+
+    Returns:
+        True if the app has third-party advertising, False otherwise
+    """
+
+    # Extract the token using regex
+    reg_exp = r"token%22%3A%22([^%]+)%22%7D"
+    match = re.search(reg_exp, html)
+    if not match:
+        raise ValueError("Could not extract token from App Store page")
+
+    token = match.group(1)
+
+    # Make request to the API for privacy details
+    api_url = f"https://amp-api.apps.apple.com/v1/catalog/{country}/apps/{store_id}?platform=web&fields=privacyDetails"
+    api_headers = {
+        "Origin": "https://apps.apple.com",
+        "Authorization": f"Bearer {token}",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+    }
+
+    response = requests.get(api_url, headers=api_headers)
+    response.raise_for_status()
+
+    data = response.json()
+    if not data.get("data") or len(data["data"]) == 0:
+        raise ValueError("App not found (404)")
+    return data["data"][0]["attributes"]["privacyDetails"]
+
+
+def find_privacy_policy_id(soup: BeautifulSoup) -> str | None:
+    privacy_learn_more = soup.find("p", class_="app-privacy__learn-more")
+
+    if privacy_learn_more:
+        # Get the anchor tag inside the paragraph
+        link = privacy_learn_more.find("a")
+
+        if link:
+            # Extract the full URL
+            url = link.get("href")
+            print(f"URL: {url}")
+
+            # Extract the ID from the URL
+            # The URL format is https://apps.apple.com/story/id1538632801
+            if "id" in url:
+                # Find the position where "id" starts and extract everything after it
+                id_position = url.find("id")
+                if id_position != -1:
+                    id_value = url[id_position + 2 :]  # +2 to skip the "id" prefix
+                    print(f"ID: {id_value}")  # This will print: 1538632801
+                    return id_value
+
+
+def get_developer_url(result: dict, urls: dict) -> str:
     """
     Decide if we should crawl the store html for the developer url.
     """
@@ -203,7 +291,6 @@ def get_developer_url(result: dict, store_id: str, country: str) -> str:
         if dev_tld_str in DEVLEOPER_IGNORE_TLDS:
             should_crawl_html = True
     if should_crawl_html:
-        urls = scrape_store_html(store_id, country)
         found_tlds = []
         for url_type, url in urls.items():
             print(url_type, url)
@@ -213,14 +300,12 @@ def get_developer_url(result: dict, store_id: str, country: str) -> str:
                 found_tlds.append(tld_str)
         if len(found_tlds) == 0:
             if "sellerUrl" not in result.keys():
-                raise Exception(f"No developer url found for {store_id=} {country=}")
+                raise Exception(f"No developer url found for {urls=}")
             final_url: str = result["sellerUrl"]
         elif len(found_tlds) == 1:
             final_url: str = found_tlds[0]
         else:
-            logger.warning(
-                f"Multiple developer sites found for {store_id=} {country=} {found_tlds=}"
-            )
+            logger.warning(f"Multiple developer sites found for {urls=} {found_tlds=}")
             final_url: str = result["sellerUrl"]
     else:
         final_url: str = result["sellerUrl"]
@@ -235,7 +320,10 @@ def scrape_app_ios(store_id: str, country: str, language: str) -> dict:
         store_id, country=country, add_ratings=True, timeout=10, lang=language
     )
     try:
-        result["sellerUrl"] = get_developer_url(result, store_id, country)
+        html_res = scrape_store_html(store_id=store_id, country=country)
+        result["in_app_purchases"] = html_res["in_app_purchases"]
+        result["ad_supported"] = html_res["ad_supported"]
+        result["sellerUrl"] = get_developer_url(result, html_res["urls"])
     except Exception as e:
         logger.warning(f"Failed to get developer url for {store_id=} {country=} {e}")
     logger.info(f"Scrape app finish {store_id=} {country=}")
