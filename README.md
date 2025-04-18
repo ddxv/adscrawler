@@ -1,6 +1,6 @@
 # Crawl App-Adst.txt and App Store Apps
 
-Various tools used for [AppGoblin](https://appgoblin.info). Mostly scripts for crawling the Google Play and Apple App Stores for as many apps as it can and also checks for their app-ads.txt files. 
+Various tools used for collecting data for [AppGoblin's free ASO app marketing tools](https://appgoblin.info). Mostly scripts for crawling the Google Play and Apple App Stores for apps, keywords, SDKs and app-ads.txt files.
 
 Scrapers:
  - pull apps from app store and google play store top lists
