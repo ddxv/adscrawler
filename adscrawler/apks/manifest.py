@@ -1,20 +1,18 @@
 """Download an APK and extract it's manifest."""
 
-import argparse
 import os
 import pathlib
 import subprocess
-import time
 from xml.etree import ElementTree
 
 import pandas as pd
 import requests
 import yaml
 
-from adscrawler.config import APKS_DIR, MODULE_DIR, get_logger
+from adscrawler.apks.download_apk import download
+from adscrawler.config import APK_PARTIALS_DIR, MODULE_DIR, get_logger
 from adscrawler.connection import PostgresCon
-from adscrawler.queries import get_top_ranks_for_unpacking, upsert_details_df
-from adscrawler.tools.download_apk import download
+from adscrawler.queries import upsert_details_df
 
 logger = get_logger(__name__, "download_apk")
 
@@ -24,7 +22,7 @@ UNZIPPED_DIR = pathlib.Path(MODULE_DIR, "apksunzipped/")
 
 def check_dirs() -> None:
     """Create if not exists for apks directory."""
-    dirs = [APKS_DIR, UNZIPPED_DIR]
+    dirs = [APK_PARTIALS_DIR, UNZIPPED_DIR]
     for _dir in dirs:
         if not pathlib.Path.exists(_dir):
             logger.info(f"creating {_dir} directory")
@@ -41,16 +39,14 @@ def empty_folder(pth: pathlib.Path) -> None:
 
 
 def unzip_apk(store_id: str, extension: str) -> None:
-    apk_path = pathlib.Path(APKS_DIR, f"{store_id}{extension}")
+    apk_path = pathlib.Path(APK_PARTIALS_DIR, f"{store_id}{extension}")
     if UNZIPPED_DIR.exists():
         empty_folder(UNZIPPED_DIR)
     check_dirs()
     if extension == ".xapk":
         xapk_path = apk_path
-        apk_path = pathlib.Path(APKS_DIR, f"{store_id}.apk")
-        unzip_command = (
-            f"unzip -o {xapk_path.as_posix()} {store_id}.apk -d {APKS_DIR.as_posix()}"
-        )
+        apk_path = pathlib.Path(APK_PARTIALS_DIR, f"{store_id}.apk")
+        unzip_command = f"unzip -o {xapk_path.as_posix()} {store_id}.apk -d {APK_PARTIALS_DIR.as_posix()}"
         unzip_result = os.system(unzip_command)
         logger.info(f"Output unzipped from xapk to apk: {unzip_result}")
     if not apk_path.exists():
@@ -206,112 +202,53 @@ def xml_to_dataframe(root: ElementTree.Element) -> pd.DataFrame:
     return df
 
 
-def download_and_unpack(store_id: str) -> str:
-    extension = download(store_id=store_id, do_redownload=False)
-    unzip_apk(store_id=store_id, extension=extension)
-    return extension
-
-
-def manifest_main(
-    database_connection: PostgresCon, number_of_apps_to_pull: int = 20
-) -> None:
-    error_count = 0
-    store = 1
-    logger.info("Start APK processing")
-    apps = get_top_ranks_for_unpacking(
-        database_connection=database_connection,
-        store=store,
-        limit=number_of_apps_to_pull,
-    )
-    logger.info(f"Start APK processing: {apps.shape=}")
-    for _id, row in apps.iterrows():
-        if error_count > 5:
-            continue
-        if error_count > 0:
-            time.sleep(error_count * error_count * 10)
-        crawl_result = 4
-        store_id = row.store_id
-        logger.info(f"{store_id=} start")
-        details_df = row.to_frame().T
-        version_str = "-1"
-        manifest_str = ""
-        try:
-            _extension = download_and_unpack(store_id=store_id)
-            manifest_str, details_df = get_parsed_manifest()
-            version_str = get_version()
-            crawl_result = 1
-            logger.info(f"{store_id=} unzipped finished")
-        except requests.exceptions.HTTPError:
-            crawl_result = 3  # 404s etc
-        except requests.exceptions.ConnectionError:
-            crawl_result = 3  # 404s etc
-        except FileNotFoundError:
-            logger.exception(f"{store_id=} unable to unpack apk")
-            crawl_result = 2
-        except subprocess.CalledProcessError as e:
-            logger.exception(f"Unexpected error for {store_id=}: {str(e)}")
-            crawl_result = 4  # Unexpected error
-        except Exception as e:
-            logger.exception(f"Unexpected error for {store_id=}: {str(e)}")
-            crawl_result = 4  # Unexpected errors
-        if crawl_result in [3]:
-            error_count += 3
-        if crawl_result in [2, 4]:
-            error_count += 1
-        details_df["store_app"] = row.store_app
-        if version_str:
-            details_df["version_code"] = version_str
-        else:
-            details_df["version_code"] = "-1"
-        try:
-            upsert_details_df(
-                details_df=details_df,
-                crawl_result=crawl_result,
-                database_connection=database_connection,
-                store_id=store_id,
-                raw_txt_str=manifest_str,
-            )
-        except Exception as e:
-            logger.exception(f"DB INSERT ERROR for {store_id=}: {str(e)}")
-        remove_apks(store_id=store_id)
-
-
-def remove_apks(store_id: str) -> None:
-    apk_path = pathlib.Path(APKS_DIR, f"{store_id}.apk")
-    try:
-        apk_path.unlink(missing_ok=True)
-        logger.info(f"{store_id=} deleted apk {apk_path.as_posix()}")
-    except FileNotFoundError:
-        pass
-    xapk_path = pathlib.Path(APKS_DIR, f"{store_id}.xapk")
-    try:
-        xapk_path.unlink(missing_ok=True)
-        logger.info(f"{store_id=} deleted xapk {xapk_path.as_posix()}")
-    except FileNotFoundError:
-        pass
-
-
-def parse_args() -> argparse.Namespace:
-    """Check passed args.
-
-    will check for command line --store-id in the form of com.example.app
+def process_manifest(database_connection: PostgresCon, row: pd.Series) -> int:
+    """Process an APKs manifest.
+    Due to the original implementation, this still downloads, processes manifest and saves the version_details.
     """
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "-s",
-        "--store-id",
-        help="Store id to download, ie -s 'org.moire.opensudoku'",
-    )
-    args, leftovers = parser.parse_known_args()
-    return args
-
-
-def main(args: argparse.Namespace) -> None:
-    """Download APK to local directory and exit."""
-    store_id = args.store_id
-    download_and_unpack(store_id=store_id)
-
-
-if __name__ == "__main__":
-    args = parse_args()
-    main(args)
+    crawl_result = 3
+    store_id = row.store_id
+    logger.info(f"{store_id=} start")
+    details_df = row.to_frame().T
+    version_str = "-2"
+    manifest_str = ""
+    try:
+        extension = download(store_id, do_redownload=False)
+        unzip_apk(store_id=store_id, extension=extension)
+        manifest_str, details_df = get_parsed_manifest()
+        version_str = get_version()
+        crawl_result = 0
+        logger.info(f"{store_id=} unzipped finished")
+    except requests.exceptions.HTTPError:
+        crawl_result = 2  # 404s etc
+    except requests.exceptions.ConnectionError:
+        crawl_result = 2  # 404s etc
+    except FileNotFoundError:
+        logger.exception(f"{store_id=} unable to unpack apk")
+        crawl_result = 1
+    except subprocess.CalledProcessError as e:
+        logger.exception(f"Unexpected error for {store_id=}: {str(e)}")
+        crawl_result = 3  # Unexpected error
+    except Exception as e:
+        logger.exception(f"Unexpected error for {store_id=}: {str(e)}")
+        crawl_result = 3  # Unexpected errors
+    if crawl_result in [2, 3]:
+        error_count = 2
+    if crawl_result in [1, 4]:
+        error_count = 0
+    details_df["store_app"] = row.store_app
+    if version_str:
+        details_df["version_code"] = version_str
+    else:
+        details_df["version_code"] = "-2"
+    try:
+        upsert_details_df(
+            details_df=details_df,
+            crawl_result=crawl_result,
+            database_connection=database_connection,
+            store_id=store_id,
+            raw_txt_str=manifest_str,
+        )
+    except Exception as e:
+        logger.exception(f"DB INSERT ERROR for {store_id=}: {str(e)}")
+    return error_count

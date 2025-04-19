@@ -7,8 +7,8 @@ new_company.yml
 mycheck.py
 
 # directory for downloaded apks
-apks/
-apksunzipped/
+#apks/
+#apksunzipped/
 ipas/
 ipasunzipped/
 
