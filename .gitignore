@@ -12,6 +12,8 @@ apksunzipped/
 ipas/
 ipasunzipped/
 
+mitmlogs/
+
 .vscode
 .virtualenv/
 node_modules/
