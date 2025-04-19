@@ -11,7 +11,7 @@ import pathlib
 
 import requests
 
-from adscrawler.config import APKS_DIR, get_logger
+from adscrawler.config import APK_PARTIALS_DIR, APKS_DIR, XAPKS_DIR, get_logger
 
 logger = get_logger(__name__, "download_apk")
 
@@ -20,7 +20,7 @@ URL = "https://d.apkpure.net/b/XAPK/{store_id}?version=latest"
 
 def check_apk_dir_created() -> None:
     """Create if not exists for apks directory."""
-    dirs = [APKS_DIR]
+    dirs = [APK_PARTIALS_DIR]
     for _dir in dirs:
         if not pathlib.Path.exists(_dir):
             logger.info("creating apks directory")
@@ -36,12 +36,17 @@ def download(store_id: str, do_redownload: bool = False) -> str:
 
     logger.info(f"{store_id=} download start")
     check_apk_dir_created()
-    filepath = pathlib.Path(APKS_DIR, f"{store_id}.apk")
-    exists = filepath.exists()
-    if exists:
-        if not do_redownload:
-            logger.info(f"apk already exists {filepath=}, skipping")
-            return filepath.suffix
+    apk_filepath = pathlib.Path(APK_PARTIALS_DIR, f"{store_id}.apk")
+    xapk_filepath = pathlib.Path(XAPKS_DIR, f"{store_id}.xapk")
+    apk_exists = apk_filepath.exists()
+    xapk_exists = xapk_filepath.exists()
+    if not do_redownload:
+        if apk_exists:
+            logger.info(f"apk already exists {apk_filepath=}, skipping")
+            return apk_filepath.suffix
+        if xapk_exists:
+            logger.info(f"xapk already exists {xapk_filepath=}, skipping")
+            return xapk_filepath.suffix
 
     r = requests.get(
         URL.format(store_id=store_id),
@@ -68,10 +73,13 @@ def download(store_id: str, do_redownload: bool = False) -> str:
                 extension = ext
                 logger.info(f"Found extension in Content-Disposition: {extension}")
 
-        filepath = pathlib.Path(APKS_DIR, f"{store_id}{extension}")
-        logger.info(f"Saving to: {filepath}")
+        if extension == ".xapk":
+            apk_filepath = pathlib.Path(XAPKS_DIR, f"{store_id}{extension}")
+        if extension == ".apk":
+            apk_filepath = pathlib.Path(APKS_DIR, f"{store_id}{extension}")
+        logger.info(f"Saving to: {apk_filepath}")
 
-        with filepath.open("wb") as file:
+        with apk_filepath.open("wb") as file:
             for chunk in r.iter_content(chunk_size=1024 * 1024):
                 if chunk:
                     file.write(chunk)

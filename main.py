@@ -3,6 +3,7 @@ import logging
 import os
 import sys
 
+from adscrawler.apks.process_apk import process_apks
 from adscrawler.app_stores.scrape_stores import (
     crawl_developers_for_new_store_ids,
     crawl_keyword_cranks,
@@ -11,7 +12,6 @@ from adscrawler.app_stores.scrape_stores import (
 )
 from adscrawler.connection import PostgresCon, get_db_connection
 from adscrawler.scrape import crawl_app_ads
-from adscrawler.tools.get_manifest import manifest_main
 from adscrawler.tools.get_plist import plist_main
 
 logger = logging.getLogger(__name__)
@@ -242,7 +242,7 @@ class ProcessManager:
                 logger.exception("iTunes scrape plist failing")
         if 1 in stores:
             try:
-                manifest_main(database_connection=self.pgcon, number_of_apps_to_pull=20)
+                process_apks(database_connection=self.pgcon, number_of_apps_to_pull=20)
             except Exception:
                 logger.exception("Android scrape manifests failing")
 
