@@ -10,19 +10,21 @@ import requests
 import yaml
 
 from adscrawler.apks.download_apk import download
-from adscrawler.config import APK_PARTIALS_DIR, MODULE_DIR, get_logger
+from adscrawler.config import (
+    APK_PARTIALS_DIR,
+    APK_UNZIPPED_DIR,
+    XAPKS_DIR,
+    get_logger,
+)
 from adscrawler.connection import PostgresCon
 from adscrawler.queries import upsert_details_df
 
 logger = get_logger(__name__, "download_apk")
 
 
-UNZIPPED_DIR = pathlib.Path(MODULE_DIR, "apksunzipped/")
-
-
 def check_dirs() -> None:
     """Create if not exists for apks directory."""
-    dirs = [APK_PARTIALS_DIR, UNZIPPED_DIR]
+    dirs = [APK_PARTIALS_DIR, APK_UNZIPPED_DIR]
     for _dir in dirs:
         if not pathlib.Path.exists(_dir):
             logger.info(f"creating {_dir} directory")
@@ -40,11 +42,11 @@ def empty_folder(pth: pathlib.Path) -> None:
 
 def unzip_apk(store_id: str, extension: str) -> None:
     apk_path = pathlib.Path(APK_PARTIALS_DIR, f"{store_id}{extension}")
-    if UNZIPPED_DIR.exists():
-        empty_folder(UNZIPPED_DIR)
+    if APK_UNZIPPED_DIR.exists():
+        empty_folder(APK_UNZIPPED_DIR)
     check_dirs()
     if extension == ".xapk":
-        xapk_path = apk_path
+        xapk_path = pathlib.Path(XAPKS_DIR, f"{store_id}{extension}")
         apk_path = pathlib.Path(APK_PARTIALS_DIR, f"{store_id}.apk")
         unzip_command = f"unzip -o {xapk_path.as_posix()} {store_id}.apk -d {APK_PARTIALS_DIR.as_posix()}"
         unzip_result = os.system(unzip_command)
@@ -60,7 +62,7 @@ def unzip_apk(store_id: str, extension: str) -> None:
             apk_path.as_posix(),
             "-f",
             "-o",
-            UNZIPPED_DIR.as_posix(),
+            APK_UNZIPPED_DIR.as_posix(),
         ]
         # Run the command and capture output
         result = subprocess.run(
@@ -94,7 +96,7 @@ def unzip_apk(store_id: str, extension: str) -> None:
 
 
 def get_parsed_manifest() -> tuple[str, pd.DataFrame]:
-    manifest_filename = pathlib.Path(MODULE_DIR, "apksunzipped/AndroidManifest.xml")
+    manifest_filename = pathlib.Path(APK_UNZIPPED_DIR, "AndroidManifest.xml")
     # Load the XML file
     with manifest_filename.open("r") as f:
         manifest_str = f.read()
@@ -125,11 +127,11 @@ def unzipped_apk_paths(mypath: pathlib.Path) -> pd.DataFrame:
 
 
 def get_smali_df() -> pd.DataFrame:
-    mydf = unzipped_apk_paths(UNZIPPED_DIR)
+    mydf = unzipped_apk_paths(APK_UNZIPPED_DIR)
     smali_df = mydf[mydf["path"].str.lower().str.contains("smali")].copy()
     smali_df["path"] = (
         smali_df["path"]
-        .str.replace(MODULE_DIR.as_posix() + "/apksunzipped/", "")
+        .str.replace(APK_UNZIPPED_DIR.as_posix() + "/", "")
         .str.replace("smali/", "")
         .str.replace(r"smali_classes_\d+/", "", regex=True)
         .str.replace(r"smali_classes\d+/", "", regex=True)
@@ -146,7 +148,7 @@ def get_smali_df() -> pd.DataFrame:
 
 
 def get_version() -> str:
-    tool_filename = pathlib.Path(MODULE_DIR, "apksunzipped/apktool.yml")
+    tool_filename = pathlib.Path(APK_UNZIPPED_DIR, "apktool.yml")
     # Open and read the YAML file
     with tool_filename.open("r") as file:
         data = yaml.safe_load(file)
@@ -217,7 +219,7 @@ def process_manifest(database_connection: PostgresCon, row: pd.Series) -> int:
         unzip_apk(store_id=store_id, extension=extension)
         manifest_str, details_df = get_parsed_manifest()
         version_str = get_version()
-        crawl_result = 0
+        crawl_result = 1
         logger.info(f"{store_id=} unzipped finished")
     except requests.exceptions.HTTPError:
         crawl_result = 2  # 404s etc

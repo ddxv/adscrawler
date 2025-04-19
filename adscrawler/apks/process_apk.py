@@ -14,7 +14,6 @@ def process_apks(
 ) -> None:
     error_count = 0
     store = 1
-    logger.info("Start APK processing")
     apps = get_top_ranks_for_unpacking(
         database_connection=database_connection,
         store=store,
@@ -33,10 +32,15 @@ def process_apks(
             )
         except Exception:
             logger.exception(f"Manifest for {store_id} failed")
-        remove_apks(store_id=store_id)
+
+        # try:
+        #     process_waydroid
+        # except exception
+
+        remove_partial_apks(store_id=store_id)
 
 
-def remove_apks(store_id: str) -> None:
+def remove_partial_apks(store_id: str) -> None:
     apk_path = pathlib.Path(APK_PARTIALS_DIR, f"{store_id}.apk")
     try:
         apk_path.unlink(missing_ok=True)
