@@ -21,6 +21,7 @@ APKS_DIR = pathlib.Path(APKS_FILES_DIR, "apks")
 XAPKS_DIR = pathlib.Path(APKS_FILES_DIR, "xapks")
 APK_PARTIALS_DIR = pathlib.Path(APKS_FILES_DIR, "apk-partials")
 APK_UNZIPPED_DIR = pathlib.Path(APKS_FILES_DIR, "tmp-unzipped")
+ANDROID_SDK = pathlib.Path(HOME, "Android/Sdk/build-tools/35.0.0")
 
 
 @typing.no_type_check

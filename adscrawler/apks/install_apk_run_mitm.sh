@@ -37,24 +37,33 @@ fi
 waydroidinstalledapps=$(waydroid app list)
 
 linecount=$(echo "$waydroidinstalledapps" | grep -c "packageName: $app" || true)
-# echo "Line count " "$linecount" " and lines " "$lines"
 if [ "$linecount" = 0 ]; then
 	echo "store_id: $app not yet installed"
-	python download_apk.py -s "$app"
+    echo "store_id: $app installing"
+    waydroid app install "/home/james/apk-files/apks/$app.apk"
+	sleep 5
+    waydroidinstalledapps=$(waydroid app list)
+    linecount=$(echo "$waydroidinstalledapps" | grep -c "packageName: $app" || true)
+    if [ "$linecount" = 0 ]; then
+	    echo "Matches $linecount already installed apps: $lines"
+	else
+	    echo "failed to install"
+		exit
+    fi
 else
 	lines=$(echo "$waydroidinstalledapps" | grep "packageName: $app")
 	echo "Matches $linecount already installed apps: $lines"
 fi
-echo "store_id: $app installing"
-waydroid app install "adscrawler/apks/$app.apk"
-echo "store_id: $app launching"
+
+adscrawler/apks/mitm_start.sh -d
+sleep 2
 
 
 echo "Setting up MITM proxy for $app..."
-./adscrawler/tools/mitm_start.sh -w -s "$app" & proxy_pid=$!
+adscrawler/apks/mitm_start.sh -w -s "$app" & proxy_pid=$!
 
 # Give the proxy a moment to start up, will ask for sudo password
-sleep 10
+sleep 20
 waydroid app launch "$app"
 
 sleep 2
@@ -85,7 +94,7 @@ kill $proxy_pid
 
 # Clean up iptables rules
 echo "Cleaning up iptables rules..."
-./adscrawler/tools/mitm_start.sh -d
+./adscrawler/apks/mitm_start.sh -d
 
 # Uninstall the app
 echo "Uninstalling app $app..."

@@ -204,7 +204,9 @@ def xml_to_dataframe(root: ElementTree.Element) -> pd.DataFrame:
     return df
 
 
-def process_manifest(database_connection: PostgresCon, row: pd.Series) -> int:
+def process_manifest(
+    database_connection: PostgresCon, row: pd.Series
+) -> tuple[int, str]:
     """Process an APKs manifest.
     Due to the original implementation, this still downloads, processes manifest and saves the version_details.
     """
@@ -213,6 +215,7 @@ def process_manifest(database_connection: PostgresCon, row: pd.Series) -> int:
     logger.info(f"{store_id=} start")
     details_df = row.to_frame().T
     version_str = "-2"
+    extension = ""
     manifest_str = ""
     try:
         extension = download(store_id, do_redownload=False)
@@ -253,4 +256,4 @@ def process_manifest(database_connection: PostgresCon, row: pd.Series) -> int:
         )
     except Exception as e:
         logger.exception(f"DB INSERT ERROR for {store_id=}: {str(e)}")
-    return error_count
+    return error_count, extension
