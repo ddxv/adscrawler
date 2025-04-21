@@ -1,9 +1,9 @@
 import os
 import pathlib
+import subprocess
 import time
 
 import pandas as pd
-import subprocess
 
 from adscrawler.apks import manifest, mitm_process_log
 from adscrawler.config import (
@@ -69,7 +69,7 @@ def process_apks_for_waydroid(database_connection: PostgresCon):
     )
     store_id_map = store_id_map.rename(columns={"id": "store_app"})
     for _, row in store_id_map.iterrows():
-        store_id = row.store_id
+        logger.info(f"Processing {row.store_id}")
         run_waydroid_app(database_connection, extension=".apk", row=row)
         break
 
@@ -77,6 +77,7 @@ def process_apks_for_waydroid(database_connection: PostgresCon):
 def run_waydroid_app(database_connection: PostgresCon, extension: str, row: pd.Series):
     store_id = row.store_id
     store_app = row.store_app
+    apk_path = pathlib.Path(APKS_DIR, f"{store_id}.apk")
     if extension == ".xapk":
         xapk_path = pathlib.Path(XAPKS_DIR, f"{store_id}{extension}")
         os.system(f"java -jar APKEditor.jar m -i {xapk_path.as_posix()}")
@@ -88,10 +89,11 @@ def run_waydroid_app(database_connection: PostgresCon, extension: str, row: pd.S
         )
         apk_path.exists()
 
-    start_script = pathlib.Path(PACKAGE_DIR, "/adscrawler/apks/install_apk_run_mitm.sh")
-    os.system(f'.{start_script.as_posix()} -s "{store_id}"')
+    logger.info("Clearing mitmdump")
+    mitm_script = pathlib.Path(PACKAGE_DIR, "/adscrawler/apks/mitm_start.sh")
+    os.system(f".{mitm_script.as_posix()} -d")
 
-    os.system("waydroid session stop")
+    # os.system("waydroid session stop")
 
     # Start the Waydroid session process
     process = subprocess.Popen(
@@ -107,6 +109,7 @@ def run_waydroid_app(database_connection: PostgresCon, extension: str, row: pd.S
     start_time = time.time()
     ready = False
 
+    logger.info("Waiting for Waydroid to be ready (120 seconds)...")
     while process.poll() is None and not ready and (time.time() - start_time) < timeout:
         line = process.stdout.readline()
         logger.info(line)
@@ -126,7 +129,7 @@ def run_waydroid_app(database_connection: PostgresCon, extension: str, row: pd.S
         exit(1)
 
     applist = subprocess.run(
-        ["waydroid", "app", "list"], capture_output=True, text=True
+        ["waydroid", "app", "list"], capture_output=True, text=True, check=False
     )
 
     output = applist.stdout
@@ -137,13 +140,61 @@ def run_waydroid_app(database_connection: PostgresCon, extension: str, row: pd.S
         logger.info("Installing app")
         os.system(f'waydroid app install "{apk_path}"')
 
-    os.system(f'waydroid app launch "{store_id}"')
-    time.sleep(60)
+    mitm_script = pathlib.Path(PACKAGE_DIR, "/adscrawler/apks/mitm_start.sh")
+    os.system(f".{mitm_script.as_posix()} -w -s {store_id}")
 
+    print(f"Starting mitmdump with script {mitm_script.as_posix()}")
+    mitm_process = subprocess.Popen(
+        [f".{mitm_script.as_posix()}", "-w", "-s", store_id],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+    )
+
+    # Store the PID
+    mitm_pid = mitm_process.pid
+    logger.info(f"Mitmdump started with PID: {mitm_pid}")
+
+    os.system(f'waydroid app launch "{store_id}"')
+
+    time.sleep(2)
+
+    # Set timeout parameters
+    timeout = 60  # seconds
+    start_time = time.time()
+    found = False
+
+    # Loop until timeout or app is found
+    while time.time() - start_time < timeout and not found:
+        # Run the waydroid shell dumpsys command
+        result = subprocess.run(
+            ["sudo", "waydroid", "shell", "dumpsys", "activity", "activities"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        # Check if app is in the output
+        if store_id in result.stdout:
+            found = True
+            logger.info(f"{store_id} is now in the foreground")
+            break
+
+        # Wait before checking again
+        os.system(f'waydroid app launch "{store_id}"')
+        time.sleep(2)
+
+    if not found:
+        logger.info(f"{store_id} not found in the foreground after {timeout} seconds")
+        exit(1)
+
+    logger.info("Waiting for 60 seconds...")
+    time.sleep(60)
+    logger.info("Stopping app & mitmdump")
+    mitm_process.terminate()
     os.system(f'sudo waydroid shell am force-stop "{store_id}"')
     os.system(f'waydroid app remove "{store_id}"')
 
-    mitm_script = pathlib.Path(PACKAGE_DIR, "/adscrawler/apks/mitm_start.sh")
     os.system(f".{mitm_script.as_posix()} -d")
 
     mdf = mitm_process_log.parse_mitm_log(store_id)
