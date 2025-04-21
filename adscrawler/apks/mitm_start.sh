@@ -9,7 +9,6 @@ Help() {
     echo "h    Print this Help."
     echo "w    Set up Waydroid VM traffic routing."
     echo "d    Delete routing rules."
-    echo "r    Set up router traffic routing."
     echo "s    Enter a store_id for logging (optional)."
     echo
 }
@@ -33,10 +32,6 @@ while getopts "hwdrs:" option; do
             [ -n "$mode" ] && { echo "Error: Only one mode (-w, -d, -r) can be specified"; exit 1; }
             mode="delete"
             ;;
-        r) # Router mode
-            [ -n "$mode" ] && { echo "Error: Only one mode (-w, -d, -r) can be specified"; exit 1; }
-            mode="router"
-            ;;
         s) # Enter a store_id
             app=$OPTARG
             ;;
@@ -50,21 +45,12 @@ done
 
 # Check if a mode was specified
 if [ -z "$mode" ]; then
-    echo "Error: You must specify one mode (-w, -d, or -r)"
+    echo "Error: You must specify one mode (-w or -d)"
     Help
     exit 1
 fi
 
-# Create log filename based on app if provided
-if [ -n "$app" ]; then
-    log_file=mitmlogs/traffic_${app}.log
-    echo "App store ID is set to: $app"
-    echo "Log will be saved to: $log_file"
-else
-    log_file=~/traffic.log
-    echo "No app store ID provided"
-    echo "Log will be saved to: $log_file"
-fi
+
 
 # Activate MITM virtualenv if it exists
 if [ -d "mitm-env" ]; then
@@ -84,15 +70,6 @@ fi
 
 # Mode-specific operations
 case $mode in
-    "router")
-        echo "Setting all proxied router traffic for port 8080"
-        sudo iptables -t nat -A PREROUTING -i wlp0s20f3 -p udp --dport 80 -j REDIRECT --to-port 8080
-        sudo iptables -t nat -A PREROUTING -i wlp0s20f3 -p udp --dport 443 -j REDIRECT --to-port 8080
-        sudo ip6tables -t nat -A PREROUTING -i wlp0s20f3 -p tcp --dport 80 -j REDIRECT --to-port 8080
-        sudo ip6tables -t nat -A PREROUTING -i wlp0s20f3 -p tcp --dport 443 -j REDIRECT --to-port 8080
-        echo "Starting mitmproxy in transparent mode"
-        mitmproxy --mode transparent --showhost --set block_global=false -w "$log_file" --listen-port 8080
-        ;;
         
     "waydroid")
         echo "Waydroid VM traffic routed to port 8080"
@@ -102,6 +79,16 @@ case $mode in
         sudo ip6tables -t nat -A PREROUTING -i waydroid0 -p tcp --dport 443 -j REDIRECT --to-port 8080
         echo "Setting ports 80, 443 to redirect to 8080. Finished"
         echo "Starting mitmweb in transparent mode"
+        # Create log filename based on app if provided
+        if [ -n "$app" ]; then
+            log_file=mitmlogs/traffic_${app}.log
+            echo "App store ID is set to: $app"
+            echo "Log will be saved to: $log_file"
+        else
+            log_file=~/traffic.log
+            echo "No app store ID provided"
+            echo "Log will be saved to: $log_file"
+        fi
         /usr/local/bin/mitmdump --mode transparent --showhost --set block_global=false -w "$log_file" --listen-port 8080 --quiet
         ;;
         
@@ -119,13 +106,10 @@ case $mode in
         sudo ip6tables -t nat -D PREROUTING -i wlp0s20f3 -p tcp --dport 80 -j REDIRECT --to-port 8080 2>/dev/null
         sudo ip6tables -t nat -D PREROUTING -i wlp0s20f3 -p tcp --dport 443 -j REDIRECT --to-port 8080 2>/dev/null
         echo "Removed port redirections. Finished"
+        sudo iptables -t nat -F
+        echo "Flushed iptables nat table"
         ;;
 esac
 
-# Flush iptables if in delete mode
-if [ "$mode" = "delete" ]; then
-    sudo iptables -t nat -F
-    echo "Flushed iptables nat table"
-fi
 
 exit 0

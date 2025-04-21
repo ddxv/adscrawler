@@ -81,50 +81,38 @@ sleep 20
 
 
 echo "Launching $app in Waydroid..."
-waydroid app launch "$apk_path" &  # Run in background
-launch_pid=$!
+waydroid app launch "$apk_path"
 
 
 
+# echo "Waiting for $app to be foregrounded..."
+# timeout 60 bash -c "
+#   until sudo waydroid shell dumpsys activity activities | grep -q '$app'; do
+#     sleep 2
+#   done
+# "
 
-echo "Waiting for $app to be foregrounded..."
-timeout 60 bash -c "
-  until sudo waydroid shell dumpsys activity activities | grep -q '$app'; do
-    sleep 0.5
-  done
-"
-
-if sudo waydroid shell dumpsys activity activities | grep -q "$app"; then
-  echo "$app is now in the foreground"
-else
-  echo "Timed out waiting for $app to be foregrounded"
-  exit 1
-fi
-
+# if sudo waydroid shell dumpsys activity activities | grep -q "$app"; then
+#   echo "$app is now in the foreground"
+# else
+#   echo "Timed out waiting for $app to be foregrounded"
+#   exit 1
+# fi
 
 
+# # This is our duration of capture
+# echo "Will capture traffic for 60 seconds"
+# sleep 60
 
 
-
-sleep 2
-
-
-# This is our duration of capture
-echo "Will capture traffic for 60 seconds"
-sleep 60
+# # Kill the proxy process
+# echo "Stopping mitmproxy..."
+# kill $proxy_pid
 
 
-# Kill the proxy process
-echo "Stopping mitmproxy..."
-kill $proxy_pid
+# # Uninstall the app
+# echo "Uninstalling app $app..."
+# sudo waydroid shell am force-stop "$app"
+# waydroid app remove "$app"
 
-# Clean up iptables rules
-#echo "Cleaning up iptables rules..."
-#./adscrawler/apks/mitm_start.sh -d
-
-# Uninstall the app
-echo "Uninstalling app $app..."
-sudo waydroid shell am force-stop "$app"
-waydroid app remove "$app"
-
-echo "Process complete. Traffic log saved."
+# echo "Process complete. Traffic log saved."

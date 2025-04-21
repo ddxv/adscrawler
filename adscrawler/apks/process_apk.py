@@ -3,6 +3,7 @@ import pathlib
 import time
 
 import pandas as pd
+import subprocess
 
 from adscrawler.apks import manifest, mitm_process_log
 from adscrawler.config import (
@@ -89,6 +90,58 @@ def run_waydroid_app(database_connection: PostgresCon, extension: str, row: pd.S
 
     start_script = pathlib.Path(PACKAGE_DIR, "/adscrawler/apks/install_apk_run_mitm.sh")
     os.system(f'.{start_script.as_posix()} -s "{store_id}"')
+
+    os.system("waydroid session stop")
+
+    # Start the Waydroid session process
+    process = subprocess.Popen(
+        ["waydroid", "session", "start"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1,
+    )
+
+    # Set a timeout (in seconds)
+    timeout = 120  # Wait up to 2 minutes
+    start_time = time.time()
+    ready = False
+
+    while process.poll() is None and not ready and (time.time() - start_time) < timeout:
+        line = process.stdout.readline()
+        logger.info(line)
+        if "Android with user 0 is ready" in line:
+            ready = True
+            logger.info("Waydroid is ready! Continuing with the script...")
+            break
+
+    if not ready:
+        if process.poll() is not None:
+            logger.info("Waydroid process ended without becoming ready")
+        else:
+            logger.info(
+                f"Timed out after {timeout} seconds waiting for Waydroid to be ready"
+            )
+            process.terminate()
+        exit(1)
+
+    applist = subprocess.run(
+        ["waydroid", "app", "list"], capture_output=True, text=True
+    )
+
+    output = applist.stdout
+
+    if store_id in output:
+        logger.info("App already installed")
+    else:
+        logger.info("Installing app")
+        os.system(f'waydroid app install "{apk_path}"')
+
+    os.system(f'waydroid app launch "{store_id}"')
+    time.sleep(60)
+
+    os.system(f'sudo waydroid shell am force-stop "{store_id}"')
+    os.system(f'waydroid app remove "{store_id}"')
 
     mitm_script = pathlib.Path(PACKAGE_DIR, "/adscrawler/apks/mitm_start.sh")
     os.system(f".{mitm_script.as_posix()} -d")
