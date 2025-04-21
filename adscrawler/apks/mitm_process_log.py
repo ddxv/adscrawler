@@ -11,7 +11,7 @@ from adscrawler.config import PACKAGE_DIR, get_logger
 logger = get_logger(__name__)
 
 
-def parse_mitm_log(store_id):
+def parse_mitm_log(store_id: str) -> pd.DataFrame:
     # Define the log file path
     mitmlog_dir = pathlib.Path(PACKAGE_DIR, "mitmlogs")
     flows_file = f"traffic_{store_id}.log"
@@ -105,5 +105,8 @@ def parse_mitm_log(store_id):
     df["tld_url"] = df["url"].apply(
         lambda x: ".".join([tldextract.extract(x).domain, tldextract.extract(x).suffix])
     )
+
+    df.loc[df["status_code"].isna(), "status_code"] = -1
+    df["status_code"] = df["status_code"].astype(int)
 
     return df

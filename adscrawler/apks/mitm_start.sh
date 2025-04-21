@@ -108,7 +108,7 @@ case $mode in
         echo "Removed port redirections. Finished"
         sudo iptables -t nat -F
         echo "Flushed iptables nat table"
-        pkill -f mitmdump
+        pkill mitmdump 
         ;;
 esac
 

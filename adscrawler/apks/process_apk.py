@@ -17,7 +17,7 @@ from adscrawler.config import (
 from adscrawler.connection import PostgresCon
 from adscrawler.queries import get_top_ranks_for_unpacking, query_store_id_map
 
-logger = get_logger(__name__, "download_apk")
+logger = get_logger(__name__)
 
 
 def process_apks(
@@ -62,7 +62,7 @@ def get_downloaded_apks() -> list[str]:
     return apks
 
 
-def process_apks_for_waydroid(database_connection: PostgresCon):
+def process_apks_for_waydroid(database_connection: PostgresCon) -> None:
     apks = get_downloaded_apks()
     store_id_map = query_store_id_map(
         database_connection=database_connection, store_ids=apks
@@ -71,10 +71,11 @@ def process_apks_for_waydroid(database_connection: PostgresCon):
     for _, row in store_id_map.iterrows():
         logger.info(f"Processing {row.store_id}")
         run_waydroid_app(database_connection, extension=".apk", row=row)
-        break
 
 
-def run_waydroid_app(database_connection: PostgresCon, extension: str, row: pd.Series):
+def run_waydroid_app(
+    database_connection: PostgresCon, extension: str, row: pd.Series
+) -> None:
     store_id = row.store_id
     store_app = row.store_app
     apk_path = pathlib.Path(APKS_DIR, f"{store_id}.apk")
@@ -113,20 +114,23 @@ def run_waydroid_app(database_connection: PostgresCon, extension: str, row: pd.S
     while process.poll() is None and not ready and (time.time() - start_time) < timeout:
         line = process.stdout.readline()
         logger.info(line)
-        if "Android with user 0 is ready" in line:
+        if (
+            "Android with user 0 is ready" in line
+            or "Session is already running" in line
+        ):
             ready = True
             logger.info("Waydroid is ready! Continuing with the script...")
             break
 
     if not ready:
         if process.poll() is not None:
-            logger.info("Waydroid process ended without becoming ready")
+            logger.error("Waydroid process ended without becoming ready")
         else:
-            logger.info(
+            logger.error(
                 f"Timed out after {timeout} seconds waiting for Waydroid to be ready"
             )
             process.terminate()
-        exit(1)
+        return
 
     applist = subprocess.run(
         ["waydroid", "app", "list"], capture_output=True, text=True, check=False
@@ -139,9 +143,6 @@ def run_waydroid_app(database_connection: PostgresCon, extension: str, row: pd.S
     else:
         logger.info("Installing app")
         os.system(f'waydroid app install "{apk_path}"')
-
-    mitm_script = pathlib.Path(PACKAGE_DIR, "/adscrawler/apks/mitm_start.sh")
-    os.system(f".{mitm_script.as_posix()} -w -s {store_id}")
 
     print(f"Starting mitmdump with script {mitm_script.as_posix()}")
     mitm_process = subprocess.Popen(
@@ -185,8 +186,8 @@ def run_waydroid_app(database_connection: PostgresCon, extension: str, row: pd.S
         time.sleep(2)
 
     if not found:
-        logger.info(f"{store_id} not found in the foreground after {timeout} seconds")
-        exit(1)
+        logger.error(f"{store_id} not found in the foreground after {timeout} seconds")
+        return
 
     logger.info("Waiting for 60 seconds...")
     time.sleep(60)
