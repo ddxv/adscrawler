@@ -23,6 +23,7 @@ dependencies = [
     "rake_nltk",
     "spacy",
     "langdetect",
+    "mitmproxy"
 ]
 
 
