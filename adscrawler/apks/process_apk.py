@@ -91,14 +91,10 @@ def run_waydroid_app(database_connection: PostgresCon, extension: str, row: pd.S
 
 def remove_partial_apks(store_id: str) -> None:
     apk_path = pathlib.Path(APK_PARTIALS_DIR, f"{store_id}.apk")
-    try:
+    if apk_path.exists():
         apk_path.unlink(missing_ok=True)
-        logger.info(f"{store_id=} deleted apk {apk_path.as_posix()}")
-    except FileNotFoundError:
-        pass
+        logger.info(f"{store_id=} deleted partial apk {apk_path.as_posix()}")
     xapk_path = pathlib.Path(APK_PARTIALS_DIR, f"{store_id}.xapk")
-    try:
+    if xapk_path.exists():
         xapk_path.unlink(missing_ok=True)
-        logger.info(f"{store_id=} deleted xapk {xapk_path.as_posix()}")
-    except FileNotFoundError:
-        pass
+        logger.info(f"{store_id=} deleted partial xapk {xapk_path.as_posix()}")
