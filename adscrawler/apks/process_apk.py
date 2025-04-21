@@ -14,7 +14,7 @@ from adscrawler.config import (
     get_logger,
 )
 from adscrawler.connection import PostgresCon
-from adscrawler.queries import get_top_ranks_for_unpacking
+from adscrawler.queries import get_top_ranks_for_unpacking, query_store_id_map
 
 logger = get_logger(__name__, "download_apk")
 
@@ -53,6 +53,26 @@ def process_apks(
         remove_partial_apks(store_id=store_id)
 
 
+def get_downloaded_apks() -> list[str]:
+    apks = []
+    apk_path = pathlib.Path(APKS_DIR)
+    for apk in apk_path.glob("*.apk"):
+        apks.append(apk.stem)
+    return apks
+
+
+def process_apks_for_waydroid(database_connection: PostgresCon):
+    apks = get_downloaded_apks()
+    store_id_map = query_store_id_map(
+        database_connection=database_connection, store_ids=apks
+    )
+    store_id_map = store_id_map.rename(columns={"id": "store_app"})
+    for _, row in store_id_map.iterrows():
+        store_id = row.store_id
+        run_waydroid_app(database_connection, extension=".apk", row=row)
+        break
+
+
 def run_waydroid_app(database_connection: PostgresCon, extension: str, row: pd.Series):
     store_id = row.store_id
     store_app = row.store_app
@@ -67,9 +87,6 @@ def run_waydroid_app(database_connection: PostgresCon, extension: str, row: pd.S
         )
         apk_path.exists()
 
-    # store_id = 'com.speechtexter.speechtexter'
-    # store_id = 'com.water.balls'
-
     start_script = pathlib.Path(PACKAGE_DIR, "/adscrawler/apks/install_apk_run_mitm.sh")
     os.system(f'.{start_script.as_posix()} -s "{store_id}"')
 
@@ -77,6 +94,7 @@ def run_waydroid_app(database_connection: PostgresCon, extension: str, row: pd.S
     os.system(f".{mitm_script.as_posix()} -d")
 
     mdf = mitm_process_log.parse_mitm_log(store_id)
+    logger.info(f"MITM log for {store_id} has {mdf.shape[0]} rows")
     mdf = mdf.rename(columns={"timestamp": "crawled_at"})
     mdf["url"] = mdf["url"].str[0:1000]
     mdf = mdf[["url", "host", "crawled_at", "status_code", "tld_url"]].drop_duplicates()
@@ -87,6 +105,7 @@ def run_waydroid_app(database_connection: PostgresCon, extension: str, row: pd.S
         if_exists="append",
         index=None,
     )
+    logger.info(f"Waydroid mitm log for {store_id} saved to db")
 
 
 def remove_partial_apks(store_id: str) -> None:

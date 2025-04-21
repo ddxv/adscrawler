@@ -102,7 +102,7 @@ case $mode in
         sudo ip6tables -t nat -A PREROUTING -i waydroid0 -p tcp --dport 443 -j REDIRECT --to-port 8080
         echo "Setting ports 80, 443 to redirect to 8080. Finished"
         echo "Starting mitmweb in transparent mode"
-        /usr/local/bin/mitmdump --mode transparent --showhost --set block_global=false -w "$log_file" --listen-port 8080
+        /usr/local/bin/mitmdump --mode transparent --showhost --set block_global=false -w "$log_file" --listen-port 8080 --quiet
         ;;
         
     "delete")

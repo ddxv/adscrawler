@@ -97,6 +97,9 @@ def parse_mitm_log(store_id):
         return pd.DataFrame()
 
     df = pd.DataFrame(requests)
+    if df.empty:
+        logger.error("No HTTP requests found in the log file")
+        return pd.DataFrame()
 
     # Add TLD extraction
     df["tld_url"] = df["url"].apply(
