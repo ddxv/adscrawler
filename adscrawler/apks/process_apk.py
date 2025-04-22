@@ -221,6 +221,9 @@ def run_waydroid_app(
 
     mdf = mitm_process_log.parse_mitm_log(store_id)
     logger.info(f"MITM log for {store_id} has {mdf.shape[0]} rows")
+    if mdf.empty:
+        logger.warning(f"MITM log for {store_id} returned empty dataframe")
+        return
     mdf = mdf.rename(columns={"timestamp": "crawled_at"})
     mdf["url"] = mdf["url"].str[0:1000]
     mdf = mdf[["url", "host", "crawled_at", "status_code", "tld_url"]].drop_duplicates()
