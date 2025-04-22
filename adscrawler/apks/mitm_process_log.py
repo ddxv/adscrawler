@@ -97,6 +97,10 @@ def parse_mitm_log(store_id: str) -> pd.DataFrame:
         return pd.DataFrame()
 
     df = pd.DataFrame(requests)
+
+    if "url" in df.columns:
+        df = df[~df["url"].isin(IGNORE_URLS)]
+
     if df.empty:
         logger.error("No HTTP requests found in the log file")
         return pd.DataFrame()
@@ -110,3 +114,12 @@ def parse_mitm_log(store_id: str) -> pd.DataFrame:
     df["status_code"] = df["status_code"].astype(int)
 
     return df
+
+
+IGNORE_URLS = [
+    "https://connectivitycheck.gstatic.com/generate_204",
+    "https://infinitedata-pa.googleapis.com/mdi.InfiniteData/Lookup",
+    "https://android.apis.google.com/c2dm/register3",
+    "http://connectivitycheck.gstatic.com/generate_204",
+    "https://www.google.com/generate_204",
+]
