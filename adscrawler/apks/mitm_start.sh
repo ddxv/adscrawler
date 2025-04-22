@@ -15,7 +15,7 @@ Help() {
 
 # Default values
 mode=""
-app=""
+logfile=""
 
 # Process the options
 while getopts "hwdrs:" option; do
@@ -33,7 +33,7 @@ while getopts "hwdrs:" option; do
             mode="delete"
             ;;
         s) # Enter a store_id
-            app=$OPTARG
+            logfile=$OPTARG
             ;;
         \?) # Invalid option
             echo "Error: Invalid option"
@@ -79,14 +79,14 @@ case $mode in
         sudo ip6tables -t nat -A PREROUTING -i waydroid0 -p tcp --dport 443 -j REDIRECT --to-port 8080
         echo "Setting ports 80, 443 to redirect to 8080. Finished"
         echo "Starting mitmweb in transparent mode"
-        # Create log filename based on app if provided
-        if [ -n "$app" ]; then
-            log_file=mitmlogs/traffic_${app}.log
-            echo "App store ID is set to: $app"
+        # Create log filename based on logfile if provided
+        if [ -n "$logfile" ]; then
+            log_file=mitmlogs/traffic_${logfile}.log
+            echo "logfile store ID is set to: $logfile"
             echo "Log will be saved to: $log_file"
         else
             log_file=~/traffic.log
-            echo "No app store ID provided"
+            echo "No logfile store ID provided"
             echo "Log will be saved to: $log_file"
         fi
         /usr/local/bin/mitmdump --mode transparent --showhost --set block_global=false -w "$log_file" --listen-port 8080 --quiet

@@ -91,10 +91,30 @@ def run_waydroid_app(
         apk_path.exists()
 
     logger.info("Clearing mitmdump")
-    mitm_script = pathlib.Path(PACKAGE_DIR, "/adscrawler/apks/mitm_start.sh")
-    os.system(f".{mitm_script.as_posix()} -d")
+    mitm_script = pathlib.Path(PACKAGE_DIR, "adscrawler/apks/mitm_start.sh")
+    os.system(f"{mitm_script.as_posix()} -d")
 
     # os.system("waydroid session stop")
+
+    # Start the Waydroid session process
+    _weston_process = subprocess.Popen(
+        [
+            "weston",
+            "-B",
+            "headless",
+            "--width=800",
+            "--height=800",
+            "--scale=1",
+            "-S",
+            "wayland-98",
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1,
+    )
+
+    os.environ["WAYLAND_DISPLAY"] = "wayland-98"
 
     # Start the Waydroid session process
     process = subprocess.Popen(
@@ -145,8 +165,9 @@ def run_waydroid_app(
         os.system(f'waydroid app install "{apk_path}"')
 
     print(f"Starting mitmdump with script {mitm_script.as_posix()}")
+    mitm_logfile = pathlib.Path(PACKAGE_DIR, f"mitmlogs/traffic_{store_id}.log")
     mitm_process = subprocess.Popen(
-        [f".{mitm_script.as_posix()}", "-w", "-s", store_id],
+        [f"{mitm_script.as_posix()}", "-w", "-s", mitm_logfile.as_posix()],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
@@ -196,7 +217,7 @@ def run_waydroid_app(
     os.system(f'sudo waydroid shell am force-stop "{store_id}"')
     os.system(f'waydroid app remove "{store_id}"')
 
-    os.system(f".{mitm_script.as_posix()} -d")
+    os.system(f"{mitm_script.as_posix()} -d")
 
     mdf = mitm_process_log.parse_mitm_log(store_id)
     logger.info(f"MITM log for {store_id} has {mdf.shape[0]} rows")
