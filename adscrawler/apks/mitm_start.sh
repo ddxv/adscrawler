@@ -81,7 +81,7 @@ case $mode in
         echo "Starting mitmweb in transparent mode"
         # Create log filename based on logfile if provided
         if [ -n "$logfile" ]; then
-            log_file=mitmlogs/traffic_${logfile}.log
+            log_file=$logfile
             echo "logfile store ID is set to: $logfile"
             echo "Log will be saved to: $log_file"
         else
