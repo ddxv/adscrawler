@@ -213,11 +213,9 @@ def run_waydroid_app(
     logger.info("Waiting for 60 seconds...")
     time.sleep(60)
     logger.info("Stopping app & mitmdump")
-    mitm_process.terminate()
+    os.system(f"{mitm_script.as_posix()} -d")
     os.system(f'sudo waydroid shell am force-stop "{store_id}"')
     os.system(f'waydroid app remove "{store_id}"')
-
-    os.system(f"{mitm_script.as_posix()} -d")
 
     mdf = mitm_process_log.parse_mitm_log(store_id)
     logger.info(f"MITM log for {store_id} has {mdf.shape[0]} rows")
