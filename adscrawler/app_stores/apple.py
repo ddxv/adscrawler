@@ -420,7 +420,7 @@ def clean_ios_app_df(df: pd.DataFrame) -> pd.DataFrame:
             df["store_language_code"] = df["description"].apply(
                 lambda x: langdetect.detect(x)
             )
-        except langdetect.lang_detect_exception.LangDetectException:
+        except Exception:
             logger.warning(
                 f"Unable to detect language for {df['store_id'].to_numpy()[0]}"
             )
