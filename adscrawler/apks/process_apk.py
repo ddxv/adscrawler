@@ -164,7 +164,7 @@ def run_waydroid_app(
         logger.info("Installing app")
         os.system(f'waydroid app install "{apk_path}"')
 
-    print(f"Starting mitmdump with script {mitm_script.as_posix()}")
+    logger.info(f"Starting mitmdump with script {mitm_script.as_posix()}")
     mitm_logfile = pathlib.Path(PACKAGE_DIR, f"mitmlogs/traffic_{store_id}.log")
     mitm_process = subprocess.Popen(
         [f"{mitm_script.as_posix()}", "-w", "-s", mitm_logfile.as_posix()],
