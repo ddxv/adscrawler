@@ -222,3 +222,12 @@ def remove_partial_apks(store_id: str) -> None:
     if xapk_path.exists():
         xapk_path.unlink(missing_ok=True)
         logger.info(f"{store_id=} deleted partial xapk {xapk_path.as_posix()}")
+
+
+if __name__ == "__main__":
+    from adscrawler.connection import get_db_connection
+
+    use_tunnel = False
+    database_connection = get_db_connection(use_ssh_tunnel=use_tunnel)
+    database_connection.set_engine()
+    process_apks_for_waydroid(database_connection=database_connection)
