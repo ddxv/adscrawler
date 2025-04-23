@@ -139,9 +139,12 @@ def run_waydroid_app(
 
 
 def launch_and_track_app(store_id: str, apk_path: pathlib.Path) -> None:
+    function_info = f"Waydroid launch and track {store_id=}"
     mitm_script = pathlib.Path(PACKAGE_DIR, "adscrawler/apks/mitm_start.sh")
 
-    logger.info(f"Starting mitmdump with script {mitm_script.as_posix()}")
+    logger.info(
+        f"{function_info} starting mitmdump with script {mitm_script.as_posix()}"
+    )
     mitm_logfile = pathlib.Path(PACKAGE_DIR, f"mitmlogs/traffic_{store_id}.log")
     mitm_process = subprocess.Popen(
         [f"{mitm_script.as_posix()}", "-w", "-s", mitm_logfile.as_posix()],
@@ -151,9 +154,20 @@ def launch_and_track_app(store_id: str, apk_path: pathlib.Path) -> None:
     )
     # Store the PID
     mitm_pid = mitm_process.pid
-    logger.info(f"Mitmdump started with PID: {mitm_pid}")
+    logger.info(f"{function_info} mitmdump started with PID: {mitm_pid}")
 
     install_app(store_id, apk_path)
+    waydroid_launch_app(store_id)
+
+    logger.info(f"{function_info} waiting for 60 seconds")
+    time.sleep(60)
+    logger.info(f"{function_info} stopping app & mitmdump")
+    os.system(f"{mitm_script.as_posix()} -d")
+    os.system(f'sudo waydroid shell am force-stop "{store_id}"')
+    os.system(f'waydroid app remove "{store_id}"')
+
+
+def waydroid_launch_app(store_id: str) -> None:
     os.system(f'waydroid app launch "{store_id}"')
 
     time.sleep(2)
@@ -179,23 +193,18 @@ def launch_and_track_app(store_id: str, apk_path: pathlib.Path) -> None:
             logger.info(f"{store_id} is now in the foreground")
             break
 
-        # Wait before checking again
+        # Wait before launching again
         os.system(f'waydroid app launch "{store_id}"')
         time.sleep(2)
 
     if not found:
         logger.error(f"{store_id} not found in the foreground after {timeout} seconds")
-        return
-
-    logger.info("Waiting for 60 seconds...")
-    time.sleep(60)
-    logger.info("Stopping app & mitmdump")
-    os.system(f"{mitm_script.as_posix()} -d")
-    os.system(f'sudo waydroid shell am force-stop "{store_id}"')
-    os.system(f'waydroid app remove "{store_id}"')
+        raise Exception(f"Waydroid failed to launch {store_id}")
 
 
 def install_app(store_id: str, apk_path: pathlib.Path) -> None:
+    function_info = f"Waydroid install {store_id=}"
+    logger.info(f"{function_info} checking")
     applist = subprocess.run(
         ["waydroid", "app", "list"], capture_output=True, text=True, check=False
     )
@@ -203,20 +212,27 @@ def install_app(store_id: str, apk_path: pathlib.Path) -> None:
     output = applist.stdout
 
     if store_id in output:
-        logger.info("App already installed")
+        logger.info(f"{function_info} found already installed")
         return
-    logger.info("Installing app")
+    logger.info(f"{function_info} installing")
     os.system(f'waydroid app install "{apk_path}"')
+
     time.sleep(2)
-    applist = subprocess.run(
-        ["waydroid", "app", "list"], capture_output=True, text=True, check=False
-    )
-    output = applist.stdout
-    if store_id in output:
-        logger.info("App installed")
+
+    timeout = 45
+    start_time = time.time()
+    while (time.time() - start_time) < timeout:
+        applist = subprocess.run(
+            ["waydroid", "app", "list"], capture_output=True, text=True, check=False
+        )
+        output = applist.stdout
+        if store_id in output:
+            logger.info(f"{function_info} installed")
+            break
+        time.sleep(1)
     else:
-        logger.error("App not installed")
-        raise Exception("App not installed")
+        logger.error(f"{function_info} not installed")
+        raise Exception(f"Waydroid failed to install {store_id}")
 
 
 def start_waydroid() -> subprocess.Popen:
