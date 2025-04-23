@@ -69,7 +69,7 @@ def process_apks_for_waydroid(database_connection: PostgresCon) -> None:
     )
     store_id_map = store_id_map.rename(columns={"id": "store_app"})
     for _, row in store_id_map.iterrows():
-        logger.info(f"Processing {row.store_id}")
+        logger.info(f"Waydroid start {row.store_id}")
         run_waydroid_app(database_connection, extension=".apk", row=row)
 
 
