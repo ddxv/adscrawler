@@ -96,7 +96,13 @@ def run_waydroid_app(
 
     # os.system("waydroid session stop")
 
-    # Start the Waydroid session process
+    # This is required to run weston in cronjob environment
+    os.environ["XDG_RUNTIME_DIR"] = "/run/user/1000"
+
+    # This will be the socket name for the weston process
+    socket_name = "wayland-98"
+    os.environ["WAYLAND_DISPLAY"] = socket_name
+
     _weston_process = subprocess.Popen(
         [
             "weston",
@@ -106,15 +112,13 @@ def run_waydroid_app(
             "--height=800",
             "--scale=1",
             "-S",
-            "wayland-98",
+            socket_name,
         ],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
         bufsize=1,
     )
-
-    os.environ["WAYLAND_DISPLAY"] = "wayland-98"
 
     # Start the Waydroid session process
     process = subprocess.Popen(
