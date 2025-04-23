@@ -119,6 +119,30 @@ def run_waydroid_app(
         text=True,
         bufsize=1,
     )
+    ready = False
+    timeout = 30
+    start_time = time.time()
+    while (
+        _weston_process.poll() is None
+        and not ready
+        and (time.time() - start_time) < timeout
+    ):
+        line = _weston_process.stdout.readline()
+        logger.info(line)
+        if "launching '/usr/libexec/weston-desktop-shell'" in line:
+            ready = True
+            logger.info("Weston is ready! Continuing with the script...")
+            break
+
+    if not ready:
+        if _weston_process.poll() is not None:
+            logger.error("Weston process ended without becoming ready")
+        else:
+            logger.error(
+                f"Timed out after {timeout} seconds waiting for Waydroid to be ready"
+            )
+            _weston_process.terminate()
+        return
 
     # Start the Waydroid session process
     process = subprocess.Popen(
