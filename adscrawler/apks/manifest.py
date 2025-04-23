@@ -13,6 +13,7 @@ from adscrawler.apks.download_apk import download
 from adscrawler.config import (
     APK_PARTIALS_DIR,
     APK_UNZIPPED_DIR,
+    APKS_DIR,
     XAPKS_DIR,
     get_logger,
 )
@@ -41,7 +42,7 @@ def empty_folder(pth: pathlib.Path) -> None:
 
 
 def unzip_apk(store_id: str, extension: str) -> None:
-    apk_path = pathlib.Path(APK_PARTIALS_DIR, f"{store_id}{extension}")
+    apk_path = pathlib.Path(APKS_DIR, f"{store_id}{extension}")
     if APK_UNZIPPED_DIR.exists():
         empty_folder(APK_UNZIPPED_DIR)
     check_dirs()
