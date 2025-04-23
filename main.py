@@ -3,7 +3,7 @@ import logging
 import os
 import sys
 
-from adscrawler.apks.process_apk import process_apks
+from adscrawler.apks.process_apk import process_apks, process_apks_for_waydroid
 from adscrawler.app_stores.scrape_stores import (
     crawl_developers_for_new_store_ids,
     crawl_keyword_cranks,
@@ -59,6 +59,12 @@ class ProcessManager:
             "-m",
             "--manifests",
             help="Scrape the iTunes and Play Store front pages to find new apps",
+            action="store_true",
+        )
+        parser.add_argument(
+            "-w",
+            "--waydroid",
+            help="Run waydroid app",
             action="store_true",
         )
         parser.add_argument(
@@ -145,6 +151,27 @@ class ProcessManager:
             ]
         return len(apk_download_processes) > 1
 
+    def check_waydroid_processes(self) -> bool:
+        processes = self.get_running_processes()
+        my_processes = self.filter_processes(processes, "/adscrawler/main.py")
+        waydroid_processes = [
+            x for x in my_processes if any([" -w" in x, " --waydroid" in x])
+        ]
+        if self.args.platforms:
+            waydroid_processes = [
+                x
+                for x in waydroid_processes
+                if any(p in x for p in self.args.platforms)
+            ]
+
+        if self.args.update_app_store_details_group:
+            waydroid_processes = [
+                x
+                for x in waydroid_processes
+                if self.args.update_app_store_details_group in x
+            ]
+        return len(waydroid_processes) > 1
+
     def check_ads_txt_download_processes(self) -> bool:
         processes = self.get_running_processes()
         my_processes = self.filter_processes(processes, "/adscrawler/main.py")
@@ -166,6 +193,8 @@ class ProcessManager:
             return self.check_app_update_processes()
         elif self.args.manifests:
             return self.check_apk_download_processes()
+        elif self.args.waydroid:
+            return self.check_waydroid_processes()
         elif self.args.app_ads_txt_scrape:
             return self.check_ads_txt_download_processes()
         elif self.args.crawl_keywords:
@@ -200,6 +229,9 @@ class ProcessManager:
 
         if self.args.manifests:
             self.scrape_manifests(stores)
+
+        if self.args.waydroid:
+            self.scrape_manifests_for_waydroid()
 
         if self.args.crawl_keywords:
             self.crawl_keywords()
@@ -245,6 +277,12 @@ class ProcessManager:
                 process_apks(database_connection=self.pgcon, number_of_apps_to_pull=20)
             except Exception:
                 logger.exception("Android scrape manifests failing")
+
+    def scrape_manifests_for_waydroid(self) -> None:
+        try:
+            process_apks_for_waydroid(database_connection=self.pgcon)
+        except Exception:
+            logger.exception("Android run waydroid app failing")
 
     def crawl_keywords(self) -> None:
         crawl_keyword_cranks(database_connection=self.pgcon)

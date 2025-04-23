@@ -46,10 +46,10 @@ def process_apks(
         except Exception:
             logger.exception(f"Manifest for {store_id} failed")
 
-        try:
-            run_waydroid_app(database_connection, extension, row)
-        except Exception:
-            logger.exception(f"Waydroid API call scraping for {store_id} failed")
+        # try:
+        #     run_waydroid_app(database_connection, extension, row)
+        # except Exception:
+        #     logger.exception(f"Waydroid API call scraping for {store_id} failed")
 
         remove_partial_apks(store_id=store_id)
 
