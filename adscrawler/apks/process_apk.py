@@ -102,95 +102,40 @@ def run_waydroid_app(
     # This will be the socket name for the weston process
     socket_name = "wayland-98"
     os.environ["WAYLAND_DISPLAY"] = socket_name
+    weston_process = start_weston(socket_name)
 
-    _weston_process = subprocess.Popen(
-        [
-            "weston",
-            "-B",
-            "headless",
-            "--width=800",
-            "--height=800",
-            "--scale=1",
-            "-S",
-            socket_name,
-        ],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-        bufsize=1,
-    )
-    ready = False
-    timeout = 30
-    start_time = time.time()
-    while (
-        _weston_process.poll() is None
-        and not ready
-        and (time.time() - start_time) < timeout
-    ):
-        line = _weston_process.stdout.readline()
-        logger.info(line)
-        if "launching '/usr/libexec/weston-desktop-shell'" in line:
-            ready = True
-            logger.info("Weston is ready! Continuing with the script...")
-            break
+    waydroid_process = start_waydroid()
+    try:
+        _mitm_process = launch_and_track_app(store_id, apk_path)
+    except Exception:
+        logger.exception(f"App {store_id} failed to log traffic")
+        waydroid_process.terminate()
+        weston_process.terminate()
+        raise
+    finally:
+        waydroid_process.terminate()
+        weston_process.terminate()
 
-    if not ready:
-        if _weston_process.poll() is not None:
-            logger.error("Weston process ended without becoming ready")
-        else:
-            logger.error(
-                f"Timed out after {timeout} seconds waiting for Waydroid to be ready"
-            )
-            _weston_process.terminate()
+    mdf = mitm_process_log.parse_mitm_log(store_id)
+    logger.info(f"MITM log for {store_id} has {mdf.shape[0]} rows")
+    if mdf.empty:
+        logger.warning(f"MITM log for {store_id} returned empty dataframe")
         return
-
-    # Start the Waydroid session process
-    process = subprocess.Popen(
-        ["waydroid", "session", "start"],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-        bufsize=1,
+    mdf = mdf.rename(columns={"timestamp": "crawled_at"})
+    mdf["url"] = mdf["url"].str[0:1000]
+    mdf = mdf[["url", "host", "crawled_at", "status_code", "tld_url"]].drop_duplicates()
+    mdf["store_app"] = store_app
+    mdf.to_sql(
+        name="store_app_api_calls",
+        con=database_connection.engine,
+        if_exists="append",
+        index=None,
     )
+    logger.info(f"Waydroid mitm log for {store_id} saved to db")
 
-    # Set a timeout (in seconds)
-    timeout = 120  # Wait up to 2 minutes
-    start_time = time.time()
-    ready = False
 
-    logger.info("Waiting for Waydroid to be ready (120 seconds)...")
-    while process.poll() is None and not ready and (time.time() - start_time) < timeout:
-        line = process.stdout.readline()
-        logger.info(line)
-        if (
-            "Android with user 0 is ready" in line
-            or "Session is already running" in line
-        ):
-            ready = True
-            logger.info("Waydroid is ready! Continuing with the script...")
-            break
-
-    if not ready:
-        if process.poll() is not None:
-            logger.error("Waydroid process ended without becoming ready")
-        else:
-            logger.error(
-                f"Timed out after {timeout} seconds waiting for Waydroid to be ready"
-            )
-            process.terminate()
-        return
-
-    applist = subprocess.run(
-        ["waydroid", "app", "list"], capture_output=True, text=True, check=False
-    )
-
-    output = applist.stdout
-
-    if store_id in output:
-        logger.info("App already installed")
-    else:
-        logger.info("Installing app")
-        os.system(f'waydroid app install "{apk_path}"')
+def launch_and_track_app(store_id: str, apk_path: pathlib.Path) -> None:
+    mitm_script = pathlib.Path(PACKAGE_DIR, "adscrawler/apks/mitm_start.sh")
 
     logger.info(f"Starting mitmdump with script {mitm_script.as_posix()}")
     mitm_logfile = pathlib.Path(PACKAGE_DIR, f"mitmlogs/traffic_{store_id}.log")
@@ -200,11 +145,11 @@ def run_waydroid_app(
         stderr=subprocess.STDOUT,
         text=True,
     )
-
     # Store the PID
     mitm_pid = mitm_process.pid
     logger.info(f"Mitmdump started with PID: {mitm_pid}")
 
+    install_app(store_id, apk_path)
     os.system(f'waydroid app launch "{store_id}"')
 
     time.sleep(2)
@@ -245,22 +190,115 @@ def run_waydroid_app(
     os.system(f'sudo waydroid shell am force-stop "{store_id}"')
     os.system(f'waydroid app remove "{store_id}"')
 
-    mdf = mitm_process_log.parse_mitm_log(store_id)
-    logger.info(f"MITM log for {store_id} has {mdf.shape[0]} rows")
-    if mdf.empty:
-        logger.warning(f"MITM log for {store_id} returned empty dataframe")
-        return
-    mdf = mdf.rename(columns={"timestamp": "crawled_at"})
-    mdf["url"] = mdf["url"].str[0:1000]
-    mdf = mdf[["url", "host", "crawled_at", "status_code", "tld_url"]].drop_duplicates()
-    mdf["store_app"] = store_app
-    mdf.to_sql(
-        name="store_app_api_calls",
-        con=database_connection.engine,
-        if_exists="append",
-        index=None,
+
+def install_app(store_id: str, apk_path: pathlib.Path) -> None:
+    applist = subprocess.run(
+        ["waydroid", "app", "list"], capture_output=True, text=True, check=False
     )
-    logger.info(f"Waydroid mitm log for {store_id} saved to db")
+
+    output = applist.stdout
+
+    if store_id in output:
+        logger.info("App already installed")
+        return
+    logger.info("Installing app")
+    os.system(f'waydroid app install "{apk_path}"')
+    time.sleep(2)
+    applist = subprocess.run(
+        ["waydroid", "app", "list"], capture_output=True, text=True, check=False
+    )
+    output = applist.stdout
+    if store_id in output:
+        logger.info("App installed")
+    else:
+        logger.error("App not installed")
+        raise Exception("App not installed")
+
+
+def start_waydroid() -> subprocess.Popen:
+    # Start the Waydroid session process
+    waydroid_process = subprocess.Popen(
+        ["waydroid", "session", "start"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1,
+    )
+
+    # Set a timeout (in seconds)
+    timeout = 120  # Wait up to 2 minutes
+    start_time = time.time()
+    ready = False
+
+    logger.info("Waiting for Waydroid to be ready (120 seconds)...")
+    while (
+        waydroid_process.poll() is None
+        and not ready
+        and (time.time() - start_time) < timeout
+    ):
+        line = waydroid_process.stdout.readline()
+        logger.info(line)
+        if (
+            "Android with user 0 is ready" in line
+            or "Session is already running" in line
+        ):
+            ready = True
+            logger.info("Waydroid is ready! Continuing with the script...")
+            break
+
+    if not ready:
+        if waydroid_process.poll() is not None:
+            logger.error("Waydroid process ended without becoming ready")
+        else:
+            logger.error(
+                f"Timed out after {timeout} seconds waiting for Waydroid to be ready"
+            )
+            waydroid_process.terminate()
+        return waydroid_process
+
+
+def start_weston(socket_name: str) -> subprocess.Popen:
+    weston_process = subprocess.Popen(
+        [
+            "weston",
+            "-B",
+            "headless",
+            "--width=800",
+            "--height=800",
+            "--scale=1",
+            "-S",
+            socket_name,
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1,
+    )
+    ready = False
+    timeout = 30
+    start_time = time.time()
+    while (
+        weston_process.poll() is None
+        and not ready
+        and (time.time() - start_time) < timeout
+    ):
+        line = weston_process.stdout.readline()
+        logger.info(line)
+        if "launching '/usr/libexec/weston-desktop-shell'" in line:
+            ready = True
+            logger.info("Weston is ready! Continuing with the script...")
+            break
+
+    if not ready:
+        if weston_process.poll() is not None:
+            logger.error("Weston process ended without becoming ready")
+        else:
+            logger.error(
+                f"Timed out after {timeout} seconds waiting for Waydroid to be ready"
+            )
+            weston_process.terminate()
+        return
+    return weston_process
 
 
 def remove_partial_apks(store_id: str) -> None:
