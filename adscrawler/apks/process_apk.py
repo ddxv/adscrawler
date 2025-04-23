@@ -109,12 +109,16 @@ def run_waydroid_app(
         _mitm_process = launch_and_track_app(store_id, apk_path)
     except Exception:
         logger.exception(f"App {store_id} failed to log traffic")
-        waydroid_process.terminate()
-        weston_process.terminate()
+        if weston_process:
+            weston_process.terminate()
+        if waydroid_process:
+            waydroid_process.terminate()
         raise
     finally:
-        waydroid_process.terminate()
-        weston_process.terminate()
+        if weston_process:
+            weston_process.terminate()
+        if waydroid_process:
+            waydroid_process.terminate()
 
     mdf = mitm_process_log.parse_mitm_log(store_id)
     logger.info(f"MITM log for {store_id} has {mdf.shape[0]} rows")
@@ -254,7 +258,7 @@ def start_waydroid() -> subprocess.Popen:
                 f"Timed out after {timeout} seconds waiting for Waydroid to be ready"
             )
             waydroid_process.terminate()
-        return waydroid_process
+    return waydroid_process
 
 
 def start_weston(socket_name: str) -> subprocess.Popen:
