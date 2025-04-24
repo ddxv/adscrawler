@@ -68,16 +68,20 @@ def process_apks_for_waydroid(database_connection: PostgresCon) -> None:
         database_connection=database_connection, store_ids=apks
     )
     store_id_map = store_id_map.rename(columns={"id": "store_app"})
-    waydroid_process, weston_process = start_waydroid()
-    if not weston_process:
-        logger.error("Weston failed to start")
-        return
+    waydroid_process = restart_waydroid()
     if not waydroid_process:
         logger.error("Waydroid failed to start")
         return
     for _, row in store_id_map.iterrows():
         if check_waydroid_session():
-            run_waydroid_app(database_connection, extension=".apk", row=row)
+            try:
+                run_waydroid_app(database_connection, extension=".apk", row=row)
+            except Exception:
+                try:
+                    restart_waydroid()
+                except Exception:
+                    logger.exception("Failed to restart waydroid, exiting")
+                    return
         else:
             logger.error("Waydroid session not running")
             break
@@ -136,22 +140,24 @@ def check_waydroid_session() -> bool:
     return False
 
 
-def start_waydroid() -> tuple[subprocess.Popen, subprocess.Popen]:
+def restart_waydroid() -> tuple[subprocess.Popen, subprocess.Popen]:
     os.system("waydroid session stop")
 
     # This is required to run weston in cronjob environment
     os.environ["XDG_RUNTIME_DIR"] = "/run/user/1000"
 
-    # This will be the socket name for the weston process
-    socket_name = "wayland-98"
-    os.environ["WAYLAND_DISPLAY"] = socket_name
-    weston_process = start_weston(socket_name)
+    if not check_wayland_display():
+        _weston_process = start_weston()
 
     waydroid_process = start_waydroid_session()
     if not waydroid_process:
         logger.error("Waydroid failed to start")
         return
-    return waydroid_process, weston_process
+    return waydroid_process
+
+
+def check_wayland_display() -> bool:
+    return os.environ.get("WAYLAND_DISPLAY") is not None
 
 
 def launch_and_track_app(store_id: str, apk_path: pathlib.Path) -> None:
@@ -184,6 +190,8 @@ def launch_and_track_app(store_id: str, apk_path: pathlib.Path) -> None:
 
 
 def waydroid_launch_app(store_id: str) -> None:
+    function_info = f"Waydroid launch {store_id=}"
+    logger.info(f"{function_info} start")
     os.system(f'waydroid app launch "{store_id}"')
 
     time.sleep(2)
@@ -206,10 +214,11 @@ def waydroid_launch_app(store_id: str) -> None:
         # Check if app is in the output
         if store_id in result.stdout:
             found = True
-            logger.info(f"{store_id} is now in the foreground")
+            logger.info(f"{function_info} {store_id} in foreground")
             break
 
         # Wait before launching again
+        logger.info(f"{function_info} {store_id} not in foreground, relaunching")
         os.system(f'waydroid app launch "{store_id}"')
         time.sleep(2)
 
@@ -231,7 +240,14 @@ def install_app(store_id: str, apk_path: pathlib.Path) -> None:
         logger.info(f"{function_info} found already installed")
         return
     logger.info(f"{function_info} installing")
-    os.system(f'waydroid app install "{apk_path}"')
+
+    install_output = subprocess.run(
+        ["waydroid", "app", "install", apk_path.as_posix()],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    logger.info(f"{function_info} install output: {install_output.stdout}")
 
     time.sleep(2)
 
@@ -244,14 +260,25 @@ def install_app(store_id: str, apk_path: pathlib.Path) -> None:
         output = applist.stdout
         if store_id in output:
             logger.info(f"{function_info} installed")
-            break
+            return
         time.sleep(1)
-    else:
-        logger.error(f"{function_info} not installed")
-        raise Exception(f"Waydroid failed to install {store_id}")
+
+    applist = subprocess.run(
+        ["waydroid", "app", "list"], capture_output=True, text=True, check=False
+    )
+
+    output = applist.stdout
+
+    if store_id in output:
+        logger.info(f"{function_info} installed")
+        return
+
+    raise Exception(f"Waydroid failed to install {store_id}")
 
 
 def start_waydroid_session() -> subprocess.Popen:
+    function_info = "Waydroid session"
+    logger.info(f"{function_info} start")
     # Start the Waydroid session process
     waydroid_process = subprocess.Popen(
         ["waydroid", "session", "start"],
@@ -265,8 +292,8 @@ def start_waydroid_session() -> subprocess.Popen:
     timeout = 120  # Wait up to 2 minutes
     start_time = time.time()
     ready = False
+    display_waiting = True
 
-    logger.info("Waiting for Waydroid to be ready (120 seconds)...")
     while (
         waydroid_process.poll() is None
         and not ready
@@ -281,6 +308,10 @@ def start_waydroid_session() -> subprocess.Popen:
             ready = True
             logger.info("Waydroid is ready! Continuing with the script...")
             break
+        if display_waiting:
+            logger.info(f"{function_info} waiting for ready (120 seconds)...")
+            display_waiting = False
+        time.sleep(1)
 
     if not ready:
         if waydroid_process.poll() is not None:
@@ -293,7 +324,11 @@ def start_waydroid_session() -> subprocess.Popen:
     return waydroid_process
 
 
-def start_weston(socket_name: str) -> subprocess.Popen:
+def start_weston() -> subprocess.Popen:
+    # This will be the socket name for the weston process
+    socket_name = "wayland-98"
+    os.environ["WAYLAND_DISPLAY"] = socket_name
+
     weston_process = subprocess.Popen(
         [
             "weston",
