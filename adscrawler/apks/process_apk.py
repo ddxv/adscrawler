@@ -68,9 +68,19 @@ def process_apks_for_waydroid(database_connection: PostgresCon) -> None:
         database_connection=database_connection, store_ids=apks
     )
     store_id_map = store_id_map.rename(columns={"id": "store_app"})
+    waydroid_process, weston_process = start_waydroid()
+    if not weston_process:
+        logger.error("Weston failed to start")
+        return
+    if not waydroid_process:
+        logger.error("Waydroid failed to start")
+        return
     for _, row in store_id_map.iterrows():
-        logger.info(f"Waydroid start {row.store_id}")
-        run_waydroid_app(database_connection, extension=".apk", row=row)
+        if check_waydroid_session():
+            run_waydroid_app(database_connection, extension=".apk", row=row)
+        else:
+            logger.error("Waydroid session not running")
+            break
 
 
 def run_waydroid_app(
@@ -94,31 +104,7 @@ def run_waydroid_app(
     mitm_script = pathlib.Path(PACKAGE_DIR, "adscrawler/apks/mitm_start.sh")
     os.system(f"{mitm_script.as_posix()} -d")
 
-    # os.system("waydroid session stop")
-
-    # This is required to run weston in cronjob environment
-    os.environ["XDG_RUNTIME_DIR"] = "/run/user/1000"
-
-    # This will be the socket name for the weston process
-    socket_name = "wayland-98"
-    os.environ["WAYLAND_DISPLAY"] = socket_name
-    weston_process = start_weston(socket_name)
-
-    waydroid_process = start_waydroid()
-    try:
-        _mitm_process = launch_and_track_app(store_id, apk_path)
-    except Exception:
-        logger.exception(f"App {store_id} failed to log traffic")
-        if weston_process:
-            weston_process.terminate()
-        if waydroid_process:
-            waydroid_process.terminate()
-        raise
-    finally:
-        if weston_process:
-            weston_process.terminate()
-        if waydroid_process:
-            waydroid_process.terminate()
+    _mitm_process = launch_and_track_app(store_id, apk_path)
 
     mdf = mitm_process_log.parse_mitm_log(store_id)
     logger.info(f"MITM log for {store_id} has {mdf.shape[0]} rows")
@@ -136,6 +122,36 @@ def run_waydroid_app(
         index=None,
     )
     logger.info(f"Waydroid mitm log for {store_id} saved to db")
+
+
+def check_waydroid_session() -> bool:
+    waydroid_process = subprocess.run(
+        ["waydroid", "status"], capture_output=True, text=True, check=False
+    )
+    # Look specifically for the line "Session:  RUNNING"
+    for line in waydroid_process.stdout.splitlines():
+        print(line.strip())
+        if line.strip() == "Session:\tRUNNING":
+            return True
+    return False
+
+
+def start_waydroid(store_id: str) -> tuple[subprocess.Popen, subprocess.Popen]:
+    os.system("waydroid session stop")
+
+    # This is required to run weston in cronjob environment
+    os.environ["XDG_RUNTIME_DIR"] = "/run/user/1000"
+
+    # This will be the socket name for the weston process
+    socket_name = "wayland-98"
+    os.environ["WAYLAND_DISPLAY"] = socket_name
+    weston_process = start_weston(socket_name)
+
+    waydroid_process = start_waydroid_session()
+    if not waydroid_process:
+        logger.error(f"Waydroid failed to start, exiting for {store_id}")
+        return
+    return waydroid_process, weston_process
 
 
 def launch_and_track_app(store_id: str, apk_path: pathlib.Path) -> None:
@@ -235,7 +251,7 @@ def install_app(store_id: str, apk_path: pathlib.Path) -> None:
         raise Exception(f"Waydroid failed to install {store_id}")
 
 
-def start_waydroid() -> subprocess.Popen:
+def start_waydroid_session() -> subprocess.Popen:
     # Start the Waydroid session process
     waydroid_process = subprocess.Popen(
         ["waydroid", "session", "start"],
