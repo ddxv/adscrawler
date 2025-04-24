@@ -61,6 +61,7 @@ def get_downloaded_apks() -> list[str]:
 
 
 def process_apks_for_waydroid(database_connection: PostgresCon) -> None:
+    # Note, we haven't started handling xapks yet
     apks = get_downloaded_apks()
     store_id_map = query_store_id_api_called_map(
         database_connection=database_connection, store_ids=apks
@@ -93,6 +94,7 @@ def run_waydroid_app(
     database_connection: PostgresCon, extension: str, row: pd.Series
 ) -> None:
     store_id = row.store_id
+    function_info = f"waydroid {store_id=}"
     store_app = row.store_app
     apk_path = pathlib.Path(APKS_DIR, f"{store_id}.apk")
     if extension == ".xapk":
@@ -106,16 +108,16 @@ def run_waydroid_app(
         )
         apk_path.exists()
 
-    logger.info("Clearing mitmdump")
+    logger.info(f"{function_info} clearing mitmdump")
     mitm_script = pathlib.Path(PACKAGE_DIR, "adscrawler/apks/mitm_start.sh")
     os.system(f"{mitm_script.as_posix()} -d")
 
     _mitm_process = launch_and_track_app(store_id, apk_path)
 
     mdf = mitm_process_log.parse_mitm_log(store_id)
-    logger.info(f"MITM log for {store_id} has {mdf.shape[0]} rows")
+    logger.info(f"{function_info} MITM log has {mdf.shape[0]} rows")
     if mdf.empty:
-        logger.warning(f"MITM log for {store_id} returned empty dataframe")
+        logger.warning(f"{function_info} MITM log returned empty dataframe")
         return
     mdf = mdf.rename(columns={"timestamp": "crawled_at"})
     mdf["url"] = mdf["url"].str[0:1000]
@@ -127,7 +129,7 @@ def run_waydroid_app(
         if_exists="append",
         index=None,
     )
-    logger.info(f"Waydroid mitm log for {store_id} saved to db")
+    logger.info(f"{function_info} saved to db")
 
 
 def check_waydroid_session() -> bool:
@@ -163,9 +165,10 @@ def check_wayland_display() -> bool:
 
 
 def launch_and_track_app(store_id: str, apk_path: pathlib.Path) -> None:
-    function_info = f"Waydroid launch and track {store_id=}"
+    function_info = f"waydroid {store_id=} launch and track"
     mitm_script = pathlib.Path(PACKAGE_DIR, "adscrawler/apks/mitm_start.sh")
 
+    install_app(store_id, apk_path)
     logger.info(
         f"{function_info} starting mitmdump with script {mitm_script.as_posix()}"
     )
@@ -180,7 +183,6 @@ def launch_and_track_app(store_id: str, apk_path: pathlib.Path) -> None:
     mitm_pid = mitm_process.pid
     logger.info(f"{function_info} mitmdump started with PID: {mitm_pid}")
 
-    install_app(store_id, apk_path)
     waydroid_launch_app(store_id)
 
     logger.info(f"{function_info} waiting for 60 seconds")
@@ -189,10 +191,11 @@ def launch_and_track_app(store_id: str, apk_path: pathlib.Path) -> None:
     os.system(f"{mitm_script.as_posix()} -d")
     os.system(f'sudo waydroid shell am force-stop "{store_id}"')
     os.system(f'waydroid app remove "{store_id}"')
+    logger.info(f"{function_info} success")
 
 
 def waydroid_launch_app(store_id: str) -> None:
-    function_info = f"Waydroid launch {store_id=}"
+    function_info = f"waydroid {store_id=} launch"
     logger.info(f"{function_info} start")
     os.system(f'waydroid app launch "{store_id}"')
 
@@ -216,17 +219,20 @@ def waydroid_launch_app(store_id: str) -> None:
         # Check if app is in the output
         if store_id in result.stdout:
             found = True
-            logger.info(f"{function_info} {store_id} in foreground")
+            logger.info(f"{function_info} in foreground")
             break
 
         # Wait before launching again
-        logger.info(f"{function_info} {store_id} not in foreground, relaunching")
+        logger.info(f"{function_info} not in foreground, relaunching")
         os.system(f'waydroid app launch "{store_id}"')
         time.sleep(2)
 
     if not found:
-        logger.error(f"{store_id} not found in the foreground after {timeout} seconds")
-        raise Exception(f"Waydroid failed to launch {store_id}")
+        logger.error(
+            f"{function_info} not found in the foreground after {timeout} seconds"
+        )
+        raise Exception(f"waydroid {store_id=} failed to launch")
+    logger.info(f"{function_info} success")
 
 
 def install_app(store_id: str, apk_path: pathlib.Path) -> None:
