@@ -241,17 +241,16 @@ def install_app(store_id: str, apk_path: pathlib.Path) -> None:
         return
     logger.info(f"{function_info} installing")
 
-    install_output = subprocess.run(
+    _install_output = subprocess.run(
         ["waydroid", "app", "install", apk_path.as_posix()],
         capture_output=True,
         text=True,
         check=False,
     )
-    logger.info(f"{function_info} install output: {install_output.stdout}")
 
     time.sleep(2)
 
-    timeout = 45
+    timeout = 30
     start_time = time.time()
     while (time.time() - start_time) < timeout:
         applist = subprocess.run(
