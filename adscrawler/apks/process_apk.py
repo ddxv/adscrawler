@@ -15,7 +15,10 @@ from adscrawler.config import (
     get_logger,
 )
 from adscrawler.connection import PostgresCon
-from adscrawler.queries import get_top_ranks_for_unpacking, query_store_id_map
+from adscrawler.queries import (
+    get_top_ranks_for_unpacking,
+    query_store_id_api_called_map,
+)
 
 logger = get_logger(__name__)
 
@@ -46,11 +49,6 @@ def process_apks(
         except Exception:
             logger.exception(f"Manifest for {store_id} failed")
 
-        # try:
-        #     run_waydroid_app(database_connection, extension, row)
-        # except Exception:
-        #     logger.exception(f"Waydroid API call scraping for {store_id} failed")
-
         remove_partial_apks(store_id=store_id)
 
 
@@ -64,10 +62,14 @@ def get_downloaded_apks() -> list[str]:
 
 def process_apks_for_waydroid(database_connection: PostgresCon) -> None:
     apks = get_downloaded_apks()
-    store_id_map = query_store_id_map(
+    store_id_map = query_store_id_api_called_map(
         database_connection=database_connection, store_ids=apks
     )
-    store_id_map = store_id_map.rename(columns={"id": "store_app"})
+    store_id_map["crawled_at"] = pd.to_datetime(store_id_map["crawled_at"])
+    last_crawled_limit = (
+        pd.Timestamp.now() - pd.Timedelta(days=31) > store_id_map["crawled_at"]
+    )
+    store_id_map = store_id_map[last_crawled_limit | store_id_map["crawled_at"].isna()]
     waydroid_process = restart_waydroid()
     if not waydroid_process:
         logger.error("Waydroid failed to start")

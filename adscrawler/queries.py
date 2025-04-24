@@ -254,6 +254,34 @@ def query_store_id_map(
     return df
 
 
+def query_store_id_api_called_map(
+    database_connection: PostgresCon,
+    store: int | None = None,
+    store_ids: list[str] | None = None,
+) -> pd.DataFrame:
+    where_statement = ""
+    if store:
+        where_statement += f"WHERE store = {store} "
+    if store_ids:
+        if "WHERE" not in where_statement:
+            where_statement += " WHERE "
+        else:
+            where_statement += " AND "
+        store_ids_list = "'" + "','".join(store_ids) + "'"
+        where_statement += f" sa.store_id in ({store_ids_list}) "
+    sel_query = f"""SELECT
+                    DISTINCT ON (sa.id) sa.id AS store_app, sa.store_id, max(saac.crawled_at) AS crawled_at
+                FROM store_apps sa
+                LEFT JOIN store_app_api_calls saac
+                    ON sa.id = saac.store_app
+        {where_statement}
+                GROUP BY sa.id, sa.store_id
+        ;
+        """
+    df = pd.read_sql(sel_query, database_connection.engine)
+    return df
+
+
 def query_collections(database_connection: PostgresCon) -> pd.DataFrame:
     sel_query = """SELECT
         *
