@@ -136,7 +136,7 @@ def check_waydroid_session() -> bool:
     return False
 
 
-def start_waydroid(store_id: str) -> tuple[subprocess.Popen, subprocess.Popen]:
+def start_waydroid() -> tuple[subprocess.Popen, subprocess.Popen]:
     os.system("waydroid session stop")
 
     # This is required to run weston in cronjob environment
@@ -149,7 +149,7 @@ def start_waydroid(store_id: str) -> tuple[subprocess.Popen, subprocess.Popen]:
 
     waydroid_process = start_waydroid_session()
     if not waydroid_process:
-        logger.error(f"Waydroid failed to start, exiting for {store_id}")
+        logger.error("Waydroid failed to start")
         return
     return waydroid_process, weston_process
 
