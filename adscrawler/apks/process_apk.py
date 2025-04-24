@@ -328,6 +328,7 @@ def start_waydroid_session() -> subprocess.Popen:
                 f"Timed out after {timeout} seconds waiting for Waydroid to be ready"
             )
             waydroid_process.terminate()
+    logger.info(f"{function_info} success")
     return waydroid_process
 
 
