@@ -1,8 +1,6 @@
 import pathlib
 import time
 
-import pandas as pd
-
 from adscrawler.apks import manifest, waydroid
 from adscrawler.config import (
     APK_PARTIALS_DIR,
@@ -61,11 +59,6 @@ def process_apks_for_waydroid(database_connection: PostgresCon) -> None:
     store_id_map = query_store_id_api_called_map(
         database_connection=database_connection, store_ids=apks
     )
-    store_id_map["crawled_at"] = pd.to_datetime(store_id_map["crawled_at"])
-    last_crawled_limit = (
-        pd.Timestamp.now() - pd.Timedelta(days=31) > store_id_map["crawled_at"]
-    )
-    store_id_map = store_id_map[last_crawled_limit | store_id_map["crawled_at"].isna()]
     waydroid_process = waydroid.restart()
     if not waydroid_process:
         logger.error("Waydroid failed to start")

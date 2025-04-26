@@ -304,7 +304,7 @@ def query_store_id_api_called_map(
                 LEFT JOIN max_api_calls mac ON
                     sa.id = mac.store_app
                     {where_statement}
-                    AND ml.crawled_at <= CURRENT_DATE - INTERVAL '1 days'
+                    AND (ml.crawled_at <= CURRENT_DATE - INTERVAL '1 days' OR ml.crawled_at IS NULL)
         ;
         """
     df = pd.read_sql(sel_query, database_connection.engine)
