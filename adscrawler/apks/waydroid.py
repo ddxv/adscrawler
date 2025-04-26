@@ -290,7 +290,7 @@ def install_app(store_id: str, apk_path: pathlib.Path) -> None:
 
     time.sleep(2)
 
-    timeout = 30
+    timeout = 60
     start_time = time.time()
     while (time.time() - start_time) < timeout:
         applist = subprocess.run(
@@ -312,7 +312,9 @@ def install_app(store_id: str, apk_path: pathlib.Path) -> None:
         logger.info(f"{function_info} installed")
         return
 
-    raise Exception(f"Waydroid failed to install {store_id}")
+    raise Exception(
+        f"Waydroid failed to install {store_id} installerror:{_install_output.stdout}"
+    )
 
 
 def start_session() -> subprocess.Popen:
