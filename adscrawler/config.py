@@ -19,6 +19,7 @@ PACKAGE_DIR = pathlib.Path(__file__).resolve().parent.parent
 APKS_FILES_DIR = pathlib.Path(HOME, "apk-files")
 APKS_DIR = pathlib.Path(APKS_FILES_DIR, "apks")
 XAPKS_DIR = pathlib.Path(APKS_FILES_DIR, "xapks")
+XAPKS_ISSUES_DIR = pathlib.Path(APKS_FILES_DIR, "xapks-issues")
 APK_PARTIALS_DIR = pathlib.Path(APKS_FILES_DIR, "apk-partials")
 APK_UNZIPPED_DIR = pathlib.Path(APKS_FILES_DIR, "tmp-unzipped")
 ANDROID_SDK = pathlib.Path(HOME, "Android/Sdk/build-tools/35.0.0")
@@ -32,8 +33,17 @@ def handle_exception(exc_type, exc_value, exc_traceback) -> None:
     logger.critical("Uncaught exception", exc_info=(exc_type, exc_value, exc_traceback))
 
 
-def check_config_dirs() -> None:
-    dirs = [TOP_CONFIGDIR, CONFIG_DIR, LOG_DIR]
+def check_dirs() -> None:
+    dirs = [
+        TOP_CONFIGDIR,
+        CONFIG_DIR,
+        LOG_DIR,
+        APKS_FILES_DIR,
+        APK_PARTIALS_DIR,
+        APK_UNZIPPED_DIR,
+        XAPKS_DIR,
+        XAPKS_ISSUES_DIR,
+    ]
     for _dir in dirs:
         if not pathlib.Path.exists(_dir):
             pathlib.Path.mkdir(_dir, exist_ok=True)
@@ -52,7 +62,7 @@ FORMATTER.datefmt = "%Y-%m-%d %H:%M:%S"
 
 
 def get_logger(mod_name: str, sep_file: str | None = "main") -> logging.Logger:
-    check_config_dirs()
+    check_dirs()
 
     # Get or create logger
     logger = logging.getLogger(mod_name)

@@ -1,5 +1,7 @@
 import os
 import pathlib
+import shutil
+import subprocess
 import time
 
 from adscrawler.apks import manifest, waydroid
@@ -7,6 +9,7 @@ from adscrawler.config import (
     APK_PARTIALS_DIR,
     APKS_DIR,
     XAPKS_DIR,
+    XAPKS_ISSUES_DIR,
     get_logger,
 )
 from adscrawler.connection import PostgresCon
@@ -63,6 +66,23 @@ def get_downloaded_xapks() -> list[str]:
     return xapks
 
 
+def check_xapk_is_valid(xapk_path: pathlib.Path) -> bool:
+    check_unzip_command = f"unzip -qt {xapk_path.as_posix()}"
+    _check_unzip_result = subprocess.run(
+        check_unzip_command,
+        shell=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    if _check_unzip_result.returncode != 0:
+        logger.error(f"Failed to unzip {xapk_path}, moving to {XAPKS_ISSUES_DIR}")
+        shutil.move(xapk_path, pathlib.Path(XAPKS_ISSUES_DIR, xapk_path.name))
+        return False
+    else:
+        return True
+
+
 def process_xapks_for_waydroid(database_connection: PostgresCon) -> None:
     store_ids = get_downloaded_xapks()
     store_id_map = query_store_id_api_called_map(
@@ -76,10 +96,15 @@ def process_xapks_for_waydroid(database_connection: PostgresCon) -> None:
     for _, row in store_id_map.iterrows():
         store_id = row.store_id
         xapk_path = pathlib.Path(XAPKS_DIR, f"{store_id}.xapk")
+        if check_xapk_is_valid(xapk_path):
+            pass
+        else:
+            continue
         tmp_apk_dir = pathlib.Path("/tmp/unzippedxapks/", f"{store_id}")
         tmp_apk_path = pathlib.Path(tmp_apk_dir, f"{store_id}.apk")
         if not tmp_apk_dir.exists():
             os.makedirs(tmp_apk_dir)
+
         unzip_command = f"unzip -o {xapk_path.as_posix()} {store_id}.apk -d {tmp_apk_dir.as_posix()}"
         _unzip_result = os.system(unzip_command)
         if _unzip_result != 0:
