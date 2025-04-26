@@ -1,3 +1,4 @@
+import os
 import pathlib
 import time
 
@@ -5,6 +6,7 @@ from adscrawler.apks import manifest, waydroid
 from adscrawler.config import (
     APK_PARTIALS_DIR,
     APKS_DIR,
+    XAPKS_DIR,
     get_logger,
 )
 from adscrawler.connection import PostgresCon
@@ -53,6 +55,44 @@ def get_downloaded_apks() -> list[str]:
     return apks
 
 
+def get_downloaded_xapks() -> list[str]:
+    xapks = []
+    apk_path = pathlib.Path(XAPKS_DIR)
+    for apk in apk_path.glob("*.xapk"):
+        xapks.append(apk.stem)
+    return xapks
+
+
+def process_xapks_for_waydroid(database_connection: PostgresCon) -> None:
+    store_ids = get_downloaded_xapks()
+    store_id_map = query_store_id_api_called_map(
+        database_connection=database_connection, store_ids=store_ids
+    )
+    store_id_map = store_id_map.sort_values(by="crawled_at", ascending=False)
+    logger.info(
+        f"Waydroid has {store_id_map.shape[0]} apps to process, starting top 20"
+    )
+    store_id_map = store_id_map.head(20)
+    for _, row in store_id_map.iterrows():
+        store_id = row.store_id
+        xapk_path = pathlib.Path(XAPKS_DIR, f"{store_id}.xapk")
+        tmp_apk_dir = pathlib.Path("/tmp/unzippedxapks/", f"{store_id}")
+        tmp_apk_path = pathlib.Path(tmp_apk_dir, f"{store_id}.apk")
+        if not tmp_apk_dir.exists():
+            os.makedirs(tmp_apk_dir)
+        unzip_command = f"unzip -o {xapk_path.as_posix()} {store_id}.apk -d {tmp_apk_dir.as_posix()}"
+        _unzip_result = os.system(unzip_command)
+        if _unzip_result != 0:
+            logger.error(f"Failed to unzip {xapk_path.as_posix()}")
+            continue
+        waydroid.process_app_for_waydroid(
+            database_connection=database_connection,
+            apk_path=tmp_apk_path,
+            store_id=store_id,
+            store_app=row.store_app,
+        )
+
+
 def process_apks_for_waydroid(database_connection: PostgresCon) -> None:
     # Note, we haven't started handling xapks yet
     apks = get_downloaded_apks()
@@ -62,23 +102,15 @@ def process_apks_for_waydroid(database_connection: PostgresCon) -> None:
     store_id_map = store_id_map.sort_values(by="crawled_at", ascending=False)
     logger.info(f"Waydroid has {store_id_map.shape[0]} apps to process, starting 20")
     store_id_map = store_id_map.head(20)
-    waydroid_process = waydroid.restart()
-    if not waydroid_process:
-        logger.error("Waydroid failed to start")
-        return
     for _, row in store_id_map.iterrows():
-        if waydroid.check_session():
-            try:
-                waydroid.run_app(database_connection, extension=".apk", row=row)
-            except Exception:
-                try:
-                    waydroid.restart()
-                except Exception:
-                    logger.exception("Failed to restart waydroid, exiting")
-                    return
-        else:
-            logger.error("Waydroid session not running")
-            break
+        store_id = row.store_id
+        apk_path = pathlib.Path(APKS_DIR, f"{store_id}.apk")
+        waydroid.process_app_for_waydroid(
+            database_connection=database_connection,
+            apk_path=apk_path,
+            store_id=store_id,
+            store_app=row.store_app,
+        )
 
 
 def remove_partial_apks(store_id: str) -> None:

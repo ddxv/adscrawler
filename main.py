@@ -3,7 +3,11 @@ import logging
 import os
 import sys
 
-from adscrawler.apks.process_apk import process_apks, process_apks_for_waydroid
+from adscrawler.apks.process_apk import (
+    process_apks,
+    process_apks_for_waydroid,
+    process_xapks_for_waydroid,
+)
 from adscrawler.app_stores.scrape_stores import (
     crawl_developers_for_new_store_ids,
     crawl_keyword_cranks,
@@ -281,6 +285,10 @@ class ProcessManager:
     def scrape_manifests_for_waydroid(self) -> None:
         try:
             process_apks_for_waydroid(database_connection=self.pgcon)
+        except Exception:
+            logger.exception("Android run waydroid app failing")
+        try:
+            process_xapks_for_waydroid(database_connection=self.pgcon)
         except Exception:
             logger.exception("Android run waydroid app failing")
 

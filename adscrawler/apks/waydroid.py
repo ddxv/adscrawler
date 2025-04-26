@@ -56,14 +56,14 @@ def extract_and_sign_xapk(store_id: str) -> pathlib.Path:
     )
 
 
-def run_app(database_connection: PostgresCon, extension: str, row: pd.Series) -> None:
-    store_id = row.store_id
+def run_app(
+    database_connection: PostgresCon,
+    apk_path: pathlib.Path,
+    store_id: str,
+    store_app: int,
+) -> None:
     function_info = f"waydroid {store_id=}"
-    store_app = row.store_app
     crawl_result = 3
-    apk_path = pathlib.Path(APKS_DIR, f"{store_id}.apk")
-    if extension == ".xapk":
-        apk_path = extract_and_sign_xapk(store_id)
 
     logger.info(f"{function_info} clearing mitmdump")
     mitm_script = pathlib.Path(PACKAGE_DIR, "adscrawler/apks/mitm_start.sh")
@@ -107,19 +107,66 @@ def process_mitm_log(
         )
 
 
+def process_app_for_waydroid(
+    database_connection: PostgresCon, apk_path: str, store_id: str, store_app: int
+) -> None:
+    if not check_container():
+        restart_container()
+    if not check_session():
+        waydroid_process = restart_session()
+        if not waydroid_process:
+            logger.error("Waydroid failed to start")
+            return
+    try:
+        run_app(
+            database_connection,
+            apk_path=apk_path,
+            store_id=store_id,
+            store_app=store_app,
+        )
+    except Exception:
+        try:
+            restart_session()
+        except Exception:
+            logger.exception("Failed to restart waydroid, exiting")
+            return
+
+
+def check_container() -> bool:
+    waydroid_process = subprocess.run(
+        ["waydroid", "status"], capture_output=True, text=True, check=False
+    )
+    # Look specifically for the line "Session:  RUNNING"
+    is_container_running = False
+    for line in waydroid_process.stdout.splitlines():
+        print(line.strip())
+        if line.strip() == "Container:\tRUNNING":
+            is_container_running = True
+    return is_container_running
+
+
 def check_session() -> bool:
     waydroid_process = subprocess.run(
         ["waydroid", "status"], capture_output=True, text=True, check=False
     )
     # Look specifically for the line "Session:  RUNNING"
+    is_session_running = False
     for line in waydroid_process.stdout.splitlines():
         print(line.strip())
         if line.strip() == "Session:\tRUNNING":
-            return True
-    return False
+            is_session_running = True
+    return is_session_running
 
 
-def restart() -> tuple[subprocess.Popen, subprocess.Popen]:
+def restart_container() -> None:
+    function_info = "Waydroid container"
+    logger.info(f"{function_info} restarting")
+    os.system("sudo waydroid container stop")
+    time.sleep(1)
+    restart_session()
+
+
+def restart_session() -> subprocess.Popen | None:
     os.system("waydroid session stop")
 
     # This is required to run weston in cronjob environment
@@ -235,7 +282,7 @@ def install_app(store_id: str, apk_path: pathlib.Path) -> None:
     if store_id in output:
         logger.info(f"{function_info} found already installed")
         return
-    logger.info(f"{function_info} installing")
+    logger.info(f"{function_info} installing {apk_path.as_posix()}")
 
     _install_output = subprocess.run(
         ["waydroid", "app", "install", apk_path.as_posix()],
