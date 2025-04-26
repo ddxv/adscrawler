@@ -116,8 +116,11 @@ def process_app_for_waydroid(
     if not check_session():
         waydroid_process = restart_session()
         if not waydroid_process:
-            logger.error("Waydroid failed to start")
-            return
+            restart_container()
+            waydroid_process = restart_session()
+            if not waydroid_process:
+                logger.error("Waydroid failed to start")
+                return
     try:
         run_app(
             database_connection,
@@ -126,11 +129,7 @@ def process_app_for_waydroid(
             store_app=store_app,
         )
     except Exception:
-        try:
-            restart_session()
-        except Exception:
-            logger.exception("Failed to restart waydroid, exiting")
-            return
+        logger.exception(f"Waydroid failed to run store_id={store_id}")
 
 
 def check_container() -> bool:
@@ -155,6 +154,11 @@ def check_session() -> bool:
         print(line.strip())
         if line.strip() == "Session:\tRUNNING":
             is_session_running = True
+    app_list = subprocess.run(
+        ["waydroid", "app", "list"], capture_output=True, text=True, check=False
+    )
+    if "Waydroid session is stopped" in app_list.stdout:
+        is_session_running = False
     return is_session_running
 
 
