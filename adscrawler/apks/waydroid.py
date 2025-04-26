@@ -21,7 +21,7 @@ logger = get_logger(__name__)
 
 
 def upsert_crawled_at(
-    store_app: str, database_connection: PostgresCon, crawl_result: int
+    store_app: int, database_connection: PostgresCon, crawl_result: int
 ) -> None:
     key_columns = ["store_app"]
     upsert_df(
@@ -64,7 +64,7 @@ def run_app(database_connection: PostgresCon, extension: str, row: pd.Series) ->
     try:
         _mitm_process = launch_and_track_app(store_id, apk_path)
         try:
-            process_mitm_log(store_id, database_connection)
+            process_mitm_log(store_id, database_connection, store_app)
             crawl_result = 1
         except Exception as e:
             crawl_result = 3
@@ -76,7 +76,9 @@ def run_app(database_connection: PostgresCon, extension: str, row: pd.Series) ->
     upsert_crawled_at(store_app, database_connection, crawl_result)
 
 
-def process_mitm_log(store_id: str, database_connection: PostgresCon) -> None:
+def process_mitm_log(
+    store_id: str, database_connection: PostgresCon, store_app: int
+) -> None:
     function_info = f"MITM {store_id=}"
     mdf = mitm_process_log.parse_mitm_log(store_id)
     logger.info(f"{function_info} log has {mdf.shape[0]} rows")
