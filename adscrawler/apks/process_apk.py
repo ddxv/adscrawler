@@ -72,7 +72,7 @@ def process_xapks_for_waydroid(database_connection: PostgresCon) -> None:
     logger.info(
         f"Waydroid has {store_id_map.shape[0]} apps to process, starting top 20"
     )
-    store_id_map = store_id_map.head(20)
+    store_id_map = store_id_map.head(10)
     for _, row in store_id_map.iterrows():
         store_id = row.store_id
         xapk_path = pathlib.Path(XAPKS_DIR, f"{store_id}.xapk")
@@ -101,7 +101,7 @@ def process_apks_for_waydroid(database_connection: PostgresCon) -> None:
     )
     store_id_map = store_id_map.sort_values(by="crawled_at", ascending=False)
     logger.info(f"Waydroid has {store_id_map.shape[0]} apps to process, starting 20")
-    store_id_map = store_id_map.head(20)
+    store_id_map = store_id_map.head(10)
     for _, row in store_id_map.iterrows():
         store_id = row.store_id
         apk_path = pathlib.Path(APKS_DIR, f"{store_id}.apk")
