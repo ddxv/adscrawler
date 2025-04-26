@@ -136,10 +136,9 @@ def check_container() -> bool:
     waydroid_process = subprocess.run(
         ["waydroid", "status"], capture_output=True, text=True, check=False
     )
-    # Look specifically for the line "Session:  RUNNING"
+    # Look specifically for the line "Container:  RUNNING"
     is_container_running = False
     for line in waydroid_process.stdout.splitlines():
-        print(line.strip())
         if line.strip() == "Container:\tRUNNING":
             is_container_running = True
     return is_container_running
@@ -357,6 +356,7 @@ def start_session() -> subprocess.Popen:
     if not ready:
         if waydroid_process.poll() is not None:
             logger.error("Waydroid process ended without becoming ready")
+            raise Exception("Waydroid process ended without becoming ready")
         else:
             logger.error(
                 f"Timed out after {timeout} seconds waiting for Waydroid to be ready"
