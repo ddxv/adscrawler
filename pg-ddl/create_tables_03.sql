@@ -181,3 +181,16 @@ CREATE TABLE keywords_base (
     id serial PRIMARY KEY,
     keyword_id int REFERENCES keywords (id)
 );
+
+
+CREATE TABLE logging.store_app_waydroid_crawled_at (
+    store_app int4 NOT NULL,
+    crawl_result int2 NOT NULL,
+    crawled_at timestamp NULL,
+    CONSTRAINT waydroid_store_apps_crawl_fk FOREIGN KEY (
+        store_app
+    ) REFERENCES public.store_apps (id),
+    CONSTRAINT waydroid_crawl_result_fk FOREIGN KEY (
+        crawl_result
+    ) REFERENCES public.crawl_results (id)
+);

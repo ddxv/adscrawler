@@ -1,3 +1,4 @@
+import datetime
 import os
 import pathlib
 import subprocess
@@ -14,14 +15,36 @@ from adscrawler.config import (
     get_logger,
 )
 from adscrawler.connection import PostgresCon
+from adscrawler.queries import upsert_df
 
 logger = get_logger(__name__)
+
+
+def upsert_crawled_at(
+    store_app: str, database_connection: PostgresCon, crawl_result: int
+) -> None:
+    key_columns = ["store_app"]
+    upsert_df(
+        table_name="store_app_waydroid_crawled_at",
+        schema="logging",
+        insert_columns=["store_app", "crawl_result", "crawled_at"],
+        df=pd.DataFrame(
+            {
+                "store_app": [store_app],
+                "crawl_result": [crawl_result],
+                "crawled_at": datetime.datetime.now(tz=datetime.UTC),
+            }
+        ),
+        key_columns=key_columns,
+        database_connection=database_connection,
+    )
 
 
 def run_app(database_connection: PostgresCon, extension: str, row: pd.Series) -> None:
     store_id = row.store_id
     function_info = f"waydroid {store_id=}"
     store_app = row.store_app
+    crawl_result = 3
     apk_path = pathlib.Path(APKS_DIR, f"{store_id}.apk")
     if extension == ".xapk":
         xapk_path = pathlib.Path(XAPKS_DIR, f"{store_id}{extension}")
@@ -38,24 +61,40 @@ def run_app(database_connection: PostgresCon, extension: str, row: pd.Series) ->
     mitm_script = pathlib.Path(PACKAGE_DIR, "adscrawler/apks/mitm_start.sh")
     os.system(f"{mitm_script.as_posix()} -d")
 
-    _mitm_process = launch_and_track_app(store_id, apk_path)
+    try:
+        _mitm_process = launch_and_track_app(store_id, apk_path)
+        try:
+            process_mitm_log(store_id, database_connection)
+            crawl_result = 1
+        except Exception as e:
+            crawl_result = 3
+            logger.exception(f"{function_info} failed: {e}")
+    except Exception as e:
+        crawl_result = 2
+        logger.exception(f"{function_info} failed: {e}")
+    logger.info(f"{function_info} saved to db")
+    upsert_crawled_at(store_app, database_connection, crawl_result)
 
+
+def process_mitm_log(store_id: str, database_connection: PostgresCon) -> None:
+    function_info = f"MITM {store_id=}"
     mdf = mitm_process_log.parse_mitm_log(store_id)
-    logger.info(f"{function_info} MITM log has {mdf.shape[0]} rows")
+    logger.info(f"{function_info} log has {mdf.shape[0]} rows")
     if mdf.empty:
         logger.warning(f"{function_info} MITM log returned empty dataframe")
-        return
-    mdf = mdf.rename(columns={"timestamp": "crawled_at"})
-    mdf["url"] = mdf["url"].str[0:1000]
-    mdf = mdf[["url", "host", "crawled_at", "status_code", "tld_url"]].drop_duplicates()
-    mdf["store_app"] = store_app
-    mdf.to_sql(
-        name="store_app_api_calls",
-        con=database_connection.engine,
-        if_exists="append",
-        index=None,
-    )
-    logger.info(f"{function_info} saved to db")
+    else:
+        mdf = mdf.rename(columns={"timestamp": "crawled_at"})
+        mdf["url"] = mdf["url"].str[0:1000]
+        mdf = mdf[
+            ["url", "host", "crawled_at", "status_code", "tld_url"]
+        ].drop_duplicates()
+        mdf["store_app"] = store_app
+        mdf.to_sql(
+            name="store_app_api_calls",
+            con=database_connection.engine,
+            if_exists="append",
+            index=None,
+        )
 
 
 def check_session() -> bool:
