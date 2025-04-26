@@ -157,7 +157,7 @@ def check_session() -> bool:
     app_list = subprocess.run(
         ["waydroid", "app", "list"], capture_output=True, text=True, check=False
     )
-    if "Waydroid session is stopped" in app_list.stdout:
+    if "waydroid session is stopped" in app_list.stdout.lower():
         is_session_running = False
     return is_session_running
 
@@ -284,7 +284,7 @@ def install_app(store_id: str, apk_path: pathlib.Path) -> None:
 
     output = applist.stdout
 
-    if "Waydroid session is stopped" in output:
+    if "waydroid session is stopped" in output.lower():
         logger.error(f"{function_info} Waydroid session is stopped")
         raise Exception(f"{function_info} Waydroid session is stopped")
 
