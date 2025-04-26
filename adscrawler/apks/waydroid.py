@@ -19,11 +19,16 @@ from adscrawler.queries import upsert_df
 
 logger = get_logger(__name__)
 
+ANDROID_PERMISSION_ACTIVITY = (
+    "com.android.permissioncontroller/.permission.ui.ReviewPermissionsActivity"
+)
+
 
 def upsert_crawled_at(
     store_app: int, database_connection: PostgresCon, crawl_result: int
 ) -> None:
-    key_columns = ["store_app"]
+    logger.info(f"upsert_crawled_at {store_app=} {crawl_result=}")
+    key_columns = ["store_app", "crawl_result", "crawled_at"]
     upsert_df(
         table_name="store_app_waydroid_crawled_at",
         schema="logging",
@@ -40,6 +45,17 @@ def upsert_crawled_at(
     )
 
 
+def extract_and_sign_xapk(store_id: str) -> pathlib.Path:
+    xapk_path = pathlib.Path(XAPKS_DIR, f"{store_id}.xapk")
+    os.system(f"java -jar APKEditor.jar m -i {xapk_path.as_posix()}")
+    # APKEditor merged APKs must be signed to install
+    apk_path = pathlib.Path(APKS_DIR, f"{store_id}.apk")
+    merged_apk_path = pathlib.Path(XAPKS_DIR, f"{store_id}_merged.apk")
+    os.system(
+        f"{ANDROID_SDK}/apksigner sign --ks ~/.android/debug.keystore  --ks-key-alias androiddebugkey   --ks-pass pass:android   --key-pass pass:android   --out {apk_path}  {merged_apk_path}"
+    )
+
+
 def run_app(database_connection: PostgresCon, extension: str, row: pd.Series) -> None:
     store_id = row.store_id
     function_info = f"waydroid {store_id=}"
@@ -47,15 +63,7 @@ def run_app(database_connection: PostgresCon, extension: str, row: pd.Series) ->
     crawl_result = 3
     apk_path = pathlib.Path(APKS_DIR, f"{store_id}.apk")
     if extension == ".xapk":
-        xapk_path = pathlib.Path(XAPKS_DIR, f"{store_id}{extension}")
-        os.system(f"java -jar APKEditor.jar m -i {xapk_path.as_posix()}")
-        # APKEditor merged APKs must be signed to install
-        apk_path = pathlib.Path(APKS_DIR, f"{store_id}.apk")
-        merged_apk_path = pathlib.Path(XAPKS_DIR, f"{store_id}_merged.apk")
-        os.system(
-            f"{ANDROID_SDK}/apksigner sign --ks ~/.android/debug.keystore  --ks-key-alias androiddebugkey   --ks-pass pass:android   --key-pass pass:android   --out {apk_path}  {merged_apk_path}"
-        )
-        apk_path.exists()
+        apk_path = extract_and_sign_xapk(store_id)
 
     logger.info(f"{function_info} clearing mitmdump")
     mitm_script = pathlib.Path(PACKAGE_DIR, "adscrawler/apks/mitm_start.sh")
@@ -150,7 +158,13 @@ def launch_and_track_app(store_id: str, apk_path: pathlib.Path) -> None:
     mitm_pid = mitm_process.pid
     logger.info(f"{function_info} mitmdump started with PID: {mitm_pid}")
 
-    launch_app(store_id)
+    try:
+        launch_app(store_id)
+    except Exception as e:
+        logger.exception(f"{function_info} failed: {e}")
+        os.system(f'sudo waydroid shell am force-stop "{store_id}"')
+        os.system(f'waydroid app remove "{store_id}"')
+        raise
 
     logger.info(f"{function_info} waiting for 60 seconds")
     time.sleep(60)
@@ -172,6 +186,7 @@ def launch_app(store_id: str) -> None:
     timeout = 60  # seconds
     start_time = time.time()
     found = False
+    permission_attempts = 2
 
     # Loop until timeout or app is found
     while time.time() - start_time < timeout and not found:
@@ -188,6 +203,12 @@ def launch_app(store_id: str) -> None:
             found = True
             logger.info(f"{function_info} in foreground")
             break
+
+        if ANDROID_PERMISSION_ACTIVITY in result.stdout:
+            logger.warning(f"{function_info} PERMISSIONS REQUEST IN FOREGROUND")
+            permission_attempts -= 1
+            if permission_attempts <= 0:
+                raise Exception(f"{function_info} PERMISSIONS REQUEST IN FOREGROUND")
 
         # Wait before launching again
         logger.info(f"{function_info} not in foreground, relaunching")

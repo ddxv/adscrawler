@@ -269,13 +269,42 @@ def query_store_id_api_called_map(
             where_statement += " AND "
         store_ids_list = "'" + "','".join(store_ids) + "'"
         where_statement += f" sa.store_id in ({store_ids_list}) "
-    sel_query = f"""SELECT
-                    DISTINCT ON (sa.id) sa.id AS store_app, sa.store_id, max(saac.crawled_at) AS crawled_at
-                FROM store_apps sa
-                LEFT JOIN store_app_api_calls saac
-                    ON sa.id = saac.store_app
-        {where_statement}
-                GROUP BY sa.id, sa.store_id
+    sel_query = f"""
+                WITH max_logging AS (
+                    SELECT
+                        DISTINCT ON
+                        (store_app) *
+                    FROM
+                        logging.store_app_waydroid_crawled_at
+                    WHERE
+                        crawled_at IS NOT NULL
+                    ORDER BY
+                        store_app,
+                        crawled_at DESC
+                ),
+                max_api_calls AS (
+                    SELECT
+                        DISTINCT ON
+                        (store_app) *
+                    FROM
+                        store_app_api_calls
+                    WHERE
+                        crawled_at IS NOT NULL
+                    ORDER BY
+                        store_app,
+                        crawled_at DESC
+                )
+                SELECT sa.id as store_app, 
+                sa.store_id, 
+                ml.crawled_at
+                FROM
+                    store_apps sa
+                LEFT JOIN max_logging ml ON
+                    sa.id = ml.store_app
+                LEFT JOIN max_api_calls mac ON
+                    sa.id = mac.store_app
+                    {where_statement}
+                    AND ml.crawled_at <= CURRENT_DATE - INTERVAL '1 days'
         ;
         """
     df = pd.read_sql(sel_query, database_connection.engine)

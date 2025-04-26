@@ -194,3 +194,6 @@ CREATE TABLE logging.store_app_waydroid_crawled_at (
         crawl_result
     ) REFERENCES public.crawl_results (id)
 );
+CREATE UNIQUE INDEX logging_store_app_upsert_unique ON logging.store_app_waydroid_crawled_at USING btree (
+    store_app, crawl_result, crawled_at
+);
