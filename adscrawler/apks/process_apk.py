@@ -59,6 +59,9 @@ def process_apks_for_waydroid(database_connection: PostgresCon) -> None:
     store_id_map = query_store_id_api_called_map(
         database_connection=database_connection, store_ids=apks
     )
+    store_id_map = store_id_map.sort_values(by="crawled_at", ascending=False)
+    logger.info(f"Waydroid has {store_id_map.shape[0]} apps to process, starting 20")
+    store_id_map = store_id_map.head(20)
     waydroid_process = waydroid.restart()
     if not waydroid_process:
         logger.error("Waydroid failed to start")
