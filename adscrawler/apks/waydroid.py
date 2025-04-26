@@ -7,6 +7,7 @@ import time
 import pandas as pd
 
 from adscrawler.apks import mitm_process_log
+from adscrawler.apks.weston import start_weston
 from adscrawler.config import (
     ANDROID_SDK,
     APKS_DIR,
@@ -158,6 +159,7 @@ def check_session() -> bool:
 
 
 def restart_container() -> None:
+    logger.info("Waydroid container restart")
     function_info = "Waydroid container"
     logger.info(f"{function_info} restarting")
     os.system("sudo waydroid container stop")
@@ -166,6 +168,7 @@ def restart_container() -> None:
 
 
 def restart_session() -> subprocess.Popen | None:
+    logger.info("Waydroid session restart")
     os.system("waydroid session stop")
 
     if not check_wayland_display():
@@ -179,7 +182,9 @@ def restart_session() -> subprocess.Popen | None:
 
 
 def check_wayland_display() -> bool:
-    return os.environ.get("WAYLAND_DISPLAY") is not None
+    display = os.environ.get("WAYLAND_DISPLAY")
+    logger.info(f"Waydroid / Weston display: WAYLAND_DISPLAY: {display}")
+    return display is not None
 
 
 def launch_and_track_app(store_id: str, apk_path: pathlib.Path) -> None:
@@ -275,6 +280,10 @@ def install_app(store_id: str, apk_path: pathlib.Path) -> None:
 
     output = applist.stdout
 
+    if "Waydroid session is stopped" in output:
+        logger.error(f"{function_info} Waydroid session is stopped")
+        raise Exception(f"{function_info} Waydroid session is stopped")
+
     if store_id in output:
         logger.info(f"{function_info} found already installed")
         return
@@ -364,53 +373,3 @@ def start_session() -> subprocess.Popen:
             waydroid_process.terminate()
     logger.info(f"{function_info} success")
     return waydroid_process
-
-
-def start_weston() -> subprocess.Popen:
-    # This will be the socket name for the weston process
-    socket_name = "wayland-98"
-    os.environ["WAYLAND_DISPLAY"] = socket_name
-    # This is required to run weston in cronjob environment
-    os.environ["XDG_RUNTIME_DIR"] = "/run/user/1000"
-
-    weston_process = subprocess.Popen(
-        [
-            "weston",
-            "-B",
-            "headless",
-            "--width=800",
-            "--height=800",
-            "--scale=1",
-            "-S",
-            socket_name,
-        ],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-        bufsize=1,
-    )
-    ready = False
-    timeout = 30
-    start_time = time.time()
-    while (
-        weston_process.poll() is None
-        and not ready
-        and (time.time() - start_time) < timeout
-    ):
-        line = weston_process.stdout.readline()
-        logger.info(line)
-        if "launching '/usr/libexec/weston-desktop-shell'" in line:
-            ready = True
-            logger.info("Weston is ready! Continuing with the script...")
-            break
-
-    if not ready:
-        if weston_process.poll() is not None:
-            logger.error("Weston process ended without becoming ready")
-        else:
-            logger.error(
-                f"Timed out after {timeout} seconds waiting for Waydroid to be ready"
-            )
-            weston_process.terminate()
-        return
-    return weston_process
