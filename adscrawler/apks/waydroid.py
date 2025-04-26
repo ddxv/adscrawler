@@ -281,13 +281,13 @@ def install_app(store_id: str, apk_path: pathlib.Path) -> None:
         return
     logger.info(f"{function_info} installing {apk_path.as_posix()}")
 
+    time.sleep(2)
     _install_output = subprocess.run(
         ["waydroid", "app", "install", apk_path.as_posix()],
         capture_output=True,
         text=True,
         check=False,
     )
-
     time.sleep(2)
 
     timeout = 60
