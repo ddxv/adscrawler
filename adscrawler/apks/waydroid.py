@@ -169,9 +169,6 @@ def restart_container() -> None:
 def restart_session() -> subprocess.Popen | None:
     os.system("waydroid session stop")
 
-    # This is required to run weston in cronjob environment
-    os.environ["XDG_RUNTIME_DIR"] = "/run/user/1000"
-
     if not check_wayland_display():
         _weston_process = start_weston()
 
@@ -371,6 +368,8 @@ def start_weston() -> subprocess.Popen:
     # This will be the socket name for the weston process
     socket_name = "wayland-98"
     os.environ["WAYLAND_DISPLAY"] = socket_name
+    # This is required to run weston in cronjob environment
+    os.environ["XDG_RUNTIME_DIR"] = "/run/user/1000"
 
     weston_process = subprocess.Popen(
         [
