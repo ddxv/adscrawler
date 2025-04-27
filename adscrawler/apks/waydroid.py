@@ -71,7 +71,7 @@ def run_app(
     os.system(f"{mitm_script.as_posix()} -d")
 
     try:
-        _mitm_process = launch_and_track_app(store_id, apk_path)
+        launch_and_track_app(store_id, apk_path)
         try:
             process_mitm_log(store_id, database_connection, store_app)
             crawl_result = 1
