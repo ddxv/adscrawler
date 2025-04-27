@@ -312,6 +312,9 @@ def install_app(store_id: str, apk_path: pathlib.Path) -> None:
         if store_id in output:
             logger.info(f"{function_info} installed")
             return
+        if "waydroid session is stopped" in output.lower():
+            logger.error(f"{function_info} Waydroid session is stopped")
+            raise Exception(f"{function_info} Waydroid session is stopped")
         time.sleep(1)
 
     applist = subprocess.run(
