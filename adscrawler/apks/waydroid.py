@@ -157,7 +157,7 @@ def check_session() -> bool:
     app_list = subprocess.run(
         ["waydroid", "app", "list"], capture_output=True, text=True, check=False
     )
-    if "waydroid session is stopped" in app_list.stdout.lower():
+    if "waydroid session is stopped" in app_list.stderr.lower():
         is_session_running = False
     return is_session_running
 
@@ -282,13 +282,11 @@ def install_app(store_id: str, apk_path: pathlib.Path) -> None:
         ["waydroid", "app", "list"], capture_output=True, text=True, check=False
     )
 
-    output = applist.stdout
-
-    if "waydroid session is stopped" in output.lower():
+    if "waydroid session is stopped" in applist.stderr.lower():
         logger.error(f"{function_info} Waydroid session is stopped")
         raise Exception(f"{function_info} Waydroid session is stopped")
 
-    if store_id in output:
+    if store_id in applist.stdout:
         logger.info(f"{function_info} found already installed")
         return
     logger.info(f"{function_info} installing {apk_path.as_posix()}")
@@ -308,11 +306,10 @@ def install_app(store_id: str, apk_path: pathlib.Path) -> None:
         applist = subprocess.run(
             ["waydroid", "app", "list"], capture_output=True, text=True, check=False
         )
-        output = applist.stdout
-        if store_id in output:
+        if store_id in applist.stdout:
             logger.info(f"{function_info} installed")
             return
-        if "waydroid session is stopped" in output.lower():
+        if "waydroid session is stopped" in applist.stderr.lower():
             logger.error(f"{function_info} Waydroid session is stopped")
             raise Exception(f"{function_info} Waydroid session is stopped")
         time.sleep(1)
@@ -321,14 +318,12 @@ def install_app(store_id: str, apk_path: pathlib.Path) -> None:
         ["waydroid", "app", "list"], capture_output=True, text=True, check=False
     )
 
-    output = applist.stdout
-
-    if store_id in output:
+    if store_id in applist.stdout:
         logger.info(f"{function_info} installed")
         return
 
     raise Exception(
-        f"Waydroid failed to install {store_id} installerror:{_install_output.stdout}"
+        f"Waydroid failed to install {store_id} installerror:{_install_output.stderr}"
     )
 
 
@@ -371,11 +366,14 @@ def start_session() -> subprocess.Popen:
 
     if not ready:
         if waydroid_process.poll() is not None:
-            logger.error("Waydroid process ended without becoming ready")
-            raise Exception("Waydroid process ended without becoming ready")
+            err = waydroid_process.stderr
+            logger.error(f"{function_info} process ended without becoming ready {err}")
+            raise Exception(
+                f"{function_info} process ended without becoming ready {err}"
+            )
         else:
             logger.error(
-                f"Timed out after {timeout} seconds waiting for Waydroid to be ready"
+                f"{function_info} session timed out after {timeout} seconds waiting for session to be ready"
             )
             waydroid_process.terminate()
     logger.info(f"{function_info} success")
