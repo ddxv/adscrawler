@@ -83,16 +83,18 @@ def check_xapk_is_valid(xapk_path: pathlib.Path) -> bool:
         return True
 
 
-def process_xapks_for_waydroid(database_connection: PostgresCon) -> None:
+def process_xapks_for_waydroid(
+    database_connection: PostgresCon, num_apps: int = 10
+) -> None:
     store_ids = get_downloaded_xapks()
     store_id_map = query_store_id_api_called_map(
         database_connection=database_connection, store_ids=store_ids
     )
     store_id_map = store_id_map.sort_values(by="crawled_at", ascending=False)
     logger.info(
-        f"Waydroid has {store_id_map.shape[0]} apps to process, starting top 20"
+        f"Waydroid has {store_id_map.shape[0]} (xapk) apps to process, starting top {num_apps}"
     )
-    store_id_map = store_id_map.head(10)
+    store_id_map = store_id_map.head(num_apps)
     for _, row in store_id_map.iterrows():
         store_id = row.store_id
         xapk_path = pathlib.Path(XAPKS_DIR, f"{store_id}.xapk")
@@ -118,7 +120,9 @@ def process_xapks_for_waydroid(database_connection: PostgresCon) -> None:
         )
 
 
-def process_apks_for_waydroid(database_connection: PostgresCon) -> None:
+def process_apks_for_waydroid(
+    database_connection: PostgresCon, num_apps: int = 10
+) -> None:
     # Note, we haven't started handling xapks yet
     apks = get_downloaded_apks()
     store_id_map = query_store_id_api_called_map(

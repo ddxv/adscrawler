@@ -258,17 +258,25 @@ def query_store_id_api_called_map(
     database_connection: PostgresCon,
     store: int | None = None,
     store_ids: list[str] | None = None,
+    exclude_recently_crawled: bool = True,
 ) -> pd.DataFrame:
     where_statement = ""
-    if store:
-        where_statement += f"WHERE store = {store} "
-    if store_ids:
-        if "WHERE" not in where_statement:
-            where_statement += " WHERE "
-        else:
-            where_statement += " AND "
-        store_ids_list = "'" + "','".join(store_ids) + "'"
-        where_statement += f" sa.store_id in ({store_ids_list}) "
+    if store or store_ids or exclude_recently_crawled:
+        if store:
+            where_statement += f"WHERE store = {store} "
+        if store_ids:
+            if "WHERE" not in where_statement:
+                where_statement += " WHERE "
+            else:
+                where_statement += " AND "
+            store_ids_list = "'" + "','".join(store_ids) + "'"
+            where_statement += f" sa.store_id in ({store_ids_list}) "
+        if exclude_recently_crawled:
+            if "WHERE" not in where_statement:
+                where_statement += " WHERE "
+            else:
+                where_statement += " AND "
+            where_statement += "(ml.crawled_at <= CURRENT_DATE - INTERVAL '1 days' OR ml.crawled_at IS NULL)"
     sel_query = f"""
                 WITH max_logging AS (
                     SELECT
@@ -303,8 +311,7 @@ def query_store_id_api_called_map(
                     sa.id = ml.store_app
                 LEFT JOIN max_api_calls mac ON
                     sa.id = mac.store_app
-                    {where_statement}
-                    AND (ml.crawled_at <= CURRENT_DATE - INTERVAL '1 days' OR ml.crawled_at IS NULL)
+                {where_statement}
         ;
         """
     df = pd.read_sql(sel_query, database_connection.engine)
