@@ -211,8 +211,12 @@ def check_wayland_display() -> bool:
 
 def cleanup_xapk_splits(store_id: str) -> None:
     apk_split_dir = pathlib.Path(WAYDROID_MEDIA_DIR, store_id)
-    if apk_split_dir.exists():
-        os.system(f"sudo rm -rf {apk_split_dir.as_posix()}")
+    try:
+        if apk_split_dir.is_dir():
+            os.system(f"sudo rm -rf {apk_split_dir.as_posix()}")
+    except (FileNotFoundError, PermissionError):
+        logger.error(f"Failed to cleanup {apk_split_dir.as_posix()}")
+        pass
 
 
 def prep_xapk_splits(store_id: str, xapk_path: pathlib.Path) -> str:
