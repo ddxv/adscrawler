@@ -12,6 +12,8 @@ from adscrawler.config import (
     ANDROID_SDK,
     APKS_DIR,
     PACKAGE_DIR,
+    WAYDROID_INTERNAL_EMULATED_DIR,
+    WAYDROID_MEDIA_DIR,
     XAPKS_DIR,
     get_logger,
 )
@@ -109,8 +111,18 @@ def process_mitm_log(
 
 
 def process_app_for_waydroid(
-    database_connection: PostgresCon, apk_path: str, store_id: str, store_app: int
+    database_connection: PostgresCon,
+    apk_path: str,
+    store_id: str,
+    store_app: int,
+    extension: str,
 ) -> None:
+    if extension == "apk":
+        apk_path = pathlib.Path(APKS_DIR, f"{store_id}.apk")
+    elif extension == "xapk":
+        apk_path = pathlib.Path(XAPKS_DIR, f"{store_id}.xapk")
+    else:
+        raise ValueError(f"Invalid extension: {extension}")
     if not check_container():
         restart_container()
     if not check_session():
@@ -191,11 +203,53 @@ def check_wayland_display() -> bool:
     return display is not None
 
 
+def prep_xapk_splits(store_id: str, xapk_path: pathlib.Path) -> str:
+    tmp_apk_dir = pathlib.Path("/tmp/unzippedxapks/", f"{store_id}")
+    if not tmp_apk_dir.exists():
+        os.makedirs(tmp_apk_dir)
+
+    unzip_command = f"unzip -o {xapk_path.as_posix()} -d {tmp_apk_dir.as_posix()}"
+    _unzip_result = os.system(unzip_command)
+    if _unzip_result != 0:
+        logger.error(f"Failed to unzip {xapk_path.as_posix()}")
+        return
+
+    list_of_apks = list(tmp_apk_dir.glob("*.apk"))
+
+    list_of_split_apks = [x.name for x in list_of_apks if x.name != f"{store_id}.apk"]
+    base_apk_name = [x.name for x in list_of_apks if x.name == f"{store_id}.apk"]
+    if len(base_apk_name) == 1:
+        base_apk_name = base_apk_name[0]
+        base_apk_path = WAYDROID_INTERNAL_EMULATED_DIR.joinpath(
+            base_apk_name
+        ).as_posix()
+    else:
+        raise ValueError(f"Found {len(base_apk_name)} base apks for {store_id}")
+
+    cp_command = f"sudo cp -r {tmp_apk_dir.as_posix()} {WAYDROID_MEDIA_DIR.as_posix()}"
+    _cp_result = os.system(cp_command)
+    if _cp_result != 0:
+        logger.error(
+            f"Failed to copy {tmp_apk_dir.as_posix()} to {WAYDROID_MEDIA_DIR.as_posix()}"
+        )
+        return
+
+    split_apk_paths = [
+        WAYDROID_INTERNAL_EMULATED_DIR.joinpath(x).as_posix()
+        for x in list_of_split_apks
+        if x != base_apk_name
+    ]
+
+    split_install_command = f"pm install {base_apk_path} {' '.join(split_apk_paths)}"
+    return split_install_command
+
+
 def launch_and_track_app(store_id: str, apk_path: pathlib.Path) -> None:
     function_info = f"waydroid {store_id=} launch and track"
     mitm_script = pathlib.Path(PACKAGE_DIR, "adscrawler/apks/mitm_start.sh")
 
     install_app(store_id, apk_path)
+
     logger.info(
         f"{function_info} starting mitmdump with script {mitm_script.as_posix()}"
     )
@@ -292,15 +346,27 @@ def install_app(store_id: str, apk_path: pathlib.Path) -> None:
     logger.info(f"{function_info} installing {apk_path.as_posix()}")
 
     time.sleep(2)
-    _install_output = subprocess.run(
-        ["waydroid", "app", "install", apk_path.as_posix()],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    extension = apk_path.suffix
+    if extension == ".xapk":
+        split_install_command = prep_xapk_splits(store_id, apk_path)
+        _install_output = subprocess.run(
+            ["sudo", "waydroid", "shell", split_install_command],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    elif extension == ".apk":
+        _install_output = subprocess.run(
+            ["waydroid", "app", "install", apk_path.as_posix()],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    else:
+        raise ValueError(f"Invalid extension: {extension}")
     time.sleep(2)
 
-    timeout = 60
+    timeout = 20
     start_time = time.time()
     while (time.time() - start_time) < timeout:
         applist = subprocess.run(
@@ -323,7 +389,7 @@ def install_app(store_id: str, apk_path: pathlib.Path) -> None:
         return
 
     raise Exception(
-        f"Waydroid failed to install {store_id} installerror:{_install_output.stderr}"
+        f"Waydroid failed to install {store_id}{extension} installerror:{_install_output.stderr}"
     )
 
 

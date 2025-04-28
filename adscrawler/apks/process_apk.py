@@ -1,4 +1,3 @@
-import os
 import pathlib
 import shutil
 import subprocess
@@ -88,7 +87,8 @@ def process_xapks_for_waydroid(
 ) -> None:
     store_ids = get_downloaded_xapks()
     store_id_map = query_store_id_api_called_map(
-        database_connection=database_connection, store_ids=store_ids
+        database_connection=database_connection,
+        store_ids=store_ids,
     )
     store_id_map = store_id_map.sort_values(by="crawled_at", ascending=False)
     logger.info(
@@ -102,19 +102,9 @@ def process_xapks_for_waydroid(
             pass
         else:
             continue
-        tmp_apk_dir = pathlib.Path("/tmp/unzippedxapks/", f"{store_id}")
-        tmp_apk_path = pathlib.Path(tmp_apk_dir, f"{store_id}.apk")
-        if not tmp_apk_dir.exists():
-            os.makedirs(tmp_apk_dir)
-
-        unzip_command = f"unzip -o {xapk_path.as_posix()} {store_id}.apk -d {tmp_apk_dir.as_posix()}"
-        _unzip_result = os.system(unzip_command)
-        if _unzip_result != 0:
-            logger.error(f"Failed to unzip {xapk_path.as_posix()}")
-            continue
         waydroid.process_app_for_waydroid(
             database_connection=database_connection,
-            apk_path=tmp_apk_path,
+            extension="xapk",
             store_id=store_id,
             store_app=row.store_app,
         )
@@ -133,10 +123,9 @@ def process_apks_for_waydroid(
     store_id_map = store_id_map.head(10)
     for _, row in store_id_map.iterrows():
         store_id = row.store_id
-        apk_path = pathlib.Path(APKS_DIR, f"{store_id}.apk")
         waydroid.process_app_for_waydroid(
             database_connection=database_connection,
-            apk_path=apk_path,
+            extension="apk",
             store_id=store_id,
             store_app=row.store_app,
         )

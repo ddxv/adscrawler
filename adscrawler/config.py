@@ -23,6 +23,10 @@ XAPKS_ISSUES_DIR = pathlib.Path(APKS_FILES_DIR, "xapks-issues")
 APK_PARTIALS_DIR = pathlib.Path(APKS_FILES_DIR, "apk-partials")
 APK_UNZIPPED_DIR = pathlib.Path(APKS_FILES_DIR, "tmp-unzipped")
 ANDROID_SDK = pathlib.Path(HOME, "Android/Sdk/build-tools/35.0.0")
+# Putting files in WAYDROID_MEDIA_DIR will put them in the internal emulated directory
+WAYDROID_MEDIA_DIR = pathlib.Path(HOME, ".local/share/waydroid/data/media")
+# This is not a directory on your filesystem, but the internal emulated directory
+WAYDROID_INTERNAL_EMULATED_DIR = pathlib.Path("/data/media/")
 
 
 @typing.no_type_check
