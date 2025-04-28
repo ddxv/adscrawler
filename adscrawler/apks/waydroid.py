@@ -112,7 +112,6 @@ def process_mitm_log(
 
 def process_app_for_waydroid(
     database_connection: PostgresCon,
-    apk_path: str,
     store_id: str,
     store_app: int,
     extension: str,
