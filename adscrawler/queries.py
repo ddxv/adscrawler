@@ -197,6 +197,10 @@ def upsert_details_df(
         insert_columns=key_insert_columns,
         return_rows=True,
     )
+    if version_strings_df is None:
+        logger.error(f"{store_id=} insert version_strings to db")
+        logger.error(strings_df[strings_df["tag"].isna()])
+        raise Exception(f"{store_id=} insert version_strings to db")
     version_strings_df = version_strings_df.rename(columns={"id": "string_id"})
     strings_map_df = pd.merge(
         strings_df,

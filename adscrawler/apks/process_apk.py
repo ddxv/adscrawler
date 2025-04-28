@@ -119,8 +119,10 @@ def process_apks_for_waydroid(
         database_connection=database_connection, store_ids=apks
     )
     store_id_map = store_id_map.sort_values(by="crawled_at", ascending=False)
-    logger.info(f"Waydroid has {store_id_map.shape[0]} apps to process, starting 20")
-    store_id_map = store_id_map.head(10)
+    logger.info(
+        f"Waydroid has {store_id_map.shape[0]} apps to process, starting {num_apps}"
+    )
+    store_id_map = store_id_map.head(num_apps)
     for _, row in store_id_map.iterrows():
         store_id = row.store_id
         waydroid.process_app_for_waydroid(

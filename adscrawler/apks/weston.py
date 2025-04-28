@@ -53,6 +53,6 @@ def start_weston() -> subprocess.Popen:
                 f"Weston timed out after {timeout} seconds waiting to be ready"
             )
             weston_process.terminate()
-        return
+        raise Exception("Weston failed to start")
     logger.info("Weston is ready! Returning process")
     return weston_process

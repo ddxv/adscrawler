@@ -48,7 +48,14 @@ def upsert_crawled_at(
     )
 
 
-def extract_and_sign_xapk(store_id: str) -> pathlib.Path:
+def extract_and_sign_xapk(store_id: str) -> None:
+    """Extract and sign an xapk to creat apk file.
+    This method works but requires dependencies on Android SDK for apksigner and APKEditor
+
+    Additionally, it requires using a (debug) keystore.
+
+    Currently not using this method.
+    """
     xapk_path = pathlib.Path(XAPKS_DIR, f"{store_id}.xapk")
     os.system(f"java -jar APKEditor.jar m -i {xapk_path.as_posix()}")
     # APKEditor merged APKs must be signed to install
@@ -192,7 +199,7 @@ def restart_session() -> subprocess.Popen | None:
     waydroid_process = start_session()
     if not waydroid_process:
         logger.error("Waydroid failed to start")
-        return
+        raise Exception("Waydroid failed to start")
     return waydroid_process
 
 
@@ -211,19 +218,17 @@ def prep_xapk_splits(store_id: str, xapk_path: pathlib.Path) -> str:
     _unzip_result = os.system(unzip_command)
     if _unzip_result != 0:
         logger.error(f"Failed to unzip {xapk_path.as_posix()}")
-        return
+        raise Exception(f"Failed to unzip {xapk_path.as_posix()}")
 
     list_of_apks = list(tmp_apk_dir.glob("*.apk"))
 
     list_of_split_apks = [x.name for x in list_of_apks if x.name != f"{store_id}.apk"]
-    base_apk_name = [x.name for x in list_of_apks if x.name == f"{store_id}.apk"]
-    if len(base_apk_name) == 1:
-        base_apk_name = base_apk_name[0]
-        base_apk_path = WAYDROID_INTERNAL_EMULATED_DIR.joinpath(
-            base_apk_name
-        ).as_posix()
+    base_apk_names = [x.name for x in list_of_apks if x.name == f"{store_id}.apk"]
+    if len(base_apk_names) == 1:
+        base_apk_name = base_apk_names[0]
+        base_apk_path = pathlib.Path(WAYDROID_INTERNAL_EMULATED_DIR, base_apk_name)
     else:
-        raise ValueError(f"Found {len(base_apk_name)} base apks for {store_id}")
+        raise ValueError(f"Found {len(base_apk_names)} base apks for {store_id}")
 
     cp_command = f"sudo cp -r {tmp_apk_dir.as_posix()} {WAYDROID_MEDIA_DIR.as_posix()}"
     _cp_result = os.system(cp_command)
@@ -231,7 +236,9 @@ def prep_xapk_splits(store_id: str, xapk_path: pathlib.Path) -> str:
         logger.error(
             f"Failed to copy {tmp_apk_dir.as_posix()} to {WAYDROID_MEDIA_DIR.as_posix()}"
         )
-        return
+        raise Exception(
+            f"Failed to copy {tmp_apk_dir.as_posix()} to {WAYDROID_MEDIA_DIR.as_posix()}"
+        )
 
     split_apk_paths = [
         WAYDROID_INTERNAL_EMULATED_DIR.joinpath(x).as_posix()
@@ -239,7 +246,9 @@ def prep_xapk_splits(store_id: str, xapk_path: pathlib.Path) -> str:
         if x != base_apk_name
     ]
 
-    split_install_command = f"pm install {base_apk_path} {' '.join(split_apk_paths)}"
+    split_install_command = (
+        f"pm install {base_apk_path.as_posix()} {' '.join(split_apk_paths)}"
+    )
     return split_install_command
 
 
