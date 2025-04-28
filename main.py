@@ -235,7 +235,7 @@ class ProcessManager:
             self.scrape_manifests(stores)
 
         if self.args.waydroid:
-            self.scrape_manifests_for_waydroid()
+            self.waydroid_mitm()
 
         if self.args.crawl_keywords:
             self.crawl_keywords()
@@ -282,7 +282,7 @@ class ProcessManager:
             except Exception:
                 logger.exception("Android scrape manifests failing")
 
-    def scrape_manifests_for_waydroid(self) -> None:
+    def waydroid_mitm(self) -> None:
         try:
             process_apks_for_waydroid(database_connection=self.pgcon)
         except Exception:

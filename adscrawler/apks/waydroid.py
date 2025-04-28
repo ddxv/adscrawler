@@ -209,6 +209,12 @@ def check_wayland_display() -> bool:
     return display is not None
 
 
+def cleanup_xapk_splits(store_id: str) -> None:
+    apk_split_dir = pathlib.Path(WAYDROID_MEDIA_DIR, store_id)
+    if apk_split_dir.exists():
+        os.system(f"sudo rm -rf {apk_split_dir.as_posix()}")
+
+
 def prep_xapk_splits(store_id: str, xapk_path: pathlib.Path) -> str:
     logger.info(f"Waydroid prep xapk splits for {store_id}")
     tmp_apk_dir = pathlib.Path("/tmp/unzippedxapks/", f"{store_id}")
@@ -277,6 +283,7 @@ def launch_and_track_app(store_id: str, apk_path: pathlib.Path) -> None:
         logger.exception(f"{function_info} failed: {e}")
         os.system(f'sudo waydroid shell am force-stop "{store_id}"')
         os.system(f'waydroid app remove "{store_id}"')
+        cleanup_xapk_splits(store_id)
         raise
 
     logger.info(f"{function_info} waiting for 60 seconds")
@@ -285,6 +292,7 @@ def launch_and_track_app(store_id: str, apk_path: pathlib.Path) -> None:
     os.system(f"{mitm_script.as_posix()} -d")
     os.system(f'sudo waydroid shell am force-stop "{store_id}"')
     os.system(f'waydroid app remove "{store_id}"')
+    cleanup_xapk_splits(store_id)
     logger.info(f"{function_info} success")
 
 
