@@ -210,6 +210,7 @@ def check_wayland_display() -> bool:
 
 
 def prep_xapk_splits(store_id: str, xapk_path: pathlib.Path) -> str:
+    logger.info(f"Waydroid prep xapk splits for {store_id}")
     tmp_apk_dir = pathlib.Path("/tmp/unzippedxapks/", f"{store_id}")
     if not tmp_apk_dir.exists():
         os.makedirs(tmp_apk_dir)
@@ -224,24 +225,22 @@ def prep_xapk_splits(store_id: str, xapk_path: pathlib.Path) -> str:
 
     list_of_split_apks = [x.name for x in list_of_apks if x.name != f"{store_id}.apk"]
     base_apk_names = [x.name for x in list_of_apks if x.name == f"{store_id}.apk"]
+    apk_split_dir = pathlib.Path(WAYDROID_INTERNAL_EMULATED_DIR, store_id)
     if len(base_apk_names) == 1:
         base_apk_name = base_apk_names[0]
-        base_apk_path = pathlib.Path(WAYDROID_INTERNAL_EMULATED_DIR, base_apk_name)
+        base_apk_path = pathlib.Path(apk_split_dir, base_apk_name)
     else:
         raise ValueError(f"Found {len(base_apk_names)} base apks for {store_id}")
 
     cp_command = f"sudo cp -r {tmp_apk_dir.as_posix()} {WAYDROID_MEDIA_DIR.as_posix()}"
     _cp_result = os.system(cp_command)
     if _cp_result != 0:
-        logger.error(
-            f"Failed to copy {tmp_apk_dir.as_posix()} to {WAYDROID_MEDIA_DIR.as_posix()}"
-        )
-        raise Exception(
-            f"Failed to copy {tmp_apk_dir.as_posix()} to {WAYDROID_MEDIA_DIR.as_posix()}"
-        )
+        err = f"Failed to copy {tmp_apk_dir.as_posix()} to {WAYDROID_MEDIA_DIR.as_posix()}"
+        logger.error(err)
+        raise Exception(err)
 
     split_apk_paths = [
-        WAYDROID_INTERNAL_EMULATED_DIR.joinpath(x).as_posix()
+        pathlib.Path(apk_split_dir, x).as_posix()
         for x in list_of_split_apks
         if x != base_apk_name
     ]
@@ -358,7 +357,7 @@ def install_app(store_id: str, apk_path: pathlib.Path) -> None:
     if extension == ".xapk":
         split_install_command = prep_xapk_splits(store_id, apk_path)
         _install_output = subprocess.run(
-            ["sudo", "waydroid", "shell", split_install_command],
+            ["sudo", "waydroid", "shell"] + split_install_command.split(),
             capture_output=True,
             text=True,
             check=False,
@@ -374,7 +373,7 @@ def install_app(store_id: str, apk_path: pathlib.Path) -> None:
         raise ValueError(f"Invalid extension: {extension}")
     time.sleep(2)
 
-    timeout = 20
+    timeout = 45
     start_time = time.time()
     while (time.time() - start_time) < timeout:
         applist = subprocess.run(
@@ -386,7 +385,7 @@ def install_app(store_id: str, apk_path: pathlib.Path) -> None:
         if "waydroid session is stopped" in applist.stderr.lower():
             logger.error(f"{function_info} Waydroid session is stopped")
             raise Exception(f"{function_info} Waydroid session is stopped")
-        time.sleep(1)
+        time.sleep(2)
 
     applist = subprocess.run(
         ["waydroid", "app", "list"], capture_output=True, text=True, check=False

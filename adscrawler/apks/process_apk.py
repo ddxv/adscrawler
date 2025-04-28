@@ -113,7 +113,6 @@ def process_xapks_for_waydroid(
 def process_apks_for_waydroid(
     database_connection: PostgresCon, num_apps: int = 10
 ) -> None:
-    # Note, we haven't started handling xapks yet
     apks = get_downloaded_apks()
     store_id_map = query_store_id_api_called_map(
         database_connection=database_connection, store_ids=apks
