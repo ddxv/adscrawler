@@ -280,7 +280,7 @@ def query_store_id_api_called_map(
                 where_statement += " WHERE "
             else:
                 where_statement += " AND "
-            where_statement += "(ml.crawled_at <= CURRENT_DATE - INTERVAL '1 days' OR ml.crawled_at IS NULL)"
+            where_statement += "(ml.crawled_at <= CURRENT_DATE - INTERVAL '30 days' OR ml.crawled_at IS NULL)"
     sel_query = f"""
                 WITH max_logging AS (
                     SELECT
