@@ -44,6 +44,10 @@ def start_weston() -> subprocess.Popen:
         if "launching '/usr/libexec/weston-desktop-shell'" in line:
             ready = True
             break
+        if "maybe another compositor is running" in line:
+            logger.info("Weston already running")
+            ready = True
+            break
 
     if not ready:
         if weston_process.poll() is not None:
