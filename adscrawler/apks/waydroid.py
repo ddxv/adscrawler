@@ -216,10 +216,19 @@ def cleanup_xapk_splits(store_id: str) -> None:
     apk_split_dir = pathlib.Path(WAYDROID_MEDIA_DIR, store_id)
     try:
         if apk_split_dir.is_dir():
-            os.system(f"sudo rm -rf {apk_split_dir.as_posix()}")
-    except (FileNotFoundError, PermissionError):
-        logger.error(f"Failed to cleanup {apk_split_dir.as_posix()}")
-        pass
+            result = subprocess.run(
+                ["sudo", "rm", "-rf", apk_split_dir.as_posix()],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                check=False,
+            )
+            if result.returncode != 0:
+                logger.error(
+                    f"Failed to remove {apk_split_dir}: {result.stderr.strip()}"
+                )
+    except Exception:
+        logger.exception(f"Exception occurred while cleaning up {apk_split_dir}")
 
 
 def prep_xapk_splits(store_id: str, xapk_path: pathlib.Path) -> str:
