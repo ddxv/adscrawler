@@ -7,7 +7,7 @@ import time
 import pandas as pd
 
 from adscrawler.apks import mitm_process_log
-from adscrawler.apks.weston import start_weston
+from adscrawler.apks.weston import restart_weston, start_weston
 from adscrawler.config import (
     ANDROID_SDK,
     APKS_DIR,
@@ -457,8 +457,12 @@ def start_session() -> subprocess.Popen:
             logger.info("Waydroid is ready! Continuing with the script...")
             break
         if display_waiting:
-            logger.info(f"{function_info} waiting for ready (120 seconds)...")
+            logger.info(f"{function_info} waiting for session to be ready...")
             display_waiting = False
+        if "Unable to autolaunch a dbus-daemon" in line:
+            logger.exception(f"{function_info} unable to autolaunch a dbus-daemon")
+            restart_weston()
+            raise Exception(f"{function_info} unable to autolaunch a dbus-daemon")
         time.sleep(1)
 
     if not ready:

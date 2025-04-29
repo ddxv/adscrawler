@@ -7,10 +7,24 @@ from adscrawler.config import get_logger
 logger = get_logger(__name__)
 
 
-def is_weston_running(socket_name: str) -> bool:
+WESTON_SOCKET_NAME = "wayland-98"
+
+
+def restart_weston() -> None:
+    if is_weston_running():
+        logger.info("Weston already running, killing...")
+        kill_weston()
+    start_weston()
+
+
+def kill_weston() -> None:
+    subprocess.run(["sudo", "pkill", "weston"], check=False)
+
+
+def is_weston_running() -> bool:
     try:
         result = subprocess.run(
-            ["pgrep", "-af", f"weston.*-S {socket_name}"],
+            ["pgrep", "-af", f"weston.*-S {WESTON_SOCKET_NAME}"],
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
             text=True,
@@ -24,12 +38,11 @@ def is_weston_running(socket_name: str) -> bool:
 
 def start_weston() -> subprocess.Popen:
     logger.info("Starting Weston")
-    socket_name = "wayland-98"
-    os.environ["WAYLAND_DISPLAY"] = socket_name
+    os.environ["WAYLAND_DISPLAY"] = WESTON_SOCKET_NAME
     os.environ["XDG_RUNTIME_DIR"] = "/run/user/1000"
 
-    if is_weston_running(socket_name):
-        logger.info(f"Weston already running with socket '{socket_name}'")
+    if is_weston_running():
+        logger.info(f"Weston already running with socket '{WESTON_SOCKET_NAME}'")
         raise Exception("Weston already running")
 
     weston_process = subprocess.Popen(
@@ -41,7 +54,7 @@ def start_weston() -> subprocess.Popen:
             "--height=800",
             "--scale=1",
             "-S",
-            socket_name,
+            WESTON_SOCKET_NAME,
         ],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
