@@ -7,13 +7,30 @@ from adscrawler.config import get_logger
 logger = get_logger(__name__)
 
 
+def is_weston_running(socket_name: str) -> bool:
+    try:
+        result = subprocess.run(
+            ["pgrep", "-af", f"weston.*-S {socket_name}"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+            check=False,
+        )
+        return result.returncode == 0
+    except Exception as e:
+        logger.warning(f"Failed to check if weston is running: {e}")
+        return False
+
+
 def start_weston() -> subprocess.Popen:
     logger.info("Starting Weston")
-    # This will be the socket name for the weston process
     socket_name = "wayland-98"
     os.environ["WAYLAND_DISPLAY"] = socket_name
-    # This is required to run weston in cronjob environment
     os.environ["XDG_RUNTIME_DIR"] = "/run/user/1000"
+
+    if is_weston_running(socket_name):
+        logger.info(f"Weston already running with socket '{socket_name}'")
+        raise Exception("Weston already running")
 
     weston_process = subprocess.Popen(
         [
@@ -31,6 +48,7 @@ def start_weston() -> subprocess.Popen:
         text=True,
         bufsize=1,
     )
+
     ready = False
     timeout = 30
     start_time = time.time()
@@ -40,7 +58,7 @@ def start_weston() -> subprocess.Popen:
         and (time.time() - start_time) < timeout
     ):
         line = weston_process.stdout.readline()
-        logger.info(line)
+        logger.info(line.strip())
         if "launching '/usr/libexec/weston-desktop-shell'" in line:
             ready = True
             break
@@ -58,5 +76,6 @@ def start_weston() -> subprocess.Popen:
             )
             weston_process.terminate()
         raise Exception("Weston failed to start")
+
     logger.info("Weston is ready! Returning process")
     return weston_process
