@@ -196,8 +196,10 @@ def restart_session() -> subprocess.Popen | None:
     if not check_wayland_display():
         _weston_process = start_weston()
         if not check_wayland_display():
-            logger.error("Weston already running but waydroid display not found")
-            raise Exception("Weston already running but waydroid display not found")
+            restart_weston()
+            if not check_wayland_display():
+                logger.error("Weston already running but waydroid display not found")
+                raise Exception("Weston already running but waydroid display not found")
 
     waydroid_process = start_session()
     if not waydroid_process:
