@@ -212,9 +212,19 @@ def restart_session() -> subprocess.Popen | None:
 def check_wayland_display() -> bool:
     display = os.environ.get("WAYLAND_DISPLAY")
     xdg_dir = os.environ.get("XDG_RUNTIME_DIR")
-    msg = f"Waydroid / Weston display: XDG_RUNTIME_DIR: {xdg_dir} WAYLAND_DISPLAY: {display}"
+    display_is_set = display is not None
+    xdg_dir_is_set = xdg_dir is not None
+    if display_is_set and xdg_dir_is_set:
+        msg = f"Weston check OK: XDG_RUNTIME_DIR:{xdg_dir} WAYLAND_DISPLAY:{display}"
+        logger.info(msg)
+    else:
+        msg = f"Weston check NOK: XDG_RUNTIME_DIR:{xdg_dir} WAYLAND_DISPLAY:{display}"
+        logger.error(msg)
+    return display_is_set and xdg_dir_is_set
+
+    msg = f"Weston check: XDG_RUNTIME_DIR:{xdg_dir} WAYLAND_DISPLAY:{display}"
     logger.info(msg)
-    return display is not None
+    return
 
 
 def cleanup_xapk_splits(store_id: str) -> None:
@@ -457,7 +467,7 @@ def start_session() -> subprocess.Popen:
         and (time.time() - start_time) < timeout
     ):
         line = waydroid_process.stdout.readline()
-        logger.info(line)
+        logger.info(f"{function_info} readline: {line}")
         if (
             "Android with user 0 is ready" in line
             or "Session is already running" in line
