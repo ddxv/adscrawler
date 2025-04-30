@@ -480,16 +480,22 @@ def start_session() -> subprocess.Popen:
             display_waiting = False
         if "Unable to autolaunch a dbus-daemon" in line:
             logger.exception(f"{function_info} unable to autolaunch a dbus-daemon")
-            restart_weston()
+            # restart_weston()
             raise Exception(f"{function_info} unable to autolaunch a dbus-daemon")
+        if "container is not running" in line:
+            logger.error(f"{function_info} container is not running")
+            raise Exception(f"{function_info} container failed to start")
         time.sleep(1)
 
     if not ready:
         if waydroid_process.poll() is not None:
+            msg = waydroid_process.stdout
             err = waydroid_process.stderr
-            logger.error(f"{function_info} process ended without becoming ready {err}")
+            logger.error(
+                f"{function_info} process ended without becoming ready stdout:{msg} stderr:{err}"
+            )
             raise Exception(
-                f"{function_info} process ended without becoming ready {err}"
+                f"{function_info} process ended without becoming ready stdout:{msg} stderr:{err}"
             )
         else:
             logger.error(
