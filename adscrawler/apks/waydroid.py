@@ -457,8 +457,9 @@ def start_session() -> subprocess.Popen:
     function_info = "Waydroid session"
     logger.info(f"{function_info} start")
     # Start the Waydroid session process
+    # ["dbus-run-session", "--", "waydroid", "session", "start"],
     waydroid_process = subprocess.Popen(
-        ["dbus-run-session", "--", "waydroid", "session", "start"],
+        ["waydroid", "session", "start"],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
