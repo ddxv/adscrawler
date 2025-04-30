@@ -131,11 +131,11 @@ def process_app_for_waydroid(
     else:
         raise ValueError(f"Invalid extension: {extension}")
     if not check_container():
-        restart_container()
+        stop_container()
     if not check_session():
         waydroid_process = restart_session()
         if not waydroid_process:
-            restart_container()
+            stop_container()
             waydroid_process = restart_session()
             if not waydroid_process:
                 logger.error("Waydroid failed to start")
@@ -160,6 +160,8 @@ def check_container() -> bool:
     for line in waydroid_process.stdout.splitlines():
         if line.strip() == "Container:\tRUNNING":
             is_container_running = True
+    if not is_container_running:
+        logger.error("Waydroid container is not running")
     return is_container_running
 
 
@@ -181,13 +183,11 @@ def check_session() -> bool:
     return is_session_running
 
 
-def restart_container() -> None:
-    logger.info("Waydroid container restart")
+def stop_container() -> None:
     function_info = "Waydroid container"
-    logger.info(f"{function_info} restarting")
+    logger.info(f"{function_info} stopping")
     os.system("sudo waydroid container stop")
     time.sleep(1)
-    restart_session()
 
 
 def restart_session() -> subprocess.Popen | None:
