@@ -1,5 +1,4 @@
 import os
-import pathlib
 import subprocess
 import time
 
@@ -40,10 +39,10 @@ def is_weston_running() -> bool:
 def start_weston() -> subprocess.Popen:
     logger.info("Starting Weston")
     os.environ["WAYLAND_DISPLAY"] = WESTON_SOCKET_NAME
-    xdg_runtime_dir = "/tmp/xdg-runtime"
-    if not pathlib.Path(xdg_runtime_dir).is_dir():
-        os.makedirs(xdg_runtime_dir, exist_ok=True)
-        os.chmod(xdg_runtime_dir, 0o700)
+    xdg_runtime_dir = "/run/user/1000"
+    # if not pathlib.Path(xdg_runtime_dir).is_dir():
+    #     os.makedirs(xdg_runtime_dir, exist_ok=True)
+    #     os.chmod(xdg_runtime_dir, 0o700)
 
     os.environ["XDG_RUNTIME_DIR"] = xdg_runtime_dir
 
