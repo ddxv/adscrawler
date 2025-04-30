@@ -15,6 +15,7 @@ from adscrawler.config import (
     WAYDROID_INTERNAL_EMULATED_DIR,
     WAYDROID_MEDIA_DIR,
     XAPKS_DIR,
+    XAPKS_TMP_UNZIP_DIR,
     get_logger,
 )
 from adscrawler.connection import PostgresCon
@@ -216,26 +217,30 @@ def check_wayland_display() -> bool:
 
 def cleanup_xapk_splits(store_id: str) -> None:
     apk_split_dir = pathlib.Path(WAYDROID_MEDIA_DIR, store_id)
+    tmp_apk_dir = pathlib.Path(XAPKS_TMP_UNZIP_DIR, f"{store_id}")
     try:
         if apk_split_dir.is_dir():
-            result = subprocess.run(
+            subprocess.run(
                 ["sudo", "rm", "-rf", apk_split_dir.as_posix()],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
                 text=True,
-                check=False,
+                check=True,
             )
-            if result.returncode != 0:
-                logger.error(
-                    f"Failed to remove {apk_split_dir}: {result.stderr.strip()}"
-                )
     except Exception:
         logger.exception(f"Exception occurred while cleaning up {apk_split_dir}")
+    try:
+        if tmp_apk_dir.is_dir():
+            subprocess.run(
+                ["sudo", "rm", "-rf", tmp_apk_dir.as_posix()],
+                text=True,
+                check=True,
+            )
+    except Exception:
+        logger.exception(f"Exception occurred while cleaning up {tmp_apk_dir}")
 
 
 def prep_xapk_splits(store_id: str, xapk_path: pathlib.Path) -> str:
     logger.info(f"Waydroid prep xapk splits for {store_id}")
-    tmp_apk_dir = pathlib.Path("/tmp/unzippedxapks/", f"{store_id}")
+    tmp_apk_dir = pathlib.Path(XAPKS_TMP_UNZIP_DIR, f"{store_id}")
     if not tmp_apk_dir.exists():
         os.makedirs(tmp_apk_dir)
 
@@ -431,7 +436,7 @@ def start_session() -> subprocess.Popen:
     logger.info(f"{function_info} start")
     # Start the Waydroid session process
     waydroid_process = subprocess.Popen(
-        ["waydroid", "session", "start"],
+        ["dbus-run-session", "--", "waydroid", "session", "start"],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
