@@ -3,6 +3,8 @@ import shutil
 import subprocess
 import time
 
+import pandas as pd
+
 from adscrawler.apks import manifest, waydroid
 from adscrawler.config import (
     APK_PARTIALS_DIR,
@@ -47,6 +49,7 @@ def process_apks(
             logger.exception(f"Manifest for {store_id} failed")
 
         remove_partial_apks(store_id=store_id)
+    check_local_apks(database_connection=database_connection)
 
 
 def get_downloaded_apks() -> list[str]:
@@ -108,6 +111,18 @@ def process_xapks_for_waydroid(
             store_id=store_id,
             store_app=row.store_app,
         )
+
+
+def check_local_apks(database_connection: PostgresCon) -> None:
+    downloaded_apks = get_downloaded_apks()
+    downloaded_xapks = get_downloaded_xapks()
+    files = [{"file_type": "apk", "package_name": apk} for apk in downloaded_apks] + [
+        {"file_type": "xapk", "package_name": xapk} for xapk in downloaded_xapks
+    ]
+    df = pd.DataFrame(files)
+    df.to_sql(
+        "local_apks", con=database_connection.engine, if_exists="replace", index=False
+    )
 
 
 def process_apks_for_waydroid(
