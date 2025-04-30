@@ -44,6 +44,7 @@ def start_weston() -> subprocess.Popen:
     if not pathlib.Path(xdg_runtime_dir).is_dir():
         fallback_dir = "/tmp/xdg-runtime"
         os.makedirs(fallback_dir, exist_ok=True)
+        os.chmod(fallback_dir, 0o700)
         xdg_runtime_dir = fallback_dir
         logger.warning(f"XDG_RUNTIME_DIR not found; using fallback: {xdg_runtime_dir}")
 
