@@ -173,12 +173,16 @@ def check_session() -> bool:
     is_session_running = False
     for line in waydroid_process.stdout.splitlines():
         logger.info(line.strip())
-        if line.strip() == "Session:\tRUNNING":
+        if "Session" in line and "RUNNING" in line:
             is_session_running = True
     app_list = subprocess.run(
         ["waydroid", "app", "list"], capture_output=True, text=True, check=False
     )
     if "waydroid session is stopped" in app_list.stderr.lower():
+        err = app_list.stderr
+        logger.error(
+            f"Check session: waydroid app list returned session is stopped {err}"
+        )
         is_session_running = False
     return is_session_running
 
