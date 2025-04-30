@@ -172,7 +172,7 @@ def check_session() -> bool:
     # Look specifically for the line "Session:  RUNNING"
     is_session_running = False
     for line in waydroid_process.stdout.splitlines():
-        print(line.strip())
+        logger.info(line.strip())
         if line.strip() == "Session:\tRUNNING":
             is_session_running = True
     app_list = subprocess.run(
@@ -206,6 +206,10 @@ def restart_session() -> subprocess.Popen | None:
     if not waydroid_process:
         logger.error("Waydroid failed to start")
         raise Exception("Waydroid failed to start")
+    time.sleep(1)
+    if not check_session():
+        logger.error("Waydroid failed check session")
+        raise Exception("Waydroid failed check session")
     return waydroid_process
 
 
@@ -387,8 +391,10 @@ def install_app(store_id: str, apk_path: pathlib.Path) -> None:
     )
 
     if "waydroid session is stopped" in applist.stderr.lower():
-        logger.error(f"{function_info} Waydroid session is stopped")
-        raise Exception(f"{function_info} Waydroid session is stopped")
+        err = applist.stderr
+        logger.error(f"{function_info} Waydroid session is stopped: {err}")
+        check_session()
+        raise Exception(f"{function_info} Waydroid session is stopped: {err}")
 
     if store_id in applist.stdout:
         logger.info(f"{function_info} found already installed")
