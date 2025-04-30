@@ -211,7 +211,9 @@ def restart_session() -> subprocess.Popen | None:
 
 def check_wayland_display() -> bool:
     display = os.environ.get("WAYLAND_DISPLAY")
-    logger.info(f"Waydroid / Weston display: WAYLAND_DISPLAY: {display}")
+    xdg_dir = os.environ.get("XDG_RUNTIME_DIR")
+    msg = f"Waydroid / Weston display: XDG_RUNTIME_DIR: {xdg_dir} WAYLAND_DISPLAY: {display}"
+    logger.info(msg)
     return display is not None
 
 

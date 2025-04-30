@@ -40,19 +40,16 @@ def is_weston_running() -> bool:
 def start_weston() -> subprocess.Popen:
     logger.info("Starting Weston")
     os.environ["WAYLAND_DISPLAY"] = WESTON_SOCKET_NAME
-    xdg_runtime_dir = "/run/user/1000"
+    xdg_runtime_dir = "/tmp/xdg-runtime"
     if not pathlib.Path(xdg_runtime_dir).is_dir():
-        fallback_dir = "/tmp/xdg-runtime"
-        os.makedirs(fallback_dir, exist_ok=True)
-        os.chmod(fallback_dir, 0o700)
-        xdg_runtime_dir = fallback_dir
-        logger.warning(f"XDG_RUNTIME_DIR not found; using fallback: {xdg_runtime_dir}")
+        os.makedirs(xdg_runtime_dir, exist_ok=True)
+        os.chmod(xdg_runtime_dir, 0o700)
 
     os.environ["XDG_RUNTIME_DIR"] = xdg_runtime_dir
 
     if is_weston_running():
         logger.info(f"Weston already running with socket '{WESTON_SOCKET_NAME}'")
-        raise Exception("Weston already running")
+        return
 
     weston_process = subprocess.Popen(
         [
