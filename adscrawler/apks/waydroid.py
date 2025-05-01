@@ -19,7 +19,7 @@ from adscrawler.config import (
     get_logger,
 )
 from adscrawler.connection import PostgresCon
-from adscrawler.queries import upsert_df
+from adscrawler.queries import query_store_app_by_store_id, upsert_df
 
 logger = get_logger(__name__)
 
@@ -72,6 +72,7 @@ def run_app(
     apk_path: pathlib.Path,
     store_id: str,
     store_app: int,
+    timeout: int = 60,
 ) -> None:
     function_info = f"waydroid {store_id=}"
     crawl_result = 3
@@ -81,7 +82,7 @@ def run_app(
     os.system(f"{mitm_script.as_posix()} -d")
 
     try:
-        launch_and_track_app(store_id, apk_path)
+        launch_and_track_app(store_id, apk_path, timeout=timeout)
         try:
             process_mitm_log(store_id, database_connection, store_app)
             crawl_result = 1
@@ -91,7 +92,7 @@ def run_app(
     except Exception as e:
         crawl_result = 2
         logger.exception(f"{function_info} failed: {e}")
-    logger.info(f"{function_info} saved to db")
+    logger.info(f"{function_info} save to db")
     upsert_crawled_at(store_app, database_connection, crawl_result)
 
 
@@ -123,6 +124,7 @@ def process_app_for_waydroid(
     store_id: str,
     store_app: int,
     extension: str,
+    timeout: int = 60,
 ) -> None:
     if extension == "apk":
         apk_path = pathlib.Path(APKS_DIR, f"{store_id}.apk")
@@ -130,22 +132,25 @@ def process_app_for_waydroid(
         apk_path = pathlib.Path(XAPKS_DIR, f"{store_id}.xapk")
     else:
         raise ValueError(f"Invalid extension: {extension}")
-    if not check_container():
-        stop_container()
-    if not check_session():
+    if not check_container() or not check_session():
         waydroid_process = restart_session()
-        if not waydroid_process:
-            stop_container()
+        if waydroid_process:
+            logger.info(f"Waydroid restarted with pid: {waydroid_process.pid}")
+        else:
+            kill_waydroid()
             waydroid_process = restart_session()
             if not waydroid_process:
                 logger.error("Waydroid failed to start")
                 return
+            logger.info(f"Waydroid restarted with pid: {waydroid_process.pid}")
+
     try:
         run_app(
             database_connection,
             apk_path=apk_path,
             store_id=store_id,
             store_app=store_app,
+            timeout=timeout,
         )
     except Exception:
         logger.exception(f"Waydroid failed to run store_id={store_id}")
@@ -267,8 +272,9 @@ def prep_xapk_splits(store_id: str, xapk_path: pathlib.Path) -> str:
     unzip_command = f"unzip -o {xapk_path.as_posix()} -d {tmp_apk_dir.as_posix()}"
     _unzip_result = os.system(unzip_command)
     if _unzip_result != 0:
-        logger.error(f"Failed to unzip {xapk_path.as_posix()}")
-        raise Exception(f"Failed to unzip {xapk_path.as_posix()}")
+        err = f"Failed to unzip {unzip_command} with err:{_unzip_result}"
+        logger.error(err)
+        raise Exception(err)
 
     list_of_apks = list(tmp_apk_dir.glob("*.apk"))
 
@@ -279,7 +285,12 @@ def prep_xapk_splits(store_id: str, xapk_path: pathlib.Path) -> str:
         base_apk_name = base_apk_names[0]
         base_apk_path = pathlib.Path(apk_split_dir, base_apk_name)
     else:
-        raise ValueError(f"Found {len(base_apk_names)} base apks for {store_id}")
+        base_apk_names = [x.name for x in list_of_apks if x.name == "base.apk"]
+        if len(base_apk_names) == 1:
+            base_apk_name = base_apk_names[0]
+            base_apk_path = pathlib.Path(apk_split_dir, base_apk_name)
+        else:
+            raise ValueError(f"Found {len(base_apk_names)} base apks for {store_id}")
 
     cp_command = f"sudo cp -r {tmp_apk_dir.as_posix()} {WAYDROID_MEDIA_DIR.as_posix()}"
     _cp_result = os.system(cp_command)
@@ -300,7 +311,9 @@ def prep_xapk_splits(store_id: str, xapk_path: pathlib.Path) -> str:
     return split_install_command
 
 
-def launch_and_track_app(store_id: str, apk_path: pathlib.Path) -> None:
+def launch_and_track_app(
+    store_id: str, apk_path: pathlib.Path, timeout: int = 60
+) -> None:
     function_info = f"waydroid {store_id=} launch and track"
     mitm_script = pathlib.Path(PACKAGE_DIR, "adscrawler/apks/mitm_start.sh")
 
@@ -321,7 +334,7 @@ def launch_and_track_app(store_id: str, apk_path: pathlib.Path) -> None:
     logger.info(f"{function_info} mitmdump started with PID: {mitm_pid}")
 
     try:
-        launch_app(store_id)
+        launch_app(store_id, timeout=timeout)
     except Exception as e:
         logger.exception(f"{function_info} failed: {e}")
         os.system(f'sudo waydroid shell am force-stop "{store_id}"')
@@ -329,13 +342,24 @@ def launch_and_track_app(store_id: str, apk_path: pathlib.Path) -> None:
         cleanup_xapk_splits(store_id)
         raise
 
-    logger.info(f"{function_info} waiting for 60 seconds")
-    time.sleep(60)
+    logger.info(f"{function_info} waiting for {timeout} seconds")
+    time.sleep(timeout)
     logger.info(f"{function_info} stopping app & mitmdump")
     os.system(f"{mitm_script.as_posix()} -d")
     os.system(f'sudo waydroid shell am force-stop "{store_id}"')
     os.system(f'waydroid app remove "{store_id}"')
     cleanup_xapk_splits(store_id)
+    logger.info(f"{function_info} success")
+
+
+def kill_waydroid() -> None:
+    function_info = "Waydroid kill"
+    logger.info(f"{function_info} start")
+    stop_container()
+    time.sleep(1)
+    os.system("waydroid session stop")
+    time.sleep(1)
+    os.system("sudo pkill waydroid")
     logger.info(f"{function_info} success")
 
 
@@ -347,7 +371,7 @@ def launch_app(store_id: str) -> None:
     time.sleep(2)
 
     # Set timeout parameters
-    timeout = 60  # seconds
+    timeout = 20
     start_time = time.time()
     found = False
     permission_attempts = 2
@@ -491,7 +515,6 @@ def start_session() -> subprocess.Popen:
             display_waiting = False
         if "Unable to autolaunch a dbus-daemon" in line:
             logger.exception(f"{function_info} unable to autolaunch a dbus-daemon")
-            # restart_weston()
             raise Exception(f"{function_info} unable to autolaunch a dbus-daemon")
         if "container is not running" in line:
             logger.error(f"{function_info} container is not running")
@@ -515,3 +538,29 @@ def start_session() -> subprocess.Popen:
             waydroid_process.terminate()
     logger.info(f"{function_info} success")
     return waydroid_process
+
+
+def check_file_is_downloaded(store_id: str, extension: str) -> bool:
+    if extension == "apk":
+        apk_path = pathlib.Path(APKS_DIR, f"{store_id}.apk")
+    elif extension == "xapk":
+        apk_path = pathlib.Path(XAPKS_DIR, f"{store_id}.xapk")
+    return apk_path.exists()
+
+
+def manual_waydroid_process(
+    database_connection: PostgresCon,
+    store_id: str,
+    extension: str,
+) -> None:
+    if not check_file_is_downloaded(store_id, extension):
+        raise Exception(f"File {store_id}{extension} not found")
+    store_app = query_store_app_by_store_id(database_connection, store_id)
+    timeout = 300
+    process_app_for_waydroid(
+        database_connection=database_connection,
+        store_id=store_id,
+        store_app=store_app,
+        extension=extension,
+        timeout=timeout,
+    )

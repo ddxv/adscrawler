@@ -8,6 +8,7 @@ from adscrawler.apks.process_apk import (
     process_apks_for_waydroid,
     process_xapks_for_waydroid,
 )
+from adscrawler.apks.waydroid import manual_waydroid_process
 from adscrawler.app_stores.scrape_stores import (
     crawl_developers_for_new_store_ids,
     crawl_keyword_cranks,
@@ -98,6 +99,19 @@ class ProcessManager:
         )
         parser.add_argument(
             "--no-limits", help="Run queries without limits", action="store_true"
+        )
+
+        ### OPTIONS FOR MANUAL/LOCAL WAYDROID PROCESSING
+        parser.add_argument(
+            "-s",
+            "--store-id",
+            help="String of store id to launch in wayroid",
+        )
+        parser.add_argument(
+            "-e",
+            "--extension",
+            help="Extension of the apk file on disk, one of apk or xapk",
+            default="apk",
         )
 
         args, _ = parser.parse_known_args()
@@ -283,14 +297,26 @@ class ProcessManager:
                 logger.exception("Android scrape manifests failing")
 
     def waydroid_mitm(self) -> None:
-        try:
-            process_apks_for_waydroid(database_connection=self.pgcon)
-        except Exception:
-            logger.exception("Android run waydroid app failing")
-        try:
-            process_xapks_for_waydroid(database_connection=self.pgcon)
-        except Exception:
-            logger.exception("Android run waydroid app failing")
+        if self.args.store_id:
+            # Manual waydroid process, launches app for 5 minutes for user to interact
+            store_id = self.args.store_id
+            extension = self.args.extension if self.args.extension else None
+            store_id = self.args.store_id if self.args.store_id else None
+            manual_waydroid_process(
+                database_connection=self.pgcon,
+                store_id=store_id,
+                extension=extension,
+            )
+        else:
+            # Default processing of apk/xapk files that need to be processed
+            try:
+                process_apks_for_waydroid(database_connection=self.pgcon)
+            except Exception:
+                logger.exception("Android run waydroid app failing")
+            try:
+                process_xapks_for_waydroid(database_connection=self.pgcon)
+            except Exception:
+                logger.exception("Android run waydroid app failing")
 
     def crawl_keywords(self) -> None:
         crawl_keyword_cranks(database_connection=self.pgcon)
