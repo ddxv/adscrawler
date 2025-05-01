@@ -334,7 +334,7 @@ def launch_and_track_app(
     logger.info(f"{function_info} mitmdump started with PID: {mitm_pid}")
 
     try:
-        launch_app(store_id, timeout=timeout)
+        launch_app(store_id)
     except Exception as e:
         logger.exception(f"{function_info} failed: {e}")
         os.system(f'sudo waydroid shell am force-stop "{store_id}"')
