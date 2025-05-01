@@ -628,6 +628,23 @@ def get_top_ranks_for_unpacking(
                     version_codes.updated_at DESC,
                     string_to_array(version_codes.version_code, '.')::bigint[] DESC
             ),
+             latest_success_version_codes AS (
+                SELECT
+                    DISTINCT ON
+                    (version_codes.store_app)
+                    version_codes.id,
+                    version_codes.store_app,
+                    version_codes.version_code,
+                    version_codes.updated_at,
+                    version_codes.crawl_result
+                FROM
+                    version_codes
+                WHERE version_codes.crawl_result = 1
+                ORDER BY
+                    version_codes.store_app,
+                    version_codes.updated_at DESC,
+                    string_to_array(version_codes.version_code, '.')::bigint[] DESC
+            ),
             scheduled_apps_crawl AS (
             SELECT
                 dc.store_app,
@@ -677,7 +694,7 @@ def get_top_ranks_for_unpacking(
                 user_requested_scan urs
             LEFT JOIN store_apps sa ON
                 urs.store_id = sa.store_id
-            LEFT JOIN latest_version_codes lvs ON
+            LEFT JOIN latest_success_version_codes lvs ON
                 sa.id = lvs.store_app
             WHERE
                 (lvs.updated_at < urs.created_at
