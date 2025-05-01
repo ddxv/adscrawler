@@ -438,6 +438,7 @@ def install_app(store_id: str, apk_path: pathlib.Path) -> None:
             capture_output=True,
             text=True,
             check=False,
+            timeout=120,
         )
     elif extension == ".apk":
         _install_output = subprocess.run(
@@ -445,6 +446,7 @@ def install_app(store_id: str, apk_path: pathlib.Path) -> None:
             capture_output=True,
             text=True,
             check=False,
+            timeout=120,
         )
     else:
         raise ValueError(f"Invalid extension: {extension}")
