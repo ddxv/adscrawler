@@ -111,6 +111,7 @@ def process_xapks_for_waydroid(
             store_id=store_id,
             store_app=row.store_app,
         )
+    waydroid.remove_all_third_party_apps()
 
 
 def check_local_apks(database_connection: PostgresCon) -> None:
@@ -145,6 +146,7 @@ def process_apks_for_waydroid(
             store_id=store_id,
             store_app=row.store_app,
         )
+    waydroid.remove_all_third_party_apps()
 
 
 def remove_partial_apks(store_id: str) -> None:

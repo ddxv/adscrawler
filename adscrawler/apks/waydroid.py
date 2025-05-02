@@ -242,25 +242,39 @@ def check_wayland_display() -> bool:
 
 def cleanup_xapk_splits(store_id: str) -> None:
     apk_split_dir = pathlib.Path(WAYDROID_MEDIA_DIR, store_id)
-    tmp_apk_dir = pathlib.Path(XAPKS_TMP_UNZIP_DIR, f"{store_id}")
-    try:
-        if apk_split_dir.is_dir():
+    tmp_apk_dir = pathlib.Path(XAPKS_TMP_UNZIP_DIR, store_id)
+
+    for path in [apk_split_dir, tmp_apk_dir]:
+        try:
             subprocess.run(
-                ["sudo", "rm", "-rf", apk_split_dir.as_posix()],
+                ["sudo", "rm", "-rf", path.as_posix()],
                 text=True,
                 check=True,
             )
-    except Exception:
-        logger.exception(f"Exception occurred while cleaning up {apk_split_dir}")
-    try:
-        if tmp_apk_dir.is_dir():
-            subprocess.run(
-                ["sudo", "rm", "-rf", tmp_apk_dir.as_posix()],
-                text=True,
-                check=True,
-            )
-    except Exception:
-        logger.exception(f"Exception occurred while cleaning up {tmp_apk_dir}")
+        except Exception:
+            logger.exception(f"Exception occurred while cleaning up {path}")
+
+
+def remove_all_third_party_apps() -> None:
+    third_party_apps = subprocess.run(
+        ["sudo", "waydroid", "shell", "pm", "list", "packages", "-3"],
+        text=True,
+        check=True,
+    )
+    apps_to_remove = [
+        x
+        for x in third_party_apps.stdout.splitlines()
+        if x not in THIRD_PARTY_APPS_TO_KEEP
+    ]
+    for app in apps_to_remove:
+        subprocess.run(
+            ["sudo", "waydroid", "shell", "pm", "uninstall", app],
+            text=True,
+            check=True,
+        )
+
+
+THIRD_PARTY_APPS_TO_KEEP = ["org.mozilla.firefox", "io.github.huskydg.magisk"]
 
 
 def prep_xapk_splits(store_id: str, xapk_path: pathlib.Path) -> str:
@@ -337,15 +351,20 @@ def launch_and_track_app(
         launch_app(store_id)
     except Exception as e:
         logger.exception(f"{function_info} failed: {e}")
-        os.system(f'sudo waydroid shell am force-stop "{store_id}"')
-        os.system(f'waydroid app remove "{store_id}"')
-        cleanup_xapk_splits(store_id)
+        remove_app(store_id)
         raise
 
     logger.info(f"{function_info} waiting for {timeout} seconds")
     time.sleep(timeout)
     logger.info(f"{function_info} stopping app & mitmdump")
     os.system(f"{mitm_script.as_posix()} -d")
+    remove_app(store_id)
+    logger.info(f"{function_info} success")
+
+
+def remove_app(store_id: str) -> None:
+    function_info = f"waydroid {store_id=} remove"
+    logger.info(f"{function_info} start")
     os.system(f'sudo waydroid shell am force-stop "{store_id}"')
     os.system(f'waydroid app remove "{store_id}"')
     cleanup_xapk_splits(store_id)
