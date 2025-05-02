@@ -18,7 +18,7 @@ def restart_weston() -> None:
 
 
 def kill_weston() -> None:
-    subprocess.run(["sudo", "pkill", "weston"], check=False)
+    subprocess.run(["sudo", "pkill", "weston"], check=False, timeout=60)
 
 
 def is_weston_running() -> bool:

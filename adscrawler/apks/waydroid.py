@@ -158,7 +158,11 @@ def process_app_for_waydroid(
 
 def check_container() -> bool:
     waydroid_process = subprocess.run(
-        ["waydroid", "status"], capture_output=True, text=True, check=False
+        ["waydroid", "status"],
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=60,
     )
     # Look specifically for the line "Container:  RUNNING"
     is_container_running = False
@@ -172,7 +176,11 @@ def check_container() -> bool:
 
 def check_session() -> bool:
     waydroid_process = subprocess.run(
-        ["waydroid", "status"], capture_output=True, text=True, check=False
+        ["waydroid", "status"],
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=60,
     )
     # Look specifically for the line "Session:  RUNNING"
     is_session_running = False
@@ -181,7 +189,11 @@ def check_session() -> bool:
         if "Session" in line and "RUNNING" in line:
             is_session_running = True
     app_list = subprocess.run(
-        ["waydroid", "app", "list"], capture_output=True, text=True, check=False
+        ["waydroid", "app", "list"],
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=60,
     )
     if "waydroid session is stopped" in app_list.stderr.lower():
         err = app_list.stderr
@@ -250,6 +262,7 @@ def cleanup_xapk_splits(store_id: str) -> None:
                 ["sudo", "rm", "-rf", path.as_posix()],
                 text=True,
                 check=True,
+                timeout=60,
             )
         except Exception:
             logger.exception(f"Exception occurred while cleaning up {path}")
@@ -260,6 +273,7 @@ def remove_all_third_party_apps() -> None:
         ["sudo", "waydroid", "shell", "pm", "list", "packages", "-3"],
         text=True,
         check=True,
+        timeout=60,
     )
     apps_to_remove = [
         x
@@ -271,6 +285,7 @@ def remove_all_third_party_apps() -> None:
             ["sudo", "waydroid", "shell", "pm", "uninstall", app],
             text=True,
             check=True,
+            timeout=60,
         )
 
 
