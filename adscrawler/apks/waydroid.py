@@ -239,17 +239,14 @@ def check_wayland_display() -> bool:
     xdg_dir = os.environ.get("XDG_RUNTIME_DIR")
     display_is_set = display is not None
     xdg_dir_is_set = xdg_dir is not None
+    msg = f"XDG_RUNTIME_DIR:{xdg_dir} WAYLAND_DISPLAY:{display}"
     if display_is_set and xdg_dir_is_set:
-        msg = f"Weston check OK: XDG_RUNTIME_DIR:{xdg_dir} WAYLAND_DISPLAY:{display}"
+        msg = f"Weston check OK: {msg}"
         logger.info(msg)
     else:
-        msg = f"Weston check NOK: XDG_RUNTIME_DIR:{xdg_dir} WAYLAND_DISPLAY:{display}"
+        msg = f"Weston check NOK: {msg}"
         logger.error(msg)
     return display_is_set and xdg_dir_is_set
-
-    msg = f"Weston check: XDG_RUNTIME_DIR:{xdg_dir} WAYLAND_DISPLAY:{display}"
-    logger.info(msg)
-    return
 
 
 def cleanup_xapk_splits(store_id: str) -> None:
@@ -269,6 +266,8 @@ def cleanup_xapk_splits(store_id: str) -> None:
 
 
 def remove_all_third_party_apps() -> None:
+    function_info = "Remove all third party apps"
+    logger.info(f"{function_info} start")
     third_party_apps = subprocess.run(
         ["sudo", "waydroid", "shell", "pm", "list", "packages", "-3"],
         text=True,
@@ -281,6 +280,8 @@ def remove_all_third_party_apps() -> None:
         if x not in THIRD_PARTY_APPS_TO_KEEP
     ]
     for app in apps_to_remove:
+        app = app.replace("package:", "")
+        logger.info(f"{function_info} removing {app}")
         subprocess.run(
             ["sudo", "waydroid", "shell", "pm", "uninstall", app],
             text=True,

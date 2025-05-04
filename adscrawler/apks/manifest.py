@@ -22,6 +22,8 @@ from adscrawler.queries import upsert_details_df
 
 logger = get_logger(__name__, "download_apk")
 
+FAILED_VERSION_STR = "-1"
+
 
 def check_dirs() -> None:
     """Create if not exists for apks directory."""
@@ -215,7 +217,7 @@ def process_manifest(
     store_id = row.store_id
     logger.info(f"{store_id=} start")
     details_df = row.to_frame().T
-    version_str = "-2"
+    version_str = FAILED_VERSION_STR
     extension = ""
     manifest_str = ""
     try:
@@ -239,14 +241,14 @@ def process_manifest(
         logger.exception(f"Unexpected error for {store_id=}: {str(e)}")
         crawl_result = 3  # Unexpected errors
     if crawl_result in [2, 3]:
-        error_count = 2
+        error_count = 20
     if crawl_result in [1, 4]:
         error_count = 0
     details_df["store_app"] = row.store_app
     if version_str:
         details_df["version_code"] = version_str
     else:
-        details_df["version_code"] = "-2"
+        details_df["version_code"] = FAILED_VERSION_STR
     try:
         upsert_details_df(
             details_df=details_df,
