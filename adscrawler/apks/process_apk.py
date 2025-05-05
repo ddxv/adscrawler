@@ -34,10 +34,10 @@ def process_apks(
     )
     logger.info(f"Start APK processing: {apps.shape=}")
     for _id, row in apps.iterrows():
-        if error_count > 0:
-            time.sleep(error_count * error_count * 10)
         if error_count > 5:
             continue
+        if error_count > 0:
+            time.sleep(error_count * error_count * 30)
         store_id = row.store_id
 
         try:
