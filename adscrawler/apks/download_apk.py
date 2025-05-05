@@ -77,6 +77,9 @@ def download(store_id: str, do_redownload: bool = False) -> str:
             logger.error(f"Error getting {source} download url for {store_id}: {e}")
             continue
 
+    if not download_url:
+        raise Exception(f"No download url found for {store_id}")
+
     r = requests.get(
         download_url,
         headers={
