@@ -241,7 +241,7 @@ def process_manifest(
         logger.exception(f"Unexpected error for {store_id=}: {str(e)}")
         crawl_result = 3  # Unexpected errors
     if crawl_result in [2, 3]:
-        error_count = 20
+        error_count = 6
     if crawl_result in [1, 4]:
         error_count = 0
     details_df["store_app"] = row.store_app
