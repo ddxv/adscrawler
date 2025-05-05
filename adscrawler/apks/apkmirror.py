@@ -37,10 +37,6 @@ def search(scraper: cloudscraper.CloudScraper, query: str) -> list[dict]:
     search_content = soup.find("div", {"id": "content"})
     app_row = search_content.find_all("div", {"id": "appRow"})
 
-    # if "No results found matching your query" in soup.text:
-    #     logger.info(f"No results found matching your query: {query}")
-    #     return []
-
     for app in app_row:
         try:
             app_dict = {
@@ -53,6 +49,15 @@ def search(scraper: cloudscraper.CloudScraper, query: str) -> list[dict]:
 
         except AttributeError:
             pass
+
+    if "No results found matching your query" in soup.text:
+        logger.info(f"No results found matching your query: {query}")
+        if len(apps) == 0:
+            raise Exception(f"No results found matching your query: {query}")
+        else:
+            logger.wwarning(
+                f"No results found matching your query: {query}, but appRows not empty! Check"
+            )
 
     return apps
 
@@ -115,6 +120,9 @@ def get_download_url(store_id: str) -> str:
     if len(results) > 0:
         app_details_link = results[0]["link"]
         logger.info(f"found app details link: {results[0]}")
+    if len(results) == 0:
+        logger.info(f"No results returned for {store_id}")
+        raise Exception(f"No results returned for {store_id}")
 
     app_download_link = get_app_details(scraper, app_details_link)
 
