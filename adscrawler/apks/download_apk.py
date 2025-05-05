@@ -11,11 +11,10 @@ import pathlib
 
 import requests
 
+from adscrawler.apks import apkmirror, apkpure
 from adscrawler.config import APK_PARTIALS_DIR, APKS_DIR, XAPKS_DIR, get_logger
 
 logger = get_logger(__name__, "download_apk")
-
-APKPURE_URL = "https://d.apkpure.net/b/XAPK/{store_id}?version=latest"
 
 
 def check_apk_dir_created() -> None:
@@ -27,11 +26,24 @@ def check_apk_dir_created() -> None:
             pathlib.Path.mkdir(_dir, exist_ok=True)
 
 
+def get_download_url(store_id: str) -> str:
+    """Get the download url for the apk."""
+    try:
+        return apkmirror.get_download_url(store_id)
+    except Exception as e:
+        logger.error(f"Error getting APKMIRROR download url for {store_id}: {e}")
+        try:
+            return apkpure.get_download_url(store_id)
+        except Exception as e:
+            logger.error(f"Error getting APKPURE download url for {store_id}: {e}")
+            raise e
+
+
 def download(store_id: str, do_redownload: bool = False) -> str:
     """Download the apk file.
 
     store_id: str the id of the android apk
-
+    do_redownload: bool if True, download the apk even if it already exists
     """
 
     logger.info(f"{store_id=} download start")
@@ -48,8 +60,10 @@ def download(store_id: str, do_redownload: bool = False) -> str:
             logger.info(f"xapk already exists {xapk_filepath=}, skipping")
             return xapk_filepath.suffix
 
+    download_url = get_download_url(store_id)
+
     r = requests.get(
-        APKPURE_URL.format(store_id=store_id),
+        download_url,
         headers={
             "User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:133.0) Gecko/20100101 Firefox/133.0",
         },
