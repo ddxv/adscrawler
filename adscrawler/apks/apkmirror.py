@@ -1,3 +1,8 @@
+"""Inspiration from:
+https://github.com/devlocalhost/ampy
+
+"""
+
 import time
 from urllib.parse import quote_plus
 
