@@ -29,11 +29,15 @@ def check_apk_dir_created() -> None:
 def get_download_url(store_id: str) -> str:
     """Get the download url for the apk."""
     try:
-        return apkmirror.get_download_url(store_id)
+        download_url = apkmirror.get_download_url(store_id)
+        logger.info("download apk from apkmirror")
+        return download_url
     except Exception as e:
         logger.error(f"Error getting APKMIRROR download url for {store_id}: {e}")
         try:
-            return apkpure.get_download_url(store_id)
+            download_url = apkpure.get_download_url(store_id)
+            logger.info("download apk from apkpure")
+            return download_url
         except Exception as e:
             logger.error(f"Error getting APKPURE download url for {store_id}: {e}")
             raise e

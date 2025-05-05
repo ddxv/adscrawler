@@ -100,7 +100,7 @@ def get_direct_download_link(
     return APKMIRROR_BASE_URL + str(data)
 
 
-def get_apkmirror_download_url(store_id: str) -> str:
+def get_download_url(store_id: str) -> str:
     scraper = cloudscraper.create_scraper()
 
     results = search(scraper, store_id)

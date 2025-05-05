@@ -240,10 +240,10 @@ def process_manifest(
     except Exception as e:
         logger.exception(f"Unexpected error for {store_id=}: {str(e)}")
         crawl_result = 3  # Unexpected errors
-    if crawl_result in [2, 3]:
+    if crawl_result in [2]:
         error_count = 6
-    if crawl_result in [1, 4]:
-        error_count = 0
+    if crawl_result in [1, 4, 3]:
+        error_count = 1
     details_df["store_app"] = row.store_app
     if version_str:
         details_df["version_code"] = version_str
