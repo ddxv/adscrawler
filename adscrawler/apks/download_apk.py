@@ -15,7 +15,7 @@ from adscrawler.config import APK_PARTIALS_DIR, APKS_DIR, XAPKS_DIR, get_logger
 
 logger = get_logger(__name__, "download_apk")
 
-URL = "https://d.apkpure.net/b/XAPK/{store_id}?version=latest"
+APKPURE_URL = "https://d.apkpure.net/b/XAPK/{store_id}?version=latest"
 
 
 def check_apk_dir_created() -> None:
@@ -49,7 +49,7 @@ def download(store_id: str, do_redownload: bool = False) -> str:
             return xapk_filepath.suffix
 
     r = requests.get(
-        URL.format(store_id=store_id),
+        APKPURE_URL.format(store_id=store_id),
         headers={
             "User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:133.0) Gecko/20100101 Firefox/133.0",
         },
