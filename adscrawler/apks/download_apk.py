@@ -69,6 +69,7 @@ def download(store_id: str, do_redownload: bool = False) -> str:
             logger.info(f"xapk already exists {xapk_filepath=}, skipping")
             return xapk_filepath.suffix
 
+    download_url = None
     for source in APK_SOURCES:
         try:
             download_url = get_download_url(store_id, source)
