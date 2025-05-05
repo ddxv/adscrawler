@@ -34,7 +34,7 @@ def search(scraper: cloudscraper.CloudScraper, query: str) -> list[dict]:
 
     soup = BeautifulSoup(resp.text, "html.parser")
     apps = []
-    search_content = soup.find_all("div", {"id": "content"})
+    search_content = soup.find("div", {"id": "content"})
     app_row = search_content.find_all("div", {"id": "appRow"})
 
     # if "No results found matching your query" in soup.text:
