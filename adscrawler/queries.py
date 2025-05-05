@@ -688,18 +688,22 @@ def get_top_ranks_for_unpacking(
                 sa.name,
                 sa.installs,
                 sa.rating_count,
-                lvs.crawl_result AS last_crawl_result,
-                lvs.updated_at
+                lsvc.crawl_result AS last_crawl_result,
+                lsvc.updated_at
             FROM
                 user_requested_scan urs
             LEFT JOIN store_apps sa ON
                 urs.store_id = sa.store_id
-            LEFT JOIN latest_success_version_codes lvs ON
-                sa.id = lvs.store_app
+            LEFT JOIN latest_success_version_codes lsvc ON
+                sa.id = lsvc.store_app
+            LEFT JOIN latest_version_codes lvc ON
+                sa.id = lvc.store_app
             WHERE
-                (lvs.updated_at < urs.created_at
-                    OR lvs.updated_at IS NULL
+                (lsvc.updated_at < urs.created_at
+                    OR lsvc.updated_at IS NULL
                 )
+                AND (lvc.updated_at < current_date - INTERVAL '1 days'
+                    OR lvc.updated_at IS NULL)
                 AND sa.store = {store}
             )
         SELECT
