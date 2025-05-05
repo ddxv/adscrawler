@@ -111,4 +111,6 @@ def get_download_url(store_id: str) -> str:
 
     direct_download_link = get_direct_download_link(scraper, app_download_link)
 
+    time.sleep(SLEEP_PAUSES)
+
     return direct_download_link
