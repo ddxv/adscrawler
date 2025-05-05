@@ -14,6 +14,8 @@ import requests
 from adscrawler.apks import apkmirror, apkpure
 from adscrawler.config import APK_PARTIALS_DIR, APKS_DIR, XAPKS_DIR, get_logger
 
+APK_SOURCES = ["apkmirror", "apkpure"]
+
 logger = get_logger(__name__, "download_apk")
 
 
@@ -26,14 +28,17 @@ def check_apk_dir_created() -> None:
             pathlib.Path.mkdir(_dir, exist_ok=True)
 
 
-def get_download_url(store_id: str) -> str:
+def get_download_url(store_id: str, source: str) -> str:
     """Get the download url for the apk."""
-    try:
-        download_url = apkmirror.get_download_url(store_id)
-        logger.info("download apk from apkmirror")
-        return download_url
-    except Exception as e:
-        logger.error(f"Error getting APKMIRROR download url for {store_id}: {e}")
+    if source == "apkmirror":
+        try:
+            download_url = apkmirror.get_download_url(store_id)
+            logger.info("download apk from apkmirror")
+            return download_url
+        except Exception as e:
+            logger.error(f"Error getting APKMIRROR download url for {store_id}: {e}")
+            raise e
+    elif source == "apkpure":
         try:
             download_url = apkpure.get_download_url(store_id)
             logger.info("download apk from apkpure")
@@ -64,7 +69,13 @@ def download(store_id: str, do_redownload: bool = False) -> str:
             logger.info(f"xapk already exists {xapk_filepath=}, skipping")
             return xapk_filepath.suffix
 
-    download_url = get_download_url(store_id)
+    for source in APK_SOURCES:
+        try:
+            download_url = get_download_url(store_id, source)
+            break
+        except Exception as e:
+            logger.error(f"Error getting {source} download url for {store_id}: {e}")
+            continue
 
     r = requests.get(
         download_url,
