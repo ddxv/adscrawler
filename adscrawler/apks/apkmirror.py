@@ -27,11 +27,19 @@ def search(scraper: cloudscraper.CloudScraper, query: str) -> list[dict]:
     search_url = APKMIRROR_BASE_SEARCH + quote_plus(query)
     resp = scraper.get(search_url, headers=USER_AGENT)
 
-    logger.info(f"[search] Status: {resp.status_code}")
+    logger.info(f"APKMIRROR search Status: {resp.status_code}")
+    if resp.status_code != 200:
+        logger.error(f"APKMIRROR search Status: {resp.status_code}")
+        raise Exception(f"APKMIRROR search Status: {resp.status_code}")
 
     soup = BeautifulSoup(resp.text, "html.parser")
     apps = []
-    app_row = soup.find_all("div", {"class": "appRow"})
+    search_content = soup.find_all("div", {"id": "content"})
+    app_row = search_content.find_all("div", {"id": "appRow"})
+
+    # if "No results found matching your query" in soup.text:
+    #     logger.info(f"No results found matching your query: {query}")
+    #     return []
 
     for app in app_row:
         try:
@@ -106,6 +114,7 @@ def get_download_url(store_id: str) -> str:
     results = search(scraper, store_id)
     if len(results) > 0:
         app_details_link = results[0]["link"]
+        logger.info(f"found app details link: {results[0]}")
 
     app_download_link = get_app_details(scraper, app_details_link)
 
