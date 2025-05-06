@@ -78,12 +78,18 @@ def get_logger(mod_name: str, sep_file: str | None = "main") -> logging.Logger:
     # Set level
     logger.setLevel(logging.INFO)
 
-    # Add file handler for individual log file
-    indiv_handler = RotatingFileHandler(
-        filename=os.path.join(LOG_DIR, f"{sep_file}.log"),
-        maxBytes=50 * 1024 * 1024,
-        backupCount=10,
-    )
+    log_filename = os.path.join(LOG_DIR, f"{sep_file}.log")
+    # Check if a handler for this file already exists
+    if not any(
+        isinstance(h, RotatingFileHandler) and h.baseFilename == log_filename
+        for h in logger.handlers
+    ):
+        # Add file handler for individual log file
+        indiv_handler = RotatingFileHandler(
+            filename=os.path.join(LOG_DIR, f"{sep_file}.log"),
+            maxBytes=50 * 1024 * 1024,
+            backupCount=10,
+        )
     indiv_handler.setFormatter(FORMATTER)
     logger.addHandler(indiv_handler)
 
