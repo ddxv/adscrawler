@@ -122,4 +122,5 @@ IGNORE_URLS = [
     "https://android.apis.google.com/c2dm/register3",
     "http://connectivitycheck.gstatic.com/generate_204",
     "https://www.google.com/generate_204",
+    "https://ota.waydro.id/system/lineage/waydroid_x86_64/GAPPS.json",
 ]
