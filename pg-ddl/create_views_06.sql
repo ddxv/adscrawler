@@ -42,7 +42,6 @@ CREATE INDEX idx_developer_store_apps_developer_domain
 ON developer_store_apps (developer_id, domain_id);
 
 
-
 -- public.store_app_z_scores source
 
 CREATE MATERIALIZED VIEW public.store_app_z_scores
@@ -206,7 +205,6 @@ SELECT
 FROM aggregated_metrics AS am
 INNER JOIN baseline_period AS bp ON am.store_app = bp.store_app
 WITH DATA;
-
 
 
 -- frontend.store_apps_z_scores source

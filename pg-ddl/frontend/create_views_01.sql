@@ -18,7 +18,6 @@ CREATE INDEX company_value_string_mapping_idx ON adtech.company_value_string_map
 );
 
 
-
 -- frontend.companies_apps_version_details source REMAKING AS frontend.store_apps_version_details
 CREATE MATERIALIZED VIEW frontend.store_apps_version_details
 TABLESPACE pg_default
@@ -90,7 +89,6 @@ CREATE UNIQUE INDEX store_apps_version_details_unique_idx ON frontend.store_apps
 );
 
 
-
 DROP MATERIALIZED VIEW frontend.companies_version_details_count;
 
 -- frontend.companies_version_details_count source
@@ -114,7 +112,6 @@ WITH DATA;
 CREATE UNIQUE INDEX companies_apps_version_details_count_unique_idx ON frontend.companies_version_details_count USING btree (
     store, company_name, company_domain, xml_path, value_name
 );
-
 
 
 CREATE MATERIALIZED VIEW frontend.companies_apps_overview
@@ -231,8 +228,6 @@ CREATE INDEX store_apps_overview_idx ON frontend.store_apps_overview USING btree
 CREATE UNIQUE INDEX store_apps_overview_unique_idx ON frontend.store_apps_overview USING btree (
     store, store_id
 );
-
-
 
 
 -- frontend.company_parent_top_apps source
@@ -358,8 +353,6 @@ CREATE UNIQUE INDEX idx_total_categories_app_counts ON frontend.total_categories
 );
 
 
-
-
 CREATE MATERIALIZED VIEW frontend.company_top_apps
 TABLESPACE pg_default
 AS WITH d30_counts AS (
@@ -467,7 +460,6 @@ CREATE UNIQUE INDEX idx_unique_company_top_apps ON frontend.company_top_apps USI
 );
 
 
-
 CREATE MATERIALIZED VIEW frontend.app_rankings_latest_by_week
 TABLESPACE pg_default
 AS WITH RECURSIVE latest_date AS (
@@ -543,13 +535,10 @@ CREATE UNIQUE INDEX idx_unique_app_ranking_latest_by_week ON frontend.app_rankin
 );
 
 
-
 CREATE INDEX idx_app_rankings_latest_by_week_query ON
 frontend.app_rankings_latest_by_week USING btree (
     store, store_collection, country, crawled_date
 );
-
-
 
 
 CREATE MATERIALIZED VIEW frontend.category_tag_stats
@@ -597,7 +586,6 @@ WITH DATA;
 CREATE UNIQUE INDEX idx_category_tag_stats ON frontend.category_tag_stats USING btree (
     store, app_category, tag_source
 );
-
 
 
 DROP MATERIALIZED VIEW IF EXISTS frontend.companies_sdks_overview;
@@ -740,7 +728,6 @@ USING btree (
 );
 
 
-
 CREATE MATERIALIZED VIEW frontend.adstxt_entries_store_apps
 TABLESPACE pg_default
 AS WITH parent_companies AS (
@@ -783,7 +770,6 @@ CREATE INDEX adstxt_entries_store_apps_idx ON frontend.adstxt_entries_store_apps
 CREATE UNIQUE INDEX adstxt_entries_store_apps_unique_idx ON frontend.adstxt_entries_store_apps USING btree (
     ad_domain_url, publisher_id, relationship, store_app
 );
-
 
 
 -- frontend.adstxt_publishers_overview source
@@ -842,7 +828,6 @@ CREATE UNIQUE INDEX adstxt_publishers_overview_ad_domain_unique_idx ON frontend.
 );
 
 
-
 -- public.adstxt_ad_domain_overview source
 
 CREATE MATERIALIZED VIEW frontend.adstxt_ad_domain_overview
@@ -879,7 +864,6 @@ USING btree (
 );
 
 
-
 CREATE MATERIALIZED VIEW frontend.store_apps_rankings
 TABLESPACE pg_default
 AS SELECT
@@ -901,8 +885,6 @@ CREATE UNIQUE INDEX idx_store_apps_rankings_unique ON frontend.store_apps_rankin
 CREATE INDEX idx_store_apps_rankings_store_app_date ON frontend.store_apps_rankings (
     store_app, crawled_date
 );
-
-
 
 
 CREATE MATERIALIZED VIEW frontend.companies_category_stats
@@ -956,7 +938,6 @@ CREATE UNIQUE INDEX companies_category_stats_idx ON frontend.companies_category_
 CREATE INDEX companies_category_stats_query_idx ON frontend.companies_category_stats USING btree (
     company_domain
 );
-
 
 
 CREATE MATERIALIZED VIEW frontend.companies_category_tag_stats
@@ -1019,8 +1000,6 @@ CREATE UNIQUE INDEX companies_category_tag_stats_idx ON frontend.companies_categ
 );
 
 
-
-
 CREATE MATERIALIZED VIEW frontend.companies_category_tag_type_stats
 TABLESPACE pg_default
 AS WITH d30_counts AS (
@@ -1079,8 +1058,6 @@ CREATE UNIQUE INDEX companies_category_tag_type_stats_idx ON frontend.companies_
 CREATE INDEX companies_category_tag_type_stats_query_idx ON frontend.companies_category_tag_type_stats USING btree (
     type_url_slug, app_category
 );
-
-
 
 
 CREATE MATERIALIZED VIEW frontend.companies_parent_category_stats
@@ -1146,7 +1123,6 @@ CREATE UNIQUE INDEX companies_parent_category_stats_idx ON frontend.companies_pa
 CREATE INDEX companies_parent_category_stats_query_idx ON frontend.companies_parent_category_stats USING btree (
     company_domain
 );
-
 
 
 CREATE MATERIALIZED VIEW frontend.companies_parent_category_tag_stats
@@ -1219,7 +1195,6 @@ CREATE UNIQUE INDEX companies_parent_category_tag_stats_idx ON frontend.companie
 CREATE INDEX companies_parent_category_tag_stats_query_idx ON frontend.companies_parent_category_tag_stats USING btree (
     company_domain
 );
-
 
 
 CREATE MATERIALIZED VIEW frontend.keyword_scores AS

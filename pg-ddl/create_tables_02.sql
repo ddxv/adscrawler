@@ -128,16 +128,11 @@ CREATE INDEX store_apps_developer_idx ON public.store_apps USING btree (
 );
 
 
-
-
 -- Table Triggers
 CREATE TRIGGER developers_updated_at BEFORE
 UPDATE
 ON
 public.developers FOR EACH ROW EXECUTE FUNCTION update_modified_column();
-
-
-
 
 
 -- public.store_apps_country_history definition
@@ -171,7 +166,6 @@ CREATE INDEX store_apps_country_history_store_app_idx ON public.store_apps_count
 );
 
 
-
 CREATE TABLE logging.developers_crawled_at (
     developer int4 NOT NULL,
     apps_crawled_at timestamp NULL,
@@ -194,8 +188,6 @@ CREATE TABLE logging.store_app_sources (
         store_app
     ) REFERENCES public.store_apps (id) ON DELETE CASCADE
 );
-
-
 
 
 -- Table Triggers

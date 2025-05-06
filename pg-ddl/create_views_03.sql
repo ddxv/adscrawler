@@ -121,7 +121,6 @@ CREATE UNIQUE INDEX idx_apps_new_yearly
 ON apps_new_yearly (store, mapped_category, store_id);
 
 
-
 --DROP MATERIALIZED VIEW top_categories;
 CREATE MATERIALIZED VIEW top_categories AS
 WITH rankedapps AS (

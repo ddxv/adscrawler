@@ -16,7 +16,6 @@ INSERT INTO store_collections (store, collection) VALUES
 (2, 'NEW_FREE_IOS');
 
 
-
 -- Insert for Store: 1
 INSERT INTO store_categories (store, category) VALUES
 (1, 'APPLICATION'),

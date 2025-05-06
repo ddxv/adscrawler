@@ -112,8 +112,6 @@ WHERE
 WITH DATA;
 
 
-
-
 -- Used for the crawler when checking which apps to download
 -- This is called very often, hence the need for an MV
 CREATE MATERIALIZED VIEW public.store_apps_in_latest_rankings

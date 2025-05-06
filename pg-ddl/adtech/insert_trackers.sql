@@ -139,7 +139,6 @@ INSERT INTO adtech.companies (id, name, parent_company_id) VALUES
 (134, 'Localytics', NULL);
 
 
-
 INSERT INTO adtech.company_categories (company_id, category_id) VALUES
 (1, 1),
 (2, 1),
@@ -267,8 +266,6 @@ INSERT INTO adtech.company_categories (company_id, category_id) VALUES
 (132, 1),
 (133, 2),
 (134, 2);
-
-
 
 
 INSERT INTO adtech.sdk_packages (company_id, package_pattern) VALUES
