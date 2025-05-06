@@ -79,7 +79,9 @@ def download(store_id: str, do_redownload: bool = False) -> str:
             continue
 
     if not download_url:
-        raise Exception(f"No download url found for {store_id}")
+        raise requests.exceptions.HTTPError(
+            f"No download url found for {store_id} from any source."
+        )
 
     r = requests.get(
         download_url,

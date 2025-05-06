@@ -762,3 +762,22 @@ def query_store_app_by_store_id(
         raise ValueError(f"Store id {store_id} not found")
     else:
         return df.iloc[0]["id"]
+
+
+def get_local_stored_apks(database_connection: PostgresCon) -> pd.DataFrame:
+    sel_query = """SELECT * FROM local_apks;"""
+    df = pd.read_sql(sel_query, con=database_connection.engine)
+    return df
+
+
+def get_version_codes_full_history(
+    database_connection: PostgresCon, store_ids: list[str]
+) -> pd.DataFrame:
+    sel_query = """SELECT vc.*, sa.store_id, sa.name as app_name FROM version_codes vc
+    LEFT JOIN store_apps sa ON
+        sa.id = vc.store_app
+    WHERE sa.store_id IN ({})""".format(
+        ", ".join([f"'{store_id}'" for store_id in store_ids])
+    )
+    df = pd.read_sql(sel_query, con=database_connection.engine)
+    return df
