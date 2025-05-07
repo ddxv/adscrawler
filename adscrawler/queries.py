@@ -785,7 +785,7 @@ def get_version_codes_full_history(
 
 def get_version_code(
     store_app: int, version_code: str, database_connection: PostgresCon
-) -> str:
+) -> str | None:
     sel_query = f"""SELECT * FROM version_codes WHERE store_app = {store_app} AND version_code = '{version_code}'"""
     df = pd.read_sql(sel_query, con=database_connection.engine)
     if df.empty:

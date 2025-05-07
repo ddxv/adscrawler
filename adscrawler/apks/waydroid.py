@@ -373,6 +373,7 @@ def get_installed_version_code(
     match = re.search(r"versionCode=(\d+)", version_info)
     if match:
         version_code = match.group(1)
+        logger.info(f"found versionCode: {version_code}")
         version_code_id = get_version_code(store_app, version_code, database_connection)
         return version_code_id
     else:
