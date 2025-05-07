@@ -138,11 +138,12 @@ def process_apks_for_waydroid(
         f"Waydroid has {store_id_map.shape[0]} apps to process, starting {num_apps}"
     )
     store_id_map = store_id_map.head(num_apps)
+    extension = "apk"
     for _, row in store_id_map.iterrows():
         store_id = row.store_id
         waydroid.process_app_for_waydroid(
             database_connection=database_connection,
-            extension="apk",
+            extension=extension,
             store_id=store_id,
             store_app=row.store_app,
         )

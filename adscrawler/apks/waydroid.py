@@ -1,6 +1,7 @@
 import datetime
 import os
 import pathlib
+import re
 import subprocess
 import time
 
@@ -19,7 +20,11 @@ from adscrawler.config import (
     get_logger,
 )
 from adscrawler.connection import PostgresCon
-from adscrawler.queries import query_store_app_by_store_id, upsert_df
+from adscrawler.queries import (
+    get_version_code,
+    query_store_app_by_store_id,
+    upsert_df,
+)
 
 logger = get_logger(__name__)
 
@@ -82,9 +87,16 @@ def run_app(
     os.system(f"{mitm_script.as_posix()} -d")
 
     try:
-        launch_and_track_app(store_id, apk_path, timeout=timeout)
+        launch_and_track_app(
+            store_id,
+            apk_path,
+            timeout=timeout,
+        )
+        version_code_id = get_installed_version_code(
+            store_id, store_app, database_connection
+        )
         try:
-            process_mitm_log(store_id, database_connection, store_app)
+            process_mitm_log(store_id, database_connection, store_app, version_code_id)
             crawl_result = 1
         except Exception as e:
             crawl_result = 3
@@ -97,7 +109,10 @@ def run_app(
 
 
 def process_mitm_log(
-    store_id: str, database_connection: PostgresCon, store_app: int
+    store_id: str,
+    database_connection: PostgresCon,
+    store_app: int,
+    version_code_id: int,
 ) -> None:
     function_info = f"MITM {store_id=}"
     mdf = mitm_process_log.parse_mitm_log(store_id)
@@ -111,6 +126,7 @@ def process_mitm_log(
             ["url", "host", "crawled_at", "status_code", "tld_url"]
         ].drop_duplicates()
         mdf["store_app"] = store_app
+        mdf["version_code"] = version_code_id
         mdf.to_sql(
             name="store_app_api_calls",
             con=database_connection.engine,
@@ -341,8 +357,32 @@ def prep_xapk_splits(store_id: str, xapk_path: pathlib.Path) -> str:
     return split_install_command
 
 
+def get_installed_version_code(
+    store_id: str, store_app: int, database_connection: PostgresCon
+) -> str:
+    package_info = subprocess.run(
+        ["sudo", "waydroid", "shell", "dumpsys", "package", store_id],
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=20,
+    )
+
+    version_info = package_info.stdout
+
+    match = re.search(r"versionCode=(\d+)", version_info)
+    if match:
+        version_code = match.group(1)
+        version_code_id = get_version_code(store_app, version_code, database_connection)
+        return version_code_id
+    else:
+        raise Exception(f"Failed to get version code for {store_id}")
+
+
 def launch_and_track_app(
-    store_id: str, apk_path: pathlib.Path, timeout: int = 60
+    store_id: str,
+    apk_path: pathlib.Path,
+    timeout: int = 60,
 ) -> None:
     function_info = f"waydroid {store_id=} launch and track"
     mitm_script = pathlib.Path(PACKAGE_DIR, "adscrawler/apks/mitm_start.sh")
@@ -507,6 +547,7 @@ def install_app(store_id: str, apk_path: pathlib.Path) -> None:
 
     if store_id in applist.stdout:
         logger.info(f"{function_info} installed")
+
         return
 
     raise Exception(
