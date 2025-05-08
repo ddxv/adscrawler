@@ -123,6 +123,7 @@ def manage_download(database_connection: PostgresCon, row: pd.Series) -> int:
     logger.info(f"{store_id=} start")
     version_str = FAILED_VERSION_STR
     md5_hash = None
+    download_in_incoming = False
     try:
         file_path = get_existing_apk_path(store_id)
         if file_path:
@@ -131,6 +132,7 @@ def manage_download(database_connection: PostgresCon, row: pd.Series) -> int:
                     f"{store_id=} already exists in incoming dir, skipping download"
                 )
                 extension = file_path.suffix
+                download_in_incoming = True
             else:
                 logger.info(
                     f"{store_id=} already exists in main dir, skipping download"
@@ -140,6 +142,7 @@ def manage_download(database_connection: PostgresCon, row: pd.Series) -> int:
                     return 0
         else:
             extension = download(store_id)
+            download_in_incoming = True
         if extension == ".apk":
             file_path = pathlib.Path(APKS_INCOMING_DIR, f"{store_id}{extension}")
         elif extension == ".xapk":
@@ -183,8 +186,9 @@ def manage_download(database_connection: PostgresCon, row: pd.Series) -> int:
         return_rows=False,
         apk_hash=md5_hash,
     )
-    # Move files from incoming to main dir
-    move_files_to_main_dir(store_id, extension)
+    if crawl_result in [1, 3] and download_in_incoming:
+        # Move files from incoming to main dir
+        move_files_to_main_dir(store_id, extension)
     return error_count
 
 
