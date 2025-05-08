@@ -234,8 +234,18 @@ def get_existing_apk_path(store_id: str) -> pathlib.Path | None:
     return None
 
 
+def empty_folder(pth: pathlib.Path) -> None:
+    for sub in pth.iterdir():
+        if sub.is_dir() and not sub.is_symlink():
+            empty_folder(sub)
+            os.rmdir(sub)
+        else:
+            sub.unlink()
+
+
 def remove_partial_apks(store_id: str) -> None:
     partials_dir = pathlib.Path(APK_TMP_PARTIALS_DIR, store_id)
     if partials_dir.exists():
+        empty_folder(partials_dir)
         os.rmdir(partials_dir)
         logger.info(f"{store_id=} deleted partial apk {partials_dir.as_posix()}")
