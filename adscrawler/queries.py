@@ -967,7 +967,7 @@ def get_version_code_by_md5_hash(
     sel_query = f"""SELECT * FROM version_codes vc
     LEFT JOIN store_apps sa ON
         sa.id = vc.store_app
-    WHERE md5_hash = '{md5_hash}' AND sa.store_id = '{store_id}'
+    WHERE apk_hash = '{md5_hash}' AND sa.store_id = '{store_id}'
     AND vc.crawl_result = 1
     ;
     """
