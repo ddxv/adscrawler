@@ -147,6 +147,37 @@ def query_developers(
     return df
 
 
+def insert_version_code(
+    version_code: str,
+    store_app: int,
+    crawl_result: int,
+    database_connection: PostgresCon,
+    return_rows: bool = False,
+) -> pd.DataFrame | None:
+    version_code_df = pd.DataFrame(
+        {
+            "store_app": store_app,
+            "version_code": version_code,
+            "crawl_result": crawl_result,
+        }
+    )
+    logger.info(f"{store_app=} {version_code=} insert version_code to db")
+    upserted: pd.DataFrame = upsert_df(
+        df=version_code_df,
+        table_name="version_codes",
+        database_connection=database_connection,
+        key_columns=["store_app", "version_code"],
+        return_rows=return_rows,
+        insert_columns=["store_app", "version_code", "crawl_result"],
+    )
+
+    if return_rows:
+        upserted = upserted.rename(
+            columns={"version_code": "original_version_code", "id": "version_code"}
+        ).drop("store_app", axis=1)
+    return upserted
+
+
 def upsert_details_df(
     details_df: pd.DataFrame,
     crawl_result: int,
@@ -783,7 +814,7 @@ def get_version_codes_full_history(
     return df
 
 
-def get_version_code(
+def get_version_code_dbid(
     store_app: int, version_code: str, database_connection: PostgresCon
 ) -> str | None:
     sel_query = f"""SELECT * FROM version_codes WHERE store_app = {store_app} AND version_code = '{version_code}'"""
@@ -792,3 +823,17 @@ def get_version_code(
         return None
     else:
         return df.iloc[0]["id"]
+
+
+def get_version_code_by_md5_hash(
+    database_connection: PostgresCon, md5_hash: str, store_id: str
+) -> str | None:
+    sel_query = f"""SELECT * FROM version_codes 
+    LEFT JOIN store_apps sa ON
+        sa.id = vc.store_app
+    WHERE md5_hash = '{md5_hash}' AND sa.store_id = '{store_id}'
+    AND vc.crawl_result = 1
+    ;
+    """
+    df = pd.read_sql(sel_query, con=database_connection.engine)
+    return df.iloc[0]["id"]

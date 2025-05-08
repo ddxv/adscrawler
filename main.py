@@ -62,8 +62,8 @@ class ProcessManager:
         )
         parser.add_argument(
             "-m",
-            "--manifests",
-            help="Scrape the iTunes and Play Store front pages to find new apps",
+            "--apk-download",
+            help="Download apk files",
             action="store_true",
         )
         parser.add_argument(
@@ -152,7 +152,7 @@ class ProcessManager:
         processes = self.get_running_processes()
         my_processes = self.filter_processes(processes, "/adscrawler/main.py")
         apk_download_processes = [
-            x for x in my_processes if any([" -m" in x, " --manifests" in x])
+            x for x in my_processes if any([" -m" in x, " --apk-download" in x])
         ]
         if self.args.platforms:
             apk_download_processes = [
@@ -209,7 +209,7 @@ class ProcessManager:
     def is_script_already_running(self) -> bool:
         if self.args.update_app_store_details:
             return self.check_app_update_processes()
-        elif self.args.manifests:
+        elif self.args.apk_download:
             return self.check_apk_download_processes()
         elif self.args.waydroid:
             return self.check_waydroid_processes()
@@ -245,8 +245,8 @@ class ProcessManager:
         if self.args.app_ads_txt_scrape:
             self.crawl_app_ads()
 
-        if self.args.manifests:
-            self.scrape_manifests(stores)
+        if self.args.apk_download:
+            self.download_apks(stores)
 
         if self.args.waydroid:
             self.waydroid_mitm()
@@ -284,7 +284,7 @@ class ProcessManager:
         limit: int | None = None if self.args.no_limits else 5000
         crawl_app_ads(self.pgcon, limit=limit)
 
-    def scrape_manifests(self, stores: list[int]) -> None:
+    def download_apks(self, stores: list[int]) -> None:
         if 2 in stores:
             try:
                 plist_main(database_connection=self.pgcon, number_of_apps_to_pull=20)
@@ -294,7 +294,7 @@ class ProcessManager:
             try:
                 process_apks(database_connection=self.pgcon, number_of_apps_to_pull=20)
             except Exception:
-                logger.exception("Android scrape manifests failing")
+                logger.exception("Android download apks failing")
 
     def waydroid_mitm(self) -> None:
         if self.args.store_id:

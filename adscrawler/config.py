@@ -17,15 +17,35 @@ PACKAGE_DIR = pathlib.Path(__file__).resolve().parent.parent
 
 # APK File dirs
 APKS_FILES_DIR = pathlib.Path(HOME, "apk-files")
+
+
+# Incoming for downloading/downloaded but not yet processed
+APKS_INCOMING_DIR = pathlib.Path(APKS_FILES_DIR, "incoming/apks")
+XAPKS_INCOMING_DIR = pathlib.Path(APKS_FILES_DIR, "incoming/xapks")
+
+# Downloaded but likely failed during unzip/processing
+APKS_ISSUES_INCOMING_DIR = pathlib.Path(APKS_FILES_DIR, "incoming/failed/apks")
+XAPKS_ISSUES_INCOMING_DIR = pathlib.Path(APKS_FILES_DIR, "incoming/failed/xapks")
+
+# Processed and ready for use
 APKS_DIR = pathlib.Path(APKS_FILES_DIR, "apks")
 XAPKS_DIR = pathlib.Path(APKS_FILES_DIR, "xapks")
+
+# Failed to unzip, often due to unzip tool. I think failed during download?
 XAPKS_ISSUES_DIR = pathlib.Path(APKS_FILES_DIR, "xapks-issues")
-XAPKS_TMP_UNZIP_DIR = pathlib.Path("/tmp/unzippedxapks")
-APK_PARTIALS_DIR = pathlib.Path(APKS_FILES_DIR, "apk-partials")
-APK_UNZIPPED_DIR = pathlib.Path("/tmp/unzippedapks")
+
+# The TMP partials dir has the base APK from an unzipped xapk.
+# Careful, as the files look like APKs but are not installable on their own.
+APK_TMP_PARTIALS_DIR = pathlib.Path("/tmp/adscrawler/apk-partials")
+APK_TMP_UNZIPPED_DIR = pathlib.Path("/tmp/adscrawler/apks-unzipped")
+XAPKS_TMP_UNZIP_DIR = pathlib.Path("/tmp/adscrawler/xapks-unzipped")
+
+# Location of the Android SDK
 ANDROID_SDK = pathlib.Path(HOME, "Android/Sdk/build-tools/35.0.0")
+
 # Putting files in WAYDROID_MEDIA_DIR will put them in the internal emulated directory
 WAYDROID_MEDIA_DIR = pathlib.Path(HOME, ".local/share/waydroid/data/media")
+
 # This is not a directory on your filesystem, but the internal emulated directory
 WAYDROID_INTERNAL_EMULATED_DIR = pathlib.Path("/data/media/")
 
@@ -44,10 +64,15 @@ def check_dirs() -> None:
         CONFIG_DIR,
         LOG_DIR,
         APKS_FILES_DIR,
-        APK_PARTIALS_DIR,
-        APK_UNZIPPED_DIR,
+        APK_TMP_PARTIALS_DIR,
+        APK_TMP_UNZIPPED_DIR,
+        XAPKS_TMP_UNZIP_DIR,
         XAPKS_DIR,
         XAPKS_ISSUES_DIR,
+        APKS_INCOMING_DIR,
+        XAPKS_INCOMING_DIR,
+        APKS_ISSUES_INCOMING_DIR,
+        XAPKS_ISSUES_INCOMING_DIR,
     ]
     for _dir in dirs:
         if not pathlib.Path.exists(_dir):

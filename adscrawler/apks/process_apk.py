@@ -3,11 +3,8 @@ import shutil
 import subprocess
 import time
 
-import pandas as pd
-
 from adscrawler.apks import manifest, waydroid
 from adscrawler.config import (
-    APK_PARTIALS_DIR,
     APKS_DIR,
     XAPKS_DIR,
     XAPKS_ISSUES_DIR,
@@ -48,8 +45,8 @@ def process_apks(
         except Exception:
             logger.exception(f"Manifest for {store_id} failed")
 
-        remove_partial_apks(store_id=store_id)
-    check_local_apks(database_connection=database_connection)
+        # remove_partial_apks(store_id=store_id)
+    # check_local_apks(database_connection=database_connection)
 
 
 def get_downloaded_apks() -> list[str]:
@@ -114,18 +111,6 @@ def process_xapks_for_waydroid(
     waydroid.remove_all_third_party_apps()
 
 
-def check_local_apks(database_connection: PostgresCon) -> None:
-    downloaded_apks = get_downloaded_apks()
-    downloaded_xapks = get_downloaded_xapks()
-    files = [{"file_type": "apk", "package_name": apk} for apk in downloaded_apks] + [
-        {"file_type": "xapk", "package_name": xapk} for xapk in downloaded_xapks
-    ]
-    df = pd.DataFrame(files)
-    df.to_sql(
-        "local_apks", con=database_connection.engine, if_exists="replace", index=False
-    )
-
-
 def process_apks_for_waydroid(
     database_connection: PostgresCon, num_apps: int = 10
 ) -> None:
@@ -148,17 +133,6 @@ def process_apks_for_waydroid(
             store_app=row.store_app,
         )
     waydroid.remove_all_third_party_apps()
-
-
-def remove_partial_apks(store_id: str) -> None:
-    apk_path = pathlib.Path(APK_PARTIALS_DIR, f"{store_id}.apk")
-    if apk_path.exists():
-        apk_path.unlink(missing_ok=True)
-        logger.info(f"{store_id=} deleted partial apk {apk_path.as_posix()}")
-    xapk_path = pathlib.Path(APK_PARTIALS_DIR, f"{store_id}.xapk")
-    if xapk_path.exists():
-        xapk_path.unlink(missing_ok=True)
-        logger.info(f"{store_id=} deleted partial xapk {xapk_path.as_posix()}")
 
 
 if __name__ == "__main__":

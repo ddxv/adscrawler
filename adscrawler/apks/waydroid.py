@@ -21,7 +21,7 @@ from adscrawler.config import (
 )
 from adscrawler.connection import PostgresCon
 from adscrawler.queries import (
-    get_version_code,
+    get_version_code_dbid,
     query_store_app_by_store_id,
     upsert_df,
 )
@@ -371,13 +371,16 @@ def get_installed_version_code(
     version_info = package_info.stdout
 
     match = re.search(r"versionCode=(\d+)", version_info)
+    version_code_id = None
     if match:
         version_code = match.group(1)
         logger.info(f"found versionCode: {version_code}")
-        version_code_id = get_version_code(store_app, version_code, database_connection)
-        return version_code_id
-    else:
-        raise Exception(f"Failed to get version code for {store_id}")
+        version_code_id = get_version_code_dbid(
+            store_app, version_code, database_connection
+        )
+
+    if version_code_id is None:
+        pass
 
 
 def launch_and_track_app(
