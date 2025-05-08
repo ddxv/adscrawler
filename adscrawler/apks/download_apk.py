@@ -9,6 +9,7 @@ This script scrapes https://apkpure.com to get the apk download link
 import hashlib
 import os
 import pathlib
+import shutil
 import subprocess
 import time
 
@@ -30,9 +31,9 @@ from adscrawler.config import (
     XAPKS_INCOMING_DIR,
     get_logger,
 )
-from adscrawler.dbcon.connection import PostgresCon
+from adscrawler.connection import PostgresCon
 from adscrawler.queries import (
-    get_top_ranks_for_unpacking,
+    get_top_apps_to_download,
     get_version_code_by_md5_hash,
     insert_version_code,
 )
@@ -50,7 +51,7 @@ def download_apks(
 ) -> None:
     error_count = 0
     store = 1
-    apps = get_top_ranks_for_unpacking(
+    apps = get_top_apps_to_download(
         database_connection=database_connection,
         store=store,
         limit=number_of_apps_to_pull,
@@ -97,22 +98,26 @@ def empty_folder(pth: pathlib.Path) -> None:
 
 
 def unzip_apk_and_get_version(store_id: str, extension: str) -> str:
-    apk_to_decode_path = pathlib.Path(APKS_INCOMING_DIR, f"{store_id}{extension}")
-    tmp_decode_path = pathlib.Path(APK_TMP_UNZIPPED_DIR, store_id)
-    if tmp_decode_path.exists():
-        tmp_apk_path = pathlib.Path(tmp_decode_path, f"{store_id}.apk")
+    if extension == ".apk":
+        apk_to_decode_path = pathlib.Path(APKS_INCOMING_DIR, f"{store_id}{extension}")
+    elif extension == ".xapk":
+        xapk_path = pathlib.Path(XAPKS_INCOMING_DIR, f"{store_id}{extension}")
+        os.makedirs(APK_TMP_PARTIALS_DIR / store_id, exist_ok=True)
+        partial_apk_dir = pathlib.Path(APK_TMP_PARTIALS_DIR, f"{store_id}")
+        partial_apk_path = pathlib.Path(partial_apk_dir, f"{store_id}.apk")
+        unzip_command = f"unzip -o {xapk_path.as_posix()} {store_id}.apk -d {partial_apk_dir.as_posix()}"
+        unzip_result = os.system(unzip_command)
+        apk_to_decode_path = partial_apk_path
+        logger.info(f"Output unzipped from xapk to apk: {unzip_result}")
+    else:
+        raise ValueError(f"Invalid extension: {extension}")
+
+    tmp_decoded_output_path = pathlib.Path(APK_TMP_UNZIPPED_DIR, store_id)
+    if tmp_decoded_output_path.exists():
+        tmp_apk_path = pathlib.Path(tmp_decoded_output_path, f"{store_id}.apk")
         if tmp_apk_path.exists():
             tmp_apk_path.unlink()
 
-    if extension == ".xapk":
-        xapk_path = pathlib.Path(XAPKS_INCOMING_DIR, f"{store_id}{extension}")
-        partial_apk_path = pathlib.Path(
-            APK_TMP_PARTIALS_DIR, f"{store_id}/{store_id}.apk"
-        )
-        apk_to_decode_path = partial_apk_path
-        unzip_command = f"unzip -o {xapk_path.as_posix()} {store_id}.apk -d {partial_apk_path.as_posix()}"
-        unzip_result = os.system(unzip_command)
-        logger.info(f"Output unzipped from xapk to apk: {unzip_result}")
     if not apk_to_decode_path.exists():
         logger.error(f"decode path: {apk_to_decode_path.as_posix()} but file not found")
         raise FileNotFoundError
@@ -124,7 +129,7 @@ def unzip_apk_and_get_version(store_id: str, extension: str) -> str:
             apk_to_decode_path.as_posix(),
             "-f",
             "-o",
-            tmp_decode_path.as_posix(),
+            tmp_decoded_output_path.as_posix(),
         ]
         # Run the command and capture output
         result = subprocess.run(
@@ -155,7 +160,7 @@ def unzip_apk_and_get_version(store_id: str, extension: str) -> str:
     except subprocess.CalledProcessError as e:
         logger.error(f"Command failed with return code {e.returncode}")
         raise
-    apktool_info_path = pathlib.Path(tmp_decode_path, "apktool.yml")
+    apktool_info_path = pathlib.Path(tmp_decoded_output_path, "apktool.yml")
     version_str = get_version(apktool_info_path)
     return version_str
 
@@ -168,12 +173,23 @@ def check_version_code_exists(
     return version_code
 
 
+def get_md5_hash(store_id: str, extension: str) -> str:
+    if extension == ".apk":
+        file_path = pathlib.Path(APKS_INCOMING_DIR, f"{store_id}.apk")
+    elif extension == ".xapk":
+        file_path = pathlib.Path(XAPKS_INCOMING_DIR, f"{store_id}.xapk")
+    else:
+        raise ValueError(f"Invalid extension: {extension}")
+    return hashlib.md5(file_path.read_bytes()).hexdigest()
+
+
 def manage_download(database_connection: PostgresCon, row: pd.Series) -> int:
     """Manage the download of an apk or xapk file"""
     crawl_result = 3
     store_id = row.store_id
     logger.info(f"{store_id=} start")
     version_str = FAILED_VERSION_STR
+    md5_hash = None
     try:
         file_path = get_existing_file_path(store_id)
         if file_path:
@@ -192,6 +208,7 @@ def manage_download(database_connection: PostgresCon, row: pd.Series) -> int:
         else:
             extension = download(store_id)
         version_str = unzip_apk_and_get_version(store_id=store_id, extension=extension)
+        md5_hash = get_md5_hash(store_id, extension)
         crawl_result = 1
         logger.info(f"{store_id=} unzipped finished")
     except requests.exceptions.HTTPError:
@@ -209,16 +226,38 @@ def manage_download(database_connection: PostgresCon, row: pd.Series) -> int:
         crawl_result = 3  # Unexpected errors
     if crawl_result in [2]:
         error_count = 5
-    if crawl_result in [2, 3, 4]:
+    elif crawl_result in [2, 3, 4]:
         error_count = 1
+    elif crawl_result in [1]:
+        error_count = 0
+    # TODO: this doesn't work quite right when running locally
+    # The files will only be available in the local and not on the main server
+    # Will need to move the files to a centralized object storage service
     insert_version_code(
-        version_code=version_str,
+        version_str=version_str,
         store_app=row.store_app,
         crawl_result=crawl_result,
         database_connection=database_connection,
         return_rows=False,
+        apk_hash=md5_hash,
     )
+    # Move files from incoming to main dir
+    move_files_to_main_dir(store_id, extension)
     return error_count
+
+
+def move_files_to_main_dir(store_id: str, extension: str) -> None:
+    """Move files from incoming to main dir"""
+    if extension == ".apk":
+        file_path = pathlib.Path(APKS_INCOMING_DIR, f"{store_id}.apk")
+        main_dir = pathlib.Path(APKS_DIR)
+    elif extension == ".xapk":
+        file_path = pathlib.Path(XAPKS_INCOMING_DIR, f"{store_id}.xapk")
+        main_dir = pathlib.Path(XAPKS_DIR)
+    else:
+        raise ValueError(f"Invalid extension: {extension}")
+    if file_path.exists():
+        shutil.move(file_path, main_dir / file_path.name)
 
 
 def get_download_url(store_id: str, source: str) -> str:
@@ -270,7 +309,7 @@ def get_existing_file_path(store_id: str) -> pathlib.Path | None:
     return None
 
 
-def download(store_id: str, do_redownload: bool = False) -> str:
+def download(store_id: str) -> str:
     """Download the apk file.
 
     Downloaded APK or XAPK files are stored in the incoming directories while processing in this script.
@@ -280,20 +319,25 @@ def download(store_id: str, do_redownload: bool = False) -> str:
     do_redownload: bool if True, download the apk even if it already exists
     """
 
-    logger.info(f"{store_id=} download start")
+    func_info = f"{store_id=} download"
+
+    logger.info(f"{func_info} start")
 
     download_url = None
     for source in APK_SOURCES:
         try:
             download_url = get_download_url(store_id, source)
+            logger.info(f"{func_info} found download url for {source}")
             break
         except Exception as e:
-            logger.error(f"Error getting {source} download url for {store_id}: {e}")
+            logger.error(
+                f"{func_info} error getting {source} download url for {store_id}: {e}"
+            )
             continue
 
     if not download_url:
         raise requests.exceptions.HTTPError(
-            f"No download url found for {store_id} from any source."
+            f"{func_info} no download url found for any source."
         )
 
     r = requests.get(
@@ -325,7 +369,7 @@ def download(store_id: str, do_redownload: bool = False) -> str:
             apk_filepath = pathlib.Path(XAPKS_INCOMING_DIR, f"{store_id}{extension}")
         if extension == ".apk":
             apk_filepath = pathlib.Path(APKS_INCOMING_DIR, f"{store_id}{extension}")
-        logger.info(f"Saving to: {apk_filepath}")
+        logger.info(f"{func_info} saving to: {apk_filepath}")
 
         with apk_filepath.open("wb") as file:
             for chunk in r.iter_content(chunk_size=1024 * 1024):
@@ -333,9 +377,9 @@ def download(store_id: str, do_redownload: bool = False) -> str:
                     file.write(chunk)
 
     else:
-        logger.error(f"{store_id=} Request failed with {r.status_code=} {r.text[:50]}")
+        logger.error(f"{func_info} request failed with {r.status_code=} {r.text[:50]}")
         raise requests.exceptions.HTTPError
-    logger.info(f"{store_id=} download finished")
+    logger.info(f"{func_info} finished")
     return extension
 
 

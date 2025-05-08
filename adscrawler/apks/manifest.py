@@ -9,7 +9,7 @@ import pandas as pd
 import requests
 import yaml
 
-from adscrawler.apks.download_apk import download
+# from adscrawler.apks.download_apk import download
 from adscrawler.config import (
     APK_TMP_PARTIALS_DIR,
     APK_TMP_UNZIPPED_DIR,
@@ -228,7 +228,7 @@ def process_manifest(
     extension = ""
     manifest_str = ""
     try:
-        extension = download(store_id, do_redownload=False)
+        # extension = download(store_id, do_redownload=False)
         unzip_apk(store_id=store_id, extension=extension)
         manifest_str, details_df = get_parsed_manifest(store_id)
         apktool_info_path = pathlib.Path(

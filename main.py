@@ -62,7 +62,7 @@ class ProcessManager:
             action="store_true",
         )
         parser.add_argument(
-            "--apk-download",
+            "--download-apks",
             help="Download apk files",
             action="store_true",
         )
@@ -155,7 +155,7 @@ class ProcessManager:
     def check_apk_download_processes(self) -> bool:
         processes = self.get_running_processes()
         my_processes = self.filter_processes(processes, "/adscrawler/main.py")
-        found_processes = [x for x in my_processes if any([" --apk-download" in x])]
+        found_processes = [x for x in my_processes if any([" --download-apks" in x])]
         if self.args.platforms:
             found_processes = [
                 x for x in found_processes if any(p in x for p in self.args.platforms)
@@ -224,7 +224,7 @@ class ProcessManager:
     def is_script_already_running(self) -> bool:
         if self.args.update_app_store_details:
             return self.check_app_update_processes()
-        elif self.args.apk_download:
+        elif self.args.download_apks:
             return self.check_apk_download_processes()
         elif self.args.process_manifest:
             return self.check_process_manifest_processes()
@@ -262,7 +262,7 @@ class ProcessManager:
         if self.args.app_ads_txt_scrape:
             self.crawl_app_ads()
 
-        if self.args.apk_download:
+        if self.args.download_apks:
             self.download_apks(stores)
 
         if self.args.process_manifest:

@@ -148,27 +148,31 @@ def query_developers(
 
 
 def insert_version_code(
-    version_code: str,
+    version_str: str,
     store_app: int,
     crawl_result: int,
     database_connection: PostgresCon,
+    apk_hash: str | None = None,
     return_rows: bool = False,
 ) -> pd.DataFrame | None:
     version_code_df = pd.DataFrame(
-        {
-            "store_app": store_app,
-            "version_code": version_code,
-            "crawl_result": crawl_result,
-        }
+        [
+            {
+                "store_app": store_app,
+                "version_code": version_str,
+                "apk_hash": apk_hash,
+                "crawl_result": crawl_result,
+            }
+        ]
     )
-    logger.info(f"{store_app=} {version_code=} insert version_code to db")
+    logger.info(f"{store_app=} {version_str=} insert version_code to db")
     upserted: pd.DataFrame = upsert_df(
         df=version_code_df,
         table_name="version_codes",
         database_connection=database_connection,
         key_columns=["store_app", "version_code"],
         return_rows=return_rows,
-        insert_columns=["store_app", "version_code", "crawl_result"],
+        insert_columns=["store_app", "version_code", "crawl_result", "apk_hash"],
     )
 
     if return_rows:
@@ -637,6 +641,122 @@ def query_all(
     return df
 
 
+def get_top_apps_to_download(
+    database_connection: PostgresCon,
+    store: int,
+    limit: int = 25,
+) -> pd.DataFrame:
+    sel_query = f"""WITH
+            latest_version_codes AS (
+                SELECT
+                    DISTINCT ON
+                    (version_codes.store_app)
+                    version_codes.id,
+                    version_codes.store_app,
+                    version_codes.version_code,
+                    version_codes.updated_at,
+                    version_codes.crawl_result
+                FROM
+                    version_codes
+                ORDER BY
+                    version_codes.store_app,
+                    version_codes.updated_at DESC,
+                    string_to_array(version_codes.version_code, '.')::bigint[] DESC
+            ),
+             latest_success_version_codes AS (
+                SELECT
+                    DISTINCT ON
+                    (version_codes.store_app)
+                    version_codes.id,
+                    version_codes.store_app,
+                    version_codes.version_code,
+                    version_codes.updated_at,
+                    version_codes.crawl_result
+                FROM
+                    version_codes
+                WHERE version_codes.crawl_result = 1
+                ORDER BY
+                    version_codes.store_app,
+                    version_codes.updated_at DESC,
+                    string_to_array(version_codes.version_code, '.')::bigint[] DESC
+            ),
+            scheduled_apps_crawl AS (
+            SELECT
+                dc.store_app,
+                dc.store_id,
+                dc.name,
+                dc.installs,
+                dc.rating_count,
+                vc.crawl_result as last_crawl_result,
+                vc.updated_at
+            FROM
+                store_apps_in_latest_rankings dc
+            LEFT JOIN latest_version_codes vc ON
+                vc.store_app = dc.store_app
+            WHERE
+                dc.store = {store}
+                AND
+                (   
+                    vc.updated_at IS NULL 
+                    OR
+                        (
+                        (vc.crawl_result = 1 AND vc.updated_at < current_date - INTERVAL '180 days')
+                        OR
+                        (vc.crawl_result IN (2,3,4) AND vc.updated_at < current_date - INTERVAL '30 days')
+                        )
+                )
+            ORDER BY
+            (CASE
+                WHEN crawl_result IS NULL THEN 0
+                ELSE 1
+            END),
+            GREATEST(
+                    COALESCE(installs, 0),
+                    COALESCE(CAST(rating_count AS bigint), 0)*50
+                )
+            DESC NULLS LAST
+            ),
+            user_requested_apps_crawl AS (
+            SELECT
+                DISTINCT sa.id AS store_app,
+                sa.store_id,
+                sa.name,
+                sa.installs,
+                sa.rating_count,
+                lsvc.crawl_result AS last_crawl_result,
+                lsvc.updated_at
+            FROM
+                user_requested_scan urs
+            LEFT JOIN store_apps sa ON
+                urs.store_id = sa.store_id
+            LEFT JOIN latest_success_version_codes lsvc ON
+                sa.id = lsvc.store_app
+            LEFT JOIN latest_version_codes lvc ON
+                sa.id = lvc.store_app
+            WHERE
+                (lsvc.updated_at < urs.created_at
+                    OR lsvc.updated_at IS NULL
+                )
+                AND (lvc.updated_at < current_date - INTERVAL '1 days'
+                    OR lvc.updated_at IS NULL)
+                AND sa.store = {store}
+            )
+        SELECT
+            *
+        FROM
+            user_requested_apps_crawl
+        UNION ALL
+        SELECT
+            *
+        FROM
+            scheduled_apps_crawl
+        LIMIT {limit}
+        ;
+    """
+    df = pd.read_sql(sel_query, con=database_connection.engine)
+    return df
+
+
 def get_top_ranks_for_unpacking(
     database_connection: PostgresCon,
     store: int,
@@ -819,7 +939,7 @@ def get_version_codes_full_history(
 
 def get_version_code_dbid(
     store_app: int, version_code: str, database_connection: PostgresCon
-) -> str | None:
+) -> int | None:
     sel_query = f"""SELECT * FROM version_codes WHERE store_app = {store_app} AND version_code = '{version_code}'"""
     df = pd.read_sql(sel_query, con=database_connection.engine)
     if df.empty:
