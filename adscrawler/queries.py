@@ -757,44 +757,61 @@ def get_top_apps_to_download(
     return df
 
 
-def get_top_ranks_for_unpacking(
+def get_next_to_sdk_scan(
     database_connection: PostgresCon,
     store: int,
     limit: int = 25,
 ) -> pd.DataFrame:
-    sel_query = f"""WITH
-            latest_version_codes AS (
+    sel_query = f"""WITH latest_version_codes AS (
                 SELECT
                     DISTINCT ON
-                    (version_codes.store_app)
-                    version_codes.id,
-                    version_codes.store_app,
-                    version_codes.version_code,
-                    version_codes.updated_at,
-                    version_codes.crawl_result
+                    (store_app)
+                    id,
+                    store_app,
+                    version_code,
+                    updated_at AS last_downloaded_at,
+                    crawl_result AS download_result
                 FROM
                     version_codes
+                WHERE crawl_result = 1
+                -- HACKY FIX only try for apps that have successuflly been downloaded, but this table still is all history of version_codes in general
+                AND updated_at >= '2025-05-01'
                 ORDER BY
-                    version_codes.store_app,
-                    version_codes.updated_at DESC,
-                    string_to_array(version_codes.version_code, '.')::bigint[] DESC
+                    store_app,
+                    updated_at DESC,
+                    string_to_array(version_code, '.')::bigint[] DESC
+            ),
+            latest_analyze_results AS (
+                SELECT
+                    DISTINCT ON
+                    (version_code)
+                    version_code,
+                    sdk_analyzed_at AS sd_last_analyzed,
+                    analyze_result AS analyze_result
+                FROM
+                    version_details_map
+                WHERE analyze_result = 1
+                ORDER BY
+                    version_code DESC
             ),
              latest_success_version_codes AS (
                 SELECT
                     DISTINCT ON
-                    (version_codes.store_app)
-                    version_codes.id,
-                    version_codes.store_app,
-                    version_codes.version_code,
-                    version_codes.updated_at,
-                    version_codes.crawl_result
+                    (vc.store_app)
+                    vc.id,
+                    vc.store_app,
+                    vc.version_code,
+                    vdm.sdk_analyzed_at,
+                    vdm.analyze_result
                 FROM
-                    version_codes
-                WHERE version_codes.crawl_result = 1
+                    version_codes vc
+                LEFT JOIN version_details_map vdm ON 
+                vc.id = vdm.version_code
+                WHERE vdm.analyze_result = 1 
                 ORDER BY
-                    version_codes.store_app,
-                    version_codes.updated_at DESC,
-                    string_to_array(version_codes.version_code, '.')::bigint[] DESC
+                    vc.store_app,
+                    vdm.sdk_analyzed_at DESC,
+                    string_to_array(vc.version_code, '.')::bigint[] DESC
             ),
             scheduled_apps_crawl AS (
             SELECT
@@ -803,27 +820,31 @@ def get_top_ranks_for_unpacking(
                 dc.name,
                 dc.installs,
                 dc.rating_count,
-                vc.crawl_result as last_crawl_result,
-                vc.updated_at
+                vc.download_result as download_result,
+               lsvc.analyze_result AS last_analyzed_result,
+                lsvc.sdk_analyzed_at
             FROM
                 store_apps_in_latest_rankings dc
-            LEFT JOIN latest_version_codes vc ON
+            RIGHT JOIN latest_version_codes vc ON
                 vc.store_app = dc.store_app
+            LEFT JOIN latest_success_version_codes lsvc ON
+                dc.store_app = lsvc.store_app
             WHERE
                 dc.store = {store}
+                AND vc.download_result = 1
                 AND
                 (   
-                    vc.updated_at IS NULL 
+                    lsvc.sdk_analyzed_at IS NULL 
                     OR
                         (
-                        (vc.crawl_result = 1 AND vc.updated_at < current_date - INTERVAL '180 days')
+                        (lsvc.analyze_result = 1 AND lsvc.sdk_analyzed_at < current_date - INTERVAL '180 days')
                         OR
-                        (vc.crawl_result IN (2,3,4) AND vc.updated_at < current_date - INTERVAL '30 days')
+                        (lsvc.analyze_result IN (2,3,4) AND lsvc.sdk_analyzed_at < current_date - INTERVAL '30 days')
                         )
                 )
             ORDER BY
             (CASE
-                WHEN crawl_result IS NULL THEN 0
+                WHEN download_result IS NULL THEN 0
                 ELSE 1
             END),
             GREATEST(
@@ -839,31 +860,43 @@ def get_top_ranks_for_unpacking(
                 sa.name,
                 sa.installs,
                 sa.rating_count,
-                lsvc.crawl_result AS last_crawl_result,
-                lsvc.updated_at
+                lsvc.analyze_result AS last_analyzed_result,
+                lsvc.sdk_analyzed_at
             FROM
                 user_requested_scan urs
             LEFT JOIN store_apps sa ON
                 urs.store_id = sa.store_id
             LEFT JOIN latest_success_version_codes lsvc ON
                 sa.id = lsvc.store_app
-            LEFT JOIN latest_version_codes lvc ON
+            RIGHT JOIN latest_version_codes lvc ON
                 sa.id = lvc.store_app
             WHERE
-                (lsvc.updated_at < urs.created_at
-                    OR lsvc.updated_at IS NULL
+                (lsvc.sdk_analyzed_at < urs.created_at
+                    OR lsvc.sdk_analyzed_at IS NULL
                 )
-                AND (lvc.updated_at < current_date - INTERVAL '1 days'
-                    OR lvc.updated_at IS NULL)
+                AND (lvc.last_downloaded_at < current_date - INTERVAL '1 days'
+                    OR lvc.last_downloaded_at IS NULL)
                 AND sa.store = {store}
             )
         SELECT
-            *
+            store_app,
+            store_id,
+            name,
+            installs,
+            rating_count,
+            last_analyzed_result,
+            sdk_analyzed_at
         FROM
             user_requested_apps_crawl
         UNION ALL
         SELECT
-            *
+            store_app,
+            store_id,
+            name,
+            installs,
+            rating_count,
+            last_analyzed_result,
+            sdk_analyzed_at
         FROM
             scheduled_apps_crawl
         LIMIT {limit}

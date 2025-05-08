@@ -67,9 +67,8 @@ class ProcessManager:
             action="store_true",
         )
         parser.add_argument(
-            "-m",
-            "--process-manifest",
-            help="Process manifest files for sdks",
+            "--process-sdks",
+            help="Process APKs, IPAS, and manifest files for sdks",
             action="store_true",
         )
         parser.add_argument(
@@ -169,10 +168,10 @@ class ProcessManager:
             ]
         return len(found_processes) > 1
 
-    def check_process_manifest_processes(self) -> bool:
+    def check_process_sdks_processes(self) -> bool:
         processes = self.get_running_processes()
         my_processes = self.filter_processes(processes, "/adscrawler/main.py")
-        found_processes = [x for x in my_processes if any([" --process-manifest" in x])]
+        found_processes = [x for x in my_processes if any([" --process-sdks" in x])]
         if self.args.platforms:
             found_processes = [
                 x for x in found_processes if any(p in x for p in self.args.platforms)
@@ -226,8 +225,8 @@ class ProcessManager:
             return self.check_app_update_processes()
         elif self.args.download_apks:
             return self.check_apk_download_processes()
-        elif self.args.process_manifest:
-            return self.check_process_manifest_processes()
+        elif self.args.process_sdks:
+            return self.check_process_sdks_processes()
         elif self.args.waydroid:
             return self.check_waydroid_processes()
         elif self.args.app_ads_txt_scrape:
@@ -265,7 +264,7 @@ class ProcessManager:
         if self.args.download_apks:
             self.download_apks(stores)
 
-        if self.args.process_manifest:
+        if self.args.process_sdks:
             self.process_sdks()
 
         if self.args.waydroid:

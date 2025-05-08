@@ -21,10 +21,11 @@ from adscrawler.apks.manifest import get_version
 from adscrawler.apks.process_apk import (
     get_downloaded_apks,
     get_downloaded_xapks,
+    get_existing_apk_path,
+    unzip_apk,
 )
 from adscrawler.config import (
     APK_TMP_PARTIALS_DIR,
-    APK_TMP_UNZIPPED_DIR,
     APKS_DIR,
     APKS_INCOMING_DIR,
     XAPKS_DIR,
@@ -97,74 +98,6 @@ def empty_folder(pth: pathlib.Path) -> None:
             sub.unlink()
 
 
-def unzip_apk_and_get_version(store_id: str, extension: str) -> str:
-    if extension == ".apk":
-        apk_to_decode_path = pathlib.Path(APKS_INCOMING_DIR, f"{store_id}{extension}")
-    elif extension == ".xapk":
-        xapk_path = pathlib.Path(XAPKS_INCOMING_DIR, f"{store_id}{extension}")
-        os.makedirs(APK_TMP_PARTIALS_DIR / store_id, exist_ok=True)
-        partial_apk_dir = pathlib.Path(APK_TMP_PARTIALS_DIR, f"{store_id}")
-        partial_apk_path = pathlib.Path(partial_apk_dir, f"{store_id}.apk")
-        unzip_command = f"unzip -o {xapk_path.as_posix()} {store_id}.apk -d {partial_apk_dir.as_posix()}"
-        unzip_result = os.system(unzip_command)
-        apk_to_decode_path = partial_apk_path
-        logger.info(f"Output unzipped from xapk to apk: {unzip_result}")
-    else:
-        raise ValueError(f"Invalid extension: {extension}")
-
-    tmp_decoded_output_path = pathlib.Path(APK_TMP_UNZIPPED_DIR, store_id)
-    if tmp_decoded_output_path.exists():
-        tmp_apk_path = pathlib.Path(tmp_decoded_output_path, f"{store_id}.apk")
-        if tmp_apk_path.exists():
-            tmp_apk_path.unlink()
-
-    if not apk_to_decode_path.exists():
-        logger.error(f"decode path: {apk_to_decode_path.as_posix()} but file not found")
-        raise FileNotFoundError
-    try:
-        # https://apktool.org/docs/the-basics/decoding
-        command = [
-            "apktool",
-            "decode",
-            apk_to_decode_path.as_posix(),
-            "-f",
-            "-o",
-            tmp_decoded_output_path.as_posix(),
-        ]
-        # Run the command and capture output
-        result = subprocess.run(
-            command,
-            capture_output=True,
-            text=True,
-            check=False,  # Don't raise exception on non-zero exit
-        )
-
-        if "java.lang.OutOfMemoryError" in result.stderr:
-            # Possibly related: https://github.com/iBotPeaches/Apktool/issues/3736
-            logger.error("Java heap space error occurred, try with -j 1")
-            # Handle the error as needed
-            result = subprocess.run(
-                command + ["-j", "1"],
-                capture_output=True,
-                text=True,
-                check=False,  # Don't raise exception on non-zero exit
-            )
-
-        if result.stderr:
-            logger.error(f"Error: {result.stderr}")
-
-        # Check return code
-        if result.returncode != 0:
-            raise subprocess.CalledProcessError(result.returncode, command)
-
-    except subprocess.CalledProcessError as e:
-        logger.error(f"Command failed with return code {e.returncode}")
-        raise
-    apktool_info_path = pathlib.Path(tmp_decoded_output_path, "apktool.yml")
-    version_str = get_version(apktool_info_path)
-    return version_str
-
-
 def check_version_code_exists(
     database_connection: PostgresCon, store_id: str, file_path: pathlib.Path
 ) -> str | None:
@@ -191,7 +124,7 @@ def manage_download(database_connection: PostgresCon, row: pd.Series) -> int:
     version_str = FAILED_VERSION_STR
     md5_hash = None
     try:
-        file_path = get_existing_file_path(store_id)
+        file_path = get_existing_apk_path(store_id)
         if file_path:
             if "incoming" in file_path.as_posix():
                 logger.info(
@@ -207,7 +140,10 @@ def manage_download(database_connection: PostgresCon, row: pd.Series) -> int:
                     return 0
         else:
             extension = download(store_id)
-        version_str = unzip_apk_and_get_version(store_id=store_id, extension=extension)
+        apk_tmp_decoded_output_path = unzip_apk(store_id=store_id, extension=extension)
+        apktool_info_path = pathlib.Path(apk_tmp_decoded_output_path, "apktool.yml")
+        version_str = get_version(apktool_info_path)
+
         md5_hash = get_md5_hash(store_id, extension)
         crawl_result = 1
         logger.info(f"{store_id=} unzipped finished")
@@ -280,33 +216,6 @@ def get_download_url(store_id: str, source: str) -> str:
             raise e
     else:
         raise ValueError(f"Invalid source: {source}")
-
-
-def get_existing_file_path(store_id: str) -> pathlib.Path | None:
-    """Check if an APK or XAPK file exists and return its extension.
-
-    Args:
-        store_id: The store ID of the app
-
-    Returns:
-        The file extension ('.apk' or '.xapk') if found, None otherwise
-    """
-
-    # Define all possible paths to check
-    # In the future we would check version codes as well
-
-    paths_to_check = [
-        pathlib.Path(APKS_DIR, f"{store_id}.apk"),
-        pathlib.Path(XAPKS_DIR, f"{store_id}.xapk"),
-        pathlib.Path(APKS_INCOMING_DIR, f"{store_id}.apk"),
-        pathlib.Path(XAPKS_INCOMING_DIR, f"{store_id}.xapk"),
-    ]
-
-    for path in paths_to_check:
-        if path.exists():
-            return path
-
-    return None
 
 
 def download(store_id: str) -> str:

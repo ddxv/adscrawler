@@ -6,15 +6,12 @@ import subprocess
 from xml.etree import ElementTree
 
 import pandas as pd
-import requests
 import yaml
 
-# from adscrawler.apks.download_apk import download
+from adscrawler.apks.download_apk import get_existing_apk_path, unzip_apk
 from adscrawler.config import (
     APK_TMP_PARTIALS_DIR,
     APK_TMP_UNZIPPED_DIR,
-    APKS_DIR,
-    XAPKS_DIR,
     get_logger,
 )
 from adscrawler.connection import PostgresCon
@@ -43,78 +40,78 @@ def empty_folder(pth: pathlib.Path) -> None:
             sub.unlink()
 
 
-def unzip_apk(store_id: str, extension: str) -> None:
-    apk_path = pathlib.Path(APKS_DIR, f"{store_id}{extension}")
-    if pathlib.Path(APK_TMP_UNZIPPED_DIR, store_id).exists():
-        tmp_apk_path = pathlib.Path(APK_TMP_UNZIPPED_DIR, store_id, f"{store_id}.apk")
-        if tmp_apk_path.exists():
-            tmp_apk_path.unlink()
+# def unzip_apk(store_id: str, extension: str) -> None:
+#     apk_path = pathlib.Path(APKS_DIR, f"{store_id}{extension}")
+#     if pathlib.Path(APK_TMP_UNZIPPED_DIR, store_id).exists():
+#         tmp_apk_path = pathlib.Path(APK_TMP_UNZIPPED_DIR, store_id, f"{store_id}.apk")
+#         if tmp_apk_path.exists():
+#             tmp_apk_path.unlink()
 
-    check_dirs()
-    if extension == ".xapk":
-        xapk_path = pathlib.Path(XAPKS_DIR, f"{store_id}{extension}")
-        partial_apk_path = pathlib.Path(
-            APK_TMP_PARTIALS_DIR, f"{store_id}/{store_id}.apk"
-        )
-        apk_path = partial_apk_path
-        unzip_command = f"unzip -o {xapk_path.as_posix()} {store_id}.apk -d {partial_apk_path.as_posix()}"
-        unzip_result = os.system(unzip_command)
-        logger.info(f"Output unzipped from xapk to apk: {unzip_result}")
-    if not apk_path.exists():
-        logger.error(f"path: {apk_path.as_posix()} file not found")
-        raise FileNotFoundError
-    try:
-        # https://apktool.org/docs/the-basics/decoding
-        command = [
-            "apktool",
-            "decode",
-            apk_path.as_posix(),
-            "-f",
-            "-o",
-            pathlib.Path(APK_TMP_UNZIPPED_DIR, store_id).as_posix(),
-        ]
-        # Run the command and capture output
-        result = subprocess.run(
-            command,
-            capture_output=True,
-            text=True,
-            check=False,  # Don't raise exception on non-zero exit
-        )
+#     check_dirs()
+#     if extension == ".xapk":
+#         xapk_path = pathlib.Path(XAPKS_DIR, f"{store_id}{extension}")
+#         partial_apk_path = pathlib.Path(
+#             APK_TMP_PARTIALS_DIR, f"{store_id}/{store_id}.apk"
+#         )
+#         apk_path = partial_apk_path
+#         unzip_command = f"unzip -o {xapk_path.as_posix()} {store_id}.apk -d {partial_apk_path.as_posix()}"
+#         unzip_result = os.system(unzip_command)
+#         logger.info(f"Output unzipped from xapk to apk: {unzip_result}")
+#     if not apk_path.exists():
+#         logger.error(f"path: {apk_path.as_posix()} file not found")
+#         raise FileNotFoundError
+#     try:
+#         # https://apktool.org/docs/the-basics/decoding
+#         command = [
+#             "apktool",
+#             "decode",
+#             apk_path.as_posix(),
+#             "-f",
+#             "-o",
+#             pathlib.Path(APK_TMP_UNZIPPED_DIR, store_id).as_posix(),
+#         ]
+#         # Run the command and capture output
+#         result = subprocess.run(
+#             command,
+#             capture_output=True,
+#             text=True,
+#             check=False,  # Don't raise exception on non-zero exit
+#         )
 
-        if "java.lang.OutOfMemoryError" in result.stderr:
-            # Possibly related: https://github.com/iBotPeaches/Apktool/issues/3736
-            logger.error("Java heap space error occurred, try with -j 1")
-            # Handle the error as needed
-            result = subprocess.run(
-                command + ["-j", "1"],
-                capture_output=True,
-                text=True,
-                check=False,  # Don't raise exception on non-zero exit
-            )
+#         if "java.lang.OutOfMemoryError" in result.stderr:
+#             # Possibly related: https://github.com/iBotPeaches/Apktool/issues/3736
+#             logger.error("Java heap space error occurred, try with -j 1")
+#             # Handle the error as needed
+#             result = subprocess.run(
+#                 command + ["-j", "1"],
+#                 capture_output=True,
+#                 text=True,
+#                 check=False,  # Don't raise exception on non-zero exit
+#             )
 
-        if result.stderr:
-            logger.error(f"Error: {result.stderr}")
+#         if result.stderr:
+#             logger.error(f"Error: {result.stderr}")
 
-        # Check return code
-        if result.returncode != 0:
-            raise subprocess.CalledProcessError(result.returncode, command)
+#         # Check return code
+#         if result.returncode != 0:
+#             raise subprocess.CalledProcessError(result.returncode, command)
 
-    except subprocess.CalledProcessError as e:
-        logger.error(f"Command failed with return code {e.returncode}")
-        raise
+#     except subprocess.CalledProcessError as e:
+#         logger.error(f"Command failed with return code {e.returncode}")
+#         raise
 
 
-def get_parsed_manifest(store_id: str) -> tuple[str, pd.DataFrame]:
-    manifest_filename = pathlib.Path(
-        APK_TMP_UNZIPPED_DIR, f"{store_id}/AndroidManifest.xml"
-    )
+def get_parsed_manifest(
+    tmp_decoded_output_path: pathlib.Path, store_id: str
+) -> tuple[str, pd.DataFrame]:
+    manifest_filename = pathlib.Path(tmp_decoded_output_path, "AndroidManifest.xml")
     # Load the XML file
     with manifest_filename.open("r") as f:
         manifest_str = f.read()
     tree = ElementTree.parse(manifest_filename)
     root = tree.getroot()
     df = xml_to_dataframe(root)
-    smali_df = get_smali_df(store_id)
+    smali_df = get_smali_df(tmp_decoded_output_path, store_id)
     df = pd.concat([df, smali_df])
     df = df.drop_duplicates()
     return manifest_str, df
@@ -137,8 +134,8 @@ def unzipped_apk_paths(mypath: pathlib.Path) -> pd.DataFrame:
     return pd.DataFrame(unzipped_paths, columns=["path"])
 
 
-def get_smali_df(store_id: str) -> pd.DataFrame:
-    mydf = unzipped_apk_paths(pathlib.Path(APK_TMP_UNZIPPED_DIR, store_id))
+def get_smali_df(tmp_decoded_output_path: pathlib.Path, store_id: str) -> pd.DataFrame:
+    mydf = unzipped_apk_paths(tmp_decoded_output_path)
     smali_df = mydf[mydf["path"].str.lower().str.contains("smali")].copy()
     smali_df["path"] = (
         smali_df["path"]
@@ -227,23 +224,24 @@ def process_manifest(
     version_str = FAILED_VERSION_STR
     extension = ""
     manifest_str = ""
+    apk_path = get_existing_apk_path(store_id)
+    if apk_path is None:
+        raise FileNotFoundError
+
+    extension = apk_path.suffix
+
     try:
+        apk_tmp_decoded_output_path = unzip_apk(store_id=store_id, extension=extension)
+
         # extension = download(store_id, do_redownload=False)
-        unzip_apk(store_id=store_id, extension=extension)
-        manifest_str, details_df = get_parsed_manifest(store_id)
-        apktool_info_path = pathlib.Path(
-            APK_TMP_UNZIPPED_DIR, f"{store_id}/apktool.yml"
+        manifest_str, details_df = get_parsed_manifest(
+            apk_tmp_decoded_output_path, store_id
         )
+        apktool_info_path = pathlib.Path(apk_tmp_decoded_output_path, "apktool.yml")
         version_str = get_version(apktool_info_path)
         crawl_result = 1
         logger.info(f"{store_id=} unzipped finished")
-    except requests.exceptions.HTTPError:
-        crawl_result = 2  # 404s etc
-    except requests.exceptions.ConnectionError:
-        crawl_result = 2  # 404s etc
-    except FileNotFoundError:
-        logger.exception(f"{store_id=} unable to unpack apk")
-        crawl_result = 1
+
     except subprocess.CalledProcessError as e:
         logger.exception(f"Unexpected error for {store_id=}: {str(e)}")
         crawl_result = 3  # Unexpected error
