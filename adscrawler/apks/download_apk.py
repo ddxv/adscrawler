@@ -133,12 +133,12 @@ def manage_download(database_connection: PostgresCon, row: pd.Series) -> int:
         else:
             extension = download(store_id)
             download_in_incoming = True
-        if extension == ".apk":
-            file_path = pathlib.Path(APKS_INCOMING_DIR, f"{store_id}{extension}")
-        elif extension == ".xapk":
-            file_path = pathlib.Path(XAPKS_INCOMING_DIR, f"{store_id}{extension}")
-        else:
-            raise ValueError(f"Invalid extension: {extension}")
+            if extension == ".apk":
+                file_path = pathlib.Path(APKS_INCOMING_DIR, f"{store_id}{extension}")
+            elif extension == ".xapk":
+                file_path = pathlib.Path(XAPKS_INCOMING_DIR, f"{store_id}{extension}")
+            else:
+                raise ValueError(f"Invalid extension: {extension}")
         apk_tmp_decoded_output_path = unzip_apk(store_id=store_id, file_path=file_path)
         apktool_info_path = pathlib.Path(apk_tmp_decoded_output_path, "apktool.yml")
         version_str = get_version(apktool_info_path)
