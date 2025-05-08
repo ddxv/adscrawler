@@ -972,6 +972,8 @@ def get_version_code_by_md5_hash(
     ;
     """
     df = pd.read_sql(sel_query, con=database_connection.engine)
+    if df.empty:
+        return None
     try:
         return int(df.iloc[0]["id"])
     except Exception:
