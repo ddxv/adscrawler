@@ -973,7 +973,7 @@ def upsert_keywords(keywords_df: pd.DataFrame, database_connection: PostgresCon)
     )
 
 
-def insert_global_keywords(database_connection: PostgresCon):
+def insert_global_keywords(database_connection: PostgresCon) -> None:
     """Insert global keywords into the database.
     NOTE: This takes about ~5-8GB of RAM for 50k keywords and 200k descriptions. For now run manually.
     """

@@ -36,7 +36,7 @@ def is_weston_running() -> bool:
         return False
 
 
-def start_weston() -> subprocess.Popen:
+def start_weston() -> subprocess.Popen | None:
     logger.info("Starting Weston")
     os.environ["WAYLAND_DISPLAY"] = WESTON_SOCKET_NAME
     xdg_runtime_dir = "/run/user/1000"

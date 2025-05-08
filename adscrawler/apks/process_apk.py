@@ -19,7 +19,7 @@ from adscrawler.queries import (
 logger = get_logger(__name__)
 
 
-def process_apks(
+def process_sdks(
     database_connection: PostgresCon, number_of_apps_to_pull: int = 20
 ) -> None:
     error_count = 0

@@ -55,7 +55,7 @@ def search(scraper: cloudscraper.CloudScraper, query: str) -> list[dict]:
         if len(apps) == 0:
             raise Exception(f"No results found matching your query: {query}")
         else:
-            logger.wwarning(
+            logger.warning(
                 f"No results found matching your query: {query}, but appRows not empty! Check"
             )
 
@@ -71,9 +71,14 @@ def get_app_details(scraper: cloudscraper.CloudScraper, app_link: str) -> str:
 
     data = soup.find_all("div", {"class": ["table-row", "headerFont"]})[1]
 
-    download_link = (
-        APKMIRROR_BASE_URL + data.find_all("a", {"class": "accent_color"})[0]["href"]
-    )
+    try:
+        download_link = (
+            APKMIRROR_BASE_URL
+            + data.find_all("a", {"class": "accent_color"})[0]["href"]
+        )
+    except Exception:
+        logger.exception(f"Error getting download link for {app_link}")
+        raise
 
     return download_link
 

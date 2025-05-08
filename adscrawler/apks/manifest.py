@@ -114,7 +114,7 @@ def get_parsed_manifest(store_id: str) -> tuple[str, pd.DataFrame]:
     tree = ElementTree.parse(manifest_filename)
     root = tree.getroot()
     df = xml_to_dataframe(root)
-    smali_df = get_smali_df()
+    smali_df = get_smali_df(store_id)
     df = pd.concat([df, smali_df])
     df = df.drop_duplicates()
     return manifest_str, df

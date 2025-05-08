@@ -162,7 +162,7 @@ def unzip_apk_and_get_version(store_id: str, extension: str) -> str:
 
 def check_version_code_exists(
     database_connection: PostgresCon, store_id: str, file_path: pathlib.Path
-) -> bool:
+) -> str | None:
     md5_hash = hashlib.md5(file_path.read_bytes()).hexdigest()
     version_code = get_version_code_by_md5_hash(database_connection, md5_hash, store_id)
     return version_code
@@ -239,9 +239,11 @@ def get_download_url(store_id: str, source: str) -> str:
         except Exception as e:
             logger.error(f"Error getting APKPURE download url for {store_id}: {e}")
             raise e
+    else:
+        raise ValueError(f"Invalid source: {source}")
 
 
-def get_existing_file_path(store_id: str) -> str | None:
+def get_existing_file_path(store_id: str) -> pathlib.Path | None:
     """Check if an APK or XAPK file exists and return its extension.
 
     Args:

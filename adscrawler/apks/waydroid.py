@@ -359,7 +359,7 @@ def prep_xapk_splits(store_id: str, xapk_path: pathlib.Path) -> str:
 
 def get_installed_version_code(
     store_id: str, store_app: int, database_connection: PostgresCon
-) -> str:
+) -> int | None:
     package_info = subprocess.run(
         ["sudo", "waydroid", "shell", "dumpsys", "package", store_id],
         capture_output=True,
@@ -381,6 +381,8 @@ def get_installed_version_code(
 
     if version_code_id is None:
         pass
+    else:
+        return version_code_id
 
 
 def launch_and_track_app(

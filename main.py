@@ -3,9 +3,10 @@ import logging
 import os
 import sys
 
+from adscrawler.apks.download_apk import download_apks
 from adscrawler.apks.process_apk import (
-    process_apks,
     process_apks_for_waydroid,
+    process_sdks,
     process_xapks_for_waydroid,
 )
 from adscrawler.apks.waydroid import manual_waydroid_process
@@ -61,9 +62,14 @@ class ProcessManager:
             action="store_true",
         )
         parser.add_argument(
-            "-m",
             "--apk-download",
             help="Download apk files",
+            action="store_true",
+        )
+        parser.add_argument(
+            "-m",
+            "--process-manifest",
+            help="Process manifest files for sdks",
             action="store_true",
         )
         parser.add_argument(
@@ -126,69 +132,78 @@ class ProcessManager:
     def check_app_update_processes(self) -> bool:
         processes = self.get_running_processes()
         my_processes = self.filter_processes(processes, "/adscrawler/main.py")
-        app_update_processes = [
+        found_processes = [
             x
             for x in my_processes
             if any([" -u " in x, " --update-app-store-details" in x])
         ]
 
         if self.args.platforms:
-            app_update_processes = [
-                x
-                for x in app_update_processes
-                if any(p in x for p in self.args.platforms)
+            found_processes = [
+                x for x in found_processes if any(p in x for p in self.args.platforms)
             ]
 
         if self.args.update_app_store_details_group:
-            app_update_processes = [
+            found_processes = [
                 x
-                for x in app_update_processes
+                for x in found_processes
                 if self.args.update_app_store_details_group in x
             ]
 
-        return len(app_update_processes) > 1
+        return len(found_processes) > 1
 
     def check_apk_download_processes(self) -> bool:
         processes = self.get_running_processes()
         my_processes = self.filter_processes(processes, "/adscrawler/main.py")
-        apk_download_processes = [
-            x for x in my_processes if any([" -m" in x, " --apk-download" in x])
-        ]
+        found_processes = [x for x in my_processes if any([" --apk-download" in x])]
         if self.args.platforms:
-            apk_download_processes = [
-                x
-                for x in apk_download_processes
-                if any(p in x for p in self.args.platforms)
+            found_processes = [
+                x for x in found_processes if any(p in x for p in self.args.platforms)
             ]
 
         if self.args.update_app_store_details_group:
-            apk_download_processes = [
+            found_processes = [
                 x
-                for x in apk_download_processes
+                for x in found_processes
                 if self.args.update_app_store_details_group in x
             ]
-        return len(apk_download_processes) > 1
+        return len(found_processes) > 1
+
+    def check_process_manifest_processes(self) -> bool:
+        processes = self.get_running_processes()
+        my_processes = self.filter_processes(processes, "/adscrawler/main.py")
+        found_processes = [x for x in my_processes if any([" --process-manifest" in x])]
+        if self.args.platforms:
+            found_processes = [
+                x for x in found_processes if any(p in x for p in self.args.platforms)
+            ]
+
+        if self.args.update_app_store_details_group:
+            found_processes = [
+                x
+                for x in found_processes
+                if self.args.update_app_store_details_group in x
+            ]
+        return len(found_processes) > 1
 
     def check_waydroid_processes(self) -> bool:
         processes = self.get_running_processes()
         my_processes = self.filter_processes(processes, "/adscrawler/main.py")
-        waydroid_processes = [
+        found_processes = [
             x for x in my_processes if any([" -w" in x, " --waydroid" in x])
         ]
         if self.args.platforms:
-            waydroid_processes = [
-                x
-                for x in waydroid_processes
-                if any(p in x for p in self.args.platforms)
+            found_processes = [
+                x for x in found_processes if any(p in x for p in self.args.platforms)
             ]
 
         if self.args.update_app_store_details_group:
-            waydroid_processes = [
+            found_processes = [
                 x
-                for x in waydroid_processes
+                for x in found_processes
                 if self.args.update_app_store_details_group in x
             ]
-        return len(waydroid_processes) > 1
+        return len(found_processes) > 1
 
     def check_ads_txt_download_processes(self) -> bool:
         processes = self.get_running_processes()
@@ -211,6 +226,8 @@ class ProcessManager:
             return self.check_app_update_processes()
         elif self.args.apk_download:
             return self.check_apk_download_processes()
+        elif self.args.process_manifest:
+            return self.check_process_manifest_processes()
         elif self.args.waydroid:
             return self.check_waydroid_processes()
         elif self.args.app_ads_txt_scrape:
@@ -247,6 +264,9 @@ class ProcessManager:
 
         if self.args.apk_download:
             self.download_apks(stores)
+
+        if self.args.process_manifest:
+            self.process_sdks()
 
         if self.args.waydroid:
             self.waydroid_mitm()
@@ -292,15 +312,18 @@ class ProcessManager:
                 logger.exception("iTunes scrape plist failing")
         if 1 in stores:
             try:
-                process_apks(database_connection=self.pgcon, number_of_apps_to_pull=20)
+                download_apks(database_connection=self.pgcon, number_of_apps_to_pull=20)
             except Exception:
                 logger.exception("Android download apks failing")
+
+    def process_sdks(self) -> None:
+        process_sdks(database_connection=self.pgcon, number_of_apps_to_pull=20)
 
     def waydroid_mitm(self) -> None:
         if self.args.store_id:
             # Manual waydroid process, launches app for 5 minutes for user to interact
             store_id = self.args.store_id
-            extension = self.args.extension if self.args.extension else None
+            extension = self.args.extension if self.args.extension else ".apk"
             store_id = self.args.store_id if self.args.store_id else None
             manual_waydroid_process(
                 database_connection=self.pgcon,

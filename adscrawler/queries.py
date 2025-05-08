@@ -791,8 +791,11 @@ def query_store_app_by_store_id(
     df = pd.read_sql(sel_query, con=database_connection.engine)
     if df.empty:
         raise ValueError(f"Store id {store_id} not found")
-    else:
-        return df.iloc[0]["id"]
+    try:
+        return int(df.iloc[0]["id"])
+    except Exception:
+        logger.exception(f"Error getting store app id for {store_id}")
+        raise
 
 
 def get_local_stored_apks(database_connection: PostgresCon) -> pd.DataFrame:
@@ -821,8 +824,13 @@ def get_version_code_dbid(
     df = pd.read_sql(sel_query, con=database_connection.engine)
     if df.empty:
         return None
-    else:
-        return df.iloc[0]["id"]
+    try:
+        return int(df.iloc[0]["id"])
+    except Exception:
+        logger.exception(
+            f"Error getting version code id for {store_app} and {version_code}"
+        )
+        raise
 
 
 def get_version_code_by_md5_hash(
@@ -836,4 +844,8 @@ def get_version_code_by_md5_hash(
     ;
     """
     df = pd.read_sql(sel_query, con=database_connection.engine)
-    return df.iloc[0]["id"]
+    try:
+        return int(df.iloc[0]["id"])
+    except Exception:
+        logger.exception(f"Error getting version code id for {md5_hash} and {store_id}")
+        raise
