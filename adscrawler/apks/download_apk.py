@@ -96,13 +96,7 @@ def check_version_code_exists(
     return version_code
 
 
-def get_md5_hash(store_id: str, extension: str) -> str:
-    if extension == ".apk":
-        file_path = pathlib.Path(APKS_INCOMING_DIR, f"{store_id}.apk")
-    elif extension == ".xapk":
-        file_path = pathlib.Path(XAPKS_INCOMING_DIR, f"{store_id}.xapk")
-    else:
-        raise ValueError(f"Invalid extension: {extension}")
+def get_md5_hash(file_path: pathlib.Path) -> str:
     return hashlib.md5(file_path.read_bytes()).hexdigest()
 
 
@@ -143,7 +137,7 @@ def manage_download(database_connection: PostgresCon, row: pd.Series) -> int:
         apktool_info_path = pathlib.Path(apk_tmp_decoded_output_path, "apktool.yml")
         version_str = get_version(apktool_info_path)
 
-        md5_hash = get_md5_hash(store_id, extension)
+        md5_hash = get_md5_hash(file_path)
         crawl_result = 1
         logger.info(f"{store_id=} unzipped finished")
     except requests.exceptions.HTTPError:
