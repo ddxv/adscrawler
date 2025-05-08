@@ -117,11 +117,11 @@ def manage_download(database_connection: PostgresCon, row: pd.Series) -> int:
     try:
         file_path = get_existing_apk_path(store_id)
         if file_path:
+            extension = file_path.suffix
             if "incoming" in file_path.as_posix():
                 logger.info(
                     f"{store_id=} already exists in incoming dir, skipping download"
                 )
-                extension = file_path.suffix
                 download_in_incoming = True
             else:
                 logger.info(
