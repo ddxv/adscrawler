@@ -8,8 +8,8 @@ from xml.etree import ElementTree
 import pandas as pd
 import yaml
 
-from adscrawler.apks.download_apk import get_existing_apk_path, unzip_apk
-from adscrawler.apks.process_apk import get_existing_apk_path, remove_partial_apks
+from adscrawler.apks.download_apk import unzip_apk
+from adscrawler.apks.process_apk import remove_partial_apks, get_existing_apk_path
 from adscrawler.config import (
     APK_TMP_UNZIPPED_DIR,
     get_logger,
