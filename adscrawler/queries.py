@@ -184,46 +184,21 @@ def insert_version_code(
 
 def upsert_details_df(
     details_df: pd.DataFrame,
-    crawl_result: int,
     database_connection: PostgresCon,
     store_id: str,
     raw_txt_str: str,
 ) -> None:
-    version_code_df = details_df[["store_app", "version_code"]].drop_duplicates()
-    version_code_df["crawl_result"] = crawl_result
     logger.info(f"{store_id=} insert version_code to db")
-    upserted: pd.DataFrame = upsert_df(
-        df=version_code_df,
-        table_name="version_codes",
-        database_connection=database_connection,
-        key_columns=["store_app", "version_code"],
-        return_rows=True,
-        insert_columns=["store_app", "version_code", "crawl_result"],
-    )
-
-    if crawl_result != 1:
-        return
-    upserted = upserted.rename(
-        columns={"version_code": "original_version_code", "id": "version_code"}
-    ).drop("store_app", axis=1)
     details_df = details_df.rename(
         columns={
             "path": "xml_path",
-            "version_code": "original_version_code",
             "android_name": "value_name",
         }
     )
-    details_df = pd.merge(
-        left=details_df,
-        right=upserted,
-        how="left",
-        on=["original_version_code"],
-        validate="m:1",
-    )
     key_insert_columns = ["xml_path", "tag", "value_name"]
-    strings_df = details_df[key_insert_columns + ["version_code"]].drop_duplicates()
     logger.info(f"{store_id=} insert version_strings to db")
-    strings_df.loc[strings_df["tag"].isna(), "tag"] = ""
+    details_df.loc[details_df["tag"].isna(), "tag"] = ""
+    strings_df = details_df[key_insert_columns + ["version_code"]].drop_duplicates()
     version_strings_df = upsert_df(
         df=strings_df,
         table_name="version_strings",

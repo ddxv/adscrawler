@@ -22,10 +22,10 @@ from adscrawler.apks.process_apk import (
     get_downloaded_apks,
     get_downloaded_xapks,
     get_existing_apk_path,
+    remove_partial_apks,
     unzip_apk,
 )
 from adscrawler.config import (
-    APK_TMP_PARTIALS_DIR,
     APKS_DIR,
     APKS_INCOMING_DIR,
     XAPKS_DIR,
@@ -140,7 +140,13 @@ def manage_download(database_connection: PostgresCon, row: pd.Series) -> int:
                     return 0
         else:
             extension = download(store_id)
-        apk_tmp_decoded_output_path = unzip_apk(store_id=store_id, extension=extension)
+        if extension == ".apk":
+            file_path = pathlib.Path(APKS_INCOMING_DIR, f"{store_id}{extension}")
+        elif extension == ".xapk":
+            file_path = pathlib.Path(XAPKS_INCOMING_DIR, f"{store_id}{extension}")
+        else:
+            raise ValueError(f"Invalid extension: {extension}")
+        apk_tmp_decoded_output_path = unzip_apk(store_id=store_id, file_path=file_path)
         apktool_info_path = pathlib.Path(apk_tmp_decoded_output_path, "apktool.yml")
         version_str = get_version(apktool_info_path)
 
@@ -290,14 +296,3 @@ def download(store_id: str) -> str:
         raise requests.exceptions.HTTPError
     logger.info(f"{func_info} finished")
     return extension
-
-
-def remove_partial_apks(store_id: str) -> None:
-    apk_path = pathlib.Path(APK_TMP_PARTIALS_DIR, f"{store_id}.apk")
-    if apk_path.exists():
-        apk_path.unlink(missing_ok=True)
-        logger.info(f"{store_id=} deleted partial apk {apk_path.as_posix()}")
-    xapk_path = pathlib.Path(APK_TMP_PARTIALS_DIR, f"{store_id}.xapk")
-    if xapk_path.exists():
-        xapk_path.unlink(missing_ok=True)
-        logger.info(f"{store_id=} deleted partial xapk {xapk_path.as_posix()}")

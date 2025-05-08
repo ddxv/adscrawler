@@ -9,26 +9,22 @@ import pandas as pd
 import yaml
 
 from adscrawler.apks.download_apk import get_existing_apk_path, unzip_apk
+from adscrawler.apks.process_apk import (
+    remove_partial_apks,
+)
 from adscrawler.config import (
-    APK_TMP_PARTIALS_DIR,
     APK_TMP_UNZIPPED_DIR,
     get_logger,
 )
 from adscrawler.connection import PostgresCon
-from adscrawler.queries import upsert_details_df
+from adscrawler.queries import (
+    get_version_code_dbid,
+    upsert_details_df,
+)
 
 logger = get_logger(__name__, "download_apk")
 
 FAILED_VERSION_STR = "-1"
-
-
-def check_dirs() -> None:
-    """Create if not exists for apks directory."""
-    dirs = [APK_TMP_PARTIALS_DIR, APK_TMP_UNZIPPED_DIR]
-    for _dir in dirs:
-        if not pathlib.Path.exists(_dir):
-            logger.info(f"creating {_dir} directory")
-            pathlib.Path.mkdir(_dir, exist_ok=True)
 
 
 def empty_folder(pth: pathlib.Path) -> None:
@@ -38,67 +34,6 @@ def empty_folder(pth: pathlib.Path) -> None:
             os.rmdir(sub)
         else:
             sub.unlink()
-
-
-# def unzip_apk(store_id: str, extension: str) -> None:
-#     apk_path = pathlib.Path(APKS_DIR, f"{store_id}{extension}")
-#     if pathlib.Path(APK_TMP_UNZIPPED_DIR, store_id).exists():
-#         tmp_apk_path = pathlib.Path(APK_TMP_UNZIPPED_DIR, store_id, f"{store_id}.apk")
-#         if tmp_apk_path.exists():
-#             tmp_apk_path.unlink()
-
-#     check_dirs()
-#     if extension == ".xapk":
-#         xapk_path = pathlib.Path(XAPKS_DIR, f"{store_id}{extension}")
-#         partial_apk_path = pathlib.Path(
-#             APK_TMP_PARTIALS_DIR, f"{store_id}/{store_id}.apk"
-#         )
-#         apk_path = partial_apk_path
-#         unzip_command = f"unzip -o {xapk_path.as_posix()} {store_id}.apk -d {partial_apk_path.as_posix()}"
-#         unzip_result = os.system(unzip_command)
-#         logger.info(f"Output unzipped from xapk to apk: {unzip_result}")
-#     if not apk_path.exists():
-#         logger.error(f"path: {apk_path.as_posix()} file not found")
-#         raise FileNotFoundError
-#     try:
-#         # https://apktool.org/docs/the-basics/decoding
-#         command = [
-#             "apktool",
-#             "decode",
-#             apk_path.as_posix(),
-#             "-f",
-#             "-o",
-#             pathlib.Path(APK_TMP_UNZIPPED_DIR, store_id).as_posix(),
-#         ]
-#         # Run the command and capture output
-#         result = subprocess.run(
-#             command,
-#             capture_output=True,
-#             text=True,
-#             check=False,  # Don't raise exception on non-zero exit
-#         )
-
-#         if "java.lang.OutOfMemoryError" in result.stderr:
-#             # Possibly related: https://github.com/iBotPeaches/Apktool/issues/3736
-#             logger.error("Java heap space error occurred, try with -j 1")
-#             # Handle the error as needed
-#             result = subprocess.run(
-#                 command + ["-j", "1"],
-#                 capture_output=True,
-#                 text=True,
-#                 check=False,  # Don't raise exception on non-zero exit
-#             )
-
-#         if result.stderr:
-#             logger.error(f"Error: {result.stderr}")
-
-#         # Check return code
-#         if result.returncode != 0:
-#             raise subprocess.CalledProcessError(result.returncode, command)
-
-#     except subprocess.CalledProcessError as e:
-#         logger.error(f"Command failed with return code {e.returncode}")
-#         raise
 
 
 def get_parsed_manifest(
@@ -211,9 +146,7 @@ def xml_to_dataframe(root: ElementTree.Element) -> pd.DataFrame:
     return df
 
 
-def process_manifest(
-    database_connection: PostgresCon, row: pd.Series
-) -> tuple[int, str]:
+def process_manifest(database_connection: PostgresCon, row: pd.Series) -> int:
     """Process an APKs manifest.
     Due to the original implementation, this still downloads, processes manifest and saves the version_details.
     """
@@ -222,16 +155,13 @@ def process_manifest(
     logger.info(f"{store_id=} start")
     details_df = row.to_frame().T
     version_str = FAILED_VERSION_STR
-    extension = ""
     manifest_str = ""
     apk_path = get_existing_apk_path(store_id)
     if apk_path is None:
         raise FileNotFoundError
 
-    extension = apk_path.suffix
-
     try:
-        apk_tmp_decoded_output_path = unzip_apk(store_id=store_id, extension=extension)
+        apk_tmp_decoded_output_path = unzip_apk(store_id=store_id, file_path=apk_path)
 
         # extension = download(store_id, do_redownload=False)
         manifest_str, details_df = get_parsed_manifest(
@@ -248,23 +178,22 @@ def process_manifest(
     except Exception as e:
         logger.exception(f"Unexpected error for {store_id=}: {str(e)}")
         crawl_result = 3  # Unexpected errors
-    if crawl_result in [2]:
-        error_count = 5
-    if crawl_result in [1, 4, 3]:
+    if crawl_result in [2, 3, 4]:
         error_count = 1
+    if not version_str:
+        raise ValueError(f"Version string is empty for {store_id=}")
     details_df["store_app"] = row.store_app
-    if version_str:
-        details_df["version_code"] = version_str
-    else:
-        details_df["version_code"] = FAILED_VERSION_STR
-    try:
-        upsert_details_df(
-            details_df=details_df,
-            crawl_result=crawl_result,
-            database_connection=database_connection,
-            store_id=store_id,
-            raw_txt_str=manifest_str,
-        )
-    except Exception as e:
-        logger.exception(f"DB INSERT ERROR for {store_id=}: {str(e)}")
-    return error_count, extension
+    version_code_dbid = get_version_code_dbid(
+        store_app=row.store_app,
+        version_code=version_str,
+        database_connection=database_connection,
+    )
+    details_df["version_code"] = version_code_dbid
+    upsert_details_df(
+        details_df=details_df,
+        database_connection=database_connection,
+        store_id=store_id,
+        raw_txt_str=manifest_str,
+    )
+    remove_partial_apks(store_id=store_id)
+    return error_count

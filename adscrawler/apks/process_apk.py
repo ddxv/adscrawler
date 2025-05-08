@@ -48,15 +48,12 @@ def process_sdks(
         store_id = row.store_id
 
         try:
-            this_error_count, extension = manifest.process_manifest(
+            this_error_count = manifest.process_manifest(
                 database_connection=database_connection, row=row
             )
             error_count += this_error_count
         except Exception:
             logger.exception(f"Manifest for {store_id} failed")
-
-        # remove_partial_apks(store_id=store_id)
-    # check_local_apks(database_connection=database_connection)
 
 
 def get_downloaded_apks() -> list[str]:
@@ -144,15 +141,15 @@ def process_apks_for_waydroid(
     waydroid.remove_all_third_party_apps()
 
 
-def unzip_apk(store_id: str, extension: str) -> pathlib.Path:
+def unzip_apk(store_id: str, file_path: pathlib.Path) -> pathlib.Path:
+    extension = file_path.suffix
     if extension == ".apk":
-        apk_to_decode_path = pathlib.Path(APKS_INCOMING_DIR, f"{store_id}{extension}")
+        apk_to_decode_path = file_path
     elif extension == ".xapk":
-        xapk_path = pathlib.Path(XAPKS_INCOMING_DIR, f"{store_id}{extension}")
         os.makedirs(APK_TMP_PARTIALS_DIR / store_id, exist_ok=True)
         partial_apk_dir = pathlib.Path(APK_TMP_PARTIALS_DIR, f"{store_id}")
         partial_apk_path = pathlib.Path(partial_apk_dir, f"{store_id}.apk")
-        unzip_command = f"unzip -o {xapk_path.as_posix()} {store_id}.apk -d {partial_apk_dir.as_posix()}"
+        unzip_command = f"unzip -o {file_path.as_posix()} {store_id}.apk -d {partial_apk_dir.as_posix()}"
         unzip_result = os.system(unzip_command)
         apk_to_decode_path = partial_apk_path
         logger.info(f"Output unzipped from xapk to apk: {unzip_result}")
@@ -235,3 +232,10 @@ def get_existing_apk_path(store_id: str) -> pathlib.Path | None:
             return path
 
     return None
+
+
+def remove_partial_apks(store_id: str) -> None:
+    partials_dir = pathlib.Path(APK_TMP_PARTIALS_DIR, store_id)
+    if partials_dir.exists():
+        partials_dir.unlink(missing_ok=True)
+        logger.info(f"{store_id=} deleted partial apk {partials_dir.as_posix()}")
