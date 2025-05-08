@@ -147,6 +147,7 @@ def process_manifest(database_connection: PostgresCon, row: pd.Series) -> int:
     details_df = row.to_frame().T
     version_str = FAILED_VERSION_STR
     manifest_str = ""
+    error_count = 0
     apk_path = get_existing_apk_path(store_id)
     if apk_path is None:
         raise FileNotFoundError
