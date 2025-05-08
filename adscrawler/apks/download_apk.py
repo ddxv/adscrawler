@@ -7,7 +7,6 @@ This script scrapes https://apkpure.com to get the apk download link
 """
 
 import hashlib
-import os
 import pathlib
 import shutil
 import subprocess
@@ -87,15 +86,6 @@ def check_local_apks(database_connection: PostgresCon) -> None:
     df.to_sql(
         "local_apks", con=database_connection.engine, if_exists="replace", index=False
     )
-
-
-def empty_folder(pth: pathlib.Path) -> None:
-    for sub in pth.iterdir():
-        if sub.is_dir() and not sub.is_symlink():
-            empty_folder(sub)
-            os.rmdir(sub)
-        else:
-            sub.unlink()
 
 
 def check_version_code_exists(

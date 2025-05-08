@@ -1,6 +1,5 @@
 """Download an APK and extract it's manifest."""
 
-import os
 import pathlib
 import subprocess
 from xml.etree import ElementTree
@@ -26,15 +25,6 @@ from adscrawler.queries import (
 logger = get_logger(__name__, "download_apk")
 
 FAILED_VERSION_STR = "-1"
-
-
-def empty_folder(pth: pathlib.Path) -> None:
-    for sub in pth.iterdir():
-        if sub.is_dir() and not sub.is_symlink():
-            empty_folder(sub)
-            os.rmdir(sub)
-        else:
-            sub.unlink()
 
 
 def get_parsed_manifest(

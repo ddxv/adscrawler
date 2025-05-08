@@ -237,5 +237,5 @@ def get_existing_apk_path(store_id: str) -> pathlib.Path | None:
 def remove_partial_apks(store_id: str) -> None:
     partials_dir = pathlib.Path(APK_TMP_PARTIALS_DIR, store_id)
     if partials_dir.exists():
-        partials_dir.unlink(missing_ok=True)
+        os.rmdir(partials_dir)
         logger.info(f"{store_id=} deleted partial apk {partials_dir.as_posix()}")
