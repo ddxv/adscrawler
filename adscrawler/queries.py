@@ -374,44 +374,30 @@ def query_store_id_api_called_map(
             else:
                 where_statement += " AND "
             where_statement += (
-                "(ml.run_at <= CURRENT_DATE - INTERVAL '60 days' OR ml.run_at IS NULL)"
+                "(ls.run_at <= CURRENT_DATE - INTERVAL '60 days' OR ls.run_at IS NULL)"
             )
-    sel_query = f"""
-                WITH max_logging AS (
+    sel_query = f"""WITH last_scanned AS (
                     SELECT
                         DISTINCT ON
                         (vc.store_app) *
                     FROM
-                        version_code_api_scan_results vasr
-                    LEFT JOIN version_codes vc 
+                       version_codes vc 
+                    LEFT JOIN version_code_api_scan_results vasr
                         ON vasr.version_code_id = vc.id
                     WHERE
-                        run_at IS NOT NULL
+                        vc.crawl_result = 1
+                        AND vc.updated_at >= '2025-05-01'
                     ORDER BY
                         vc.store_app,
                         run_at DESC
-                ),
-                max_api_calls AS (
-                    SELECT
-                        DISTINCT ON
-                        (store_app) *
-                    FROM
-                        store_app_api_calls
-                    WHERE
-                        called_at IS NOT NULL
-                    ORDER BY
-                        store_app,
-                        called_at DESC
                 )
                 SELECT sa.id as store_app, 
                 sa.store_id, 
-                ml.run_at
+                ls.run_at
                 FROM
                     store_apps sa
-                LEFT JOIN max_logging ml ON
-                    sa.id = ml.store_app
-                LEFT JOIN max_api_calls mac ON
-                    sa.id = mac.store_app
+                RIGHT JOIN last_scanned ls ON
+                    sa.id = ls.store_app
                 {where_statement}
         ;
         """

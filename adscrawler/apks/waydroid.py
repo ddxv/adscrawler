@@ -95,7 +95,7 @@ def run_app(
 ) -> None:
     function_info = f"waydroid {store_id=}"
     crawl_result = 3
-
+    version_code_id = None
     logger.info(f"{function_info} clearing mitmdump")
     mitm_script = pathlib.Path(PACKAGE_DIR, "adscrawler/apks/mitm_start.sh")
     os.system(f"{mitm_script.as_posix()} -d")
@@ -119,6 +119,11 @@ def run_app(
     except Exception as e:
         crawl_result = 2
         logger.exception(f"{function_info} failed: {e}")
+    if version_code_id is None:
+        logger.error(
+            f"{function_info} failed to get version code id will NOT save to db"
+        )
+        return
     logger.info(f"{function_info} save to db")
     insert_api_calls(
         version_code_id=version_code_id,
