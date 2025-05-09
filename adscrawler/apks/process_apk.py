@@ -89,7 +89,7 @@ def process_xapks_for_waydroid(
         database_connection=database_connection,
         store_ids=store_ids,
     )
-    store_id_map = store_id_map.sort_values(by="crawled_at", ascending=False)
+    store_id_map = store_id_map.sort_values(by="run_at", ascending=False)
     logger.info(
         f"Waydroid has {store_id_map.shape[0]} (xapk) apps to process, starting top {num_apps}"
     )
@@ -106,6 +106,7 @@ def process_xapks_for_waydroid(
             extension="xapk",
             store_id=store_id,
             store_app=row.store_app,
+            run_name="regular",
         )
     waydroid.remove_all_third_party_apps()
 
@@ -117,7 +118,7 @@ def process_apks_for_waydroid(
     store_id_map = query_store_id_api_called_map(
         database_connection=database_connection, store_ids=apks
     )
-    store_id_map = store_id_map.sort_values(by="crawled_at", ascending=False)
+    store_id_map = store_id_map.sort_values(by="run_at", ascending=False)
     logger.info(
         f"Waydroid has {store_id_map.shape[0]} apps to process, starting {num_apps}"
     )
@@ -130,6 +131,7 @@ def process_apks_for_waydroid(
             extension=extension,
             store_id=store_id,
             store_app=row.store_app,
+            run_name="regular",
         )
     waydroid.remove_all_third_party_apps()
 

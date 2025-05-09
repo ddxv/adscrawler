@@ -22,8 +22,8 @@ from adscrawler.config import (
 from adscrawler.connection import PostgresCon
 from adscrawler.queries import (
     get_version_code_dbid,
+    insert_df,
     query_store_app_by_store_id,
-    upsert_df,
 )
 
 logger = get_logger(__name__)
@@ -33,25 +33,38 @@ ANDROID_PERMISSION_ACTIVITY = (
 )
 
 
-def upsert_crawled_at(
-    store_app: int, database_connection: PostgresCon, crawl_result: int
+def insert_api_calls(
+    version_code_id: int,
+    database_connection: PostgresCon,
+    crawl_result: int,
+    run_name: str,
+    mdf: pd.DataFrame,
 ) -> None:
-    logger.info(f"upsert_crawled_at {store_app=} {crawl_result=}")
-    key_columns = ["store_app", "crawl_result", "crawled_at"]
-    upsert_df(
-        table_name="store_app_waydroid_crawled_at",
-        schema="logging",
-        insert_columns=["store_app", "crawl_result", "crawled_at"],
-        df=pd.DataFrame(
-            {
-                "store_app": [store_app],
-                "crawl_result": [crawl_result],
-                "crawled_at": datetime.datetime.now(tz=datetime.UTC),
-            }
-        ),
-        key_columns=key_columns,
-        database_connection=database_connection,
+    logger.info(f"insert_crawled_at {crawl_result=}")
+    insert_columns = ["version_code_id", "run_name", "run_result", "run_at"]
+    df = pd.DataFrame(
+        {
+            "version_code_id": [version_code_id],
+            "run_name": [run_name],
+            "run_result": [crawl_result],
+            "run_at": datetime.datetime.now(tz=datetime.UTC),
+        }
     )
+    df = df[insert_columns]
+    run_df = insert_df(
+        df=df,
+        table_name="store_app_api_scan_results",
+        database_connection=database_connection,
+        return_rows=True,
+    )
+    if not mdf.empty:
+        mdf["run_id"] = run_df["id"].to_numpy()[0]
+        insert_df(
+            df=mdf,
+            table_name="store_app_api_calls",
+            database_connection=database_connection,
+        )
+        logger.info(f"inserted {mdf.shape[0]} api calls")
 
 
 def extract_and_sign_xapk(store_id: str) -> None:
@@ -77,6 +90,7 @@ def run_app(
     apk_path: pathlib.Path,
     store_id: str,
     store_app: int,
+    run_name: str,
     timeout: int = 60,
 ) -> None:
     function_info = f"waydroid {store_id=}"
@@ -85,6 +99,7 @@ def run_app(
     logger.info(f"{function_info} clearing mitmdump")
     mitm_script = pathlib.Path(PACKAGE_DIR, "adscrawler/apks/mitm_start.sh")
     os.system(f"{mitm_script.as_posix()} -d")
+    mdf = pd.DataFrame()
 
     try:
         launch_and_track_app(
@@ -96,7 +111,7 @@ def run_app(
             store_id, store_app, database_connection
         )
         try:
-            process_mitm_log(store_id, database_connection, store_app, version_code_id)
+            mdf = process_mitm_log(store_id, store_app, version_code_id)
             crawl_result = 1
         except Exception as e:
             crawl_result = 3
@@ -105,12 +120,17 @@ def run_app(
         crawl_result = 2
         logger.exception(f"{function_info} failed: {e}")
     logger.info(f"{function_info} save to db")
-    upsert_crawled_at(store_app, database_connection, crawl_result)
+    insert_api_calls(
+        version_code_id=version_code_id,
+        database_connection=database_connection,
+        crawl_result=crawl_result,
+        run_name=run_name,
+        mdf=mdf,
+    )
 
 
 def process_mitm_log(
     store_id: str,
-    database_connection: PostgresCon,
     store_app: int,
     version_code_id: int,
 ) -> None:
@@ -120,19 +140,14 @@ def process_mitm_log(
     if mdf.empty:
         logger.warning(f"{function_info} MITM log returned empty dataframe")
     else:
-        mdf = mdf.rename(columns={"timestamp": "crawled_at"})
+        mdf = mdf.rename(columns={"timestamp": "called_at"})
         mdf["url"] = mdf["url"].str[0:1000]
         mdf = mdf[
-            ["url", "host", "crawled_at", "status_code", "tld_url"]
+            ["url", "host", "called_at", "status_code", "tld_url"]
         ].drop_duplicates()
         mdf["store_app"] = store_app
         mdf["version_code"] = version_code_id
-        mdf.to_sql(
-            name="store_app_api_calls",
-            con=database_connection.engine,
-            if_exists="append",
-            index=None,
-        )
+    return mdf
 
 
 def process_app_for_waydroid(
@@ -140,6 +155,7 @@ def process_app_for_waydroid(
     store_id: str,
     store_app: int,
     extension: str,
+    run_name: str,
     timeout: int = 60,
 ) -> None:
     if extension == "apk":
@@ -166,6 +182,7 @@ def process_app_for_waydroid(
             apk_path=apk_path,
             store_id=store_id,
             store_app=store_app,
+            run_name=run_name,
             timeout=timeout,
         )
     except Exception:
@@ -640,10 +657,12 @@ def manual_waydroid_process(
         raise Exception(f"File {store_id}{extension} not found")
     store_app = query_store_app_by_store_id(database_connection, store_id)
     timeout = 300
+    run_name = "regular"
     process_app_for_waydroid(
         database_connection=database_connection,
         store_id=store_id,
         store_app=store_app,
         extension=extension,
         timeout=timeout,
+        run_name=run_name,
     )

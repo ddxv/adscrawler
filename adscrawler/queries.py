@@ -13,6 +13,89 @@ from .connection import PostgresCon
 logger = get_logger(__name__)
 
 
+def insert_df(
+    df: pd.DataFrame,
+    table_name: str,
+    database_connection: Connection,
+    insert_columns: list[str] | None = None,
+    return_rows: bool = False,
+    schema: str | None = None,
+    log: bool = False,
+) -> pd.DataFrame | None:
+    """Perform an "insert" on a PostgreSQL table from a DataFrame.
+    Constructs an INSERT statement, uploads the DataFrame to a
+    temporary table, and then executes the INSERT.
+
+    Parameters
+    ----------
+    data_frame : pandas.DataFrame
+        The DataFrame to be upserted.
+    table_name : str
+        The name of the target table.
+    engine : sqlalchemy.engine.Engine
+        The SQLAlchemy Engine to use.
+    schema : str, optional
+        The name of the schema containing the target table.
+    """
+
+    raw_conn = database_connection.engine.raw_connection()
+
+    if "crawled_date" in df.columns and df["crawled_date"].isna().all():
+        df["crawled_date"] = pd.to_datetime(df["crawled_date"]).dt.date
+        df["crawled_date"] = None
+    if "release_date" in df.columns and df["release_date"].isna().all():
+        df["release_date"] = None
+
+    if insert_columns is None:
+        insert_columns = df.columns.tolist()
+    all_columns = list(set(insert_columns))
+    table_identifier = Identifier(table_name)
+    if schema:
+        table_identifier = Composed([Identifier(schema), SQL("."), table_identifier])
+
+    columns = SQL(", ").join(map(Identifier, all_columns))
+    placeholders = SQL(", ").join(SQL("%s") for _ in all_columns)
+
+    if return_rows:
+        returning_clause = "RETURNING * "
+    else:
+        returning_clause = ""
+
+    insert_query = SQL("""
+        INSERT INTO {table} ({columns})
+        VALUES ({placeholders})
+        {returning_clause}
+    """).format(
+        table=table_identifier,
+        columns=columns,
+        placeholders=placeholders,
+        returning_clause=returning_clause,
+    )
+
+    if log:
+        logger.info(f"Insert query: {insert_query.as_string(raw_conn)}")
+
+    with raw_conn.cursor() as cur:
+        # Perform insert
+        data = [
+            tuple(row) for row in df[all_columns].itertuples(index=False, name=None)
+        ]
+        if log:
+            logger.info(f"Insert data: {data}")
+        cur.executemany(insert_query, data)
+
+        # Fetch affected rows if required
+        if return_rows:
+            result = cur.fetchall()
+            column_names = [desc[0] for desc in cur.description]
+            return_df = pd.DataFrame(result, columns=column_names)
+        else:
+            return_df = None
+
+    raw_conn.commit()
+    return return_df
+
+
 def upsert_df(
     df: pd.DataFrame,
     table_name: str,
@@ -290,19 +373,23 @@ def query_store_id_api_called_map(
                 where_statement += " WHERE "
             else:
                 where_statement += " AND "
-            where_statement += "(ml.crawled_at <= CURRENT_DATE - INTERVAL '30 days' OR ml.crawled_at IS NULL)"
+            where_statement += (
+                "(ml.run_at <= CURRENT_DATE - INTERVAL '60 days' OR ml.run_at IS NULL)"
+            )
     sel_query = f"""
                 WITH max_logging AS (
                     SELECT
                         DISTINCT ON
-                        (store_app) *
+                        (vc.store_app) *
                     FROM
-                        logging.store_app_waydroid_crawled_at
+                        version_code_api_scan_results vasr
+                    LEFT JOIN version_codes vc 
+                        ON vasr.version_code_id = vc.id
                     WHERE
-                        crawled_at IS NOT NULL
+                        run_at IS NOT NULL
                     ORDER BY
-                        store_app,
-                        crawled_at DESC
+                        vc.store_app,
+                        run_at DESC
                 ),
                 max_api_calls AS (
                     SELECT
@@ -311,14 +398,14 @@ def query_store_id_api_called_map(
                     FROM
                         store_app_api_calls
                     WHERE
-                        crawled_at IS NOT NULL
+                        called_at IS NOT NULL
                     ORDER BY
                         store_app,
-                        crawled_at DESC
+                        called_at DESC
                 )
                 SELECT sa.id as store_app, 
                 sa.store_id, 
-                ml.crawled_at
+                ml.run_at
                 FROM
                     store_apps sa
                 LEFT JOIN max_logging ml ON
