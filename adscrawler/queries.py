@@ -188,15 +188,6 @@ def upsert_details_df(
     store_id: str,
     raw_txt_str: str,
 ) -> None:
-    version_code_df = details_df[["version_code_id", "scan_result"]].drop_duplicates()
-
-    version_code_df.to_sql(
-        "version_code_sdk_scan_results",
-        database_connection.engine,
-        if_exists="append",
-        index=False,
-    )
-
     details_df = details_df.rename(
         columns={
             "path": "xml_path",

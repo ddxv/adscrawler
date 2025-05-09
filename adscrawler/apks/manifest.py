@@ -183,10 +183,23 @@ def process_manifest(database_connection: PostgresCon, row: pd.Series):
     )
     details_df["version_code_id"] = version_code_dbid
     details_df["scan_result"] = crawl_result
-    upsert_details_df(
-        details_df=details_df,
-        database_connection=database_connection,
-        store_id=store_id,
-        raw_txt_str=manifest_str,
+
+    version_code_df = details_df[["version_code_id", "scan_result"]].drop_duplicates()
+
+    version_code_df.to_sql(
+        "version_code_sdk_scan_results",
+        database_connection.engine,
+        if_exists="append",
+        index=False,
     )
+    if crawl_result == 1:
+        upsert_details_df(
+            details_df=details_df,
+            database_connection=database_connection,
+            store_id=store_id,
+            raw_txt_str=manifest_str,
+        )
+    else:
+        logger.info(f"{store_id=} crawl_result {crawl_result=} skipping upsert")
+
     remove_partial_apks(store_id=store_id)
