@@ -60,8 +60,8 @@ def download_apks(
     for _id, row in apps.iterrows():
         if error_count > 0:
             sleep_time = error_count * error_count * 10
-            time.sleep(sleep_time)
             logger.info(f"Sleeping for {sleep_time} seconds due to {error_count=}")
+            time.sleep(sleep_time)
         if error_count > 11:
             logger.error(f"Too many errors: {error_count=} breaking loop")
             break
@@ -72,6 +72,9 @@ def download_apks(
                 database_connection=database_connection, row=row
             )
             error_count += this_error_count
+            if this_error_count == 0:
+                logger.info(f"Sleeping for default time: {sleep_time}")
+                sleep_time = time.sleep(error_count + 30)
         except Exception:
             logger.exception(f"Download for {store_id} failed")
 
