@@ -188,10 +188,20 @@ def upsert_details_df(
     store_id: str,
     raw_txt_str: str,
 ) -> None:
+    version_code_df = details_df[["version_code_id", "scan_result"]].drop_duplicates()
+
+    version_code_df.to_sql(
+        "version_code_sdk_scan_results",
+        database_connection.engine,
+        if_exists="append",
+        index=False,
+    )
+
     details_df = details_df.rename(
         columns={
             "path": "xml_path",
             "android_name": "value_name",
+            "version_code_id": "version_code",
         }
     )
     key_insert_columns = ["xml_path", "tag", "value_name"]
@@ -755,36 +765,38 @@ def get_next_to_sdk_scan(
                     updated_at DESC,
                     string_to_array(version_code, '.')::bigint[] DESC
             ),
-            latest_analyze_results AS (
+            last_scan AS (
                 SELECT
                     DISTINCT ON
-                    (version_code)
-                    version_code,
-                    sdk_analyzed_at AS sd_last_analyzed,
-                    analyze_result AS analyze_result
+                    (vc.store_app)
+                    vc.store_app,
+                    version_code_id AS version_code,
+                    scanned_at,
+                    scan_result
                 FROM
-                    version_details_map
-                WHERE analyze_result = 1
+                    version_code_sdk_scan_results lsscr
+                LEFT JOIN version_codes vc ON lsscr.version_code_id = vc.id
                 ORDER BY
-                    version_code DESC
+                    vc.store_app,
+                    lsscr.scanned_at DESC 
             ),
-             latest_success_version_codes AS (
+            last_scan_succeed AS (
                 SELECT
                     DISTINCT ON
                     (vc.store_app)
                     vc.id,
                     vc.store_app,
                     vc.version_code,
-                    vdm.sdk_analyzed_at,
-                    vdm.analyze_result
+                    vcss.scanned_at,
+                    vcss.scan_result
                 FROM
                     version_codes vc
-                LEFT JOIN version_details_map vdm ON 
-                vc.id = vdm.version_code
-                WHERE vdm.analyze_result = 1 
+                LEFT JOIN version_code_sdk_scan_results vcss ON 
+                vc.id = vcss.version_code_id
+                WHERE vcss.scan_result = 1 
                 ORDER BY
                     vc.store_app,
-                    vdm.sdk_analyzed_at DESC,
+                    vcss.scanned_at DESC,
                     string_to_array(vc.version_code, '.')::bigint[] DESC
             ),
             scheduled_apps_crawl AS (
@@ -794,26 +806,28 @@ def get_next_to_sdk_scan(
                 dc.name,
                 dc.installs,
                 dc.rating_count,
-                vc.download_result as download_result,
-               lsvc.analyze_result AS last_analyzed_result,
-                lsvc.sdk_analyzed_at
+                'regular' AS mysource,
+                ls.scan_result AS last_analyzed_result,
+                ls.scanned_at AS last_scanned_at,
+                lsvc.scanned_at AS last_scuccess_scanned_at
             FROM
                 store_apps_in_latest_rankings dc
             RIGHT JOIN latest_version_codes vc ON
                 vc.store_app = dc.store_app
-            LEFT JOIN latest_success_version_codes lsvc ON
+            LEFT JOIN last_scan ls ON dc.store_app = ls.store_app
+            LEFT JOIN last_scan_succeed lsvc ON
                 dc.store_app = lsvc.store_app
             WHERE
                 dc.store = {store}
                 AND vc.download_result = 1
                 AND
                 (   
-                    lsvc.sdk_analyzed_at IS NULL 
+                    lsvc.scanned_at IS NULL 
                     OR
                         (
-                        (lsvc.analyze_result = 1 AND lsvc.sdk_analyzed_at < current_date - INTERVAL '180 days')
+                        (lsvc.scan_result = 1 AND lsvc.scanned_at < current_date - INTERVAL '180 days')
                         OR
-                        (lsvc.analyze_result IN (2,3,4) AND lsvc.sdk_analyzed_at < current_date - INTERVAL '30 days')
+                        (lsvc.scan_result IN (2,3,4) AND lsvc.scanned_at < current_date - INTERVAL '30 days')
                         )
                 )
             ORDER BY
@@ -834,19 +848,22 @@ def get_next_to_sdk_scan(
                 sa.name,
                 sa.installs,
                 sa.rating_count,
-                lsvc.analyze_result AS last_analyzed_result,
-                lsvc.sdk_analyzed_at
+                'user' AS mysource,
+                ls.scan_result AS last_analyzed_result,
+                ls.scanned_at AS last_scanned_at,
+                lsvc.scanned_at AS last_scuccess_scanned_at
             FROM
                 user_requested_scan urs
             LEFT JOIN store_apps sa ON
                 urs.store_id = sa.store_id
-            LEFT JOIN latest_success_version_codes lsvc ON
-                sa.id = lsvc.store_app
+            LEFT JOIN last_scan ls ON sa.id = ls.store_app
+            LEFT JOIN last_scan_succeed lsvc ON
+                sa.id = lsvc.store_app                
             RIGHT JOIN latest_version_codes lvc ON
                 sa.id = lvc.store_app
             WHERE
-                (lsvc.sdk_analyzed_at < urs.created_at
-                    OR lsvc.sdk_analyzed_at IS NULL
+                (lsvc.scanned_at < urs.created_at
+                    OR lsvc.scanned_at IS NULL
                 )
                 AND (lvc.last_downloaded_at < current_date - INTERVAL '1 days'
                     OR lvc.last_downloaded_at IS NULL)
@@ -858,8 +875,10 @@ def get_next_to_sdk_scan(
             name,
             installs,
             rating_count,
+            mysource,
             last_analyzed_result,
-            sdk_analyzed_at
+            last_scanned_at,
+            last_scuccess_scanned_at
         FROM
             user_requested_apps_crawl
         UNION ALL
@@ -869,8 +888,10 @@ def get_next_to_sdk_scan(
             name,
             installs,
             rating_count,
-            last_analyzed_result,
-            sdk_analyzed_at
+            mysource,
+           last_analyzed_result,
+            last_scanned_at,
+            last_scuccess_scanned_at
         FROM
             scheduled_apps_crawl
         LIMIT {limit}

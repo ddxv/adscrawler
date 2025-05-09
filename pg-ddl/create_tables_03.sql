@@ -195,3 +195,10 @@ CREATE TABLE logging.store_app_waydroid_crawled_at (
 CREATE UNIQUE INDEX logging_store_app_upsert_unique ON logging.store_app_waydroid_crawled_at USING btree (
     store_app, crawl_result, crawled_at
 );
+
+
+CREATE TABLE public.version_code_sdk_scan_results (
+    version_code_id int PRIMARY KEY REFERENCES public.version_codes (id),
+    scan_result int2 NOT NULL,
+    scanned_at timestamp NOT NULL DEFAULT TIMEZONE('utc', NOW())
+);

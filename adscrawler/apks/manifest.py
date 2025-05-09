@@ -181,7 +181,8 @@ def process_manifest(database_connection: PostgresCon, row: pd.Series):
         version_code=version_str,
         database_connection=database_connection,
     )
-    details_df["version_code"] = version_code_dbid
+    details_df["version_code_id"] = version_code_dbid
+    details_df["scan_result"] = crawl_result
     upsert_details_df(
         details_df=details_df,
         database_connection=database_connection,
