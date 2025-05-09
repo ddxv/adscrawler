@@ -165,7 +165,6 @@ def insert_version_code(
             }
         ]
     )
-    logger.info(f"{store_app=} {version_str=} insert version_code to db")
     upserted: pd.DataFrame = upsert_df(
         df=version_code_df,
         table_name="version_codes",
@@ -174,6 +173,7 @@ def insert_version_code(
         return_rows=return_rows,
         insert_columns=["store_app", "version_code", "crawl_result", "apk_hash"],
     )
+    logger.info(f"{store_app=} {version_str=} inserted to db")
 
     if return_rows:
         upserted = upserted.rename(
@@ -188,7 +188,6 @@ def upsert_details_df(
     store_id: str,
     raw_txt_str: str,
 ) -> None:
-    logger.info(f"{store_id=} insert version_code to db")
     details_df = details_df.rename(
         columns={
             "path": "xml_path",
@@ -196,7 +195,7 @@ def upsert_details_df(
         }
     )
     key_insert_columns = ["xml_path", "tag", "value_name"]
-    logger.info(f"{store_id=} insert version_strings to db")
+    logger.info(f"{store_id=} insert {details_df.shape[0]} version_strings to db")
     details_df.loc[details_df["tag"].isna(), "tag"] = ""
     strings_df = details_df[key_insert_columns + ["version_code"]].drop_duplicates()
     version_strings_df = upsert_df(
@@ -208,7 +207,7 @@ def upsert_details_df(
         return_rows=True,
     )
     if version_strings_df is None:
-        logger.error(f"{store_id=} insert version_strings to db")
+        logger.error(f"{store_id=} insert version_strings to db returned None")
         logger.error(strings_df[strings_df["tag"].isna()])
         raise Exception(f"{store_id=} insert version_strings to db")
     version_strings_df = version_strings_df.rename(columns={"id": "string_id"})

@@ -61,7 +61,9 @@ def download_apks(
         if error_count > 5:
             continue
         if error_count > 0:
-            time.sleep(error_count * error_count * 30)
+            sleep_time = error_count * error_count * 30
+            logger.info(f"Sleeping for {sleep_time} seconds due to {error_count=}")
+            time.sleep(sleep_time)
         store_id = row.store_id
 
         try:
@@ -191,22 +193,18 @@ def move_files_to_main_dir(store_id: str, extension: str) -> None:
 
 
 def get_download_url(store_id: str, source: str) -> str:
-    """Get the download url for the apk."""
+    """Get the download URL for the apk."""
     if source == "apkmirror":
         try:
             download_url = apkmirror.get_download_url(store_id)
-            logger.info("download apk from apkmirror")
             return download_url
         except Exception as e:
-            logger.error(f"Error getting APKMIRROR download url for {store_id}: {e}")
             raise e
     elif source == "apkpure":
         try:
             download_url = apkpure.get_download_url(store_id)
-            logger.info("download apk from apkpure")
             return download_url
         except Exception as e:
-            logger.error(f"Error getting APKPURE download url for {store_id}: {e}")
             raise e
     else:
         raise ValueError(f"Invalid source: {source}")
@@ -230,17 +228,15 @@ def download(store_id: str) -> str:
     for source in APK_SOURCES:
         try:
             download_url = get_download_url(store_id, source)
-            logger.info(f"{func_info} found download url for {source}")
+            logger.info(f"{func_info} {source} found download URL")
             break
         except Exception as e:
-            logger.error(
-                f"{func_info} error getting {source} download url for {store_id}: {e}"
-            )
+            logger.error(f"{func_info} {source}: {e}")
             continue
 
     if not download_url:
         raise requests.exceptions.HTTPError(
-            f"{func_info} no download url found for any source."
+            f"{func_info} no download URL found for any source."
         )
 
     r = requests.get(
