@@ -137,7 +137,7 @@ def xml_to_dataframe(root: ElementTree.Element) -> pd.DataFrame:
     return df
 
 
-def process_manifest(database_connection: PostgresCon, row: pd.Series) -> int:
+def process_manifest(database_connection: PostgresCon, row: pd.Series):
     """Process an APKs manifest.
     Due to the original implementation, this still downloads, processes manifest and saves the version_details.
     """
@@ -147,12 +147,12 @@ def process_manifest(database_connection: PostgresCon, row: pd.Series) -> int:
     details_df = row.to_frame().T
     version_str = FAILED_VERSION_STR
     manifest_str = ""
-    error_count = 0
-    apk_path = get_existing_apk_path(store_id)
-    if apk_path is None:
-        raise FileNotFoundError
 
     try:
+        apk_path = get_existing_apk_path(store_id)
+        if apk_path is None:
+            raise FileNotFoundError(f"{store_id=} no apk found: {apk_path=}")
+
         apk_tmp_decoded_output_path = unzip_apk(store_id=store_id, file_path=apk_path)
 
         # extension = download(store_id, do_redownload=False)
@@ -164,14 +164,15 @@ def process_manifest(database_connection: PostgresCon, row: pd.Series) -> int:
         crawl_result = 1
         logger.info(f"{store_id=} unzipped finished")
 
+    except FileNotFoundError as e:
+        logger.exception(f"FileNotFoundError for {store_id=}: {str(e)}")
+        crawl_result = 4  # FileNotFoundError
     except subprocess.CalledProcessError as e:
         logger.exception(f"Unexpected error for {store_id=}: {str(e)}")
         crawl_result = 3  # Unexpected error
     except Exception as e:
         logger.exception(f"Unexpected error for {store_id=}: {str(e)}")
         crawl_result = 3  # Unexpected errors
-    if crawl_result in [2, 3, 4]:
-        error_count = 1
     if not version_str:
         raise ValueError(f"Version string is empty for {store_id=}")
     details_df["store_app"] = row.store_app
@@ -188,4 +189,3 @@ def process_manifest(database_connection: PostgresCon, row: pd.Series) -> int:
         raw_txt_str=manifest_str,
     )
     remove_partial_apks(store_id=store_id)
-    return error_count

@@ -59,7 +59,8 @@ def download_apks(
     logger.info(f"Start APK downloads: {apps.shape=}")
     for _id, row in apps.iterrows():
         if error_count > 5:
-            continue
+            logger.error(f"Too many errors: {error_count=} breaking loop")
+            break
         if error_count > 0:
             sleep_time = error_count * error_count * 30
             logger.info(f"Sleeping for {sleep_time} seconds due to {error_count=}")
@@ -76,6 +77,7 @@ def download_apks(
 
         remove_partial_apks(store_id=store_id)
     check_local_apks(database_connection=database_connection)
+    logger.info("Finished downloading APKs")
 
 
 def check_local_apks(database_connection: PostgresCon) -> None:

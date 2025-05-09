@@ -32,7 +32,6 @@ def process_sdks(
     This shows which SDKs are used in the app.
     All results are saved to the database.
     """
-    error_count = 0
     store = 1
     apps = get_next_to_sdk_scan(
         database_connection=database_connection,
@@ -41,17 +40,11 @@ def process_sdks(
     )
     logger.info(f"Start APK processing: {apps.shape=}")
     for _id, row in apps.iterrows():
-        if error_count > 5:
-            continue
-        if error_count > 0:
-            time.sleep(error_count * error_count * 30)
         store_id = row.store_id
 
         try:
-            this_error_count = manifest.process_manifest(
-                database_connection=database_connection, row=row
-            )
-            error_count += this_error_count
+            manifest.process_manifest(database_connection=database_connection, row=row)
+            time.sleep(1)
         except Exception:
             logger.exception(f"Manifest for {store_id} failed")
 
