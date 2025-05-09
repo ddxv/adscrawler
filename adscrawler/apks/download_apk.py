@@ -58,13 +58,13 @@ def download_apks(
     )
     logger.info(f"Start APK downloads: {apps.shape=}")
     for _id, row in apps.iterrows():
-        if error_count > 5:
-            logger.error(f"Too many errors: {error_count=} breaking loop")
-            break
         if error_count > 0:
             sleep_time = error_count * error_count * 30
             logger.info(f"Sleeping for {sleep_time} seconds due to {error_count=}")
+        if error_count > 11:
             time.sleep(sleep_time)
+            logger.error(f"Too many errors: {error_count=} breaking loop")
+            break
         store_id = row.store_id
 
         try:
