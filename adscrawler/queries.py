@@ -962,7 +962,7 @@ def get_version_code_dbid(
 
 def get_version_code_by_md5_hash(
     database_connection: PostgresCon, md5_hash: str, store_id: str
-) -> str | None:
+) -> int | None:
     sel_query = f"""SELECT * FROM version_codes vc
     LEFT JOIN store_apps sa ON
         sa.id = vc.store_app
