@@ -73,8 +73,8 @@ def download_apks(
             )
             error_count += this_error_count
             if this_error_count == 0:
-                logger.info(f"Sleeping for default time: {sleep_time}")
                 sleep_time = time.sleep(error_count + 30)
+                logger.info(f"Sleeping for default time: {sleep_time}")
         except Exception:
             logger.exception(f"Download for {store_id} failed")
 
