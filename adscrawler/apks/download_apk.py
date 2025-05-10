@@ -68,12 +68,30 @@ def download_apks(
         store_id = row.store_id
 
         try:
-            this_error_count = manage_download(
-                database_connection=database_connection, row=row
-            )
+            file_path = get_existing_apk_path(store_id)
+            if file_path:
+                if (
+                    "apk-files/apks/" in file_path.as_posix()
+                    or "apk-files/xapks/" in file_path.as_posix()
+                ):
+                    if check_version_code_exists(
+                        database_connection, store_id, file_path
+                    ):
+                        logger.info(f"{store_id=} version code already in db,skipping")
+                        continue
+                else:
+                    manage_download(
+                        database_connection, row, exsiting_file_path=file_path
+                    )
+            else:
+                this_error_count = manage_download(
+                    database_connection=database_connection,
+                    row=row,
+                    exsiting_file_path=None,
+                )
             error_count += this_error_count
             if this_error_count == 0:
-                sleep_time = time.sleep(error_count + 30)
+                sleep_time = error_count + 30
                 logger.info(f"Sleeping for default time: {sleep_time}")
         except Exception:
             logger.exception(f"Download for {store_id} failed")
@@ -97,7 +115,7 @@ def check_local_apks(database_connection: PostgresCon) -> None:
 
 def check_version_code_exists(
     database_connection: PostgresCon, store_id: str, file_path: pathlib.Path
-) -> str | None:
+) -> int | None:
     md5_hash = hashlib.md5(file_path.read_bytes()).hexdigest()
     version_code = get_version_code_by_md5_hash(database_connection, md5_hash, store_id)
     return version_code
@@ -107,52 +125,53 @@ def get_md5_hash(file_path: pathlib.Path) -> str:
     return hashlib.md5(file_path.read_bytes()).hexdigest()
 
 
-def manage_download(database_connection: PostgresCon, row: pd.Series) -> int:
+def manage_download(
+    database_connection: PostgresCon,
+    row: pd.Series,
+    exsiting_file_path: pathlib.Path | None,
+) -> int:
     """Manage the download of an apk or xapk file"""
+    func_info = f"{row.store_id=} download"
     crawl_result = 3
     store_id = row.store_id
-    logger.info(f"{store_id=} start")
+    logger.info(f"{func_info} start")
     version_str = FAILED_VERSION_STR
     md5_hash = None
-    download_in_incoming = False
+    file_path = None
+
+    download_url = None
+    for source in APK_SOURCES:
+        try:
+            download_url = get_download_url(store_id, source)
+            break
+        except Exception as e:
+            logger.error(f"{source}: {e}")
+            continue
+
+    if not download_url:
+        raise requests.exceptions.HTTPError(
+            f"{store_id=} no download URL found for any source."
+        )
+
     try:
-        file_path = get_existing_apk_path(store_id)
-        if file_path:
-            extension = file_path.suffix
-            if "incoming" in file_path.as_posix():
-                logger.info(
-                    f"{store_id=} already exists in incoming dir, skipping download"
-                )
-                download_in_incoming = True
-            else:
-                logger.info(
-                    f"{store_id=} already exists in main dir, skipping download"
-                )
-                if check_version_code_exists(database_connection, store_id, file_path):
-                    logger.info(f"{store_id=} version code already in db")
-                    return 0
+        if exsiting_file_path:
+            file_path = exsiting_file_path
+            logger.info(f"{func_info=} using existing file: {file_path}")
         else:
-            extension = download(store_id)
-            download_in_incoming = True
-            if extension == ".apk":
-                file_path = pathlib.Path(APKS_INCOMING_DIR, f"{store_id}{extension}")
-            elif extension == ".xapk":
-                file_path = pathlib.Path(XAPKS_INCOMING_DIR, f"{store_id}{extension}")
-            else:
-                raise ValueError(f"Invalid extension: {extension}")
+            file_path = download(store_id, download_url)
         apk_tmp_decoded_output_path = unzip_apk(store_id=store_id, file_path=file_path)
         apktool_info_path = pathlib.Path(apk_tmp_decoded_output_path, "apktool.yml")
         version_str = get_version(apktool_info_path)
 
         md5_hash = get_md5_hash(file_path)
         crawl_result = 1
-        logger.info(f"{store_id=} unzipped finished")
+
     except requests.exceptions.HTTPError:
         crawl_result = 2  # 404, 403s etc
     except requests.exceptions.ConnectionError:
         crawl_result = 2  # 404s etc
     except FileNotFoundError:
-        logger.exception(f"{store_id=} unable to unpack apk")
+        logger.exception(f"{func_info=} unable to unpack apk")
         crawl_result = 1
     except subprocess.CalledProcessError as e:
         logger.exception(f"Unexpected error for {store_id=}: {str(e)}")
@@ -166,9 +185,12 @@ def manage_download(database_connection: PostgresCon, row: pd.Series) -> int:
         error_count = 1
     elif crawl_result in [1]:
         error_count = 0
+
+    logger.info(f"{func_info=} {crawl_result} {md5_hash=} {version_str=}")
     # TODO: this doesn't work quite right when running locally
     # The files will only be available in the local and not on the main server
     # Will need to move the files to a centralized object storage service
+
     insert_version_code(
         version_str=version_str,
         store_app=row.store_app,
@@ -177,9 +199,9 @@ def manage_download(database_connection: PostgresCon, row: pd.Series) -> int:
         return_rows=False,
         apk_hash=md5_hash,
     )
-    if crawl_result in [1, 3] and download_in_incoming:
+    if crawl_result in [1, 3] and "incoming" in file_path.as_posix():
         # Move files from incoming to main dir
-        move_files_to_main_dir(store_id, extension)
+        move_files_to_main_dir(store_id, file_path.suffix)
     return error_count
 
 
@@ -215,7 +237,7 @@ def get_download_url(store_id: str, source: str) -> str:
         raise ValueError(f"Invalid source: {source}")
 
 
-def download(store_id: str) -> str:
+def download(store_id: str, download_url: str) -> pathlib.Path:
     """Download the apk file.
 
     Downloaded APK or XAPK files are stored in the incoming directories while processing in this script.
@@ -225,24 +247,8 @@ def download(store_id: str) -> str:
     do_redownload: bool if True, download the apk even if it already exists
     """
 
-    func_info = f"{store_id=} download"
-
+    func_info = f"{store_id=} {download_url=} download"
     logger.info(f"{func_info} start")
-
-    download_url = None
-    for source in APK_SOURCES:
-        try:
-            download_url = get_download_url(store_id, source)
-            logger.info(f"{func_info} {source} found download URL")
-            break
-        except Exception as e:
-            logger.error(f"{func_info} {source}: {e}")
-            continue
-
-    if not download_url:
-        raise requests.exceptions.HTTPError(
-            f"{func_info} no download URL found for any source."
-        )
 
     r = requests.get(
         download_url,
@@ -271,8 +277,10 @@ def download(store_id: str) -> str:
 
         if extension == ".xapk":
             apk_filepath = pathlib.Path(XAPKS_INCOMING_DIR, f"{store_id}{extension}")
-        if extension == ".apk":
+        elif extension == ".apk":
             apk_filepath = pathlib.Path(APKS_INCOMING_DIR, f"{store_id}{extension}")
+        else:
+            raise ValueError(f"Invalid extension: {extension}")
         logger.info(f"{func_info} saving to: {apk_filepath}")
 
         with apk_filepath.open("wb") as file:
@@ -284,4 +292,4 @@ def download(store_id: str) -> str:
         logger.error(f"{func_info} request failed with {r.status_code=} {r.text[:50]}")
         raise requests.exceptions.HTTPError
     logger.info(f"{func_info} finished")
-    return extension
+    return apk_filepath

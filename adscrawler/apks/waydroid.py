@@ -138,7 +138,7 @@ def process_mitm_log(
     store_id: str,
     store_app: int,
     version_code_id: int,
-) -> None:
+) -> pd.DataFrame:
     function_info = f"MITM {store_id=}"
     mdf = mitm_process_log.parse_mitm_log(store_id)
     logger.info(f"{function_info} log has {mdf.shape[0]} rows")

@@ -257,7 +257,7 @@ def plist_main(
             ipa_path = pathlib.Path(IPAS_DIR, f"{bundle_id}.ipa")
             version_str, plist_str, details_df = get_parsed_plist()
             crawl_result = 1
-            logger.info(f"{store_id=} unzipped finished")
+            logger.info(f"{store_id=} plist finished")
         except requests.exceptions.HTTPError:
             crawl_result = 3  # 404s etc
         except requests.exceptions.ConnectionError:
@@ -283,7 +283,6 @@ def plist_main(
         try:
             upsert_details_df(
                 details_df=details_df,
-                crawl_result=crawl_result,
                 database_connection=database_connection,
                 store_id=store_id,
                 raw_txt_str=plist_str,

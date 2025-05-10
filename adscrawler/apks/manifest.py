@@ -137,13 +137,13 @@ def xml_to_dataframe(root: ElementTree.Element) -> pd.DataFrame:
     return df
 
 
-def process_manifest(database_connection: PostgresCon, row: pd.Series):
+def process_manifest(database_connection: PostgresCon, row: pd.Series) -> None:
     """Process an APKs manifest.
     Due to the original implementation, this still downloads, processes manifest and saves the version_details.
     """
     crawl_result = 3
     store_id = row.store_id
-    logger.info(f"{store_id=} start")
+    logger.info(f"process_manifest {store_id=} start")
     details_df = row.to_frame().T
     version_str = FAILED_VERSION_STR
     manifest_str = ""
@@ -162,7 +162,6 @@ def process_manifest(database_connection: PostgresCon, row: pd.Series):
         apktool_info_path = pathlib.Path(apk_tmp_decoded_output_path, "apktool.yml")
         version_str = get_version(apktool_info_path)
         crawl_result = 1
-        logger.info(f"{store_id=} unzipped finished")
 
     except FileNotFoundError as e:
         logger.exception(f"FileNotFoundError for {store_id=}: {str(e)}")
