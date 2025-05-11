@@ -89,7 +89,7 @@ def download_apks(
                     row=row,
                     exsiting_file_path=None,
                 )
-            error_count += this_error_count
+                error_count += this_error_count
             if this_error_count == 0:
                 sleep_time = error_count + 30
                 logger.info(f"Sleeping for default time: {sleep_time}")
