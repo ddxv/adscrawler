@@ -58,6 +58,7 @@ def download_apks(
     )
     logger.info(f"Start APK downloads: {apps.shape=}")
     for _id, row in apps.iterrows():
+        this_error_count = 0
         if error_count > 0:
             sleep_time = error_count * error_count * 10
             logger.info(f"Sleeping for {sleep_time} seconds due to {error_count=}")
