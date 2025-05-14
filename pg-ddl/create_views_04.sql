@@ -116,7 +116,8 @@ WITH DATA;
 -- This is called very often, hence the need for an MV
 CREATE MATERIALIZED VIEW public.store_apps_in_latest_rankings
 TABLESPACE pg_default
-AS SELECT DISTINCT ON (ar.store_app)
+AS
+SELECT DISTINCT ON (ar.store_app)
     ar.store_app,
     sa.store,
     sa.name,
@@ -125,5 +126,9 @@ AS SELECT DISTINCT ON (ar.store_app)
     sa.store_id
 FROM app_rankings AS ar
 LEFT JOIN store_apps AS sa ON ar.store_app = sa.id
-WHERE ar.crawled_date > (CURRENT_DATE - '15 days'::interval)
+LEFT JOIN countries AS c ON ar.country = c.id
+WHERE
+    ar.crawled_date > (CURRENT_DATE - '15 days'::interval)
+    AND c.alpha2 IN ('US', 'GB', 'DE', 'CN', 'BR')
+    AND ar.rank < 100
 WITH DATA;
