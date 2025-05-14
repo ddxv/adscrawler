@@ -711,8 +711,7 @@ def get_top_apps_to_download(
     store: int,
     limit: int = 25,
 ) -> pd.DataFrame:
-    sel_query = f"""WITH
-            latest_version_codes AS (
+    sel_query = f"""WITH latest_version_codes AS (
                 SELECT
                     DISTINCT ON
                     (version_codes.store_app)
@@ -745,19 +744,34 @@ def get_top_apps_to_download(
                     version_codes.updated_at DESC,
                     string_to_array(version_codes.version_code, '.')::bigint[] DESC
             ),
-            scheduled_apps_crawl AS (
+            failing_downloads AS (
+SELECT
+    store_app,
+    count(*) AS attempt_count
+FROM
+    logging.store_app_downloads
+WHERE
+    crawl_result != 1
+    AND updated_at >= current_date - INTERVAL '30 days'
+GROUP BY
+    store_app
+    ),       
+    scheduled_apps_crawl AS (
             SELECT
                 dc.store_app,
                 dc.store_id,
                 dc.name,
                 dc.installs,
                 dc.rating_count,
+                COALESCE(fd.attempt_count, 0) AS attempt_count,
                 vc.crawl_result as last_crawl_result,
                 vc.updated_at
             FROM
                 store_apps_in_latest_rankings dc
             LEFT JOIN latest_version_codes vc ON
                 vc.store_app = dc.store_app
+            LEFT JOIN failing_downloads fd ON 
+                vc.store_app = fd.store_app
             WHERE
                 dc.store = {store}
                 AND
@@ -788,6 +802,7 @@ def get_top_apps_to_download(
                 sa.name,
                 sa.installs,
                 sa.rating_count,
+                COALESCE(fd.attempt_count, 0) AS attempt_count,
                 lsvc.crawl_result AS last_crawl_result,
                 lsvc.updated_at
             FROM
@@ -798,6 +813,7 @@ def get_top_apps_to_download(
                 sa.id = lsvc.store_app
             LEFT JOIN latest_version_codes lvc ON
                 sa.id = lvc.store_app
+            LEFT JOIN failing_downloads fd ON sa.id = fd.store_app
             WHERE
                 (lsvc.updated_at < urs.created_at
                     OR lsvc.updated_at IS NULL
@@ -810,11 +826,13 @@ def get_top_apps_to_download(
             *
         FROM
             user_requested_apps_crawl
+        WHERE attempt_count < 3
         UNION ALL
         SELECT
             *
         FROM
             scheduled_apps_crawl
+        WHERE attempt_count < 2
         LIMIT {limit}
         ;
     """
