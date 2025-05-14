@@ -181,9 +181,8 @@ CREATE TABLE keywords_base (
 );
 
 
-
 CREATE TABLE public.version_code_sdk_scan_results (
-        id serial PRIMARY KEY,
+    id serial PRIMARY KEY,
     version_code_id int PRIMARY KEY REFERENCES public.version_codes (id),
     scan_result int2 NOT NULL,
     scanned_at timestamp NOT NULL DEFAULT TIMEZONE('utc', NOW())
@@ -191,26 +190,45 @@ CREATE TABLE public.version_code_sdk_scan_results (
 
 
 CREATE TABLE public.store_app_api_calls (
-	id serial4 NOT NULL,
-	store_app int4 NOT NULL,
-	tld_url text NOT NULL,
-	url text NOT NULL,
-	host text NOT NULL,
-	status_code int4 NOT NULL,
-	called_at timestamp NOT NULL,
-	run_id int4 NOT NULL,
-	CONSTRAINT store_app_api_calls_pkey PRIMARY KEY (id),
-	CONSTRAINT unique_store_app_api_calls UNIQUE (store_app, tld_url, url, host, status_code, called_at),
-	CONSTRAINT store_app_api_call_fk FOREIGN KEY (store_app) REFERENCES public.store_apps(id) ON DELETE CASCADE,
-	CONSTRAINT store_app_api_calls_api_scan_id_fkey FOREIGN KEY (run_id) REFERENCES public.version_code_api_scan_results(id)
+    id serial4 NOT NULL,
+    store_app int4 NOT NULL,
+    tld_url text NOT NULL,
+    url text NOT NULL,
+    host text NOT NULL,
+    status_code int4 NOT NULL,
+    called_at timestamp NOT NULL,
+    run_id int4 NOT NULL,
+    CONSTRAINT store_app_api_calls_pkey PRIMARY KEY (id),
+    CONSTRAINT unique_store_app_api_calls UNIQUE (
+        store_app, tld_url, url, host, status_code, called_at
+    ),
+    CONSTRAINT store_app_api_call_fk FOREIGN KEY (
+        store_app
+    ) REFERENCES public.store_apps (id) ON DELETE CASCADE,
+    CONSTRAINT store_app_api_calls_api_scan_id_fkey FOREIGN KEY (
+        run_id
+    ) REFERENCES public.version_code_api_scan_results (id)
 );
 
 CREATE TABLE public.version_code_api_scan_results (
-	id serial4 NOT NULL,
-	version_code_id int4 NOT NULL,
-	run_name text NULL,
-	run_result int2 NOT NULL,
-	run_at timestamp DEFAULT timezone('utc'::text, now()) NOT NULL,
-	CONSTRAINT version_code_api_scan_results_pkey PRIMARY KEY (id),
-	CONSTRAINT version_code_api_scan_results_version_code_id_fkey FOREIGN KEY (version_code_id) REFERENCES public.version_codes(id)
+    id serial4 NOT NULL,
+    version_code_id int4 NOT NULL,
+    run_name text NULL,
+    run_result int2 NOT NULL,
+    run_at timestamp DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
+    CONSTRAINT version_code_api_scan_results_pkey PRIMARY KEY (id),
+    CONSTRAINT version_code_api_scan_results_version_code_id_fkey FOREIGN KEY (
+        version_code_id
+    ) REFERENCES public.version_codes (id)
+);
+
+
+CREATE TABLE logging.store_app_download (
+    store_app int4 NOT NULL,
+    version_code text NOT NULL,
+    crawl_result int2 NOT NULL,
+    updated_at timestamp NOT NULL DEFAULT TIMEZONE('utc', NOW()),
+    CONSTRAINT store_app_download_fk FOREIGN KEY (
+        store_app
+    ) REFERENCES public.store_apps (id)
 );

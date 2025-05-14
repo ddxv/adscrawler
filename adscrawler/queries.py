@@ -248,6 +248,12 @@ def insert_version_code(
             }
         ]
     )
+    try:
+        log_crawl_results(version_code_df, database_connection)
+    except Exception as e:
+        logger.error(f"{store_app=} {version_str=} {crawl_result=} {apk_hash=} {e=}")
+        raise e
+
     upserted: pd.DataFrame = upsert_df(
         df=version_code_df,
         table_name="version_codes",
@@ -263,6 +269,17 @@ def insert_version_code(
             columns={"version_code": "original_version_code", "id": "version_code"}
         ).drop("store_app", axis=1)
     return upserted
+
+
+def log_crawl_results(df: pd.DataFrame, database_connection: PostgresCon) -> None:
+    insert_columns = ["store_app", "version_code", "crawl_result"]
+    df = df[insert_columns]
+    df.to_sql(
+        name="store_app_download",
+        schema="logging",
+        con=database_connection.engine,
+        if_exists="append",
+    )
 
 
 def upsert_details_df(
