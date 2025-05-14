@@ -275,7 +275,7 @@ def log_crawl_results(df: pd.DataFrame, database_connection: PostgresCon) -> Non
     insert_columns = ["store_app", "version_code", "crawl_result"]
     df = df[insert_columns]
     df.to_sql(
-        name="store_app_download",
+        name="store_app_downloads",
         schema="logging",
         con=database_connection.engine,
         if_exists="append",

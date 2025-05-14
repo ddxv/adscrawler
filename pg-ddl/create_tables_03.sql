@@ -223,7 +223,7 @@ CREATE TABLE public.version_code_api_scan_results (
 );
 
 
-CREATE TABLE logging.store_app_download (
+CREATE TABLE logging.store_app_downloads (
     store_app int4 NOT NULL,
     version_code text NOT NULL,
     crawl_result int2 NOT NULL,
