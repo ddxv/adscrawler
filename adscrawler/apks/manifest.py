@@ -22,7 +22,7 @@ from adscrawler.queries import (
     upsert_details_df,
 )
 
-logger = get_logger(__name__, "download_apk")
+logger = get_logger(__name__, "process_sdks")
 
 FAILED_VERSION_STR = "-1"
 
