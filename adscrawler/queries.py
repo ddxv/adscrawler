@@ -279,6 +279,7 @@ def log_crawl_results(df: pd.DataFrame, database_connection: PostgresCon) -> Non
         schema="logging",
         con=database_connection.engine,
         if_exists="append",
+        index=False,
     )
 
 
