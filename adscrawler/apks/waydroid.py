@@ -11,6 +11,7 @@ from adscrawler.apks import mitm_process_log
 from adscrawler.apks.weston import restart_weston, start_weston
 from adscrawler.config import (
     ANDROID_SDK,
+    APK_TMP_UNZIPPED_DIR,
     APKS_DIR,
     PACKAGE_DIR,
     WAYDROID_INTERNAL_EMULATED_DIR,
@@ -288,19 +289,18 @@ def check_wayland_display() -> bool:
 
 
 def cleanup_xapk_splits(store_id: str) -> None:
-    apk_split_dir = pathlib.Path(WAYDROID_MEDIA_DIR, store_id)
-    tmp_apk_dir = pathlib.Path(XAPKS_TMP_UNZIP_DIR, store_id)
-
-    for path in [apk_split_dir, tmp_apk_dir]:
-        try:
-            subprocess.run(
-                ["sudo", "rm", "-rf", path.as_posix()],
-                text=True,
-                check=True,
-                timeout=60,
-            )
-        except Exception:
-            logger.exception(f"Exception occurred while cleaning up {path}")
+    for path in [WAYDROID_MEDIA_DIR, XAPKS_TMP_UNZIP_DIR, APK_TMP_UNZIPPED_DIR]:
+        app_path = pathlib.Path(path, store_id)
+        if app_path.exists():
+            try:
+                subprocess.run(
+                    ["sudo", "rm", "-rf", app_path.as_posix()],
+                    text=True,
+                    check=True,
+                    timeout=60,
+                )
+            except Exception:
+                logger.exception(f"Exception occurred while cleaning up {path}")
 
 
 def remove_all_third_party_apps() -> None:

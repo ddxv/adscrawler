@@ -21,7 +21,7 @@ from adscrawler.apks.process_apk import (
     get_downloaded_apks,
     get_downloaded_xapks,
     get_existing_apk_path,
-    remove_partial_apks,
+    remove_tmp_files,
     unzip_apk,
 )
 from adscrawler.config import (
@@ -96,7 +96,7 @@ def download_apks(
         except Exception:
             logger.exception(f"Download for {store_id} failed")
 
-        remove_partial_apks(store_id=store_id)
+        remove_tmp_files(store_id=store_id)
     check_local_apks(database_connection=database_connection)
     logger.info("Finished downloading APKs")
 

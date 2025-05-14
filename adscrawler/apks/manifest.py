@@ -9,7 +9,7 @@ import yaml
 
 from adscrawler.apks.process_apk import (
     get_existing_apk_path,
-    remove_partial_apks,
+    remove_tmp_files,
     unzip_apk,
 )
 from adscrawler.config import (
@@ -201,4 +201,4 @@ def process_manifest(database_connection: PostgresCon, row: pd.Series) -> None:
     else:
         logger.info(f"{store_id=} crawl_result {crawl_result=} skipping upsert")
 
-    remove_partial_apks(store_id=store_id)
+    remove_tmp_files(store_id=store_id)

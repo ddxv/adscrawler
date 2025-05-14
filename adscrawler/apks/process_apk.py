@@ -238,9 +238,13 @@ def empty_folder(pth: pathlib.Path) -> None:
             sub.unlink()
 
 
-def remove_partial_apks(store_id: str) -> None:
-    partials_dir = pathlib.Path(APK_TMP_PARTIALS_DIR, store_id)
-    if partials_dir.exists():
-        empty_folder(partials_dir)
-        os.rmdir(partials_dir)
-        logger.info(f"{store_id=} deleted partial apk {partials_dir.as_posix()}")
+def remove_tmp_files(store_id: str) -> None:
+    paths = [APK_TMP_PARTIALS_DIR, APK_TMP_UNZIPPED_DIR]
+    for path in paths:
+        app_path = pathlib.Path(path, store_id)
+        if app_path.exists():
+            empty_folder(app_path)
+            os.rmdir(app_path)
+        else:
+            continue
+        logger.info(f"{store_id=} deleted {path=}")
