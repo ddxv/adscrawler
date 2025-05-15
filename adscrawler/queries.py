@@ -816,7 +816,8 @@ GROUP BY
                 sa.id = lvc.store_app
             LEFT JOIN failing_downloads fd ON sa.id = fd.store_app
             WHERE
-                (lsvc.updated_at < urs.created_at
+                (
+                    (lsvc.updated_at < urs.created_at AND sa.store_last_updated > lsvc.updated_at)
                     OR lsvc.updated_at IS NULL
                 )
                 AND (lvc.updated_at < current_date - INTERVAL '1 days'
