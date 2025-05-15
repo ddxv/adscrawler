@@ -823,6 +823,8 @@ GROUP BY
                 AND (lvc.updated_at < current_date - INTERVAL '1 days'
                     OR lvc.updated_at IS NULL)
                 AND sa.store = {store}
+                AND sa."free"
+
             )
         SELECT
             *
