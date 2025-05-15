@@ -78,22 +78,22 @@ def download_apks(
                     if check_version_code_exists(
                         database_connection, store_id, file_path
                     ):
-                        logger.info(f"{store_id=} version code already in db,skipping")
+                        logger.info(f"{store_id=} version code already in db, skipping")
                         continue
                 else:
-                    manage_download(
-                        database_connection, row, exsiting_file_path=file_path
-                    )
+                    existing_file_path = file_path
             else:
-                this_error_count = manage_download(
-                    database_connection=database_connection,
-                    row=row,
-                    exsiting_file_path=None,
-                )
+                existing_file_path = None
+            this_error_count = manage_download(
+                database_connection=database_connection,
+                row=row,
+                exsiting_file_path=existing_file_path,
+            )
+            if not existing_file_path:
                 error_count += this_error_count
-            if this_error_count == 0:
-                sleep_time = error_count + 30
-                logger.info(f"Sleeping for default time: {sleep_time}")
+                if this_error_count == 0:
+                    sleep_time = error_count + 30
+                    logger.info(f"Sleeping for default time: {sleep_time}")
         except Exception:
             logger.exception(f"Download for {store_id} failed")
 
@@ -132,7 +132,7 @@ def manage_download(
     exsiting_file_path: pathlib.Path | None,
 ) -> int:
     """Manage the download of an apk or xapk file"""
-    func_info = f"{row.store_id=} download"
+    func_info = f"{row.store_id=} manage_download"
     crawl_result = 3
     store_id = row.store_id
     logger.info(f"{func_info} start")
