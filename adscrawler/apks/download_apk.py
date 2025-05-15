@@ -180,7 +180,7 @@ def manage_download(
         logger.exception(f"Unexpected error for {store_id=}: {str(e)}")
         crawl_result = 3  # Unexpected errors
     if crawl_result in [2]:
-        error_count = 5
+        error_count = 3
     elif crawl_result in [2, 3, 4]:
         error_count = 1
     elif crawl_result in [1]:
