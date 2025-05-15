@@ -67,6 +67,7 @@ def download_apks(
             logger.error(f"Too many errors: {error_count=} breaking loop")
             break
         store_id = row.store_id
+        existing_file_path = None
 
         try:
             file_path = get_existing_apk_path(store_id)
@@ -74,16 +75,13 @@ def download_apks(
                 if (
                     "apk-files/apks/" in file_path.as_posix()
                     or "apk-files/xapks/" in file_path.as_posix()
+                ) and check_version_code_exists(
+                    database_connection, store_id, file_path
                 ):
-                    if check_version_code_exists(
-                        database_connection, store_id, file_path
-                    ):
-                        logger.info(f"{store_id=} version code already in db, skipping")
-                        continue
+                    logger.info(f"{store_id=} version code already in db, skipping")
+                    continue
                 else:
                     existing_file_path = file_path
-            else:
-                existing_file_path = None
             this_error_count = manage_download(
                 database_connection=database_connection,
                 row=row,
