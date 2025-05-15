@@ -126,8 +126,8 @@ def get_download_url(store_id: str) -> str:
         app_details_link = results[0]["link"]
         logger.info(f"found app details link: {results[0]}")
     if len(results) == 0:
-        logger.info(f"No results returned for {store_id}")
-        raise Exception(f"No results returned for {store_id}")
+        logger.info("No results returned")
+        raise Exception("No results returned")
 
     app_download_link = get_app_details(scraper, app_details_link)
 

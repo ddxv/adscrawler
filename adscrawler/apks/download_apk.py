@@ -132,7 +132,8 @@ def manage_download(
     exsiting_file_path: pathlib.Path | None,
 ) -> int:
     """Manage the download of an apk or xapk file"""
-    func_info = f"{row.store_id=} manage_download"
+    store_id = row.store_id
+    func_info = f"{store_id=} manage_download"
     crawl_result = 3
     store_id = row.store_id
     logger.info(f"{func_info} start")
@@ -146,7 +147,7 @@ def manage_download(
             download_url = get_download_url(store_id, source)
             break
         except Exception as e:
-            logger.error(f"{source}: {e}")
+            logger.error(f"{func_info} {source=}: {e}")
             continue
 
     if not download_url:
@@ -157,7 +158,7 @@ def manage_download(
     try:
         if exsiting_file_path:
             file_path = exsiting_file_path
-            logger.info(f"{func_info=} using existing file: {file_path}")
+            logger.info(f"{func_info} using existing file: {file_path}")
         else:
             file_path = download(store_id, download_url)
         apk_tmp_decoded_output_path = unzip_apk(store_id=store_id, file_path=file_path)
@@ -172,7 +173,7 @@ def manage_download(
     except requests.exceptions.ConnectionError:
         crawl_result = 2  # 404s etc
     except FileNotFoundError:
-        logger.exception(f"{func_info=} unable to unpack apk")
+        logger.exception(f"{func_info} unable to unpack apk")
         crawl_result = 1
     except subprocess.CalledProcessError as e:
         logger.exception(f"Unexpected error for {store_id=}: {str(e)}")
@@ -187,7 +188,7 @@ def manage_download(
     elif crawl_result in [1]:
         error_count = 0
 
-    logger.info(f"{func_info=} {crawl_result} {md5_hash=} {version_str=}")
+    logger.info(f"{func_info} {crawl_result=} {md5_hash=} {version_str=}")
     # TODO: this doesn't work quite right when running locally
     # The files will only be available in the local and not on the main server
     # Will need to move the files to a centralized object storage service
