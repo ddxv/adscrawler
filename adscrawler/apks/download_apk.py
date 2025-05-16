@@ -205,7 +205,7 @@ def manage_download(
         return_rows=False,
         apk_hash=md5_hash,
     )
-    if crawl_result in [1, 3] and "incoming" in file_path.as_posix():
+    if file_path and crawl_result in [1, 3] and "incoming" in file_path.as_posix():
         # Move files from incoming to main dir
         move_files_to_main_dir(store_id, file_path.suffix)
     return error_count
