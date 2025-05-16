@@ -49,7 +49,9 @@ FAILED_VERSION_STR = "-1"
 def download_apks(
     database_connection: PostgresCon, number_of_apps_to_pull: int = 20
 ) -> None:
-    error_count = 0
+    total_errors = 0
+    last_error_count = 0
+    this_error_count = 0
     store = 1
     apps = get_top_apps_to_download(
         database_connection=database_connection,
@@ -58,13 +60,14 @@ def download_apks(
     )
     logger.info(f"Start APK downloads: {apps.shape=}")
     for _id, row in apps.iterrows():
+        last_error_count = this_error_count
         this_error_count = 0
-        if error_count > 0:
-            sleep_time = error_count * error_count * 10
-            logger.info(f"Sleeping for {sleep_time} seconds due to {error_count=}")
+        if last_error_count > 0:
+            sleep_time = total_errors * total_errors * 10
+            logger.info(f"Sleeping for {sleep_time} seconds due to {total_errors=}")
             time.sleep(sleep_time)
-        if error_count > 11:
-            logger.error(f"Too many errors: {error_count=} breaking loop")
+        if total_errors > 11:
+            logger.error(f"Too many errors: {total_errors=} breaking loop")
             break
         store_id = row.store_id
         existing_file_path = None
@@ -88,14 +91,16 @@ def download_apks(
                 exsiting_file_path=existing_file_path,
             )
             if not existing_file_path:
-                error_count += this_error_count
+                total_errors += this_error_count
                 if this_error_count == 0:
-                    sleep_time = error_count + 30
+                    sleep_time = total_errors + 30
                     logger.info(f"Sleeping for default time: {sleep_time}")
+                    time.sleep(sleep_time)
         except Exception:
             logger.exception(f"Download for {store_id} failed")
 
         remove_tmp_files(store_id=store_id)
+        logger.info(f"{store_id=} finished with {this_error_count=} {total_errors=}")
     check_local_apks(database_connection=database_connection)
     logger.info("Finished downloading APKs")
 
@@ -179,6 +184,7 @@ def manage_download(
     except Exception as e:
         logger.exception(f"Unexpected error for {store_id=}: {str(e)}")
         crawl_result = 3  # Unexpected errors
+
     if crawl_result in [2]:
         error_count = 3
     elif crawl_result in [2, 3, 4]:
