@@ -136,22 +136,24 @@ def manage_download(
 ) -> int:
     """Manage the download of an apk or xapk file"""
     store_id = row.store_id
-    func_info = f"{store_id=} manage_download"
+    func_info = f"manage_download {store_id=}"
     crawl_result = 3
     store_id = row.store_id
     logger.info(f"{func_info} start")
     version_str = FAILED_VERSION_STR
     md5_hash = None
     file_path = None
-
     download_url = None
-    for source in APK_SOURCES:
-        try:
-            download_url = get_download_url(store_id, source)
-            break
-        except Exception as e:
-            logger.error(f"{func_info} {source=}: {e}")
-            continue
+    if not exsiting_file_path:
+        for source in APK_SOURCES:
+            try:
+                download_url = get_download_url(store_id, source)
+                break
+            except Exception as e:
+                logger.error(f"{func_info} {source=}: {e}")
+                continue
+    else:
+        source = "local-file"
 
     if not download_url:
         raise requests.exceptions.HTTPError(
@@ -161,9 +163,9 @@ def manage_download(
     try:
         if exsiting_file_path:
             file_path = exsiting_file_path
-            logger.info(f"{func_info} using existing file: {file_path}")
+            logger.info(f"{func_info} found existing file: {file_path}")
         else:
-            file_path = download(store_id, download_url)
+            file_path = download(store_id, download_url, source)
         apk_tmp_decoded_output_path = unzip_apk(store_id=store_id, file_path=file_path)
         apktool_info_path = pathlib.Path(apk_tmp_decoded_output_path, "apktool.yml")
         version_str = get_version(apktool_info_path)
@@ -187,7 +189,7 @@ def manage_download(
 
     if crawl_result in [2]:
         error_count = 3
-    elif crawl_result in [2, 3, 4]:
+    elif crawl_result in [3, 4]:
         error_count = 1
     elif crawl_result in [1]:
         error_count = 0
@@ -243,7 +245,7 @@ def get_download_url(store_id: str, source: str) -> str:
         raise ValueError(f"Invalid source: {source}")
 
 
-def download(store_id: str, download_url: str) -> pathlib.Path:
+def download(store_id: str, download_url: str, source: str) -> pathlib.Path:
     """Download the apk file.
 
     Downloaded APK or XAPK files are stored in the incoming directories while processing in this script.
@@ -251,9 +253,10 @@ def download(store_id: str, download_url: str) -> pathlib.Path:
 
     store_id: str the id of the android apk
     do_redownload: bool if True, download the apk even if it already exists
+    source: str the source of the download
     """
 
-    func_info = f"{store_id=} {download_url=} download"
+    func_info = f"download {store_id=} {source=}"
     logger.info(f"{func_info} start")
 
     r = requests.get(
@@ -279,7 +282,8 @@ def download(store_id: str, download_url: str) -> pathlib.Path:
             ext = pathlib.Path(filename).suffix
             if ext:
                 extension = ext
-                logger.info(f"Found extension in Content-Disposition: {extension}")
+            else:
+                logger.info(f"{func_info} no extension found in Content-Disposition")
 
         if extension == ".xapk":
             apk_filepath = pathlib.Path(XAPKS_INCOMING_DIR, f"{store_id}{extension}")
@@ -287,7 +291,6 @@ def download(store_id: str, download_url: str) -> pathlib.Path:
             apk_filepath = pathlib.Path(APKS_INCOMING_DIR, f"{store_id}{extension}")
         else:
             raise ValueError(f"Invalid extension: {extension}")
-        logger.info(f"{func_info} saving to: {apk_filepath}")
 
         with apk_filepath.open("wb") as file:
             for chunk in r.iter_content(chunk_size=1024 * 1024):
@@ -295,7 +298,7 @@ def download(store_id: str, download_url: str) -> pathlib.Path:
                     file.write(chunk)
 
     else:
-        logger.error(f"{func_info} request failed with {r.status_code=} {r.text[:50]}")
+        logger.error(f"{func_info} {r.status_code=} {r.text[:20]}")
         raise requests.exceptions.HTTPError
     logger.info(f"{func_info} finished")
     return apk_filepath
