@@ -188,7 +188,7 @@ def manage_download(
         crawl_result = 3  # Unexpected errors
 
     if crawl_result in [2]:
-        error_count = 3
+        error_count = 2
     elif crawl_result in [3, 4]:
         error_count = 1
     elif crawl_result in [1]:
