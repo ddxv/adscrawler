@@ -824,7 +824,6 @@ GROUP BY
                     OR lvc.updated_at IS NULL)
                 AND sa.store = {store}
                 AND sa."free"
-
             )
         SELECT
             *

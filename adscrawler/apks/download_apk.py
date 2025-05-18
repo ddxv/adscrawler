@@ -88,7 +88,7 @@ def download_apks(
             this_error_count = manage_download(
                 database_connection=database_connection,
                 row=row,
-                exsiting_file_path=existing_file_path,
+                existing_file_path=existing_file_path,
             )
             if not existing_file_path:
                 total_errors += this_error_count
@@ -132,7 +132,7 @@ def get_md5_hash(file_path: pathlib.Path) -> str:
 def manage_download(
     database_connection: PostgresCon,
     row: pd.Series,
-    exsiting_file_path: pathlib.Path | None,
+    existing_file_path: pathlib.Path | None,
 ) -> int:
     """Manage the download of an apk or xapk file"""
     store_id = row.store_id
@@ -144,7 +144,7 @@ def manage_download(
     md5_hash = None
     file_path = None
     download_url = None
-    if not exsiting_file_path:
+    if not existing_file_path:
         for source in APK_SOURCES:
             try:
                 download_url = get_download_url(store_id, source)
@@ -152,17 +152,16 @@ def manage_download(
             except Exception as e:
                 logger.error(f"{func_info} {source=}: {e}")
                 continue
+        if not download_url:
+            raise requests.exceptions.HTTPError(
+                f"{store_id=} no download URL found for any source."
+            )
     else:
         source = "local-file"
 
-    if not download_url:
-        raise requests.exceptions.HTTPError(
-            f"{store_id=} no download URL found for any source."
-        )
-
     try:
-        if exsiting_file_path:
-            file_path = exsiting_file_path
+        if existing_file_path:
+            file_path = existing_file_path
             logger.info(f"{func_info} found existing file: {file_path}")
         else:
             file_path = download(store_id, download_url, source)
