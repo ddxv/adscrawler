@@ -743,7 +743,7 @@ AS WITH parent_companies AS (
 SELECT DISTINCT
     ad.id AS ad_domain_id,
     myc.parent_company_id AS company_id,
-    aae.id AS app_ad_entry_id,
+    aae.id AS app_ad_entryr_id,
     sa.id AS store_app,
     pd.id AS pub_domain_id
 FROM app_ads_entrys AS aae
@@ -860,6 +860,58 @@ CREATE UNIQUE INDEX idx_store_apps_rankings_unique ON frontend.store_apps_rankin
 
 CREATE INDEX idx_store_apps_rankings_store_app_date ON frontend.store_apps_rankings (
     store_app, crawled_date
+);
+
+
+CREATE MATERIALIZED VIEW frontend.store_app_ranks_weekly
+TABLESPACE pg_default
+AS
+WITH weekly_max_dates AS (
+    SELECT
+        ar.country,
+        ar.store_collection,
+        ar.store_category,
+        date_trunc(
+            'week'::text, ar.crawled_date::timestamp with time zone
+        ) AS week_start,
+        min(ar.rank) AS best_rank,
+        max(ar.crawled_date) AS max_crawled_date
+    FROM app_rankings AS ar
+    WHERE ar.crawled_date >= (current_date - '120 days'::interval)
+    GROUP BY
+        ar.country,
+        ar.store_collection,
+        ar.store_category,
+        (date_trunc('week'::text, ar.crawled_date::timestamp with time zone))
+)
+
+SELECT
+    ar.rank,
+    wmd.best_rank,
+    ar.country,
+    ar.store_collection,
+    ar.store_category,
+    ar.crawled_date,
+    ar.store_app
+FROM app_rankings AS ar
+INNER JOIN
+    weekly_max_dates AS wmd
+    ON
+        ar.country = wmd.country
+        AND ar.store_collection = wmd.store_collection
+        AND ar.store_category = wmd.store_category
+        AND ar.crawled_date = wmd.max_crawled_date
+WHERE ar.crawled_date >= (current_date - '120 days'::interval)
+ORDER BY
+    ar.country, ar.store_collection, ar.store_category, ar.crawled_date, ar.rank
+WITH DATA;
+
+-- View indexes:
+CREATE INDEX idx_store_app_ranks_weekly_query ON frontend.store_app_ranks_weekly USING btree (
+    store_collection, store_category, country, crawled_date, rank
+);
+CREATE UNIQUE INDEX idx_store_app_ranks_weekly_unique ON frontend.store_app_ranks_weekly USING btree (
+    store_collection, store_category, country, crawled_date, rank, store_app
 );
 
 
