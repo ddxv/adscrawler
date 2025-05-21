@@ -162,7 +162,17 @@ def process_mitm_log(
         mdf = mdf.rename(columns={"timestamp": "called_at"})
         mdf["url"] = mdf["url"].str[0:1000]
         mdf = mdf[
-            ["url", "host", "called_at", "status_code", "tld_url"]
+            [
+                "url",
+                "host",
+                "called_at",
+                "status_code",
+                "tld_url",
+                "country_id",
+                "state_iso",
+                "city_name",
+                "org",
+            ]
         ].drop_duplicates()
         mdf["store_app"] = store_app
     return mdf
