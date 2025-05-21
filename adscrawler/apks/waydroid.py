@@ -103,13 +103,12 @@ def run_app(
     mdf = pd.DataFrame()
 
     try:
-        launch_and_track_app(
+        version_code_id = launch_and_track_app(
             store_id,
+            store_app,
+            database_connection,
             apk_path,
             timeout=timeout,
-        )
-        version_code_id = get_installed_version_code(
-            store_id, store_app, database_connection
         )
         try:
             mdf = process_mitm_log(store_id, store_app, version_code_id)
@@ -409,6 +408,8 @@ def get_installed_version_code(
 
 def launch_and_track_app(
     store_id: str,
+    store_app: int,
+    database_connection: PostgresCon,
     apk_path: pathlib.Path,
     timeout: int = 60,
 ) -> None:
@@ -442,8 +443,13 @@ def launch_and_track_app(
     time.sleep(timeout)
     logger.info(f"{function_info} stopping app & mitmdump")
     os.system(f"{mitm_script.as_posix()} -d")
+    version_code_id = get_installed_version_code(
+        store_id, store_app, database_connection
+    )
     remove_app(store_id)
-    logger.info(f"{function_info} success")
+    if version_code_id is None:
+        raise Exception(f"{function_info} failed to get version code")
+    logger.info(f"{function_info} {version_code_id=} success")
 
 
 def remove_app(store_id: str) -> None:
