@@ -19,6 +19,7 @@ from adscrawler.app_stores.scrape_stores import (
 from adscrawler.connection import PostgresCon, get_db_connection
 from adscrawler.scrape import crawl_app_ads
 from adscrawler.tools.get_plist import plist_main
+from adscrawler.tools.geo import update_geo_dbs
 
 logger = logging.getLogger(__name__)
 
@@ -319,6 +320,7 @@ class ProcessManager:
         process_sdks(database_connection=self.pgcon, number_of_apps_to_pull=20)
 
     def waydroid_mitm(self) -> None:
+        update_geo_dbs()
         if self.args.store_id:
             # Manual waydroid process, launches app for 5 minutes for user to interact
             store_id = self.args.store_id
