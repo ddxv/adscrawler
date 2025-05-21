@@ -48,7 +48,7 @@ def update_geo_dbs() -> None:
                                 break  # Stop once the target file is written
 
 
-def lookup_ip(ip: str) -> dict:
+def lookup_ip(ip: str) -> dict | None:
     """
     Lookup ip address.
 
@@ -59,39 +59,43 @@ def lookup_ip(ip: str) -> dict:
         dict: A dictionary containing the geo data for the ip address.
 
     """
-    with geoip2.database.Reader(f"{GEO_DATA_DIR}/GeoLite2-City.mmdb") as reader:
-        response = reader.city(ip)
-        country_code = response.country.iso_code
-        country_name = response.country.name
-        state_code = response.subdivisions.most_specific.iso_code
-        state_name = response.subdivisions.most_specific.name
-        city_name = response.city.name
-        zip_code = response.postal.code
-        latitude = response.location.latitude
-        longitude = response.location.longitude
-        cidr = response.traits.network
+    try:
+        with geoip2.database.Reader(f"{GEO_DATA_DIR}/GeoLite2-City.mmdb") as reader:
+            response = reader.city(ip)
+            country_code = response.country.iso_code
+            country_name = response.country.name
+            state_code = response.subdivisions.most_specific.iso_code
+            state_name = response.subdivisions.most_specific.name
+            city_name = response.city.name
+            zip_code = response.postal.code
+            latitude = response.location.latitude
+            longitude = response.location.longitude
+            cidr = response.traits.network
 
-    with geoip2.database.Reader(f"{GEO_DATA_DIR}/GeoLite2-ASN.mmdb") as reader2:
-        response2 = reader2.asn(ip)
-        asn = response2.autonomous_system_number
-        org = response2.autonomous_system_organization
-    msg = {
-        "country_name": country_name,
-        "country_iso": country_code,
-        "state_name": state_name,
-        "state_iso": state_code,
-        "city_name": city_name,
-        "zip": zip_code,
-        "latitude": latitude,
-        "longitude": longitude,
-        "cidr": str(cidr),
-        "asn": asn,
-        "org": org,
-    }
-    return msg
+        with geoip2.database.Reader(f"{GEO_DATA_DIR}/GeoLite2-ASN.mmdb") as reader2:
+            response2 = reader2.asn(ip)
+            asn = response2.autonomous_system_number
+            org = response2.autonomous_system_organization
+        msg = {
+            "country_name": country_name,
+            "country_iso": country_code,
+            "state_name": state_name,
+            "state_iso": state_code,
+            "city_name": city_name,
+            "zip": zip_code,
+            "latitude": latitude,
+            "longitude": longitude,
+            "cidr": str(cidr),
+            "asn": asn,
+            "org": org,
+        }
+        return msg
+    except geoip2.errors.AddressNotFoundError:
+        logger.warning(f"failed to get geo info for {ip}")
+        return None
 
 
-def get_geo(ip: str) -> dict:
+def get_geo(ip: str) -> tuple[str, str, str, str]:
     """
     Get geo data for an ip address.
 
@@ -104,7 +108,23 @@ def get_geo(ip: str) -> dict:
     """
     try:
         msg = lookup_ip(ip)
-    except geoip2.errors.AddressNotFoundError:
+        if msg is None:
+            logger.warning(f"failed to get geo info for {ip}")
+            msg = {
+                "country_iso": None,
+                "state_iso": None,
+                "city_name": None,
+                "org": None,
+            }
+        else:
+            msg = {
+                "country_iso": msg["country_iso"],
+                "state_iso": msg["state_iso"],
+                "city_name": msg["city_name"],
+                "org": msg["org"],
+            }
+        return msg
+    except Exception:
         logger.warning(f"failed to get geo info for {ip}")
-        msg = {"country_iso": "", "state_iso": "", "city_name": ""}
+        msg = {"country_iso": "", "state_iso": "", "city_name": "", "org": ""}
     return msg

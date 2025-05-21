@@ -7,11 +7,14 @@ from mitmproxy import http
 from mitmproxy.io import FlowReader
 
 from adscrawler.config import PACKAGE_DIR, get_logger
+from adscrawler.connection import PostgresCon
+from adscrawler.queries import query_countries
+from adscrawler.tools.geo import get_geo
 
 logger = get_logger(__name__)
 
 
-def parse_mitm_log(store_id: str) -> pd.DataFrame:
+def parse_mitm_log(store_id: str, database_connection: PostgresCon) -> pd.DataFrame:
     # Define the log file path
     mitmlog_dir = pathlib.Path(PACKAGE_DIR, "mitmlogs")
     flows_file = f"traffic_{store_id}.log"
@@ -112,6 +115,21 @@ def parse_mitm_log(store_id: str) -> pd.DataFrame:
 
     df.loc[df["status_code"].isna(), "status_code"] = -1
     df["status_code"] = df["status_code"].astype(int)
+
+    country_map = query_countries(database_connection)
+
+    df[["country_iso", "state_iso", "city_name", "org"]] = df["host"].apply(
+        lambda x: pd.Series(get_geo(x))
+    )
+
+    df = pd.merge(
+        df,
+        country_map[["id", "alpha2"]].rename(columns={"id": "country_id"}),
+        how="left",
+        left_on="country_iso",
+        right_on="alpha2",
+        validate="m:1",
+    )
 
     return df
 

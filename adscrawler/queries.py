@@ -1101,3 +1101,9 @@ def get_version_code_by_md5_hash(
     except Exception:
         logger.exception(f"Error getting version code id for {md5_hash} and {store_id}")
         raise
+
+
+def get_all_api_calls(database_connection: PostgresCon) -> pd.DataFrame:
+    sel_query = """SELECT * FROM store_app_api_calls;"""
+    df = pd.read_sql(sel_query, con=database_connection.engine)
+    return df
