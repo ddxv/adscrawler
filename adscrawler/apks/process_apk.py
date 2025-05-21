@@ -126,11 +126,12 @@ def process_apks_for_waydroid(
     extension = "apk"
     for _, row in store_id_map.iterrows():
         store_id = row.store_id
+        store_app = row.store_app
         waydroid.process_app_for_waydroid(
             database_connection=database_connection,
             extension=extension,
             store_id=store_id,
-            store_app=row.store_app,
+            store_app=store_app,
             run_name="regular",
         )
     waydroid.remove_all_third_party_apps()

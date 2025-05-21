@@ -20,7 +20,6 @@ def update_geo_dbs() -> None:
     """Update the geo databases."""
     for db in MAXMIND_GEO_DBS:
         if pathlib.Path(f"{GEO_DATA_DIR}/{db}.mmdb").exists():
-            logger.info(f"{db}.mmdb found")
             continue
         logger.info(f"{db}: Unable to find {db}.mmdb file")
         logger.info(f"{db}: Downloading {db}.tar.gz")

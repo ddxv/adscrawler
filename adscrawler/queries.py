@@ -57,9 +57,9 @@ def insert_df(
     placeholders = SQL(", ").join(SQL("%s") for _ in all_columns)
 
     if return_rows:
-        returning_clause = "RETURNING * "
+        returning_clause = SQL("RETURNING * ")
     else:
-        returning_clause = ""
+        returning_clause = SQL("")
 
     insert_query = SQL("""
         INSERT INTO {table} ({columns})
@@ -75,24 +75,26 @@ def insert_df(
     if log:
         logger.info(f"Insert query: {insert_query.as_string(raw_conn)}")
 
+    results = []
+    column_names = None
     with raw_conn.cursor() as cur:
-        # Perform insert
         data = [
             tuple(row) for row in df[all_columns].itertuples(index=False, name=None)
         ]
         if log:
             logger.info(f"Insert data: {data}")
-        cur.executemany(insert_query, data)
+        for row in data:
+            cur.execute(insert_query, row)
+            if return_rows:
+                results.append(cur.fetchone())
+                if column_names is None:
+                    column_names = [desc[0] for desc in cur.description]
+        raw_conn.commit()
 
-        # Fetch affected rows if required
-        if return_rows:
-            result = cur.fetchall()
-            column_names = [desc[0] for desc in cur.description]
-            return_df = pd.DataFrame(result, columns=column_names)
-        else:
-            return_df = None
-
-    raw_conn.commit()
+    if return_rows:
+        return_df = pd.DataFrame(results, columns=column_names)
+    else:
+        return_df = None
     return return_df
 
 
