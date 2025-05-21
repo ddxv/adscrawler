@@ -54,7 +54,7 @@ def insert_api_calls(
     df = df[insert_columns]
     run_df = insert_df(
         df=df,
-        table_name="store_app_api_scan_results",
+        table_name="version_code_api_scan_results",
         database_connection=database_connection,
         return_rows=True,
     )
