@@ -125,9 +125,7 @@ def run_app(
             timeout=timeout,
         )
         try:
-            mdf = process_mitm_log(
-                store_id, store_app, version_code_id, database_connection
-            )
+            mdf = process_mitm_log(store_id, store_app, database_connection)
             crawl_result = 1
         except Exception as e:
             crawl_result = 3
@@ -153,7 +151,6 @@ def run_app(
 def process_mitm_log(
     store_id: str,
     store_app: int,
-    version_code_id: int,
     database_connection: PostgresCon,
 ) -> pd.DataFrame:
     function_info = f"MITM {store_id=}"
@@ -168,7 +165,6 @@ def process_mitm_log(
             ["url", "host", "called_at", "status_code", "tld_url"]
         ].drop_duplicates()
         mdf["store_app"] = store_app
-        mdf["version_code"] = version_code_id
     return mdf
 
 
