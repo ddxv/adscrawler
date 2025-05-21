@@ -60,10 +60,24 @@ def insert_api_calls(
     )
     if not mdf.empty:
         mdf["run_id"] = run_df["id"].to_numpy()[0]
+        insert_columns = [
+            "store_app",
+            "tld_url",
+            "url",
+            "host",
+            "status_code",
+            "called_at",
+            "run_id",
+            "country_id",
+            "state_iso",
+            "city_name",
+            "org",
+        ]
         insert_df(
             df=mdf,
             table_name="store_app_api_calls",
             database_connection=database_connection,
+            insert_columns=insert_columns,
         )
         logger.info(f"inserted {mdf.shape[0]} api calls")
 
