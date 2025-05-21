@@ -15,6 +15,8 @@ LOG_DIR = pathlib.Path(CONFIG_DIR, pathlib.Path("logs"))
 MODULE_DIR = pathlib.Path(__file__).resolve().parent
 PACKAGE_DIR = pathlib.Path(__file__).resolve().parent.parent
 
+GEO_DATA_DIR = pathlib.Path(CONFIG_DIR, pathlib.Path("geo-data"))
+
 # APK File dirs
 APKS_FILES_DIR = pathlib.Path(HOME, "apk-files")
 
@@ -76,6 +78,7 @@ def check_dirs() -> None:
         XAPKS_ISSUES_DIR,
         APKS_INCOMING_DIR,
         XAPKS_INCOMING_DIR,
+        GEO_DATA_DIR,
         # APKS_ISSUES_INCOMING_DIR,
         # XAPKS_ISSUES_INCOMING_DIR,
     ]

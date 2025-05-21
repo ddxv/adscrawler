@@ -324,10 +324,14 @@ class ProcessManager:
             store_id = self.args.store_id
             extension = self.args.extension if self.args.extension else ".apk"
             store_id = self.args.store_id if self.args.store_id else None
+            timeout = 300
+            run_name = "manual"
             manual_waydroid_process(
                 database_connection=self.pgcon,
                 store_id=store_id,
                 extension=extension,
+                timeout=timeout,
+                run_name=run_name,
             )
         else:
             # Default processing of apk/xapk files that need to be processed

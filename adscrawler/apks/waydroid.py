@@ -663,12 +663,13 @@ def manual_waydroid_process(
     database_connection: PostgresCon,
     store_id: str,
     extension: str,
+    timeout: int,
+    run_name: str,
 ) -> None:
     if not check_file_is_downloaded(store_id, extension):
         raise Exception(f"File {store_id}{extension} not found")
     store_app = query_store_app_by_store_id(database_connection, store_id)
-    timeout = 300
-    run_name = "regular"
+
     process_app_for_waydroid(
         database_connection=database_connection,
         store_id=store_id,
