@@ -2,6 +2,7 @@ import datetime
 import os
 import pathlib
 import re
+import select
 import subprocess
 import time
 
@@ -635,41 +636,49 @@ def start_session() -> subprocess.Popen:
     ready = False
     display_waiting = True
 
+    logger.info(f"{function_info} start loop")
     while (
         waydroid_process.poll() is None
         and not ready
         and (time.time() - start_time) < timeout
     ):
-        line = waydroid_process.stdout.readline()
-        logger.info(f"{function_info} readline: {line}")
-        if (
-            "Android with user 0 is ready" in line
-            or "Session is already running" in line
-        ):
-            ready = True
-            logger.info("Waydroid is ready! Continuing with the script...")
-            break
-        if display_waiting:
-            logger.info(f"{function_info} waiting for session to be ready...")
-            display_waiting = False
-        if "Unable to autolaunch a dbus-daemon" in line:
-            logger.exception(f"{function_info} unable to autolaunch a dbus-daemon")
-            raise Exception(f"{function_info} unable to autolaunch a dbus-daemon")
-        if "container is not running" in line:
-            logger.error(f"{function_info} container is not running")
-            raise Exception(f"{function_info} container failed to start")
+        rlist, _, _ = select.select(
+            [waydroid_process.stdout], [], [], 1.0
+        )  # 1-second timeout for select
+
+        if rlist:
+            line = waydroid_process.stdout.readline()
+            if line:
+                line = waydroid_process.stdout.readline()
+                logger.info(f"{function_info} readline: {line}")
+                if (
+                    "Android with user 0 is ready" in line
+                    or "Session is already running" in line
+                ):
+                    ready = True
+                    logger.info("Waydroid is ready! Continuing with the script...")
+                    break
+                if display_waiting:
+                    logger.info(f"{function_info} waiting for session to be ready...")
+                    display_waiting = False
+                if "Unable to autolaunch a dbus-daemon" in line:
+                    logger.exception(
+                        f"{function_info} unable to autolaunch a dbus-daemon"
+                    )
+                    raise Exception(
+                        f"{function_info} unable to autolaunch a dbus-daemon"
+                    )
+                if "container is not running" in line:
+                    logger.error(f"{function_info} container is not running")
+                    raise Exception(f"{function_info} container failed to start")
         time.sleep(1)
 
     if not ready:
         if waydroid_process.poll() is not None:
             msg = waydroid_process.stdout
             err = waydroid_process.stderr
-            logger.error(
-                f"{function_info} process ended without becoming ready stdout:{msg} stderr:{err}"
-            )
-            raise Exception(
-                f"{function_info} process ended without becoming ready stdout:{msg} stderr:{err}"
-            )
+            msg = f"{function_info} process ended without becoming ready stdout:{msg} stderr:{err}"
+            raise Exception(msg)
         else:
             logger.error(
                 f"{function_info} session timed out after {timeout} seconds waiting for session to be ready"
