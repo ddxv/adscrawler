@@ -415,7 +415,7 @@ def launch_and_track_app(
     database_connection: PostgresCon,
     apk_path: pathlib.Path,
     timeout: int = 60,
-) -> None:
+) -> str | None:
     function_info = f"waydroid {store_id=} launch and track"
     mitm_script = pathlib.Path(PACKAGE_DIR, "adscrawler/apks/mitm_start.sh")
 
@@ -453,6 +453,7 @@ def launch_and_track_app(
     if version_code_id is None:
         raise Exception(f"{function_info} failed to get version code")
     logger.info(f"{function_info} {version_code_id=} success")
+    return version_code_id
 
 
 def remove_app(store_id: str) -> None:
