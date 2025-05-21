@@ -291,7 +291,7 @@ def check_wayland_display() -> bool:
 def cleanup_xapk_splits(store_id: str) -> None:
     for path in [WAYDROID_MEDIA_DIR, XAPKS_TMP_UNZIP_DIR, APK_TMP_UNZIPPED_DIR]:
         app_path = pathlib.Path(path, store_id)
-        if app_path.exists():
+        if os.access(app_path, os.F_OK):
             try:
                 subprocess.run(
                     ["sudo", "rm", "-rf", app_path.as_posix()],
