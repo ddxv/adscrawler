@@ -415,7 +415,7 @@ def launch_and_track_app(
     database_connection: PostgresCon,
     apk_path: pathlib.Path,
     timeout: int = 60,
-) -> str | None:
+) -> int | None:
     function_info = f"waydroid {store_id=} launch and track"
     mitm_script = pathlib.Path(PACKAGE_DIR, "adscrawler/apks/mitm_start.sh")
 
@@ -457,12 +457,16 @@ def launch_and_track_app(
 
 
 def remove_app(store_id: str) -> None:
-    function_info = f"waydroid {store_id=} remove"
+    function_info = f"waydroid {store_id=} remove files"
     logger.info(f"{function_info} start")
-    os.system(f'sudo waydroid shell am force-stop "{store_id}"')
-    os.system(f'waydroid app remove "{store_id}"')
-    cleanup_xapk_splits(store_id)
-    logger.info(f"{function_info} success")
+    try:
+        os.system(f'sudo waydroid shell am force-stop "{store_id}"')
+        os.system(f'waydroid app remove "{store_id}"')
+        cleanup_xapk_splits(store_id)
+        logger.info(f"{function_info} success")
+    except Exception as e:
+        logger.exception(f"{function_info} failed: {e}")
+        raise
 
 
 def kill_waydroid() -> None:
