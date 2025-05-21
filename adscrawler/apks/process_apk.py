@@ -143,6 +143,10 @@ def unzip_apk(store_id: str, file_path: pathlib.Path) -> pathlib.Path:
         apk_to_decode_path = file_path
     elif extension == ".xapk":
         os.makedirs(APK_TMP_PARTIALS_DIR / store_id, exist_ok=True)
+        if not check_xapk_is_valid(file_path):
+            raise FileNotFoundError(
+                f"{store_id=} xapk was invalid: moved to issues dir"
+            )
         partial_apk_dir = pathlib.Path(APK_TMP_PARTIALS_DIR, f"{store_id}")
         partial_apk_path = pathlib.Path(partial_apk_dir, f"{store_id}.apk")
         unzip_command = f"unzip -o {file_path.as_posix()} {store_id}.apk -d {partial_apk_dir.as_posix()}"
