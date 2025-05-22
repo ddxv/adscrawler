@@ -71,7 +71,6 @@
 14 03 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW CONCURRENTLY developer_store_apps" >> /var/log/postgresql/refresh_mv.log 2>&1 
 
 ## SDK -> Company Flow. Aim to run 2x per day at 9AM and 18PM
-#01 */9 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW adtech.company_value_name_package_mapping" >> /var/log/postgresql/refresh_mv.log 2>&1
 01 9 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW adtech.company_value_string_mapping" >> /var/log/postgresql/refresh_mv.log 2>&1
 20 9 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW CONCURRENTLY frontend.store_apps_version_details" >> /var/log/postgresql/refresh_mv.log 2>&1 
 45 9 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW adtech.store_apps_companies_sdk" >> /var/log/postgresql/refresh_mv.log 2>&1 

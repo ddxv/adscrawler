@@ -9,10 +9,8 @@ AS WITH sdk_based_companies AS (
         ad.domain AS ad_domain,
         'sdk'::text AS tag_source
     FROM adtech.store_apps_companies_sdk AS sac
-    LEFT JOIN
-        adtech.company_domain_mapping AS cdm
-        ON COALESCE(sac.company_id, sac.parent_id) = cdm.company_id
-    LEFT JOIN ad_domains AS ad ON cdm.domain_id = ad.id
+    LEFT JOIN adtech.companies AS c ON sac.company_id = c.id
+    LEFT JOIN ad_domains AS ad ON c.domain_id = ad.id
     LEFT JOIN store_apps AS sa ON sac.store_app = sa.id
     LEFT JOIN
         category_mapping AS cm
@@ -53,8 +51,7 @@ adstxt_based_companies AS (
         distinct_ad_and_pub_domains AS pnv
         ON pd.url::text = pnv.publisher_domain_url::text
     LEFT JOIN ad_domains AS ad ON pnv.ad_domain_url::text = ad.domain::text
-    LEFT JOIN adtech.company_domain_mapping AS cdm ON ad.id = cdm.domain_id
-    LEFT JOIN adtech.companies AS c ON cdm.company_id = c.id
+    LEFT JOIN adtech.companies AS c ON ad.id = c.domain_id
     LEFT JOIN store_apps AS sa ON aum.store_app = sa.id
     LEFT JOIN
         category_mapping AS cm
@@ -84,8 +81,6 @@ FROM adstxt_based_companies
 WITH DATA;
 
 
--- adtech.combined_store_apps_parent_companies source
-
 CREATE MATERIALIZED VIEW adtech.combined_store_apps_parent_companies
 TABLESPACE pg_default
 AS SELECT DISTINCT
@@ -96,19 +91,13 @@ AS SELECT DISTINCT
     COALESCE(ad.domain, csac.ad_domain) AS ad_domain
 FROM adtech.combined_store_apps_companies AS csac
 LEFT JOIN adtech.companies AS c ON csac.parent_id = c.id
-LEFT JOIN adtech.company_domain_mapping AS cdm ON c.id = cdm.company_id
-LEFT JOIN ad_domains AS ad ON cdm.domain_id = ad.id
-WHERE
-    csac.parent_id IN (
-        SELECT DISTINCT pc.id
-        FROM
-            adtech.companies AS pc
-        LEFT JOIN adtech.companies AS c
-            ON
-                pc.id = c.parent_company_id
-        WHERE
-            c.id IS NOT NULL
-    )
+LEFT JOIN ad_domains AS ad ON c.domain_id = ad.id
+WHERE (csac.parent_id IN (
+    SELECT DISTINCT pc.id
+    FROM adtech.companies AS pc
+    LEFT JOIN adtech.companies AS c_1 ON pc.id = c_1.parent_company_id
+    WHERE c_1.id IS NOT NULL
+))
 WITH DATA;
 
 

@@ -17,20 +17,16 @@ CREATE INDEX company_value_string_mapping_idx ON adtech.company_value_string_map
     company_id
 );
 
-
 CREATE MATERIALIZED VIEW frontend.store_apps_version_details
 TABLESPACE pg_default
-AS
-WITH latest_version_codes AS (
-    SELECT DISTINCT ON
-    (version_codes.store_app)
+AS WITH latest_version_codes AS (
+    SELECT DISTINCT ON (version_codes.store_app)
         version_codes.id,
         version_codes.store_app,
         version_codes.version_code,
         version_codes.updated_at,
         version_codes.crawl_result
-    FROM
-        version_codes
+    FROM version_codes
     ORDER BY
         version_codes.store_app,
         (
@@ -48,35 +44,17 @@ SELECT DISTINCT
     c.name AS company_name,
     ad.domain AS company_domain,
     cats.url_slug AS category_slug
-FROM
-    latest_version_codes AS vc
-LEFT JOIN version_details_map AS vdm
-    ON
-        vc.id = vdm.version_code
-LEFT JOIN version_strings AS vs
-    ON
-        vdm.string_id = vs.id
-LEFT JOIN adtech.company_value_string_mapping AS cvsm
-    ON
-        vs.id = cvsm.version_string_id
-LEFT JOIN adtech.companies AS c
-    ON
-        cvsm.company_id = c.id
-LEFT JOIN adtech.company_categories AS cc
-    ON
-        c.id = cc.company_id
-LEFT JOIN adtech.categories AS cats
-    ON
-        cc.category_id = cats.id
-LEFT JOIN adtech.company_domain_mapping AS cdm
-    ON
-        c.id = cdm.company_id
-LEFT JOIN ad_domains AS ad
-    ON
-        cdm.domain_id = ad.id
-LEFT JOIN store_apps AS sa
-    ON
-        vc.store_app = sa.id
+FROM latest_version_codes AS vc
+LEFT JOIN version_details_map AS vdm ON vc.id = vdm.version_code
+LEFT JOIN version_strings AS vs ON vdm.string_id = vs.id
+LEFT JOIN
+    adtech.company_value_string_mapping AS cvsm
+    ON vs.id = cvsm.version_string_id
+LEFT JOIN adtech.companies AS c ON cvsm.company_id = c.id
+LEFT JOIN adtech.company_categories AS cc ON c.id = cc.company_id
+LEFT JOIN adtech.categories AS cats ON cc.category_id = cats.id
+LEFT JOIN ad_domains AS ad ON c.domain_id = ad.id
+LEFT JOIN store_apps AS sa ON vc.store_app = sa.id
 WITH DATA;
 
 -- View indexes:
@@ -88,13 +66,9 @@ CREATE UNIQUE INDEX store_apps_version_details_unique_idx ON frontend.store_apps
 );
 
 
-DROP MATERIALIZED VIEW frontend.companies_version_details_count;
-
--- frontend.companies_version_details_count source
 CREATE MATERIALIZED VIEW frontend.companies_version_details_count
 TABLESPACE pg_default
-AS
-SELECT
+AS SELECT
     savd.store,
     savd.company_name,
     savd.company_domain,
@@ -103,8 +77,14 @@ SELECT
     count(DISTINCT savd.store_id) AS app_count
 FROM frontend.store_apps_version_details AS savd
 LEFT JOIN version_strings AS vs ON savd.version_string_id = vs.id
-GROUP BY store, company_name, company_domain, xml_path, value_name
-ORDER BY app_count DESC LIMIT 1000
+GROUP BY
+    savd.store,
+    savd.company_name,
+    savd.company_domain,
+    vs.xml_path,
+    vs.value_name
+ORDER BY (count(DISTINCT savd.store_id)) DESC
+LIMIT 1000
 WITH DATA;
 
 -- View indexes:
@@ -229,7 +209,6 @@ CREATE UNIQUE INDEX store_apps_overview_unique_idx ON frontend.store_apps_overvi
 );
 
 
--- frontend.company_parent_top_apps source
 CREATE MATERIALIZED VIEW frontend.company_parent_top_apps
 TABLESPACE pg_default
 AS WITH d30_counts AS (
@@ -321,6 +300,7 @@ FROM ranked_apps
 WHERE app_company_category_rank <= 100
 ORDER BY store, tag_source, app_company_category_rank
 WITH DATA;
+
 
 -- View indexes:
 CREATE INDEX idx_company_parent_top_apps ON frontend.company_parent_top_apps USING btree (
@@ -443,6 +423,7 @@ FROM ranked_apps
 WHERE app_company_category_rank <= 100
 ORDER BY store, tag_source, app_company_category_rank
 WITH DATA;
+
 
 -- View indexes:
 CREATE INDEX idx_company_top_apps ON frontend.company_top_apps USING btree (
@@ -581,55 +562,34 @@ LEFT JOIN d30_counts AS dc ON dag.store_app = dc.store_app
 GROUP BY dag.store, dag.app_category, dag.tag_source
 WITH DATA;
 
+
 -- View indexes:
 CREATE UNIQUE INDEX idx_category_tag_stats ON frontend.category_tag_stats USING btree (
     store, app_category, tag_source
 );
 
 
-DROP MATERIALIZED VIEW IF EXISTS frontend.companies_sdks_overview;
 CREATE MATERIALIZED VIEW frontend.companies_sdks_overview
-AS
-SELECT
+TABLESPACE pg_default
+AS SELECT
     c.name AS company_name,
     ad.domain AS company_domain,
     parad.domain AS parent_company_domain,
     sdk.sdk_name,
     sp.package_pattern,
     sp2.path_pattern,
-    coalesce(
-        cc.name,
-        c.name
-    ) AS parent_company_name
-FROM
-    adtech.companies AS c
-LEFT JOIN adtech.companies AS cc
-    ON
-        c.parent_company_id = cc.id
-LEFT JOIN adtech.company_domain_mapping AS cdm
-    ON
-        c.id = cdm.company_id
-LEFT JOIN adtech.company_domain_mapping AS pcdm
-    ON
-        cc.id = pcdm.company_id
-LEFT JOIN ad_domains AS ad
-    ON
-        cdm.domain_id = ad.id
-LEFT JOIN ad_domains AS parad
-    ON
-        pcdm.domain_id = parad.id
-LEFT JOIN adtech.sdks AS sdk
-    ON
-        c.id = sdk.company_id
-LEFT JOIN adtech.sdk_packages AS sp
-    ON
-        sdk.id = sp.sdk_id
-LEFT JOIN adtech.sdk_paths AS sp2
-    ON
-        sdk.id = sp2.sdk_id;
+    coalesce(cc.name, c.name) AS parent_company_name
+FROM adtech.companies AS c
+LEFT JOIN adtech.companies AS cc ON c.parent_company_id = cc.id
+LEFT JOIN ad_domains AS ad ON c.domain_id = ad.id
+LEFT JOIN ad_domains AS parad ON cc.domain_id = parad.id
+LEFT JOIN adtech.sdks AS sdk ON c.id = sdk.company_id
+LEFT JOIN adtech.sdk_packages AS sp ON sdk.id = sp.sdk_id
+LEFT JOIN adtech.sdk_paths AS sp2 ON sdk.id = sp2.sdk_id
+WITH DATA;
 
-CREATE UNIQUE INDEX companies_sdks_overview_unique_idx ON
-frontend.companies_sdks_overview (
+-- View indexes:
+CREATE UNIQUE INDEX companies_sdks_overview_unique_idx ON frontend.companies_sdks_overview USING btree (
     company_name,
     company_domain,
     parent_company_domain,
@@ -640,23 +600,23 @@ frontend.companies_sdks_overview (
 
 
 CREATE MATERIALIZED VIEW frontend.companies_open_source_percent
-AS
-SELECT
+TABLESPACE pg_default
+AS SELECT
     ad.domain AS company_domain,
-    avg(CASE WHEN sd.is_open_source THEN 1 ELSE 0 END) AS percent_open_source
-FROM
-    adtech.sdks AS sd
-LEFT JOIN adtech.company_domain_mapping AS cdm
-    ON
-        sd.company_id = cdm.company_id
-LEFT JOIN ad_domains AS ad
-    ON
-        cdm.domain_id = ad.id
-GROUP BY
-    ad.domain;
+    avg(
+        CASE
+            WHEN sd.is_open_source THEN 1
+            ELSE 0
+        END
+    ) AS percent_open_source
+FROM adtech.sdks AS sd
+LEFT JOIN adtech.companies AS c ON sd.company_id = c.id
+LEFT JOIN ad_domains AS ad ON c.domain_id = ad.id
+GROUP BY ad.domain
+WITH DATA;
 
-CREATE UNIQUE INDEX companies_open_source_percent_unique ON
-frontend.companies_open_source_percent (
+-- View indexes:
+CREATE UNIQUE INDEX companies_open_source_percent_unique ON frontend.companies_open_source_percent USING btree (
     company_domain
 );
 
@@ -734,7 +694,8 @@ AS WITH parent_companies AS (
         c.id AS company_id,
         c.name AS company_name,
         coalesce(c.parent_company_id, c.id) AS parent_company_id,
-        coalesce(pc.name, c.name) AS parent_company_name
+        coalesce(pc.name, c.name) AS parent_company_name,
+        coalesce(pc.domain_id, c.domain_id) AS parent_company_domain_id
     FROM adtech.companies AS c
     LEFT JOIN adtech.companies AS pc ON c.parent_company_id = pc.id
 )
@@ -742,7 +703,7 @@ AS WITH parent_companies AS (
 SELECT DISTINCT
     ad.id AS ad_domain_id,
     myc.parent_company_id AS company_id,
-    aae.id AS app_ad_entryr_id,
+    aae.id AS app_ad_entry_id,
     sa.id AS store_app,
     pd.id AS pub_domain_id
 FROM app_ads_entrys AS aae
@@ -751,8 +712,7 @@ LEFT JOIN app_ads_map AS aam ON aae.id = aam.app_ads_entry
 LEFT JOIN pub_domains AS pd ON aam.pub_domain = pd.id
 LEFT JOIN app_urls_map AS aum ON pd.id = aum.pub_domain
 INNER JOIN store_apps AS sa ON aum.store_app = sa.id
-LEFT JOIN adtech.company_domain_mapping AS cdm ON ad.id = cdm.domain_id
-LEFT JOIN parent_companies AS myc ON cdm.company_id = myc.company_id
+LEFT JOIN parent_companies AS myc ON ad.id = myc.parent_company_domain_id
 WHERE (pd.crawled_at - aam.updated_at) < '01:00:00'::interval
 WITH DATA;
 
@@ -935,6 +895,7 @@ LEFT JOIN d30_counts AS dc ON dag.store_app = dc.store_app
 GROUP BY dag.store, dag.app_category, dag.company_domain, dag.company_name
 WITH DATA;
 
+
 -- View indexes:
 CREATE UNIQUE INDEX companies_category_stats_idx ON frontend.companies_category_stats USING btree (
     store, app_category, company_domain
@@ -943,6 +904,8 @@ CREATE INDEX companies_category_stats_query_idx ON frontend.companies_category_s
     company_domain
 );
 
+
+-- frontend.companies_category_tag_stats source
 
 CREATE MATERIALIZED VIEW frontend.companies_category_tag_stats
 TABLESPACE pg_default
@@ -995,8 +958,9 @@ GROUP BY
     dag.company_name
 WITH DATA;
 
+
 -- View indexes:
-CREATE INDEX companies_category_tag_stats_query_idx ON frontend.companies_category_tag_stats USING btree (
+CREATE INDEX companies_category_tag_stats__query_idx ON frontend.companies_category_tag_stats USING btree (
     company_domain
 );
 CREATE UNIQUE INDEX companies_category_tag_stats_idx ON frontend.companies_category_tag_stats USING btree (
@@ -1054,6 +1018,7 @@ GROUP BY
         END
     )
 WITH DATA;
+
 
 -- View indexes:
 CREATE UNIQUE INDEX companies_category_tag_type_stats_idx ON frontend.companies_category_tag_type_stats USING btree (
@@ -1156,19 +1121,14 @@ distinct_apps_group AS (
         coalesce(ad.domain, csac.ad_domain) AS company_domain
     FROM adtech.combined_store_apps_companies AS csac
     LEFT JOIN adtech.companies AS c ON csac.parent_id = c.id
-    LEFT JOIN adtech.company_domain_mapping AS cdm ON c.id = cdm.company_id
-    LEFT JOIN ad_domains AS ad ON cdm.domain_id = ad.id
+    LEFT JOIN ad_domains AS ad ON c.domain_id = ad.id
     LEFT JOIN store_apps AS sa ON csac.store_app = sa.id
-    WHERE csac.parent_id IN (
+    WHERE (csac.parent_id IN (
         SELECT DISTINCT pc.id
-        FROM
-            adtech.companies AS pc
-        LEFT JOIN adtech.companies AS c
-            ON
-                pc.id = c.parent_company_id
-        WHERE
-            c.id IS NOT NULL
-    )
+        FROM adtech.companies AS pc
+        LEFT JOIN adtech.companies AS c_1 ON pc.id = c_1.parent_company_id
+        WHERE c_1.id IS NOT NULL
+    ))
 )
 
 SELECT
@@ -1197,6 +1157,67 @@ CREATE UNIQUE INDEX companies_parent_category_tag_stats_idx ON frontend.companie
     store, company_domain, company_name, app_category, tag_source
 );
 CREATE INDEX companies_parent_category_tag_stats_query_idx ON frontend.companies_parent_category_tag_stats USING btree (
+    company_domain
+);
+
+
+CREATE MATERIALIZED VIEW frontend.companies_parent_category_stats
+TABLESPACE pg_default
+AS WITH d30_counts AS (
+    SELECT
+        sahw.store_app,
+        sum(sahw.installs_diff) AS d30_installs,
+        sum(sahw.rating_count_diff) AS d30_rating_count
+    FROM store_apps_history_weekly AS sahw
+    WHERE
+        sahw.week_start > (current_date - '31 days'::interval)
+        AND sahw.country_id = 840
+        AND (sahw.installs_diff > 0::numeric OR sahw.rating_count_diff > 0)
+    GROUP BY sahw.store_app
+),
+
+distinct_apps_group AS (
+    SELECT
+        sa.store,
+        csac.store_app,
+        csac.app_category,
+        c.name AS company_name,
+        sa.installs,
+        sa.rating_count,
+        coalesce(ad.domain, csac.ad_domain) AS company_domain
+    FROM adtech.combined_store_apps_companies AS csac
+    LEFT JOIN adtech.companies AS c ON csac.parent_id = c.id
+    LEFT JOIN ad_domains AS ad ON c.domain_id = ad.id
+    LEFT JOIN store_apps AS sa ON csac.store_app = sa.id
+    WHERE (csac.parent_id IN (
+        SELECT DISTINCT pc.id
+        FROM adtech.companies AS pc
+        LEFT JOIN adtech.companies AS c_1 ON pc.id = c_1.parent_company_id
+        WHERE c_1.id IS NOT NULL
+    ))
+)
+
+SELECT
+    dag.store,
+    dag.app_category,
+    dag.company_domain,
+    dag.company_name,
+    count(DISTINCT dag.store_app) AS app_count,
+    sum(dc.d30_installs) AS installs_d30,
+    sum(dc.d30_rating_count) AS rating_count_d30,
+    sum(dag.installs) AS installs_total,
+    sum(dag.rating_count) AS rating_count_total
+FROM distinct_apps_group AS dag
+LEFT JOIN d30_counts AS dc ON dag.store_app = dc.store_app
+GROUP BY dag.store, dag.app_category, dag.company_domain, dag.company_name
+WITH DATA;
+
+
+-- View indexes:
+CREATE UNIQUE INDEX companies_parent_category_stats_idx ON frontend.companies_parent_category_stats USING btree (
+    store, company_domain, company_name, app_category
+);
+CREATE INDEX companies_parent_category_stats_query_idx ON frontend.companies_parent_category_stats USING btree (
     company_domain
 );
 
