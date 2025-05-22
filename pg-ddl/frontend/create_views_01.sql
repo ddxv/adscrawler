@@ -18,7 +18,6 @@ CREATE INDEX company_value_string_mapping_idx ON adtech.company_value_string_map
 );
 
 
--- frontend.companies_apps_version_details source REMAKING AS frontend.store_apps_version_details
 CREATE MATERIALIZED VIEW frontend.store_apps_version_details
 TABLESPACE pg_default
 AS
