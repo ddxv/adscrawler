@@ -840,29 +840,6 @@ CREATE UNIQUE INDEX adstxt_ad_domain_overview_unique_idx ON frontend.adstxt_ad_d
 );
 
 
-CREATE MATERIALIZED VIEW frontend.store_apps_rankings
-TABLESPACE pg_default
-AS SELECT
-    ar.crawled_date,
-    ar.country,
-    ar.store_app,
-    ar.rank,
-    ar.store_collection,
-    ar.store_category
-FROM app_rankings AS ar
-WHERE ar.crawled_date >= (current_date - '120 days'::interval)
-WITH DATA;
-
-
-CREATE UNIQUE INDEX idx_store_apps_rankings_unique ON frontend.store_apps_rankings (
-    crawled_date, country, store_app, rank, store_collection, store_category
-);
-
-CREATE INDEX idx_store_apps_rankings_store_app_date ON frontend.store_apps_rankings (
-    store_app, crawled_date
-);
-
-
 CREATE MATERIALIZED VIEW frontend.store_app_ranks_weekly
 TABLESPACE pg_default
 AS

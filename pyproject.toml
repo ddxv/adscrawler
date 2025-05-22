@@ -22,6 +22,7 @@ dependencies = [
     "nltk",
     "rake_nltk",
     "spacy",
+    "scikit-learn",
     "langdetect",
     "mitmproxy",
     "cloudscraper",
