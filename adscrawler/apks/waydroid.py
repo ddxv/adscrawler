@@ -646,11 +646,12 @@ def start_session() -> subprocess.Popen:
             [waydroid_process.stdout], [], [], 1.0
         )  # 1-second timeout for select
 
+        logger.info(f"{function_info} rlist: {rlist}")
+
         if rlist:
             line = waydroid_process.stdout.readline()
+            logger.info(f"{function_info} line: {line=}")
             if line:
-                line = waydroid_process.stdout.readline()
-                logger.info(f"{function_info} readline: {line}")
                 if (
                     "Android with user 0 is ready" in line
                     or "Session is already running" in line
