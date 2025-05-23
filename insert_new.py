@@ -64,12 +64,12 @@ def insert_company_with_domain(cur, company_name: str, domain: str) -> int:
     # Insert company if not exists and get its ID
     cur.execute(
         """
-            INSERT INTO adtech.companies (name) 
-            VALUES (%s) 
+            INSERT INTO adtech.companies (name, domain_id) 
+            VALUES (%s, %s) 
             ON CONFLICT (name) DO NOTHING
             RETURNING id;
         """,
-        (company_name,),
+        (company_name, ad_domain_id),
     )
     company_id = cur.fetchone()
 
@@ -79,15 +79,16 @@ def insert_company_with_domain(cur, company_name: str, domain: str) -> int:
     else:
         company_id = company_id[0]
 
-    # Insert into mapping table if not exists
-    cur.execute(
-        """
-            INSERT INTO adtech.company_domain_mapping (company_id, domain_id)
-            VALUES (%s, %s)
-            ON CONFLICT (company_id, domain_id) DO NOTHING;
-        """,
-        (company_id, ad_domain_id),
-    )
+    # # Insert into mapping table if not exists
+    # TODO: Add this back when we want to add multiple additional domains
+    # cur.execute(
+    #     """
+    #         INSERT INTO adtech.company_domain_mapping (company_id, domain_id)
+    #         VALUES (%s, %s)
+    #         ON CONFLICT (company_id, domain_id) DO NOTHING;
+    #     """,
+    #     (company_id, ad_domain_id),
+    # )
 
     return company_id
 
