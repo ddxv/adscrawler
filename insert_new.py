@@ -114,7 +114,7 @@ def insert_sdk(
     sdk_id = cur.fetchone()
 
     if not sdk_id:
-        cur.execute("SELECT id FROM adtech.sdks WHERE name = %s;", (sdk_name,))
+        cur.execute("SELECT id FROM adtech.sdks WHERE sdk_name = %s;", (sdk_name,))
         sdk_id = cur.fetchone()[0]
     else:
         sdk_id = sdk_id[0]
