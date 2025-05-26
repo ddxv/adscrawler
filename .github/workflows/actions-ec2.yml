@@ -25,7 +25,6 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           envs: TARGETDIR
           protocol: tcp4
-          script_stop: true
           script: |
             cd $TARGETDIR
             pwd
