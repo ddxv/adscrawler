@@ -28,7 +28,7 @@ from adscrawler.queries import (
     query_store_app_by_store_id,
 )
 
-logger = get_logger(__name__)
+logger = get_logger(__name__, sep_file="waydroid")
 
 ANDROID_PERMISSION_ACTIVITY = (
     "com.android.permissioncontroller/.permission.ui.ReviewPermissionsActivity"
