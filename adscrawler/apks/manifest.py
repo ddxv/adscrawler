@@ -2,13 +2,14 @@
 
 import pathlib
 import subprocess
+import time
 from xml.etree import ElementTree
 
 import pandas as pd
-import yaml
 
 from adscrawler.apks.process_apk import (
     get_existing_apk_path,
+    get_version,
     remove_tmp_files,
     unzip_apk,
 )
@@ -18,6 +19,7 @@ from adscrawler.config import (
 )
 from adscrawler.connection import PostgresCon
 from adscrawler.queries import (
+    get_next_to_sdk_scan,
     get_version_code_dbid,
     upsert_details_df,
 )
@@ -79,14 +81,6 @@ def get_smali_df(tmp_decoded_output_path: pathlib.Path, store_id: str) -> pd.Dat
     smali_df = smali_df.rename(columns={"path": "android_name"})
     smali_df["path"] = "smali"
     return smali_df
-
-
-def get_version(apktool_info_path: pathlib.Path) -> str:
-    # Open and read the YAML file
-    with apktool_info_path.open("r") as file:
-        data = yaml.safe_load(file)
-    version = str(data["versionInfo"]["versionCode"])
-    return version
 
 
 def xml_to_dataframe(root: ElementTree.Element) -> pd.DataFrame:
@@ -202,3 +196,28 @@ def process_manifest(database_connection: PostgresCon, row: pd.Series) -> None:
         logger.info(f"{store_id=} crawl_result {crawl_result=} skipping upsert")
 
     remove_tmp_files(store_id=store_id)
+
+
+def process_sdks(
+    database_connection: PostgresCon, number_of_apps_to_pull: int = 20
+) -> None:
+    """
+    Decompile the app into its various files and directories.
+    This shows which SDKs are used in the app.
+    All results are saved to the database.
+    """
+    store = 1
+    apps = get_next_to_sdk_scan(
+        database_connection=database_connection,
+        store=store,
+        limit=number_of_apps_to_pull,
+    )
+    logger.info(f"Start APK processing: {apps.shape=}")
+    for _id, row in apps.iterrows():
+        store_id = row.store_id
+
+        try:
+            process_manifest(database_connection=database_connection, row=row)
+            time.sleep(1)
+        except Exception:
+            logger.exception(f"Manifest for {store_id} failed")

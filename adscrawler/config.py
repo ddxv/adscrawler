@@ -26,16 +26,13 @@ INCOMING_DIR = pathlib.Path(APKS_FILES_DIR, "incoming")
 APKS_INCOMING_DIR = pathlib.Path(INCOMING_DIR, "apks")
 XAPKS_INCOMING_DIR = pathlib.Path(INCOMING_DIR, "xapks")
 
-# Downloaded but likely failed during unzip/processing
-# APKS_ISSUES_INCOMING_DIR = pathlib.Path(INCOMING_DIR, "failed/apks")
-# XAPKS_ISSUES_INCOMING_DIR = pathlib.Path(INCOMING_DIR, "failed/xapks")
-
 # Processed and ready for use
 APKS_DIR = pathlib.Path(APKS_FILES_DIR, "apks")
 XAPKS_DIR = pathlib.Path(APKS_FILES_DIR, "xapks")
 
 # Failed to unzip, often due to unzip tool. I think failed during download?
 XAPKS_ISSUES_DIR = pathlib.Path(APKS_FILES_DIR, "xapks-issues")
+APKS_ISSUES_DIR = pathlib.Path(APKS_FILES_DIR, "apks-issues")
 
 TMP_DIR = pathlib.Path("/tmp/adscrawler")
 
@@ -76,11 +73,10 @@ def check_dirs() -> None:
         XAPKS_TMP_UNZIP_DIR,
         XAPKS_DIR,
         XAPKS_ISSUES_DIR,
+        APKS_ISSUES_DIR,
         APKS_INCOMING_DIR,
         XAPKS_INCOMING_DIR,
         GEO_DATA_DIR,
-        # APKS_ISSUES_INCOMING_DIR,
-        # XAPKS_ISSUES_INCOMING_DIR,
     ]
     for _dir in dirs:
         if not pathlib.Path.exists(_dir):

@@ -4,12 +4,12 @@ import os
 import sys
 
 from adscrawler.apks.download_apk import download_apks
-from adscrawler.apks.process_apk import (
+from adscrawler.apks.manifest import process_sdks
+from adscrawler.apks.waydroid import (
+    manual_waydroid_process,
     process_apks_for_waydroid,
-    process_sdks,
     process_xapks_for_waydroid,
 )
-from adscrawler.apks.waydroid import manual_waydroid_process
 from adscrawler.app_stores.scrape_stores import (
     crawl_developers_for_new_store_ids,
     crawl_keyword_cranks,
@@ -18,8 +18,8 @@ from adscrawler.app_stores.scrape_stores import (
 )
 from adscrawler.connection import PostgresCon, get_db_connection
 from adscrawler.scrape import crawl_app_ads
-from adscrawler.tools.get_plist import plist_main
 from adscrawler.tools.geo import update_geo_dbs
+from adscrawler.tools.get_plist import plist_main
 
 logger = logging.getLogger(__name__)
 
@@ -112,12 +112,6 @@ class ProcessManager:
             "-s",
             "--store-id",
             help="String of store id to launch in wayroid",
-        )
-        parser.add_argument(
-            "-e",
-            "--extension",
-            help="Extension of the apk file on disk, one of apk or xapk",
-            default="apk",
         )
 
         args, _ = parser.parse_known_args()
@@ -324,14 +318,12 @@ class ProcessManager:
         if self.args.store_id:
             # Manual waydroid process, launches app for 5 minutes for user to interact
             store_id = self.args.store_id
-            extension = self.args.extension if self.args.extension else ".apk"
             store_id = self.args.store_id if self.args.store_id else None
             timeout = 300
             run_name = "manual"
             manual_waydroid_process(
                 database_connection=self.pgcon,
                 store_id=store_id,
-                extension=extension,
                 timeout=timeout,
                 run_name=run_name,
             )

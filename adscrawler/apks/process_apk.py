@@ -1,10 +1,11 @@
+import hashlib
 import os
 import pathlib
 import shutil
 import subprocess
-import time
 
-from adscrawler.apks import manifest, waydroid
+import yaml
+
 from adscrawler.config import (
     APK_TMP_PARTIALS_DIR,
     APK_TMP_UNZIPPED_DIR,
@@ -15,38 +16,12 @@ from adscrawler.config import (
     XAPKS_ISSUES_DIR,
     get_logger,
 )
-from adscrawler.connection import PostgresCon
-from adscrawler.queries import (
-    get_next_to_sdk_scan,
-    query_store_id_api_called_map,
-)
 
 logger = get_logger(__name__)
 
 
-def process_sdks(
-    database_connection: PostgresCon, number_of_apps_to_pull: int = 20
-) -> None:
-    """
-    Decompile the app into its various files and directories.
-    This shows which SDKs are used in the app.
-    All results are saved to the database.
-    """
-    store = 1
-    apps = get_next_to_sdk_scan(
-        database_connection=database_connection,
-        store=store,
-        limit=number_of_apps_to_pull,
-    )
-    logger.info(f"Start APK processing: {apps.shape=}")
-    for _id, row in apps.iterrows():
-        store_id = row.store_id
-
-        try:
-            manifest.process_manifest(database_connection=database_connection, row=row)
-            time.sleep(1)
-        except Exception:
-            logger.exception(f"Manifest for {store_id} failed")
+def get_md5_hash(file_path: pathlib.Path) -> str:
+    return hashlib.md5(file_path.read_bytes()).hexdigest()
 
 
 def get_downloaded_apks() -> list[str]:
@@ -79,62 +54,6 @@ def check_xapk_is_valid(xapk_path: pathlib.Path) -> bool:
         return False
     else:
         return True
-
-
-def process_xapks_for_waydroid(
-    database_connection: PostgresCon, num_apps: int = 10
-) -> None:
-    store_ids = get_downloaded_xapks()
-    store_id_map = query_store_id_api_called_map(
-        database_connection=database_connection,
-        store_ids=store_ids,
-    )
-    store_id_map = store_id_map.sort_values(by="run_at", ascending=False)
-    logger.info(
-        f"Waydroid has {store_id_map.shape[0]} (xapk) apps to process, starting top {num_apps}"
-    )
-    store_id_map = store_id_map.head(num_apps)
-    for _, row in store_id_map.iterrows():
-        store_id = row.store_id
-        xapk_path = pathlib.Path(XAPKS_DIR, f"{store_id}.xapk")
-        if check_xapk_is_valid(xapk_path):
-            pass
-        else:
-            continue
-        waydroid.process_app_for_waydroid(
-            database_connection=database_connection,
-            extension="xapk",
-            store_id=store_id,
-            store_app=row.store_app,
-            run_name="regular",
-        )
-    waydroid.remove_all_third_party_apps()
-
-
-def process_apks_for_waydroid(
-    database_connection: PostgresCon, num_apps: int = 10
-) -> None:
-    apks = get_downloaded_apks()
-    store_id_map = query_store_id_api_called_map(
-        database_connection=database_connection, store_ids=apks
-    )
-    store_id_map = store_id_map.sort_values(by="run_at", ascending=False)
-    logger.info(
-        f"Waydroid has {store_id_map.shape[0]} apps to process, starting {num_apps}"
-    )
-    store_id_map = store_id_map.head(num_apps)
-    extension = "apk"
-    for _, row in store_id_map.iterrows():
-        store_id = row.store_id
-        store_app = row.store_app
-        waydroid.process_app_for_waydroid(
-            database_connection=database_connection,
-            extension=extension,
-            store_id=store_id,
-            store_app=store_app,
-            run_name="regular",
-        )
-    waydroid.remove_all_third_party_apps()
 
 
 def unzip_apk(store_id: str, file_path: pathlib.Path) -> pathlib.Path:
@@ -205,6 +124,14 @@ def unzip_apk(store_id: str, file_path: pathlib.Path) -> pathlib.Path:
         logger.error(f"Command failed with return code {e.returncode}")
         raise
     return tmp_decoded_output_path
+
+
+def get_version(apktool_info_path: pathlib.Path) -> str:
+    # Open and read the YAML file
+    with apktool_info_path.open("r") as file:
+        data = yaml.safe_load(file)
+    version = str(data["versionInfo"]["versionCode"])
+    return version
 
 
 def get_existing_apk_path(store_id: str) -> pathlib.Path | None:

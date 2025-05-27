@@ -6,7 +6,6 @@ Author: James O'Claire
 This script scrapes https://apkpure.com to get the apk download link
 """
 
-import hashlib
 import pathlib
 import shutil
 import subprocess
@@ -16,11 +15,12 @@ import pandas as pd
 import requests
 
 from adscrawler.apks import apkmirror, apkpure
-from adscrawler.apks.manifest import get_version
 from adscrawler.apks.process_apk import (
     get_downloaded_apks,
     get_downloaded_xapks,
     get_existing_apk_path,
+    get_md5_hash,
+    get_version,
     remove_tmp_files,
     unzip_apk,
 )
@@ -120,13 +120,9 @@ def check_local_apks(database_connection: PostgresCon) -> None:
 def check_version_code_exists(
     database_connection: PostgresCon, store_id: str, file_path: pathlib.Path
 ) -> int | None:
-    md5_hash = hashlib.md5(file_path.read_bytes()).hexdigest()
+    md5_hash = get_md5_hash(file_path)
     version_code = get_version_code_by_md5_hash(database_connection, md5_hash, store_id)
     return version_code
-
-
-def get_md5_hash(file_path: pathlib.Path) -> str:
-    return hashlib.md5(file_path.read_bytes()).hexdigest()
 
 
 def manage_download(
