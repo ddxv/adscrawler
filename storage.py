@@ -44,7 +44,12 @@ def move_local_files_to_s3():
         logger.info(f"Processing {row['package_name']}")
         store_id = row.package_name
         extension = row.file_type
-        file_path = pathlib.Path(XAPKS_DIR, f"{row['package_name']}.{extension}")
+        if extension == "apk":
+            file_path = pathlib.Path(APKS_DIR, f"{row['package_name']}.{extension}")
+        elif extension == "xapk":
+            file_path = pathlib.Path(XAPKS_DIR, f"{row['package_name']}.{extension}")
+        else:
+            raise ValueError(f"Invalid extension: {extension}")
         try:
             apk_tmp_decoded_output_path = unzip_apk(
                 store_id=store_id, file_path=file_path
