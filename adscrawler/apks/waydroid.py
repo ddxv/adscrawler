@@ -427,9 +427,8 @@ def get_installed_version_code(
         )
 
     if version_code_id is None:
-        pass
-    else:
-        return version_code_id
+        logger.error(f"No version code id found for {store_id=}")
+    return version_code_id
 
 
 def launch_and_track_app(
