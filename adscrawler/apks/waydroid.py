@@ -334,6 +334,7 @@ def remove_all_third_party_apps() -> None:
     third_party_apps = subprocess.run(
         ["sudo", "waydroid", "shell", "pm", "list", "packages", "-3"],
         text=True,
+        capture_output=True,
         check=True,
         timeout=60,
     )
