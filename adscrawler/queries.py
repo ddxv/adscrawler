@@ -715,88 +715,88 @@ def get_top_apps_to_download(
     limit: int = 25,
 ) -> pd.DataFrame:
     sel_query = f"""WITH latest_version_codes AS (
-                SELECT
+            SELECT
                     DISTINCT ON
-                    (version_codes.store_app)
-                    version_codes.id,
-                    version_codes.store_app,
-                    version_codes.version_code,
-                    version_codes.updated_at,
-                    version_codes.crawl_result
+                    (store_app)
+                    id,
+                    store_app,
+                    version_code,
+                    updated_at,
+                    crawl_result
                 FROM
                     version_codes
                 ORDER BY
-                    version_codes.store_app,
-                    version_codes.updated_at DESC,
-                    string_to_array(version_codes.version_code, '.')::bigint[] DESC
+                    store_app,
+                    updated_at DESC,
+                    string_to_array(version_code, '.')::bigint[] DESC
             ),
-             latest_success_version_codes AS (
+            latest_success_version_codes AS (
                 SELECT
                     DISTINCT ON
-                    (version_codes.store_app)
-                    version_codes.id,
-                    version_codes.store_app,
-                    version_codes.version_code,
-                    version_codes.updated_at,
-                    version_codes.crawl_result
+                    (store_app)
+                    id,
+                    store_app,
+                    version_code,
+                    updated_at,
+                    crawl_result
                 FROM
                     version_codes
-                WHERE version_codes.crawl_result = 1
+                WHERE crawl_result = 1
                 ORDER BY
-                    version_codes.store_app,
-                    version_codes.updated_at DESC,
-                    string_to_array(version_codes.version_code, '.')::bigint[] DESC
+                    store_app,
+                    updated_at DESC,
+                    string_to_array(version_code, '.')::bigint[] DESC
             ),
             failing_downloads AS (
-SELECT
-    store_app,
-    count(*) AS attempt_count
-FROM
-    logging.store_app_downloads
-WHERE
-    crawl_result != 1
-    AND updated_at >= current_date - INTERVAL '30 days'
-GROUP BY
-    store_app
-    ),       
-    scheduled_apps_crawl AS (
-            SELECT
-                dc.store_app,
-                dc.store_id,
-                dc.name,
-                dc.installs,
-                dc.rating_count,
-                COALESCE(fd.attempt_count, 0) AS attempt_count,
-                vc.crawl_result as last_crawl_result,
-                vc.updated_at
-            FROM
-                store_apps_in_latest_rankings dc
-            LEFT JOIN latest_version_codes vc ON
-                vc.store_app = dc.store_app
-            LEFT JOIN failing_downloads fd ON 
-                vc.store_app = fd.store_app
-            WHERE
-                dc.store = {store}
-                AND
-                (   
-                    vc.updated_at IS NULL 
-                    OR
-                        (
-                        (vc.crawl_result = 1 AND vc.updated_at < current_date - INTERVAL '180 days')
+                SELECT
+                    store_app,
+                    count(*) AS attempt_count
+                FROM
+                    logging.store_app_downloads
+                WHERE
+                    crawl_result != 1
+                    AND updated_at >= current_date - INTERVAL '30 days'
+                GROUP BY
+                    store_app
+            ),       
+            scheduled_apps_crawl AS (
+                SELECT
+                    dc.store_app,
+                    dc.store_id,
+                    dc.name,
+                    dc.installs,
+                    dc.rating_count,
+                    COALESCE(fd.attempt_count, 0) AS attempt_count,
+                    vc.crawl_result as last_crawl_result,
+                    vc.updated_at
+                FROM
+                    store_apps_in_latest_rankings dc
+                LEFT JOIN latest_version_codes vc ON
+                    vc.store_app = dc.store_app
+                LEFT JOIN failing_downloads fd ON 
+                    vc.store_app = fd.store_app
+                WHERE
+                    dc.store = {store}
+                    AND
+                    (   
+                        vc.updated_at IS NULL 
                         OR
-                        (vc.crawl_result IN (2,3,4) AND vc.updated_at < current_date - INTERVAL '30 days')
-                        )
-                )
-            ORDER BY
-            (CASE
-                WHEN crawl_result IS NULL THEN 0
-                ELSE 1
-            END),
-            GREATEST(
-                    COALESCE(installs, 0),
-                    COALESCE(CAST(rating_count AS bigint), 0)*50
-                )
-            DESC NULLS LAST
+                            (
+                            (vc.crawl_result = 1 AND vc.updated_at < current_date - INTERVAL '180 days')
+                            OR
+                            (vc.crawl_result IN (2,3,4) AND vc.updated_at < current_date - INTERVAL '30 days')
+                            )
+                    )
+                ORDER BY
+                (CASE
+                    WHEN crawl_result IS NULL THEN 0
+                    ELSE 1
+                END),
+                GREATEST(
+                        COALESCE(installs, 0),
+                        COALESCE(CAST(rating_count AS bigint), 0)*50
+                    )
+                DESC NULLS LAST
             ),
             user_requested_apps_crawl AS (
             SELECT
@@ -1048,12 +1048,6 @@ def query_store_app_by_store_id(
     except Exception:
         logger.exception(f"Error getting store app id for {store_id}")
         raise
-
-
-def get_local_stored_apks(database_connection: PostgresCon) -> pd.DataFrame:
-    sel_query = """SELECT * FROM local_apks;"""
-    df = pd.read_sql(sel_query, con=database_connection.engine)
-    return df
 
 
 def get_version_codes_full_history(

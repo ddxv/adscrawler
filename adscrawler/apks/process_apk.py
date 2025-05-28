@@ -134,7 +134,7 @@ def get_version(apktool_info_path: pathlib.Path) -> str:
     return version
 
 
-def get_existing_apk_path(store_id: str) -> pathlib.Path | None:
+def get_local_apk_path(store_id: str) -> pathlib.Path | None:
     """Check if an APK or XAPK file exists and return its extension.
 
     Args:

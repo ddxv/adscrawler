@@ -66,7 +66,9 @@ class PostgresCon:
             conn.close()
 
 
-def get_db_connection(use_ssh_tunnel: bool = False) -> PostgresCon:
+def get_db_connection(
+    use_ssh_tunnel: bool = False, server_name: str = "madrone"
+) -> PostgresCon:
     """
     Get a database connection, optionally using an SSH tunnel.
 
@@ -76,12 +78,18 @@ def get_db_connection(use_ssh_tunnel: bool = False) -> PostgresCon:
     Returns:
         PostgresCon: A PostgreSQL connection object.
     """
-    server_name = "madrone"
     host = get_host_ip(CONFIG[server_name]["host"])
 
     if use_ssh_tunnel:
         ssh_port = CONFIG[server_name].get("ssh_port", 22)
-        server = open_ssh_tunnel(host, server_name, ssh_port)
+        remote_port = CONFIG[server_name].get("remote_port", 5432)
+        server = SSHTunnelForwarder(
+            (host, ssh_port),
+            ssh_username=CONFIG[server_name]["os_user"],
+            remote_bind_address=("127.0.0.1", remote_port),
+            ssh_pkey=CONFIG[server_name].get("ssh_pkey"),
+            ssh_private_key_password=CONFIG[server_name].get("ssh_pkey_password"),
+        )
         server.start()
         db_port = str(server.local_bind_port)
         host = "127.0.0.1"
@@ -91,29 +99,6 @@ def get_db_connection(use_ssh_tunnel: bool = False) -> PostgresCon:
     conn = PostgresCon(server_name, host, db_port)
     conn.set_engine()
     return conn
-
-
-def open_ssh_tunnel(
-    remote_host: str, server_name: str, ssh_port: int
-) -> SSHTunnelForwarder:
-    """
-    Open an SSH tunnel to the remote server.
-
-    Args:
-        remote_host (str): The remote host to connect to.
-        server_name (str): The name of the server in the configuration.
-        ssh_port (int): The SSH port to use.
-
-    Returns:
-        SSHTunnelForwarder: An SSH tunnel object.
-    """
-    return SSHTunnelForwarder(
-        (remote_host, ssh_port),
-        ssh_username=CONFIG[server_name]["os_user"],
-        remote_bind_address=("127.0.0.1", 5432),
-        ssh_pkey=CONFIG[server_name].get("ssh_pkey"),
-        ssh_private_key_password=CONFIG[server_name].get("ssh_pkey_password"),
-    )
 
 
 def get_host_ip(hostname: str) -> str:

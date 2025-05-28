@@ -1,13 +1,7 @@
 #!/usr/bin/env python
-"""Download APK files from with Python.
-
-Author: James O'Claire
-
-This script scrapes https://apkpure.com to get the apk download link
-"""
+"""Download APK files from with Python."""
 
 import pathlib
-import shutil
 import subprocess
 import time
 
@@ -16,25 +10,25 @@ import requests
 
 from adscrawler.apks import apkmirror, apkpure
 from adscrawler.apks.process_apk import (
-    get_downloaded_apks,
-    get_downloaded_xapks,
-    get_existing_apk_path,
+    get_local_apk_path,
     get_md5_hash,
     get_version,
     remove_tmp_files,
     unzip_apk,
 )
+from adscrawler.apks.storage import (
+    download_s3_apk,
+    get_store_id_s3_keys,
+    upload_apk_to_s3,
+)
 from adscrawler.config import (
-    APKS_DIR,
     APKS_INCOMING_DIR,
-    XAPKS_DIR,
     XAPKS_INCOMING_DIR,
     get_logger,
 )
 from adscrawler.connection import PostgresCon
 from adscrawler.queries import (
     get_top_apps_to_download,
-    get_version_code_by_md5_hash,
     insert_version_code,
 )
 
@@ -60,6 +54,30 @@ def download_apks(
     )
     logger.info(f"Start APK downloads: {apps.shape=}")
     for _id, row in apps.iterrows():
+        store_id = row.store_id
+        existing_file_path = None
+        s3df = get_store_id_s3_keys(store_id=store_id)
+        if not s3df.empty:
+            s3df = s3df[s3df["version_code"].notna()]
+        file_path = get_local_apk_path(store_id)
+        needs_external_download = s3df.empty and not file_path
+        has_local_file_but_no_s3 = file_path and s3df.empty
+        needs_s3_download = not file_path and not s3df.empty
+
+        if needs_external_download:
+            # proceed to regular download
+            pass
+        elif has_local_file_but_no_s3:
+            # Found a local file, process into s3
+            existing_file_path = file_path
+        elif needs_s3_download:
+            # download from s3
+            logger.warning(
+                f"{store_id=} was already present in S3, this should rarely happen"
+            )
+            s3_key = s3df.sort_values(by="version_code", ascending=False).iloc[0].key
+            existing_file_path = download_s3_apk(s3_key=s3_key)
+
         last_error_count = this_error_count
         this_error_count = 0
         if last_error_count > 0:
@@ -69,26 +87,12 @@ def download_apks(
         if total_errors > 11:
             logger.error(f"Too many errors: {total_errors=} breaking loop")
             break
-        store_id = row.store_id
-        existing_file_path = None
 
         try:
-            file_path = get_existing_apk_path(store_id)
-            if file_path:
-                if (
-                    "apk-files/apks/" in file_path.as_posix()
-                    or "apk-files/xapks/" in file_path.as_posix()
-                ) and check_version_code_exists(
-                    database_connection, store_id, file_path
-                ):
-                    logger.info(f"{store_id=} version code already in db, skipping")
-                    continue
-                else:
-                    existing_file_path = file_path
             this_error_count = manage_download(
                 database_connection=database_connection,
                 row=row,
-                existing_file_path=existing_file_path,
+                existing_s3_path=existing_file_path,
             )
             if not existing_file_path:
                 total_errors += this_error_count
@@ -101,34 +105,13 @@ def download_apks(
 
         remove_tmp_files(store_id=store_id)
         logger.info(f"{store_id=} finished with {this_error_count=} {total_errors=}")
-    check_local_apks(database_connection=database_connection)
     logger.info("Finished downloading APKs")
-
-
-def check_local_apks(database_connection: PostgresCon) -> None:
-    downloaded_apks = get_downloaded_apks()
-    downloaded_xapks = get_downloaded_xapks()
-    files = [{"file_type": "apk", "package_name": apk} for apk in downloaded_apks] + [
-        {"file_type": "xapk", "package_name": xapk} for xapk in downloaded_xapks
-    ]
-    df = pd.DataFrame(files)
-    df.to_sql(
-        "local_apks", con=database_connection.engine, if_exists="replace", index=False
-    )
-
-
-def check_version_code_exists(
-    database_connection: PostgresCon, store_id: str, file_path: pathlib.Path
-) -> int | None:
-    md5_hash = get_md5_hash(file_path)
-    version_code = get_version_code_by_md5_hash(database_connection, md5_hash, store_id)
-    return version_code
 
 
 def manage_download(
     database_connection: PostgresCon,
     row: pd.Series,
-    existing_file_path: pathlib.Path | None,
+    existing_s3_path: pathlib.Path | None,
 ) -> int:
     """Manage the download of an apk or xapk file"""
     store_id = row.store_id
@@ -138,34 +121,20 @@ def manage_download(
     logger.info(f"{func_info} start")
     version_str = FAILED_VERSION_STR
     md5_hash = None
-    file_path = None
-    download_url = None
-    if not existing_file_path:
-        for source in APK_SOURCES:
-            try:
-                download_url = get_download_url(store_id, source)
-                break
-            except Exception as e:
-                logger.error(f"{func_info} {source=}: {e}")
-                continue
-        if not download_url:
-            raise requests.exceptions.HTTPError(
-                f"{store_id=} no download URL found for any source."
-            )
-    else:
-        source = "local-file"
+    downloaded_file_path = None
 
     try:
-        if existing_file_path:
-            file_path = existing_file_path
-            logger.info(f"{func_info} found existing file: {file_path}")
+        if existing_s3_path:
+            downloaded_file_path = download_s3_apk(s3_key=existing_s3_path)
+            logger.info(f"{func_info} found existing file: {downloaded_file_path}")
         else:
-            file_path = download(store_id, download_url, source)
-        apk_tmp_decoded_output_path = unzip_apk(store_id=store_id, file_path=file_path)
+            downloaded_file_path = download(store_id)
+        apk_tmp_decoded_output_path = unzip_apk(
+            store_id=store_id, file_path=downloaded_file_path
+        )
         apktool_info_path = pathlib.Path(apk_tmp_decoded_output_path, "apktool.yml")
         version_str = get_version(apktool_info_path)
-
-        md5_hash = get_md5_hash(file_path)
+        md5_hash = get_md5_hash(downloaded_file_path)
         crawl_result = 1
 
     except requests.exceptions.HTTPError:
@@ -189,10 +158,10 @@ def manage_download(
     elif crawl_result in [1]:
         error_count = 0
 
+    if existing_s3_path:
+        error_count = 0
+
     logger.info(f"{func_info} {crawl_result=} {md5_hash=} {version_str=}")
-    # TODO: this doesn't work quite right when running locally
-    # The files will only be available in the local and not on the main server
-    # Will need to move the files to a centralized object storage service
 
     insert_version_code(
         version_str=version_str,
@@ -202,24 +171,15 @@ def manage_download(
         return_rows=False,
         apk_hash=md5_hash,
     )
-    if file_path and crawl_result in [1, 3] and "incoming" in file_path.as_posix():
-        # Move files from incoming to main dir
-        move_files_to_main_dir(store_id, file_path.suffix)
+    if downloaded_file_path and crawl_result in [1, 3] and not existing_s3_path:
+        upload_apk_to_s3(
+            store_id,
+            downloaded_file_path.suffix.replace(".", ""),
+            md5_hash,
+            version_str,
+            downloaded_file_path,
+        )
     return error_count
-
-
-def move_files_to_main_dir(store_id: str, extension: str) -> None:
-    """Move files from incoming to main dir"""
-    if extension == ".apk":
-        file_path = pathlib.Path(APKS_INCOMING_DIR, f"{store_id}.apk")
-        main_dir = pathlib.Path(APKS_DIR)
-    elif extension == ".xapk":
-        file_path = pathlib.Path(XAPKS_INCOMING_DIR, f"{store_id}.xapk")
-        main_dir = pathlib.Path(XAPKS_DIR)
-    else:
-        raise ValueError(f"Invalid extension: {extension}")
-    if file_path.exists():
-        shutil.move(file_path, main_dir / file_path.name)
 
 
 def get_download_url(store_id: str, source: str) -> str:
@@ -240,7 +200,7 @@ def get_download_url(store_id: str, source: str) -> str:
         raise ValueError(f"Invalid source: {source}")
 
 
-def download(store_id: str, download_url: str, source: str) -> pathlib.Path:
+def download(store_id: str) -> pathlib.Path:
     """Download the apk file.
 
     Downloaded APK or XAPK files are stored in the incoming directories while processing in this script.
@@ -250,6 +210,20 @@ def download(store_id: str, download_url: str, source: str) -> pathlib.Path:
     do_redownload: bool if True, download the apk even if it already exists
     source: str the source of the download
     """
+
+    func_info = f"download {store_id=}"
+
+    for source in APK_SOURCES:
+        try:
+            download_url = get_download_url(store_id, source)
+            break
+        except Exception as e:
+            logger.error(f"{func_info} {source=}: {e}")
+            continue
+    if not download_url:
+        raise requests.exceptions.HTTPError(
+            f"{store_id=} no download URL found for any source."
+        )
 
     func_info = f"download {store_id=} {source=}"
     logger.info(f"{func_info} start")
