@@ -171,6 +171,8 @@ def process_manifest(database_connection: PostgresCon, row: pd.Series) -> None:
         version_code=version_str,
         database_connection=database_connection,
     )
+    if version_code_dbid is None:
+        raise ValueError(f"Version code dbid is None for {store_id=}")
     details_df["version_code_id"] = version_code_dbid
     details_df["scan_result"] = crawl_result
 
