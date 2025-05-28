@@ -40,7 +40,7 @@ def get_s3_client() -> boto3.client:
     """Create and return an S3 client."""
     if CONFIG["loki"]["host"].startswith("192.168"):
         # On local network connect directly
-        host = CONFIG["loki"]["host"]
+        host = f"http://{CONFIG['loki']['host']}"
         db_port = CONFIG["loki"]["remote_port"]
     else:
         # SSH port forwarded
