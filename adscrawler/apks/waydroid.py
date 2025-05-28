@@ -9,6 +9,7 @@ import time
 import pandas as pd
 
 from adscrawler.apks import mitm_process_log
+from adscrawler.apks.process_apk import get_version, unzip_apk
 from adscrawler.apks.storage import download_to_local
 from adscrawler.apks.weston import restart_weston, start_weston
 from adscrawler.config import (
@@ -137,10 +138,18 @@ def run_app(
         crawl_result = 2
         logger.exception(f"{function_info} failed: {e}")
     if version_code_id is None:
-        logger.error(
-            f"{function_info} failed to get version code id will NOT save to db"
-        )
-        return
+        try:
+            version_code_id = get_version_via_apktool(
+                store_id, apk_path, store_app, database_connection
+            )
+        except Exception as e:
+            logger.exception(f"{function_info} failed to get version code id: {e}")
+            version_code_id = None
+        if version_code_id is None:
+            logger.error(
+                f"{function_info} failed to get version code id will NOT save to db"
+            )
+            return
     logger.info(f"{function_info} save to db")
     insert_api_calls(
         version_code_id=version_code_id,
@@ -149,6 +158,19 @@ def run_app(
         run_name=run_name,
         mdf=mdf,
     )
+
+
+def get_version_via_apktool(
+    store_id: str,
+    apk_path: pathlib.Path,
+    store_app: int,
+    database_connection: PostgresCon,
+) -> int | None:
+    apk_tmp_decoded_output_path = unzip_apk(store_id, apk_path)
+    apktool_info_path = pathlib.Path(apk_tmp_decoded_output_path, "apktool.yml")
+    version_str = get_version(apktool_info_path)
+    version_code_id = get_version_code_dbid(store_app, version_str, database_connection)
+    return version_code_id
 
 
 def process_mitm_log(
