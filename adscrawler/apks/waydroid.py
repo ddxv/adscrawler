@@ -358,7 +358,7 @@ def remove_all_third_party_apps() -> None:
         text=True,
         capture_output=True,
         check=True,
-        timeout=60,
+        timeout=20,
     )
     apps_to_remove = [
         x
@@ -372,8 +372,9 @@ def remove_all_third_party_apps() -> None:
             ["sudo", "waydroid", "shell", "pm", "uninstall", app],
             text=True,
             check=True,
-            timeout=60,
+            timeout=30,
         )
+    logger.info(f"{function_info} success")
 
 
 THIRD_PARTY_APPS_TO_KEEP = ["org.mozilla.firefox", "io.github.huskydg.magisk"]
@@ -528,16 +529,16 @@ def kill_waydroid() -> None:
 def launch_app(store_id: str) -> None:
     function_info = f"waydroid {store_id=} launch"
     logger.info(f"{function_info} start")
-    os.system(f'waydroid app launch "{store_id}"')
+    os.system(f"waydroid app launch {store_id}")
 
     time.sleep(2)
 
     # Set timeout parameters
-    timeout = 20
+    timeout = 30
     start_time = time.time()
     found = False
     permission_attempts = 2
-    relaunch_attempts = 2
+    last_relaunch_time = time.time()
 
     # Loop until timeout or app is found
     while time.time() - start_time < timeout and not found:
@@ -564,14 +565,12 @@ def launch_app(store_id: str) -> None:
                 raise Exception(f"{function_info} PERMISSIONS REQUEST IN FOREGROUND")
 
         logger.info(f"{function_info} not in foreground yet")
-        if (
-            relaunch_attempts > 0
-            and time.time() - start_time > timeout / relaunch_attempts
-        ):
+        # Relaunch every 10 seconds
+        if time.time() - last_relaunch_time >= 10:
             logger.info(f"{function_info} relaunching")
-            os.system(f'waydroid app launch "{store_id}"')
-            relaunch_attempts -= 1
-        # Wait before launching again
+            os.system(f"waydroid app launch {store_id}")
+            last_relaunch_time = time.time()
+        # Wait before checking again
         time.sleep(1)
 
     if not found:
