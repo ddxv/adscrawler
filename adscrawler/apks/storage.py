@@ -240,8 +240,10 @@ def download_s3_apk(
 
 def download_to_local(store_id: str) -> pathlib.Path | None:
     apk_path = get_local_apk_path(store_id)
-    if apk_path is None:
-        apk_path = download_s3_apk(store_id=store_id)
+    if apk_path:
+        logger.info(f"{store_id=} already downloaded")
+        return apk_path
+    apk_path = download_s3_apk(store_id=store_id)
     if apk_path is None:
         raise FileNotFoundError(f"{store_id=} no apk found: {apk_path=}")
     return apk_path

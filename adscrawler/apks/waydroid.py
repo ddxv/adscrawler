@@ -712,7 +712,13 @@ def manual_waydroid_process(
             file_downloaded = True
             break
     if not file_downloaded:
-        raise Exception(f"File {store_id} not found")
+        download_to_local(store_id)
+        for extension in extensions:
+            if check_file_is_downloaded(store_id, extension):
+                file_downloaded = True
+                break
+        if not file_downloaded:
+            raise Exception(f"File {store_id} not found")
     store_app = query_store_app_by_store_id(database_connection, store_id)
 
     process_app_for_waydroid(
