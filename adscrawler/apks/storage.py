@@ -18,10 +18,8 @@ from adscrawler.config import APKS_DIR, CONFIG, XAPKS_DIR, get_logger
 logger = get_logger(__name__)
 
 
-def start_tunnel() -> str:
+def start_tunnel(server_name: str) -> str:
     from sshtunnel import SSHTunnelForwarder
-
-    server_name = "loki"
 
     ssh_port = CONFIG[server_name].get("ssh_port", 22)
     remote_port = CONFIG[server_name].get("remote_port", 5432)
@@ -38,8 +36,12 @@ def start_tunnel() -> str:
 
 
 def get_s3_client() -> boto3.client:
+    server_name = "loki"
     """Create and return an S3 client."""
-    db_port = start_tunnel()
+    if not CONFIG["loki"]["host"].startswith("192.168"):
+        db_port = start_tunnel(server_name)
+    else:
+        db_port = CONFIG["loki"]["remote_port"]
     session = boto3.session.Session()
     return session.client(
         "s3",
