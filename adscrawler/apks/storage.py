@@ -38,12 +38,14 @@ def start_tunnel(server_name: str) -> str:
 def get_s3_client() -> boto3.client:
     server_name = "loki"
     """Create and return an S3 client."""
-    if not CONFIG["loki"]["host"].startswith("192.168"):
-        db_port = start_tunnel(server_name)
-        host = CONFIG["loki"]["host"].startswith("192.168")
-    else:
+    if CONFIG["loki"]["host"].startswith("192.168"):
+        # On local network connect directly
+        host = CONFIG["loki"]["host"]
         db_port = CONFIG["loki"]["remote_port"]
+    else:
+        # SSH port forwarded
         host = "http://127.0.0.1"
+        db_port = start_tunnel(server_name)
     session = boto3.session.Session()
     return session.client(
         "s3",
