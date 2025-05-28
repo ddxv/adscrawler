@@ -167,7 +167,10 @@ def empty_folder(pth: pathlib.Path) -> None:
             empty_folder(sub)
             os.rmdir(sub)
         else:
-            sub.unlink()
+            try:
+                sub.unlink()
+            except FileNotFoundError:
+                pass
 
 
 def remove_tmp_files(store_id: str) -> None:
