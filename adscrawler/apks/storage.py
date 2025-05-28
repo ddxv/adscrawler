@@ -40,13 +40,15 @@ def get_s3_client() -> boto3.client:
     """Create and return an S3 client."""
     if not CONFIG["loki"]["host"].startswith("192.168"):
         db_port = start_tunnel(server_name)
+        host = CONFIG["loki"]["host"].startswith("192.168")
     else:
         db_port = CONFIG["loki"]["remote_port"]
+        host = "http://127.0.0.1"
     session = boto3.session.Session()
     return session.client(
         "s3",
         region_name="garage",
-        endpoint_url=f"http://127.0.0.1:{db_port}",
+        endpoint_url=f"{host}:{db_port}",
         aws_access_key_id=CONFIG["cloud"]["access_key_id"],
         aws_secret_access_key=CONFIG["cloud"]["secret_key"],
     )
