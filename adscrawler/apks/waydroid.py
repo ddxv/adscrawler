@@ -514,6 +514,7 @@ def launch_app(store_id: str) -> None:
     start_time = time.time()
     found = False
     permission_attempts = 2
+    relaunch_attempts = 2
 
     # Loop until timeout or app is found
     while time.time() - start_time < timeout and not found:
@@ -523,7 +524,9 @@ def launch_app(store_id: str) -> None:
             capture_output=True,
             text=True,
             check=False,
+            timeout=10,
         )
+        time.sleep(1)
 
         # Check if app is in the output
         if store_id in result.stdout:
@@ -537,10 +540,16 @@ def launch_app(store_id: str) -> None:
             if permission_attempts <= 0:
                 raise Exception(f"{function_info} PERMISSIONS REQUEST IN FOREGROUND")
 
+        logger.info(f"{function_info} not in foreground yet")
+        if (
+            relaunch_attempts > 0
+            and time.time() - start_time > timeout / relaunch_attempts
+        ):
+            logger.info(f"{function_info} relaunching")
+            os.system(f'waydroid app launch "{store_id}"')
+            relaunch_attempts -= 1
         # Wait before launching again
-        logger.info(f"{function_info} not in foreground, relaunching")
-        os.system(f'waydroid app launch "{store_id}"')
-        time.sleep(2)
+        time.sleep(1)
 
     if not found:
         logger.error(
