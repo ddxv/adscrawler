@@ -18,7 +18,7 @@ from adscrawler.config import APKS_DIR, CONFIG, XAPKS_DIR, get_logger
 logger = get_logger(__name__)
 
 
-def start_tunnel():
+def start_tunnel() -> str:
     from sshtunnel import SSHTunnelForwarder
 
     server_name = "loki"
@@ -45,7 +45,6 @@ def get_s3_client() -> boto3.client:
         "s3",
         region_name="garage",
         endpoint_url=f"http://127.0.0.1:{db_port}",
-        # endpoint_url=CONFIG["cloud"]["endpoint_url"],
         aws_access_key_id=CONFIG["cloud"]["access_key_id"],
         aws_secret_access_key=CONFIG["cloud"]["secret_key"],
     )
@@ -76,19 +75,9 @@ def upload_apk_to_s3(
         logger.info(f"Uploaded {store_id} to S3")
     else:
         logger.error(f"Failed to upload {store_id} to S3")
-    # if extension == ".apk":
-    #     file_path = pathlib.Path(APKS_INCOMING_DIR, f"{store_id}.apk")
-    #     main_dir = pathlib.Path(APKS_DIR)
-    # elif extension == ".xapk":
-    #     file_path = pathlib.Path(XAPKS_INCOMING_DIR, f"{store_id}.xapk")
-    #     main_dir = pathlib.Path(XAPKS_DIR)
-    # else:
-    #     raise ValueError(f"Invalid extension: {extension}")
-    # if file_path.exists():
-    #     shutil.move(file_path, main_dir / file_path.name)
 
 
-def move_local_files_to_s3():
+def move_local_files_to_s3() -> None:
     apks = get_downloaded_apks()
     xapks = get_downloaded_xapks()
 
@@ -140,7 +129,7 @@ def move_local_files_to_s3():
         )
 
 
-def get_store_ids():
+def get_all_store_ids() -> list[str]:
     # Get only the common prefixes (folder-like structure)
     paginator = S3_CLIENT.get_paginator("list_objects_v2")
     prefixes = set()
@@ -156,7 +145,7 @@ def get_store_ids():
     return store_ids
 
 
-def get_keys_with_metadata():
+def get_keys_with_metadata() -> pd.DataFrame:
     """
     Get all keys and their metadata from S3 bucket and return as a pandas DataFrame.
     Returns a DataFrame with columns: key, store_id, version_code, md5
@@ -189,7 +178,7 @@ def get_keys_with_metadata():
     return df
 
 
-def get_store_id_s3_keys(store_id: str):
+def get_store_id_s3_keys(store_id: str) -> pd.DataFrame:
     paginator = S3_CLIENT.get_paginator("list_objects_v2")
     objects_data = []
     for page in paginator.paginate(
@@ -215,11 +204,16 @@ def get_store_id_s3_keys(store_id: str):
     return df
 
 
-def download_s3_apk(s3_key: str | None = None, store_id: str | None = None):
+def download_s3_apk(
+    s3_key: str | None = None, store_id: str | None = None
+) -> pathlib.Path | None:
     if s3_key:
         key = s3_key
     elif store_id:
         df = get_store_id_s3_keys(store_id)
+        if df.empty:
+            logger.error(f"{store_id=} no apk found in s3")
+            return None
         key = df.iloc[0].key
     else:
         raise ValueError("Either s3_key or store_id must be provided")
