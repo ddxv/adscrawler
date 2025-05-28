@@ -373,30 +373,28 @@ def query_store_id_map(
 
 def query_store_id_api_called_map(
     database_connection: PostgresCon,
-    store: int | None = None,
-    store_ids: list[str] | None = None,
-    exclude_recently_crawled: bool = True,
+    store: int,
 ) -> pd.DataFrame:
-    where_statement = ""
-    if store or store_ids or exclude_recently_crawled:
-        if store:
-            where_statement += f"WHERE store = {store} "
-        if store_ids:
-            if "WHERE" not in where_statement:
-                where_statement += " WHERE "
-            else:
-                where_statement += " AND "
-            store_ids_list = "'" + "','".join(store_ids) + "'"
-            where_statement += f" sa.store_id in ({store_ids_list}) "
-        if exclude_recently_crawled:
-            if "WHERE" not in where_statement:
-                where_statement += " WHERE "
-            else:
-                where_statement += " AND "
-            where_statement += (
-                "(ls.run_at <= CURRENT_DATE - INTERVAL '60 days' OR ls.run_at IS NULL)"
-            )
-    sel_query = f"""WITH last_scanned AS (
+    sel_query = f"""WITH latest_version_codes AS (
+                SELECT
+                    DISTINCT ON
+                    (store_app)
+                    id,
+                    store_app,
+                    version_code,
+                    updated_at AS last_downloaded_at,
+                    crawl_result AS download_result
+                FROM
+                    version_codes
+                WHERE crawl_result = 1
+                -- HACKY FIX only try for apps that have successuflly been downloaded, but this table still is all history of version_codes in general
+                AND updated_at >= '2025-05-01'
+                ORDER BY
+                    store_app,
+                    updated_at DESC,
+                    string_to_array(version_code, '.')::bigint[] DESC
+            ),
+            last_scanned AS (
                     SELECT
                         DISTINCT ON
                         (vc.store_app) *
@@ -411,14 +409,17 @@ def query_store_id_api_called_map(
                         vc.store_app,
                         run_at DESC
                 )
-                SELECT sa.id as store_app, 
+                SELECT lvc.store_app as store_app, 
                 sa.store_id, 
                 ls.run_at
                 FROM
-                    store_apps sa
-                RIGHT JOIN last_scanned ls ON
-                    sa.id = ls.store_app
-                {where_statement}
+                    latest_version_codes lvc
+                LEFT JOIN last_scanned ls ON
+                    lvc.store_app = ls.store_app
+                LEFT JOIN store_apps sa ON
+                    lvc.store_app = sa.id
+                WHERE (ls.run_at <= CURRENT_DATE - INTERVAL '60 days' OR ls.run_at IS NULL)
+                    AND sa.store = {store}
         ;
         """
     df = pd.read_sql(sel_query, database_connection.engine)

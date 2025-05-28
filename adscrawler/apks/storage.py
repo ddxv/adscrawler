@@ -1,18 +1,19 @@
-import boto3
 import os
 import pathlib
-import pandas as pd
 
-from adscrawler.config import CONFIG, APKS_DIR, XAPKS_DIR, get_logger
+import boto3
+import pandas as pd
 
 from adscrawler.apks.process_apk import (
     get_downloaded_apks,
     get_downloaded_xapks,
-    unzip_apk,
+    get_local_apk_path,
     get_md5_hash,
     get_version,
     remove_tmp_files,
+    unzip_apk,
 )
+from adscrawler.config import APKS_DIR, CONFIG, XAPKS_DIR, get_logger
 
 logger = get_logger(__name__)
 
@@ -235,6 +236,15 @@ def download_s3_apk(s3_key: str | None = None, store_id: str | None = None):
         Filename=local_path,
     )
     return local_path
+
+
+def download_to_local(store_id: str) -> pathlib.Path | None:
+    apk_path = get_local_apk_path(store_id)
+    if apk_path is None:
+        apk_path = download_s3_apk(store_id=store_id)
+    if apk_path is None:
+        raise FileNotFoundError(f"{store_id=} no apk found: {apk_path=}")
+    return apk_path
 
 
 S3_CLIENT = get_s3_client()

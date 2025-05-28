@@ -8,11 +8,11 @@ from xml.etree import ElementTree
 import pandas as pd
 
 from adscrawler.apks.process_apk import (
-    get_local_apk_path,
     get_version,
     remove_tmp_files,
     unzip_apk,
 )
+from adscrawler.apks.storage import download_to_local
 from adscrawler.config import (
     APK_TMP_UNZIPPED_DIR,
     get_logger,
@@ -143,10 +143,7 @@ def process_manifest(database_connection: PostgresCon, row: pd.Series) -> None:
     manifest_str = ""
 
     try:
-        apk_path = get_local_apk_path(store_id)
-        if apk_path is None:
-            raise FileNotFoundError(f"{store_id=} no apk found: {apk_path=}")
-
+        apk_path = download_to_local(store_id=store_id)
         apk_tmp_decoded_output_path = unzip_apk(store_id=store_id, file_path=apk_path)
 
         # extension = download(store_id, do_redownload=False)

@@ -9,11 +9,7 @@ import time
 import pandas as pd
 
 from adscrawler.apks import mitm_process_log
-from adscrawler.apks.process_apk import (
-    check_xapk_is_valid,
-    get_downloaded_apks,
-    get_downloaded_xapks,
-)
+from adscrawler.apks.storage import download_to_local
 from adscrawler.apks.weston import restart_weston, start_weston
 from adscrawler.config import (
     ANDROID_SDK,
@@ -729,52 +725,21 @@ def manual_waydroid_process(
     )
 
 
-def process_xapks_for_waydroid(
-    database_connection: PostgresCon, num_apps: int = 10
-) -> None:
-    store_ids = get_downloaded_xapks()
-    store_id_map = query_store_id_api_called_map(
-        database_connection=database_connection,
-        store_ids=store_ids,
-    )
-    store_id_map = store_id_map.sort_values(by="run_at", ascending=False)
-    logger.info(
-        f"Waydroid has {store_id_map.shape[0]} (xapk) apps to process, starting top {num_apps}"
-    )
-    store_id_map = store_id_map.head(num_apps)
-    for _, row in store_id_map.iterrows():
-        store_id = row.store_id
-        xapk_path = pathlib.Path(XAPKS_DIR, f"{store_id}.xapk")
-        if check_xapk_is_valid(xapk_path):
-            pass
-        else:
-            continue
-        process_app_for_waydroid(
-            database_connection=database_connection,
-            extension="xapk",
-            store_id=store_id,
-            store_app=row.store_app,
-            run_name="regular",
-        )
-    remove_all_third_party_apps()
-
-
 def process_apks_for_waydroid(
     database_connection: PostgresCon, num_apps: int = 10
 ) -> None:
-    apks = get_downloaded_apks()
     store_id_map = query_store_id_api_called_map(
-        database_connection=database_connection, store_ids=apks
+        database_connection=database_connection, store=1
     )
-    store_id_map = store_id_map.sort_values(by="run_at", ascending=False)
     logger.info(
         f"Waydroid has {store_id_map.shape[0]} apps to process, starting {num_apps}"
     )
     store_id_map = store_id_map.head(num_apps)
-    extension = "apk"
     for _, row in store_id_map.iterrows():
         store_id = row.store_id
         store_app = row.store_app
+        apk_path = download_to_local(store_id=store_id)
+        extension = apk_path.suffix.replace(".", "")
         process_app_for_waydroid(
             database_connection=database_connection,
             extension=extension,

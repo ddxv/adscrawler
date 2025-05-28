@@ -8,7 +8,6 @@ from adscrawler.apks.manifest import process_sdks
 from adscrawler.apks.waydroid import (
     manual_waydroid_process,
     process_apks_for_waydroid,
-    process_xapks_for_waydroid,
 )
 from adscrawler.app_stores.scrape_stores import (
     crawl_developers_for_new_store_ids,
@@ -331,10 +330,6 @@ class ProcessManager:
             # Default processing of apk/xapk files that need to be processed
             try:
                 process_apks_for_waydroid(database_connection=self.pgcon)
-            except Exception:
-                logger.exception("Android run waydroid app failing")
-            try:
-                process_xapks_for_waydroid(database_connection=self.pgcon)
             except Exception:
                 logger.exception("Android run waydroid app failing")
 
