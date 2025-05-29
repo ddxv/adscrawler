@@ -774,7 +774,6 @@ def process_apks_for_waydroid(
         store_app = row.store_app
         apk_path = download_to_local(store_id=store_id)
         extension = apk_path.suffix.replace(".", "")
-        break
         process_app_for_waydroid(
             database_connection=database_connection,
             extension=extension,

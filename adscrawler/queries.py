@@ -450,6 +450,7 @@ def query_apps_to_api_check(
             ORDER BY sa.id, urs.created_at
             )            
             SELECT 
+                store_app,
                 store_id,
                 name,
                 installs,
@@ -460,7 +461,8 @@ def query_apps_to_api_check(
                 'user' AS mysource
                 FROM user_requested_apps_crawl urac
             UNION ALL
-            SELECT  
+            SELECT 
+                store_app,
                 store_id,
                 name,
                 installs,
