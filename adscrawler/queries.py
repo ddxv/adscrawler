@@ -371,7 +371,7 @@ def query_store_id_map(
     return df
 
 
-def query_store_id_api_called_map(
+def query_apps_to_api_check(
     database_connection: PostgresCon,
     store: int,
 ) -> pd.DataFrame:

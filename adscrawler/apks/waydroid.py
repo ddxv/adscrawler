@@ -28,7 +28,7 @@ from adscrawler.queries import (
     get_version_code_dbid,
     insert_df,
     query_store_app_by_store_id,
-    query_store_id_api_called_map,
+    query_apps_to_api_check,
 )
 
 logger = get_logger(__name__, sep_file="waydroid")
@@ -764,7 +764,7 @@ def manual_waydroid_process(
 def process_apks_for_waydroid(
     database_connection: PostgresCon, num_apps: int = 10
 ) -> None:
-    store_id_map = query_store_id_api_called_map(
+    store_id_map = query_apps_to_api_check(
         database_connection=database_connection, store=1
     )
     logger.info(
