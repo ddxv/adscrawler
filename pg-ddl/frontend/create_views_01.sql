@@ -113,23 +113,28 @@ CREATE UNIQUE INDEX companies_apps_overview_unique_idx ON frontend.companies_app
     store_id, company_id, category_slug
 );
 
-
-DROP MATERIALIZED VIEW IF EXISTS frontend.store_apps_overview;
-
 CREATE MATERIALIZED VIEW frontend.store_apps_overview
 TABLESPACE pg_default
 AS
-WITH latest_version_codes AS (
-    SELECT DISTINCT ON (vc.store_app)
-        vc.id,
-        vc.store_app,
-        vc.version_code,
-        vc.updated_at,
-        vc.crawl_result
-    FROM version_codes AS vc
+WITH
+latest_version_codes AS (
+    SELECT DISTINCT ON
+    (store_app)
+        id,
+        store_app,
+        version_code,
+        updated_at AS last_downloaded_at,
+        crawl_result AS download_result
+    FROM
+        version_codes
+    WHERE
+        crawl_result = 1
+        -- HACKY FIX only try for apps that have successuflly been downloaded, but this table still is all history of version_codes in general
+        AND updated_at >= '2025-05-01'
     ORDER BY
-        vc.store_app,
-        (string_to_array(vc.version_code::text, '.'::text)::bigint []) DESC
+        store_app ASC,
+        updated_at DESC,
+        string_to_array(version_code, '.')::bigint [] DESC
 ),
 
 latest_successful_version_codes AS (
@@ -146,14 +151,79 @@ latest_successful_version_codes AS (
         (string_to_array(vc.version_code::text, '.'::text)::bigint []) DESC
 ),
 
+last_sdk_scan AS (
+    SELECT DISTINCT ON
+    (vc.store_app)
+        vc.store_app,
+        version_code_id AS version_code,
+        scanned_at,
+        scan_result
+    FROM
+        version_code_sdk_scan_results AS lsscr
+    LEFT JOIN version_codes AS vc ON lsscr.version_code_id = vc.id
+    ORDER BY
+        vc.store_app ASC,
+        lsscr.scanned_at DESC
+),
+
+last_successful_sdk_scan AS (
+    SELECT DISTINCT ON
+    (vc.store_app)
+        vc.id,
+        vc.store_app,
+        vc.version_code,
+        vcss.scanned_at,
+        vcss.scan_result
+    FROM
+        version_codes AS vc
+    LEFT JOIN version_code_sdk_scan_results AS vcss
+        ON
+            vc.id = vcss.version_code_id
+    WHERE vcss.scan_result = 1
+    ORDER BY
+        vc.store_app ASC,
+        vcss.scanned_at DESC,
+        string_to_array(vc.version_code, '.')::bigint [] DESC
+),
+
 latest_en_descriptions AS (
-    SELECT DISTINCT ON (store_app)
-        store_app,
-        description,
-        description_short
+    SELECT DISTINCT ON (store_apps_descriptions.store_app)
+        store_apps_descriptions.store_app,
+        store_apps_descriptions.description,
+        store_apps_descriptions.description_short
     FROM store_apps_descriptions
-    WHERE language_id = 1
-    ORDER BY store_app ASC, updated_at DESC
+    WHERE store_apps_descriptions.language_id = 1
+    ORDER BY
+        store_apps_descriptions.store_app ASC,
+        store_apps_descriptions.updated_at DESC
+),
+
+latest_api_calls AS (
+    SELECT DISTINCT ON
+    (vc.store_app)
+        store_app,
+        vasr.run_result,
+        vasr.run_at
+    FROM
+        version_codes AS vc
+    LEFT JOIN version_code_api_scan_results AS vasr
+        ON vc.id = vasr.version_code_id
+    WHERE
+        vc.updated_at >= '2025-05-01'
+),
+
+latest_successful_api_calls AS (
+    SELECT DISTINCT ON
+    (vc.store_app)
+        store_app,
+        vasr.run_at
+    FROM
+        version_codes AS vc
+    LEFT JOIN version_code_api_scan_results AS vasr
+        ON vc.id = vasr.version_code_id
+    WHERE
+        vasr.run_result = 1
+        AND vc.updated_at >= '2025-05-01'
 )
 
 SELECT
@@ -166,6 +236,16 @@ SELECT
     sa.rating_count,
     sa.review_count,
     sa.installs,
+    saz.installs_sum_1w,
+    saz.ratings_sum_1w,
+    saz.installs_sum_4w,
+    saz.ratings_sum_4w,
+    saz.installs_z_score_2w,
+    saz.ratings_z_score_2w,
+    saz.installs_z_score_4w,
+    saz.ratings_z_score_4w,
+    sa.ad_supported,
+    sa.in_app_purchases,
     sa.store_last_updated,
     sa.created_at,
     sa.updated_at,
@@ -184,27 +264,33 @@ SELECT
     pd.url AS developer_url,
     pd.updated_at AS adstxt_last_crawled,
     pd.crawl_result AS adstxt_crawl_result,
-    lvc.updated_at AS sdk_last_crawled,
-    lvc.crawl_result AS sdk_crawl_result,
-    lsvc.updated_at AS sdk_successful_last_crawled,
+    lss.scanned_at AS sdk_last_crawled,
+    lss.scanned_at AS sdk_crawl_result,
+    lsss.scanned_at AS sdk_successful_last_crawled,
     lvc.version_code,
     ld.description,
-    ld.description_short
+    ld.description_short,
+    lac.run_at AS api_last_crawled,
+    lac.run_result,
+    lsac.run_at AS api_successful_last_crawled
 FROM store_apps AS sa
 LEFT JOIN developers AS d ON sa.developer = d.id
 LEFT JOIN app_urls_map AS aum ON sa.id = aum.store_app
 LEFT JOIN pub_domains AS pd ON aum.pub_domain = pd.id
 LEFT JOIN latest_version_codes AS lvc ON sa.id = lvc.store_app
+LEFT JOIN last_sdk_scan AS lss ON sa.id = lss.store_app
+LEFT JOIN last_successful_sdk_scan AS lsss ON sa.id = lsss.store_app
 LEFT JOIN latest_successful_version_codes AS lsvc ON sa.id = lsvc.store_app
 LEFT JOIN latest_en_descriptions AS ld ON sa.id = ld.store_app
+LEFT JOIN store_app_z_scores AS saz ON sa.id = saz.store_app
+LEFT JOIN latest_api_calls AS lac ON sa.id = lac.store_app
+LEFT JOIN latest_successful_api_calls AS lsac ON sa.id = lsac.store_app
 WITH DATA;
 
-
--- View indexes:
-CREATE INDEX store_apps_overview_idx ON frontend.store_apps_overview USING btree (
+CREATE INDEX store_apps_overview_idx ON frontend.store_apps_overview_new USING btree (
     store_id
 );
-CREATE UNIQUE INDEX store_apps_overview_unique_idx ON frontend.store_apps_overview USING btree (
+CREATE UNIQUE INDEX store_apps_overview_unique_idx ON frontend.store_apps_overview_new USING btree (
     store, store_id
 );
 

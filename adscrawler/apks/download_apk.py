@@ -28,8 +28,8 @@ from adscrawler.config import (
 )
 from adscrawler.connection import PostgresCon
 from adscrawler.queries import (
-    get_top_apps_to_download,
     insert_version_code,
+    query_apps_to_download,
 )
 
 APK_SOURCES = ["apkmirror", "apkpure"]
@@ -47,7 +47,7 @@ def download_apks(
     last_error_count = 0
     this_error_count = 0
     store = 1
-    apps = get_top_apps_to_download(
+    apps = query_apps_to_download(
         database_connection=database_connection,
         store=store,
         limit=number_of_apps_to_pull,

@@ -764,7 +764,7 @@ def query_all(
     return df
 
 
-def get_top_apps_to_download(
+def query_apps_to_download(
     database_connection: PostgresCon,
     store: int,
     limit: int = 25,
@@ -935,7 +935,7 @@ def get_top_apps_to_download(
     return df
 
 
-def get_next_to_sdk_scan(
+def query_apps_to_sdk_scan(
     database_connection: PostgresCon,
     store: int,
     limit: int = 25,

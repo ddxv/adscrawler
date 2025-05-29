@@ -19,8 +19,8 @@ from adscrawler.config import (
 )
 from adscrawler.connection import PostgresCon
 from adscrawler.queries import (
-    get_next_to_sdk_scan,
     get_version_code_dbid,
+    query_apps_to_sdk_scan,
     upsert_details_df,
 )
 
@@ -206,7 +206,7 @@ def process_sdks(
     All results are saved to the database.
     """
     store = 1
-    apps = get_next_to_sdk_scan(
+    apps = query_apps_to_sdk_scan(
         database_connection=database_connection,
         store=store,
         limit=number_of_apps_to_pull,
