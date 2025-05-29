@@ -6,6 +6,7 @@ import select
 import subprocess
 import time
 
+import numpy as np
 import pandas as pd
 
 from adscrawler.apks import mitm_process_log
@@ -78,6 +79,10 @@ def insert_api_calls(
             "city_name",
             "org",
         ]
+        mdf = mdf[insert_columns]
+        mdf["country_id"] = np.where(
+            np.isnan(mdf["country_id"]), None, mdf["country_id"]
+        )
         insert_df(
             df=mdf,
             table_name="store_app_api_calls",

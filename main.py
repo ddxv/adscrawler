@@ -112,6 +112,11 @@ class ProcessManager:
             "--store-id",
             help="String of store id to launch in wayroid",
         )
+        parser.add_argument(
+            "--redownload-geo-dbs",
+            help="Redownload geo dbs",
+            action="store_true",
+        )
 
         args, _ = parser.parse_known_args()
         return args
@@ -313,7 +318,7 @@ class ProcessManager:
         process_sdks(database_connection=self.pgcon, number_of_apps_to_pull=20)
 
     def waydroid_mitm(self) -> None:
-        update_geo_dbs()
+        update_geo_dbs(redownload=self.args.redownload_geo_dbs)
         if self.args.store_id:
             # Manual waydroid process, launches app for 5 minutes for user to interact
             store_id = self.args.store_id

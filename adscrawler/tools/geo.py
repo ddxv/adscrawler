@@ -16,10 +16,10 @@ GITSQUARED_GEOLITE2_RAW_DATA = "https://raw.githubusercontent.com/GitSquared/nod
 MAXMIND_GEO_DBS = ["GeoLite2-City", "GeoLite2-ASN"]
 
 
-def update_geo_dbs() -> None:
+def update_geo_dbs(redownload: bool = False) -> None:
     """Update the geo databases."""
     for db in MAXMIND_GEO_DBS:
-        if pathlib.Path(f"{GEO_DATA_DIR}/{db}.mmdb").exists():
+        if pathlib.Path(f"{GEO_DATA_DIR}/{db}.mmdb").exists() and not redownload:
             continue
         logger.info(f"{db}: Unable to find {db}.mmdb file")
         logger.info(f"{db}: Downloading {db}.tar.gz")
