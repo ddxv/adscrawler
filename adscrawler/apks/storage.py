@@ -187,6 +187,7 @@ def get_keys_with_metadata() -> pd.DataFrame:
 def get_store_id_s3_keys(store_id: str) -> pd.DataFrame:
     paginator = S3_CLIENT.get_paginator("list_objects_v2")
     objects_data = []
+    logger.info(f"Getting {store_id=} s3 keys")
     for page in paginator.paginate(
         Bucket="adscrawler", Prefix=f"apks/android/{store_id}/"
     ):
@@ -207,6 +208,7 @@ def get_store_id_s3_keys(store_id: str) -> pd.DataFrame:
                     }
                 )
     df = pd.DataFrame(objects_data)
+    logger.info(f"Got {store_id=} s3 keys: {df.shape[0]}")
     return df
 
 
@@ -230,12 +232,13 @@ def download_s3_apk(
         local_path = pathlib.Path(XAPKS_DIR, f"{store_id}.{extension}")
     else:
         raise ValueError(f"Invalid extension: {extension}")
+    logger.info(f"Download {store_id}.{extension} to local start")
     S3_CLIENT.download_file(
         Bucket="adscrawler",
         Key=key,
         Filename=local_path,
     )
-    logger.info(f"Downloaded {store_id}.{extension} to local")
+    logger.info(f"Download {store_id}.{extension} to local finished")
     return local_path
 
 
