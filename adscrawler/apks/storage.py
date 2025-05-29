@@ -250,7 +250,3 @@ def download_to_local(store_id: str) -> pathlib.Path | None:
 
 
 S3_CLIENT = get_s3_client()
-
-
-if __name__ == "__main__":
-    move_local_files_to_s3()
