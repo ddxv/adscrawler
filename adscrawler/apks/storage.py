@@ -185,24 +185,28 @@ def get_keys_with_metadata() -> pd.DataFrame:
 
 
 def get_store_id_s3_keys(store_id: str) -> pd.DataFrame:
+    logger.info(f"Getting {store_id=} s3 keys start")
     paginator = S3_CLIENT.get_paginator("list_objects_v2")
     objects_data = []
-    logger.info(f"Getting {store_id=} s3 keys")
     for page in paginator.paginate(
         Bucket="adscrawler", Prefix=f"apks/android/{store_id}/"
     ):
         if "Contents" in page:
             for obj in page["Contents"]:
                 # Get the object's metadata
-                response = S3_CLIENT.head_object(Bucket="adscrawler", Key=obj["Key"])
-                metadata = response.get("Metadata", {})
+                # response = S3_CLIENT.head_object(Bucket="adscrawler", Key=obj["Key"])
+                key_parts = obj["Key"].split("/")
+                if len(key_parts) >= 4:
+                    version_code = key_parts[3]
+                else:
+                    version_code = "uknown"
 
                 objects_data.append(
                     {
                         "key": obj["Key"],
-                        "store_id": metadata.get("store_id", "unknown"),
-                        "version_code": metadata.get("version_code", "unknown"),
-                        "md5": metadata.get("md5", "unknown"),
+                        "store_id": store_id,
+                        "version_code": version_code,
+                        "md5": key_parts[4].split(".")[0],
                         "size": obj["Size"],
                         "last_modified": obj["LastModified"],
                     }
@@ -222,6 +226,7 @@ def download_s3_apk(
         if df.empty:
             logger.error(f"{store_id=} no apk found in s3")
             return None
+        df = df.sort_values(by="version_code", ascending=False)
         key = df.iloc[0].key
     else:
         raise ValueError("Either s3_key or store_id must be provided")

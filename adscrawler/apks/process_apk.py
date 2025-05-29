@@ -154,6 +154,8 @@ def get_local_apk_path(store_id: str) -> pathlib.Path | None:
         pathlib.Path(XAPKS_INCOMING_DIR, f"{store_id}.xapk"),
     ]
 
+    logger.info(f"Checking {store_id=} if exists locally")
+
     for path in paths_to_check:
         if path.exists():
             return path
