@@ -3,6 +3,7 @@ import os
 import pathlib
 import sys
 import tomllib
+import traceback
 import typing
 from logging import Formatter
 from logging.handlers import RotatingFileHandler
@@ -58,9 +59,6 @@ def handle_exception(exc_type, exc_value, exc_traceback) -> None:
         sys.__excepthook__(exc_type, exc_value, exc_traceback)
         return
     logger.critical("Uncaught exception", exc_info=(exc_type, exc_value, exc_traceback))
-
-
-import traceback
 
 
 @typing.no_type_check
@@ -158,7 +156,6 @@ def get_logger(mod_name: str, sep_file: str | None = "main") -> logging.Logger:
 
 
 # Set global handling of uncaught exceptions
-# sys.excepthook = handle_exception
 sys.excepthook = exc_handler
 
 logger = get_logger(__name__)

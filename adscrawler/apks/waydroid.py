@@ -535,7 +535,7 @@ def launch_app(store_id: str) -> None:
     time.sleep(2)
 
     # Set timeout parameters
-    timeout = 30
+    timeout = 60
     start_time = time.time()
     found = False
     permission_attempts = 2
@@ -567,7 +567,7 @@ def launch_app(store_id: str) -> None:
 
         logger.info(f"{function_info} not in foreground yet")
         # Relaunch every 10 seconds
-        if time.time() - last_relaunch_time >= 10:
+        if time.time() - last_relaunch_time >= 20:
             logger.info(f"{function_info} relaunching")
             os.system(f"waydroid app launch {store_id}")
             last_relaunch_time = time.time()
