@@ -27,8 +27,8 @@ from adscrawler.connection import PostgresCon
 from adscrawler.queries import (
     get_version_code_dbid,
     insert_df,
-    query_store_app_by_store_id,
     query_apps_to_api_check,
+    query_store_app_by_store_id,
 )
 
 logger = get_logger(__name__, sep_file="waydroid")
@@ -112,7 +112,7 @@ def run_app(
     run_name: str,
     timeout: int = 60,
 ) -> None:
-    function_info = f"waydroid {store_id=}"
+    function_info = f"run_app {store_id=}"
     crawl_result = 3
     version_code_id = None
     logger.info(f"{function_info} clearing mitmdump")
@@ -764,14 +764,11 @@ def manual_waydroid_process(
 def process_apks_for_waydroid(
     database_connection: PostgresCon, num_apps: int = 10
 ) -> None:
-    store_id_map = query_apps_to_api_check(
-        database_connection=database_connection, store=1
-    )
-    logger.info(
-        f"Waydroid has {store_id_map.shape[0]} apps to process, starting {num_apps}"
-    )
-    store_id_map = store_id_map.head(num_apps)
-    for _, row in store_id_map.iterrows():
+    apps_df = query_apps_to_api_check(database_connection=database_connection, store=1)
+    logger.info(f"Waydroid has {apps_df.shape[0]} apps to process, starting {num_apps}")
+    apps_df = apps_df.head(num_apps)
+    for _, row in apps_df.iterrows():
+        logger.info(f"Start app {_}/{apps_df.shape[0]}: {row.store_id}")
         store_id = row.store_id
         store_app = row.store_app
         apk_path = download_to_local(store_id=store_id)

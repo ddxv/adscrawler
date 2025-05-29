@@ -235,6 +235,7 @@ def download_s3_apk(
         Key=key,
         Filename=local_path,
     )
+    logger.info(f"Downloaded {store_id}.{extension} to local")
     return local_path
 
 
