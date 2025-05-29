@@ -362,13 +362,11 @@ def remove_all_third_party_apps() -> None:
         timeout=20,
     )
     apps_to_remove = [
-        x
-        for x in third_party_apps.stdout.splitlines()
-        if x not in THIRD_PARTY_APPS_TO_KEEP
+        x.replace("package:", "") for x in third_party_apps.stdout.splitlines()
     ]
+    apps_to_remove = [x for x in apps_to_remove if x not in THIRD_PARTY_APPS_TO_KEEP]
     for app in apps_to_remove:
-        app = app.replace("package:", "")
-        logger.info(f"{function_info} removing {app}")
+        logger.info(f"{function_info} removing '{app}'")
         subprocess.run(
             ["sudo", "waydroid", "shell", "pm", "uninstall", app],
             text=True,
