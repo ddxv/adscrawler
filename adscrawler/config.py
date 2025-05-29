@@ -60,6 +60,18 @@ def handle_exception(exc_type, exc_value, exc_traceback) -> None:
     logger.critical("Uncaught exception", exc_info=(exc_type, exc_value, exc_traceback))
 
 
+import traceback
+
+
+@typing.no_type_check
+def exc_handler(exctype, value, tb):
+    if issubclass(exctype, KeyboardInterrupt):
+        sys.__excepthook__(exctype, value, tb)
+        return
+    logger.exception("".join(traceback.format_exception(exctype, value, tb)))
+    # logger.critical("Uncaught exception", exc_info=(exc_type, exc_value, exc_traceback))
+
+
 def check_dirs() -> None:
     dirs = [
         TOP_CONFIGDIR,
@@ -101,24 +113,15 @@ def get_logger(mod_name: str, sep_file: str | None = "main") -> logging.Logger:
     # Get or create logger
     logger = logging.getLogger(mod_name)
 
-    # Clear any existing handlers
-    logger.handlers.clear()
-
     # Set level
     logger.setLevel(logging.INFO)
 
-    log_filename = os.path.join(LOG_DIR, f"{sep_file}.log")
-    # Check if a handler for this file already exists
-    if not any(
-        isinstance(h, RotatingFileHandler) and h.baseFilename == log_filename
-        for h in logger.handlers
-    ):
-        # Add file handler for individual log file
-        indiv_handler = RotatingFileHandler(
-            filename=os.path.join(LOG_DIR, f"{sep_file}.log"),
-            maxBytes=50 * 1024 * 1024,
-            backupCount=10,
-        )
+    # Add file handler for individual log file
+    indiv_handler = RotatingFileHandler(
+        filename=os.path.join(LOG_DIR, f"{sep_file}.log"),
+        maxBytes=50 * 1024 * 1024,
+        backupCount=10,
+    )
     indiv_handler.setFormatter(FORMATTER)
     logger.addHandler(indiv_handler)
 
@@ -155,10 +158,10 @@ def get_logger(mod_name: str, sep_file: str | None = "main") -> logging.Logger:
 
 
 # Set global handling of uncaught exceptions
-sys.excepthook = handle_exception
+# sys.excepthook = handle_exception
+sys.excepthook = exc_handler
 
 logger = get_logger(__name__)
-
 
 CONFIG_FILENAME = "config.toml"
 

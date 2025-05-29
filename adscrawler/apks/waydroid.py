@@ -31,7 +31,8 @@ from adscrawler.queries import (
     query_store_app_by_store_id,
 )
 
-logger = get_logger(__name__, sep_file="waydroid")
+logger = get_logger(__name__, "waydroid")
+# logger = get_logger(__name__)
 
 ANDROID_PERMISSION_ACTIVITY = (
     "com.android.permissioncontroller/.permission.ui.ReviewPermissionsActivity"
@@ -773,6 +774,7 @@ def process_apks_for_waydroid(
         store_app = row.store_app
         apk_path = download_to_local(store_id=store_id)
         extension = apk_path.suffix.replace(".", "")
+        break
         process_app_for_waydroid(
             database_connection=database_connection,
             extension=extension,
