@@ -302,16 +302,14 @@ def log_version_code_scan_crawl_results(
             "crawl_result": [crawl_result],
         }
     )
-    result = df.to_sql(
+    df.to_sql(
         name="version_code_api_scan_results",
         schema="logging",
         con=database_connection.engine,
         if_exists="append",
         index=False,
     )
-    logger.info(
-        f"logged: {store_app=} {md5_hash=} {crawl_result=} {version_code_id=} {result=}"
-    )
+    logger.info(f"logged: {store_app=} {md5_hash=} {crawl_result=} {version_code_id=}")
 
 
 def upsert_details_df(
