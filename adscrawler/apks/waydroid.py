@@ -153,7 +153,6 @@ def run_app(
             version_code_id = None
         if version_code_id is None:
             logger.error(f"{function_info} failed to get version code id")
-            return
 
     md5_hash = get_md5_hash(apk_path)
     logger.info(f"{function_info} log: {md5_hash=} {version_code_id=} {crawl_result=}")
