@@ -857,7 +857,8 @@ def query_apps_to_sdk_scan(
     store: int,
     limit: int = 25,
 ) -> pd.DataFrame:
-    sel_query = f"""WITH latest_version_codes AS (
+    sel_query = f"""
+    WITH latest_version_codes AS (
                 SELECT
                     DISTINCT ON
                     (store_app)
@@ -933,12 +934,12 @@ def query_apps_to_sdk_scan(
                 AND vc.download_result = 1
                 AND
                 (   
-                    lsvc.scanned_at IS NULL 
+                    ls.scanned_at IS NULL 
                     OR
                         (
-                        (lsvc.scan_result = 1 AND lsvc.scanned_at < current_date - INTERVAL '180 days')
+                        (lsvc.scan_result = 1 AND lsvc.scanned_at < current_date - INTERVAL '30 days')
                         OR
-                        (lsvc.scan_result IN (2,3,4) AND lsvc.scanned_at < current_date - INTERVAL '30 days')
+                        (lsvc.scan_result IN (2,3,4) AND (lsvc.scanned_at < current_date - INTERVAL '10 days' AND ls.scanned_at < current_date - INTERVAL '3 days'))
                         )
                 )
             ORDER BY
@@ -1005,7 +1006,7 @@ def query_apps_to_sdk_scan(
             last_scuccess_scanned_at
         FROM
             scheduled_apps_crawl
-        LIMIT {limit}
+            LIMIT {limit}
         ;
     """
     df = pd.read_sql(sel_query, con=database_connection.engine)
