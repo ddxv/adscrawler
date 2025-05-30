@@ -956,7 +956,8 @@ def query_apps_to_sdk_scan(
             ),
             user_requested_apps_crawl AS (
             SELECT
-                DISTINCT sa.id AS store_app,
+                DISTINCT ON (sa.id)
+                sa.id AS store_app,
                 sa.store_id,
                 sa.name,
                 sa.installs,
@@ -981,6 +982,7 @@ def query_apps_to_sdk_scan(
                 AND (lvc.last_downloaded_at < current_date - INTERVAL '1 days'
                     OR lvc.last_downloaded_at IS NULL)
                 AND sa.store = {store}
+            ORDER BY sa.id, urs.created_at desc
             )
         SELECT
             store_app,
@@ -1048,6 +1050,7 @@ def query_apps_to_api_check(
                     WHERE
                         vc.crawl_result = 1
                         AND vc.updated_at >= '2025-05-01'
+                    ORDER BY vc.store_app, vc.updated_at desc
                 ),
             failed_runs AS (
             SELECT store_app, count(*) AS failed_attempts FROM logging.version_code_api_scan_results
@@ -1100,7 +1103,7 @@ def query_apps_to_api_check(
                 )
                 AND sa.store = {store}
                 AND (fr.failed_attempts < 1 OR fr.failed_attempts IS NULL )
-            ORDER BY sa.id, urs.created_at
+            ORDER BY sa.id, urs.created_at desc
             )            
             SELECT 
                 store_app,
