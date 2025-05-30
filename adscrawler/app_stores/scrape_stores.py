@@ -37,7 +37,7 @@ from adscrawler.queries import (
     query_store_ids,
     upsert_df,
 )
-from adscrawler.tools.extract_keywords import extract_keywords, get_global_keywords
+from adscrawler.tools.extract_keywords import get_global_keywords
 
 logger = get_logger(__name__, "scrape_stores")
 
@@ -934,11 +934,11 @@ def upsert_store_apps_descriptions(
             description_id = row["description_id"]
             app_name = row["name"]
             text = ". ".join([app_name, description_short, description])
-            keywords = extract_keywords(text, database_connection=database_connection)
-            keywords_df = pd.DataFrame(keywords, columns=["keyword_text"])
-            keywords_df["language_id"] = language_id
-            keywords_df["description_id"] = description_id
-            upsert_keywords(keywords_df, database_connection)
+            # keywords = extract_keywords(text, database_connection=database_connection)
+            # keywords_df = pd.DataFrame(keywords, columns=["keyword_text"])
+            # keywords_df["language_id"] = language_id
+            # keywords_df["description_id"] = description_id
+            # upsert_keywords(keywords_df, database_connection)
 
 
 def upsert_keywords(keywords_df: pd.DataFrame, database_connection: PostgresCon):
