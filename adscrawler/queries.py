@@ -371,115 +371,6 @@ def query_store_id_map(
     return df
 
 
-def query_apps_to_api_check(
-    database_connection: PostgresCon,
-    store: int,
-) -> pd.DataFrame:
-    sel_query = f"""WITH latest_version_codes AS (
-                SELECT
-                    DISTINCT ON
-                    (store_app)
-                    id,
-                    store_app,
-                    version_code,
-                    updated_at AS last_downloaded_at,
-                    crawl_result AS download_result
-                FROM
-                    version_codes
-                WHERE crawl_result = 1
-                -- HACKY FIX only try for apps that have successuflly been downloaded, but this table still is all history of version_codes in general
-                AND updated_at >= '2025-05-01'
-                ORDER BY
-                    store_app,
-                    updated_at DESC,
-                    string_to_array(version_code, '.')::bigint[] DESC
-            ),
-            last_scanned AS (
-                    SELECT
-                        DISTINCT ON
-                        (vc.store_app) *
-                    FROM
-                       version_codes vc 
-                    LEFT JOIN version_code_api_scan_results vasr
-                        ON vasr.version_code_id = vc.id
-                    WHERE
-                        vc.crawl_result = 1
-                        AND vc.updated_at >= '2025-05-01'
-                ),
-        scheduled_to_run AS (
-                SELECT lvc.store_app as store_app,
-                sa.name,
-                sa.store_id,
-                sa.installs,
-                ls.run_at AS last_run_at,
-                lvc.download_result AS last_download_result,
-                lvc.last_downloaded_at
-                FROM
-                    latest_version_codes lvc
-                LEFT JOIN last_scanned ls ON
-                    lvc.store_app = ls.store_app
-                LEFT JOIN store_apps sa ON
-                    lvc.store_app = sa.id
-                WHERE (ls.run_at <= CURRENT_DATE - INTERVAL '120 days' OR ls.run_at IS NULL)
-                    AND sa.store = {store}
-                ORDER BY sa.installs DESC
-                ),     
-        user_requested_apps_crawl AS (
-            SELECT
-                DISTINCT ON (sa.id)
-                sa.id AS store_app,
-                sa.store_id,
-                sa.name,
-                sa.installs,
-                ls.run_at AS last_run_at,
-                lsvc.download_result AS last_download_result,
-                lsvc.last_downloaded_at,
-                urs.created_at AS user_requested_at
-            FROM
-                user_requested_scan urs
-            LEFT JOIN store_apps sa ON
-                urs.store_id = sa.store_id
-            INNER JOIN latest_version_codes lsvc ON
-                sa.id = lsvc.store_app
-            LEFT JOIN last_scanned ls ON lsvc.id = ls.version_code_id
-            WHERE
-                (ls.run_at < urs.created_at
-                    OR ls.run_at IS NULL
-                )
-                AND sa.store = {store}
-            ORDER BY sa.id, urs.created_at
-            )            
-            SELECT 
-                store_app,
-                store_id,
-                name,
-                installs,
-                last_run_at,
-                last_download_result,
-                last_downloaded_at,
-                user_requested_at,
-                'user' AS mysource
-                FROM user_requested_apps_crawl urac
-            UNION ALL
-            SELECT 
-                store_app,
-                store_id,
-                name,
-                installs,
-                last_run_at,
-                last_download_result,
-                last_downloaded_at,
-                NULL AS user_requested_at,
-                'scheduled' AS mysource
-                FROM scheduled_to_run
-                WHERE store_id NOT IN (SELECT store_id FROM user_requested_apps_crawl)
-            ORDER BY mysource DESC, user_requested_at, installs DESC 
-        ;
-        """
-    df = pd.read_sql(sel_query, database_connection.engine)
-    return df
-
-
 def query_collections(database_connection: PostgresCon) -> pd.DataFrame:
     sel_query = """SELECT
         *
@@ -1092,6 +983,115 @@ def query_apps_to_sdk_scan(
         ;
     """
     df = pd.read_sql(sel_query, con=database_connection.engine)
+    return df
+
+
+def query_apps_to_api_check(
+    database_connection: PostgresCon,
+    store: int,
+) -> pd.DataFrame:
+    sel_query = f"""WITH latest_version_codes AS (
+                SELECT
+                    DISTINCT ON
+                    (store_app)
+                    id,
+                    store_app,
+                    version_code,
+                    updated_at AS last_downloaded_at,
+                    crawl_result AS download_result
+                FROM
+                    version_codes
+                WHERE crawl_result = 1
+                -- HACKY FIX only try for apps that have successuflly been downloaded, but this table still is all history of version_codes in general
+                AND updated_at >= '2025-05-01'
+                ORDER BY
+                    store_app,
+                    updated_at DESC,
+                    string_to_array(version_code, '.')::bigint[] DESC
+            ),
+            last_scanned AS (
+                    SELECT
+                        DISTINCT ON
+                        (vc.store_app) *
+                    FROM
+                       version_codes vc 
+                    LEFT JOIN version_code_api_scan_results vasr
+                        ON vasr.version_code_id = vc.id
+                    WHERE
+                        vc.crawl_result = 1
+                        AND vc.updated_at >= '2025-05-01'
+                ),
+        scheduled_to_run AS (
+                SELECT lvc.store_app as store_app,
+                sa.name,
+                sa.store_id,
+                sa.installs,
+                ls.run_at AS last_run_at,
+                lvc.download_result AS last_download_result,
+                lvc.last_downloaded_at
+                FROM
+                    latest_version_codes lvc
+                LEFT JOIN last_scanned ls ON
+                    lvc.store_app = ls.store_app
+                LEFT JOIN store_apps sa ON
+                    lvc.store_app = sa.id
+                WHERE (ls.run_at <= CURRENT_DATE - INTERVAL '120 days' OR ls.run_at IS NULL)
+                    AND sa.store = {store}
+                ORDER BY sa.installs DESC
+                ),     
+        user_requested_apps_crawl AS (
+            SELECT
+                DISTINCT ON (sa.id)
+                sa.id AS store_app,
+                sa.store_id,
+                sa.name,
+                sa.installs,
+                ls.run_at AS last_run_at,
+                lsvc.download_result AS last_download_result,
+                lsvc.last_downloaded_at,
+                urs.created_at AS user_requested_at
+            FROM
+                user_requested_scan urs
+            LEFT JOIN store_apps sa ON
+                urs.store_id = sa.store_id
+            INNER JOIN latest_version_codes lsvc ON
+                sa.id = lsvc.store_app
+            LEFT JOIN last_scanned ls ON lsvc.id = ls.version_code_id
+            WHERE
+                (ls.run_at < urs.created_at
+                    OR ls.run_at IS NULL
+                )
+                AND sa.store = {store}
+            ORDER BY sa.id, urs.created_at
+            )            
+            SELECT 
+                store_app,
+                store_id,
+                name,
+                installs,
+                last_run_at,
+                last_download_result,
+                last_downloaded_at,
+                user_requested_at,
+                'user' AS mysource
+                FROM user_requested_apps_crawl urac
+            UNION ALL
+            SELECT 
+                store_app,
+                store_id,
+                name,
+                installs,
+                last_run_at,
+                last_download_result,
+                last_downloaded_at,
+                NULL AS user_requested_at,
+                'scheduled' AS mysource
+                FROM scheduled_to_run
+                WHERE store_id NOT IN (SELECT store_id FROM user_requested_apps_crawl)
+            ORDER BY mysource DESC, user_requested_at, installs DESC 
+        ;
+        """
+    df = pd.read_sql(sel_query, database_connection.engine)
     return df
 
 
