@@ -192,15 +192,16 @@ def get_global_keywords(database_connection: PostgresCon) -> list[str]:
     NOTE: This takes about ~5-8GB of RAM for 50k keywords and 200k descriptions. For now run manually.
     """
     df = query_all_store_app_descriptions(database_connection=database_connection)
-    descriptions = df["description"].tolist()
-    cleaned_texts = [clean_text(description) for description in descriptions]
+    cleaned_texts = [
+        clean_text(description) for description in df["description"].tolist()
+    ]
 
     vectorizer = TfidfVectorizer(
         ngram_range=(1, 3),  # Include 1-grams, 2-grams, and 3-grams
         stop_words=list(STOPWORDS),
-        max_df=0.8,  # Ignore terms in >80% of docs (too common)
-        min_df=20,  # Ignore terms in <10 docs (too rare)
-        max_features=50000,  # Limit to top 10K terms for memory
+        max_df=0.80,  # Ignore terms in >80% of docs (too common)
+        min_df=30,  # Ignore terms in <10 docs (too rare)
+        max_features=50000,
     )
 
     tfidf_matrix = vectorizer.fit_transform(cleaned_texts)
