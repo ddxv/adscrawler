@@ -140,9 +140,9 @@ def run_app(
         except Exception as e:
             crawl_result = 3
             logger.exception(f"{function_info} mitm log ingestion failed: {e}")
-    except Exception as e:
+    except Exception:
         crawl_result = 2
-        logger.exception(f"{function_info} failed: {e}")
+        logger.exception(f"{function_info} launch_and_track_app failed")
     if version_code_id is None:
         try:
             version_code_id = get_version_via_apktool(
