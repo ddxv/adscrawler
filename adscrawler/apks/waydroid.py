@@ -156,6 +156,7 @@ def run_app(
             return
 
     md5_hash = get_md5_hash(apk_path)
+    logger.info(f"{function_info} log: {md5_hash=} {version_code_id=} {crawl_result=}")
     log_version_code_scan_crawl_results(
         store_app=store_app,
         version_code_id=version_code_id,
