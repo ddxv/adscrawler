@@ -4,6 +4,7 @@ import pathlib
 import boto3
 import pandas as pd
 
+from adscrawler.apks.download_apk import move_apk_to_main_dir
 from adscrawler.apks.process_apk import (
     get_downloaded_apks,
     get_downloaded_xapks,
@@ -13,7 +14,14 @@ from adscrawler.apks.process_apk import (
     remove_tmp_files,
     unzip_apk,
 )
-from adscrawler.config import APKS_DIR, CONFIG, XAPKS_DIR, get_logger
+from adscrawler.config import (
+    APKS_DIR,
+    APKS_INCOMING_DIR,
+    CONFIG,
+    XAPKS_DIR,
+    XAPKS_INCOMING_DIR,
+    get_logger,
+)
 
 logger = get_logger(__name__)
 
@@ -232,9 +240,9 @@ def download_s3_apk(
         raise ValueError("Either s3_key or store_id must be provided")
     extension = key.split(".")[-1]
     if extension == "apk":
-        local_path = pathlib.Path(APKS_DIR, f"{store_id}.{extension}")
+        local_path = pathlib.Path(APKS_INCOMING_DIR, f"{store_id}.{extension}")
     elif extension == "xapk":
-        local_path = pathlib.Path(XAPKS_DIR, f"{store_id}.{extension}")
+        local_path = pathlib.Path(XAPKS_INCOMING_DIR, f"{store_id}.{extension}")
     else:
         raise ValueError(f"Invalid extension: {extension}")
     logger.info(f"Download {store_id}.{extension} to local start")
@@ -243,6 +251,7 @@ def download_s3_apk(
         Key=key,
         Filename=local_path,
     )
+    move_apk_to_main_dir(local_path)
     logger.info(f"Download {store_id}.{extension} to local finished")
     return local_path
 
