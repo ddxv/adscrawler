@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 
 from adscrawler.apks import mitm_process_log
-from adscrawler.apks.process_apk import get_version, unzip_apk
+from adscrawler.apks.process_apk import get_md5_hash, get_version, unzip_apk
 from adscrawler.apks.storage import download_to_local
 from adscrawler.apks.weston import restart_weston, start_weston
 from adscrawler.config import (
@@ -28,6 +28,7 @@ from adscrawler.connection import PostgresCon
 from adscrawler.queries import (
     get_version_code_dbid,
     insert_df,
+    log_version_code_scan_crawl_results,
     query_apps_to_api_check,
     query_store_app_by_store_id,
 )
@@ -147,15 +148,28 @@ def run_app(
             version_code_id = get_version_via_apktool(
                 store_id, apk_path, store_app, database_connection
             )
-        except Exception as e:
-            logger.exception(f"{function_info} failed to get version code id: {e}")
+        except Exception:
+            logger.exception(f"{function_info} apktool failed to get version code")
             version_code_id = None
         if version_code_id is None:
-            logger.error(
-                f"{function_info} failed to get version code id will NOT save to db"
-            )
+            logger.error(f"{function_info} failed to get version code id")
             return
-    logger.info(f"{function_info} save to db")
+
+    md5_hash = get_md5_hash(apk_path)
+    log_version_code_scan_crawl_results(
+        store_app=store_app,
+        version_code_id=version_code_id,
+        md5_hash=md5_hash,
+        crawl_result=crawl_result,
+        database_connection=database_connection,
+    )
+
+    if version_code_id is None:
+        logger.error(
+            f"{function_info} failed: No version code id with {mdf.shape[0]} api calls"
+        )
+        return
+
     insert_api_calls(
         version_code_id=version_code_id,
         database_connection=database_connection,
@@ -163,6 +177,7 @@ def run_app(
         run_name=run_name,
         mdf=mdf,
     )
+    logger.info(f"{function_info} success: {mdf.shape[0]} api calls saved to db")
 
 
 def get_version_via_apktool(

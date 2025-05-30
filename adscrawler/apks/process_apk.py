@@ -77,9 +77,7 @@ def unzip_apk(store_id: str, file_path: pathlib.Path) -> pathlib.Path:
 
     tmp_decoded_output_path = pathlib.Path(APK_TMP_UNZIPPED_DIR, store_id)
     if tmp_decoded_output_path.exists():
-        tmp_apk_path = pathlib.Path(tmp_decoded_output_path, f"{store_id}.apk")
-        if tmp_apk_path.exists():
-            tmp_apk_path.unlink()
+        empty_folder(tmp_decoded_output_path)
 
     if not apk_to_decode_path.exists():
         logger.error(f"decode path: {apk_to_decode_path.as_posix()} but file not found")

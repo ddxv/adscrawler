@@ -251,7 +251,7 @@ def insert_version_code(
         ]
     )
     try:
-        log_crawl_results(version_code_df, database_connection)
+        log_download_crawl_results(version_code_df, database_connection)
     except Exception as e:
         logger.error(f"{store_app=} {version_str=} {crawl_result=} {apk_hash=} {e=}")
         raise e
@@ -273,11 +273,37 @@ def insert_version_code(
     return upserted
 
 
-def log_crawl_results(df: pd.DataFrame, database_connection: PostgresCon) -> None:
+def log_download_crawl_results(
+    df: pd.DataFrame, database_connection: PostgresCon
+) -> None:
     insert_columns = ["store_app", "version_code", "crawl_result"]
     df = df[insert_columns]
     df.to_sql(
         name="store_app_downloads",
+        schema="logging",
+        con=database_connection.engine,
+        if_exists="append",
+        index=False,
+    )
+
+
+def log_version_code_scan_crawl_results(
+    store_app: int,
+    md5_hash: str,
+    crawl_result: int,
+    database_connection: PostgresCon,
+    version_code_id: int | None = None,
+) -> None:
+    df = pd.DataFrame(
+        {
+            "store_app": [store_app],
+            "version_code": [version_code_id],
+            "apk_hash": [md5_hash],
+            "crawl_result": [crawl_result],
+        }
+    )
+    df.to_sql(
+        name="version_code_api_scan_results",
         schema="logging",
         con=database_connection.engine,
         if_exists="append",
@@ -1021,6 +1047,12 @@ def query_apps_to_api_check(
                         vc.crawl_result = 1
                         AND vc.updated_at >= '2025-05-01'
                 ),
+            failed_runs AS (
+            SELECT store_app, count(*) AS failed_attempts FROM logging.version_code_api_scan_results
+            WHERE crawl_result != 1
+                AND updated_at >= current_date - INTERVAL '10 days'
+                GROUP BY store_app
+),
         scheduled_to_run AS (
                 SELECT lvc.store_app as store_app,
                 sa.name,
@@ -1035,8 +1067,10 @@ def query_apps_to_api_check(
                     lvc.store_app = ls.store_app
                 LEFT JOIN store_apps sa ON
                     lvc.store_app = sa.id
+                LEFT JOIN failed_runs fr ON sa.id = fr.store_app
                 WHERE (ls.run_at <= CURRENT_DATE - INTERVAL '120 days' OR ls.run_at IS NULL)
                     AND sa.store = {store}
+                      AND (fr.failed_attempts < 1 OR fr.failed_attempts IS NULL )
                 ORDER BY sa.installs DESC
                 ),     
         user_requested_apps_crawl AS (
@@ -1057,11 +1091,13 @@ def query_apps_to_api_check(
             INNER JOIN latest_version_codes lsvc ON
                 sa.id = lsvc.store_app
             LEFT JOIN last_scanned ls ON lsvc.id = ls.version_code_id
+            LEFT JOIN failed_runs fr ON sa.id = fr.store_app
             WHERE
                 (ls.run_at < urs.created_at
                     OR ls.run_at IS NULL
                 )
                 AND sa.store = {store}
+                AND (fr.failed_attempts < 1 OR fr.failed_attempts IS NULL )
             ORDER BY sa.id, urs.created_at
             )            
             SELECT 
@@ -1089,7 +1125,7 @@ def query_apps_to_api_check(
                 FROM scheduled_to_run
                 WHERE store_id NOT IN (SELECT store_id FROM user_requested_apps_crawl)
             ORDER BY mysource DESC, user_requested_at, installs DESC 
-        ;
+            ; 
         """
     df = pd.read_sql(sel_query, database_connection.engine)
     return df
