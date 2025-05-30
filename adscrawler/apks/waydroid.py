@@ -227,16 +227,12 @@ def process_app_for_waydroid(
     database_connection: PostgresCon,
     store_id: str,
     store_app: int,
-    extension: str,
+    apk_path: pathlib.Path,
     run_name: str,
     timeout: int = 60,
 ) -> None:
-    if extension == "apk":
-        apk_path = pathlib.Path(APKS_DIR, f"{store_id}.apk")
-    elif extension == "xapk":
-        apk_path = pathlib.Path(XAPKS_DIR, f"{store_id}.xapk")
-    else:
-        raise ValueError(f"Invalid extension: {extension}")
+    if not apk_path.exists():
+        raise FileNotFoundError(f"{apk_path=} not found")
     if not check_container() or not check_session():
         waydroid_process = restart_session()
         if waydroid_process:
@@ -739,12 +735,12 @@ def start_session() -> subprocess.Popen:
     return waydroid_process
 
 
-def check_file_is_downloaded(store_id: str, extension: str) -> bool:
-    if extension == "apk":
-        apk_path = pathlib.Path(APKS_DIR, f"{store_id}.apk")
-    elif extension == "xapk":
-        apk_path = pathlib.Path(XAPKS_DIR, f"{store_id}.xapk")
-    return apk_path.exists()
+def get_local_file_path(store_id: str) -> pathlib.Path:
+    for extension in ["apk", "xapk"]:
+        apk_path = pathlib.Path(APKS_DIR, f"{store_id}.{extension}")
+        if apk_path.exists():
+            return apk_path
+    raise FileNotFoundError(f"{store_id=} not found")
 
 
 def manual_waydroid_process(
@@ -754,27 +750,18 @@ def manual_waydroid_process(
     run_name: str,
 ) -> None:
     logger.info(f"Manual waydroid process for {store_id=}")
-    extensions = ["apk", "xapk"]
-    file_downloaded = False
-    for extension in extensions:
-        if check_file_is_downloaded(store_id, extension):
-            file_downloaded = True
-            break
-    if not file_downloaded:
-        download_to_local(store_id)
-        for extension in extensions:
-            if check_file_is_downloaded(store_id, extension):
-                file_downloaded = True
-                break
-        if not file_downloaded:
-            raise Exception(f"File {store_id} not found")
+    try:
+        apk_path = get_local_file_path(store_id)
+    except FileNotFoundError:
+        apk_path = download_to_local(store_id)
+    if not apk_path.exists():
+        raise FileNotFoundError(f"{store_id=} not found")
     store_app = query_store_app_by_store_id(database_connection, store_id)
-
     process_app_for_waydroid(
         database_connection=database_connection,
         store_id=store_id,
         store_app=store_app,
-        extension=extension,
+        apk_path=apk_path,
         timeout=timeout,
         run_name=run_name,
     )
@@ -791,10 +778,9 @@ def process_apks_for_waydroid(
         store_id = row.store_id
         store_app = row.store_app
         apk_path = download_to_local(store_id=store_id)
-        extension = apk_path.suffix.replace(".", "")
         process_app_for_waydroid(
             database_connection=database_connection,
-            extension=extension,
+            apk_path=apk_path,
             store_id=store_id,
             store_app=store_app,
             run_name="regular",
