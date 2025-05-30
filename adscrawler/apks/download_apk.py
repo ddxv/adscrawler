@@ -2,7 +2,6 @@
 """Download APK files from with Python."""
 
 import pathlib
-import shutil
 import subprocess
 import time
 
@@ -14,6 +13,7 @@ from adscrawler.apks.process_apk import (
     get_local_apk_path,
     get_md5_hash,
     get_version,
+    move_incoming_apk_to_main_dir,
     remove_tmp_files,
     unzip_apk,
 )
@@ -23,9 +23,7 @@ from adscrawler.apks.storage import (
     upload_apk_to_s3,
 )
 from adscrawler.config import (
-    APKS_DIR,
     APKS_INCOMING_DIR,
-    XAPKS_DIR,
     XAPKS_INCOMING_DIR,
     get_logger,
 )
@@ -128,7 +126,7 @@ def manage_download(
 
     try:
         if existing_s3_path:
-            downloaded_file_path = download_s3_apk(s3_key=existing_s3_path)
+            downloaded_file_path = download_s3_apk(s3_key=existing_s3_path.as_posix())
             logger.info(f"{func_info} found existing file: {downloaded_file_path}")
         else:
             downloaded_file_path = download(store_id)
@@ -174,7 +172,12 @@ def manage_download(
         return_rows=False,
         apk_hash=md5_hash,
     )
-    if downloaded_file_path and crawl_result in [1, 3] and not existing_s3_path:
+    if (
+        downloaded_file_path
+        and crawl_result in [1, 3]
+        and not existing_s3_path
+        and md5_hash
+    ):
         upload_apk_to_s3(
             store_id,
             downloaded_file_path.suffix.replace(".", ""),
@@ -182,22 +185,8 @@ def manage_download(
             version_str,
             downloaded_file_path,
         )
-        move_apk_to_main_dir(downloaded_file_path)
+        move_incoming_apk_to_main_dir(downloaded_file_path)
     return error_count
-
-
-def move_apk_to_main_dir(downloaded_file_path: pathlib.Path) -> None:
-    """Move the apk file to the main directory."""
-    if downloaded_file_path.suffix == ".apk":
-        shutil.move(
-            downloaded_file_path, pathlib.Path(APKS_DIR, downloaded_file_path.name)
-        )
-    elif downloaded_file_path.suffix == ".xapk":
-        shutil.move(
-            downloaded_file_path, pathlib.Path(XAPKS_DIR, downloaded_file_path.name)
-        )
-    else:
-        raise ValueError(f"Invalid extension: {downloaded_file_path.suffix}")
 
 
 def get_download_url(store_id: str, source: str) -> str:

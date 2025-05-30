@@ -4,13 +4,13 @@ import pathlib
 import boto3
 import pandas as pd
 
-from adscrawler.apks.download_apk import move_apk_to_main_dir
 from adscrawler.apks.process_apk import (
     get_downloaded_apks,
     get_downloaded_xapks,
     get_local_apk_path,
     get_md5_hash,
     get_version,
+    move_incoming_apk_to_main_dir,
     remove_tmp_files,
     unzip_apk,
 )
@@ -226,14 +226,14 @@ def get_store_id_s3_keys(store_id: str) -> pd.DataFrame:
 
 def download_s3_apk(
     s3_key: str | None = None, store_id: str | None = None
-) -> pathlib.Path | None:
+) -> pathlib.Path:
     if s3_key:
         key = s3_key
     elif store_id:
         df = get_store_id_s3_keys(store_id)
         if df.empty:
             logger.error(f"{store_id=} no apk found in s3")
-            return None
+            raise FileNotFoundError(f"{store_id=} no apk found in s3")
         df = df.sort_values(by="version_code", ascending=False)
         key = df.iloc[0].key
     else:
@@ -251,7 +251,7 @@ def download_s3_apk(
         Key=key,
         Filename=local_path,
     )
-    move_apk_to_main_dir(local_path)
+    move_incoming_apk_to_main_dir(local_path)
     logger.info(f"Download {store_id}.{extension} to local finished")
     return local_path
 

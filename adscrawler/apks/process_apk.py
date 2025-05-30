@@ -56,6 +56,20 @@ def check_xapk_is_valid(xapk_path: pathlib.Path) -> bool:
         return True
 
 
+def move_incoming_apk_to_main_dir(downloaded_file_path: pathlib.Path) -> None:
+    """Move the apk file to the main directory."""
+    if downloaded_file_path.suffix == ".apk":
+        shutil.move(
+            downloaded_file_path, pathlib.Path(APKS_DIR, downloaded_file_path.name)
+        )
+    elif downloaded_file_path.suffix == ".xapk":
+        shutil.move(
+            downloaded_file_path, pathlib.Path(XAPKS_DIR, downloaded_file_path.name)
+        )
+    else:
+        raise ValueError(f"Invalid extension: {downloaded_file_path.suffix}")
+
+
 def unzip_apk(store_id: str, file_path: pathlib.Path) -> pathlib.Path:
     extension = file_path.suffix
     if extension == ".apk":
