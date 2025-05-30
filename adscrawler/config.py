@@ -130,6 +130,7 @@ def get_logger(mod_name: str, sep_file: str | None = "main") -> logging.Logger:
     # Set level
     logger.setLevel(logging.INFO)
 
+    # Add rsyslog file handler, if available
     syslog_handler = logging.handlers.SysLogHandler(
         address=SYSLOG_ADDRESS, facility=SYSLOG_FACILITY
     )
@@ -137,9 +138,9 @@ def get_logger(mod_name: str, sep_file: str | None = "main") -> logging.Logger:
     syslog_handler.ident = f"{sep_file}: "
     logger.addHandler(syslog_handler)
 
-    # Add fallback log file
+    # Add fallback log file, but struggles in multi-process environments
     indiv_handler = RotatingFileHandler(
-        filename=os.path.join(LOG_DIR, "main.log"),
+        filename=os.path.join(LOG_DIR, f"{sep_file}.log"),
         maxBytes=50 * 1024 * 1024,
         backupCount=10,
     )
