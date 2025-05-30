@@ -23,6 +23,10 @@ jobs:
           port: ${{ secrets.PORT }}
           username: ${{ secrets.USERNAME }}
           key: ${{ secrets.EC2_SSH_KEY }}
+          proxy_host: ${{ secrets.HOST_DNS }}
+          proxy_key: ${{ secrets.EC2_SSH_KEY }}
+          proxy_username: ${{ secrets.PROXY_USERNAME }}
+          proxy_port: ${{ secrets.PROXY_PORT }}
           envs: TARGETDIR
           protocol: tcp4
           script: |
