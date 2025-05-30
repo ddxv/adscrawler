@@ -1044,14 +1044,26 @@ def query_apps_to_api_check(
                         DISTINCT ON
                         (vc.store_app) *
                     FROM
-                       version_codes vc 
-                    LEFT JOIN version_code_api_scan_results vasr
+                       version_code_api_scan_results vasr
+                    LEFT JOIN version_codes vc 
+                        ON vasr.version_code_id = vc.id
+                    WHERE
+                        vc.updated_at >= '2025-05-01'
+                    ORDER BY vc.store_app, vasr.run_at desc
+                ),
+            last_successful_scanned AS (
+                    SELECT
+                        DISTINCT ON
+                        (vc.store_app) *
+                    FROM
+                       version_code_api_scan_results vasr
+                    LEFT JOIN version_codes vc 
                         ON vasr.version_code_id = vc.id
                     WHERE
                         vc.crawl_result = 1
                         AND vc.updated_at >= '2025-05-01'
-                    ORDER BY vc.store_app, vc.updated_at desc
-                ),
+                    ORDER BY vc.store_app, vasr.run_at desc
+                ),    
             failed_runs AS (
             SELECT store_app, count(*) AS failed_attempts FROM logging.version_code_api_scan_results
             WHERE crawl_result != 1
@@ -1064,12 +1076,15 @@ def query_apps_to_api_check(
                 sa.store_id,
                 sa.installs,
                 ls.run_at AS last_run_at,
-                lvc.download_result AS last_download_result,
+                fr.failed_attempts,
+                ls.run_result AS last_run_result,
+                lss.run_at AS last_succesful_run_at,
                 lvc.last_downloaded_at
                 FROM
                     latest_version_codes lvc
                 LEFT JOIN last_scanned ls ON
                     lvc.store_app = ls.store_app
+                LEFT JOIN last_successful_scanned lss ON lvc.id = lss.version_code_id
                 LEFT JOIN store_apps sa ON
                     lvc.store_app = sa.id
                 LEFT JOIN failed_runs fr ON sa.id = fr.store_app
@@ -1080,13 +1095,15 @@ def query_apps_to_api_check(
                 ),     
         user_requested_apps_crawl AS (
             SELECT
-                DISTINCT ON (sa.id)
+                DISTINCT ON (sa.id) 
                 sa.id AS store_app,
                 sa.store_id,
                 sa.name,
                 sa.installs,
                 ls.run_at AS last_run_at,
-                lsvc.download_result AS last_download_result,
+                fr.failed_attempts,
+                ls.run_result AS last_run_result,
+                lss.run_at AS last_succesful_run_at,
                 lsvc.last_downloaded_at,
                 urs.created_at AS user_requested_at
             FROM
@@ -1096,22 +1113,26 @@ def query_apps_to_api_check(
             INNER JOIN latest_version_codes lsvc ON
                 sa.id = lsvc.store_app
             LEFT JOIN last_scanned ls ON lsvc.id = ls.version_code_id
+            LEFT JOIN last_successful_scanned lss ON lsvc.id = lss.version_code_id
             LEFT JOIN failed_runs fr ON sa.id = fr.store_app
             WHERE
                 (ls.run_at < urs.created_at
                     OR ls.run_at IS NULL
                 )
                 AND sa.store = {store}
-                AND (fr.failed_attempts < 1 OR fr.failed_attempts IS NULL )
+                AND (fr.failed_attempts < 1 OR fr.failed_attempts IS NULL 
+                )
             ORDER BY sa.id, urs.created_at desc
-            )            
+            )
             SELECT 
                 store_app,
                 store_id,
                 name,
                 installs,
                 last_run_at,
-                last_download_result,
+                failed_attempts,
+                last_run_result,
+                last_succesful_run_at,
                 last_downloaded_at,
                 user_requested_at,
                 'user' AS mysource
@@ -1123,7 +1144,9 @@ def query_apps_to_api_check(
                 name,
                 installs,
                 last_run_at,
-                last_download_result,
+                last_run_result,
+                failed_attempts,
+                last_succesful_run_at,
                 last_downloaded_at,
                 NULL AS user_requested_at,
                 'scheduled' AS mysource

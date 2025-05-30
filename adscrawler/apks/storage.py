@@ -251,9 +251,9 @@ def download_s3_apk(
         Key=key,
         Filename=local_path,
     )
-    move_incoming_apk_to_main_dir(local_path)
+    final_path = move_incoming_apk_to_main_dir(local_path)
     logger.info(f"Download {store_id}.{extension} to local finished")
-    return local_path
+    return final_path
 
 
 def download_to_local(store_id: str) -> pathlib.Path | None:
