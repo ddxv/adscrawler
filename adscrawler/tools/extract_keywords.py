@@ -197,11 +197,11 @@ def get_global_keywords(database_connection: PostgresCon) -> list[str]:
     ]
 
     vectorizer = TfidfVectorizer(
-        ngram_range=(1, 3),  # Include 1-grams, 2-grams, and 3-grams
+        ngram_range=(1, 2),  # Include 1-grams, 2-grams, and 3-grams
         stop_words=list(STOPWORDS),
         max_df=0.80,  # Ignore terms in >80% of docs (too common)
         min_df=30,  # Ignore terms in <10 docs (too rare)
-        max_features=50000,
+        max_features=100000,
     )
 
     tfidf_matrix = vectorizer.fit_transform(cleaned_texts)
