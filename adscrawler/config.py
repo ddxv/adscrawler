@@ -53,21 +53,29 @@ WAYDROID_MEDIA_DIR = pathlib.Path(HOME, ".local/share/waydroid/data/media")
 WAYDROID_INTERNAL_EMULATED_DIR = pathlib.Path("/data/media/")
 
 
+# SysLogHandler parameters
+# Address can be '/dev/log' for local Unix socket (most common on Linux)
+# or ('hostname', port) for a remote syslog server.
+SYSLOG_ADDRESS = "/dev/log"  # For Linux
+# On macOS, it might be '/var/run/syslog'
+# If /dev/log doesn't work, check your system's syslog socket path.
+
+# Facility tells syslog what kind of program is logging.
+# 'local0' through 'local7' are generally free for custom use.
+SYSLOG_FACILITY = logging.handlers.SysLogHandler.LOG_LOCAL0
+
+LOG_LEVEL = logging.DEBUG
+
+
 @typing.no_type_check
 def handle_exception(exc_type, exc_value, exc_traceback) -> None:
     if issubclass(exc_type, KeyboardInterrupt):
         sys.__excepthook__(exc_type, exc_value, exc_traceback)
         return
     logger.critical("Uncaught exception", exc_info=(exc_type, exc_value, exc_traceback))
-
-
-@typing.no_type_check
-def exc_handler(exctype, value, tb):
-    if issubclass(exctype, KeyboardInterrupt):
-        sys.__excepthook__(exctype, value, tb)
-        return
-    logger.exception("".join(traceback.format_exception(exctype, value, tb)))
-    # logger.critical("Uncaught exception", exc_info=(exc_type, exc_value, exc_traceback))
+    logger.critical(
+        "".join(traceback.format_exception(exc_type, exc_value, exc_traceback))
+    )
 
 
 def check_dirs() -> None:
@@ -105,7 +113,15 @@ FORMATTER = Formatter(
 FORMATTER.datefmt = "%Y-%m-%d %H:%M:%S"
 
 
+_loggers = {}
+
+
 def get_logger(mod_name: str, sep_file: str | None = "main") -> logging.Logger:
+    global _loggers
+
+    if mod_name in _loggers:
+        return _loggers[mod_name]
+
     check_dirs()
 
     # Get or create logger
@@ -114,49 +130,35 @@ def get_logger(mod_name: str, sep_file: str | None = "main") -> logging.Logger:
     # Set level
     logger.setLevel(logging.INFO)
 
-    # Add file handler for individual log file
+    syslog_handler = logging.handlers.SysLogHandler(
+        address=SYSLOG_ADDRESS, facility=SYSLOG_FACILITY
+    )
+    syslog_handler.setFormatter(FORMATTER)
+    syslog_handler.ident = f"{sep_file}: "
+    logger.addHandler(syslog_handler)
+
+    # Add fallback log file
     indiv_handler = RotatingFileHandler(
-        filename=os.path.join(LOG_DIR, f"{sep_file}.log"),
+        filename=os.path.join(LOG_DIR, "main.log"),
         maxBytes=50 * 1024 * 1024,
         backupCount=10,
     )
     indiv_handler.setFormatter(FORMATTER)
     logger.addHandler(indiv_handler)
 
-    if sep_file != "main":
-        root_logger = logging.getLogger(PROJECT_NAME)
-        if not root_logger.handlers:
-            # Add main file handler if it doesn't exist
-            main_handler = RotatingFileHandler(
-                filename=os.path.join(LOG_DIR, "main.log"),
-                maxBytes=50 * 1024 * 1024,
-                backupCount=10,
-            )
-            main_handler.setFormatter(FORMATTER)
-            root_logger.addHandler(main_handler)
+    # For print to console
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(FORMATTER)
+    logger.addHandler(console_handler)
+    logger.propagate = False  # Main logger shouldn't propagate
 
-            # Add console handler
-            console_handler = logging.StreamHandler()
-            console_handler.setFormatter(FORMATTER)
-            root_logger.addHandler(console_handler)
-
-        # Ensure the root logger level is set to capture all messages
-        root_logger.setLevel(logging.INFO)
-
-        # Set propagate to True for non-main loggers
-        logger.propagate = True
-    else:
-        # For the main logger (root logger), add console handler
-        console_handler = logging.StreamHandler()
-        console_handler.setFormatter(FORMATTER)
-        logger.addHandler(console_handler)
-        logger.propagate = False  # Main logger shouldn't propagate
+    _loggers[mod_name] = logger
 
     return logger
 
 
 # Set global handling of uncaught exceptions
-sys.excepthook = exc_handler
+sys.excepthook = handle_exception
 
 logger = get_logger(__name__)
 

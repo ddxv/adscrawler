@@ -33,7 +33,6 @@ from adscrawler.queries import (
 )
 
 logger = get_logger(__name__, "waydroid")
-# logger = get_logger(__name__)
 
 ANDROID_PERMISSION_ACTIVITY = (
     "com.android.permissioncontroller/.permission.ui.ReviewPermissionsActivity"
@@ -739,6 +738,7 @@ def manual_waydroid_process(
     timeout: int,
     run_name: str,
 ) -> None:
+    logger.info(f"Manual waydroid process for {store_id=}")
     extensions = ["apk", "xapk"]
     file_downloaded = False
     for extension in extensions:

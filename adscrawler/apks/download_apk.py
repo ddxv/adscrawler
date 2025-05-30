@@ -2,6 +2,7 @@
 """Download APK files from with Python."""
 
 import pathlib
+import shutil
 import subprocess
 import time
 
@@ -22,7 +23,9 @@ from adscrawler.apks.storage import (
     upload_apk_to_s3,
 )
 from adscrawler.config import (
+    APKS_DIR,
     APKS_INCOMING_DIR,
+    XAPKS_DIR,
     XAPKS_INCOMING_DIR,
     get_logger,
 )
@@ -179,7 +182,22 @@ def manage_download(
             version_str,
             downloaded_file_path,
         )
+        move_apk_to_main_dir(downloaded_file_path)
     return error_count
+
+
+def move_apk_to_main_dir(downloaded_file_path: pathlib.Path) -> None:
+    """Move the apk file to the main directory."""
+    if downloaded_file_path.suffix == ".apk":
+        shutil.move(
+            downloaded_file_path, pathlib.Path(APKS_DIR, downloaded_file_path.name)
+        )
+    elif downloaded_file_path.suffix == ".xapk":
+        shutil.move(
+            downloaded_file_path, pathlib.Path(XAPKS_DIR, downloaded_file_path.name)
+        )
+    else:
+        raise ValueError(f"Invalid extension: {downloaded_file_path.suffix}")
 
 
 def get_download_url(store_id: str, source: str) -> str:
