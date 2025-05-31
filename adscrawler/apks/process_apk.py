@@ -81,9 +81,25 @@ def unzip_apk(store_id: str, file_path: pathlib.Path) -> pathlib.Path:
         partial_apk_dir = pathlib.Path(APK_TMP_PARTIALS_DIR, f"{store_id}")
         partial_apk_path = pathlib.Path(partial_apk_dir, f"{store_id}.apk")
         unzip_command = f"unzip -o {file_path.as_posix()} {store_id}.apk -d {partial_apk_dir.as_posix()}"
-        unzip_result = os.system(unzip_command)
+        output = subprocess.run(
+            unzip_command,
+            shell=True,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        if "filename not matched" in output.stderr:
+            unzip_command = f"unzip -o {file_path.as_posix()} base.apk -d {partial_apk_dir.as_posix()}"
+            output = subprocess.run(
+                unzip_command, shell=True, check=True, capture_output=True, timeout=60
+            )
+            base_apk_path = pathlib.Path(partial_apk_dir, "base.apk")
+            if base_apk_path.exists():
+                partial_apk_path = base_apk_path
+            else:
+                raise FileNotFoundError(f"{store_id=} xapk unable to unzip base")
         apk_to_decode_path = partial_apk_path
-        logger.info(f"Output unzipped from xapk to apk: {unzip_result}")
     else:
         raise ValueError(f"Invalid extension: {extension}")
 

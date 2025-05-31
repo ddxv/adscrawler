@@ -5,7 +5,6 @@ import pathlib
 import subprocess
 import time
 
-import pandas as pd
 import requests
 
 from adscrawler.apks import apkmirror, apkpure
@@ -31,6 +30,7 @@ from adscrawler.connection import PostgresCon
 from adscrawler.queries import (
     insert_version_code,
     query_apps_to_download,
+    query_store_app_by_store_id,
 )
 
 APK_SOURCES = ["apkmirror", "apkpure"]
@@ -92,7 +92,8 @@ def download_apks(
         try:
             this_error_count = manage_download(
                 database_connection=database_connection,
-                row=row,
+                store_id=store_id,
+                store_app=row.store_app,
                 existing_s3_path=existing_file_path,
             )
             if not existing_file_path:
@@ -109,16 +110,35 @@ def download_apks(
     logger.info("Finished downloading APKs")
 
 
+def manual_process_download(
+    database_connection: PostgresCon,
+    store_id: str,
+) -> None:
+    """Manual download of an apk file."""
+    store_id = "com.anthropic.claude"
+    store_app = query_store_app_by_store_id(
+        database_connection=database_connection, store_id=store_id
+    )
+    existing_local_file_path = get_local_apk_path(store_id)
+    manage_download(
+        database_connection=database_connection,
+        store_id=store_id,
+        store_app=store_app,
+        existing_s3_path=None,
+        existing_local_file_path=existing_local_file_path,
+    )
+
+
 def manage_download(
     database_connection: PostgresCon,
-    row: pd.Series,
+    store_id: str,
+    store_app: int,
     existing_s3_path: pathlib.Path | None,
+    existing_local_file_path: pathlib.Path | None,
 ) -> int:
     """Manage the download of an apk or xapk file"""
-    store_id = row.store_id
     func_info = f"manage_download {store_id=}"
     crawl_result = 3
-    store_id = row.store_id
     logger.info(f"{func_info} start")
     version_str = FAILED_VERSION_STR
     md5_hash = None
@@ -128,6 +148,8 @@ def manage_download(
         if existing_s3_path:
             downloaded_file_path = download_s3_apk(s3_key=existing_s3_path.as_posix())
             logger.info(f"{func_info} found existing file: {downloaded_file_path}")
+        elif existing_local_file_path:
+            downloaded_file_path = existing_local_file_path
         else:
             downloaded_file_path = download(store_id)
         apk_tmp_decoded_output_path = unzip_apk(
@@ -159,14 +181,14 @@ def manage_download(
     elif crawl_result in [1]:
         error_count = 0
 
-    if existing_s3_path:
+    if existing_s3_path or existing_local_file_path:
         error_count = 0
 
     logger.info(f"{func_info} {crawl_result=} {md5_hash=} {version_str=}")
 
     insert_version_code(
         version_str=version_str,
-        store_app=row.store_app,
+        store_app=store_app,
         crawl_result=crawl_result,
         database_connection=database_connection,
         return_rows=False,
