@@ -765,6 +765,7 @@ def manual_waydroid_process(
         timeout=timeout,
         run_name=run_name,
     )
+    remove_all_third_party_apps()
 
 
 def process_apks_for_waydroid(

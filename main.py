@@ -117,6 +117,12 @@ class ProcessManager:
             help="Redownload geo dbs",
             action="store_true",
         )
+        parser.add_argument(
+            "--timeout-waydroid",
+            help="timeout in seconds for waydroid app to run",
+            type=int,
+            default=180,
+        )
 
         args, _ = parser.parse_known_args()
         return args
@@ -323,7 +329,7 @@ class ProcessManager:
             # Manual waydroid process, launches app for 5 minutes for user to interact
             store_id = self.args.store_id
             store_id = self.args.store_id if self.args.store_id else None
-            timeout = 300
+            timeout = self.args.timeout_waydroid
             run_name = "manual"
             manual_waydroid_process(
                 database_connection=self.pgcon,
