@@ -201,20 +201,20 @@ def get_store_id_s3_keys(store_id: str) -> pd.DataFrame:
     ):
         if "Contents" in page:
             for obj in page["Contents"]:
+                print(obj)
                 # Get the object's metadata
                 # response = S3_CLIENT.head_object(Bucket="adscrawler", Key=obj["Key"])
                 key_parts = obj["Key"].split("/")
                 if len(key_parts) >= 4:
                     version_code = key_parts[3]
                 else:
-                    version_code = "uknown"
+                    version_code = "unknown"
 
                 objects_data.append(
                     {
                         "key": obj["Key"],
                         "store_id": store_id,
                         "version_code": version_code,
-                        "md5": key_parts[4].split(".")[0],
                         "size": obj["Size"],
                         "last_modified": obj["LastModified"],
                     }
@@ -227,6 +227,9 @@ def get_store_id_s3_keys(store_id: str) -> pd.DataFrame:
 def download_s3_apk(
     s3_key: str | None = None, store_id: str | None = None
 ) -> pathlib.Path:
+    if s3_key is None and store_id is None:
+        raise ValueError("Either s3_key or store_id must be provided")
+    func_info = "download_s3_apk "
     if s3_key:
         key = s3_key
     elif store_id:
@@ -234,25 +237,30 @@ def download_s3_apk(
         if df.empty:
             logger.error(f"{store_id=} no apk found in s3")
             raise FileNotFoundError(f"{store_id=} no apk found in s3")
-        df = df.sort_values(by="version_code", ascending=False)
+        if df[~(df["version_code"] == "failed")].empty:
+            logger.error(f"{store_id=} S3 only has failed apk, no version_code")
+        else:
+            df = df[~(df["version_code"] == "failed")]
+            df = df.sort_values(by="version_code", ascending=False)
         key = df.iloc[0].key
     else:
         raise ValueError("Either s3_key or store_id must be provided")
-    extension = key.split(".")[-1]
+    filename = key.split("/")[-1]
+    extension = filename.split(".")[-1]
     if extension == "apk":
-        local_path = pathlib.Path(APKS_INCOMING_DIR, f"{store_id}.{extension}")
+        local_path = pathlib.Path(APKS_INCOMING_DIR, filename)
     elif extension == "xapk":
-        local_path = pathlib.Path(XAPKS_INCOMING_DIR, f"{store_id}.{extension}")
+        local_path = pathlib.Path(XAPKS_INCOMING_DIR, filename)
     else:
         raise ValueError(f"Invalid extension: {extension}")
-    logger.info(f"Download {store_id}.{extension} to local start")
+    logger.info(f"{func_info} {key=} to local start")
     S3_CLIENT.download_file(
         Bucket="adscrawler",
         Key=key,
         Filename=local_path,
     )
     final_path = move_incoming_apk_to_main_dir(local_path)
-    logger.info(f"Download {store_id}.{extension} to local finished")
+    logger.info(f"{func_info} to local finished")
     return final_path
 
 

@@ -57,13 +57,16 @@ def download_apks(
     for _id, row in apps.iterrows():
         store_id = row.store_id
         existing_file_path = None
+        is_already_in_s3 = False
         s3df = get_store_id_s3_keys(store_id=store_id)
         if not s3df.empty:
-            s3df = s3df[s3df["version_code"].notna()]
+            s3df = s3df[
+                s3df["version_code"].notna() & ~(s3df["version_code"] == "failed")
+            ]
         file_path = get_local_apk_path(store_id)
         needs_external_download = s3df.empty and not file_path
-        has_local_file_but_no_s3 = file_path and s3df.empty
-        needs_s3_download = not file_path and not s3df.empty
+        has_local_file_but_no_s3 = file_path is not None and s3df.empty
+        needs_s3_download = not file_path is not None and not s3df.empty
 
         if needs_external_download:
             # proceed to regular download
@@ -78,6 +81,7 @@ def download_apks(
             )
             s3_key = s3df.sort_values(by="version_code", ascending=False).iloc[0].key
             existing_file_path = download_s3_apk(s3_key=s3_key)
+            is_already_in_s3 = True
 
         last_error_count = this_error_count
         this_error_count = 0
@@ -94,7 +98,8 @@ def download_apks(
                 database_connection=database_connection,
                 store_id=store_id,
                 store_app=row.store_app,
-                existing_s3_path=existing_file_path,
+                is_already_in_s3=is_already_in_s3,
+                existing_local_file_path=existing_file_path,
             )
             if not existing_file_path:
                 total_errors += this_error_count
@@ -123,7 +128,7 @@ def manual_process_download(
         database_connection=database_connection,
         store_id=store_id,
         store_app=store_app,
-        existing_s3_path=None,
+        is_already_in_s3=False,
         existing_local_file_path=existing_local_file_path,
     )
 
@@ -132,7 +137,7 @@ def manage_download(
     database_connection: PostgresCon,
     store_id: str,
     store_app: int,
-    existing_s3_path: pathlib.Path | None,
+    is_already_in_s3: bool,
     existing_local_file_path: pathlib.Path | None,
 ) -> int:
     """Manage the download of an apk or xapk file"""
@@ -144,10 +149,7 @@ def manage_download(
     downloaded_file_path = None
 
     try:
-        if existing_s3_path:
-            downloaded_file_path = download_s3_apk(s3_key=existing_s3_path.as_posix())
-            logger.info(f"{func_info} found existing file: {downloaded_file_path}")
-        elif existing_local_file_path:
+        if existing_local_file_path:
             downloaded_file_path = existing_local_file_path
         else:
             downloaded_file_path = download(store_id)
@@ -180,7 +182,7 @@ def manage_download(
     elif crawl_result in [1]:
         error_count = 0
 
-    if existing_s3_path or existing_local_file_path:
+    if existing_local_file_path:
         error_count = 0
 
     logger.info(f"{func_info} {crawl_result=} {md5_hash=} {version_str=}")
@@ -196,7 +198,7 @@ def manage_download(
     if (
         downloaded_file_path
         and crawl_result in [1, 3]
-        and not existing_s3_path
+        and not is_already_in_s3
         and md5_hash
     ):
         upload_apk_to_s3(
