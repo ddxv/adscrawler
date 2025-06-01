@@ -152,6 +152,9 @@ def get_store_id_s3_keys(store_id: str) -> pd.DataFrame:
         Bucket="adscrawler", Prefix=f"apks/android/{store_id}/"
     )
     objects_data = []
+    if response["KeyCount"] == 0:
+        logger.error(f"{store_id=} no apk found in s3")
+        raise FileNotFoundError(f"{store_id=} no apk found in s3")
     for obj in response["Contents"]:
         print(obj)
         # Get the object's metadata
