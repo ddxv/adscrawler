@@ -26,8 +26,8 @@ from adscrawler.config import (
     XAPKS_INCOMING_DIR,
     get_logger,
 )
-from adscrawler.connection import PostgresCon
-from adscrawler.queries import (
+from adscrawler.dbcon.connection import PostgresCon
+from adscrawler.dbcon.queries import (
     insert_version_code,
     query_apps_to_download,
     query_store_app_by_store_id,

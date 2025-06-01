@@ -9,8 +9,8 @@ from nltk.tokenize import word_tokenize
 from rake_nltk import Rake
 from sklearn.feature_extraction.text import TfidfVectorizer
 
-from adscrawler.connection import PostgresCon
-from adscrawler.queries import (
+from adscrawler.dbcon.connection import PostgresCon
+from adscrawler.dbcon.queries import (
     query_all_store_app_descriptions,
     query_keywords_base,
 )
@@ -156,8 +156,8 @@ def extract_keywords_rake(text: str, top_n: int = 10, max_tokens: int = 3) -> li
 def extract_keywords(
     text: str,
     database_connection: PostgresCon,
-    top_n: int = 5,
-    max_tokens: int = 2,
+    top_n: int = 2,
+    max_tokens: int = 1,
 ) -> list[str]:
     """Extracts keywords using spaCy, NLTK, and RAKE, then returns a unique set."""
     text = clean_text(text)

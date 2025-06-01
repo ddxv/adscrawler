@@ -14,8 +14,8 @@ import requests
 
 from adscrawler.app_stores.apple import lookupby_id
 from adscrawler.config import MODULE_DIR, get_logger
-from adscrawler.connection import PostgresCon
-from adscrawler.queries import query_apps_to_sdk_scan, upsert_details_df
+from adscrawler.dbcon.connection import PostgresCon
+from adscrawler.dbcon.queries import query_apps_to_sdk_scan, upsert_details_df
 from adscrawler.tools.download_ipa import download, ipatool_auth
 
 logger = get_logger(__name__, "download_ipa")

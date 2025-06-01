@@ -24,12 +24,12 @@ from adscrawler.config import (
     XAPKS_TMP_UNZIP_DIR,
     get_logger,
 )
-from adscrawler.connection import PostgresCon
-from adscrawler.queries import (
+from adscrawler.dbcon.connection import PostgresCon
+from adscrawler.dbcon.queries import (
     get_version_code_dbid,
     insert_df,
     log_version_code_scan_crawl_results,
-    query_apps_to_api_check,
+    query_apps_to_api_scan,
     query_store_app_by_store_id,
 )
 
@@ -771,7 +771,7 @@ def manual_waydroid_process(
 def process_apks_for_waydroid(
     database_connection: PostgresCon, num_apps: int = 10
 ) -> None:
-    apps_df = query_apps_to_api_check(database_connection=database_connection, store=1)
+    apps_df = query_apps_to_api_scan(database_connection=database_connection, store=1)
     logger.info(f"Waydroid has {apps_df.shape[0]} apps to process, starting {num_apps}")
     apps_df = apps_df.head(num_apps)
     for _, row in apps_df.iterrows():

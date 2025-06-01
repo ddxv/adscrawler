@@ -7,8 +7,8 @@ import requests
 import tldextract
 
 from .config import DEVLEOPER_IGNORE_TLDS, get_logger
-from .connection import PostgresCon
-from .queries import query_pub_domains, upsert_df
+from .dbcon.connection import PostgresCon
+from .dbcon.queries import query_pub_domains, upsert_df
 
 """
     Pulling, parsing and save to db for app-ads.txt

@@ -7,8 +7,8 @@ from mitmproxy import http
 from mitmproxy.io import FlowReader
 
 from adscrawler.config import PACKAGE_DIR, get_logger
-from adscrawler.connection import PostgresCon
-from adscrawler.queries import query_countries
+from adscrawler.dbcon.connection import PostgresCon
+from adscrawler.dbcon.queries import query_countries
 from adscrawler.tools.geo import get_geo
 
 logger = get_logger(__name__)

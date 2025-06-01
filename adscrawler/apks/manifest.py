@@ -17,8 +17,8 @@ from adscrawler.config import (
     APK_TMP_UNZIPPED_DIR,
     get_logger,
 )
-from adscrawler.connection import PostgresCon
-from adscrawler.queries import (
+from adscrawler.dbcon.connection import PostgresCon
+from adscrawler.dbcon.queries import (
     get_version_code_dbid,
     query_apps_to_sdk_scan,
     upsert_details_df,
@@ -214,6 +214,7 @@ def process_sdks(
     logger.info(f"Start APK processing: {apps.shape=}")
     for _id, row in apps.iterrows():
         store_id = row.store_id
+        print(f"Processing {store_id=}")
 
         try:
             process_manifest(database_connection=database_connection, row=row)

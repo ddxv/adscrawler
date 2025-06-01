@@ -15,7 +15,7 @@ from adscrawler.app_stores.scrape_stores import (
     update_app_details,
 )
 from adscrawler.config import get_logger
-from adscrawler.connection import PostgresCon, get_db_connection
+from adscrawler.dbcon.connection import PostgresCon, get_db_connection
 from adscrawler.scrape import crawl_app_ads
 from adscrawler.tools.geo import update_geo_dbs
 from adscrawler.tools.get_plist import plist_main

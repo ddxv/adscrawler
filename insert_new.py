@@ -2,7 +2,7 @@
 
 import yaml
 
-from adscrawler.connection import get_db_connection
+from adscrawler.dbcon.connection import get_db_connection
 
 use_tunnel = True
 database_connection = get_db_connection(use_ssh_tunnel=use_tunnel)

@@ -23,8 +23,8 @@ from adscrawler.app_stores.google import (
     search_play_store,
 )
 from adscrawler.config import get_logger
-from adscrawler.connection import PostgresCon
-from adscrawler.queries import (
+from adscrawler.dbcon.connection import PostgresCon
+from adscrawler.dbcon.queries import (
     delete_app_url_mapping,
     query_categories,
     query_collections,

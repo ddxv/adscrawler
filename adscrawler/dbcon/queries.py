@@ -1,4 +1,5 @@
 import datetime
+import pathlib
 from functools import lru_cache
 
 import numpy as np
@@ -7,10 +8,8 @@ from psycopg import Connection
 from psycopg.sql import SQL, Composed, Identifier
 from sqlalchemy import text
 
-from adscrawler.config import get_logger, SQL_DIR
+from adscrawler.config import SQL_DIR, get_logger
 from adscrawler.dbcon.connection import PostgresCon
-
-import pathlib
 
 logger = get_logger(__name__)
 
