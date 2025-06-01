@@ -778,7 +778,11 @@ def process_apks_for_waydroid(
         logger.info(f"Start app {_}/{apps_df.shape[0]}: {row.store_id}")
         store_id = row.store_id
         store_app = row.store_app
-        apk_path = download_to_local(store_id=store_id)
+        try:
+            apk_path = download_to_local(store_id=store_id)
+        except FileNotFoundError:
+            logger.error(f"Waydroid failed to download {store_id}")
+            continue
         process_app_for_waydroid(
             database_connection=database_connection,
             apk_path=apk_path,
