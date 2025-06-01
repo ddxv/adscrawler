@@ -115,7 +115,6 @@ def manual_process_download(
     store_id: str,
 ) -> None:
     """Manual download of an apk file."""
-    store_id = "com.anthropic.claude"
     store_app = query_store_app_by_store_id(
         database_connection=database_connection, store_id=store_id
     )
