@@ -700,9 +700,8 @@ def query_apps_to_download(
     store: int,
     limit: int = 25,
 ) -> pd.DataFrame:
-    sel_query = text(QUERY_APPS_TO_DOWNLOAD)
     df = pd.read_sql(
-        sel_query,
+        QUERY_APPS_TO_DOWNLOAD,
         con=database_connection.engine,
         params={"store": store, "mylimit": limit},
     )
@@ -714,9 +713,8 @@ def query_apps_to_sdk_scan(
     store: int,
     limit: int = 25,
 ) -> pd.DataFrame:
-    sel_query = text(QUERY_APPS_TO_SDK_SCAN)
     df = pd.read_sql(
-        sel_query,
+        QUERY_APPS_TO_SDK_SCAN,
         con=database_connection.engine,
         params={"store": store, "mylimit": limit},
     )
@@ -724,11 +722,13 @@ def query_apps_to_sdk_scan(
 
 
 def query_apps_to_api_scan(
-    database_connection: PostgresCon,
-    store: int,
+    database_connection: PostgresCon, store: int, limit: int = 25
 ) -> pd.DataFrame:
-    sel_query = text(QUERY_APPS_TO_API_SCAN)
-    df = pd.read_sql(sel_query, database_connection.engine)
+    df = pd.read_sql(
+        QUERY_APPS_TO_API_SCAN,
+        con=database_connection.engine,
+        params={"store": store, "mylimit": limit},
+    )
     return df
 
 
