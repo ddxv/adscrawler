@@ -58,30 +58,35 @@ def download_apks(
         store_id = row.store_id
         existing_file_path = None
         is_already_in_s3 = False
-        s3df = get_store_id_s3_keys(store_id=store_id)
-        if not s3df.empty:
-            s3df = s3df[
-                s3df["version_code"].notna() & ~(s3df["version_code"] == "failed")
-            ]
-        file_path = get_local_apk_path(store_id)
-        needs_external_download = s3df.empty and not file_path
-        has_local_file_but_no_s3 = file_path is not None and s3df.empty
-        needs_s3_download = not file_path is not None and not s3df.empty
+        try:
+            s3df = get_store_id_s3_keys(store_id=store_id)
+            if not s3df.empty:
+                s3df = s3df[
+                    s3df["version_code"].notna() & ~(s3df["version_code"] == "failed")
+                ]
+            s3_key = s3df.sort_values(by="version_code", ascending=False).iloc[0].key
+            is_already_in_s3 = True
+        except FileNotFoundError:
+            is_already_in_s3 = False
+            s3_key = None
 
-        if needs_external_download:
+        file_path = get_local_apk_path(store_id)
+        external_download = not is_already_in_s3 and not file_path
+        has_local_file_but_no_s3 = file_path is not None and not is_already_in_s3
+        can_s3_download = file_path is None and is_already_in_s3
+
+        if external_download:
             # proceed to regular download
             pass
         elif has_local_file_but_no_s3:
             # Found a local file, process into s3
             existing_file_path = file_path
-        elif needs_s3_download:
+        elif can_s3_download:
             # download from s3
             logger.warning(
                 f"{store_id=} was already present in S3, this should rarely happen"
             )
-            s3_key = s3df.sort_values(by="version_code", ascending=False).iloc[0].key
             existing_file_path = download_s3_apk(s3_key=s3_key)
-            is_already_in_s3 = True
 
         last_error_count = this_error_count
         this_error_count = 0
