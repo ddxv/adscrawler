@@ -354,18 +354,15 @@ def check_wayland_display() -> bool:
 def cleanup_xapk_splits(store_id: str) -> None:
     for path in [WAYDROID_MEDIA_DIR, XAPKS_TMP_UNZIP_DIR, APK_TMP_UNZIPPED_DIR]:
         app_path = pathlib.Path(path, store_id)
-        if os.access(app_path, os.F_OK):
-            try:
-                subprocess.run(
-                    ["sudo", "rm", "-rf", app_path.as_posix()],
-                    text=True,
-                    check=True,
-                    timeout=60,
-                )
-            except Exception:
-                logger.exception(f"Exception occurred while cleaning up {path}")
-        else:
-            logger.info(f"No {app_path} to cleanup")
+        try:
+            subprocess.run(
+                ["sudo", "rm", "-rf", app_path.as_posix()],
+                text=True,
+                check=True,
+                timeout=60,
+            )
+        except Exception:
+            logger.exception(f"Exception occurred while cleaning up {app_path}")
 
 
 def remove_all_third_party_apps() -> None:
