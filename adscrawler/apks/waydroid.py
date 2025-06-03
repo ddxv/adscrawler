@@ -364,6 +364,8 @@ def cleanup_xapk_splits(store_id: str) -> None:
                 )
             except Exception:
                 logger.exception(f"Exception occurred while cleaning up {path}")
+        else:
+            logger.info(f"No {app_path} to cleanup")
 
 
 def remove_all_third_party_apps() -> None:
