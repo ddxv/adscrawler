@@ -75,7 +75,11 @@ scheduled_apps_crawl AS (
             (
                 (
                     vc.crawl_result = 1
-                    AND vc.updated_at < current_date - interval '180 days'
+                    AND (
+                        vc.updated_at < current_date - interval '180 days'
+                        OR vc.updated_at < '2025-05-01'
+                    )
+
                 )
                 OR
                 (
