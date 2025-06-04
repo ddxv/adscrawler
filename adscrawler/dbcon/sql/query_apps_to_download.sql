@@ -24,7 +24,8 @@ latest_success_version_codes AS (
         crawl_result
     FROM
         version_codes
-    WHERE crawl_result = 1
+    WHERE
+        crawl_result = 1
     ORDER BY
         store_app ASC,
         updated_at DESC,
@@ -79,12 +80,13 @@ scheduled_apps_crawl AS (
                         vc.updated_at < current_date - interval '180 days'
                         OR vc.updated_at < '2025-05-01'
                     )
-
                 )
                 OR
                 (
                     lsvc.updated_at IS NULL
-                    AND vc.crawl_result IN (2, 3, 4)
+                    AND vc.crawl_result IN (
+                        2, 3, 4
+                    )
                     AND vc.updated_at < current_date - interval '30 days'
                 )
             )
@@ -92,7 +94,8 @@ scheduled_apps_crawl AS (
 ),
 
 user_requested_apps_crawl AS (
-    SELECT DISTINCT ON (sa.id)
+    SELECT DISTINCT ON
+    (sa.id)
         sa.id AS store_app,
         sa.store_id,
         sa.name,
@@ -114,7 +117,9 @@ user_requested_apps_crawl AS (
     LEFT JOIN latest_version_codes AS lvc
         ON
             sa.id = lvc.store_app
-    LEFT JOIN failing_downloads AS fd ON sa.id = fd.store_app
+    LEFT JOIN failing_downloads AS fd
+        ON
+            sa.id = fd.store_app
     WHERE
         (
             (
@@ -137,7 +142,9 @@ user_requested_apps_crawl AS (
         AND sa.free
         -- random apps requested directly BY users NOT FOUND ON store
         AND sa.name IS NOT NULL
-    ORDER BY sa.id ASC, urs.created_at DESC
+    ORDER BY
+        sa.id ASC,
+        urs.created_at DESC
 ),
 
 combined AS (
@@ -154,7 +161,8 @@ combined AS (
         last_downloaded_at
     FROM
         user_requested_apps_crawl
-    WHERE attempt_count < 3
+    WHERE
+        attempt_count < 3
     UNION ALL
     SELECT
         store_app,
@@ -169,19 +177,37 @@ combined AS (
         last_downloaded_at
     FROM
         scheduled_apps_crawl
-    WHERE attempt_count < 2
+    WHERE
+        attempt_count < 2
+        AND (
+            last_downloaded_at IS NULL
+            OR last_downloaded_at < current_date - interval '180 days'
+        )
+),
+
+final_selection AS (
+    SELECT
+        *,
+        coalesce(date_part('day', current_date - last_downloaded_at), 1000)
+        * greatest(
+            coalesce(installs, 0),
+            coalesce(rating_count::bigint, 0) * 50
+        ) AS mynum,
+        row_number() OVER (
+            ORDER BY
+                mysource DESC,
+                coalesce(
+                    date_part('day', current_date - last_downloaded_at), 1000
+                )
+                * greatest(
+                    coalesce(installs, 0),
+                    coalesce(rating_count::bigint, 0) * 50
+                ) DESC NULLS LAST
+        ) AS app_rank
+    FROM
+        combined
 )
 
-SELECT * FROM combined
-ORDER BY
-    mysource DESC,
-    (CASE
-        WHEN last_crawl_result IS NULL THEN 0
-        ELSE 1
-    END),
-    greatest(
-        coalesce(installs, 0),
-        coalesce(rating_count::bigint, 0) * 50
-    )
-    DESC NULLS LAST
-LIMIT :mylimit;
+SELECT *
+FROM
+    final_selection;

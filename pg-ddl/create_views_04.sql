@@ -106,18 +106,56 @@ WITH DATA;
 CREATE MATERIALIZED VIEW public.store_apps_in_latest_rankings
 TABLESPACE pg_default
 AS
-SELECT DISTINCT ON (ar.store_app)
+SELECT DISTINCT ON
+(ar.store_app)
     ar.store_app,
     sa.store,
+    sa.store_last_updated,
     sa.name,
     sa.installs,
     sa.rating_count,
     sa.store_id
-FROM app_rankings AS ar
-LEFT JOIN store_apps AS sa ON ar.store_app = sa.id
-LEFT JOIN countries AS c ON ar.country = c.id
+FROM
+    app_rankings AS ar
+LEFT JOIN store_apps AS sa
+    ON
+        ar.store_app = sa.id
+LEFT JOIN countries AS c
+    ON
+        ar.country = c.id
 WHERE
-    ar.crawled_date > (CURRENT_DATE - '15 days'::interval)
-    AND c.alpha2 IN ('US', 'GB', 'DE', 'CN', 'BR')
+    sa.free
+    AND (
+        ar.store_collection = ANY(
+            ARRAY[
+                1,
+                3,
+                4,
+                6
+            ]
+        )
+    )
+    AND ar.crawled_date > (
+        CURRENT_DATE - '15 days'::interval
+    )
+    AND (
+        c.alpha2::text = ANY(
+            ARRAY[
+                'US'::character varying::text,
+                'CN'::character varying::text,
+                'DE'::character varying::text,
+                'IN'::character varying::text,
+                'JP'::character varying::text,
+                'FR'::character varying::text,
+                'BR'::character varying::text,
+                'MX'::character varying::text,
+                'KR'::character varying::text
+            ]
+        )
+    )
     AND ar.rank < 100
+    AND (
+        sa.installs > 100000
+        OR rating_count > 2000
+    )
 WITH DATA;
