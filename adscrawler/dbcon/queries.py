@@ -698,12 +698,11 @@ def query_all(
 def query_apps_to_download(
     database_connection: PostgresCon,
     store: int,
-    limit: int = 25,
 ) -> pd.DataFrame:
     df = pd.read_sql(
         QUERY_APPS_TO_DOWNLOAD,
         con=database_connection.engine,
-        params={"store": store, "mylimit": limit},
+        params={"store": store},
     )
     return df
 
@@ -722,12 +721,12 @@ def query_apps_to_sdk_scan(
 
 
 def query_apps_to_api_scan(
-    database_connection: PostgresCon, store: int, limit: int = 25
+    database_connection: PostgresCon, store: int
 ) -> pd.DataFrame:
     df = pd.read_sql(
         QUERY_APPS_TO_API_SCAN,
         con=database_connection.engine,
-        params={"store": store, "mylimit": limit},
+        params={"store": store},
     )
     return df
 

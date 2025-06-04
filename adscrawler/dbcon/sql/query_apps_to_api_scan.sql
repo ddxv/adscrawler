@@ -144,5 +144,4 @@ SELECT
     'scheduled' AS mysource
 FROM scheduled_to_run
 WHERE store_id NOT IN (SELECT store_id FROM user_requested_apps_crawl)
-ORDER BY mysource DESC, user_requested_at ASC, installs DESC
-LIMIT :mylimit;
+ORDER BY mysource DESC, user_requested_at ASC, installs DESC;

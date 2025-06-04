@@ -51,9 +51,11 @@ def download_apks(
     apps = query_apps_to_download(
         database_connection=database_connection,
         store=store,
-        limit=number_of_apps_to_pull,
     )
-    logger.info(f"Start APK downloads: {apps.shape=}")
+    logger.info(
+        f"download_apks start: {apps.shape[0]} total apps to download, start top {number_of_apps_to_pull}"
+    )
+    apps = apps.head(number_of_apps_to_pull)
     for _id, row in apps.iterrows():
         store_id = row.store_id
         existing_file_path = None
