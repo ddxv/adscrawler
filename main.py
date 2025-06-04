@@ -357,6 +357,5 @@ class ProcessManager:
 
 
 if __name__ == "__main__":
-    logger.info("Starting app-ads.txt crawler")
     process_manager = ProcessManager()
     process_manager.run()
