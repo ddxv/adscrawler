@@ -11,6 +11,9 @@ from adscrawler.config import (
     APK_TMP_UNZIPPED_DIR,
     APKS_DIR,
     APKS_INCOMING_DIR,
+    IPAS_DIR,
+    IPAS_INCOMING_DIR,
+    IPAS_TMP_UNZIPPED_DIR,
     XAPKS_DIR,
     XAPKS_INCOMING_DIR,
     XAPKS_ISSUES_DIR,
@@ -21,23 +24,10 @@ logger = get_logger(__name__)
 
 
 def get_md5_hash(file_path: pathlib.Path) -> str:
-    return hashlib.md5(file_path.read_bytes()).hexdigest()
-
-
-def get_downloaded_apks() -> list[str]:
-    apks = []
-    apk_path = pathlib.Path(APKS_DIR)
-    for apk in apk_path.glob("*.apk"):
-        apks.append(apk.stem)
-    return apks
-
-
-def get_downloaded_xapks() -> list[str]:
-    xapks = []
-    apk_path = pathlib.Path(XAPKS_DIR)
-    for apk in apk_path.glob("*.xapk"):
-        xapks.append(apk.stem)
-    return xapks
+    md5_hash = hashlib.md5(file_path.read_bytes()).hexdigest()
+    if not md5_hash:
+        raise ValueError(f"Failed to get MD5 hash for {file_path.as_posix()}")
+    return md5_hash
 
 
 def check_xapk_is_valid(xapk_path: pathlib.Path) -> bool:
@@ -56,12 +46,14 @@ def check_xapk_is_valid(xapk_path: pathlib.Path) -> bool:
         return True
 
 
-def move_incoming_apk_to_main_dir(downloaded_file_path: pathlib.Path) -> pathlib.Path:
+def move_downloaded_app_to_main_dir(downloaded_file_path: pathlib.Path) -> pathlib.Path:
     """Move the apk file to the main directory."""
     if downloaded_file_path.suffix == ".apk":
         destination_path = pathlib.Path(APKS_DIR, downloaded_file_path.name)
     elif downloaded_file_path.suffix == ".xapk":
         destination_path = pathlib.Path(XAPKS_DIR, downloaded_file_path.name)
+    elif downloaded_file_path.suffix == ".ipa":
+        destination_path = pathlib.Path(IPAS_DIR, downloaded_file_path.name)
     else:
         raise ValueError(f"Invalid extension: {downloaded_file_path.suffix}")
     shutil.move(downloaded_file_path, destination_path)
@@ -152,6 +144,21 @@ def unzip_apk(store_id: str, file_path: pathlib.Path) -> pathlib.Path:
     return tmp_decoded_output_path
 
 
+def unzip_ipa(ipa_path: pathlib.Path, store_id: str) -> pathlib.Path:
+    tmp_decoded_output_path = pathlib.Path(IPAS_TMP_UNZIPPED_DIR, store_id)
+    if tmp_decoded_output_path.exists():
+        empty_folder(tmp_decoded_output_path)
+    if not ipa_path.exists():
+        logger.error(f"path: {ipa_path.as_posix()} file not found")
+        raise FileNotFoundError(f"IPA file not found: {ipa_path.as_posix()}")
+    command = f"unzip {ipa_path.as_posix()} -d {tmp_decoded_output_path.as_posix()}"
+    # Run the command
+    result = os.system(command)
+    # Print the standard output of the command
+    logger.info(f"Unzip output: {result}")
+    return tmp_decoded_output_path
+
+
 def get_version(apktool_info_path: pathlib.Path) -> str:
     # Open and read the YAML file
     with apktool_info_path.open("r") as file:
@@ -160,10 +167,11 @@ def get_version(apktool_info_path: pathlib.Path) -> str:
     return version
 
 
-def get_local_apk_path(store_id: str) -> pathlib.Path | None:
-    """Check if an APK or XAPK file exists and return its extension.
+def get_local_file_path(store: int, store_id: str) -> pathlib.Path | None:
+    """Check if an APK, XAPK, or IPA file exists and return its extension.
 
     Args:
+        store: The store ID of the app
         store_id: The store ID of the app
 
     Returns:
@@ -173,12 +181,19 @@ def get_local_apk_path(store_id: str) -> pathlib.Path | None:
     # Define all possible paths to check
     # In the future we would check version codes as well
 
-    paths_to_check = [
+    apk_paths = [
         pathlib.Path(APKS_DIR, f"{store_id}.apk"),
         pathlib.Path(XAPKS_DIR, f"{store_id}.xapk"),
         pathlib.Path(APKS_INCOMING_DIR, f"{store_id}.apk"),
         pathlib.Path(XAPKS_INCOMING_DIR, f"{store_id}.xapk"),
     ]
+
+    ipa_paths = [
+        pathlib.Path(IPAS_DIR, f"{store_id}.ipa"),
+        pathlib.Path(IPAS_INCOMING_DIR, f"{store_id}.ipa"),
+    ]
+
+    paths_to_check = apk_paths if store == 1 else ipa_paths
 
     logger.info(f"Checking {store_id=} if exists locally")
 

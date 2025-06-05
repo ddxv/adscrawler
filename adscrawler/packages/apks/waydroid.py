@@ -9,10 +9,6 @@ import time
 import numpy as np
 import pandas as pd
 
-from adscrawler.apks import mitm_process_log
-from adscrawler.apks.process_apk import get_md5_hash, get_version, unzip_apk
-from adscrawler.apks.storage import download_to_local
-from adscrawler.apks.weston import restart_weston, start_weston
 from adscrawler.config import (
     ANDROID_SDK,
     APK_TMP_UNZIPPED_DIR,
@@ -32,6 +28,10 @@ from adscrawler.dbcon.queries import (
     query_apps_to_api_scan,
     query_store_app_by_store_id,
 )
+from adscrawler.packages.apks import mitm_process_log
+from adscrawler.packages.apks.weston import restart_weston, start_weston
+from adscrawler.packages.storage import download_to_local
+from adscrawler.packages.utils import get_md5_hash, get_version, unzip_apk
 
 logger = get_logger(__name__, "waydroid")
 
@@ -752,8 +752,8 @@ def manual_waydroid_process(
     try:
         apk_path = get_local_file_path(store_id)
     except FileNotFoundError:
-        apk_path = download_to_local(store_id)
-    if not apk_path.exists():
+        apk_path = download_to_local(store=1, store_id=store_id)
+    if not apk_path or not apk_path.exists():
         raise FileNotFoundError(f"{store_id=} not found")
     store_app = query_store_app_by_store_id(database_connection, store_id)
     process_app_for_waydroid(
@@ -778,7 +778,9 @@ def process_apks_for_waydroid(
         store_id = row.store_id
         store_app = row.store_app
         try:
-            apk_path = download_to_local(store_id=store_id)
+            apk_path = download_to_local(store=1, store_id=store_id)
+            if not apk_path:
+                raise FileNotFoundError(f"APK file not found for {store_id=}")
         except FileNotFoundError:
             logger.error(f"Waydroid failed to download {store_id}")
             continue

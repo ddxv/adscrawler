@@ -4,23 +4,23 @@ import pathlib
 import boto3
 import pandas as pd
 
-from adscrawler.apks.process_apk import (
-    get_downloaded_apks,
-    get_downloaded_xapks,
-    get_local_apk_path,
-    get_md5_hash,
-    get_version,
-    move_incoming_apk_to_main_dir,
-    remove_tmp_files,
-    unzip_apk,
-)
 from adscrawler.config import (
     APKS_DIR,
     APKS_INCOMING_DIR,
     CONFIG,
+    IPAS_DIR,
+    IPAS_INCOMING_DIR,
     XAPKS_DIR,
     XAPKS_INCOMING_DIR,
     get_logger,
+)
+from adscrawler.packages.utils import (
+    get_local_file_path,
+    get_md5_hash,
+    get_version,
+    move_downloaded_app_to_main_dir,
+    remove_tmp_files,
+    unzip_apk,
 )
 
 logger = get_logger(__name__)
@@ -65,24 +65,30 @@ def get_s3_client() -> boto3.client:
 
 
 def upload_apk_to_s3(
+    store: int,
     store_id: str,
     extension: str,
     md5_hash: str,
     version_str: str,
     file_path: pathlib.Path,
 ) -> None:
-    s3_key = f"apks/android/{store_id}/{version_str}/{store_id}_{md5_hash}.{extension}"
+    """Upload apk to s3."""
+    app_prefix = f"{store_id}/{version_str}/{store_id}_{md5_hash}.{extension}"
+    if store == 1:
+        prefix = f"apks/android/{app_prefix}"
+    elif store == 2:
+        prefix = f"apks/ios/{app_prefix}"
+    else:
+        raise ValueError(f"Invalid store: {store}")
     metadata = {
         "store_id": store_id,
         "version_code": version_str,
         "md5": md5_hash,
     }
-    # s3_key = f"apks/android/{store_id}/failed/{store_id}.{extension}"
-    # metadata = {"store_id": store_id, "version_code": "failed", "md5": "failed"}
     s3_client = get_s3_client()
     response = s3_client.put_object(
         Bucket="adscrawler",
-        Key=s3_key,
+        Key=prefix,
         Body=file_path.read_bytes(),
         Metadata=metadata,
     )
@@ -92,13 +98,36 @@ def upload_apk_to_s3(
         logger.error(f"Failed to upload {store_id} to S3")
 
 
-def move_local_files_to_s3() -> None:
-    apks = get_downloaded_apks()
-    xapks = get_downloaded_xapks()
+def get_downloaded_files(extension: str) -> list[str]:
+    """Get all downloaded files of a given extension."""
+    if extension == "apk":
+        main_dir = APKS_DIR
+    elif extension == "xapk":
+        main_dir = XAPKS_DIR
+    elif extension == "ipa":
+        main_dir = IPAS_DIR
+    else:
+        raise ValueError(f"Invalid extension: {extension}")
+    files = []
+    for file in pathlib.Path(main_dir).glob(f"*.{extension}"):
+        files.append(file.stem)
+    return files
 
-    files = [{"file_type": "apk", "package_name": apk} for apk in apks] + [
-        {"file_type": "xapk", "package_name": xapk} for xapk in xapks
-    ]
+
+def move_local_files_to_s3() -> None:
+    """Upload all local files to s3.
+
+    This is for occasional MANUAL PROCESSING.
+    """
+    apks = get_downloaded_files(extension="apk")
+    xapks = get_downloaded_files(extension="xapk")
+    ipas = get_downloaded_files(extension="ipa")
+
+    files = (
+        [{"file_type": "apk", "package_name": apk} for apk in apks]
+        + [{"file_type": "xapk", "package_name": xapk} for xapk in xapks]
+        + [{"file_type": "ipa", "package_name": ipa} for ipa in ipas]
+    )
     df = pd.DataFrame(files)
 
     for _, row in df.iterrows():
@@ -107,8 +136,13 @@ def move_local_files_to_s3() -> None:
         extension = row.file_type
         if extension == "apk":
             file_path = pathlib.Path(APKS_DIR, f"{row['package_name']}.{extension}")
+            store_name = "android"
         elif extension == "xapk":
             file_path = pathlib.Path(XAPKS_DIR, f"{row['package_name']}.{extension}")
+            store_name = "android"
+        elif extension == "ipa":
+            file_path = pathlib.Path(IPAS_DIR, f"{row['package_name']}.{extension}")
+            store_name = "ios"
         else:
             raise ValueError(f"Invalid extension: {extension}")
         try:
@@ -118,7 +152,7 @@ def move_local_files_to_s3() -> None:
             apktool_info_path = pathlib.Path(apk_tmp_decoded_output_path, "apktool.yml")
             version_str = get_version(apktool_info_path)
             md5_hash = get_md5_hash(file_path)
-            s3_key = f"apks/android/{store_id}/{version_str}/{store_id}_{md5_hash}.{extension}"
+            s3_key = f"apks/{store_name}/{store_id}/{version_str}/{store_id}_{md5_hash}.{extension}"
             metadata = {
                 "store_id": store_id,
                 "version_code": version_str,
@@ -126,7 +160,7 @@ def move_local_files_to_s3() -> None:
             }
         except Exception:
             logger.exception(f"Failed to process {store_id}")
-            s3_key = f"apks/android/{store_id}/failed/{store_id}.{extension}"
+            s3_key = f"apks/{store_name}/{store_id}/failed/{store_id}.{extension}"
             metadata = {"store_id": store_id, "version_code": "failed", "md5": "failed"}
         s3_client = get_s3_client()
         response = s3_client.put_object(
@@ -145,12 +179,16 @@ def move_local_files_to_s3() -> None:
         )
 
 
-def get_store_id_s3_keys(store_id: str) -> pd.DataFrame:
+def get_store_id_s3_keys(store: int, store_id: str) -> pd.DataFrame:
+    if store == 1:
+        prefix = f"apks/android/{store_id}/"
+    elif store == 2:
+        prefix = f"apks/ios/{store_id}/"
+    else:
+        raise ValueError(f"Invalid store: {store}")
     logger.info(f"Getting {store_id=} s3 keys start")
     s3_client = get_s3_client()
-    response = s3_client.list_objects_v2(
-        Bucket="adscrawler", Prefix=f"apks/android/{store_id}/"
-    )
+    response = s3_client.list_objects_v2(Bucket="adscrawler", Prefix=prefix)
     objects_data = []
     if response["KeyCount"] == 0:
         logger.error(f"{store_id=} no apk found in s3")
@@ -179,27 +217,17 @@ def get_store_id_s3_keys(store_id: str) -> pd.DataFrame:
     return df
 
 
-def download_s3_apk(
-    s3_key: str | None = None, store_id: str | None = None
-) -> pathlib.Path:
-    if s3_key is None and store_id is None:
-        raise ValueError("Either s3_key or store_id must be provided")
-    func_info = "download_s3_apk "
-    if s3_key:
-        key = s3_key
-    elif store_id:
-        df = get_store_id_s3_keys(store_id)
-        if df.empty:
-            logger.error(f"{store_id=} no apk found in s3")
-            raise FileNotFoundError(f"{store_id=} no apk found in s3")
-        if df[~(df["version_code"] == "failed")].empty:
-            logger.error(f"{store_id=} S3 only has failed apk, no version_code")
-        else:
-            df = df[~(df["version_code"] == "failed")]
-            df = df.sort_values(by="version_code", ascending=False)
-        key = df.iloc[0].key
-    else:
-        raise ValueError("Either s3_key or store_id must be provided")
+def download_app_by_store_id(store: int, store_id: str) -> pathlib.Path:
+    func_info = "download_app_by_store_id "
+    df = get_store_id_s3_keys(store, store_id)
+    if df.empty:
+        logger.error(f"{store_id=} no apk found in s3")
+        raise FileNotFoundError(f"{store_id=} no apk found in s3")
+    df = df[~(df["version_code"] == "failed")]
+    if df.empty:
+        logger.error(f"{store_id=} S3 only has failed apk, no version_code")
+    df = df.sort_values(by="version_code", ascending=False)
+    key = df["key"].to_numpy()[0]
     filename = key.split("/")[-1]
     extension = filename.split(".")[-1]
     if extension == "apk":
@@ -216,17 +244,47 @@ def download_s3_apk(
             Key=key,
             Fileobj=f,
         )
-    final_path = move_incoming_apk_to_main_dir(local_path)
+    final_path = move_downloaded_app_to_main_dir(local_path)
     logger.info(f"{func_info} to local finished")
     return final_path
 
 
-def download_to_local(store_id: str) -> pathlib.Path | None:
-    apk_path = get_local_apk_path(store_id)
-    if apk_path:
+def download_s3_app_by_key(
+    s3_key: str,
+) -> pathlib.Path:
+    func_info = "download_s3_file_by_key "
+    filename = s3_key.split("/")[-1]
+    extension = filename.split(".")[-1]
+    if extension == "apk":
+        local_path = pathlib.Path(APKS_INCOMING_DIR, filename)
+    elif extension == "xapk":
+        local_path = pathlib.Path(XAPKS_INCOMING_DIR, filename)
+    elif extension == "ipa":
+        local_path = pathlib.Path(IPAS_INCOMING_DIR, filename)
+    else:
+        raise ValueError(f"Invalid extension: {extension}")
+    logger.info(f"{func_info} {s3_key=} to local start")
+    s3_client = get_s3_client()
+    with open(local_path, "wb") as f:
+        s3_client.download_fileobj(
+            Bucket="adscrawler",
+            Key=s3_key,
+            Fileobj=f,
+        )
+    if extension in ["apk", "xapk", "ipa"]:
+        final_path = move_downloaded_app_to_main_dir(local_path)
+    else:
+        final_path = local_path
+    logger.info(f"{func_info} to local finished")
+    return final_path
+
+
+def download_to_local(store: int, store_id: str) -> pathlib.Path | None:
+    file_path = get_local_file_path(store, store_id)
+    if file_path:
         logger.info(f"{store_id=} already downloaded")
-        return apk_path
-    apk_path = download_s3_apk(store_id=store_id)
-    if apk_path is None:
-        raise FileNotFoundError(f"{store_id=} no apk found: {apk_path=}")
-    return apk_path
+        return file_path
+    file_path = download_app_by_store_id(store=store, store_id=store_id)
+    if file_path is None:
+        raise FileNotFoundError(f"{store_id=} no file found: {file_path=}")
+    return file_path

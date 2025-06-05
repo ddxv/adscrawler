@@ -7,12 +7,6 @@ from xml.etree import ElementTree
 
 import pandas as pd
 
-from adscrawler.apks.process_apk import (
-    get_version,
-    remove_tmp_files,
-    unzip_apk,
-)
-from adscrawler.apks.storage import download_to_local
 from adscrawler.config import (
     APK_TMP_UNZIPPED_DIR,
     get_logger,
@@ -22,6 +16,12 @@ from adscrawler.dbcon.queries import (
     get_version_code_dbid,
     query_apps_to_sdk_scan,
     upsert_details_df,
+)
+from adscrawler.packages.storage import download_to_local
+from adscrawler.packages.utils import (
+    get_version,
+    remove_tmp_files,
+    unzip_apk,
 )
 
 logger = get_logger(__name__, "process_sdks")
@@ -137,16 +137,18 @@ def process_manifest(database_connection: PostgresCon, row: pd.Series) -> None:
     """
     crawl_result = 3
     store_id = row.store_id
+    store = row.store
     logger.info(f"process_manifest {store_id=} start")
     details_df = row.to_frame().T
     version_str = FAILED_VERSION_STR
     manifest_str = ""
 
     try:
-        apk_path = download_to_local(store_id=store_id)
+        apk_path = download_to_local(store=store, store_id=store_id)
+        if apk_path is None:
+            raise FileNotFoundError(f"APK file not found for {store_id=}")
         apk_tmp_decoded_output_path = unzip_apk(store_id=store_id, file_path=apk_path)
 
-        # extension = download(store_id, do_redownload=False)
         manifest_str, details_df = get_parsed_manifest(
             apk_tmp_decoded_output_path, store_id
         )

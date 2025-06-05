@@ -20,21 +20,24 @@ SQL_DIR = pathlib.Path(MODULE_DIR, pathlib.Path("dbcon/sql"))
 GEO_DATA_DIR = pathlib.Path(CONFIG_DIR, pathlib.Path("geo-data"))
 
 # APK File dirs
-APKS_FILES_DIR = pathlib.Path(HOME, "apk-files")
+APP_FILES_DIR = pathlib.Path(HOME, "apk-files")
 
 
 # Incoming for downloading/downloaded but not yet processed
-INCOMING_DIR = pathlib.Path(APKS_FILES_DIR, "incoming")
+INCOMING_DIR = pathlib.Path(APP_FILES_DIR, "incoming")
 APKS_INCOMING_DIR = pathlib.Path(INCOMING_DIR, "apks")
 XAPKS_INCOMING_DIR = pathlib.Path(INCOMING_DIR, "xapks")
+IPAS_INCOMING_DIR = pathlib.Path(INCOMING_DIR, "ipas")
 
 # Processed and ready for use
-APKS_DIR = pathlib.Path(APKS_FILES_DIR, "apks")
-XAPKS_DIR = pathlib.Path(APKS_FILES_DIR, "xapks")
+APKS_DIR = pathlib.Path(APP_FILES_DIR, "apks")
+XAPKS_DIR = pathlib.Path(APP_FILES_DIR, "xapks")
+IPAS_DIR = pathlib.Path(APP_FILES_DIR, "ipas")
 
 # Failed to unzip, often due to unzip tool. I think failed during download?
-XAPKS_ISSUES_DIR = pathlib.Path(APKS_FILES_DIR, "xapks-issues")
-APKS_ISSUES_DIR = pathlib.Path(APKS_FILES_DIR, "apks-issues")
+XAPKS_ISSUES_DIR = pathlib.Path(APP_FILES_DIR, "xapks-issues")
+APKS_ISSUES_DIR = pathlib.Path(APP_FILES_DIR, "apks-issues")
+IPAS_ISSUES_DIR = pathlib.Path(APP_FILES_DIR, "ipas-issues")
 
 TMP_DIR = pathlib.Path("/tmp/adscrawler")
 
@@ -43,6 +46,7 @@ TMP_DIR = pathlib.Path("/tmp/adscrawler")
 APK_TMP_PARTIALS_DIR = pathlib.Path(TMP_DIR, "apk-partials")
 APK_TMP_UNZIPPED_DIR = pathlib.Path(TMP_DIR, "apks-unzipped")
 XAPKS_TMP_UNZIP_DIR = pathlib.Path(TMP_DIR, "xapks-unzipped")
+IPAS_TMP_UNZIPPED_DIR = pathlib.Path(TMP_DIR, "ipas-unzipped")
 
 # Location of the Android SDK
 ANDROID_SDK = pathlib.Path(HOME, "Android/Sdk/build-tools/35.0.0")
@@ -84,17 +88,21 @@ def check_dirs() -> None:
         TOP_CONFIGDIR,
         CONFIG_DIR,
         LOG_DIR,
-        APKS_FILES_DIR,
+        APP_FILES_DIR,
         TMP_DIR,
         INCOMING_DIR,
         APK_TMP_PARTIALS_DIR,
         APK_TMP_UNZIPPED_DIR,
         XAPKS_TMP_UNZIP_DIR,
+        IPAS_DIR,
+        IPAS_TMP_UNZIPPED_DIR,
         XAPKS_DIR,
         XAPKS_ISSUES_DIR,
         APKS_ISSUES_DIR,
+        IPAS_ISSUES_DIR,
         APKS_INCOMING_DIR,
         XAPKS_INCOMING_DIR,
+        IPAS_INCOMING_DIR,
         GEO_DATA_DIR,
     ]
     for _dir in dirs:
@@ -114,14 +122,14 @@ FORMATTER = Formatter(
 FORMATTER.datefmt = "%Y-%m-%d %H:%M:%S"
 
 
-_loggers = {}
+global_loggers: dict[str, logging.Logger] = {}
 
 
 def get_logger(mod_name: str, sep_file: str | None = "main") -> logging.Logger:
-    global _loggers
+    global global_loggers
 
-    if mod_name in _loggers:
-        return _loggers[mod_name]
+    if mod_name in global_loggers:
+        return global_loggers[mod_name]
 
     check_dirs()
 
@@ -154,7 +162,7 @@ def get_logger(mod_name: str, sep_file: str | None = "main") -> logging.Logger:
     logger.addHandler(console_handler)
     logger.propagate = False  # Main logger shouldn't propagate
 
-    _loggers[mod_name] = logger
+    global_loggers[mod_name] = logger
 
     return logger
 

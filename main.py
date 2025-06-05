@@ -2,12 +2,6 @@ import argparse
 import os
 import sys
 
-from adscrawler.apks.download_apk import download_apks
-from adscrawler.apks.manifest import process_sdks
-from adscrawler.apks.waydroid import (
-    manual_waydroid_process,
-    process_apks_for_waydroid,
-)
 from adscrawler.app_stores.scrape_stores import (
     crawl_developers_for_new_store_ids,
     crawl_keyword_cranks,
@@ -16,9 +10,14 @@ from adscrawler.app_stores.scrape_stores import (
 )
 from adscrawler.config import get_logger
 from adscrawler.dbcon.connection import PostgresCon, get_db_connection
+from adscrawler.packages.apks.manifest import process_sdks
+from adscrawler.packages.apks.waydroid import (
+    manual_waydroid_process,
+    process_apks_for_waydroid,
+)
+from adscrawler.packages.process_files import download_apps
 from adscrawler.scrape import crawl_app_ads
 from adscrawler.tools.geo import update_geo_dbs
-from adscrawler.tools.get_plist import plist_main
 
 logger = get_logger(__name__)
 
@@ -311,12 +310,16 @@ class ProcessManager:
     def download_apks(self, stores: list[int]) -> None:
         if 2 in stores:
             try:
-                plist_main(database_connection=self.pgcon, number_of_apps_to_pull=20)
+                download_apps(
+                    store=2, database_connection=self.pgcon, number_of_apps_to_pull=20
+                )
             except Exception:
                 logger.exception("iTunes scrape plist failing")
         if 1 in stores:
             try:
-                download_apks(database_connection=self.pgcon, number_of_apps_to_pull=20)
+                download_apps(
+                    store=1, database_connection=self.pgcon, number_of_apps_to_pull=20
+                )
             except Exception:
                 logger.exception("Android download apks failing")
 
