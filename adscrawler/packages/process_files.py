@@ -47,7 +47,9 @@ def download_apps(
                 s3df = s3df[
                     s3df["version_code"].notna() & ~(s3df["version_code"] == "failed")
                 ]
-            s3_key = s3df.sort_values(by="version_code", ascending=False).iloc[0].key
+            if s3df.empty:
+                raise FileNotFoundError(f"No S3 key found for {store_id=}")
+            s3_key = s3df.sort_values(by="version_code", ascending=False)["key"][0]
             is_already_in_s3 = True
         except FileNotFoundError:
             is_already_in_s3 = False
