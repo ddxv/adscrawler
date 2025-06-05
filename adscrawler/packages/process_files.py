@@ -34,7 +34,7 @@ def download_apps(
         store=store,
     )
     logger.info(
-        f"download_apks start: {apps.shape[0]} total apps to download, start top {number_of_apps_to_pull}"
+        f"download_apps: {store=} {apps.shape[0]} total apps, start top {number_of_apps_to_pull}"
     )
     apps = apps.head(number_of_apps_to_pull)
     for _id, row in apps.iterrows():
