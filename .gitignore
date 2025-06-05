@@ -6,12 +6,6 @@ new_company.yml
 # check-testing
 mycheck.py
 
-# directory for downloaded apks
-#apks/
-#apksunzipped/
-ipas/
-ipasunzipped/
-
 mitmlogs/
 
 .vscode
