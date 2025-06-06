@@ -194,9 +194,6 @@ def get_store_id_s3_keys(store: int, store_id: str) -> pd.DataFrame:
         logger.error(f"{store_id=} no apk found in s3")
         raise FileNotFoundError(f"{store_id=} no apk found in s3")
     for obj in response["Contents"]:
-        print(obj)
-        # Get the object's metadata
-        # response = S3_CLIENT.head_object(Bucket="adscrawler", Key=obj["Key"])
         key_parts = obj["Key"].split("/")
         if len(key_parts) >= 4:
             version_code = key_parts[3]
@@ -231,20 +228,24 @@ def download_app_by_store_id(store: int, store_id: str) -> pathlib.Path:
     filename = key.split("/")[-1]
     extension = filename.split(".")[-1]
     if extension == "apk":
-        local_path = pathlib.Path(APKS_INCOMING_DIR, filename)
+        downloaded_file_path = pathlib.Path(APKS_INCOMING_DIR, filename)
     elif extension == "xapk":
-        local_path = pathlib.Path(XAPKS_INCOMING_DIR, filename)
+        downloaded_file_path = pathlib.Path(XAPKS_INCOMING_DIR, filename)
+    elif extension == "ipa":
+        downloaded_file_path = pathlib.Path(IPAS_INCOMING_DIR, filename)
     else:
         raise ValueError(f"Invalid extension: {extension}")
     logger.info(f"{func_info} {key=} to local start")
     s3_client = get_s3_client()
-    with open(local_path, "wb") as f:
+    with open(downloaded_file_path, "wb") as f:
         s3_client.download_fileobj(
             Bucket="adscrawler",
             Key=key,
             Fileobj=f,
         )
-    final_path = move_downloaded_app_to_main_dir(local_path)
+    if not downloaded_file_path.exists():
+        raise FileNotFoundError(f"{downloaded_file_path=} after download not found")
+    final_path = move_downloaded_app_to_main_dir(downloaded_file_path)
     logger.info(f"{func_info} to local finished")
     return final_path
 

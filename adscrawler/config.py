@@ -91,6 +91,7 @@ def check_dirs() -> None:
         APP_FILES_DIR,
         TMP_DIR,
         INCOMING_DIR,
+        APKS_DIR,
         APK_TMP_PARTIALS_DIR,
         APK_TMP_UNZIPPED_DIR,
         XAPKS_TMP_UNZIP_DIR,

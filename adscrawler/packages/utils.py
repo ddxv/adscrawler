@@ -49,11 +49,14 @@ def check_xapk_is_valid(xapk_path: pathlib.Path) -> bool:
 
 def move_downloaded_app_to_main_dir(downloaded_file_path: pathlib.Path) -> pathlib.Path:
     """Move the apk file to the main directory."""
-    if downloaded_file_path.suffix == ".apk":
+    if not downloaded_file_path.exists():
+        raise FileNotFoundError(f"{downloaded_file_path=} not found")
+    suffix = downloaded_file_path.suffix
+    if suffix == ".apk":
         destination_path = pathlib.Path(APKS_DIR, downloaded_file_path.name)
-    elif downloaded_file_path.suffix == ".xapk":
+    elif suffix == ".xapk":
         destination_path = pathlib.Path(XAPKS_DIR, downloaded_file_path.name)
-    elif downloaded_file_path.suffix == ".ipa":
+    elif suffix == ".ipa":
         destination_path = pathlib.Path(IPAS_DIR, downloaded_file_path.name)
     else:
         raise ValueError(f"Invalid extension: {downloaded_file_path.suffix}")
