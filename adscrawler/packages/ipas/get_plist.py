@@ -1,8 +1,6 @@
 """Download an IPA and extract it's Info.plist file."""
 
-import argparse
 import json
-import os
 import pathlib
 import plistlib
 import subprocess
@@ -10,19 +8,12 @@ import subprocess
 import pandas as pd
 
 from adscrawler.config import get_logger
+from adscrawler.packages.storage import download_to_local
+from adscrawler.packages.utils import unzip_ipa
 
 logger = get_logger(__name__)
 
 FAILED_VERSION_STR = "-1"
-
-
-def empty_folder(pth: pathlib.Path) -> None:
-    for sub in pth.iterdir():
-        if sub.is_dir() and not sub.is_symlink():
-            empty_folder(sub)
-            os.rmdir(sub)
-        else:
-            sub.unlink()
 
 
 def unpack_and_attach(
@@ -178,16 +169,19 @@ def special_files(tmp_decoded_output_path: pathlib.Path) -> pd.DataFrame:
     return df
 
 
-def parse_args() -> argparse.Namespace:
-    """Check passed args.
-
-    will check for command line --store-id in the form of com.example.app
-    """
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "-s",
-        "--store-id",
-        help="Store id to download, ie -s 'org.moire.opensudoku'",
+def process_plist(
+    row: pd.Series,
+) -> tuple[pd.DataFrame, int, str, str]:
+    store = row.store
+    store_id = row.store_id
+    downloaded_file_path, version_str = download_to_local(
+        store=store, store_id=store_id
     )
-    args, leftovers = parser.parse_known_args()
-    return args
+    tmp_decoded_output_path = unzip_ipa(
+        ipa_path=downloaded_file_path, store_id=store_id
+    )
+    version_str, plist_str, details_df = get_parsed_plist(
+        tmp_decoded_output_path=tmp_decoded_output_path
+    )
+    crawl_result = 1
+    return details_df, crawl_result, version_str, plist_str

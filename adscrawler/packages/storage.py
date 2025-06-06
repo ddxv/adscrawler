@@ -260,6 +260,7 @@ def download_app_by_store_id(store: int, store_id: str) -> pathlib.Path:
         logger.error(f"{store_id=} S3 only has failed apk, no version_code")
     df = df.sort_values(by="version_code", ascending=False)
     key = df["key"].to_numpy()[0]
+    version_str = df["version_code"].to_numpy()[0]
     filename = key.split("/")[-1]
     extension = filename.split(".")[-1]
     if extension == "apk":
@@ -282,7 +283,7 @@ def download_app_by_store_id(store: int, store_id: str) -> pathlib.Path:
         raise FileNotFoundError(f"{downloaded_file_path=} after download not found")
     final_path = move_downloaded_app_to_main_dir(downloaded_file_path)
     logger.info(f"{func_info} to local finished")
-    return final_path
+    return final_path, version_str
 
 
 def download_s3_app_by_key(

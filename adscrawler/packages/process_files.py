@@ -1,15 +1,22 @@
 import time
 
+import pandas as pd
+
 from adscrawler.config import (
     get_logger,
 )
 from adscrawler.dbcon.connection import PostgresCon
 from adscrawler.dbcon.queries import (
+    get_version_code_dbid,
     insert_version_code,
     query_apps_to_download,
+    query_apps_to_sdk_scan,
+    upsert_details_df,
 )
 from adscrawler.packages.apks.download_apk import manage_apk_download
+from adscrawler.packages.apks.manifest import process_manifest
 from adscrawler.packages.ipas.download_ipa import manage_ipa_download
+from adscrawler.packages.ipas.get_plist import process_plist
 from adscrawler.packages.storage import (
     download_s3_app_by_key,
     get_store_id_s3_keys,
@@ -130,3 +137,80 @@ def download_apps(
             f"{store_id=} finished with errors={download_result.error_count} {total_errors=}"
         )
     logger.info("Finished downloading APKs")
+
+
+def process_sdks(
+    store: int, database_connection: PostgresCon, number_of_apps_to_pull: int = 20
+) -> None:
+    """
+    Decompile the app into its various files and directories.
+    This shows which SDKs are used in the app.
+    All results are saved to the database.
+    """
+    apps = query_apps_to_sdk_scan(
+        database_connection=database_connection,
+        store=store,
+        limit=number_of_apps_to_pull,
+    )
+    apps["store"] = store
+    logger.info(f"SDK processing: {store=} apps:{apps.shape[0]} start")
+    for _id, row in apps.iterrows():
+        store_id = row.store_id
+        version_str = None
+        crawl_result = 3
+        logger.info(f"SDK processing: {store_id=} start")
+        try:
+            if store == 1:
+                details_df, crawl_result, version_str, raw_txt_str = process_manifest(
+                    row=row
+                )
+            elif store == 2:
+                details_df, crawl_result, version_str, raw_txt_str = process_plist(
+                    row=row
+                )
+            else:
+                raise ValueError(f"Invalid store: {store}")
+            time.sleep(1)
+        except Exception:
+            logger.exception(f"Manifest for {store_id} failed")
+        version_code_dbid = get_version_code_dbid(
+            store_app=row.store_app,
+            version_code=version_str,
+            database_connection=database_connection,
+        )
+        if version_code_dbid is None:
+            raise ValueError(f"Version code dbid is None for {store_id=}")
+        if details_df is None or details_df.empty:
+            details_df = pd.DataFrame(
+                {
+                    "store_app": row.store_app,
+                    "version_code_id": version_code_dbid,
+                    "scan_result": crawl_result,
+                }
+            )
+        else:
+            details_df["store_app"] = row.store_app
+            details_df["version_code_id"] = version_code_dbid
+            details_df["scan_result"] = crawl_result
+
+        version_code_df = details_df[
+            ["version_code_id", "scan_result"]
+        ].drop_duplicates()
+
+        version_code_df.to_sql(
+            "version_code_sdk_scan_results",
+            database_connection.engine,
+            if_exists="append",
+            index=False,
+        )
+        if crawl_result == 1:
+            upsert_details_df(
+                details_df=details_df,
+                database_connection=database_connection,
+                store_id=store_id,
+                raw_txt_str=raw_txt_str,
+            )
+        else:
+            logger.info(f"{store_id=} crawl_result {crawl_result=} skipping upsert")
+
+        remove_tmp_files(store_id=store_id)

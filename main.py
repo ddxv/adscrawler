@@ -10,12 +10,11 @@ from adscrawler.app_stores.scrape_stores import (
 )
 from adscrawler.config import get_logger
 from adscrawler.dbcon.connection import PostgresCon, get_db_connection
-from adscrawler.packages.apks.manifest import process_sdks
 from adscrawler.packages.apks.waydroid import (
     manual_waydroid_process,
     process_apks_for_waydroid,
 )
-from adscrawler.packages.process_files import download_apps
+from adscrawler.packages.process_files import download_apps, process_sdks
 from adscrawler.scrape import crawl_app_ads
 from adscrawler.tools.geo import update_geo_dbs
 
@@ -269,7 +268,7 @@ class ProcessManager:
             self.download_apks(stores)
 
         if self.args.process_sdks:
-            self.process_sdks()
+            self.process_sdks(stores)
 
         if self.args.waydroid:
             self.waydroid_mitm()
@@ -323,8 +322,15 @@ class ProcessManager:
             except Exception:
                 logger.exception("Android download apks failing")
 
-    def process_sdks(self) -> None:
-        process_sdks(database_connection=self.pgcon, number_of_apps_to_pull=20)
+    def process_sdks(self, stores: list[int]) -> None:
+        if 1 in stores:
+            process_sdks(
+                store=1, database_connection=self.pgcon, number_of_apps_to_pull=20
+            )
+        if 2 in stores:
+            process_sdks(
+                store=2, database_connection=self.pgcon, number_of_apps_to_pull=20
+            )
 
     def waydroid_mitm(self) -> None:
         update_geo_dbs(redownload=self.args.redownload_geo_dbs)

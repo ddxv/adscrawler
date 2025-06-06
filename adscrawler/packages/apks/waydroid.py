@@ -33,8 +33,8 @@ from adscrawler.packages.storage import download_to_local
 from adscrawler.packages.utils import (
     get_md5_hash,
     get_version,
-    unzip_apk,
     remove_tmp_files,
+    unzip_apk,
 )
 
 logger = get_logger(__name__, "waydroid")
@@ -760,7 +760,7 @@ def manual_waydroid_process(
     try:
         apk_path = get_local_file_path(store_id)
     except FileNotFoundError:
-        apk_path = download_to_local(store=1, store_id=store_id)
+        apk_path, _version_str = download_to_local(store=1, store_id=store_id)
     if not apk_path or not apk_path.exists():
         raise FileNotFoundError(f"{store_id=} not found")
     store_app = query_store_app_by_store_id(database_connection, store_id)
@@ -786,7 +786,7 @@ def process_apks_for_waydroid(
         store_id = row.store_id
         store_app = row.store_app
         try:
-            apk_path = download_to_local(store=1, store_id=store_id)
+            apk_path, _version_str = download_to_local(store=1, store_id=store_id)
             if not apk_path:
                 raise FileNotFoundError(f"APK file not found for {store_id=}")
         except FileNotFoundError:
