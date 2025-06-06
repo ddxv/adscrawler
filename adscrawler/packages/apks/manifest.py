@@ -213,6 +213,7 @@ def process_sdks(
         store=store,
         limit=number_of_apps_to_pull,
     )
+    apps["store"] = store
     logger.info(f"Start APK processing: {apps.shape=}")
     for _id, row in apps.iterrows():
         store_id = row.store_id

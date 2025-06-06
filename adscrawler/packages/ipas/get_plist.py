@@ -88,7 +88,7 @@ def get_parsed_plist(
             logger.info(f"Found plist.Info at: {plist_info_path}")
             ipa_filename = pathlib.Path(plist_info_path)
     if ipa_filename is None:
-        raise FileNotFoundError
+        raise FileNotFoundError(f"No Info.plist found in {tmp_decoded_output_path}")
     # Load the XML file
     with ipa_filename.open("rb") as f:
         plist_bytes = f.read()
