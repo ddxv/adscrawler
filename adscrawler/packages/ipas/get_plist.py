@@ -30,7 +30,7 @@ def unpack_and_attach(
     unpacked_columns = unpacked.columns
     duplicated_columns = [x for x in unpacked_columns if x in df.columns]
     if len(duplicated_columns) > 0:
-        logger.warning(f"{info} contains {duplicated_columns=}")
+        logger.debug(f"{info} contains {duplicated_columns=}")
     combined = pd.concat([df.drop(column_to_unpack, axis=1), unpacked], axis=1)
     combined_shape = combined.shape
     rows = combined_shape[0] - original_shape[0]
@@ -54,6 +54,9 @@ def get_macho_info(app_dir: pathlib.Path) -> pd.DataFrame:
         logger.info("Successfully captured macho info")
     except (subprocess.CalledProcessError, json.JSONDecodeError) as e:
         logger.error(f"Failed to get macho info: {e}")
+        return pd.DataFrame()
+    except FileNotFoundError as e:
+        logger.warning(f"ipsw not installed. Macho not found. to get macho info: {e}")
         return pd.DataFrame()
 
     df = pd.json_normalize(macho_info["loads"])
@@ -108,6 +111,7 @@ def get_parsed_plist(
     paths_df = pd.concat([frameworks_df, bundles_df, special_files_df, macho_df])
     df = pd.concat([ddf, paths_df])
     df["tag"] = ""
+    df.rename(columns={"value": "value_name"}, inplace=True)
     return version, plist_str, df
 
 
