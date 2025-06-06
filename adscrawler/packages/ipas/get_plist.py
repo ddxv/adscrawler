@@ -107,6 +107,7 @@ def get_parsed_plist(
     macho_df = get_macho_info(app_dir=app_dir)
     paths_df = pd.concat([frameworks_df, bundles_df, special_files_df, macho_df])
     df = pd.concat([ddf, paths_df])
+    df["tag"] = ""
     return version, plist_str, df
 
 
