@@ -11,7 +11,6 @@ import pandas as pd
 
 from adscrawler.config import (
     ANDROID_SDK,
-    APK_TMP_UNZIPPED_DIR,
     APKS_DIR,
     PACKAGE_DIR,
     WAYDROID_INTERNAL_EMULATED_DIR,
@@ -31,7 +30,12 @@ from adscrawler.dbcon.queries import (
 from adscrawler.packages.apks import mitm_process_log
 from adscrawler.packages.apks.weston import restart_weston, start_weston
 from adscrawler.packages.storage import download_to_local
-from adscrawler.packages.utils import get_md5_hash, get_version, unzip_apk
+from adscrawler.packages.utils import (
+    get_md5_hash,
+    get_version,
+    unzip_apk,
+    remove_tmp_files,
+)
 
 logger = get_logger(__name__, "waydroid")
 
@@ -122,7 +126,7 @@ def run_app(
     crawl_result = 3
     version_code_id = None
     logger.info(f"{function_info} clearing mitmdump")
-    mitm_script = pathlib.Path(PACKAGE_DIR, "adscrawler/apks/mitm_start.sh")
+    mitm_script = pathlib.Path(PACKAGE_DIR, "adscrawler/packages/apks/mitm_start.sh")
     os.system(f"{mitm_script.as_posix()} -d")
     mdf = pd.DataFrame()
 
@@ -351,8 +355,12 @@ def check_wayland_display() -> bool:
     return display_is_set and xdg_dir_is_set
 
 
-def cleanup_xapk_splits(store_id: str) -> None:
-    for path in [WAYDROID_MEDIA_DIR, XAPKS_TMP_UNZIP_DIR, APK_TMP_UNZIPPED_DIR]:
+def cleanup_waydroid_apk_files(store_id: str) -> None:
+    """Cleanup waydroid apk files for a given store_id.
+    APKs are copied direclty to the media dir.
+    XAPKS have an additional unzip step in the tmp folder.
+    """
+    for path in [WAYDROID_MEDIA_DIR, XAPKS_TMP_UNZIP_DIR]:
         app_path = pathlib.Path(path, store_id)
         try:
             subprocess.run(
@@ -476,7 +484,7 @@ def launch_and_track_app(
     timeout: int = 60,
 ) -> int | None:
     function_info = f"waydroid {store_id=} launch and track"
-    mitm_script = pathlib.Path(PACKAGE_DIR, "adscrawler/apks/mitm_start.sh")
+    mitm_script = pathlib.Path(PACKAGE_DIR, "adscrawler/packages/apks/mitm_start.sh")
 
     install_app(store_id, apk_path)
 
@@ -521,7 +529,7 @@ def remove_app(store_id: str) -> None:
     try:
         os.system(f'sudo waydroid shell am force-stop "{store_id}"')
         os.system(f'waydroid app remove "{store_id}"')
-        cleanup_xapk_splits(store_id)
+        cleanup_waydroid_apk_files(store_id)
         logger.info(f"{function_info} success")
     except Exception as e:
         logger.exception(f"{function_info} failed: {e}")
@@ -791,4 +799,5 @@ def process_apks_for_waydroid(
             store_app=store_app,
             run_name="regular",
         )
+        remove_tmp_files(store_id=store_id)
     remove_all_third_party_apps()
