@@ -17,6 +17,7 @@ from adscrawler.config import (
     XAPKS_DIR,
     XAPKS_INCOMING_DIR,
     XAPKS_ISSUES_DIR,
+    XAPKS_TMP_UNZIP_DIR,
     get_logger,
 )
 
@@ -217,7 +218,12 @@ def empty_folder(pth: pathlib.Path) -> None:
 
 
 def remove_tmp_files(store_id: str) -> None:
-    paths = [APK_TMP_PARTIALS_DIR, APK_TMP_UNZIPPED_DIR]
+    paths = [
+        APK_TMP_PARTIALS_DIR,
+        APK_TMP_UNZIPPED_DIR,
+        XAPKS_TMP_UNZIP_DIR,
+        IPAS_TMP_UNZIPPED_DIR,
+    ]
     for path in paths:
         app_path = pathlib.Path(path, store_id)
         if app_path.exists():

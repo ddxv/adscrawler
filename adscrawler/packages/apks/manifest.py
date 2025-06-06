@@ -196,8 +196,6 @@ def process_manifest(database_connection: PostgresCon, row: pd.Series) -> None:
     else:
         logger.info(f"{store_id=} crawl_result {crawl_result=} skipping upsert")
 
-    remove_tmp_files(store_id=store_id)
-
 
 def process_sdks(
     database_connection: PostgresCon, number_of_apps_to_pull: int = 20
@@ -217,10 +215,10 @@ def process_sdks(
     logger.info(f"Start APK processing: {apps.shape=}")
     for _id, row in apps.iterrows():
         store_id = row.store_id
-        print(f"Processing {store_id=}")
-
+        logger.info(f"Processing {store_id=}")
         try:
             process_manifest(database_connection=database_connection, row=row)
             time.sleep(1)
         except Exception:
             logger.exception(f"Manifest for {store_id} failed")
+        remove_tmp_files(store_id=store_id)
