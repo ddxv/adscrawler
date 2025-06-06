@@ -311,7 +311,7 @@ class ProcessManager:
         if 2 in stores:
             try:
                 download_apps(
-                    store=2, database_connection=self.pgcon, number_of_apps_to_pull=20
+                    store=2, database_connection=self.pgcon, number_of_apps_to_pull=50
                 )
             except Exception:
                 logger.exception("iTunes scrape plist failing")
