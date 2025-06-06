@@ -110,7 +110,12 @@ def get_downloaded_files(extension: str) -> list[str]:
         raise ValueError(f"Invalid extension: {extension}")
     files = []
     for file in pathlib.Path(main_dir).glob(f"*.{extension}"):
-        files.append(file.stem)
+        file_name = file.stem
+        # Check if the file has a 32-character MD5 hash at the end
+        if len(file_name) > 33 and file_name[-33] == "_" and file_name[-32:].isalnum():
+            # Remove the hash and any preceding underscore
+            file_name = file_name[:-33]  # Remove hash and underscore
+        files.append(file_name)
     return files
 
 
@@ -119,6 +124,8 @@ def move_local_files_to_s3() -> None:
 
     This is for occasional MANUAL PROCESSING.
     """
+    import numpy as np
+
     apks = get_downloaded_files(extension="apk")
     xapks = get_downloaded_files(extension="xapk")
     ipas = get_downloaded_files(extension="ipa")
@@ -128,7 +135,35 @@ def move_local_files_to_s3() -> None:
         + [{"file_type": "xapk", "package_name": xapk} for xapk in xapks]
         + [{"file_type": "ipa", "package_name": ipa} for ipa in ipas]
     )
-    df = pd.DataFrame(files)
+    fdf = pd.DataFrame(files)
+
+    fdf["store"] = np.where(fdf["file_type"] == "ipa", 2, 1)
+
+    s3_client = get_s3_client()
+    missing_files = pd.DataFrame()
+    failed_files = pd.DataFrame()
+    for _, row in fdf.iterrows():
+        logger.info(f"{_}/{fdf.shape[0]}")
+        df = pd.DataFrame()
+        try:
+            df = get_store_id_s3_keys(store=row["store"], store_id=row["package_name"])
+        except Exception:
+            logger.exception(f"Failed to get {row['package_name']} s3 keys")
+            failed_files = pd.concat([failed_files, row])
+            continue
+        if df.empty:
+            logger.info(f"Not in S3: {row['package_name']}")
+            missing_files = pd.concat([missing_files, row])
+            continue
+        elif df[~(df["version_code"] == "failed")].empty:
+            logger.info(f"One Failed version_code found for {row['package_name']}")
+            failed_files = pd.concat([failed_files, row])
+            continue
+        else:
+            continue
+
+    logger.info(f"Missing files: {missing_files.shape[0]}")
+    logger.info(f"Failed files: {failed_files.shape[0]}")
 
     for _, row in df.iterrows():
         logger.info(f"Processing {row['package_name']}")
