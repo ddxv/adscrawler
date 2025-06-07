@@ -317,11 +317,12 @@ def download_s3_app_by_key(
 
 
 def download_to_local(store: int, store_id: str) -> pathlib.Path | None:
+    version_str = None
     file_path = get_local_file_path(store, store_id)
     if file_path:
         logger.info(f"{store_id=} already downloaded")
         return file_path
-    file_path = download_app_by_store_id(store=store, store_id=store_id)
+    file_path, version_str = download_app_by_store_id(store=store, store_id=store_id)
     if file_path is None:
         raise FileNotFoundError(f"{store_id=} no file found: {file_path=}")
-    return file_path
+    return file_path, version_str
