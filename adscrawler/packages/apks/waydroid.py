@@ -31,6 +31,7 @@ from adscrawler.packages.apks import mitm_process_log
 from adscrawler.packages.apks.weston import restart_weston, start_weston
 from adscrawler.packages.storage import download_to_local
 from adscrawler.packages.utils import (
+    get_local_file_path,
     get_md5_hash,
     get_version,
     remove_tmp_files,
@@ -742,14 +743,6 @@ def start_session() -> subprocess.Popen:
     return waydroid_process
 
 
-def get_local_file_path(store_id: str) -> pathlib.Path:
-    for extension in ["apk", "xapk"]:
-        apk_path = pathlib.Path(APKS_DIR, f"{store_id}.{extension}")
-        if apk_path.exists():
-            return apk_path
-    raise FileNotFoundError(f"{store_id=} not found")
-
-
 def manual_waydroid_process(
     database_connection: PostgresCon,
     store_id: str,
@@ -757,10 +750,11 @@ def manual_waydroid_process(
     run_name: str,
 ) -> None:
     logger.info(f"Manual waydroid process for {store_id=}")
+    store = 1
     try:
-        apk_path = get_local_file_path(store_id)
+        apk_path = get_local_file_path(store, store_id)
     except FileNotFoundError:
-        apk_path, _version_str = download_to_local(store=1, store_id=store_id)
+        apk_path, _version_str = download_to_local(store=store, store_id=store_id)
     if not apk_path or not apk_path.exists():
         raise FileNotFoundError(f"{store_id=} not found")
     store_app = query_store_app_by_store_id(database_connection, store_id)
