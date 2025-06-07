@@ -35,9 +35,7 @@ def manage_ipa_download(
     ipatool_auth()
     error_count = 0
     crawl_result = 4
-    # details_df = row.to_frame().T
     version_str = FAILED_VERSION_STR
-    _plist_str = ""
     md5_hash = None
     downloaded_file_path = None
 
