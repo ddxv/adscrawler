@@ -136,6 +136,7 @@ def run_app(
     function_info = f"run_app {store_id=}"
     crawl_result = 3
     version_code_id = None
+    version_str = None
     logger.info(f"{function_info} clearing mitmdump")
     mitm_script = pathlib.Path(PACKAGE_DIR, "adscrawler/packages/apks/mitm_start.sh")
     os.system(f"{mitm_script.as_posix()} -d")
@@ -182,6 +183,11 @@ def run_app(
     if version_code_id is None:
         logger.error(
             f"{function_info} failed: No version code id with {mdf.shape[0]} api calls"
+        )
+        return
+    if version_str is None:
+        logger.error(
+            f"{function_info} failed: No version str with {mdf.shape[0]} api calls"
         )
         return
 
