@@ -7,6 +7,7 @@ import pandas as pd
 from psycopg import Connection
 from psycopg.sql import SQL, Composed, Identifier
 from sqlalchemy import text
+from sqlalchemy.sql.elements import TextClause
 
 from adscrawler.config import SQL_DIR, get_logger
 from adscrawler.dbcon.connection import PostgresCon
@@ -14,7 +15,7 @@ from adscrawler.dbcon.connection import PostgresCon
 logger = get_logger(__name__)
 
 
-def load_sql_file(file_name: str) -> str:
+def load_sql_file(file_name: str) -> TextClause:
     """Load local SQL file based on file name."""
     file_path = pathlib.Path(SQL_DIR, file_name)
     with file_path.open() as file:
@@ -323,6 +324,31 @@ def log_version_code_scan_crawl_results(
         index=False,
     )
     logger.info(f"logged: {store_app=} {md5_hash=} {crawl_result=} {version_code_id=}")
+
+
+def query_latest_api_scan_by_store_id(
+    store_ids: list[str], database_connection: PostgresCon
+) -> pd.DataFrame:
+    store_ids_str = "'" + "','".join(store_ids) + "'"
+    sel_query = text(f"""WITH last_successful_scanned AS (
+            SELECT DISTINCT ON
+            (vc.store_app) vc.version_code, vc.store_app, vasr.id as run_id
+            FROM
+                version_code_api_scan_results AS vasr
+            LEFT JOIN version_codes AS vc
+                ON vasr.version_code_id = vc.id
+            WHERE
+                vc.updated_at >= '2025-04-20'
+            ORDER BY vc.store_app ASC, vasr.run_at DESC
+            )
+            SELECT lss.*, sa.store_id FROM last_successful_scanned lss
+            left join store_apps sa
+                on lss.store_app = sa.id
+            where sa.store_id IN ({store_ids_str})
+            ;
+    """)
+    df = pd.read_sql(sel_query, database_connection.engine)
+    return df
 
 
 def upsert_details_df(

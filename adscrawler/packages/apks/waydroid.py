@@ -12,6 +12,7 @@ import pandas as pd
 from adscrawler.config import (
     ANDROID_SDK,
     APKS_DIR,
+    MITM_DIR,
     PACKAGE_DIR,
     WAYDROID_INTERNAL_EMULATED_DIR,
     WAYDROID_MEDIA_DIR,
@@ -29,7 +30,7 @@ from adscrawler.dbcon.queries import (
 )
 from adscrawler.packages.apks import mitm_process_log
 from adscrawler.packages.apks.weston import restart_weston, start_weston
-from adscrawler.packages.storage import download_to_local
+from adscrawler.packages.storage import download_to_local, upload_mitm_log_to_s3
 from adscrawler.packages.utils import (
     get_local_file_path,
     get_md5_hash,
@@ -47,6 +48,8 @@ ANDROID_PERMISSION_ACTIVITY = (
 
 def insert_api_calls(
     version_code_id: int,
+    store_id: str,
+    version_str: str,
     database_connection: PostgresCon,
     crawl_result: int,
     run_name: str,
@@ -70,7 +73,8 @@ def insert_api_calls(
         return_rows=True,
     )
     if not mdf.empty:
-        mdf["run_id"] = run_df["id"].to_numpy()[0]
+        run_id = run_df["id"].to_numpy()[0]
+        mdf["run_id"] = run_id
         insert_columns = [
             "store_app",
             "tld_url",
@@ -93,6 +97,12 @@ def insert_api_calls(
             table_name="store_app_api_calls",
             database_connection=database_connection,
             insert_columns=insert_columns,
+        )
+        upload_mitm_log_to_s3(
+            store=1,
+            store_id=store_id,
+            version_str=version_str,
+            run_id=run_id,
         )
         logger.info(f"inserted {mdf.shape[0]} api calls")
 
@@ -150,7 +160,7 @@ def run_app(
         logger.exception(f"{function_info} launch_and_track_app failed")
     if version_code_id is None:
         try:
-            version_code_id = get_version_via_apktool(
+            version_str, version_code_id = get_version_via_apktool(
                 store_id, apk_path, store_app, database_connection
             )
         except Exception:
@@ -177,11 +187,14 @@ def run_app(
 
     insert_api_calls(
         version_code_id=version_code_id,
+        store_id=store_id,
+        version_str=version_str,
         database_connection=database_connection,
         crawl_result=crawl_result,
         run_name=run_name,
         mdf=mdf,
     )
+
     logger.info(f"{function_info} success: {mdf.shape[0]} api calls saved to db")
 
 
@@ -190,12 +203,12 @@ def get_version_via_apktool(
     apk_path: pathlib.Path,
     store_app: int,
     database_connection: PostgresCon,
-) -> int | None:
+) -> tuple[str, int | None]:
     apk_tmp_decoded_output_path = unzip_apk(store_id, apk_path)
     apktool_info_path = pathlib.Path(apk_tmp_decoded_output_path, "apktool.yml")
     version_str = get_version(apktool_info_path)
     version_code_id = get_version_code_dbid(store_app, version_str, database_connection)
-    return version_code_id
+    return version_str, version_code_id
 
 
 def process_mitm_log(
@@ -492,7 +505,7 @@ def launch_and_track_app(
     logger.info(
         f"{function_info} starting mitmdump with script {mitm_script.as_posix()}"
     )
-    mitm_logfile = pathlib.Path(PACKAGE_DIR, f"mitmlogs/traffic_{store_id}.log")
+    mitm_logfile = pathlib.Path(MITM_DIR, f"traffic_{store_id}.log")
     mitm_process = subprocess.Popen(
         [f"{mitm_script.as_posix()}", "-w", "-s", mitm_logfile.as_posix()],
         stdout=subprocess.PIPE,

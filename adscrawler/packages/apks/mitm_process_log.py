@@ -6,7 +6,7 @@ import tldextract
 from mitmproxy import http
 from mitmproxy.io import FlowReader
 
-from adscrawler.config import PACKAGE_DIR, get_logger
+from adscrawler.config import MITM_DIR, get_logger
 from adscrawler.dbcon.connection import PostgresCon
 from adscrawler.dbcon.queries import query_countries
 from adscrawler.tools.geo import get_geo
@@ -16,9 +16,8 @@ logger = get_logger(__name__)
 
 def parse_mitm_log(store_id: str, database_connection: PostgresCon) -> pd.DataFrame:
     # Define the log file path
-    mitmlog_dir = pathlib.Path(PACKAGE_DIR, "mitmlogs")
     flows_file = f"traffic_{store_id}.log"
-    mitmlog_file = pathlib.Path(mitmlog_dir, flows_file)
+    mitmlog_file = pathlib.Path(MITM_DIR, flows_file)
 
     if not mitmlog_file.exists():
         logger.error(f"mitm log file not found at {mitmlog_file}")

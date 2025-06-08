@@ -10,10 +10,12 @@ from adscrawler.config import (
     CONFIG,
     IPAS_DIR,
     IPAS_INCOMING_DIR,
+    MITM_DIR,
     XAPKS_DIR,
     XAPKS_INCOMING_DIR,
     get_logger,
 )
+from adscrawler.dbcon.postgres import PostgresCon
 from adscrawler.packages.utils import (
     get_local_file_path,
     get_md5_hash,
@@ -64,6 +66,42 @@ def get_s3_client() -> boto3.client:
     )
 
 
+def upload_mitm_log_to_s3(
+    store: int,
+    store_id: str,
+    version_str: str,
+    run_id: int,
+) -> None:
+    """Upload apk to s3."""
+    file_path = pathlib.Path(MITM_DIR, f"traffic_{store_id}.log")
+    if not file_path.exists():
+        logger.error(f"mitm log file not found at {file_path}")
+        raise FileNotFoundError
+    app_prefix = f"{store_id}/{version_str}/{run_id}.log"
+    if store == 1:
+        s3_key = f"mitm/android/{app_prefix}"
+    elif store == 2:
+        s3_key = f"mitm/ios/{app_prefix}"
+    else:
+        raise ValueError(f"Invalid store: {store}")
+    metadata = {
+        "store_id": store_id,
+        "version_code": version_str,
+        "run_id": str(run_id),
+    }
+    s3_client = get_s3_client()
+    response = s3_client.put_object(
+        Bucket="adscrawler",
+        Key=s3_key,
+        Body=file_path.read_bytes(),
+        Metadata=metadata,
+    )
+    if response["ResponseMetadata"]["HTTPStatusCode"] == 200:
+        logger.info(f"Uploaded {store_id} mitm log to S3")
+    else:
+        logger.error(f"Failed to upload {store_id} mitm log to S3")
+
+
 def upload_apk_to_s3(
     store: int,
     store_id: str,
@@ -98,7 +136,7 @@ def upload_apk_to_s3(
         logger.error(f"Failed to upload {store_id} to S3")
 
 
-def get_downloaded_files(extension: str) -> list[str]:
+def get_downloaded_apk_files(extension: str) -> list[str]:
     """Get all downloaded files of a given extension."""
     if extension == "apk":
         main_dir = APKS_DIR
@@ -119,16 +157,72 @@ def get_downloaded_files(extension: str) -> list[str]:
     return files
 
 
-def move_local_files_to_s3() -> None:
-    """Upload all local files to s3.
+def get_downloaded_mitm_files(database_connection: PostgresCon) -> pd.DataFrame:
+    """Get all downloaded files of a given extension."""
+    from adscrawler.dbcon.queries import query_latest_api_scan_by_store_id
+
+    main_dir = pathlib.Path("/home/adscrawler/adscrawler/mitmlogs/")
+
+    store_ids = []
+    for file in pathlib.Path(main_dir).glob("traffic_*.log"):
+        file_name = file.stem
+        store_id = file_name[8:]
+        store_ids.append(store_id)
+
+    missing_files = []
+    df = query_latest_api_scan_by_store_id(store_ids, database_connection)
+    missing_files = [x for x in store_ids if x not in df["store_id"].to_list()]
+
+    logger.info(f"Uploadable: {df.shape[0]} missing: {len(missing_files)}")
+    return df
+
+
+def move_local_mitm_files_to_s3(database_connection: PostgresCon) -> None:
+    """Upload all local mitm files to s3.
+
+    This is for occasional MANUAL PROCESSING.
+    """
+
+    df = get_downloaded_mitm_files(database_connection)
+
+    df = df.rename(columns={"version_code": "version_str"})
+
+    s3_client = get_s3_client()
+    for _, row in df.iterrows():
+        logger.info(f"{_}/{df.shape[0]}")
+        store_id = row.store_id
+        run_id = row.run_id
+        version_str = row.version_str
+        file_path = pathlib.Path(MITM_DIR, f"traffic_{store_id}.log")
+        s3_key = f"mitm/android/{store_id}/{version_str}/{run_id}.log"
+        metadata = {
+            "store_id": store_id,
+            "version_code": version_str,
+            "run_id": str(run_id),
+        }
+        response = s3_client.put_object(
+            Bucket="adscrawler",
+            Key=s3_key,
+            Body=file_path.read_bytes(),
+            Metadata=metadata,
+        )
+        if response["ResponseMetadata"]["HTTPStatusCode"] == 200:
+            pass
+        else:
+            logger.error(f"Failed to upload {store_id} to S3")
+        os.system(f"mv {file_path} /home/adscrawler/completed-mitm-logs/{store_id}.log")
+
+
+def move_local_apk_files_to_s3() -> None:
+    """Upload all local apk/ipa/xapk files to s3.
 
     This is for occasional MANUAL PROCESSING.
     """
     import numpy as np
 
-    apks = get_downloaded_files(extension="apk")
-    xapks = get_downloaded_files(extension="xapk")
-    ipas = get_downloaded_files(extension="ipa")
+    apks = get_downloaded_apk_files(extension="apk")
+    xapks = get_downloaded_apk_files(extension="xapk")
+    ipas = get_downloaded_apk_files(extension="ipa")
 
     files = (
         [{"file_type": "apk", "package_name": apk} for apk in apks]
@@ -249,7 +343,7 @@ def get_store_id_s3_keys(store: int, store_id: str) -> pd.DataFrame:
     return df
 
 
-def download_app_by_store_id(store: int, store_id: str) -> pathlib.Path:
+def download_app_by_store_id(store: int, store_id: str) -> tuple[pathlib.Path, str]:
     func_info = "download_app_by_store_id "
     df = get_store_id_s3_keys(store, store_id)
     if df.empty:
@@ -260,7 +354,7 @@ def download_app_by_store_id(store: int, store_id: str) -> pathlib.Path:
         logger.error(f"{store_id=} S3 only has failed apk, no version_code")
     df = df.sort_values(by="version_code", ascending=False)
     key = df["key"].to_numpy()[0]
-    version_str = df["version_code"].to_numpy()[0]
+    version_str: str = df["version_code"].to_numpy()[0]
     filename = key.split("/")[-1]
     extension = filename.split(".")[-1]
     if extension == "apk":
@@ -316,7 +410,7 @@ def download_s3_app_by_key(
     return final_path
 
 
-def download_to_local(store: int, store_id: str) -> pathlib.Path | None:
+def download_to_local(store: int, store_id: str) -> tuple[pathlib.Path, str]:
     version_str = None
     file_path = get_local_file_path(store, store_id)
     if file_path:

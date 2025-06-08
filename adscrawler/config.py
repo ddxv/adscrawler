@@ -19,6 +19,8 @@ SQL_DIR = pathlib.Path(MODULE_DIR, pathlib.Path("dbcon/sql"))
 
 GEO_DATA_DIR = pathlib.Path(CONFIG_DIR, pathlib.Path("geo-data"))
 
+MITM_DIR = pathlib.Path(PACKAGE_DIR, pathlib.Path("mitmlogs"))
+
 # APK File dirs
 APP_FILES_DIR = pathlib.Path(HOME, "apk-files")
 
@@ -92,6 +94,7 @@ def check_dirs() -> None:
         TMP_DIR,
         INCOMING_DIR,
         APKS_DIR,
+        MITM_DIR,
         APK_TMP_PARTIALS_DIR,
         APK_TMP_UNZIPPED_DIR,
         XAPKS_TMP_UNZIP_DIR,
