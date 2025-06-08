@@ -15,7 +15,7 @@ from adscrawler.config import (
     XAPKS_INCOMING_DIR,
     get_logger,
 )
-from adscrawler.dbcon.postgres import PostgresCon
+from adscrawler.dbcon.connection import PostgresCon
 from adscrawler.packages.utils import (
     get_local_file_path,
     get_md5_hash,
