@@ -143,7 +143,7 @@ def run_app(
     mdf = pd.DataFrame()
 
     try:
-        version_code_id = launch_and_track_app(
+        version_str, version_code_id = launch_and_track_app(
             store_id,
             store_app,
             database_connection,
@@ -469,9 +469,9 @@ def prep_xapk_splits(store_id: str, xapk_path: pathlib.Path) -> str:
     return split_install_command
 
 
-def get_installed_version_code(
+def get_installed_version_str(
     store_id: str, store_app: int, database_connection: PostgresCon
-) -> int | None:
+) -> tuple[str | None, int | None]:
     package_info = subprocess.run(
         ["sudo", "waydroid", "shell", "dumpsys", "package", store_id],
         capture_output=True,
@@ -484,16 +484,17 @@ def get_installed_version_code(
 
     match = re.search(r"versionCode=(\d+)", version_info)
     version_code_id = None
+    version_str = None
     if match:
-        version_code = match.group(1)
-        logger.info(f"found versionCode: {version_code}")
+        version_str = match.group(1)
+        logger.info(f"found versionCode: {version_str}")
         version_code_id = get_version_code_dbid(
-            store_app, version_code, database_connection
+            store_app, version_str, database_connection
         )
 
     if version_code_id is None:
         logger.error(f"No version code id found for {store_id=}")
-    return version_code_id
+    return version_str, version_code_id
 
 
 def launch_and_track_app(
@@ -502,7 +503,7 @@ def launch_and_track_app(
     database_connection: PostgresCon,
     apk_path: pathlib.Path,
     timeout: int = 60,
-) -> int | None:
+) -> tuple[str, int]:
     function_info = f"waydroid {store_id=} launch and track"
     mitm_script = pathlib.Path(PACKAGE_DIR, "adscrawler/packages/apks/mitm_start.sh")
 
@@ -533,14 +534,14 @@ def launch_and_track_app(
     time.sleep(timeout)
     logger.info(f"{function_info} stopping app & mitmdump")
     os.system(f"{mitm_script.as_posix()} -d")
-    version_code_id = get_installed_version_code(
+    version_str, version_code_id = get_installed_version_str(
         store_id, store_app, database_connection
     )
     remove_app(store_id)
     if version_code_id is None:
         raise Exception(f"{function_info} failed to get version code")
     logger.info(f"{function_info} {version_code_id=} success")
-    return version_code_id
+    return version_str, version_code_id
 
 
 def remove_app(store_id: str) -> None:
