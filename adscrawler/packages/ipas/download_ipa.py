@@ -46,7 +46,7 @@ def manage_ipa_download(
             r = lookupby_id(app_id=store_id)
             bundle_id: str = r["bundleId"]
             downloaded_file_path = external_download(
-                bundle_id=bundle_id, do_redownload=False
+                store_id=store_id, bundle_id=bundle_id, do_redownload=False
             )
         tmp_decoded_output_path = unzip_ipa(
             ipa_path=downloaded_file_path, store_id=store_id
@@ -93,8 +93,10 @@ def ipatool_auth() -> None:
     logger.info(f"ipatool auth result: {result}")
 
 
-def external_download(bundle_id: str, do_redownload: bool = False) -> pathlib.Path:
-    filepath = pathlib.Path(IPAS_INCOMING_DIR, f"{bundle_id}.ipa")
+def external_download(
+    store_id: str, bundle_id: str, do_redownload: bool = False
+) -> pathlib.Path:
+    filepath = pathlib.Path(IPAS_INCOMING_DIR, f"{store_id}.ipa")
     exists = filepath.exists()
     if exists:
         if not do_redownload:
