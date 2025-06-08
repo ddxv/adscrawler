@@ -35,7 +35,6 @@ def download_apps(
     store: int, database_connection: PostgresCon, number_of_apps_to_pull: int = 20
 ) -> None:
     total_errors = 0
-    last_error_count = 0
     apps = query_apps_to_download(
         database_connection=database_connection,
         store=store,
@@ -80,14 +79,6 @@ def download_apps(
             )
             existing_file_path = download_s3_app_by_key(s3_key=s3_key)
 
-        if last_error_count > 0:
-            sleep_time = total_errors * total_errors * 10
-            logger.info(f"Sleeping for {sleep_time} seconds due to {total_errors=}")
-            time.sleep(sleep_time)
-        if total_errors > 11:
-            logger.error(f"Too many errors: {total_errors=} breaking loop")
-            break
-
         try:
             if store == 1:
                 download_result = manage_apk_download(
@@ -122,20 +113,33 @@ def download_apps(
                     download_result.downloaded_file_path,
                 )
                 move_downloaded_app_to_main_dir(download_result.downloaded_file_path)
-            if not existing_file_path:
-                total_errors += download_result.error_count
-                if download_result.error_count == 0:
-                    sleep_time = total_errors + 30
-                    logger.info(f"Sleeping for default time: {sleep_time}")
-                    time.sleep(sleep_time)
         except Exception:
             logger.exception(f"Download for {store_id} failed")
 
         remove_tmp_files(store_id=store_id)
-        last_error_count = download_result.error_count
         logger.info(
             f"{store_id=} finished with errors={download_result.error_count} {total_errors=}"
         )
+
+        # Handle sleep & errors
+        if download_result.error_count == 0:
+            if existing_file_path:
+                pass
+            else:
+                if total_errors > 0:
+                    total_errors -= 1
+                sleep_time = total_errors + 30
+                logger.info(f"Sleeping for default time: {sleep_time}")
+                time.sleep(sleep_time)
+        elif download_result.error_count > 0:
+            total_errors += download_result.error_count
+            sleep_time = total_errors * total_errors * 10
+            logger.info(f"Sleeping for {sleep_time} seconds due to {total_errors=}")
+            time.sleep(sleep_time)
+        if total_errors > 11:
+            logger.error(f"Too many errors: {total_errors=} breaking loop")
+            break
+
     logger.info("Finished downloading APKs")
 
 
