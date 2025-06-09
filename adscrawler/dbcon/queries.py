@@ -736,14 +736,41 @@ def query_apps_to_download(
 def query_apps_to_sdk_scan(
     database_connection: PostgresCon,
     store: int,
-    limit: int = 25,
 ) -> pd.DataFrame:
     df = pd.read_sql(
         QUERY_APPS_TO_SDK_SCAN,
         con=database_connection.engine,
-        params={"store": store, "mylimit": limit},
+        params={"store": store},
     )
     return df
+
+
+def query_all_apps_to_process(
+    database_connection: PostgresCon,
+) -> None:
+    download_df = query_apps_to_download(
+        database_connection=database_connection, store=1
+    )
+    sdk_df = query_apps_to_sdk_scan(database_connection=database_connection, store=1)
+    api_df = query_apps_to_api_scan(database_connection=database_connection, store=1)
+
+    ipa_download_df = query_apps_to_download(
+        database_connection=database_connection, store=2
+    )
+    ipa_sdk_df = query_apps_to_sdk_scan(
+        database_connection=database_connection, store=2
+    )
+
+    android_downloads = download_df.shape[0]
+    android_sdks = sdk_df.shape[0]
+    android_apis = api_df.shape[0]
+
+    ipa_downloads = ipa_download_df.shape[0]
+    ipa_sdks = ipa_sdk_df.shape[0]
+
+    logger.info(f"Android: {android_downloads} -> {android_sdks} -> {android_apis}")
+    logger.info(f"iOS: {ipa_downloads} -> {ipa_sdks}")
+    return
 
 
 def query_apps_to_api_scan(

@@ -17,7 +17,12 @@ APKMIRROR_BASE_URL = "https://www.apkmirror.com"
 APKMIRROR_BASE_SEARCH = f"{APKMIRROR_BASE_URL}/?post_type=app_release&searchtype=apk&s="
 
 USER_AGENT = {
-    "User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:133.0) Gecko/20100101 Firefox/133.0"
+    "User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:139.0) Gecko/20100101 Firefox/139.0",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.5",
+    "Accept-Encoding": "gzip, deflate, br",
+    "Connection": "keep-alive",
+    "Upgrade-Insecure-Requests": "1",
 }
 
 SLEEP_PAUSES = 5
@@ -121,7 +126,7 @@ def get_direct_download_link(
 def get_download_url(store_id: str) -> str:
     scraper = cloudscraper.create_scraper()
 
-    results = search(scraper, store_id)
+    results = search(scraper, query=store_id)
     if len(results) > 0:
         app_details_link = results[0]["link"]
         logger.info(f"found app details link: {results[0]}")

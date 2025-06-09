@@ -14,7 +14,11 @@ from adscrawler.packages.apks.waydroid import (
     manual_waydroid_process,
     process_apks_for_waydroid,
 )
-from adscrawler.packages.process_files import download_apps, process_sdks
+from adscrawler.packages.process_files import (
+    download_apps,
+    manual_download_app,
+    process_sdks,
+)
 from adscrawler.scrape import crawl_app_ads
 from adscrawler.tools.geo import update_geo_dbs
 
@@ -307,6 +311,14 @@ class ProcessManager:
         crawl_app_ads(self.pgcon, limit=limit)
 
     def download_apks(self, stores: list[int]) -> None:
+        if self.args.store_id:
+            # For manually processing a single app
+            manual_download_app(
+                database_connection=self.pgcon,
+                store_id=self.args.store_id,
+                store=1,
+            )
+            return
         if 2 in stores:
             try:
                 download_apps(

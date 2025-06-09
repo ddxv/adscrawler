@@ -170,5 +170,4 @@ SELECT
     last_scanned_at,
     last_scuccess_scanned_at
 FROM
-    scheduled_apps_crawl
-LIMIT :mylimit;
+    scheduled_apps_crawl;

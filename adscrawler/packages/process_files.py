@@ -13,7 +13,10 @@ from adscrawler.dbcon.queries import (
     query_apps_to_sdk_scan,
     upsert_details_df,
 )
-from adscrawler.packages.apks.download_apk import manage_apk_download
+from adscrawler.packages.apks.download_apk import (
+    manage_apk_download,
+    manual_process_download,
+)
 from adscrawler.packages.apks.manifest import process_manifest
 from adscrawler.packages.ipas.download_ipa import manage_ipa_download
 from adscrawler.packages.ipas.get_plist import process_plist
@@ -29,6 +32,23 @@ from adscrawler.packages.utils import (
 )
 
 logger = get_logger(__name__)
+
+
+def manual_download_app(
+    database_connection: PostgresCon,
+    store_id: str,
+    store: int,
+) -> None:
+    if store == 1:
+        manual_process_download(
+            database_connection=database_connection,
+            store_id=store_id,
+            store=store,
+        )
+    elif store == 2:
+        raise NotImplementedError("Manual download of ipa is not implemented")
+    else:
+        raise ValueError(f"Invalid store: {store}")
 
 
 def download_apps(
@@ -154,10 +174,12 @@ def process_sdks(
     apps = query_apps_to_sdk_scan(
         database_connection=database_connection,
         store=store,
-        limit=number_of_apps_to_pull,
     )
     apps["store"] = store
-    logger.info(f"SDK processing: {store=} apps:{apps.shape[0]} start")
+    logger.info(
+        f"SDK processing: {store=} total apps:{apps.shape[0]} top {number_of_apps_to_pull} start"
+    )
+    apps = apps.head(number_of_apps_to_pull)
     for _id, row in apps.iterrows():
         store_id = row.store_id
         version_str = None

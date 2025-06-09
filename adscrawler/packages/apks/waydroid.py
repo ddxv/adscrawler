@@ -790,7 +790,7 @@ def manual_waydroid_process(
 
 
 def process_apks_for_waydroid(
-    database_connection: PostgresCon, num_apps: int = 10
+    database_connection: PostgresCon, num_apps: int = 20
 ) -> None:
     apps_df = query_apps_to_api_scan(database_connection=database_connection, store=1)
     logger.info(f"Waydroid has {apps_df.shape[0]} apps to process, starting {num_apps}")

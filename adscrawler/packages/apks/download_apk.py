@@ -29,7 +29,7 @@ from adscrawler.packages.utils import (
     unzip_apk,
 )
 
-APK_SOURCES = ["apkmirror", "apkpure"]
+APK_SOURCES = ["apkpure", "apkmirror"]
 
 
 logger = get_logger(__name__, "download_apk")
