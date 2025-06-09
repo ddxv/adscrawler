@@ -16,7 +16,6 @@ logger = get_logger(__name__)
 
 def parse_mitm_log(store_id: str, database_connection: PostgresCon) -> pd.DataFrame:
     # Define the log file path
-    store_id = "com.xgame.trafficmoto"
     flows_file = f"traffic_{store_id}.log"
     mitmlog_file = pathlib.Path(MITM_DIR, flows_file)
 
@@ -64,9 +63,10 @@ def parse_mitm_log(store_id: str, database_connection: PostgresCon) -> pd.DataFr
                             request_data["content"] = flow.request.get_text()
                         except Exception:
                             # If text extraction fails, store raw content length
-                            request_data["content"] = (
-                                f"[Binary content: {len(flow.request.content)} bytes]"
-                            )
+                            # request_data["content"] = (
+                            #     f"[Binary content: {len(flow.request.content)} bytes]"
+                            # )
+                            pass
 
                         # Add response info if available
                         if flow.response:
@@ -90,7 +90,6 @@ def parse_mitm_log(store_id: str, database_connection: PostgresCon) -> pd.DataFr
                         requests.append(request_data)
                     except Exception as e:
                         logger.exception(f"Error parsing flow: {e}")
-                        break
                         continue
     except Exception as e:
         logger.exception(e)
