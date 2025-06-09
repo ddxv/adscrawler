@@ -771,12 +771,18 @@ def manual_waydroid_process(
 ) -> None:
     logger.info(f"Manual waydroid process for {store_id=}")
     store = 1
+    download_from_s3 = False
     try:
         apk_path = get_local_file_path(store, store_id)
+        if apk_path is None:
+            download_from_s3 = True
     except FileNotFoundError:
+        download_from_s3 = True
+    if download_from_s3:
         apk_path, _version_str = download_to_local(store=store, store_id=store_id)
     if not apk_path or not apk_path.exists():
         raise FileNotFoundError(f"{store_id=} not found")
+
     store_app = query_store_app_by_store_id(database_connection, store_id)
     process_app_for_waydroid(
         database_connection=database_connection,
