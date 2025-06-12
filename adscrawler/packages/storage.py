@@ -66,6 +66,17 @@ def get_s3_client() -> boto3.client:
     )
 
 
+def download_mitm_log_from_s3(
+    store_id: str,
+) -> None:
+    s3_client = get_s3_client()
+    s3_client.download_file(
+        Bucket="adscrawler",
+        Key=f"mitm/android/{store_id}.log",
+        Filename=f"traffic_{store_id}.log",
+    )
+
+
 def upload_mitm_log_to_s3(
     store: int,
     store_id: str,
@@ -100,6 +111,38 @@ def upload_mitm_log_to_s3(
         logger.info(f"Uploaded {store_id} mitm log to S3")
     else:
         logger.error(f"Failed to upload {store_id} mitm log to S3")
+
+
+def upload_ad_creative_to_s3(
+    store: int,
+    adv_store_id: str,
+    file_path: pathlib.Path,
+    md5_hash: str,
+    extension: str,
+) -> None:
+    """Upload apk to s3."""
+    app_prefix = f"{adv_store_id}/{md5_hash}.{extension}"
+    if store == 1:
+        prefix = f"ad-creatives/android/{app_prefix}"
+    elif store == 2:
+        prefix = f"ad-creatives/ios/{app_prefix}"
+    else:
+        raise ValueError(f"Invalid store: {store}")
+    metadata = {
+        "store_id": adv_store_id,
+        "md5": md5_hash,
+    }
+    s3_client = get_s3_client()
+    response = s3_client.put_object(
+        Bucket="adscrawler",
+        Key=prefix,
+        Body=file_path.read_bytes(),
+        Metadata=metadata,
+    )
+    if response["ResponseMetadata"]["HTTPStatusCode"] == 200:
+        logger.info(f"Uploaded {adv_store_id} creative to S3")
+    else:
+        logger.error(f"Failed to upload {adv_store_id} creative to S3")
 
 
 def upload_apk_to_s3(
@@ -240,7 +283,9 @@ def move_local_apk_files_to_s3() -> None:
         logger.info(f"{_}/{fdf.shape[0]}")
         df = pd.DataFrame()
         try:
-            df = get_store_id_s3_keys(store=row["store"], store_id=row["package_name"])
+            df = get_store_id_apk_s3_keys(
+                store=row["store"], store_id=row["package_name"]
+            )
         except Exception:
             logger.exception(f"Failed to get {row['package_name']} s3 keys")
             failed_files = pd.concat([failed_files, row])
@@ -308,7 +353,76 @@ def move_local_apk_files_to_s3() -> None:
         )
 
 
-def get_store_id_s3_keys(store: int, store_id: str) -> pd.DataFrame:
+def get_app_creatives_s3_keys(store: int, store_id: str) -> pd.DataFrame:
+    if store == 1:
+        prefix = f"ad-creatives/android/{store_id}/"
+    elif store == 2:
+        prefix = f"ad-creatives/ios/{store_id}/"
+    else:
+        raise ValueError(f"Invalid store: {store}")
+    logger.info(f"Getting {store_id=} s3 keys start")
+    s3_client = get_s3_client()
+    response = s3_client.list_objects_v2(Bucket="adscrawler", Prefix=prefix)
+    objects_data = []
+    if response["KeyCount"] == 0:
+        logger.error(f"{store_id=} no creatives found in s3")
+        raise FileNotFoundError(f"{store_id=} no creatives found in s3")
+    for obj in response["Contents"]:
+        key_parts = obj["Key"].split("/")[-1].split(".")
+        md5_hash = key_parts[0]
+        extension = key_parts[1]
+        objects_data.append(
+            {
+                "key": obj["Key"],
+                "store_id": store_id,
+                "md5_hash": md5_hash,
+                "extension": extension,
+                "last_modified": obj["LastModified"],
+            }
+        )
+    df = pd.DataFrame(objects_data)
+    logger.info(f"Got {store_id=} s3 keys: {df.shape[0]}")
+    return df
+
+
+def get_store_id_mitm_s3_keys(store_id: str) -> pd.DataFrame:
+    store = 1
+    if store == 1:
+        prefix = f"mitm/android/{store_id}/"
+    elif store == 2:
+        prefix = f"apks/ios/{store_id}/"
+    else:
+        raise ValueError(f"Invalid store: {store}")
+    s3_client = get_s3_client()
+    response = s3_client.list_objects_v2(Bucket="adscrawler", Prefix=prefix)
+    objects_data = []
+    if response["KeyCount"] == 0:
+        logger.error(f"{store_id=} no mitm log found in s3")
+        raise FileNotFoundError(f"{store_id=} no mitm log found in s3")
+    for obj in response["Contents"]:
+        key = obj["Key"]
+        key_parts = key.split("/")
+        if len(key_parts) >= 4:
+            version_code = key_parts[3]
+        else:
+            version_code = "unknown"
+        run_id = key.split("/")[-1].replace(".log", "")
+        objects_data.append(
+            {
+                "key": key,
+                "store_id": store_id,
+                "run_id": run_id,
+                "version_code": version_code,
+                "size": obj["Size"],
+                "last_modified": obj["LastModified"],
+            }
+        )
+    df = pd.DataFrame(objects_data)
+    logger.info(f"Found {store_id=} s3 keys: {df.shape[0]}")
+    return df
+
+
+def get_store_id_apk_s3_keys(store: int, store_id: str) -> pd.DataFrame:
     if store == 1:
         prefix = f"apks/android/{store_id}/"
     elif store == 2:
@@ -343,9 +457,35 @@ def get_store_id_s3_keys(store: int, store_id: str) -> pd.DataFrame:
     return df
 
 
+def download_mitm_log_by_store_id(store_id: str) -> pathlib.Path:
+    func_info = "download_mitm_log_by_store_id "
+    df = get_store_id_mitm_s3_keys(store_id)
+    if df.empty:
+        logger.error(f"{store_id=} no apk found in s3")
+        raise FileNotFoundError(f"{store_id=} no apk found in s3")
+    df["run_id"] = df["run_id"].astype(int)
+    df = df.sort_values(by="run_id").tail(1)
+    key = df["key"].to_numpy()[0]
+    run_id = df["run_id"].to_numpy()[0]
+    filename = f"{store_id}_{run_id}.log"
+    downloaded_file_path = pathlib.Path(MITM_DIR, filename)
+    logger.info(f"{func_info} {key=} to local start")
+    s3_client = get_s3_client()
+    with open(downloaded_file_path, "wb") as f:
+        s3_client.download_fileobj(
+            Bucket="adscrawler",
+            Key=key,
+            Fileobj=f,
+        )
+    if not downloaded_file_path.exists():
+        raise FileNotFoundError(f"{downloaded_file_path=} after download not found")
+    logger.info(f"{func_info} to local finished")
+    return downloaded_file_path
+
+
 def download_app_by_store_id(store: int, store_id: str) -> tuple[pathlib.Path, str]:
     func_info = "download_app_by_store_id "
-    df = get_store_id_s3_keys(store, store_id)
+    df = get_store_id_apk_s3_keys(store, store_id)
     if df.empty:
         logger.error(f"{store_id=} no apk found in s3")
         raise FileNotFoundError(f"{store_id=} no apk found in s3")

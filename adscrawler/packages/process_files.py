@@ -22,7 +22,7 @@ from adscrawler.packages.ipas.download_ipa import manage_ipa_download
 from adscrawler.packages.ipas.get_plist import process_plist
 from adscrawler.packages.storage import (
     download_s3_app_by_key,
-    get_store_id_s3_keys,
+    get_store_id_apk_s3_keys,
     upload_apk_to_s3,
 )
 from adscrawler.packages.utils import (
@@ -68,7 +68,7 @@ def download_apps(
         existing_file_path = None
         is_already_in_s3 = False
         try:
-            s3df = get_store_id_s3_keys(store=store, store_id=store_id)
+            s3df = get_store_id_apk_s3_keys(store=store, store_id=store_id)
             if not s3df.empty:
                 s3df = s3df[
                     s3df["version_code"].notna() & ~(s3df["version_code"] == "failed")

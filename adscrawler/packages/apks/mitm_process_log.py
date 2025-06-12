@@ -1,5 +1,6 @@
 import datetime
 import pathlib
+import shutil
 
 import pandas as pd
 import tldextract
@@ -12,6 +13,17 @@ from adscrawler.dbcon.queries import query_countries
 from adscrawler.tools.geo import get_geo
 
 logger = get_logger(__name__)
+
+
+def move_mitm_to_processed(store_id: str, run_id: int) -> None:
+    flows_file = f"traffic_{store_id}.log"
+    final_flows_file = f"{store_id}_{run_id}.log"
+    mitmlog_file = pathlib.Path(MITM_DIR, flows_file)
+    destination_path = pathlib.Path(MITM_DIR, final_flows_file)
+    if not mitmlog_file.exists():
+        logger.error(f"mitm log file not found at {mitmlog_file}")
+        raise FileNotFoundError
+    shutil.move(mitmlog_file, destination_path)
 
 
 def parse_mitm_log(store_id: str, database_connection: PostgresCon) -> pd.DataFrame:

@@ -800,6 +800,13 @@ def query_all_store_app_descriptions(
 
 
 @lru_cache(maxsize=1)
+def query_ad_domains(database_connection: PostgresCon) -> pd.DataFrame:
+    sel_query = """SELECT * FROM ad_domains;"""
+    df = pd.read_sql(sel_query, con=database_connection.engine)
+    return df
+
+
+@lru_cache(maxsize=1)
 def query_keywords_base(database_connection: PostgresCon) -> pd.DataFrame:
     sel_query = """SELECT
     k.keyword_text

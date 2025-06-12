@@ -232,3 +232,25 @@ CREATE TABLE logging.store_app_downloads (
         store_app
     ) REFERENCES public.store_apps (id)
 );
+
+-- Table to store unique creative assets
+CREATE TABLE creative_assets (
+    id serial PRIMARY KEY,
+    store_app_id integer NOT NULL REFERENCES store_apps (id),
+    md5_hash varchar NOT NULL,
+    extension varchar NOT NULL,
+    UNIQUE (store_app_id, md5_hash)
+);
+
+
+-- Table to track creative occurrences in API data
+CREATE TABLE creative_records (
+    id serial PRIMARY KEY,
+    creative_domain_id integer NOT NULL REFERENCES ad_domains (id),
+    creative_source_domain_id integer NOT NULL REFERENCES ad_domains (id),
+    run_id integer NOT NULL REFERENCES version_code_api_scan_results (id),
+    pub_id integer NOT NULL REFERENCES store_apps (id),
+    creative_asset_id integer NOT NULL REFERENCES creative_assets (id),
+    mmp_domain_id integer REFERENCES ad_domains (id),  -- Nullable
+    updated_at timestamp with time zone DEFAULT NOW()
+);

@@ -54,7 +54,7 @@ def insert_api_calls(
     crawl_result: int,
     run_name: str,
     mdf: pd.DataFrame,
-) -> None:
+) -> int:
     logger.info(f"insert_crawled_at {crawl_result=}")
     insert_columns = ["version_code_id", "run_name", "run_result", "run_at"]
     df = pd.DataFrame(
@@ -104,6 +104,8 @@ def insert_api_calls(
             version_str=version_str,
             run_id=run_id,
         )
+        mitm_process_log.move_mitm_to_processed(store_id, run_id)
+
         logger.info(f"inserted {mdf.shape[0]} api calls")
 
 
