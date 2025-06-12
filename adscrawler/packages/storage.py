@@ -46,6 +46,9 @@ def start_tunnel(server_name: str) -> str:
 
 
 def get_s3_client() -> boto3.client:
+    global S3_CLIENT
+    if S3_CLIENT is not None:
+        return S3_CLIENT
     server_name = "loki"
     """Create and return an S3 client."""
     if CONFIG["loki"]["host"].startswith("192.168"):
@@ -57,13 +60,14 @@ def get_s3_client() -> boto3.client:
         host = "http://127.0.0.1"
         db_port = start_tunnel(server_name)
     session = boto3.session.Session()
-    return session.client(
+    S3_CLIENT = session.client(
         "s3",
         region_name="garage",
         endpoint_url=f"{host}:{db_port}",
         aws_access_key_id=CONFIG["cloud"]["access_key_id"],
         aws_secret_access_key=CONFIG["cloud"]["secret_key"],
     )
+    return S3_CLIENT
 
 
 def download_mitm_log_from_s3(
@@ -393,6 +397,7 @@ def get_store_id_mitm_s3_keys(store_id: str) -> pd.DataFrame:
         prefix = f"apks/ios/{store_id}/"
     else:
         raise ValueError(f"Invalid store: {store}")
+    logger.info(f"Getting {store_id=} s3 keys start")
     s3_client = get_s3_client()
     response = s3_client.list_objects_v2(Bucket="adscrawler", Prefix=prefix)
     objects_data = []
@@ -564,3 +569,6 @@ def download_to_local(store: int, store_id: str) -> tuple[pathlib.Path, str]:
     if file_path is None:
         raise FileNotFoundError(f"{store_id=} no file found: {file_path=}")
     return file_path, version_str
+
+
+S3_CLIENT = None

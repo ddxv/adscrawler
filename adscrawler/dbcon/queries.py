@@ -302,6 +302,30 @@ def log_download_crawl_results(
     )
 
 
+def log_creative_scan_results(
+    df: pd.DataFrame, database_connection: PostgresCon
+) -> None:
+    insert_columns = [
+        "url",
+        "tld_url",
+        "path",
+        "content_type",
+        "run_id",
+        "pub_store_id",
+        "file_extension",
+        "creative_size",
+        "error_msg",
+    ]
+    df = df[insert_columns]
+    df.to_sql(
+        name="creative_scan_results",
+        schema="logging",
+        con=database_connection.engine,
+        if_exists="append",
+        index=False,
+    )
+
+
 def log_version_code_scan_crawl_results(
     store_app: int,
     md5_hash: str,

@@ -8,14 +8,17 @@ import re
 import urllib
 
 import pandas as pd
+import protod
 import tldextract
 from bs4 import BeautifulSoup
 from mitmproxy import http
 from mitmproxy.io import FlowReader
+from protod import Renderer
 
 from adscrawler.config import CREATIVES_DIR, MITM_DIR, get_logger
 from adscrawler.dbcon.connection import PostgresCon
 from adscrawler.dbcon.queries import (
+    log_creative_scan_results,
     query_ad_domains,
     query_apps_to_creative_scan,
     query_store_app_by_store_id,
@@ -32,7 +35,7 @@ from adscrawler.packages.storage import (
 logger = get_logger(__name__, "mitm_scrape_ads")
 
 
-IGNORE_IDS = ["privacy"]
+IGNORE_CREATIVE_IDS = ["privacy", "google_play_icon_grey_2022", "favicon"]
 
 
 @dataclasses.dataclass
@@ -252,6 +255,101 @@ def google_extract_ad_urls(
     }
 
 
+def parse_mtg_ad(sent_video_dict: dict) -> AdInfo:
+    ad_network_tld = "mtgglobals.com"
+    mmp_url = None
+    ad_response_text = sent_video_dict["response_text"]
+    ad_response = json.loads(ad_response_text)
+    adv_store_id = ad_response["data"]["ads"][0]["package_name"]
+    ad_info = AdInfo(
+        adv_store_id=adv_store_id,
+        ad_network_tld=ad_network_tld,
+        mmp_url=mmp_url,
+    )
+    return ad_info
+
+
+class JsonRenderer(Renderer):
+    def __init__(self):
+        self.result = dict()
+        self.current = self.result
+
+    def _add(self, id, item):
+        self.current[id] = item
+
+    def _build_tmp_item(self, chunk):
+        # use a temporary renderer to build
+        jr = JsonRenderer()
+        chunk.render(jr)
+        tmp_dict = jr.build_result()
+
+        # the tmp_dict only contains 1 item
+        for _, item in tmp_dict.items():
+            return item
+
+    def build_result(self):
+        return self.result
+
+    def render_repeated_fields(self, repeated):
+        arr = []
+        for ch in repeated.items:
+            arr.append(self._build_tmp_item(ch))
+        self._add(repeated.idtype.id, arr)
+
+    def render_varint(self, varint):
+        self._add(varint.idtype.id, varint.i64)
+
+    def render_fixed(self, fixed):
+        self._add(fixed.idtype.id, fixed.i)
+
+    def render_struct(self, struct):
+        curr = None
+
+        if struct.as_fields:
+            curr = {}
+            for ch in struct.as_fields:
+                curr[ch.idtype.id] = self._build_tmp_item(ch)
+        elif struct.is_str:
+            curr = struct.as_str
+
+        else:
+            curr = " ".join(format(x, "02x") for x in struct.view)
+
+        self._add(struct.idtype.id, curr)
+
+
+# return (
+#   decoded bytes: bytes
+#   encoding name: str
+#   decoding succeeded: bool
+# )
+def decode_utf8(view) -> tuple[bytes, str, bool]:
+    view_bytes = view.tobytes()
+    try:
+        utf8 = "UTF-8"
+        decoded = view_bytes.decode(utf8)
+        return decoded, utf8, True
+    except Exception:
+        return view_bytes, "", False
+
+
+def parse_everestop_ad(sent_video_dict: dict) -> AdInfo:
+    ret = protod.dump(
+        sent_video_dict["response_content"],
+        renderer=JsonRenderer(),
+        str_decoder=decode_utf8,
+    )
+    adv_store_id = ret[5][6][3][13][2][3]
+    ad_network_tld = ret[5][6][3][13][2][2]
+    mmp_url = None
+    ad_info = AdInfo(
+        adv_store_id=adv_store_id,
+        ad_network_tld=ad_network_tld,
+        mmp_url=mmp_url,
+    )
+    return ad_info
+
+
 def parse_unity_ad(sent_video_dict: dict) -> AdInfo:
     ad_network_tld = "unity3d.com"
     mmp_url = None
@@ -281,13 +379,10 @@ def parse_unity_ad(sent_video_dict: dict) -> AdInfo:
 
 
 def parse_google_ad(
-    sent_video_dict: dict, video_id: str, database_connection: PostgresCon
+    ad_html: dict, video_id: str, database_connection: PostgresCon
 ) -> AdInfo:
-    google_response = json.loads(sent_video_dict["response_text"])
-    g_ad_network_name = google_response["ad_networks"][0]["ad_source_name"]
-    ad_html = google_response["ad_networks"][0]["ad"]["ad_html"]
-    with open(f"{g_ad_network_name}_{video_id}.html", "w") as f:
-        f.write(ad_html)
+    # with open(f"google_ad_{video_id}.html", "w") as f:
+    #     f.write(ad_html)
     urls = google_extract_ad_urls(ad_html, database_connection)
     try:
         adv_store_id = urls["adv_store_id"]
@@ -320,64 +415,94 @@ def get_creatives(
 ) -> pd.DataFrame:
     if "status_code" not in df.columns:
         logger.error("No status code found in df, skipping")
-        return pd.DataFrame()
+        return pd.DataFrame(), pd.DataFrame()
+    df["file_extension"] = df["url"].apply(lambda x: x.split(".")[-1])
     status_code_200 = df["status_code"] == 200
+    response_content_not_na = df["response_content"].notna()
     is_creative_content = df["response_content_type"].str.contains(
         "image|video|webm|mp4|jpeg|jpg|png|gif|webp", regex=True
     )
-    creatives_df = df[is_creative_content & status_code_200].copy()
+    is_right_ext_len = df["file_extension"].str.len() < 7
+    creatives_df = df[
+        response_content_not_na
+        & is_creative_content
+        & status_code_200
+        & is_right_ext_len
+    ].copy()
     creatives_df["creative_size"] = creatives_df["response_content"].apply(
-        lambda x: len(x)
+        lambda x: len(x) if isinstance(x, bytes) else 0
     )
-    creatives_df = creatives_df[creatives_df["creative_size"] > 10000]
-    creatives_df["file_extension"] = creatives_df["url"].apply(
-        lambda x: x.split(".")[-1]
-    )
+    creatives_df = creatives_df[creatives_df["creative_size"] > 50000]
     i = 0
     adv_creatives = []
+    unmatched_creatives = []
     row_count = creatives_df.shape[0]
     for _i, row in creatives_df.iterrows():
         i += 1
-        video_id = row["url"].split("/")[-1].split(".")[0]
+        video_id = ".".join(row["url"].split("/")[-1].split(".")[:-1])
         if row["tld_url"] == "unity3dusercontent.com":
             # this isn't the video name, but the id of the content as the name is the quality
             video_id = row["url"].split("/")[-2]
         file_extension = row["file_extension"]
-        if video_id in IGNORE_IDS:
+        if video_id in IGNORE_CREATIVE_IDS:
             logger.info(f"Ignoring video {video_id}.{file_extension}")
             continue
-        sent_video_dict = get_first_sent_video_df(creatives_df, row, video_id)
+        sent_video_dict = get_first_sent_video_df(df, row, video_id)
         if sent_video_dict is None:
             logger.error(f"No video source found for {row['tld_url']} {video_id}")
+            unmatched_creatives.append(row)
             continue
-        if "doubleclick.net" in sent_video_dict["tld_url"]:
-            ad_info = parse_google_ad(sent_video_dict, video_id, database_connection)
+        if "everestop.io" in sent_video_dict["tld_url"]:
+            ad_info = parse_everestop_ad(sent_video_dict)
+        elif "doubleclick.net" in sent_video_dict["tld_url"]:
+            if sent_video_dict["response_text"] is None:
+                logger.error(f"No response text for {row['tld_url']} {video_id}")
+                row["error_msg"] = "No response text"
+                unmatched_creatives.append(row)
+                continue
+            response_text = sent_video_dict["response_text"]
+            try:
+                google_response = json.loads(response_text)
+                ad_html = google_response["ad_networks"][0]["ad"]["ad_html"]
+            except json.JSONDecodeError:
+                logger.error(f"Error parsing response text for {video_id}")
+                row["error_msg"] = "Error parsing response text"
+                unmatched_creatives.append(row)
+                continue
+            ad_info = parse_google_ad(ad_html, video_id, database_connection)
         elif "unityads.unity3d.com" in sent_video_dict["tld_url"]:
             ad_info = parse_unity_ad(sent_video_dict)
+        elif "mtgglobals.com" in sent_video_dict["tld_url"]:
+            ad_info = parse_mtg_ad(sent_video_dict)
         else:
+            error_msg = f"Not a recognized ad network: {sent_video_dict['tld_url']}"
             logger.error(
                 f"Not a recognized ad network: {sent_video_dict['tld_url']} for video {video_id[0:10]}"
             )
+            row["error_msg"] = error_msg
+            unmatched_creatives.append(row)
             continue
         if ad_info.adv_store_id is None:
             ad_info.adv_store_id = "unknown"
         if ad_info.adv_store_id == pub_store_id:
+            error_msg = "Incorrect adv_store_id, identified pub ID as adv ID"
             logger.error(
                 f"Incorrect adv_store_id, identified pub ID as adv ID for video {video_id[0:10]}"
             )
+            row["error_msg"] = error_msg
+            unmatched_creatives.append(row)
             continue
         local_path = pathlib.Path(CREATIVES_DIR, ad_info.adv_store_id)
         local_path.mkdir(parents=True, exist_ok=True)
         md5_hash = hashlib.md5(row["response_content"]).hexdigest()
         local_path = local_path / f"{md5_hash}.{file_extension}"
-        # if file_extension == "mp4":
-        #     if not check_mp4_with_pyav(row["response_content"]):
-        #         logger.error(f"Invalid MP4 file: {local_path}")
-        #         continue
         with open(local_path, "wb") as creative_file:
             creative_file.write(row["response_content"])
         if ad_info.adv_store_id == "unknown":
+            error_msg = f"Unknown adv_store_id for {row['tld_url']}"
             logger.error(f"Unknown adv_store_id for {row['tld_url']} {video_id}")
+            row["error_msg"] = error_msg
+            unmatched_creatives.append(row)
             continue
         adv_db_id = query_store_app_by_store_id(
             store_id=ad_info.adv_store_id, database_connection=database_connection
@@ -400,21 +525,26 @@ def get_creatives(
                 "local_path": local_path,
             }
         )
-        logger.info(
+        logger.debug(
             f"{i}/{row_count}: {ad_info.ad_network_tld} adv={ad_info.adv_store_id} init_tld={init_tld}"
         )
     adv_creatives_df = pd.DataFrame(adv_creatives)
+    unmatched_creatives_df = pd.DataFrame(unmatched_creatives)
     if adv_creatives_df.empty:
-        logger.error(f"No creatives found for {pub_store_id}")
-        return pd.DataFrame()
-    return adv_creatives_df
+        msg = f"No matched for creatives {pub_store_id}, {len(unmatched_creatives)} unmatched"
+        logger.warning(msg)
+    return adv_creatives_df, unmatched_creatives_df
 
 
 def upload_creatives_to_s3(adv_creatives_df: pd.DataFrame) -> None:
     for adv_id, adv_creatives_df_adv in adv_creatives_df.groupby("adv_store_id"):
-        s3_keys = get_app_creatives_s3_keys(store=1, store_id=adv_id)
+        try:
+            s3_keys = get_app_creatives_s3_keys(store=1, store_id=adv_id)
+            s3_keys_md5_hashes = s3_keys["md5_hash"].to_numpy()
+        except FileNotFoundError:
+            s3_keys_md5_hashes = []
         for _i, row in adv_creatives_df_adv.iterrows():
-            if row["md5_hash"] in s3_keys["md5_hash"].to_numpy():
+            if row["md5_hash"] in s3_keys_md5_hashes:
                 logger.info(f"Creative {row['md5_hash']} already in S3")
                 continue
             upload_ad_creative_to_s3(
@@ -441,7 +571,7 @@ def get_latest_local_mitm(
                 mitm_log_path = mitm_log
     else:
         mitm_log_path = download_mitm_log_by_store_id(store_id)
-    logger.info(f"Using {mitm_log_path} for {store_id}")
+    logger.debug(f"Using {mitm_log_path} for {store_id}")
     run_id = mitm_log_path.as_posix().split("_")[-1].replace(".log", "")
     run_id = int(run_id)
     return mitm_log_path, run_id
@@ -499,16 +629,21 @@ def parse_store_id_mitm_log(
     run_id: int,
     mitm_log_path: pathlib.Path,
     database_connection: PostgresCon,
-) -> None:
+) -> pd.DataFrame:
     pub_db_id = query_store_app_by_store_id(
         store_id=pub_store_id, database_connection=database_connection
     )
     df = parse_mitm_log(mitm_log_path)
-    adv_creatives_df = get_creatives(df, pub_store_id, database_connection)
+    df["pub_store_app_id"] = pub_db_id
+    df["pub_store_id"] = pub_store_id
+    adv_creatives_df, unmatched_creatives_df = get_creatives(
+        df, pub_store_id, database_connection
+    )
     if adv_creatives_df.empty:
-        logger.error(f"No creatives found for {pub_store_id}")
-        return
-    adv_creatives_df["store_app_pub_id"] = pub_db_id
+        error_msg = "No creatives found"
+        logger.error(f"{error_msg} for {pub_store_id}")
+        return unmatched_creatives_df
+    # adv_creatives_df["store_app_pub_id"] = pub_db_id
     adv_creatives_df["run_id"] = run_id
     assets_df = adv_creatives_df[
         ["adv_store_app_id", "md5_hash", "file_extension"]
@@ -541,27 +676,79 @@ def parse_store_id_mitm_log(
         insert_columns=key_columns,
     )
     upload_creatives_to_s3(adv_creatives_df)
+    return unmatched_creatives_df
 
 
 def parse_all_runs_for_store_id(
     pub_store_id: str, database_connection: PostgresCon
-) -> None:
-    # mitm_log_path, run_id = get_latest_local_mitm(pub_store_id)
+) -> pd.DataFrame:
     mitms = get_store_id_mitm_s3_keys(store_id=pub_store_id)
+    all_failed_df = pd.DataFrame()
     for _i, mitm in mitms.iterrows():
         key = mitm["key"]
         run_id = mitm["run_id"]
         filename = f"{pub_store_id}_{run_id}.log"
-        mitm_log_path = download_mitm_log_by_key(key, filename)
-        parse_store_id_mitm_log(
+        if not pathlib.Path(MITM_DIR, filename).exists():
+            mitm_log_path = download_mitm_log_by_key(key, filename)
+        else:
+            mitm_log_path = pathlib.Path(MITM_DIR, filename)
+        unmatched_creatives_df = parse_store_id_mitm_log(
             pub_store_id, run_id, mitm_log_path, database_connection
         )
+        if unmatched_creatives_df.empty:
+            continue
+        mycols = [
+            x
+            for x in unmatched_creatives_df.columns
+            if x
+            in [
+                "url",
+                "tld_url",
+                "path",
+                "content_type",
+                "run_id",
+                "pub_store_id",
+                "file_extension",
+                "creative_size",
+                "error_msg",
+            ]
+        ]
+        unmatched_creatives_df = unmatched_creatives_df[mycols]
+        all_failed_df = pd.concat(
+            [all_failed_df, unmatched_creatives_df], ignore_index=True
+        )
+        log_creative_scan_results(unmatched_creatives_df, database_connection)
+    return all_failed_df
+
+
+def parse_specific_run_for_store_id(
+    pub_store_id: str, run_id: int, database_connection: PostgresCon
+) -> pd.DataFrame:
+    pub_store_id = "com.kawaii.craft.world"
+    run_id = 8697
+    mitm_log_path = pathlib.Path(MITM_DIR, f"{pub_store_id}_{run_id}.log")
+    if not mitm_log_path.exists():
+        key = f"mitm_logs/android/{pub_store_id}/{run_id}.log"
+        mitm_log_path = download_mitm_log_by_key(key, mitm_log_path)
+    return parse_store_id_mitm_log(
+        pub_store_id, run_id, mitm_log_path, database_connection
+    )
 
 
 def scan_all_apps(database_connection: PostgresCon) -> None:
     apps_to_scan = query_apps_to_creative_scan(database_connection=database_connection)
     apps_count = apps_to_scan.shape[0]
+    all_failed_df = pd.DataFrame()
     for i, app in apps_to_scan.iterrows():
         pub_store_id = app["store_id"]
         logger.info(f"{i}/{apps_count}: {pub_store_id} start")
-        parse_all_runs_for_store_id(pub_store_id, database_connection)
+        try:
+            app_failed_df = parse_all_runs_for_store_id(
+                pub_store_id, database_connection
+            )
+        except Exception as e:
+            logger.error(f"Error parsing {pub_store_id}: {e}")
+            continue
+        if not app_failed_df.empty:
+            all_failed_df = pd.concat([all_failed_df, app_failed_df], ignore_index=True)
+            logger.info(f"Saved {all_failed_df.shape[0]} failed creatives to csv")
