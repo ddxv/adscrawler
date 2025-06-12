@@ -29,27 +29,10 @@ from adscrawler.packages.storage import (
     upload_ad_creative_to_s3,
 )
 
-# import av
-# import io
-
-
 logger = get_logger(__name__, "mitm_scrape_ads")
 
 
 IGNORE_IDS = ["privacy"]
-
-# def check_mp4_with_pyav(content):
-#     # Is this really working?
-#     try:
-#         container = av.open(io.BytesIO(content))
-#         video_stream = next(s for s in container.streams if s.type == "video")
-#         for packet in container.demux(video_stream):
-#             for frame in packet.decode():
-#                 pass
-#         return True
-#     except av.AVError as e:
-#         print(f"AV error: {e}")
-#         return False
 
 
 @dataclasses.dataclass
@@ -124,7 +107,10 @@ def parse_mitm_log(
                             request_data["content"] = ""
                         # Add response info if available
                         if flow.response:
-                            request_data["status_code"] = flow.response.status_code
+                            try:
+                                request_data["status_code"] = flow.response.status_code
+                            except Exception:
+                                request_data["status_code"] = None
                             request_data["response_headers"] = dict(
                                 flow.response.headers
                             )
@@ -332,6 +318,9 @@ def get_creatives(
     pub_store_id: str,
     database_connection: PostgresCon,
 ) -> pd.DataFrame:
+    if "status_code" not in df.columns:
+        logger.error("No status code found in df, skipping")
+        return pd.DataFrame()
     status_code_200 = df["status_code"] == 200
     is_creative_content = df["response_content_type"].str.contains(
         "image|video|webm|mp4|jpeg|jpg|png|gif|webp", regex=True
@@ -558,12 +547,10 @@ def parse_all_runs_for_store_id(
     pub_store_id: str, database_connection: PostgresCon
 ) -> None:
     # mitm_log_path, run_id = get_latest_local_mitm(pub_store_id)
-    mitms = get_store_id_mitm_s3_keys(
-        store_id=pub_store_id, database_connection=database_connection
-    )
+    mitms = get_store_id_mitm_s3_keys(store_id=pub_store_id)
     for _i, mitm in mitms.iterrows():
-        key = mitm["key"].to_numpy()[0]
-        run_id = mitm["run_id"].to_numpy()[0]
+        key = mitm["key"]
+        run_id = mitm["run_id"]
         filename = f"{pub_store_id}_{run_id}.log"
         mitm_log_path = download_mitm_log_by_key(key, filename)
         parse_store_id_mitm_log(
@@ -573,6 +560,8 @@ def parse_all_runs_for_store_id(
 
 def scan_all_apps(database_connection: PostgresCon) -> None:
     apps_to_scan = query_apps_to_creative_scan(database_connection=database_connection)
-    for _i, app in apps_to_scan.iterrows():
+    apps_count = apps_to_scan.shape[0]
+    for i, app in apps_to_scan.iterrows():
         pub_store_id = app["store_id"]
+        logger.info(f"{i}/{apps_count}: {pub_store_id} start")
         parse_all_runs_for_store_id(pub_store_id, database_connection)

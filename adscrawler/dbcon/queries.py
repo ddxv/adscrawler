@@ -785,13 +785,10 @@ def query_apps_to_api_scan(
     return df
 
 
-def query_apps_to_creative_scan(
-    database_connection: PostgresCon, store: int
-) -> pd.DataFrame:
+def query_apps_to_creative_scan(database_connection: PostgresCon) -> pd.DataFrame:
     df = pd.read_sql(
         QUERY_APPS_TO_CREATIVE_SCAN,
         con=database_connection.engine,
-        params={"store": store},
     )
     return df
 

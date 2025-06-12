@@ -10,6 +10,7 @@ from adscrawler.app_stores.scrape_stores import (
 )
 from adscrawler.config import get_logger
 from adscrawler.dbcon.connection import PostgresCon, get_db_connection
+from adscrawler.packages.apks.mitm_scrape_ads import scan_all_apps
 from adscrawler.packages.apks.waydroid import (
     manual_waydroid_process,
     process_apks_for_waydroid,
@@ -106,6 +107,11 @@ class ProcessManager:
         )
         parser.add_argument(
             "--no-limits", help="Run queries without limits", action="store_true"
+        )
+        parser.add_argument(
+            "--creative-scan-all-apps",
+            help="Scan all apps for creatives",
+            action="store_true",
         )
 
         ### OPTIONS FOR MANUAL/LOCAL WAYDROID PROCESSING
@@ -277,6 +283,9 @@ class ProcessManager:
         if self.args.waydroid:
             self.waydroid_mitm()
 
+        if self.args.creative_scan_all_apps:
+            self.creative_scan_all_apps()
+
         if self.args.crawl_keywords:
             self.crawl_keywords()
 
@@ -343,6 +352,9 @@ class ProcessManager:
             process_sdks(
                 store=2, database_connection=self.pgcon, number_of_apps_to_pull=20
             )
+
+    def creative_scan_all_apps(self) -> None:
+        scan_all_apps(database_connection=self.pgcon)
 
     def waydroid_mitm(self) -> None:
         update_geo_dbs(redownload=self.args.redownload_geo_dbs)
