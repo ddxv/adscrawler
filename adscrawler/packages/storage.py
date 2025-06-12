@@ -468,8 +468,13 @@ def download_mitm_log_by_store_id(store_id: str) -> pathlib.Path:
     key = df["key"].to_numpy()[0]
     run_id = df["run_id"].to_numpy()[0]
     filename = f"{store_id}_{run_id}.log"
+    downloaded_file_path = download_mitm_log_by_key(key, filename)
+    logger.info(f"{func_info} to local finished")
+    return downloaded_file_path
+
+
+def download_mitm_log_by_key(key: str, filename: str) -> pathlib.Path:
     downloaded_file_path = pathlib.Path(MITM_DIR, filename)
-    logger.info(f"{func_info} {key=} to local start")
     s3_client = get_s3_client()
     with open(downloaded_file_path, "wb") as f:
         s3_client.download_fileobj(
@@ -479,7 +484,6 @@ def download_mitm_log_by_store_id(store_id: str) -> pathlib.Path:
         )
     if not downloaded_file_path.exists():
         raise FileNotFoundError(f"{downloaded_file_path=} after download not found")
-    logger.info(f"{func_info} to local finished")
     return downloaded_file_path
 
 

@@ -25,6 +25,7 @@ def load_sql_file(file_name: str) -> TextClause:
 QUERY_APPS_TO_DOWNLOAD = load_sql_file("query_apps_to_download.sql")
 QUERY_APPS_TO_SDK_SCAN = load_sql_file("query_apps_to_sdk_scan.sql")
 QUERY_APPS_TO_API_SCAN = load_sql_file("query_apps_to_api_scan.sql")
+QUERY_APPS_TO_CREATIVE_SCAN = load_sql_file("query_apps_to_creative_scan.sql")
 
 
 def insert_df(
@@ -778,6 +779,17 @@ def query_apps_to_api_scan(
 ) -> pd.DataFrame:
     df = pd.read_sql(
         QUERY_APPS_TO_API_SCAN,
+        con=database_connection.engine,
+        params={"store": store},
+    )
+    return df
+
+
+def query_apps_to_creative_scan(
+    database_connection: PostgresCon, store: int
+) -> pd.DataFrame:
+    df = pd.read_sql(
+        QUERY_APPS_TO_CREATIVE_SCAN,
         con=database_connection.engine,
         params={"store": store},
     )

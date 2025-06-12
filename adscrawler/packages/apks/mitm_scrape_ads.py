@@ -13,16 +13,19 @@ from bs4 import BeautifulSoup
 from mitmproxy import http
 from mitmproxy.io import FlowReader
 
-from adscrawler.config import MITM_DIR, get_logger
+from adscrawler.config import CREATIVES_DIR, MITM_DIR, get_logger
 from adscrawler.dbcon.connection import PostgresCon
 from adscrawler.dbcon.queries import (
     query_ad_domains,
+    query_apps_to_creative_scan,
     query_store_app_by_store_id,
     upsert_df,
 )
 from adscrawler.packages.storage import (
+    download_mitm_log_by_key,
     download_mitm_log_by_store_id,
     get_app_creatives_s3_keys,
+    get_store_id_mitm_s3_keys,
     upload_ad_creative_to_s3,
 )
 
@@ -32,7 +35,6 @@ from adscrawler.packages.storage import (
 
 logger = get_logger(__name__, "mitm_scrape_ads")
 
-VIDEO_OUTPUT_DIR = pathlib.Path("videos")
 
 IGNORE_IDS = ["privacy"]
 
@@ -67,7 +69,7 @@ class AdInfo:
         return None
 
 
-def get_log(
+def parse_mitm_log(
     mitm_log_path: pathlib.Path,
 ) -> pd.DataFrame:
     # Define the log file path
@@ -375,7 +377,7 @@ def get_creatives(
                 f"Incorrect adv_store_id, identified pub ID as adv ID for video {video_id[0:10]}"
             )
             continue
-        local_path = pathlib.Path(VIDEO_OUTPUT_DIR, ad_info.adv_store_id)
+        local_path = pathlib.Path(CREATIVES_DIR, ad_info.adv_store_id)
         local_path.mkdir(parents=True, exist_ok=True)
         md5_hash = hashlib.md5(row["response_content"]).hexdigest()
         local_path = local_path / f"{md5_hash}.{file_extension}"
@@ -504,13 +506,15 @@ def make_creative_records_df(
 
 
 def parse_store_id_mitm_log(
-    pub_store_id: str, database_connection: PostgresCon
+    pub_store_id: str,
+    run_id: int,
+    mitm_log_path: pathlib.Path,
+    database_connection: PostgresCon,
 ) -> None:
     pub_db_id = query_store_app_by_store_id(
         store_id=pub_store_id, database_connection=database_connection
     )
-    mitm_log_path, run_id = get_latest_local_mitm(pub_store_id)
-    df = get_log(mitm_log_path)
+    df = parse_mitm_log(mitm_log_path)
     adv_creatives_df = get_creatives(df, pub_store_id, database_connection)
     if adv_creatives_df.empty:
         logger.error(f"No creatives found for {pub_store_id}")
@@ -548,3 +552,27 @@ def parse_store_id_mitm_log(
         insert_columns=key_columns,
     )
     upload_creatives_to_s3(adv_creatives_df)
+
+
+def parse_all_runs_for_store_id(
+    pub_store_id: str, database_connection: PostgresCon
+) -> None:
+    # mitm_log_path, run_id = get_latest_local_mitm(pub_store_id)
+    mitms = get_store_id_mitm_s3_keys(
+        store_id=pub_store_id, database_connection=database_connection
+    )
+    for _i, mitm in mitms.iterrows():
+        key = mitm["key"].to_numpy()[0]
+        run_id = mitm["run_id"].to_numpy()[0]
+        filename = f"{pub_store_id}_{run_id}.log"
+        mitm_log_path = download_mitm_log_by_key(key, filename)
+        parse_store_id_mitm_log(
+            pub_store_id, run_id, mitm_log_path, database_connection
+        )
+
+
+def scan_all_apps(database_connection: PostgresCon) -> None:
+    apps_to_scan = query_apps_to_creative_scan(database_connection=database_connection)
+    for _i, app in apps_to_scan.iterrows():
+        pub_store_id = app["store_id"]
+        parse_all_runs_for_store_id(pub_store_id, database_connection)

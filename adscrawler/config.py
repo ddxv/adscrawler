@@ -20,6 +20,7 @@ SQL_DIR = pathlib.Path(MODULE_DIR, pathlib.Path("dbcon/sql"))
 GEO_DATA_DIR = pathlib.Path(CONFIG_DIR, pathlib.Path("geo-data"))
 
 MITM_DIR = pathlib.Path(PACKAGE_DIR, pathlib.Path("mitmlogs"))
+CREATIVES_DIR = pathlib.Path(PACKAGE_DIR, pathlib.Path("creatives"))
 
 # APK File dirs
 APP_FILES_DIR = pathlib.Path(HOME, "apk-files")
@@ -100,6 +101,7 @@ def check_dirs() -> None:
         XAPKS_TMP_UNZIP_DIR,
         IPAS_DIR,
         IPAS_TMP_UNZIPPED_DIR,
+        CREATIVES_DIR,
         XAPKS_DIR,
         XAPKS_ISSUES_DIR,
         APKS_ISSUES_DIR,
