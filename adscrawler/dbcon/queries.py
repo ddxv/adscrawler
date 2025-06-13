@@ -305,7 +305,7 @@ def log_download_crawl_results(
 def log_creative_scan_results(
     df: pd.DataFrame, database_connection: PostgresCon
 ) -> None:
-    insert_columns = [
+    my_columns = [
         "url",
         "tld_url",
         "path",
@@ -316,6 +316,7 @@ def log_creative_scan_results(
         "creative_size",
         "error_msg",
     ]
+    insert_columns = [x for x in my_columns if x in df.columns]
     df = df[insert_columns]
     df.to_sql(
         name="creative_scan_results",

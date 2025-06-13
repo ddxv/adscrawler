@@ -796,7 +796,7 @@ def parse_store_id_mitm_log(
         store_id=pub_store_id, database_connection=database_connection
     )
     df = parse_mitm_log(mitm_log_path)
-    df["pub_store_app_id"] = pub_db_id
+    df["store_app_pub_id"] = pub_db_id
     df["pub_store_id"] = pub_store_id
     adv_creatives_df, error_messages = get_creatives(
         df, pub_store_id, database_connection
