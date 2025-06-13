@@ -215,7 +215,7 @@ def extract_fyber_ad_urls(
     ad_response_text: str, database_connection: PostgresCon
 ) -> dict | None:
     """
-    Parses an HTML ad file to extract Google Play and AppsFlyer URLs
+    Parses an HTML ad file to extract Google Play
     from the VAST data embedded within it.
     Args:
         html_content (str): The HTML content of the ad.
@@ -224,7 +224,6 @@ def extract_fyber_ad_urls(
     """
     urls = parse_fyber_vast_xml(ad_response_text)
     google_play_url = None
-    google_tracking_url = None
     market_intent_url = None
     intent_url = None
     adv_store_id = None
@@ -238,13 +237,7 @@ def extract_fyber_ad_urls(
                 1
             ]
             mmp_url = url
-        elif "adjust.com" in url:
-            mmp_url = url
-        elif "abr.ge" in url:
-            mmp_url = url
-        elif "kochava.com" in url:
-            mmp_url = url
-        elif "singular.com" in url:
+        elif tld_url in MMP_TLDS:
             mmp_url = url
         elif "tpbid.com" in url:
             ad_network_url = url
@@ -283,7 +276,7 @@ def google_extract_ad_urls(
     ad_html: str, database_connection: PostgresCon
 ) -> dict | None:
     """
-    Parses an HTML ad file to extract Google Play and AppsFlyer URLs
+    Parses an HTML ad file to extract Google Play
     from the VAST data embedded within it.
     Args:
         html_content (str): The HTML content of the ad.
@@ -614,7 +607,8 @@ def get_creatives(
             continue
         sent_video_dict = get_first_sent_video_df(df, row, video_id)
         if sent_video_dict is None:
-            logger.error(f"No video source found for {row['tld_url']} {video_id}")
+            error_msg = f"No source bidrequest found for {row['tld_url']}"
+            logger.error(f"{error_msg} {video_id}")
             error_messages.append(row)
             continue
         if "vungle.com" in sent_video_dict["tld_url"]:
@@ -850,6 +844,13 @@ def parse_store_id_mitm_log(
             }
             error_messages.append(row)
         return error_messages
+    else:
+        msg = "Success found creatives!"
+        row = {
+            "run_id": run_id,
+            "pub_store_id": pub_store_id,
+            "error_msg": msg,
+        }
     adv_creatives_df["store_app_pub_id"] = pub_db_id
     adv_creatives_df["run_id"] = run_id
     assets_df = adv_creatives_df[
