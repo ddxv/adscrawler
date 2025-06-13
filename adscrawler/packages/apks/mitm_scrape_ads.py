@@ -565,10 +565,12 @@ def get_creatives(
 ) -> tuple[pd.DataFrame, list]:
     error_messages = []
     if "status_code" not in df.columns:
-        row = df[["run_id", "pub_store_id"]].drop_duplicates().T
+        run_id = df["run_id"].run_id.values[0]
+        pub_store_id = df["pub_store_id"].run_id.values[0]
         error_msg = "No status code found in df, skipping"
         logger.error(error_msg)
         row["error_msg"] = error_msg
+        row = {"run_id": run_id, "pub_store_id": pub_store_id, "error_msg": error_msg}
         error_messages.append(row)
         return pd.DataFrame(), error_messages
     df["file_extension"] = df["url"].apply(lambda x: x.split(".")[-1])
@@ -588,6 +590,15 @@ def get_creatives(
         lambda x: len(x) if isinstance(x, bytes) else 0
     )
     creatives_df = creatives_df[creatives_df["creative_size"] > 50000]
+    if creatives_df.empty:
+        run_id = df["run_id"].run_id.values[0]
+        pub_store_id = df["pub_store_id"].run_id.values[0]
+        error_msg = "No creatives to check"
+        logger.error(error_msg)
+        row["error_msg"] = error_msg
+        row = {"run_id": run_id, "pub_store_id": pub_store_id, "error_msg": error_msg}
+        error_messages.append(row)
+        return pd.DataFrame(), error_messages
     i = 0
     adv_creatives = []
     row_count = creatives_df.shape[0]
@@ -829,10 +840,15 @@ def parse_store_id_mitm_log(
         df, pub_store_id, database_connection
     )
     if adv_creatives_df.empty:
-        error_msg = "No creatives found"
-        logger.error(f"{error_msg}")
-        row = {"run_id": run_id, "pub_store_id": pub_store_id, "error_msg": error_msg}
-        error_messages.append(row)
+        if len(error_messages) == 0:
+            error_msg = "No creatives or errors"
+            logger.error(f"{error_msg}")
+            row = {
+                "run_id": run_id,
+                "pub_store_id": pub_store_id,
+                "error_msg": error_msg,
+            }
+            error_messages.append(row)
         return error_messages
     adv_creatives_df["store_app_pub_id"] = pub_db_id
     adv_creatives_df["run_id"] = run_id
