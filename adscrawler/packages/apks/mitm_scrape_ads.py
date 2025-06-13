@@ -588,7 +588,6 @@ def get_creatives(
         pub_store_id = df["pub_store_id"].values[0]
         error_msg = "No creatives to check"
         logger.error(error_msg)
-        row["error_msg"] = error_msg
         row = {"run_id": run_id, "pub_store_id": pub_store_id, "error_msg": error_msg}
         error_messages.append(row)
         return pd.DataFrame(), error_messages
