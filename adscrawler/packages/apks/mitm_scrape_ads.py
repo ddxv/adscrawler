@@ -38,6 +38,20 @@ logger = get_logger(__name__, "mitm_scrape_ads")
 
 IGNORE_CREATIVE_IDS = ["privacy", "google_play_icon_grey_2022", "favicon"]
 
+MMP_TLDS = [
+    "appsflyer.com",
+    "adjust.com",
+    "adjust.io",
+    "singular.com",
+    "singular.net",
+    "kochava.com",
+    "openattribution.dev",
+    "airbridge.com",
+    "arb.ge",
+]
+
+PLAYSTORE_URL_PARTS = ["play.google", "market://", "intent://"]
+
 
 @dataclasses.dataclass
 class AdInfo:
@@ -471,19 +485,6 @@ def get_tld(url: str) -> str:
     return tld
 
 
-MMP_TLDS = [
-    "appsflyer.com",
-    "adjust.com",
-    "adjust.io",
-    "singular.com",
-    "singular.net",
-    "kochava.com",
-    "openattribution.dev",
-    "airbridge.com",
-    "arb.ge",
-]
-
-
 def parse_vungle_ad(sent_video_dict: dict) -> AdInfo:
     ad_network_tld = "vungle.com"
     mmp_url = None
@@ -607,6 +608,7 @@ def get_creatives(
         if sent_video_dict is None:
             error_msg = f"No source bidrequest found for {row['tld_url']}"
             logger.error(f"{error_msg} {video_id}")
+            row["error_msg"] = error_msg
             error_messages.append(row)
             continue
         if "vungle.com" in sent_video_dict["tld_url"]:
@@ -623,6 +625,19 @@ def get_creatives(
                 error_messages.append(row)
                 continue
             response_text = sent_video_dict["response_text"]
+            video_id
+            if response_text[0:15] == "<!DOCTYPE html>":
+                # destinationUrl holds web landing page for a regular ad
+                found_potential_app = any(
+                    [x in response_text for x in PLAYSTORE_URL_PARTS + MMP_TLDS]
+                )
+                if found_potential_app:
+                    error_msg = "doubleclick found potential app!"
+                else:
+                    error_msg = "doubleclick html / web ad"
+                row["error_msg"] = error_msg
+                error_messages.append(row)
+                continue
             google_response = json.loads(response_text)
             if "ad_networks" in google_response:
                 try:
@@ -939,8 +954,8 @@ def parse_all_runs_for_store_id(
 def parse_specific_run_for_store_id(
     pub_store_id: str, run_id: int, database_connection: PostgresCon
 ) -> pd.DataFrame:
-    pub_store_id = "com.bigstarkids.wordtravelturkish"
-    run_id = 10317
+    pub_store_id = "com.StykeGames.SuperCarMerge"
+    run_id = 13611
     mitm_log_path = pathlib.Path(MITM_DIR, f"{pub_store_id}_{run_id}.log")
     if not mitm_log_path.exists():
         key = f"mitm_logs/android/{pub_store_id}/{run_id}.log"
