@@ -290,7 +290,6 @@ def google_extract_ad_urls(
     Returns:
         dict: A dictionary containing the found 'google_play_url' and
     """
-    ad_html
     soup = BeautifulSoup(ad_html, "html.parser")
     # The URLs are located inside a <meta> tag with name="video_fields"
     # The content of this tag contains VAST XML data.
@@ -535,9 +534,7 @@ def parse_fyber_ad(sent_video_dict: dict, database_connection: PostgresCon) -> A
     return ad_info
 
 
-def parse_google_ad(
-    ad_html: dict, video_id: str, database_connection: PostgresCon
-) -> AdInfo:
+def parse_google_ad(ad_html: dict, database_connection: PostgresCon) -> AdInfo:
     # with open(f"google_ad_{video_id}.html", "w") as f:
     #     f.write(ad_html)
     urls = google_extract_ad_urls(ad_html, database_connection)
@@ -617,20 +614,51 @@ def get_creatives(
             ad_info = parse_everestop_ad(sent_video_dict)
         elif "doubleclick.net" in sent_video_dict["tld_url"]:
             if sent_video_dict["response_text"] is None:
-                logger.error(f"No response text for {row['tld_url']} {video_id}")
-                row["error_msg"] = "No response text"
+                error_msg = "doubleclick no response_text"
+                logger.error(f"{error_msg} for {row['tld_url']} {video_id}")
+                row["error_msg"] = error_msg
                 error_messages.append(row)
                 continue
             response_text = sent_video_dict["response_text"]
-            try:
-                google_response = json.loads(response_text)
-                ad_html = google_response["ad_networks"][0]["ad"]["ad_html"]
-            except json.JSONDecodeError:
-                logger.error(f"Error parsing response text for {video_id}")
-                row["error_msg"] = "Error parsing response text"
+            google_response = json.loads(response_text)
+            if "ad_networks" in google_response:
+                try:
+                    ad_html = google_response["ad_networks"][0]["ad"]["ad_html"]
+                    ad_info = parse_google_ad(ad_html, database_connection)
+                except Exception:
+                    error_msg = "doubleclick failing to parse ad_html for VAST response"
+                    logger.error(error_msg)
+                    row["error_msg"] = error_msg
+                    error_messages.append(row)
+                    continue
+            elif "slots" in google_response:
+                try:
+                    for slot in google_response["slots"]:
+                        print("a")
+                        if video_id in str(slot):
+                            print("b")
+                            for ad in slot["ads"]:
+                                print("c")
+                                if video_id in str(ad):
+                                    "wtcg" in str(ad)
+                                    for clickurl in ad["tracking_urls_and_actions"][
+                                        "click_actions"
+                                    ]:
+                                        logger.info(get_tld(clickurl["url"]))
+                    # Haven't found example with adv_id
+                    raise Exception
+                except Exception:
+                    error_msg = "doubleclick failing to parse for slots response"
+                    logger.error(error_msg)
+                    row["error_msg"] = error_msg
+                    error_messages.append(row)
+                    continue
+            else:
+                error_msg = "doubleclick new format"
+                logger.error(error_msg)
+                row["error_msg"] = error_msg
                 error_messages.append(row)
                 continue
-            ad_info = parse_google_ad(ad_html, video_id, database_connection)
         elif "unityads.unity3d.com" in sent_video_dict["tld_url"]:
             ad_info = parse_unity_ad(sent_video_dict)
         elif "mtgglobals.com" in sent_video_dict["tld_url"]:
