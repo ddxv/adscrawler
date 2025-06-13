@@ -863,8 +863,9 @@ def parse_all_runs_for_store_id(
             )
         except Exception:
             error_msg = "CRITICAL uncaught error"
-            logger.error(f"{error_msg}")
-            row = df[["run_id", "pub_store_id"]].drop_duplicates().T
+            logger.exception(f"{error_msg}")
+            row = mitm[["run_id"]].drop_duplicates().T
+            row["pub_store_id"] = pub_store_id
             row["error_msg"] = error_msg
             error_messages = [row]
         unmatched_creatives_df = pd.DataFrame(error_messages)
