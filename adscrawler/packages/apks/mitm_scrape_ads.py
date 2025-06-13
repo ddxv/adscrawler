@@ -221,7 +221,6 @@ def extract_fyber_ad_urls(
         html_content (str): The HTML content of the ad.
     Returns:
         dict: A dictionary containing the found 'google_play_url' and
-              'appsflyer_url'. Returns None for a URL if it's not found.
     """
     urls = parse_fyber_vast_xml(ad_response_text)
     google_play_url = None
@@ -265,15 +264,10 @@ def extract_fyber_ad_urls(
             market_intent_url = url
             parsed_market_intent = urllib.parse.urlparse(market_intent_url)
             adv_store_id = urllib.parse.parse_qs(parsed_market_intent.query)["id"][0]
-        elif "play.google.com" in url:
-            google_play_url = url
-            parsed_gplay = urllib.parse.urlparse(google_play_url)
-            adv_store_id = urllib.parse.parse_qs(parsed_gplay.query)["id"][0]
-            appsflyer_url = url
         else:
             logger.debug(f"Found unknown URL: {url}")
         # Stop if we have found both URLs
-        if google_play_url and appsflyer_url:
+        if google_play_url and mmp_url and adv_store_id:
             break
     return {
         "mmp_url": mmp_url,
@@ -295,8 +289,8 @@ def google_extract_ad_urls(
         html_content (str): The HTML content of the ad.
     Returns:
         dict: A dictionary containing the found 'google_play_url' and
-              'appsflyer_url'. Returns None for a URL if it's not found.
     """
+    ad_html
     soup = BeautifulSoup(ad_html, "html.parser")
     # The URLs are located inside a <meta> tag with name="video_fields"
     # The content of this tag contains VAST XML data.
@@ -312,7 +306,7 @@ def google_extract_ad_urls(
     urls = re.findall(r"<!\[CDATA\[(.*?)\]\]>", vast_xml_string)
     google_play_url = None
     google_tracking_url = None
-    appsflyer_url = None
+    mmp_url = None
     market_intent_url = None
     intent_url = None
     adv_store_id = None
@@ -321,9 +315,8 @@ def google_extract_ad_urls(
     ad_network_urls = query_ad_domains(database_connection=database_connection)
     for url in urls:
         tld_url = tldextract.extract(url).domain + "." + tldextract.extract(url).suffix
-        if tld_url in ad_network_urls["domain"].to_list():
-            ad_network_url = url
-            ad_network_tld = tld_url
+        if tld_url in MMP_TLDS:
+            mmp_url = url
         elif "doubleclick.net" in tld_url:
             google_tracking_url = url
         elif "intent://" in url:
@@ -337,16 +330,18 @@ def google_extract_ad_urls(
             google_play_url = url
             parsed_gplay = urllib.parse.urlparse(google_play_url)
             adv_store_id = urllib.parse.parse_qs(parsed_gplay.query)["id"][0]
-        elif "app.appsflyer.com" in url:
-            appsflyer_url = url
+        elif tld_url in ad_network_urls["domain"].to_list():
+            # last effort
+            ad_network_url = url
+            ad_network_tld = tld_url
         else:
             logger.debug(f"Found unknown URL: {url}")
         # Stop if we have found both URLs
-        if google_play_url and appsflyer_url:
+        if ad_network_tld and mmp_url and adv_store_id:
             break
     return {
         "google_play_url": google_play_url,
-        "appsflyer_url": appsflyer_url,
+        "mmp_url": mmp_url,
         "google_tracking_url": google_tracking_url,
         "market_intent_url": market_intent_url,
         "intent_url": intent_url,
@@ -549,19 +544,15 @@ def parse_google_ad(
     try:
         adv_store_id = urls["adv_store_id"]
         ad_network_tld = urls["ad_network_tld"]
+        mmp_url = urls["mmp_url"]
     except Exception:
         logger.error("No adv_store_id found")
         adv_store_id = None
-    if "appsflyer_url" in urls:
-        mmp_url = urls["appsflyer_url"]
-        # parsed_url = urllib.parse.urlparse(mmp_url)
-        # query_params = urllib.parse.parse_qs(parsed_url.query)
-        # campaign_name = query_params["c"][0]
-        # af_siteid = query_params["af_siteid"][0]
-        # af_network_id = query_params["pid"][0]
-    else:
-        logger.error("Did not find MMP!")
-        mmp_url = None
+    # parsed_url = urllib.parse.urlparse(mmp_url)
+    # query_params = urllib.parse.parse_qs(parsed_url.query)
+    # campaign_name = query_params["c"][0]
+    # af_siteid = query_params["af_siteid"][0]
+    # af_network_id = query_params["pid"][0]
     ad_info = AdInfo(
         adv_store_id=adv_store_id,
         ad_network_tld=ad_network_tld,
@@ -906,8 +897,8 @@ def parse_all_runs_for_store_id(
 def parse_specific_run_for_store_id(
     pub_store_id: str, run_id: int, database_connection: PostgresCon
 ) -> pd.DataFrame:
-    pub_store_id = "com.changdu.ereader3.es"
-    run_id = 10010
+    pub_store_id = "com.bigstarkids.wordtravelturkish"
+    run_id = 10317
     mitm_log_path = pathlib.Path(MITM_DIR, f"{pub_store_id}_{run_id}.log")
     if not mitm_log_path.exists():
         key = f"mitm_logs/android/{pub_store_id}/{run_id}.log"
