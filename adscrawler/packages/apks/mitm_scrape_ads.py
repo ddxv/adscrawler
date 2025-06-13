@@ -6,6 +6,7 @@ import json
 import pathlib
 import re
 import urllib
+import xml.etree.ElementTree as ET
 
 import pandas as pd
 import protod
@@ -162,7 +163,7 @@ def get_first_sent_video_df(
     if sent_video_df.empty:
         return None
     if sent_video_df.shape[0] > 1:
-        logger.warning("Multiple responses for video found, selecting 1")
+        logger.debug("Multiple responses for video found, selecting 1")
         sent_video_df = sent_video_df.head(1).reset_index()
     response = sent_video_df.to_dict(orient="records")[0]
     subdomain = tldextract.extract(response["url"]).subdomain
@@ -182,6 +183,106 @@ def get_first_sent_video_df(
         )
     response["tld_url"] = tld_url
     return response
+
+
+def parse_fyber_vast_xml(ad_response_text: str) -> list[str]:
+    outer_tree = ET.fromstring(ad_response_text)
+    ns = {"tns": "http://www.inner-active.com/SimpleM2M/M2MResponse"}
+    ad_element = outer_tree.find(".//tns:Ad", ns)
+    urls = []
+    if ad_element is not None and ad_element.text:
+        # Clean up and parse the inner VAST XML
+        inner_vast_xml = ad_element.text.strip()
+        try:
+            vast_tree = ET.fromstring(inner_vast_xml)
+        except ET.ParseError:
+            vast_tree = ET.fromstring(html.unescape(inner_vast_xml))
+        # Now extract URLs from the inner VAST tree
+        for tag in [
+            "Impression",
+            "ClickThrough",
+            "ClickTracking",
+            "MediaFile",
+            "Tracking",
+        ]:
+            for el in vast_tree.iter(tag):
+                if el.text:
+                    urls.append(el.text.strip())
+    return urls
+
+
+def extract_fyber_ad_urls(
+    ad_response_text: str, database_connection: PostgresCon
+) -> dict | None:
+    """
+    Parses an HTML ad file to extract Google Play and AppsFlyer URLs
+    from the VAST data embedded within it.
+    Args:
+        html_content (str): The HTML content of the ad.
+    Returns:
+        dict: A dictionary containing the found 'google_play_url' and
+              'appsflyer_url'. Returns None for a URL if it's not found.
+    """
+    urls = parse_fyber_vast_xml(ad_response_text)
+    google_play_url = None
+    google_tracking_url = None
+    market_intent_url = None
+    intent_url = None
+    adv_store_id = None
+    ad_network_url = None
+    ad_network_tld = None
+    ad_network_urls = query_ad_domains(database_connection=database_connection)
+    for url in urls:
+        tld_url = tldextract.extract(url).domain + "." + tldextract.extract(url).suffix
+        if "appsflyer.com" in url:
+            adv_store_id = re.search(r"http.*\.appsflyer\.com/([a-zA-Z0-9_.]+)\?", url)[
+                1
+            ]
+            mmp_url = url
+        elif "adjust.com" in url:
+            mmp_url = url
+        elif "abr.ge" in url:
+            mmp_url = url
+        elif "kochava.com" in url:
+            mmp_url = url
+        elif "singular.com" in url:
+            mmp_url = url
+        elif "tpbid.com" in url:
+            ad_network_url = url
+            ad_network_tld = tld_url
+        elif "inner-active.mobi" in url:
+            ad_network_url = url
+            ad_network_tld = tld_url
+        elif tld_url in ad_network_urls["domain"].to_list():
+            ad_network_url = url
+            ad_network_tld = tld_url
+        elif "doubleclick.net" in tld_url:
+            google_tracking_url = url
+        elif "intent://" in url:
+            intent_url = url
+            adv_store_id = intent_url.replace("intent://", "")
+        elif "market://details?id=" in url:
+            market_intent_url = url
+            parsed_market_intent = urllib.parse.urlparse(market_intent_url)
+            adv_store_id = urllib.parse.parse_qs(parsed_market_intent.query)["id"][0]
+        elif "play.google.com" in url:
+            google_play_url = url
+            parsed_gplay = urllib.parse.urlparse(google_play_url)
+            adv_store_id = urllib.parse.parse_qs(parsed_gplay.query)["id"][0]
+            appsflyer_url = url
+        else:
+            logger.debug(f"Found unknown URL: {url}")
+        # Stop if we have found both URLs
+        if google_play_url and appsflyer_url:
+            break
+    return {
+        "mmp_url": mmp_url,
+        "market_intent_url": market_intent_url,
+        "intent_url": intent_url,
+        "adv_store_id": adv_store_id,
+        "ad_network_url": ad_network_url,
+        "ad_network_tld": ad_network_tld,
+    }
 
 
 def google_extract_ad_urls(
@@ -378,6 +479,22 @@ def parse_unity_ad(sent_video_dict: dict) -> AdInfo:
     return ad_info
 
 
+def parse_fyber_ad(sent_video_dict: dict, database_connection: PostgresCon) -> AdInfo:
+    ad_network_tld = "fyber.com"
+    mmp_url = None
+    ad_response_text = sent_video_dict["response_text"]
+    urls = extract_fyber_ad_urls(ad_response_text, database_connection)
+    adv_store_id = urls["adv_store_id"]
+    ad_network_tld = urls["ad_network_tld"]
+    mmp_url = urls["mmp_url"]
+    ad_info = AdInfo(
+        adv_store_id=adv_store_id,
+        ad_network_tld=ad_network_tld,
+        mmp_url=mmp_url,
+    )
+    return ad_info
+
+
 def parse_google_ad(
     ad_html: dict, video_id: str, database_connection: PostgresCon
 ) -> AdInfo:
@@ -452,7 +569,9 @@ def get_creatives(
             logger.error(f"No video source found for {row['tld_url']} {video_id}")
             unmatched_creatives.append(row)
             continue
-        if "everestop.io" in sent_video_dict["tld_url"]:
+        if "fyber.com" in sent_video_dict["tld_url"]:
+            ad_info = parse_fyber_ad(sent_video_dict, database_connection)
+        elif "everestop.io" in sent_video_dict["tld_url"]:
             ad_info = parse_everestop_ad(sent_video_dict)
         elif "doubleclick.net" in sent_video_dict["tld_url"]:
             if sent_video_dict["response_text"] is None:
@@ -724,8 +843,8 @@ def parse_all_runs_for_store_id(
 def parse_specific_run_for_store_id(
     pub_store_id: str, run_id: int, database_connection: PostgresCon
 ) -> pd.DataFrame:
-    pub_store_id = "com.kawaii.craft.world"
-    run_id = 8697
+    pub_store_id = "com.playvalve.dominoes"
+    run_id = 9254
     mitm_log_path = pathlib.Path(MITM_DIR, f"{pub_store_id}_{run_id}.log")
     if not mitm_log_path.exists():
         key = f"mitm_logs/android/{pub_store_id}/{run_id}.log"
