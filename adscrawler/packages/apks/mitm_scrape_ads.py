@@ -479,6 +479,51 @@ def parse_unity_ad(sent_video_dict: dict) -> AdInfo:
     return ad_info
 
 
+def get_tld(url: str) -> str:
+    tld = tldextract.extract(url).domain + "." + tldextract.extract(url).suffix
+    return tld
+
+
+MMP_TLDS = [
+    "appsflyer.com",
+    "adjust.com",
+    "adjust.io",
+    "singular.com",
+    "singular.net",
+    "kochava.com",
+    "openattribution.dev",
+    "airbridge.com",
+    "arb.ge",
+]
+
+
+def parse_vungle_ad(sent_video_dict: dict) -> AdInfo:
+    ad_network_tld = "vungle.com"
+    mmp_url = None
+    ad_response_text = sent_video_dict["response_text"]
+    response_dict = json.loads(ad_response_text)
+    adv_store_id = response_dict["ads"][0]["ad_markup"]["ad_market_id"]
+    check_urls = ["clickUrl", "checkpoint.0", "checkpoint.100"]
+    urlkeys = response_dict["ads"][0]["ad_markup"]["tpat"]
+    mmp_url = None
+    for x in check_urls:
+        try:
+            these_urls = urlkeys[x]
+            for url in these_urls:
+                if get_tld(url) in MMP_TLDS:
+                    mmp_url = url
+                    break
+        except Exception:
+            pass
+    mmp_url = mmp_url
+    ad_info = AdInfo(
+        adv_store_id=adv_store_id,
+        ad_network_tld=ad_network_tld,
+        mmp_url=mmp_url,
+    )
+    return ad_info
+
+
 def parse_fyber_ad(sent_video_dict: dict, database_connection: PostgresCon) -> AdInfo:
     ad_network_tld = "fyber.com"
     mmp_url = None
@@ -529,10 +574,15 @@ def get_creatives(
     df: pd.DataFrame,
     pub_store_id: str,
     database_connection: PostgresCon,
-) -> pd.DataFrame:
+) -> tuple[pd.DataFrame, list]:
+    error_messages = []
     if "status_code" not in df.columns:
-        logger.error("No status code found in df, skipping")
-        return pd.DataFrame(), pd.DataFrame()
+        row = df[["run_id", "pub_store_id"]].drop_duplicates().T
+        error_msg = "No status code found in df, skipping"
+        logger.error(error_msg)
+        row["error_msg"] = error_msg
+        error_messages.append(row)
+        return pd.DataFrame(), error_messages
     df["file_extension"] = df["url"].apply(lambda x: x.split(".")[-1])
     status_code_200 = df["status_code"] == 200
     response_content_not_na = df["response_content"].notna()
@@ -552,7 +602,6 @@ def get_creatives(
     creatives_df = creatives_df[creatives_df["creative_size"] > 50000]
     i = 0
     adv_creatives = []
-    unmatched_creatives = []
     row_count = creatives_df.shape[0]
     for _i, row in creatives_df.iterrows():
         i += 1
@@ -567,9 +616,11 @@ def get_creatives(
         sent_video_dict = get_first_sent_video_df(df, row, video_id)
         if sent_video_dict is None:
             logger.error(f"No video source found for {row['tld_url']} {video_id}")
-            unmatched_creatives.append(row)
+            error_messages.append(row)
             continue
-        if "fyber.com" in sent_video_dict["tld_url"]:
+        if "vungle.com" in sent_video_dict["tld_url"]:
+            ad_info = parse_vungle_ad(sent_video_dict)
+        elif "fyber.com" in sent_video_dict["tld_url"]:
             ad_info = parse_fyber_ad(sent_video_dict, database_connection)
         elif "everestop.io" in sent_video_dict["tld_url"]:
             ad_info = parse_everestop_ad(sent_video_dict)
@@ -577,7 +628,7 @@ def get_creatives(
             if sent_video_dict["response_text"] is None:
                 logger.error(f"No response text for {row['tld_url']} {video_id}")
                 row["error_msg"] = "No response text"
-                unmatched_creatives.append(row)
+                error_messages.append(row)
                 continue
             response_text = sent_video_dict["response_text"]
             try:
@@ -586,7 +637,7 @@ def get_creatives(
             except json.JSONDecodeError:
                 logger.error(f"Error parsing response text for {video_id}")
                 row["error_msg"] = "Error parsing response text"
-                unmatched_creatives.append(row)
+                error_messages.append(row)
                 continue
             ad_info = parse_google_ad(ad_html, video_id, database_connection)
         elif "unityads.unity3d.com" in sent_video_dict["tld_url"]:
@@ -599,7 +650,7 @@ def get_creatives(
                 f"Not a recognized ad network: {sent_video_dict['tld_url']} for video {video_id[0:10]}"
             )
             row["error_msg"] = error_msg
-            unmatched_creatives.append(row)
+            error_messages.append(row)
             continue
         if ad_info.adv_store_id is None:
             ad_info.adv_store_id = "unknown"
@@ -609,7 +660,7 @@ def get_creatives(
                 f"Incorrect adv_store_id, identified pub ID as adv ID for video {video_id[0:10]}"
             )
             row["error_msg"] = error_msg
-            unmatched_creatives.append(row)
+            error_messages.append(row)
             continue
         local_path = pathlib.Path(CREATIVES_DIR, ad_info.adv_store_id)
         local_path.mkdir(parents=True, exist_ok=True)
@@ -621,7 +672,7 @@ def get_creatives(
             error_msg = f"Unknown adv_store_id for {row['tld_url']}"
             logger.error(f"Unknown adv_store_id for {row['tld_url']} {video_id}")
             row["error_msg"] = error_msg
-            unmatched_creatives.append(row)
+            error_messages.append(row)
             continue
         adv_db_id = query_store_app_by_store_id(
             store_id=ad_info.adv_store_id, database_connection=database_connection
@@ -648,11 +699,12 @@ def get_creatives(
             f"{i}/{row_count}: {ad_info.ad_network_tld} adv={ad_info.adv_store_id} init_tld={init_tld}"
         )
     adv_creatives_df = pd.DataFrame(adv_creatives)
-    unmatched_creatives_df = pd.DataFrame(unmatched_creatives)
     if adv_creatives_df.empty:
-        msg = f"No matched for creatives {pub_store_id}, {len(unmatched_creatives)} unmatched"
+        msg = (
+            f"No matched for creatives {pub_store_id}, {len(error_messages)} unmatched"
+        )
         logger.warning(msg)
-    return adv_creatives_df, unmatched_creatives_df
+    return adv_creatives_df, error_messages
 
 
 def upload_creatives_to_s3(adv_creatives_df: pd.DataFrame) -> None:
@@ -748,20 +800,23 @@ def parse_store_id_mitm_log(
     run_id: int,
     mitm_log_path: pathlib.Path,
     database_connection: PostgresCon,
-) -> pd.DataFrame:
+) -> list:
     pub_db_id = query_store_app_by_store_id(
         store_id=pub_store_id, database_connection=database_connection
     )
     df = parse_mitm_log(mitm_log_path)
     df["pub_store_app_id"] = pub_db_id
     df["pub_store_id"] = pub_store_id
-    adv_creatives_df, unmatched_creatives_df = get_creatives(
+    adv_creatives_df, error_messages = get_creatives(
         df, pub_store_id, database_connection
     )
     if adv_creatives_df.empty:
         error_msg = "No creatives found"
-        logger.error(f"{error_msg} for {pub_store_id}")
-        return unmatched_creatives_df
+        logger.error(f"{error_msg}")
+        row = df[["run_id", "pub_store_id"]].drop_duplicates().T
+        row["error_msg"] = error_msg
+        error_messages.append(row)
+        return error_messages
     # adv_creatives_df["store_app_pub_id"] = pub_db_id
     adv_creatives_df["run_id"] = run_id
     assets_df = adv_creatives_df[
@@ -795,7 +850,7 @@ def parse_store_id_mitm_log(
         insert_columns=key_columns,
     )
     upload_creatives_to_s3(adv_creatives_df)
-    return unmatched_creatives_df
+    return error_messages
 
 
 def parse_all_runs_for_store_id(
@@ -811,9 +866,17 @@ def parse_all_runs_for_store_id(
             mitm_log_path = download_mitm_log_by_key(key, filename)
         else:
             mitm_log_path = pathlib.Path(MITM_DIR, filename)
-        unmatched_creatives_df = parse_store_id_mitm_log(
-            pub_store_id, run_id, mitm_log_path, database_connection
-        )
+        try:
+            error_messages = parse_store_id_mitm_log(
+                pub_store_id, run_id, mitm_log_path, database_connection
+            )
+        except Exception:
+            error_msg = "CRITICAL uncaught error"
+            logger.error(f"{error_msg}")
+            row = df[["run_id", "pub_store_id"]].drop_duplicates().T
+            row["error_msg"] = error_msg
+            error_messages = [row]
+        unmatched_creatives_df = pd.DataFrame(error_messages)
         if unmatched_creatives_df.empty:
             continue
         mycols = [
@@ -843,8 +906,8 @@ def parse_all_runs_for_store_id(
 def parse_specific_run_for_store_id(
     pub_store_id: str, run_id: int, database_connection: PostgresCon
 ) -> pd.DataFrame:
-    pub_store_id = "com.playvalve.dominoes"
-    run_id = 9254
+    pub_store_id = "com.changdu.ereader3.es"
+    run_id = 10010
     mitm_log_path = pathlib.Path(MITM_DIR, f"{pub_store_id}_{run_id}.log")
     if not mitm_log_path.exists():
         key = f"mitm_logs/android/{pub_store_id}/{run_id}.log"
