@@ -803,8 +803,7 @@ def parse_store_id_mitm_log(
     if adv_creatives_df.empty:
         error_msg = "No creatives found"
         logger.error(f"{error_msg}")
-        row = df[["run_id", "pub_store_id"]].drop_duplicates().T
-        row["error_msg"] = error_msg
+        row = {"run_id": run_id, "pub_store_id": pub_store_id, "error_msg": error_msg}
         error_messages.append(row)
         return error_messages
     adv_creatives_df["store_app_pub_id"] = pub_db_id
@@ -869,7 +868,7 @@ def parse_all_runs_for_store_id(
                 "error_msg": error_msg,
             }
             error_messages = [row]
-        if len(error_messages) > 0:
+        if len(error_messages) == 0:
             continue
         error_msg_df = pd.DataFrame(error_messages)
         mycols = [
