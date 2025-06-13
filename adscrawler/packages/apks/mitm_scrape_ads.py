@@ -558,8 +558,8 @@ def get_creatives(
 ) -> tuple[pd.DataFrame, list]:
     error_messages = []
     if "status_code" not in df.columns:
-        run_id = df["run_id"].run_id.values[0]
-        pub_store_id = df["pub_store_id"].run_id.values[0]
+        run_id = df["run_id"].values[0]
+        pub_store_id = df["pub_store_id"].values[0]
         error_msg = "No status code found in df, skipping"
         logger.error(error_msg)
         row["error_msg"] = error_msg
@@ -584,8 +584,8 @@ def get_creatives(
     )
     creatives_df = creatives_df[creatives_df["creative_size"] > 50000]
     if creatives_df.empty:
-        run_id = df["run_id"].run_id.values[0]
-        pub_store_id = df["pub_store_id"].run_id.values[0]
+        run_id = df["run_id"].values[0]
+        pub_store_id = df["pub_store_id"].values[0]
         error_msg = "No creatives to check"
         logger.error(error_msg)
         row["error_msg"] = error_msg
