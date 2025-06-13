@@ -864,16 +864,18 @@ def parse_all_runs_for_store_id(
         except Exception:
             error_msg = "CRITICAL uncaught error"
             logger.exception(f"{error_msg}")
-            row = mitm[["run_id"]].drop_duplicates().T
-            row["pub_store_id"] = pub_store_id
-            row["error_msg"] = error_msg
+            row = {
+                "run_id": run_id,
+                "pub_store_id": pub_store_id,
+                "error_msg": error_msg,
+            }
             error_messages = [row]
-        unmatched_creatives_df = pd.DataFrame(error_messages)
-        if unmatched_creatives_df.empty:
+        if len(error_messages) > 0:
             continue
+        error_msg_df = pd.DataFrame(error_messages)
         mycols = [
             x
-            for x in unmatched_creatives_df.columns
+            for x in error_msg_df.columns
             if x
             in [
                 "url",
@@ -887,11 +889,9 @@ def parse_all_runs_for_store_id(
                 "error_msg",
             ]
         ]
-        unmatched_creatives_df = unmatched_creatives_df[mycols]
-        all_failed_df = pd.concat(
-            [all_failed_df, unmatched_creatives_df], ignore_index=True
-        )
-        log_creative_scan_results(unmatched_creatives_df, database_connection)
+        error_msg_df = error_msg_df[mycols]
+        all_failed_df = pd.concat([all_failed_df, error_msg_df], ignore_index=True)
+        log_creative_scan_results(error_msg_df, database_connection)
     return all_failed_df
 
 
