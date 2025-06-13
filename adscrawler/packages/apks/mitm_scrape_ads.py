@@ -796,7 +796,6 @@ def parse_store_id_mitm_log(
         store_id=pub_store_id, database_connection=database_connection
     )
     df = parse_mitm_log(mitm_log_path)
-    df["store_app_pub_id"] = pub_db_id
     df["pub_store_id"] = pub_store_id
     adv_creatives_df, error_messages = get_creatives(
         df, pub_store_id, database_connection
@@ -808,7 +807,7 @@ def parse_store_id_mitm_log(
         row["error_msg"] = error_msg
         error_messages.append(row)
         return error_messages
-    # adv_creatives_df["store_app_pub_id"] = pub_db_id
+    adv_creatives_df["store_app_pub_id"] = pub_db_id
     adv_creatives_df["run_id"] = run_id
     assets_df = adv_creatives_df[
         ["adv_store_app_id", "md5_hash", "file_extension"]
