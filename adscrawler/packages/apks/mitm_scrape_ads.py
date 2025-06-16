@@ -1,3 +1,4 @@
+import numpy as np
 import dataclasses
 import datetime
 import hashlib
@@ -490,6 +491,52 @@ def decode_utf8(view) -> tuple[bytes, str, bool]:
         return view_bytes, "", False
 
 
+def parse_bidmachine_ad(sent_video_dict: dict) -> AdInfo:
+    sent_video_dict["response_content"]
+    ret = protod.dump(
+        sent_video_dict["response_content"],
+        renderer=JsonRenderer(),
+        str_decoder=decode_utf8,
+    )
+    mmp_url = None
+    ad_network_url = None
+    try:
+        adv_store_id = ret[5][6][3][13][2][3]
+        ad_network_tld = ret[5][6][3][13][2][2]
+    except Exception:
+        pass
+    text = str(ret[5][6][3][13][2][17])
+    urls = extract_and_decode_urls(text)
+    for url in urls:
+        tld_url = tldextract.extract(url).domain + "." + tldextract.extract(url).suffix
+        if "appsflyer.com" in url:
+            adv_store_id = re.search(r"http.*\.appsflyer\.com/([a-zA-Z0-9_.]+)\?", url)[
+                1
+            ]
+            mmp_url = url
+        elif tld_url in MMP_TLDS:
+            mmp_url = url
+        elif "bidmachine.io" in url:
+            ad_network_url = url
+            ad_network_tld = tld_url
+        elif "intent://" in url:
+            intent_url = url
+            adv_store_id = intent_url.replace("intent://", "")
+        elif "market://details?id=" in url:
+            market_intent_url = url
+            parsed_market_intent = urllib.parse.urlparse(market_intent_url)
+            adv_store_id = urllib.parse.parse_qs(parsed_market_intent.query)["id"][0]
+        else:
+            logger.debug(f"Found unknown URL: {url}")
+        # Stop if we have found both URLs
+        if ad_network_url and mmp_url and adv_store_id:
+            break
+    ad_info = AdInfo(adv_store_id=adv_store_id, ad_network_tld=ad_network_tld, mmp_url=mmp_url)
+    return ad_info
+
+    
+
+
 def parse_everestop_ad(sent_video_dict: dict) -> AdInfo:
     ret = protod.dump(
         sent_video_dict["response_content"],
@@ -498,6 +545,13 @@ def parse_everestop_ad(sent_video_dict: dict) -> AdInfo:
     )
     adv_store_id = ret[5][6][3][13][2][3]
     ad_network_tld = ret[5][6][3][13][2][2]
+    
+    ad_network_tld = 
+    
+    str(ret[5][6][3][13][2][17])
+
+    ret[5][6][3][13][2][17][2][33][3][1][3]
+
     mmp_url = None
     ad_info = AdInfo(
         adv_store_id=adv_store_id,
@@ -621,11 +675,19 @@ def get_creatives(
         return pd.DataFrame(), error_messages
     df["url"].apply(lambda x: os.path.basename(urllib.parse.urlparse(x).path))
     df["file_extension"] = df["url"].apply(lambda x: x.split(".")[-1])
+    ext_too_long = (df['file_extension'].str.len() > 4) & (df['content_type'].fillna('').str.contains('/')) 
+    def get_subtype(x):
+        parts = x.split('/')
+        return parts[1] if len(parts) > 1 else None
+    df['file_extension']  = np.where(ext_too_long, df['content_type'].apply(get_subtype), df['file_extension'])
     status_code_200 = df["status_code"] == 200
     response_content_not_na = df["response_content"].notna()
-    is_creative_content = df["response_content_type"].str.contains(
-        "image|video|webm|mp4|jpeg|jpg|png|gif|webp", regex=True
+    is_creative_content = df["response_content_type"].fillna('').str.contains(
+    r"\b(image|video)/(jpeg|jpg|png|gif|webp|webm|mp4|mpeg|avi|quicktime)\b",
+    case=False,
+    regex=True
     )
+    df['is_creative_content'] = is_creative_content
     creatives_df = df[
         response_content_not_na & is_creative_content & status_code_200
     ].copy()
@@ -668,6 +730,8 @@ def get_creatives(
             continue
         if "vungle.com" in sent_video_dict["tld_url"]:
             ad_info = parse_vungle_ad(sent_video_dict)
+        elif "bidmachine.io" in sent_video_dict['tld_url']:
+            ad_info = parse_bidmachine_ad(sent_video_dict)
         elif (
             "fyber.com" in sent_video_dict["tld_url"]
             or "tpbid.com" in sent_video_dict["tld_url"]
@@ -1007,8 +1071,8 @@ def parse_all_runs_for_store_id(
 def parse_specific_run_for_store_id(
     pub_store_id: str, run_id: int, database_connection: PostgresCon
 ) -> pd.DataFrame:
-    pub_store_id = "traffic.car.jam.escape.parking.puzzle.race"
-    run_id = 5277
+    pub_store_id = "com.gimica.spaceconnect"
+    run_id = 6325
     mitm_log_path = pathlib.Path(MITM_DIR, f"{pub_store_id}_{run_id}.log")
     if not mitm_log_path.exists():
         key = f"mitm_logs/android/{pub_store_id}/{run_id}.log"
