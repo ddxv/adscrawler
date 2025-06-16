@@ -1,9 +1,9 @@
-import os
 import dataclasses
 import datetime
 import hashlib
 import html
 import json
+import os
 import pathlib
 import re
 import urllib
@@ -11,6 +11,7 @@ import xml.etree.ElementTree as ET
 
 import pandas as pd
 import protod
+import requests
 import tldextract
 from bs4 import BeautifulSoup
 from mitmproxy import http
@@ -49,9 +50,12 @@ MMP_TLDS = [
     "openattribution.dev",
     "airbridge.com",
     "arb.ge",
+    "branch.io",
+    "impression.link",
 ]
 
-PLAYSTORE_URL_PARTS = ['play.google', 'market://', 'intent://']
+PLAYSTORE_URL_PARTS = ["play.google", "market://", "intent://"]
+
 
 @dataclasses.dataclass
 class AdInfo:
@@ -206,7 +210,9 @@ def extract_and_decode_urls(text):
     urls = []
     # 1. Broad regex for URLs (http, https, fybernativebrowser, etc.)
     # This pattern is made more flexible to capture various URL formats
-    url_pattern = re.compile(r'(?:https?|fybernativebrowser):\/\/(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+')
+    url_pattern = re.compile(
+        r"(?:https?|fybernativebrowser):\/\/(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+"
+    )
     found_urls = url_pattern.findall(text)
     for url in found_urls:
         # First, unescape HTML entities like &apos; to ' and &lt; to <
@@ -216,81 +222,28 @@ def extract_and_decode_urls(text):
         urls.append(decoded_url)
     return urls
 
-# Extract all URLs from the raw HTML content first
-all_extracted_urls = extract_and_decode_urls(inner_ad_element)
-# Filter for the most likely click URLs.
-# We're looking for URLs that start with 'fybernativebrowser://navigate?url='
-# or 'https://gotu.tpbid.com/click'
-click_urls = []
-for url in all_extracted_urls:
-    if url.startswith('fybernativebrowser://navigate?url='):
-        pattern = r'.*?(https?://.*)'
-        match = re.search(pattern, url)
-        if match:
-            url = match.group(1)
+
+def parse_fyber_html(inner_ad_element: str):
+    # Extract all URLs from the raw HTML content first
+    all_extracted_urls = extract_and_decode_urls(inner_ad_element)
+    # We're looking for URLs that start with 'fybernativebrowser://navigate?url='
+    # or 'https://gotu.tpbid.com/click'
+    click_urls = []
+    for url in all_extracted_urls:
+        if url.startswith("fybernativebrowser://navigate?url="):
+            pattern = r".*?(https?://.*)"
+            match = re.search(pattern, url)
+            if match:
+                url = match.group(1)
+                click_urls.append(url)
+        elif "https://gotu.tpbid.com/click" in url:
             click_urls.append(url)
-    elif 'https://gotu.tpbid.com/click' in url:
-        # This catches the direct click URL if it appears directly
-        click_urls.append(url)
-# Print all extracted URLs for debugging/inspection
-print("All extracted and decoded URLs:")
-for url in all_extracted_urls:
-    print(f"- {url}")
-print("\n---")
-# Print the most likely final click destination(s)
-if click_urls:
-    # Sort by length to try and get the longest (most complete) click URL
-    click_urls.sort(key=len, reverse=True) 
-    print(f"Most likely final click destination URL: {click_urls[0]}")
-else:
-    print("Could not reliably determine the final click destination URL.")
+        elif get_tld(url) in MMP_TLDS:
+            click_urls.append(url)
+    return click_urls
 
-import requests
 
-click_url = click_urls[0]
-response = requests.get(click_url, allow_redirects=True)
-final_url = response.url
-if 'play.google.com' in final_url:
-
-def parse_fyber_html(inner_ad_element:str):
-    soup = BeautifulSoup(inner_ad_element, 'html.parser')
-    # Find the div with id 'iawrapper'
-    iawrapper_div = soup.find('div', id='iawrapper')
-    if iawrapper_div:
-        # The 'a' tag is inside a JavaScript string, so we need to extract that string first.
-        # We look for the &lt;a tag, which is HTML-encoded.
-        anchor_tag_str_encoded = None
-        for content in iawrapper_div.contents:
-            if isinstance(content, str) and '&lt;a class=cr' in content:
-                anchor_tag_str_encoded = content
-                break
-        if anchor_tag_str_encoded:
-            # Decode the HTML entities to get the actual HTML string for the anchor tag
-            decoded_anchor_tag_str = urllib.parse.unquote(anchor_tag_str_encoded)
-            # Now, parse this snippet to find the 'a' tag and get its href
-            inner_soup = BeautifulSoup(decoded_anchor_tag_str, 'html.parser')
-            anchor_tag = inner_soup.find('a', class_='cr')
-            if anchor_tag and 'href' in anchor_tag.attrs:
-                # The href itself is URL-encoded, so we need to decode it
-                initial_href = anchor_tag['href']
-            
-                # The 'fybernativebrowser://navigate?url=' part needs to be stripped
-                # and the remaining part URL-decoded
-                if initial_href.startswith('fybernativebrowser://navigate?url='):
-                    encoded_final_url = initial_href.split('url=', 1)[1]
-                    final_destination_url = urllib.parse.unquote(encoded_final_url)
-                    return final_destination_url
-                    print(f"Extracted Click Link: {final_destination_url}")
-                else:
-                    print(f"Extracted initial href (not a fybernativebrowser URL): {initial_href}")
-            else:
-                print("No anchor tag with href found inside the decoded content of 'iawrapper'.")
-        else:
-            print("Could not find the encoded anchor tag string within 'iawrapper'.")
-    else:
-        print("Could not find the 'iawrapper' div.")
-
-def parse_fyber_vast_xml(ad_response_text: str) -> list[str]:
+def parse_fyber_ad_response(ad_response_text: str) -> list[str]:
     outer_tree = ET.fromstring(ad_response_text)
     ns = {"tns": "http://www.inner-active.com/SimpleM2M/M2MResponse"}
     ad_element = outer_tree.find(".//tns:Ad", ns)
@@ -299,7 +252,6 @@ def parse_fyber_vast_xml(ad_response_text: str) -> list[str]:
     if ad_element is not None and ad_element.text:
         # Clean up and parse the inner VAST XML
         inner_ad_element = ad_element.text.strip()
-        inner_ad_element[0:120]
         try:
             vast_tree = ET.fromstring(inner_ad_element)
         except ET.ParseError:
@@ -333,13 +285,13 @@ def extract_fyber_ad_urls(
     Returns:
         dict: A dictionary containing the found 'google_play_url' and
     """
-    urls = parse_fyber_vast_xml(ad_response_text)
-    google_play_url = None
+    urls = parse_fyber_ad_response(ad_response_text)
     market_intent_url = None
     intent_url = None
     adv_store_id = None
     ad_network_url = None
     ad_network_tld = None
+    mmp_url = None
     ad_network_urls = query_ad_domains(database_connection=database_connection)
     for url in urls:
         tld_url = tldextract.extract(url).domain + "." + tldextract.extract(url).suffix
@@ -353,6 +305,13 @@ def extract_fyber_ad_urls(
         elif "tpbid.com" in url:
             ad_network_url = url
             ad_network_tld = tld_url
+            if "/click" in url:
+                response = requests.get(url, allow_redirects=True)
+                final_url = response.url
+                if "play.google.com" in final_url:
+                    adv_store_id = adv_id_from_play_url(final_url)
+                else:
+                    logger.error(f"Cant find advertiser Unrecognized click {url=}")
         elif "inner-active.mobi" in url:
             ad_network_url = url
             ad_network_tld = tld_url
@@ -369,21 +328,20 @@ def extract_fyber_ad_urls(
         else:
             logger.debug(f"Found unknown URL: {url}")
         # Stop if we have found both URLs
-        if google_play_url and mmp_url and adv_store_id:
+        if ad_network_url and mmp_url and adv_store_id:
             break
     return {
         "mmp_url": mmp_url,
-        "market_intent_url": market_intent_url,
-        "intent_url": intent_url,
         "adv_store_id": adv_store_id,
-        "ad_network_url": ad_network_url,
         "ad_network_tld": ad_network_tld,
     }
 
-def adv_id_from_play_url(google_play_url:str)->str:
+
+def adv_id_from_play_url(google_play_url: str) -> str:
     parsed_gplay = urllib.parse.urlparse(google_play_url)
     adv_store_id = urllib.parse.parse_qs(parsed_gplay.query)["id"][0]
     return adv_store_id
+
 
 def google_extract_ad_urls(
     ad_html: str, database_connection: PostgresCon
@@ -563,7 +521,7 @@ def parse_unity_ad(sent_video_dict: dict) -> AdInfo:
             if "adjust_external" in referrer:
                 mmp_url = "adjust.com"
     else:
-        logger.error(f"Unknown Unity ad domain: {sent_video_dict['url']}")
+        logger.error(f"Unknown UnityAds domain: {sent_video_dict['url']}")
         adv_store_id = None
     #  and auction-load.unityads.unity3d.com
     # ad_html = sent_video_dict["response_text"]
@@ -582,8 +540,6 @@ def get_tld(url: str) -> str:
     return tld
 
 
-
-
 def parse_vungle_ad(sent_video_dict: dict) -> AdInfo:
     ad_network_tld = "vungle.com"
     mmp_url = None
@@ -592,7 +548,6 @@ def parse_vungle_ad(sent_video_dict: dict) -> AdInfo:
     adv_store_id = response_dict["ads"][0]["ad_markup"]["ad_market_id"]
     check_urls = ["clickUrl", "checkpoint.0", "checkpoint.100"]
     urlkeys = response_dict["ads"][0]["ad_markup"]["tpat"]
-    mmp_url = None
     for x in check_urls:
         try:
             these_urls = urlkeys[x]
@@ -602,7 +557,6 @@ def parse_vungle_ad(sent_video_dict: dict) -> AdInfo:
                     break
         except Exception:
             pass
-    mmp_url = mmp_url
     ad_info = AdInfo(
         adv_store_id=adv_store_id,
         ad_network_tld=ad_network_tld,
@@ -658,15 +612,14 @@ def get_creatives(
 ) -> tuple[pd.DataFrame, list]:
     error_messages = []
     if "status_code" not in df.columns:
-        run_id = df["run_id"].values[0]
-        pub_store_id = df["pub_store_id"].values[0]
+        run_id = df["run_id"].to_numpy()[0]
+        pub_store_id = df["pub_store_id"].to_numpy()[0]
         error_msg = "No status code found in df, skipping"
         logger.error(error_msg)
         row = {"run_id": run_id, "pub_store_id": pub_store_id, "error_msg": error_msg}
         error_messages.append(row)
         return pd.DataFrame(), error_messages
-
-    df['url'].apply(lambda x: os.path.basename(urllib.parse.urlparse(x).path))
+    df["url"].apply(lambda x: os.path.basename(urllib.parse.urlparse(x).path))
     df["file_extension"] = df["url"].apply(lambda x: x.split(".")[-1])
     status_code_200 = df["status_code"] == 200
     response_content_not_na = df["response_content"].notna()
@@ -674,17 +627,15 @@ def get_creatives(
         "image|video|webm|mp4|jpeg|jpg|png|gif|webp", regex=True
     )
     creatives_df = df[
-        response_content_not_na
-        & is_creative_content
-        & status_code_200
+        response_content_not_na & is_creative_content & status_code_200
     ].copy()
     creatives_df["creative_size"] = creatives_df["response_content"].apply(
         lambda x: len(x) if isinstance(x, bytes) else 0
     )
     creatives_df = creatives_df[creatives_df["creative_size"] > 50000]
     if creatives_df.empty:
-        run_id = df["run_id"].values[0]
-        pub_store_id = df["pub_store_id"].values[0]
+        run_id = df["run_id"].to_numpy()[0]
+        pub_store_id = df["pub_store_id"].to_numpy()[0]
         error_msg = "No creatives to check"
         logger.error(error_msg)
         row = {"run_id": run_id, "pub_store_id": pub_store_id, "error_msg": error_msg}
@@ -699,6 +650,11 @@ def get_creatives(
         if row["tld_url"] == "unity3dusercontent.com":
             # this isn't the video name, but the id of the content as the name is the quality
             video_id = row["url"].split("/")[-2]
+        if video_id == "":
+            error_msg = "Video ID is empty"
+            row["error_msg"] = error_msg
+            error_messages.append(row)
+            continue
         file_extension = row["file_extension"]
         if video_id in IGNORE_CREATIVE_IDS:
             logger.info(f"Ignoring video {video_id}.{file_extension}")
@@ -707,12 +663,15 @@ def get_creatives(
         if sent_video_dict is None:
             error_msg = f"No source bidrequest found for {row['tld_url']}"
             logger.error(f"{error_msg} {video_id}")
-            row['error_msg'] = error_msg
+            row["error_msg"] = error_msg
             error_messages.append(row)
             continue
         if "vungle.com" in sent_video_dict["tld_url"]:
             ad_info = parse_vungle_ad(sent_video_dict)
-        elif "fyber.com" in sent_video_dict["tld_url"]:
+        elif (
+            "fyber.com" in sent_video_dict["tld_url"]
+            or "tpbid.com" in sent_video_dict["tld_url"]
+        ):
             ad_info = parse_fyber_ad(sent_video_dict, database_connection)
         elif "everestop.io" in sent_video_dict["tld_url"]:
             ad_info = parse_everestop_ad(sent_video_dict)
@@ -724,15 +683,16 @@ def get_creatives(
                 error_messages.append(row)
                 continue
             response_text = sent_video_dict["response_text"]
-            video_id
-            if response_text[0:15] == '<!DOCTYPE html>':
+            if response_text[0:15] == "<!DOCTYPE html>":
                 # destinationUrl holds web landing page for a regular ad
-                found_potential_app = any([x in response_text for x in PLAYSTORE_URL_PARTS + MMP_TLDS])
+                found_potential_app = any(
+                    [x in response_text for x in PLAYSTORE_URL_PARTS + MMP_TLDS]
+                )
                 if found_potential_app:
-                    error_msg = 'doubleclick found potential app!'
+                    error_msg = "doubleclick found potential app!"
                 else:
-                    error_msg = 'doubleclick html / web ad'
-                row['error_msg'] = error_msg
+                    error_msg = "doubleclick html / web ad"
+                row["error_msg"] = error_msg
                 error_messages.append(row)
                 continue
             google_response = json.loads(response_text)
@@ -749,13 +709,9 @@ def get_creatives(
             elif "slots" in google_response:
                 try:
                     for slot in google_response["slots"]:
-                        print("a")
                         if video_id in str(slot):
-                            print("b")
                             for ad in slot["ads"]:
-                                print("c")
                                 if video_id in str(ad):
-                                    "wtcg" in str(ad)
                                     for clickurl in ad["tracking_urls_and_actions"][
                                         "click_actions"
                                     ]:
