@@ -747,7 +747,10 @@ def get_creatives(
                 error_messages.append(row)
                 continue
             response_text = sent_video_dict["response_text"]
-            if response_text[0:15] == "<!DOCTYPE html>":
+            if (
+                response_text[0:15] == "<!DOCTYPE html>"
+                or response_text[0:15] == "document.write("
+            ):
                 # destinationUrl holds web landing page for a regular ad
                 found_potential_app = any(
                     [x in response_text for x in PLAYSTORE_URL_PARTS + MMP_TLDS]
@@ -1071,8 +1074,8 @@ def parse_all_runs_for_store_id(
 def parse_specific_run_for_store_id(
     pub_store_id: str, run_id: int, database_connection: PostgresCon
 ) -> pd.DataFrame:
-    pub_store_id = "com.livescore.footballscores.matchlive"
-    run_id = 12352
+    pub_store_id = "com.gtsy.passengerexpress"
+    run_id = 9258
     mitm_log_path = pathlib.Path(MITM_DIR, f"{pub_store_id}_{run_id}.log")
     if not mitm_log_path.exists():
         key = f"mitm_logs/android/{pub_store_id}/{run_id}.log"
