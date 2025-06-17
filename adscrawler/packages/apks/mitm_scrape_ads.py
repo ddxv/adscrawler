@@ -55,7 +55,7 @@ MMP_TLDS = [
     "impression.link",
 ]
 
-PLAYSTORE_URL_PARTS = ["play.google", "market://", "intent://"]
+PLAYSTORE_URL_PARTS = ["play.google.com/store", "market://", "intent://"]
 
 
 @dataclasses.dataclass
@@ -360,14 +360,11 @@ def google_extract_ad_urls(
     # The content of this tag contains VAST XML data.
     video_fields_meta = soup.find("meta", {"name": "video_fields"})
     if not video_fields_meta:
-        print("Could not find the meta tag with name='video_fields'")
-        return None
-    # The content is a string that needs to be parsed as XML.
-    # We also need to unescape HTML entities like &lt; and &gt;
-    vast_xml_string = html.unescape(video_fields_meta["content"])
-    # The actual URLs are inside CDATA sections, so we can use regex
-    # to find all URLs within the VAST data.
-    urls = re.findall(r"<!\[CDATA\[(.*?)\]\]>", vast_xml_string)
+        vast_xml_string = html.unescape(video_fields_meta["content"])
+        urls = re.findall(r"<!\[CDATA\[(.*?)\]\]>", vast_xml_string)
+    else:
+        urls = extract_and_decode_urls(ad_html)
+
     google_play_url = None
     google_tracking_url = None
     mmp_url = None
@@ -1074,8 +1071,8 @@ def parse_all_runs_for_store_id(
 def parse_specific_run_for_store_id(
     pub_store_id: str, run_id: int, database_connection: PostgresCon
 ) -> pd.DataFrame:
-    pub_store_id = "com.gimica.spaceconnect"
-    run_id = 6325
+    pub_store_id = "com.livescore.footballscores.matchlive"
+    run_id = 12352
     mitm_log_path = pathlib.Path(MITM_DIR, f"{pub_store_id}_{run_id}.log")
     if not mitm_log_path.exists():
         key = f"mitm_logs/android/{pub_store_id}/{run_id}.log"
