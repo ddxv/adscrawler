@@ -735,6 +735,7 @@ def get_creatives(
         elif (
             "fyber.com" in sent_video_dict["tld_url"]
             or "tpbid.com" in sent_video_dict["tld_url"]
+            or "inner-active.mobi" in sent_video_dict["tld_url"]
         ):
             ad_info = parse_fyber_ad(sent_video_dict, database_connection)
         elif "everestop.io" in sent_video_dict["tld_url"]:
@@ -1074,8 +1075,8 @@ def parse_all_runs_for_store_id(
 def parse_specific_run_for_store_id(
     pub_store_id: str, run_id: int, database_connection: PostgresCon
 ) -> pd.DataFrame:
-    pub_store_id = "com.gtsy.passengerexpress"
-    run_id = 9258
+    pub_store_id = "com.dino.spider.stickman.rope"
+    run_id = 4272
     mitm_log_path = pathlib.Path(MITM_DIR, f"{pub_store_id}_{run_id}.log")
     if not mitm_log_path.exists():
         key = f"mitm_logs/android/{pub_store_id}/{run_id}.log"
