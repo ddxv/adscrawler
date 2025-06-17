@@ -54,6 +54,9 @@ def manage_ipa_download(
         version_str, _plist_str, _details_df = get_parsed_plist(
             tmp_decoded_output_path=tmp_decoded_output_path
         )
+        if version_str is None:
+            version_str = FAILED_VERSION_STR
+            logger.error(f"APP HAS NO VERSION STR: {store_id=} {version_str=}")
         md5_hash = get_md5_hash(downloaded_file_path)
         crawl_result = 1
         logger.info(f"{store_id=} plist finished")
