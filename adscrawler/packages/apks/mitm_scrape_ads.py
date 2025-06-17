@@ -1,4 +1,3 @@
-import numpy as np
 import dataclasses
 import datetime
 import hashlib
@@ -10,6 +9,7 @@ import re
 import urllib
 import xml.etree.ElementTree as ET
 
+import numpy as np
 import pandas as pd
 import protod
 import requests
@@ -531,10 +531,10 @@ def parse_bidmachine_ad(sent_video_dict: dict) -> AdInfo:
         # Stop if we have found both URLs
         if ad_network_url and mmp_url and adv_store_id:
             break
-    ad_info = AdInfo(adv_store_id=adv_store_id, ad_network_tld=ad_network_tld, mmp_url=mmp_url)
+    ad_info = AdInfo(
+        adv_store_id=adv_store_id, ad_network_tld=ad_network_tld, mmp_url=mmp_url
+    )
     return ad_info
-
-    
 
 
 def parse_everestop_ad(sent_video_dict: dict) -> AdInfo:
@@ -545,13 +545,6 @@ def parse_everestop_ad(sent_video_dict: dict) -> AdInfo:
     )
     adv_store_id = ret[5][6][3][13][2][3]
     ad_network_tld = ret[5][6][3][13][2][2]
-    
-    ad_network_tld = 
-    
-    str(ret[5][6][3][13][2][17])
-
-    ret[5][6][3][13][2][17][2][33][3][1][3]
-
     mmp_url = None
     ad_info = AdInfo(
         adv_store_id=adv_store_id,
@@ -675,19 +668,29 @@ def get_creatives(
         return pd.DataFrame(), error_messages
     df["url"].apply(lambda x: os.path.basename(urllib.parse.urlparse(x).path))
     df["file_extension"] = df["url"].apply(lambda x: x.split(".")[-1])
-    ext_too_long = (df['file_extension'].str.len() > 4) & (df['content_type'].fillna('').str.contains('/')) 
+    ext_too_long = (df["file_extension"].str.len() > 4) & (
+        df["content_type"].fillna("").str.contains("/")
+    )
+
     def get_subtype(x):
-        parts = x.split('/')
+        parts = x.split("/")
         return parts[1] if len(parts) > 1 else None
-    df['file_extension']  = np.where(ext_too_long, df['content_type'].apply(get_subtype), df['file_extension'])
+
+    df["file_extension"] = np.where(
+        ext_too_long, df["content_type"].apply(get_subtype), df["file_extension"]
+    )
     status_code_200 = df["status_code"] == 200
     response_content_not_na = df["response_content"].notna()
-    is_creative_content = df["response_content_type"].fillna('').str.contains(
-    r"\b(image|video)/(jpeg|jpg|png|gif|webp|webm|mp4|mpeg|avi|quicktime)\b",
-    case=False,
-    regex=True
+    is_creative_content = (
+        df["response_content_type"]
+        .fillna("")
+        .str.contains(
+            r"\b(image|video)/(jpeg|jpg|png|gif|webp|webm|mp4|mpeg|avi|quicktime)\b",
+            case=False,
+            regex=True,
+        )
     )
-    df['is_creative_content'] = is_creative_content
+    df["is_creative_content"] = is_creative_content
     creatives_df = df[
         response_content_not_na & is_creative_content & status_code_200
     ].copy()
@@ -730,7 +733,7 @@ def get_creatives(
             continue
         if "vungle.com" in sent_video_dict["tld_url"]:
             ad_info = parse_vungle_ad(sent_video_dict)
-        elif "bidmachine.io" in sent_video_dict['tld_url']:
+        elif "bidmachine.io" in sent_video_dict["tld_url"]:
             ad_info = parse_bidmachine_ad(sent_video_dict)
         elif (
             "fyber.com" in sent_video_dict["tld_url"]
