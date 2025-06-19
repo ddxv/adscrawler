@@ -212,7 +212,7 @@ def extract_and_decode_urls(text):
     # 1. Broad regex for URLs (http, https, fybernativebrowser, etc.)
     # This pattern is made more flexible to capture various URL formats
     url_pattern = re.compile(
-        r"(?:https?|fybernativebrowser):\/\/(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+"
+        r"(?:https?|fybernativebrowser|intent|market):\/\/(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+"
     )
     found_urls = url_pattern.findall(text)
     for url in found_urls:
@@ -359,11 +359,13 @@ def google_extract_ad_urls(
     # The URLs are located inside a <meta> tag with name="video_fields"
     # The content of this tag contains VAST XML data.
     video_fields_meta = soup.find("meta", {"name": "video_fields"})
-    if not video_fields_meta:
+    vast_urls = []
+    if video_fields_meta:
         vast_xml_string = html.unescape(video_fields_meta["content"])
-        urls = re.findall(r"<!\[CDATA\[(.*?)\]\]>", vast_xml_string)
-    else:
-        urls = extract_and_decode_urls(ad_html)
+        vast_urls = re.findall(r"<!\[CDATA\[(.*?)\]\]>", vast_xml_string)
+    any_urls = extract_and_decode_urls(ad_html)
+
+    all_urls = set(vast_urls + any_urls)
 
     google_play_url = None
     google_tracking_url = None
@@ -374,20 +376,19 @@ def google_extract_ad_urls(
     ad_network_url = None
     ad_network_tld = None
     ad_network_urls = query_ad_domains(database_connection=database_connection)
-    for url in urls:
+    for url in all_urls:
         tld_url = tldextract.extract(url).domain + "." + tldextract.extract(url).suffix
         if tld_url in MMP_TLDS:
             mmp_url = url
         elif "doubleclick.net" in tld_url:
             google_tracking_url = url
-        elif "intent://" in url:
+        elif match := re.search(r"intent://details\?id=([a-zA-Z0-9._]+)", url):
             intent_url = url
-            adv_store_id = intent_url.replace("intent://", "")
-        elif "market://details?id=" in url:
+            adv_store_id = match.group(1)
+        elif match := re.search(r"market://details\?id=([a-zA-Z0-9._]+)", url):
             market_intent_url = url
-            parsed_market_intent = urllib.parse.urlparse(market_intent_url)
-            adv_store_id = urllib.parse.parse_qs(parsed_market_intent.query)["id"][0]
-        elif "play.google.com" in url:
+            adv_store_id = match.group(1)
+        elif "play.google.com" in url and "google.com" in tld_url:
             adv_store_id = adv_id_from_play_url(url)
         elif tld_url in ad_network_urls["domain"].to_list():
             # last effort
@@ -1094,8 +1095,8 @@ def parse_all_runs_for_store_id(
 def parse_specific_run_for_store_id(
     pub_store_id: str, run_id: int, database_connection: PostgresCon
 ) -> pd.DataFrame:
-    pub_store_id = "com.gimica.ballbounce"
-    run_id = 15483
+    pub_store_id = "spin.coin.game"
+    run_id = 13254
     mitm_log_path = pathlib.Path(MITM_DIR, f"{pub_store_id}_{run_id}.log")
     if not mitm_log_path.exists():
         key = f"mitm_logs/android/{pub_store_id}/{run_id}.log"
