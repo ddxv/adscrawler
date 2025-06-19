@@ -832,6 +832,13 @@ def get_creatives(
             row["error_msg"] = error_msg
             error_messages.append(row)
             continue
+        if (
+            ad_info.ad_network_tld
+            not in query_ad_domains(database_connection=database_connection)[
+                "domain"
+            ].to_list()
+        ):
+            ad_info.ad_network_tld = get_tld(sent_video_dict["tld_url"])
         adv_db_id = query_store_app_by_store_id(
             store_id=ad_info.adv_store_id, database_connection=database_connection
         )
@@ -950,6 +957,11 @@ def make_creative_records_df(
             "mmp_domain_id",
         ]
     ]
+    check_cols = ["creative_host_domain_id", "mmp_domain_id"]
+    for col in check_cols:
+        creative_records_df[col] = np.where(
+            creative_records_df[col].isna(), None, creative_records_df[col]
+        )
     return creative_records_df
 
 
@@ -964,6 +976,12 @@ def parse_store_id_mitm_log(
     )
     df = parse_mitm_log(mitm_log_path)
     df["pub_store_id"] = pub_store_id
+    if df.empty:
+        error_msg = "No data in mitm df"
+        logger.error(error_msg)
+        row = {"run_id": run_id, "pub_store_id": pub_store_id, "error_msg": error_msg}
+        error_messages = [row]
+        return error_messages
     adv_creatives_df, error_messages = get_creatives(
         df, pub_store_id, database_connection
     )
@@ -985,6 +1003,7 @@ def parse_store_id_mitm_log(
             "pub_store_id": pub_store_id,
             "error_msg": msg,
         }
+        error_messages.append(row)
     adv_creatives_df["store_app_pub_id"] = pub_db_id
     adv_creatives_df["run_id"] = run_id
     assets_df = adv_creatives_df[
@@ -1075,8 +1094,8 @@ def parse_all_runs_for_store_id(
 def parse_specific_run_for_store_id(
     pub_store_id: str, run_id: int, database_connection: PostgresCon
 ) -> pd.DataFrame:
-    pub_store_id = "com.dino.spider.stickman.rope"
-    run_id = 4272
+    pub_store_id = "com.gimica.ballbounce"
+    run_id = 15483
     mitm_log_path = pathlib.Path(MITM_DIR, f"{pub_store_id}_{run_id}.log")
     if not mitm_log_path.exists():
         key = f"mitm_logs/android/{pub_store_id}/{run_id}.log"
