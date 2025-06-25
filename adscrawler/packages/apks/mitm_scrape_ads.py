@@ -748,10 +748,9 @@ def get_creatives(
         elif "mtgglobals.com" in sent_video_dict["tld_url"]:
             ad_info = parse_mtg_ad(sent_video_dict)
         else:
-            error_msg = f"Not a recognized ad network: {sent_video_dict['tld_url']}"
-            logger.error(
-                f"Not a recognized ad network: {sent_video_dict['tld_url']} for video {video_id[0:10]}"
-            )
+            real_tld = get_tld(sent_video_dict["tld_url"])
+            error_msg = f"Not a recognized ad network: {real_tld}"
+            logger.error(f"{error_msg} for video {video_id[0:10]}")
             row["error_msg"] = error_msg
             error_messages.append(row)
             continue
