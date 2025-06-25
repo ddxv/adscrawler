@@ -204,13 +204,24 @@ def get_first_sent_video_df(
     return response
 
 
-def extract_and_decode_urls(text):
+def extract_and_decode_urls(text: str):
     """
     Extracts all URLs from a given text, handles HTML entities and URL encoding.
     """
-    urls = []
+    soup = BeautifulSoup(text, "html.parser")
+    # The URLs are located inside a <meta> tag with name="video_fields"
+    # The content of this tag contains VAST XML data.
+    video_fields_meta = soup.find("meta", {"name": "video_fields"})
+    vast_urls = []
+    if video_fields_meta:
+        vast_xml_string = html.unescape(video_fields_meta["content"])
+        vast_urls = re.findall(r"<!\[CDATA\[(.*?)\]\]>", vast_xml_string)
+    if soup.find("vast"):
+        vast_urls = re.findall(r"<!\[CDATA\[(.*?)\]\]>", text)
+        vast_urls = [x for x in vast_urls if "http" in x]
     # 1. Broad regex for URLs (http, https, fybernativebrowser, etc.)
     # This pattern is made more flexible to capture various URL formats
+    urls = []
     url_pattern = re.compile(
         r"(?:https?|fybernativebrowser|intent|market):\/\/(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+"
     )
@@ -221,7 +232,8 @@ def extract_and_decode_urls(text):
         # Then, URL decode the whole string
         decoded_url = urllib.parse.unquote(url)
         urls.append(decoded_url)
-    return urls
+    all_urls = list(set(vast_urls + urls))
+    return all_urls
 
 
 def parse_fyber_html(inner_ad_element: str):
@@ -275,28 +287,31 @@ def parse_fyber_ad_response(ad_response_text: str) -> list[str]:
     return urls
 
 
-def extract_fyber_ad_urls(
-    ad_response_text: str, database_connection: PostgresCon
-) -> dict | None:
-    """
-    Parses an HTML ad file to extract Google Play
-    from the VAST data embedded within it.
-    Args:
-        html_content (str): The HTML content of the ad.
-    Returns:
-        dict: A dictionary containing the found 'google_play_url' and
-    """
-    urls = parse_fyber_ad_response(ad_response_text)
-    market_intent_url = None
-    intent_url = None
+def adv_id_from_play_url(google_play_url: str) -> str:
+    parsed_gplay = urllib.parse.urlparse(google_play_url)
+    adv_store_id = urllib.parse.parse_qs(parsed_gplay.query)["id"][0]
+    return adv_store_id
+
+
+def parse_urls_for_known_parts(
+    all_urls: list[str], database_connection: PostgresCon
+) -> dict:
+    mmp_url = None
     adv_store_id = None
     ad_network_url = None
     ad_network_tld = None
-    mmp_url = None
     ad_network_urls = query_ad_domains(database_connection=database_connection)
-    for url in urls:
+    for url in all_urls:
         tld_url = tldextract.extract(url).domain + "." + tldextract.extract(url).suffix
-        if "appsflyer.com" in url:
+        if tld_url in MMP_TLDS:
+            mmp_url = url
+        elif match := re.search(r"intent://details\?id=([a-zA-Z0-9._]+)", url):
+            adv_store_id = match.group(1)
+        elif match := re.search(r"market://details\?id=([a-zA-Z0-9._]+)", url):
+            adv_store_id = match.group(1)
+        elif "play.google.com" in url and "google.com" in tld_url:
+            adv_store_id = adv_id_from_play_url(url)
+        elif "appsflyer.com" in url:
             adv_store_id = re.search(r"http.*\.appsflyer\.com/([a-zA-Z0-9_.]+)\?", url)[
                 1
             ]
@@ -316,95 +331,15 @@ def extract_fyber_ad_urls(
         elif "inner-active.mobi" in url:
             ad_network_url = url
             ad_network_tld = tld_url
-        elif tld_url in ad_network_urls["domain"].to_list():
+        if tld_url in ad_network_urls["domain"].to_list():
+            # last effort
             ad_network_url = url
             ad_network_tld = tld_url
-        elif "intent://" in url:
-            intent_url = url
-            adv_store_id = intent_url.replace("intent://", "")
-        elif "market://details?id=" in url:
-            market_intent_url = url
-            parsed_market_intent = urllib.parse.urlparse(market_intent_url)
-            adv_store_id = urllib.parse.parse_qs(parsed_market_intent.query)["id"][0]
-        else:
-            logger.debug(f"Found unknown URL: {url}")
         # Stop if we have found both URLs
         if ad_network_url and mmp_url and adv_store_id:
             break
     return {
         "mmp_url": mmp_url,
-        "adv_store_id": adv_store_id,
-        "ad_network_tld": ad_network_tld,
-    }
-
-
-def adv_id_from_play_url(google_play_url: str) -> str:
-    parsed_gplay = urllib.parse.urlparse(google_play_url)
-    adv_store_id = urllib.parse.parse_qs(parsed_gplay.query)["id"][0]
-    return adv_store_id
-
-
-def google_extract_ad_urls(
-    ad_html: str, database_connection: PostgresCon
-) -> dict | None:
-    """
-    Parses an HTML ad file to extract Google Play
-    from the VAST data embedded within it.
-    Args:
-        html_content (str): The HTML content of the ad.
-    Returns:
-        dict: A dictionary containing the found 'google_play_url' and
-    """
-    soup = BeautifulSoup(ad_html, "html.parser")
-    # The URLs are located inside a <meta> tag with name="video_fields"
-    # The content of this tag contains VAST XML data.
-    video_fields_meta = soup.find("meta", {"name": "video_fields"})
-    vast_urls = []
-    if video_fields_meta:
-        vast_xml_string = html.unescape(video_fields_meta["content"])
-        vast_urls = re.findall(r"<!\[CDATA\[(.*?)\]\]>", vast_xml_string)
-    any_urls = extract_and_decode_urls(ad_html)
-
-    all_urls = set(vast_urls + any_urls)
-
-    google_play_url = None
-    google_tracking_url = None
-    mmp_url = None
-    market_intent_url = None
-    intent_url = None
-    adv_store_id = None
-    ad_network_url = None
-    ad_network_tld = None
-    ad_network_urls = query_ad_domains(database_connection=database_connection)
-    for url in all_urls:
-        tld_url = tldextract.extract(url).domain + "." + tldextract.extract(url).suffix
-        if tld_url in MMP_TLDS:
-            mmp_url = url
-        elif "doubleclick.net" in tld_url:
-            google_tracking_url = url
-        elif match := re.search(r"intent://details\?id=([a-zA-Z0-9._]+)", url):
-            intent_url = url
-            adv_store_id = match.group(1)
-        elif match := re.search(r"market://details\?id=([a-zA-Z0-9._]+)", url):
-            market_intent_url = url
-            adv_store_id = match.group(1)
-        elif "play.google.com" in url and "google.com" in tld_url:
-            adv_store_id = adv_id_from_play_url(url)
-        elif tld_url in ad_network_urls["domain"].to_list():
-            # last effort
-            ad_network_url = url
-            ad_network_tld = tld_url
-        else:
-            logger.debug(f"Found unknown URL: {url}")
-        # Stop if we have found both URLs
-        if ad_network_tld and mmp_url and adv_store_id:
-            break
-    return {
-        "google_play_url": google_play_url,
-        "mmp_url": mmp_url,
-        "google_tracking_url": google_tracking_url,
-        "market_intent_url": market_intent_url,
-        "intent_url": intent_url,
         "adv_store_id": adv_store_id,
         "ad_network_url": ad_network_url,
         "ad_network_tld": ad_network_tld,
@@ -518,11 +453,9 @@ def parse_bidmachine_ad(sent_video_dict: dict) -> AdInfo:
             ad_network_url = url
             ad_network_tld = tld_url
         elif "intent://" in url:
-            intent_url = url
-            adv_store_id = intent_url.replace("intent://", "")
+            adv_store_id = url.replace("intent://", "")
         elif "market://details?id=" in url:
-            market_intent_url = url
-            parsed_market_intent = urllib.parse.urlparse(market_intent_url)
+            parsed_market_intent = urllib.parse.urlparse(url)
             adv_store_id = urllib.parse.parse_qs(parsed_market_intent.query)["id"][0]
         else:
             logger.debug(f"Found unknown URL: {url}")
@@ -552,14 +485,23 @@ def parse_everestop_ad(sent_video_dict: dict) -> AdInfo:
     return ad_info
 
 
-def parse_unity_ad(sent_video_dict: dict) -> AdInfo:
+def parse_unity_ad(sent_video_dict: dict, database_connection: PostgresCon) -> AdInfo:
     ad_network_tld = "unity3d.com"
     mmp_url = None
     if "auction-load.unityads.unity3d.com" in sent_video_dict["url"]:
         ad_response_text = sent_video_dict["response_text"]
         ad_response = json.loads(ad_response_text)
         mykey = list(ad_response["media"].keys())[0]
-        adv_store_id = ad_response["media"][mykey]["bundleId"]
+        keyresp = ad_response["media"][mykey]
+        if "bundleId" in keyresp:
+            adv_store_id = keyresp["bundleId"]
+        else:
+            content = keyresp["content"]
+            decoded_content = urllib.parse.unquote(content)
+            all_urls = extract_and_decode_urls(decoded_content)
+            ad_parts = parse_urls_for_known_parts(all_urls, database_connection)
+            adv_store_id = ad_parts["adv_store_id"]
+            mmp_url = ad_parts["mmp_url"]
         adcontent: str = ad_response["media"][mykey]["content"]
         if "referrer" in adcontent:
             referrer = adcontent.split("referrer=")[1].split(",")[0]
@@ -614,10 +556,11 @@ def parse_fyber_ad(sent_video_dict: dict, database_connection: PostgresCon) -> A
     ad_network_tld = "fyber.com"
     mmp_url = None
     ad_response_text = sent_video_dict["response_text"]
-    urls = extract_fyber_ad_urls(ad_response_text, database_connection)
-    adv_store_id = urls["adv_store_id"]
-    ad_network_tld = urls["ad_network_tld"]
-    mmp_url = urls["mmp_url"]
+    all_urls = extract_and_decode_urls(ad_response_text)
+    ad_parts = parse_urls_for_known_parts(all_urls, database_connection)
+    adv_store_id = ad_parts["adv_store_id"]
+    ad_network_tld = ad_parts["ad_network_tld"]
+    mmp_url = ad_parts["mmp_url"]
     ad_info = AdInfo(
         adv_store_id=adv_store_id,
         ad_network_tld=ad_network_tld,
@@ -629,11 +572,12 @@ def parse_fyber_ad(sent_video_dict: dict, database_connection: PostgresCon) -> A
 def parse_google_ad(ad_html: dict, database_connection: PostgresCon) -> AdInfo:
     # with open(f"google_ad_{video_id}.html", "w") as f:
     #     f.write(ad_html)
-    urls = google_extract_ad_urls(ad_html, database_connection)
+    all_urls = extract_and_decode_urls(ad_html)
+    ad_parts = parse_urls_for_known_parts(all_urls, database_connection)
     try:
-        adv_store_id = urls["adv_store_id"]
-        ad_network_tld = urls["ad_network_tld"]
-        mmp_url = urls["mmp_url"]
+        adv_store_id = ad_parts["adv_store_id"]
+        ad_network_tld = ad_parts["ad_network_tld"]
+        mmp_url = ad_parts["mmp_url"]
     except Exception:
         logger.error("No adv_store_id found")
         adv_store_id = None
@@ -800,7 +744,7 @@ def get_creatives(
                 error_messages.append(row)
                 continue
         elif "unityads.unity3d.com" in sent_video_dict["tld_url"]:
-            ad_info = parse_unity_ad(sent_video_dict)
+            ad_info = parse_unity_ad(sent_video_dict, database_connection)
         elif "mtgglobals.com" in sent_video_dict["tld_url"]:
             ad_info = parse_mtg_ad(sent_video_dict)
         else:
@@ -966,6 +910,26 @@ def make_creative_records_df(
     return creative_records_df
 
 
+def collect_creative_records_df(
+    pub_store_id: str,
+    run_id: int,
+    mitm_log_path: pathlib.Path,
+    database_connection: PostgresCon,
+) -> pd.DataFrame:
+    df = parse_mitm_log(mitm_log_path)
+    df["pub_store_id"] = pub_store_id
+    if df.empty:
+        error_msg = "No data in mitm df"
+        logger.error(error_msg)
+        row = {"run_id": run_id, "pub_store_id": pub_store_id, "error_msg": error_msg}
+        error_messages = [row]
+        return pd.DataFrame(), error_messages
+    adv_creatives_df, error_messages = get_creatives(
+        df, pub_store_id, database_connection
+    )
+    return adv_creatives_df, error_messages
+
+
 def parse_store_id_mitm_log(
     pub_store_id: str,
     run_id: int,
@@ -1095,12 +1059,16 @@ def parse_all_runs_for_store_id(
 def parse_specific_run_for_store_id(
     pub_store_id: str, run_id: int, database_connection: PostgresCon
 ) -> pd.DataFrame:
-    pub_store_id = "spin.coin.game"
-    run_id = 13254
+    pub_store_id = "com.big.summerwheelie"
+    run_id = 10811
     mitm_log_path = pathlib.Path(MITM_DIR, f"{pub_store_id}_{run_id}.log")
     if not mitm_log_path.exists():
         key = f"mitm_logs/android/{pub_store_id}/{run_id}.log"
+        mitms = get_store_id_mitm_s3_keys(store_id=pub_store_id)
+        key = mitms[mitms["run_id"] == str(run_id)]["key"].to_numpy()[0]
         mitm_log_path = download_mitm_log_by_key(key, mitm_log_path)
+    else:
+        logger.error("mitm not found")
     return parse_store_id_mitm_log(
         pub_store_id, run_id, mitm_log_path, database_connection
     )
