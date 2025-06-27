@@ -64,6 +64,14 @@ class AdInfo:
     ad_network_tld: str
     mmp_url: str | None = None
 
+    def __getitem__(self, key: str):
+        """Support dictionary-style access to dataclass fields"""
+        return getattr(self, key)
+
+    def __setitem__(self, key: str, value):
+        """Support dictionary-style assignment to dataclass fields"""
+        setattr(self, key, value)
+
     @property
     def mmp_tld(self) -> str | None:
         if self.mmp_url:
@@ -223,15 +231,15 @@ def extract_and_decode_urls(text: str):
     # This pattern is made more flexible to capture various URL formats
     urls = []
     url_pattern = re.compile(
-        r"(?:https?|fybernativebrowser|intent|market):\/\/(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+"
+        r"""(?:(?:https?|intent|market|fybernativebrowser):\/\/          # protocol
+    [^\s'"<>\\]+)                                                    # URL body excluding common terminators
+    """,
+        re.VERBOSE,
     )
     found_urls = url_pattern.findall(text)
     for url in found_urls:
-        print("--------------------------------")
-        print(url)
-        # First, unescape HTML entities like &apos; to ' and &lt; to <
-        # unescaped_url = urllib.parse.unescape(url)
-        # Then, URL decode the whole string
+        # print("--------------------------------")
+        # print(url)
         decoded_url = urllib.parse.unquote(url)
         urls.append(decoded_url)
     all_urls = list(set(vast_urls + urls))
@@ -291,7 +299,10 @@ def parse_fyber_ad_response(ad_response_text: str) -> list[str]:
 
 def adv_id_from_play_url(google_play_url: str) -> str:
     parsed_gplay = urllib.parse.urlparse(google_play_url)
-    adv_store_id = urllib.parse.parse_qs(parsed_gplay.query)["id"][0]
+    try:
+        adv_store_id = urllib.parse.parse_qs(parsed_gplay.query)["id"][0]
+    except Exception:
+        adv_store_id = None
     return adv_store_id
 
 
@@ -312,7 +323,9 @@ def parse_urls_for_known_parts(
         elif match := re.search(r"market://details\?id=([a-zA-Z0-9._]+)", url):
             adv_store_id = match.group(1)
         elif "play.google.com" in url and "google.com" in tld_url:
-            adv_store_id = adv_id_from_play_url(url)
+            resp_adv_id = adv_id_from_play_url(url)
+            if resp_adv_id:
+                adv_store_id = resp_adv_id
         elif "appsflyer.com" in url:
             adv_store_id = re.search(r"http.*\.appsflyer\.com/([a-zA-Z0-9_.]+)\?", url)[
                 1
@@ -328,7 +341,9 @@ def parse_urls_for_known_parts(
                 response = requests.get(url, allow_redirects=True)
                 final_url = response.url
                 if "play.google.com" in final_url:
-                    adv_store_id = adv_id_from_play_url(final_url)
+                    resp_adv_id = adv_id_from_play_url(final_url)
+                    if resp_adv_id:
+                        adv_store_id = resp_adv_id
                 else:
                     logger.error(f"Cant find advertiser Unrecognized click {url=}")
         elif "inner-active.mobi" in url:
@@ -338,6 +353,8 @@ def parse_urls_for_known_parts(
             # last effort
             ad_network_url = url
             ad_network_tld = tld_url
+        if adv_store_id:
+            break
         # Stop if we have found both URLs
         if ad_network_url and mmp_url and adv_store_id:
             break
@@ -477,6 +494,7 @@ def parse_everestop_ad(sent_video_dict: dict) -> AdInfo:
 def parse_unity_ad(sent_video_dict: dict, database_connection: PostgresCon) -> AdInfo:
     ad_network_tld = "unity3d.com"
     mmp_url = None
+    adv_store_id = None
     if "auction-load.unityads.unity3d.com" in sent_video_dict["url"]:
         ad_response_text = sent_video_dict["response_text"]
         ad_response = json.loads(ad_response_text)
@@ -497,12 +515,10 @@ def parse_unity_ad(sent_video_dict: dict, database_connection: PostgresCon) -> A
             if "adjust_external" in referrer:
                 mmp_url = "adjust.com"
     else:
-        logger.error(f"Unknown UnityAds domain: {sent_video_dict['url']}")
-        adv_store_id = None
-    #  and auction-load.unityads.unity3d.com
-    # ad_html = sent_video_dict["response_text"]
-    # with open(f"unity_ad_{video_id}.html", "w") as f:
-    #     f.write(ad_html)
+        all_urls = extract_and_decode_urls(sent_video_dict["response_text"])
+        ad_parts = parse_urls_for_known_parts(all_urls, database_connection)
+        adv_store_id = ad_parts["adv_store_id"]
+        mmp_url = ad_parts["mmp_url"]
     ad_info = AdInfo(
         adv_store_id=adv_store_id,
         ad_network_tld=ad_network_tld,
@@ -544,8 +560,14 @@ def parse_vungle_ad(sent_video_dict: dict) -> AdInfo:
 def parse_fyber_ad(sent_video_dict: dict, database_connection: PostgresCon) -> AdInfo:
     ad_network_tld = "fyber.com"
     mmp_url = None
-    ad_response_text = sent_video_dict["response_text"]
-    all_urls = extract_and_decode_urls(text=ad_response_text)
+    parsed_urls = []
+    text = sent_video_dict["response_text"]
+    try:
+        parsed_urls = parse_fyber_ad_response(text)
+    except Exception:
+        pass
+    all_urls = extract_and_decode_urls(text=text)
+    all_urls = list(set(all_urls + parsed_urls))
     ad_parts = parse_urls_for_known_parts(all_urls, database_connection)
     adv_store_id = ad_parts["adv_store_id"]
     ad_network_tld = ad_parts["ad_network_tld"]
@@ -646,6 +668,8 @@ def get_creatives(
         if row["tld_url"] == "unity3dusercontent.com":
             # this isn't the video name, but the id of the content as the name is the quality
             video_id = row["url"].split("/")[-2]
+        if row["tld_url"] == "adcolony.com":
+            video_id = row["url"].split("/")[-2]
         if video_id == "":
             error_msg = "Video ID is empty"
             row["error_msg"] = error_msg
@@ -743,22 +767,23 @@ def get_creatives(
             row["error_msg"] = error_msg
             error_messages.append(row)
             continue
-        if ad_info.adv_store_id is None:
-            urls = extract_and_decode_urls(sent_video_dict["response_text"])
-            if any([x in urls for x in MMP_TLDS]):
+        if ad_info["adv_store_id"] is None:
+            text = sent_video_dict["response_text"]
+            all_urls = extract_and_decode_urls(text)
+            if any([x in all_urls for x in MMP_TLDS]):
                 error_msg = "found potential app! mmp"
                 row["error_msg"] = error_msg
                 error_messages.append(row)
                 continue
-            ad_parts = parse_urls_for_known_parts(urls, database_connection)
+            ad_parts = parse_urls_for_known_parts(all_urls, database_connection)
             if ad_parts["adv_store_id"] is not None:
                 error_msg = "found potential app! adv_store_id"
                 row["error_msg"] = error_msg
                 error_messages.append(row)
                 continue
             else:
-                ad_info.adv_store_id = "unknown"
-        if ad_info.adv_store_id == pub_store_id:
+                ad_info["adv_store_id"] = "unknown"
+        if ad_info["adv_store_id"] == pub_store_id:
             error_msg = "Incorrect adv_store_id, identified pub ID as adv ID"
             logger.error(
                 f"Incorrect adv_store_id, identified pub ID as adv ID for video {video_id[0:10]}"
@@ -766,27 +791,27 @@ def get_creatives(
             row["error_msg"] = error_msg
             error_messages.append(row)
             continue
-        local_path = pathlib.Path(CREATIVES_DIR, ad_info.adv_store_id)
+        local_path = pathlib.Path(CREATIVES_DIR, ad_info["adv_store_id"])
         local_path.mkdir(parents=True, exist_ok=True)
         md5_hash = hashlib.md5(row["response_content"]).hexdigest()
         local_path = local_path / f"{md5_hash}.{file_extension}"
         with open(local_path, "wb") as creative_file:
             creative_file.write(row["response_content"])
-        if ad_info.adv_store_id == "unknown":
+        if ad_info["adv_store_id"] == "unknown":
             error_msg = f"Unknown adv_store_id for {row['tld_url']}"
             logger.error(f"Unknown adv_store_id for {row['tld_url']} {video_id}")
             row["error_msg"] = error_msg
             error_messages.append(row)
             continue
         if (
-            ad_info.ad_network_tld
+            ad_info["ad_network_tld"]
             not in query_ad_domains(database_connection=database_connection)[
                 "domain"
             ].to_list()
         ):
-            ad_info.ad_network_tld = get_tld(sent_video_dict["tld_url"])
+            ad_info["ad_network_tld"] = get_tld(sent_video_dict["tld_url"])
         adv_db_id = query_store_app_by_store_id(
-            store_id=ad_info.adv_store_id, database_connection=database_connection
+            store_id=ad_info["adv_store_id"], database_connection=database_connection
         )
         init_tld = (
             tldextract.extract(sent_video_dict["tld_url"]).domain
@@ -796,18 +821,18 @@ def get_creatives(
         adv_creatives.append(
             {
                 "pub_store_id": pub_store_id,
-                "adv_store_id": ad_info.adv_store_id,
+                "adv_store_id": ad_info["adv_store_id"],
                 "adv_store_app_id": adv_db_id,
-                "ad_network_tld": ad_info.ad_network_tld,
+                "ad_network_tld": ad_info["ad_network_tld"],
                 "creative_initial_domain_tld": init_tld,
-                "mmp_tld": ad_info.mmp_tld if ad_info.mmp_tld else None,
+                "mmp_tld": ad_info["mmp_tld"] if ad_info["mmp_url"] else None,
                 "md5_hash": md5_hash,
                 "file_extension": file_extension,
                 "local_path": local_path,
             }
         )
         logger.debug(
-            f"{i}/{row_count}: {ad_info.ad_network_tld} adv={ad_info.adv_store_id} init_tld={init_tld}"
+            f"{i}/{row_count}: {ad_info['ad_network_tld']} adv={ad_info['adv_store_id']} init_tld={init_tld}"
         )
     adv_creatives_df = pd.DataFrame(adv_creatives)
     if adv_creatives_df.empty:
@@ -1060,8 +1085,8 @@ def parse_all_runs_for_store_id(
 def parse_specific_run_for_store_id(
     pub_store_id: str, run_id: int, database_connection: PostgresCon
 ) -> pd.DataFrame:
-    pub_store_id = "com.ohmgames.chambouletout"
-    run_id = 3973
+    pub_store_id = "com.car.jam.puzzle"
+    run_id = 10187
     mitm_log_path = pathlib.Path(MITM_DIR, f"{pub_store_id}_{run_id}.log")
     if not mitm_log_path.exists():
         key = f"mitm_logs/android/{pub_store_id}/{run_id}.log"
