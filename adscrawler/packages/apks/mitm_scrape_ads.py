@@ -227,6 +227,8 @@ def extract_and_decode_urls(text: str):
     )
     found_urls = url_pattern.findall(text)
     for url in found_urls:
+        print("--------------------------------")
+        print(url)
         # First, unescape HTML entities like &apos; to ' and &lt; to <
         # unescaped_url = urllib.parse.unescape(url)
         # Then, URL decode the whole string
@@ -319,6 +321,7 @@ def parse_urls_for_known_parts(
         elif tld_url in MMP_TLDS:
             mmp_url = url
         elif "tpbid.com" in url:
+            url = url.replace("fybernativebrowser://navigate?url=", "")
             ad_network_url = url
             ad_network_tld = tld_url
             if "/click" in url:
@@ -424,7 +427,9 @@ def decode_utf8(view) -> tuple[bytes, str, bool]:
         return view_bytes, "", False
 
 
-def parse_bidmachine_ad(sent_video_dict: dict) -> AdInfo:
+def parse_bidmachine_ad(
+    sent_video_dict: dict, database_connection: PostgresCon
+) -> AdInfo:
     sent_video_dict["response_content"]
     ret = protod.dump(
         sent_video_dict["response_content"],
@@ -432,40 +437,24 @@ def parse_bidmachine_ad(sent_video_dict: dict) -> AdInfo:
         str_decoder=decode_utf8,
     )
     mmp_url = None
-    ad_network_url = None
+    adv_store_id = None
+    ad_network_tld = None
     try:
         adv_store_id = ret[5][6][3][13][2][3]
         ad_network_tld = ret[5][6][3][13][2][2]
     except Exception:
         pass
-    text = str(ret[5][6][3][13][2][17])
-    urls = extract_and_decode_urls(text)
-    for url in urls:
-        tld_url = tldextract.extract(url).domain + "." + tldextract.extract(url).suffix
-        if "appsflyer.com" in url:
-            adv_store_id = re.search(r"http.*\.appsflyer\.com/([a-zA-Z0-9_.]+)\?", url)[
-                1
-            ]
-            mmp_url = url
-        elif tld_url in MMP_TLDS:
-            mmp_url = url
-        elif "bidmachine.io" in url:
-            ad_network_url = url
-            ad_network_tld = tld_url
-        elif "intent://" in url:
-            adv_store_id = url.replace("intent://", "")
-        elif "market://details?id=" in url:
-            parsed_market_intent = urllib.parse.urlparse(url)
-            adv_store_id = urllib.parse.parse_qs(parsed_market_intent.query)["id"][0]
-        else:
-            logger.debug(f"Found unknown URL: {url}")
-        # Stop if we have found both URLs
-        if ad_network_url and mmp_url and adv_store_id:
-            break
-    ad_info = AdInfo(
-        adv_store_id=adv_store_id, ad_network_tld=ad_network_tld, mmp_url=mmp_url
-    )
-    return ad_info
+    if adv_store_id is None:
+        text = str(ret[5][6][3][13][2][17])
+        urls = extract_and_decode_urls(text)
+        ad_parts = parse_urls_for_known_parts(urls, database_connection)
+    else:
+        ad_parts = {
+            "adv_store_id": adv_store_id,
+            "ad_network_tld": ad_network_tld,
+            "mmp_url": mmp_url,
+        }
+    return ad_parts
 
 
 def parse_everestop_ad(sent_video_dict: dict) -> AdInfo:
@@ -556,7 +545,7 @@ def parse_fyber_ad(sent_video_dict: dict, database_connection: PostgresCon) -> A
     ad_network_tld = "fyber.com"
     mmp_url = None
     ad_response_text = sent_video_dict["response_text"]
-    all_urls = extract_and_decode_urls(ad_response_text)
+    all_urls = extract_and_decode_urls(text=ad_response_text)
     ad_parts = parse_urls_for_known_parts(all_urls, database_connection)
     adv_store_id = ad_parts["adv_store_id"]
     ad_network_tld = ad_parts["ad_network_tld"]
@@ -676,7 +665,7 @@ def get_creatives(
         if "vungle.com" in sent_video_dict["tld_url"]:
             ad_info = parse_vungle_ad(sent_video_dict)
         elif "bidmachine.io" in sent_video_dict["tld_url"]:
-            ad_info = parse_bidmachine_ad(sent_video_dict)
+            ad_info = parse_bidmachine_ad(sent_video_dict, database_connection)
         elif (
             "fyber.com" in sent_video_dict["tld_url"]
             or "tpbid.com" in sent_video_dict["tld_url"]
@@ -702,7 +691,7 @@ def get_creatives(
                     [x in response_text for x in PLAYSTORE_URL_PARTS + MMP_TLDS]
                 )
                 if found_potential_app:
-                    error_msg = "doubleclick found potential app!"
+                    error_msg = "found potential app! doubleclick"
                 else:
                     error_msg = "doubleclick html / web ad"
                 row["error_msg"] = error_msg
@@ -1058,8 +1047,8 @@ def parse_all_runs_for_store_id(
 def parse_specific_run_for_store_id(
     pub_store_id: str, run_id: int, database_connection: PostgresCon
 ) -> pd.DataFrame:
-    pub_store_id = "com.big.summerwheelie"
-    run_id = 10811
+    pub_store_id = "com.ohmgames.chambouletout"
+    run_id = 3973
     mitm_log_path = pathlib.Path(MITM_DIR, f"{pub_store_id}_{run_id}.log")
     if not mitm_log_path.exists():
         key = f"mitm_logs/android/{pub_store_id}/{run_id}.log"
