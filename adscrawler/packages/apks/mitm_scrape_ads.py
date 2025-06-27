@@ -744,7 +744,20 @@ def get_creatives(
             error_messages.append(row)
             continue
         if ad_info.adv_store_id is None:
-            ad_info.adv_store_id = "unknown"
+            urls = extract_and_decode_urls(sent_video_dict["response_text"])
+            if any([x in urls for x in MMP_TLDS]):
+                error_msg = "found potential app! mmp"
+                row["error_msg"] = error_msg
+                error_messages.append(row)
+                continue
+            ad_parts = parse_urls_for_known_parts(urls, database_connection)
+            if ad_parts["adv_store_id"] is not None:
+                error_msg = "found potential app! adv_store_id"
+                row["error_msg"] = error_msg
+                error_messages.append(row)
+                continue
+            else:
+                ad_info.adv_store_id = "unknown"
         if ad_info.adv_store_id == pub_store_id:
             error_msg = "Incorrect adv_store_id, identified pub ID as adv ID"
             logger.error(
