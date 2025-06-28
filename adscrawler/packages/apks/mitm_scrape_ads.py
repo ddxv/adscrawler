@@ -190,7 +190,7 @@ def get_first_sent_video_df(
     if sent_video_df.empty:
         return None
     if sent_video_df.shape[0] > 1:
-        logger.debug("Multiple responses for video found, selecting 1")
+        logger.info("Multiple responses for video found, selecting 1")
         sent_video_df = sent_video_df.head(1).reset_index()
     response = sent_video_df.to_dict(orient="records")[0]
     subdomain = tldextract.extract(response["url"]).subdomain
@@ -230,6 +230,7 @@ def extract_and_decode_urls(text: str):
     # 1. Broad regex for URLs (http, https, fybernativebrowser, etc.)
     # This pattern is made more flexible to capture various URL formats
     urls = []
+    text = html.unescape(text)
     url_pattern = re.compile(
         r"""(?:(?:https?|intent|market|fybernativebrowser):\/\/          # protocol
     [^\s'"<>\\]+)                                                    # URL body excluding common terminators
@@ -580,10 +581,10 @@ def parse_fyber_ad(sent_video_dict: dict, database_connection: PostgresCon) -> A
     return ad_info
 
 
-def parse_google_ad(ad_html: dict, database_connection: PostgresCon) -> AdInfo:
+def parse_google_ad(text: str, database_connection: PostgresCon) -> AdInfo:
     # with open(f"google_ad_{video_id}.html", "w") as f:
     #     f.write(ad_html)
-    all_urls = extract_and_decode_urls(ad_html)
+    all_urls = extract_and_decode_urls(text)
     ad_parts = parse_urls_for_known_parts(all_urls, database_connection)
     try:
         adv_store_id = ad_parts["adv_store_id"]
@@ -622,7 +623,7 @@ def get_creatives(
     df["url"].apply(lambda x: os.path.basename(urllib.parse.urlparse(x).path))
     df["file_extension"] = df["url"].apply(lambda x: x.split(".")[-1])
     ext_too_long = (df["file_extension"].str.len() > 4) & (
-        df["content_type"].fillna("").str.contains("/")
+        df["response_content_type"].fillna("").str.contains("/")
     )
 
     def get_subtype(x):
@@ -630,7 +631,9 @@ def get_creatives(
         return parts[1] if len(parts) > 1 else None
 
     df["file_extension"] = np.where(
-        ext_too_long, df["content_type"].apply(get_subtype), df["file_extension"]
+        ext_too_long,
+        df["response_content_type"].apply(get_subtype),
+        df["file_extension"],
     )
     status_code_200 = df["status_code"] == 200
     response_content_not_na = df["response_content"].notna()
@@ -665,6 +668,16 @@ def get_creatives(
     for _i, row in creatives_df.iterrows():
         i += 1
         video_id = ".".join(row["url"].split("/")[-1].split(".")[:-1])
+        if "2mdn" in row["tld_url"]:
+            if "/id/" in row["url"]:
+                url_parts = urllib.parse.urlparse(row["url"])
+                video_id = url_parts.path.split("/id/")[1].split("/")[0]
+            elif "simgad" in row["url"]:
+                video_id = row["url"].split("/")[-1]
+        if "googlevideo" in row["tld_url"]:
+            url_parts = urllib.parse.urlparse(row["url"])
+            query_params = urllib.parse.parse_qs(url_parts.query)
+            video_id = query_params["ei"][0]
         if row["tld_url"] == "unity3dusercontent.com":
             # this isn't the video name, but the id of the content as the name is the quality
             video_id = row["url"].split("/")[-2]
@@ -706,11 +719,14 @@ def get_creatives(
                 error_messages.append(row)
                 continue
             response_text = sent_video_dict["response_text"]
-            if (
+            if response_text[0:14] == "<?xml version=":
+                ad_info = parse_google_ad(
+                    text=response_text, database_connection=database_connection
+                )
+            elif (
                 response_text[0:15] == "<!DOCTYPE html>"
                 or response_text[0:15] == "document.write("
             ):
-                # destinationUrl holds web landing page for a regular ad
                 found_potential_app = any(
                     [x in response_text for x in PLAYSTORE_URL_PARTS + MMP_TLDS]
                 )
@@ -718,44 +734,50 @@ def get_creatives(
                     error_msg = "found potential app! doubleclick"
                 else:
                     error_msg = "doubleclick html / web ad"
+                logger.info(error_msg)
                 row["error_msg"] = error_msg
                 error_messages.append(row)
                 continue
-            google_response = json.loads(response_text)
-            if "ad_networks" in google_response:
-                try:
-                    ad_html = google_response["ad_networks"][0]["ad"]["ad_html"]
-                    ad_info = parse_google_ad(ad_html, database_connection)
-                except Exception:
-                    error_msg = "doubleclick failing to parse ad_html for VAST response"
-                    logger.error(error_msg)
-                    row["error_msg"] = error_msg
-                    error_messages.append(row)
-                    continue
-            elif "slots" in google_response:
-                try:
+            else:
+                google_response = json.loads(response_text)
+                if "ad_networks" in google_response:
+                    try:
+                        ad_html = google_response["ad_networks"][0]["ad"]["ad_html"]
+                        ad_info = parse_google_ad(ad_html, database_connection)
+                    except Exception:
+                        error_msg = (
+                            "doubleclick failing to parse ad_html for VAST response"
+                        )
+                        logger.error(error_msg)
+                        row["error_msg"] = error_msg
+                        error_messages.append(row)
+                        continue
+                elif "slots" in google_response:
+                    slot_adv = None
                     for slot in google_response["slots"]:
+                        if slot_adv is not None:
+                            continue
                         if video_id in str(slot):
                             for ad in slot["ads"]:
                                 if video_id in str(ad):
-                                    for clickurl in ad["tracking_urls_and_actions"][
-                                        "click_actions"
-                                    ]:
-                                        logger.info(get_tld(clickurl["url"]))
-                    # Haven't found example with adv_id
-                    raise Exception
-                except Exception:
-                    error_msg = "doubleclick failing to parse for slots response"
+                                    slots_try = parse_google_ad(
+                                        str(slot), database_connection
+                                    )
+                                    if slots_try["adv_store_id"] is not None:
+                                        ad_info = slots_try
+                                        slot_adv = True
+                    if slot_adv is None:
+                        error_msg = "doubleclick failing to parse for slots response"
+                        logger.error(error_msg)
+                        row["error_msg"] = error_msg
+                        error_messages.append(row)
+                        continue
+                else:
+                    error_msg = "doubleclick new format"
                     logger.error(error_msg)
                     row["error_msg"] = error_msg
                     error_messages.append(row)
                     continue
-            else:
-                error_msg = "doubleclick new format"
-                logger.error(error_msg)
-                row["error_msg"] = error_msg
-                error_messages.append(row)
-                continue
         elif "unityads.unity3d.com" in sent_video_dict["tld_url"]:
             ad_info = parse_unity_ad(sent_video_dict, database_connection)
         elif "mtgglobals.com" in sent_video_dict["tld_url"]:
@@ -770,8 +792,8 @@ def get_creatives(
         if ad_info["adv_store_id"] is None:
             text = sent_video_dict["response_text"]
             all_urls = extract_and_decode_urls(text)
-            if any([x in all_urls for x in MMP_TLDS]):
-                error_msg = "found potential app! mmp"
+            if any([x in all_urls for x in MMP_TLDS + PLAYSTORE_URL_PARTS]):
+                error_msg = "found potential app! mmp or playstore"
                 row["error_msg"] = error_msg
                 error_messages.append(row)
                 continue
@@ -1085,8 +1107,8 @@ def parse_all_runs_for_store_id(
 def parse_specific_run_for_store_id(
     pub_store_id: str, run_id: int, database_connection: PostgresCon
 ) -> pd.DataFrame:
-    pub_store_id = "com.car.jam.puzzle"
-    run_id = 10187
+    pub_store_id = "com.oussx.dzads"
+    run_id = 24533
     mitm_log_path = pathlib.Path(MITM_DIR, f"{pub_store_id}_{run_id}.log")
     if not mitm_log_path.exists():
         key = f"mitm_logs/android/{pub_store_id}/{run_id}.log"
