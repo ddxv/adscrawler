@@ -3,7 +3,6 @@ import datetime
 import hashlib
 import html
 import json
-import os
 import pathlib
 import re
 import urllib
@@ -620,7 +619,7 @@ def get_creatives(
         row = {"run_id": run_id, "pub_store_id": pub_store_id, "error_msg": error_msg}
         error_messages.append(row)
         return pd.DataFrame(), error_messages
-    df["url"].apply(lambda x: os.path.basename(urllib.parse.urlparse(x).path))
+    # df["url"].apply(lambda x: os.path.basename(urllib.parse.urlparse(x).path))
     df["file_extension"] = df["url"].apply(lambda x: x.split(".")[-1])
     ext_too_long = (df["file_extension"].str.len() > 4) & (
         df["response_content_type"].fillna("").str.contains("/")
@@ -632,12 +631,12 @@ def get_creatives(
 
     df["file_extension"] = np.where(
         ext_too_long,
-        df["response_content_type"].apply(get_subtype),
+        df["response_content_type"].fillna("").apply(get_subtype),
         df["file_extension"],
     )
     status_code_200 = df["status_code"] == 200
     response_content_not_na = df["response_content"].notna()
-    is_creative_content = (
+    is_creative_content_response = (
         df["response_content_type"]
         .fillna("")
         .str.contains(
@@ -646,6 +645,16 @@ def get_creatives(
             regex=True,
         )
     )
+    is_creative_content_request = (
+        df["response_content_type"]
+        .fillna("")
+        .str.contains(
+            r"\b(image|video)/(jpeg|jpg|png|gif|webp|webm|mp4|mpeg|avi|quicktime)\b",
+            case=False,
+            regex=True,
+        )
+    )
+    is_creative_content = is_creative_content_response | is_creative_content_request
     df["is_creative_content"] = is_creative_content
     creatives_df = df[
         response_content_not_na & is_creative_content & status_code_200
@@ -1107,8 +1116,8 @@ def parse_all_runs_for_store_id(
 def parse_specific_run_for_store_id(
     pub_store_id: str, run_id: int, database_connection: PostgresCon
 ) -> pd.DataFrame:
-    pub_store_id = "com.oussx.dzads"
-    run_id = 24533
+    pub_store_id = "com.binance.dev"
+    run_id = 12786
     mitm_log_path = pathlib.Path(MITM_DIR, f"{pub_store_id}_{run_id}.log")
     if not mitm_log_path.exists():
         key = f"mitm_logs/android/{pub_store_id}/{run_id}.log"
