@@ -31,10 +31,14 @@ logger = get_logger(__name__)
 def start_tunnel(server_name: str) -> str:
     from sshtunnel import SSHTunnelForwarder
 
+    from adscrawler.dbcon.connection import get_host_ip
+
+    host = get_host_ip(CONFIG["loki"]["host"])
+
     ssh_port = CONFIG[server_name].get("ssh_port", 22)
     remote_port = CONFIG[server_name].get("remote_port", 5432)
     server = SSHTunnelForwarder(
-        (CONFIG[server_name]["host"], ssh_port),
+        (host, ssh_port),
         ssh_username=CONFIG[server_name]["os_user"],
         remote_bind_address=("127.0.0.1", remote_port),
         ssh_pkey=CONFIG[server_name].get("ssh_pkey"),
@@ -64,8 +68,8 @@ def get_s3_client() -> boto3.client:
         "s3",
         region_name="garage",
         endpoint_url=f"{host}:{db_port}",
-        aws_access_key_id=CONFIG["cloud"]["access_key_id"],
-        aws_secret_access_key=CONFIG["cloud"]["secret_key"],
+        aws_access_key_id=CONFIG["loki"]["access_key_id"],
+        aws_secret_access_key=CONFIG["loki"]["secret_key"],
     )
     return S3_CLIENT
 
@@ -394,7 +398,7 @@ def get_store_id_mitm_s3_keys(store_id: str) -> pd.DataFrame:
     if store == 1:
         prefix = f"mitm/android/{store_id}/"
     elif store == 2:
-        prefix = f"apks/ios/{store_id}/"
+        prefix = f"mitm/ios/{store_id}/"
     else:
         raise ValueError(f"Invalid store: {store}")
     logger.info(f"Getting {store_id=} s3 keys start")

@@ -90,7 +90,7 @@ def parse_mitm_log(
         logger.error(f"mitm log file not found at {mitm_log_path}")
         raise FileNotFoundError
     # Parse the flows
-    requests = []
+    mitm_requests = []
     try:
         with open(mitm_log_path, "rb") as f:
             reader = FlowReader(f)
@@ -147,26 +147,26 @@ def parse_mitm_log(
                             request_data["response_content_type"] = (
                                 flow.response.headers.get("Content-Type", "")
                             )
+                            request_data["response_size"] = flow.response.headers.get(
+                                "Content-Length", "0"
+                            )
                             try:
                                 request_data["response_content"] = flow.response.content
                                 response_text = flow.response.get_text()
                                 request_data["response_text"] = response_text
-                                request_data["response_text"] = request_data[
-                                    "response_text"
-                                ]
                             except Exception:
                                 pass
-                        requests.append(request_data)
+                        mitm_requests.append(request_data)
                     except Exception as e:
                         logger.exception(f"Error parsing flow: {e}")
                         continue
     except Exception as e:
         logger.exception(e)
     # Convert to DataFrame
-    if not requests:
+    if not mitm_requests:
         logger.error("No HTTP requests found in the log file")
         return pd.DataFrame()
-    df = pd.DataFrame(requests)
+    df = pd.DataFrame(mitm_requests)
     if "response_text" in df.columns:
         df["response_text"] = df["response_text"].astype(str)
     df["run_id"] = (
@@ -605,6 +605,30 @@ def parse_google_ad(text: str, database_connection: PostgresCon) -> AdInfo:
     return ad_info
 
 
+def add_is_creative_content_column(df: pd.DataFrame) -> pd.DataFrame:
+    is_creative_content_response = (
+        df["response_content_type"]
+        .fillna("")
+        .str.contains(
+            r"\b(?:image|video)/(?:jpeg|jpg|png|gif|webp|webm|mp4|mpeg|avi|quicktime)\b",
+            case=False,
+            regex=True,
+        )
+    )
+    is_creative_content_request = (
+        df["response_content_type"]
+        .fillna("")
+        .str.contains(
+            r"\b(?:image|video)/(?:jpeg|jpg|png|gif|webp|webm|mp4|mpeg|avi|quicktime)\b",
+            case=False,
+            regex=True,
+        )
+    )
+    is_creative_content = is_creative_content_response | is_creative_content_request
+    df["is_creative_content"] = is_creative_content
+    return df
+
+
 def get_creatives(
     df: pd.DataFrame,
     pub_store_id: str,
@@ -636,32 +660,11 @@ def get_creatives(
     )
     status_code_200 = df["status_code"] == 200
     response_content_not_na = df["response_content"].notna()
-    is_creative_content_response = (
-        df["response_content_type"]
-        .fillna("")
-        .str.contains(
-            r"\b(image|video)/(jpeg|jpg|png|gif|webp|webm|mp4|mpeg|avi|quicktime)\b",
-            case=False,
-            regex=True,
-        )
-    )
-    is_creative_content_request = (
-        df["response_content_type"]
-        .fillna("")
-        .str.contains(
-            r"\b(image|video)/(jpeg|jpg|png|gif|webp|webm|mp4|mpeg|avi|quicktime)\b",
-            case=False,
-            regex=True,
-        )
-    )
-    is_creative_content = is_creative_content_response | is_creative_content_request
-    df["is_creative_content"] = is_creative_content
+    df = add_is_creative_content_column(df)
     creatives_df = df[
-        response_content_not_na & is_creative_content & status_code_200
+        response_content_not_na & (df["is_creative_content"]) & status_code_200
     ].copy()
-    creatives_df["creative_size"] = creatives_df["response_content"].apply(
-        lambda x: len(x) if isinstance(x, bytes) else 0
-    )
+    creatives_df["creative_size"] = creatives_df["response_size"].fillna(0).astype(int)
     creatives_df = creatives_df[creatives_df["creative_size"] > 50000]
     if creatives_df.empty:
         run_id = df["run_id"].to_numpy()[0]
@@ -1148,3 +1151,92 @@ def scan_all_apps(database_connection: PostgresCon) -> None:
         if not app_failed_df.empty:
             all_failed_df = pd.concat([all_failed_df, app_failed_df], ignore_index=True)
             logger.info(f"Saved {all_failed_df.shape[0]} failed creatives to csv")
+
+
+def download_all_mitms(database_connection: PostgresCon) -> None:
+    apps_to_download = query_apps_to_creative_scan(
+        database_connection=database_connection
+    )
+    for i, app in apps_to_download.iterrows():
+        logger.info(f"{i}/{apps_to_download.shape[0]}: {app['store_id']} start")
+        pub_store_id = app["store_id"]
+        # Check if any log files exist for this pub_store_id
+        if list(pathlib.Path(MITM_DIR).glob(f"{pub_store_id}_*.log")):
+            logger.info(f"{pub_store_id} already downloaded")
+            continue
+        try:
+            mitms = get_store_id_mitm_s3_keys(store_id=pub_store_id)
+        except FileNotFoundError:
+            logger.error(f"{pub_store_id} not found in s3")
+            continue
+        for _i, mitm in mitms.iterrows():
+            key = mitm["key"]
+            run_id = mitm["run_id"]
+            filename = f"{pub_store_id}_{run_id}.log"
+            if not pathlib.Path(MITM_DIR, filename).exists():
+                _mitm_log_path = download_mitm_log_by_key(key, filename)
+            else:
+                pass
+
+
+def open_all_local_mitms(database_connection: PostgresCon) -> None:
+    all_mitms_df = pd.DataFrame()
+    i = 0
+    num_files = len(list(pathlib.Path(MITM_DIR).glob("*.log")))
+    logger.info(f"Opening {num_files} local mitm logs")
+    for mitm_log_path in pathlib.Path(MITM_DIR).glob("*.log"):
+        i += 1
+        logger.info(f"{i}/{num_files}: {mitm_log_path}")
+        pub_store_id = mitm_log_path.name.split("_")[0]
+        run_id = mitm_log_path.name.split("_")[1].replace(".log", "")
+        df = parse_mitm_log(mitm_log_path)
+        if "response_content_type" in df.columns:
+            df = add_is_creative_content_column(df)
+            df["response_text"] = np.where(
+                df["is_creative_content"], "", df["response_text"]
+            )
+            df["response_content"] = np.where(
+                df["is_creative_content"], "", df["response_content"]
+            )
+        if "response_size" in df.columns:
+            df["response_text"] = np.where(
+                df["response_size"].fillna("0").astype(int) > 500000,
+                "",
+                df["response_text"],
+            )
+            df["response_content"] = np.where(
+                df["response_size"].fillna("0").astype(int) > 500000,
+                "",
+                df["response_content"],
+            )
+        df["pub_store_id"] = pub_store_id
+        df["run_id"] = run_id
+        all_mitms_df = pd.concat([all_mitms_df, df], ignore_index=True)
+    return all_mitms_df
+
+
+def upload_all_mitms_to_s3(all_mitms_df: pd.DataFrame) -> None:
+    import os
+
+    BUCKET_NAME = "appgoblin-data"
+    client = get_cloud_s3_client()
+    client.upload_file(
+        "all_mitms.tsv.xz", Bucket=BUCKET_NAME, Key="mitmcsv/all_mitms.tsv.xz"
+    )
+    os.system("s3cmd setacl s3://appgoblin-data/mitmcsv/ --acl-public --recursive")
+
+
+def get_cloud_s3_client():
+    """Create and return an S3 client."""
+    import boto3
+
+    from adscrawler.config import CONFIG
+
+    session = boto3.session.Session()
+    return session.client(
+        "s3",
+        region_name="sgp1",
+        endpoint_url="https://sgp1.digitaloceanspaces.com",
+        aws_access_key_id=CONFIG["digi-cloud"]["access_key_id"],
+        aws_secret_access_key=CONFIG["digi-cloud"]["secret_key"],
+    )
