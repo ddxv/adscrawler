@@ -231,8 +231,11 @@ def extract_and_decode_urls(text: str):
     urls = []
     text = html.unescape(text)
     url_pattern = re.compile(
-        r"""(?:(?:https?|intent|market|fybernativebrowser):\/\/          # protocol
-    [^\s'"<>\\]+)                                                    # URL body excluding common terminators
+        r"""(?:
+        (?:https?|intent|market|fybernativebrowser):\/\/      # allowed schemes
+        [^\s'"<>\]\)\}]+?                                     # non-greedy match
+    )
+    (?=[\s"'<>\]\)\},]|$)                                     # must be followed by separator or end
     """,
         re.VERBOSE,
     )
@@ -242,6 +245,7 @@ def extract_and_decode_urls(text: str):
         # print(url)
         decoded_url = urllib.parse.unquote(url)
         urls.append(decoded_url)
+        # print(decoded_url)
     all_urls = list(set(vast_urls + urls))
     return all_urls
 
@@ -297,8 +301,8 @@ def parse_fyber_ad_response(ad_response_text: str) -> list[str]:
     return urls
 
 
-def adv_id_from_play_url(google_play_url: str) -> str:
-    parsed_gplay = urllib.parse.urlparse(google_play_url)
+def adv_id_from_play_url(url: str) -> str:
+    parsed_gplay = urllib.parse.urlparse(url)
     try:
         adv_store_id = urllib.parse.parse_qs(parsed_gplay.query)["id"][0]
     except Exception:
@@ -324,8 +328,14 @@ def parse_urls_for_known_parts(
             adv_store_id = match.group(1)
         elif "play.google.com" in url and "google.com" in tld_url:
             resp_adv_id = adv_id_from_play_url(url)
-            if resp_adv_id:
-                adv_store_id = resp_adv_id
+            if not resp_adv_id:
+                continue
+            if adv_store_id:
+                if adv_store_id != resp_adv_id:
+                    raise Exception(
+                        f"multiple adv_store_id found for {resp_adv_id=} & {adv_store_id=}"
+                    )
+            adv_store_id = resp_adv_id
         elif "appsflyer.com" in url:
             adv_store_id = re.search(r"http.*\.appsflyer\.com/([a-zA-Z0-9_.]+)\?", url)[
                 1
@@ -353,8 +363,6 @@ def parse_urls_for_known_parts(
             # last effort
             ad_network_url = url
             ad_network_tld = tld_url
-        if adv_store_id:
-            break
         # Stop if we have found both URLs
         if ad_network_url and mmp_url and adv_store_id:
             break
@@ -447,7 +455,12 @@ def decode_utf8(view) -> tuple[bytes, str, bool]:
 def parse_bidmachine_ad(
     sent_video_dict: dict, database_connection: PostgresCon
 ) -> AdInfo:
-    sent_video_dict["response_content"]
+    if isinstance(sent_video_dict["response_content"], str):
+        import ast
+
+        sent_video_dict["response_content"] = ast.literal_eval(
+            sent_video_dict["response_content"]
+        )
     ret = protod.dump(
         sent_video_dict["response_content"],
         renderer=JsonRenderer(),
@@ -475,6 +488,12 @@ def parse_bidmachine_ad(
 
 
 def parse_everestop_ad(sent_video_dict: dict) -> AdInfo:
+    if isinstance(sent_video_dict["response_content"], str):
+        import ast
+
+        sent_video_dict["response_content"] = ast.literal_eval(
+            sent_video_dict["response_content"]
+        )
     ret = protod.dump(
         sent_video_dict["response_content"],
         renderer=JsonRenderer(),
@@ -633,6 +652,7 @@ def get_creatives(
     df: pd.DataFrame,
     pub_store_id: str,
     database_connection: PostgresCon,
+    do_store_creatives: bool = True,
 ) -> tuple[pd.DataFrame, list]:
     error_messages = []
     if "status_code" not in df.columns:
@@ -643,7 +663,6 @@ def get_creatives(
         row = {"run_id": run_id, "pub_store_id": pub_store_id, "error_msg": error_msg}
         error_messages.append(row)
         return pd.DataFrame(), error_messages
-    # df["url"].apply(lambda x: os.path.basename(urllib.parse.urlparse(x).path))
     df["file_extension"] = df["url"].apply(lambda x: x.split(".")[-1])
     ext_too_long = (df["file_extension"].str.len() > 4) & (
         df["response_content_type"].fillna("").str.contains("/")
@@ -659,11 +678,12 @@ def get_creatives(
         df["file_extension"],
     )
     status_code_200 = df["status_code"] == 200
-    response_content_not_na = df["response_content"].notna()
+    # response_content_not_na = df["response_content"].notna()
     df = add_is_creative_content_column(df)
-    creatives_df = df[
-        response_content_not_na & (df["is_creative_content"]) & status_code_200
-    ].copy()
+    # creatives_df = df[
+    #     response_content_not_na & (df["is_creative_content"]) & status_code_200
+    # ].copy()
+    creatives_df = df[(df["is_creative_content"]) & status_code_200].copy()
     creatives_df["creative_size"] = creatives_df["response_size"].fillna(0).astype(int)
     creatives_df = creatives_df[creatives_df["creative_size"] > 50000]
     if creatives_df.empty:
@@ -731,31 +751,14 @@ def get_creatives(
                 error_messages.append(row)
                 continue
             response_text = sent_video_dict["response_text"]
-            if response_text[0:14] == "<?xml version=":
-                ad_info = parse_google_ad(
-                    text=response_text, database_connection=database_connection
-                )
-            elif (
-                response_text[0:15] == "<!DOCTYPE html>"
-                or response_text[0:15] == "document.write("
-            ):
-                found_potential_app = any(
-                    [x in response_text for x in PLAYSTORE_URL_PARTS + MMP_TLDS]
-                )
-                if found_potential_app:
-                    error_msg = "found potential app! doubleclick"
-                else:
-                    error_msg = "doubleclick html / web ad"
-                logger.info(error_msg)
-                row["error_msg"] = error_msg
-                error_messages.append(row)
-                continue
-            else:
+            try:
                 google_response = json.loads(response_text)
                 if "ad_networks" in google_response:
                     try:
                         ad_html = google_response["ad_networks"][0]["ad"]["ad_html"]
-                        ad_info = parse_google_ad(ad_html, database_connection)
+                        ad_info = parse_google_ad(
+                            text=ad_html, database_connection=database_connection
+                        )
                     except Exception:
                         error_msg = (
                             "doubleclick failing to parse ad_html for VAST response"
@@ -784,6 +787,33 @@ def get_creatives(
                         row["error_msg"] = error_msg
                         error_messages.append(row)
                         continue
+                else:
+                    error_msg = "doubleclick new format"
+                    logger.error(error_msg)
+                    row["error_msg"] = error_msg
+                    error_messages.append(row)
+                    continue
+            except json.JSONDecodeError:
+                if response_text[0:14] == "<?xml version=":
+                    ad_info = parse_google_ad(
+                        text=response_text, database_connection=database_connection
+                    )
+                elif (
+                    response_text[0:15] == "<!DOCTYPE html>"
+                    or response_text[0:15] == "document.write("
+                    or response_text[0:3] == "if "
+                ):
+                    found_potential_app = any(
+                        [x in response_text for x in PLAYSTORE_URL_PARTS + MMP_TLDS]
+                    )
+                    if found_potential_app:
+                        error_msg = "found potential app! doubleclick"
+                    else:
+                        error_msg = "doubleclick html / web ad"
+                    logger.info(error_msg)
+                    row["error_msg"] = error_msg
+                    error_messages.append(row)
+                    continue
                 else:
                     error_msg = "doubleclick new format"
                     logger.error(error_msg)
@@ -827,10 +857,14 @@ def get_creatives(
             continue
         local_path = pathlib.Path(CREATIVES_DIR, ad_info["adv_store_id"])
         local_path.mkdir(parents=True, exist_ok=True)
-        md5_hash = hashlib.md5(row["response_content"]).hexdigest()
-        local_path = local_path / f"{md5_hash}.{file_extension}"
-        with open(local_path, "wb") as creative_file:
-            creative_file.write(row["response_content"])
+        if do_store_creatives:
+            md5_hash = hashlib.md5(row["response_content"]).hexdigest()
+            local_path = local_path / f"{md5_hash}.{file_extension}"
+            with open(local_path, "wb") as creative_file:
+                creative_file.write(row["response_content"])
+        else:
+            local_path = local_path / f"{video_id}.{file_extension}"
+            md5_hash = video_id
         if ad_info["adv_store_id"] == "unknown":
             error_msg = f"Unknown adv_store_id for {row['tld_url']}"
             logger.error(f"Unknown adv_store_id for {row['tld_url']} {video_id}")
@@ -844,9 +878,17 @@ def get_creatives(
             ].to_list()
         ):
             ad_info["ad_network_tld"] = get_tld(sent_video_dict["tld_url"])
-        adv_db_id = query_store_app_by_store_id(
-            store_id=ad_info["adv_store_id"], database_connection=database_connection
-        )
+        try:
+            adv_db_id = query_store_app_by_store_id(
+                store_id=ad_info["adv_store_id"],
+                database_connection=database_connection,
+            )
+        except Exception:
+            error_msg = "found potential app! but failed to get db id"
+            logger.error(error_msg)
+            row["error_msg"] = error_msg
+            error_messages.append(row)
+            continue
         init_tld = (
             tldextract.extract(sent_video_dict["tld_url"]).domain
             + "."
@@ -1179,7 +1221,7 @@ def download_all_mitms(database_connection: PostgresCon) -> None:
                 pass
 
 
-def open_all_local_mitms(database_connection: PostgresCon) -> None:
+def open_all_local_mitms() -> pd.DataFrame:
     all_mitms_df = pd.DataFrame()
     i = 0
     num_files = len(list(pathlib.Path(MITM_DIR).glob("*.log")))
@@ -1215,7 +1257,7 @@ def open_all_local_mitms(database_connection: PostgresCon) -> None:
     return all_mitms_df
 
 
-def upload_all_mitms_to_s3(all_mitms_df: pd.DataFrame) -> None:
+def upload_all_mitms_to_s3() -> None:
     import os
 
     BUCKET_NAME = "appgoblin-data"
@@ -1240,3 +1282,23 @@ def get_cloud_s3_client():
         aws_access_key_id=CONFIG["digi-cloud"]["access_key_id"],
         aws_secret_access_key=CONFIG["digi-cloud"]["secret_key"],
     )
+
+
+def test_mitm_scrape_ads(database_connection: PostgresCon):
+    all_mitms_df = pd.read_csv("all_mitms.tsv", sep="\t")
+    all_creatives_df = pd.DataFrame()
+    all_error_messages = []
+    row_count = all_mitms_df[["pub_store_id", "run_id"]].drop_duplicates().shape[0]
+    i = 0
+    for (pub_store_id, run_id), df in all_mitms_df.groupby(["pub_store_id", "run_id"]):
+        i += 1
+        logger.info(f"{i}/{row_count}: {pub_store_id}, {run_id}")
+        df["pub_store_id"] = pub_store_id
+        df["run_id"] = run_id
+        adv_creatives_df, error_messages = get_creatives(
+            df, pub_store_id, database_connection, do_store_creatives=False
+        )
+        all_creatives_df = pd.concat(
+            [all_creatives_df, adv_creatives_df], ignore_index=True
+        )
+        all_error_messages.append(error_messages)

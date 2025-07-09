@@ -866,7 +866,7 @@ def query_store_app_by_store_id(
     try:
         return int(df.iloc[0]["id"])
     except Exception:
-        logger.exception(f"Error getting store app id for {store_id}")
+        logger.exception(f"Error getting store app id for '{store_id}'")
         raise
 
 
