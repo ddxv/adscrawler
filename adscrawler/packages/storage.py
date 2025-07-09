@@ -496,7 +496,9 @@ def download_mitm_log_by_key(key: str, filename: str) -> pathlib.Path:
     return downloaded_file_path
 
 
-def download_app_by_store_id(store: int, store_id: str) -> tuple[pathlib.Path, str]:
+def download_app_by_store_id(
+    store: int, store_id: str, version_str: str = None
+) -> tuple[pathlib.Path, str]:
     func_info = "download_app_by_store_id "
     df = get_store_id_apk_s3_keys(store, store_id)
     if df.empty:
@@ -505,9 +507,12 @@ def download_app_by_store_id(store: int, store_id: str) -> tuple[pathlib.Path, s
     df = df[~(df["version_code"] == "failed")]
     if df.empty:
         logger.error(f"{store_id=} S3 only has failed apk, no version_code")
-    df = df.sort_values(by="version_code", ascending=False)
+    if version_str:
+        df = df[df["version_code"] == version_str]
+    else:
+        df = df.sort_values(by="version_code", ascending=False)
+        version_str: str = df["version_code"].to_numpy()[0]
     key = df["key"].to_numpy()[0]
-    version_str: str = df["version_code"].to_numpy()[0]
     filename = key.split("/")[-1]
     extension = filename.split(".")[-1]
     if extension == "apk":
@@ -563,13 +568,16 @@ def download_s3_app_by_key(
     return final_path
 
 
-def download_to_local(store: int, store_id: str) -> tuple[pathlib.Path, str]:
-    version_str = None
+def download_to_local(
+    store: int, store_id: str, version_str: str = None
+) -> tuple[pathlib.Path, str]:
     file_path = get_local_file_path(store, store_id)
     if file_path:
         logger.info(f"{store_id=} already downloaded")
         return file_path, version_str
-    file_path, version_str = download_app_by_store_id(store=store, store_id=store_id)
+    file_path, version_str = download_app_by_store_id(
+        store=store, store_id=store_id, version_str=version_str
+    )
     if file_path is None:
         raise FileNotFoundError(f"{store_id=} no file found: {file_path=}")
     return file_path, version_str

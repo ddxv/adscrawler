@@ -551,23 +551,32 @@ def get_tld(url: str) -> str:
     return tld
 
 
-def parse_vungle_ad(sent_video_dict: dict) -> AdInfo:
+def parse_vungle_ad(sent_video_dict: dict, database_connection: PostgresCon) -> AdInfo:
     ad_network_tld = "vungle.com"
     mmp_url = None
+    adv_store_id = None
     ad_response_text = sent_video_dict["response_text"]
     response_dict = json.loads(ad_response_text)
-    adv_store_id = response_dict["ads"][0]["ad_markup"]["ad_market_id"]
-    check_urls = ["clickUrl", "checkpoint.0", "checkpoint.100"]
-    urlkeys = response_dict["ads"][0]["ad_markup"]["tpat"]
-    for x in check_urls:
-        try:
-            these_urls = urlkeys[x]
-            for url in these_urls:
-                if get_tld(url) in MMP_TLDS:
-                    mmp_url = url
-                    break
-        except Exception:
-            pass
+    try:
+        adv_store_id = response_dict["ads"][0]["ad_markup"]["ad_market_id"]
+        check_urls = ["clickUrl", "checkpoint.0", "checkpoint.100"]
+        urlkeys = response_dict["ads"][0]["ad_markup"]["tpat"]
+        for x in check_urls:
+            try:
+                these_urls = urlkeys[x]
+                for url in these_urls:
+                    if get_tld(url) in MMP_TLDS:
+                        mmp_url = url
+                        break
+            except Exception:
+                pass
+    except Exception:
+        pass
+    if not adv_store_id:
+        extracted_urls = extract_and_decode_urls(ad_response_text)
+        ad_parts = parse_urls_for_known_parts(extracted_urls, database_connection)
+        adv_store_id = ad_parts["adv_store_id"]
+        mmp_url = ad_parts["mmp_url"]
     ad_info = AdInfo(
         adv_store_id=adv_store_id,
         ad_network_tld=ad_network_tld,
@@ -700,6 +709,8 @@ def get_creatives(
     for _i, row in creatives_df.iterrows():
         i += 1
         video_id = ".".join(row["url"].split("/")[-1].split(".")[:-1])
+        if video_id.startswith("?"):
+            video_id = video_id[1:]
         if "2mdn" in row["tld_url"]:
             if "/id/" in row["url"]:
                 url_parts = urllib.parse.urlparse(row["url"])
@@ -732,7 +743,7 @@ def get_creatives(
             error_messages.append(row)
             continue
         if "vungle.com" in sent_video_dict["tld_url"]:
-            ad_info = parse_vungle_ad(sent_video_dict)
+            ad_info = parse_vungle_ad(sent_video_dict, database_connection)
         elif "bidmachine.io" in sent_video_dict["tld_url"]:
             ad_info = parse_bidmachine_ad(sent_video_dict, database_connection)
         elif (
