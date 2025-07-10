@@ -807,8 +807,11 @@ def process_apks_for_waydroid(
         logger.info(f"Start app {_}/{apps_df.shape[0]}: {row.store_id}")
         store_id = row.store_id
         store_app = row.store_app
+        version_str = row.version_string
         try:
-            apk_path, _version_str = download_to_local(store=1, store_id=store_id)
+            apk_path, _version_str = download_to_local(
+                store=1, store_id=store_id, version_str=version_str
+            )
             if not apk_path:
                 raise FileNotFoundError(f"APK file not found for {store_id=}")
         except FileNotFoundError:
