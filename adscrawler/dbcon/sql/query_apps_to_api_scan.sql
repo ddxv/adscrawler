@@ -59,7 +59,7 @@ scheduled_to_run AS (
         lvc.store_app,
         sa.name,
         sa.store_id,
-        lsvc.version_code AS version_string,
+        lvc.version_code AS version_string,
         sa.installs,
         ls.run_at AS last_run_at,
         fr.failed_attempts,
