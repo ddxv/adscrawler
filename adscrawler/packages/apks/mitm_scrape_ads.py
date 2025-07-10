@@ -1193,9 +1193,6 @@ def scan_all_apps(database_connection: PostgresCon) -> None:
     apps_to_scan = query_apps_to_creative_scan(database_connection=database_connection)
     apps_count = apps_to_scan.shape[0]
     all_failed_df = pd.DataFrame()
-    apps_to_scan = apps_to_scan[
-        apps_to_scan["store_id"] == "com.frameme.photoeditor.collagemaker.effects"
-    ]
     for i, app in apps_to_scan.iterrows():
         pub_store_id = app["store_id"]
         logger.info(f"{i}/{apps_count}: {pub_store_id} start")
