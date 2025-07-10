@@ -177,7 +177,7 @@ def parse_mitm_log(
 
 def get_first_sent_video_df(
     df: pd.DataFrame, row: pd.Series, video_id: str
-) -> dict | None:
+) -> pd.Series | None:
     sent_video_df = df[
         (df["response_text"].astype(str).str.contains(video_id))
         & (df["start_time"] <= row.start_time)
@@ -191,24 +191,8 @@ def get_first_sent_video_df(
     if sent_video_df.shape[0] > 1:
         logger.info("Multiple responses for video found, selecting 1")
         sent_video_df = sent_video_df.head(1).reset_index()
-    response = sent_video_df.to_dict(orient="records")[0]
-    subdomain = tldextract.extract(response["url"]).subdomain
-    if subdomain:
-        tld_url = (
-            subdomain
-            + "."
-            + tldextract.extract(response["url"]).domain
-            + "."
-            + tldextract.extract(response["url"]).suffix
-        )
-    else:
-        tld_url = (
-            tldextract.extract(response["url"]).domain
-            + "."
-            + tldextract.extract(response["url"]).suffix
-        )
-    response["tld_url"] = tld_url
-    return response
+    sent_video_df["tld_url"] = sent_video_df["url"].apply(lambda x: get_tld(x))
+    return sent_video_df
 
 
 def extract_and_decode_urls(text: str):
@@ -735,184 +719,220 @@ def get_creatives(
         if video_id in IGNORE_CREATIVE_IDS:
             logger.info(f"Ignoring video {video_id}.{file_extension}")
             continue
-        sent_video_dict = get_first_sent_video_df(df, row, video_id)
-        if sent_video_dict is None:
+        sent_video_df = get_first_sent_video_df(df, row, video_id)
+        if sent_video_df is None or sent_video_df.empty:
             error_msg = f"No source bidrequest found for {row['tld_url']}"
             logger.error(f"{error_msg} {video_id}")
             row["error_msg"] = error_msg
             error_messages.append(row)
             continue
-        if "vungle.com" in sent_video_dict["tld_url"]:
-            ad_info = parse_vungle_ad(sent_video_dict, database_connection)
-        elif "bidmachine.io" in sent_video_dict["tld_url"]:
-            ad_info = parse_bidmachine_ad(sent_video_dict, database_connection)
-        elif (
-            "fyber.com" in sent_video_dict["tld_url"]
-            or "tpbid.com" in sent_video_dict["tld_url"]
-            or "inner-active.mobi" in sent_video_dict["tld_url"]
-        ):
-            ad_info = parse_fyber_ad(sent_video_dict, database_connection)
-        elif "everestop.io" in sent_video_dict["tld_url"]:
-            ad_info = parse_everestop_ad(sent_video_dict)
-        elif "doubleclick.net" in sent_video_dict["tld_url"]:
-            if sent_video_dict["response_text"] is None:
-                error_msg = "doubleclick no response_text"
+        sent_video_dicts = sent_video_df.to_dict(orient="records")
+        found_ad_infos = []
+        for sent_video_dict in sent_video_dicts:
+            if "vungle.com" in sent_video_dict["tld_url"]:
+                ad_info = parse_vungle_ad(sent_video_dict, database_connection)
+            elif "bidmachine.io" in sent_video_dict["tld_url"]:
+                ad_info = parse_bidmachine_ad(sent_video_dict, database_connection)
+            elif (
+                "fyber.com" in sent_video_dict["tld_url"]
+                or "tpbid.com" in sent_video_dict["tld_url"]
+                or "inner-active.mobi" in sent_video_dict["tld_url"]
+            ):
+                ad_info = parse_fyber_ad(sent_video_dict, database_connection)
+            elif "everestop.io" in sent_video_dict["tld_url"]:
+                ad_info = parse_everestop_ad(sent_video_dict)
+            elif "doubleclick.net" in sent_video_dict["tld_url"]:
+                if sent_video_dict["response_text"] is None:
+                    error_msg = "doubleclick no response_text"
+                    logger.error(f"{error_msg} for {row['tld_url']} {video_id}")
+                    row["error_msg"] = error_msg
+                    error_messages.append(row)
+                    continue
+                response_text = sent_video_dict["response_text"]
+                try:
+                    google_response = json.loads(response_text)
+                    if "ad_networks" in google_response:
+                        try:
+                            ad_html = google_response["ad_networks"][0]["ad"]["ad_html"]
+                            ad_info = parse_google_ad(
+                                text=ad_html, database_connection=database_connection
+                            )
+                        except Exception:
+                            error_msg = (
+                                "doubleclick failing to parse ad_html for VAST response"
+                            )
+                            logger.error(error_msg)
+                            row["error_msg"] = error_msg
+                            error_messages.append(row)
+                            continue
+                    elif "slots" in google_response:
+                        slot_adv = None
+                        for slot in google_response["slots"]:
+                            if slot_adv is not None:
+                                continue
+                            if video_id in str(slot):
+                                for ad in slot["ads"]:
+                                    if video_id in str(ad):
+                                        slots_try = parse_google_ad(
+                                            str(slot), database_connection
+                                        )
+                                        if slots_try["adv_store_id"] is not None:
+                                            ad_info = slots_try
+                                            slot_adv = True
+                        if slot_adv is None:
+                            error_msg = (
+                                "doubleclick failing to parse for slots response"
+                            )
+                            logger.error(error_msg)
+                            row["error_msg"] = error_msg
+                            error_messages.append(row)
+                            continue
+                    else:
+                        error_msg = "doubleclick new format"
+                        logger.error(error_msg)
+                        row["error_msg"] = error_msg
+                        error_messages.append(row)
+                        continue
+                except json.JSONDecodeError:
+                    if response_text[0:14] == "<?xml version=":
+                        ad_info = parse_google_ad(
+                            text=response_text, database_connection=database_connection
+                        )
+                    elif (
+                        response_text[0:15] == "<!DOCTYPE html>"
+                        or response_text[0:15] == "document.write("
+                        or response_text[0:3] == "if "
+                    ):
+                        found_potential_app = any(
+                            [x in response_text for x in PLAYSTORE_URL_PARTS + MMP_TLDS]
+                        )
+                        if found_potential_app:
+                            error_msg = "found potential app! doubleclick"
+                        else:
+                            error_msg = "doubleclick html / web ad"
+                        logger.info(error_msg)
+                        row["error_msg"] = error_msg
+                        error_messages.append(row)
+                        continue
+                    else:
+                        error_msg = "doubleclick new format"
+                        logger.error(error_msg)
+                        row["error_msg"] = error_msg
+                        error_messages.append(row)
+                        continue
+            elif "unityads.unity3d.com" in sent_video_dict["tld_url"]:
+                ad_info = parse_unity_ad(sent_video_dict, database_connection)
+            elif "mtgglobals.com" in sent_video_dict["tld_url"]:
+                ad_info = parse_mtg_ad(sent_video_dict)
+            else:
+                real_tld = get_tld(sent_video_dict["tld_url"])
+                error_msg = f"Not a recognized ad network: {real_tld}"
+                logger.error(f"{error_msg} for video {video_id[0:10]}")
+                row["error_msg"] = error_msg
+                error_messages.append(row)
+                continue
+            if ad_info["adv_store_id"] is None:
+                text = sent_video_dict["response_text"]
+                all_urls = extract_and_decode_urls(text)
+                if any([x in all_urls for x in MMP_TLDS + PLAYSTORE_URL_PARTS]):
+                    error_msg = "found potential app! mmp or playstore"
+                    row["error_msg"] = error_msg
+                    error_messages.append(row)
+                    continue
+                ad_parts = parse_urls_for_known_parts(all_urls, database_connection)
+                if ad_parts["adv_store_id"] is not None:
+                    error_msg = "found potential app! adv_store_id"
+                    row["error_msg"] = error_msg
+                    error_messages.append(row)
+                    continue
+                else:
+                    ad_info["adv_store_id"] = "unknown"
+            if ad_info["adv_store_id"] == pub_store_id:
+                error_msg = "Incorrect adv_store_id, identified pub ID as adv ID"
+                logger.error(
+                    f"Incorrect adv_store_id, identified pub ID as adv ID for video {video_id[0:10]}"
+                )
+                row["error_msg"] = error_msg
+                error_messages.append(row)
+                continue
+            local_path = pathlib.Path(CREATIVES_DIR, ad_info["adv_store_id"])
+            local_path.mkdir(parents=True, exist_ok=True)
+            if do_store_creatives:
+                md5_hash = hashlib.md5(row["response_content"]).hexdigest()
+                local_path = local_path / f"{md5_hash}.{file_extension}"
+                with open(local_path, "wb") as creative_file:
+                    creative_file.write(row["response_content"])
+            else:
+                local_path = local_path / f"{video_id}.{file_extension}"
+                md5_hash = video_id
+            if ad_info["adv_store_id"] == "unknown":
+                error_msg = f"Unknown adv_store_id for {row['tld_url']}"
+                logger.error(f"Unknown adv_store_id for {row['tld_url']} {video_id}")
+                row["error_msg"] = error_msg
+                error_messages.append(row)
+                continue
+            if (
+                ad_info["ad_network_tld"]
+                not in query_ad_domains(database_connection=database_connection)[
+                    "domain"
+                ].to_list()
+            ):
+                ad_info["ad_network_tld"] = get_tld(sent_video_dict["tld_url"])
+            try:
+                adv_db_id = query_store_app_by_store_id(
+                    store_id=ad_info["adv_store_id"],
+                    database_connection=database_connection,
+                )
+            except Exception:
+                error_msg = "found potential app! but failed to get db id"
+                logger.error(error_msg)
+                row["error_msg"] = error_msg
+                error_messages.append(row)
+                continue
+            init_tld = (
+                tldextract.extract(sent_video_dict["tld_url"]).domain
+                + "."
+                + tldextract.extract(sent_video_dict["tld_url"]).suffix
+            )
+            found_ad_infos.append(ad_info)
+        found_advs = [
+            x["adv_store_id"] for x in found_ad_infos if x["adv_store_id"] != "unknown"
+        ]
+        mmp_tlds = [x["mmp_tld"] for x in found_ad_infos if x["mmp_url"] is not None]
+        mmp_tlds = list(set(mmp_tlds))
+        mmp_tld = None
+        if len(mmp_tlds) > 0:
+            mmp_tld = mmp_tlds[0]
+            if len(mmp_tlds) > 1:
+                error_msg = "Multiple mmp_urls"
                 logger.error(f"{error_msg} for {row['tld_url']} {video_id}")
                 row["error_msg"] = error_msg
                 error_messages.append(row)
-                continue
-            response_text = sent_video_dict["response_text"]
-            try:
-                google_response = json.loads(response_text)
-                if "ad_networks" in google_response:
-                    try:
-                        ad_html = google_response["ad_networks"][0]["ad"]["ad_html"]
-                        ad_info = parse_google_ad(
-                            text=ad_html, database_connection=database_connection
-                        )
-                    except Exception:
-                        error_msg = (
-                            "doubleclick failing to parse ad_html for VAST response"
-                        )
-                        logger.error(error_msg)
-                        row["error_msg"] = error_msg
-                        error_messages.append(row)
-                        continue
-                elif "slots" in google_response:
-                    slot_adv = None
-                    for slot in google_response["slots"]:
-                        if slot_adv is not None:
-                            continue
-                        if video_id in str(slot):
-                            for ad in slot["ads"]:
-                                if video_id in str(ad):
-                                    slots_try = parse_google_ad(
-                                        str(slot), database_connection
-                                    )
-                                    if slots_try["adv_store_id"] is not None:
-                                        ad_info = slots_try
-                                        slot_adv = True
-                    if slot_adv is None:
-                        error_msg = "doubleclick failing to parse for slots response"
-                        logger.error(error_msg)
-                        row["error_msg"] = error_msg
-                        error_messages.append(row)
-                        continue
-                else:
-                    error_msg = "doubleclick new format"
-                    logger.error(error_msg)
-                    row["error_msg"] = error_msg
-                    error_messages.append(row)
-                    continue
-            except json.JSONDecodeError:
-                if response_text[0:14] == "<?xml version=":
-                    ad_info = parse_google_ad(
-                        text=response_text, database_connection=database_connection
-                    )
-                elif (
-                    response_text[0:15] == "<!DOCTYPE html>"
-                    or response_text[0:15] == "document.write("
-                    or response_text[0:3] == "if "
-                ):
-                    found_potential_app = any(
-                        [x in response_text for x in PLAYSTORE_URL_PARTS + MMP_TLDS]
-                    )
-                    if found_potential_app:
-                        error_msg = "found potential app! doubleclick"
-                    else:
-                        error_msg = "doubleclick html / web ad"
-                    logger.info(error_msg)
-                    row["error_msg"] = error_msg
-                    error_messages.append(row)
-                    continue
-                else:
-                    error_msg = "doubleclick new format"
-                    logger.error(error_msg)
-                    row["error_msg"] = error_msg
-                    error_messages.append(row)
-                    continue
-        elif "unityads.unity3d.com" in sent_video_dict["tld_url"]:
-            ad_info = parse_unity_ad(sent_video_dict, database_connection)
-        elif "mtgglobals.com" in sent_video_dict["tld_url"]:
-            ad_info = parse_mtg_ad(sent_video_dict)
+        found_advs = list(set(found_advs))
+        if len(found_advs) > 1:
+            error_msg = "Found potential app! Multiple adv_store_id"
+            logger.error(f"{error_msg} for {row['tld_url']} {video_id}")
+            row["error_msg"] = error_msg
+            error_messages.append(row)
+            continue
+        elif len(found_advs) == 0:
+            error_msg = "No adv_store_id found for {row['tld_url']}"
+            logger.error(f"{error_msg} {video_id}")
+            row["error_msg"] = error_msg
+            error_messages.append(row)
+            continue
         else:
-            real_tld = get_tld(sent_video_dict["tld_url"])
-            error_msg = f"Not a recognized ad network: {real_tld}"
-            logger.error(f"{error_msg} for video {video_id[0:10]}")
-            row["error_msg"] = error_msg
-            error_messages.append(row)
-            continue
-        if ad_info["adv_store_id"] is None:
-            text = sent_video_dict["response_text"]
-            all_urls = extract_and_decode_urls(text)
-            if any([x in all_urls for x in MMP_TLDS + PLAYSTORE_URL_PARTS]):
-                error_msg = "found potential app! mmp or playstore"
-                row["error_msg"] = error_msg
-                error_messages.append(row)
-                continue
-            ad_parts = parse_urls_for_known_parts(all_urls, database_connection)
-            if ad_parts["adv_store_id"] is not None:
-                error_msg = "found potential app! adv_store_id"
-                row["error_msg"] = error_msg
-                error_messages.append(row)
-                continue
-            else:
-                ad_info["adv_store_id"] = "unknown"
-        if ad_info["adv_store_id"] == pub_store_id:
-            error_msg = "Incorrect adv_store_id, identified pub ID as adv ID"
-            logger.error(
-                f"Incorrect adv_store_id, identified pub ID as adv ID for video {video_id[0:10]}"
-            )
-            row["error_msg"] = error_msg
-            error_messages.append(row)
-            continue
-        local_path = pathlib.Path(CREATIVES_DIR, ad_info["adv_store_id"])
-        local_path.mkdir(parents=True, exist_ok=True)
-        if do_store_creatives:
-            md5_hash = hashlib.md5(row["response_content"]).hexdigest()
-            local_path = local_path / f"{md5_hash}.{file_extension}"
-            with open(local_path, "wb") as creative_file:
-                creative_file.write(row["response_content"])
-        else:
-            local_path = local_path / f"{video_id}.{file_extension}"
-            md5_hash = video_id
-        if ad_info["adv_store_id"] == "unknown":
-            error_msg = f"Unknown adv_store_id for {row['tld_url']}"
-            logger.error(f"Unknown adv_store_id for {row['tld_url']} {video_id}")
-            row["error_msg"] = error_msg
-            error_messages.append(row)
-            continue
-        if (
-            ad_info["ad_network_tld"]
-            not in query_ad_domains(database_connection=database_connection)[
-                "domain"
-            ].to_list()
-        ):
-            ad_info["ad_network_tld"] = get_tld(sent_video_dict["tld_url"])
-        try:
-            adv_db_id = query_store_app_by_store_id(
-                store_id=ad_info["adv_store_id"],
-                database_connection=database_connection,
-            )
-        except Exception:
-            error_msg = "found potential app! but failed to get db id"
-            logger.error(error_msg)
-            row["error_msg"] = error_msg
-            error_messages.append(row)
-            continue
-        init_tld = (
-            tldextract.extract(sent_video_dict["tld_url"]).domain
-            + "."
-            + tldextract.extract(sent_video_dict["tld_url"]).suffix
-        )
+            adv_store_id = found_advs[0]
+        ad_network_tlds = [x["ad_network_tld"] for x in found_ad_infos]
+        ad_network_tld = ad_network_tlds[0]
         adv_creatives.append(
             {
                 "pub_store_id": pub_store_id,
-                "adv_store_id": ad_info["adv_store_id"],
+                "adv_store_id": adv_store_id,
                 "adv_store_app_id": adv_db_id,
-                "ad_network_tld": ad_info["ad_network_tld"],
+                "ad_network_tld": ad_network_tld,
                 "creative_initial_domain_tld": init_tld,
-                "mmp_tld": ad_info["mmp_tld"] if ad_info["mmp_url"] else None,
+                "mmp_tld": mmp_tld,
                 "md5_hash": md5_hash,
                 "file_extension": file_extension,
                 "local_path": local_path,
