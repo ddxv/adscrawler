@@ -1146,7 +1146,9 @@ def parse_all_runs_for_store_id(
             error_messages = [row]
         if len(error_messages) == 0:
             continue
-        error_msg_df = pd.DataFrame(error_messages)
+        d = [x for x in error_messages if type(x) is dict]
+        s = [x for x in error_messages if type(x) is pd.Series]
+        error_msg_df = pd.concat([pd.DataFrame(d), pd.DataFrame(s)], ignore_index=True)
         mycols = [
             x
             for x in error_msg_df.columns
@@ -1191,6 +1193,9 @@ def scan_all_apps(database_connection: PostgresCon) -> None:
     apps_to_scan = query_apps_to_creative_scan(database_connection=database_connection)
     apps_count = apps_to_scan.shape[0]
     all_failed_df = pd.DataFrame()
+    apps_to_scan = apps_to_scan[
+        apps_to_scan["store_id"] == "com.frameme.photoeditor.collagemaker.effects"
+    ]
     for i, app in apps_to_scan.iterrows():
         pub_store_id = app["store_id"]
         logger.info(f"{i}/{apps_count}: {pub_store_id} start")
@@ -1199,7 +1204,7 @@ def scan_all_apps(database_connection: PostgresCon) -> None:
                 pub_store_id, database_connection
             )
         except Exception as e:
-            logger.error(f"Error parsing {pub_store_id}: {e}")
+            logger.exception(f"Error parsing {pub_store_id}: {e}")
             continue
         if not app_failed_df.empty:
             all_failed_df = pd.concat([all_failed_df, app_failed_df], ignore_index=True)
