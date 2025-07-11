@@ -916,7 +916,7 @@ def get_creatives(
             error_messages.append(row)
             continue
         elif len(found_advs) == 0:
-            error_msg = "No adv_store_id found for {row['tld_url']}"
+            error_msg = f"No adv_store_id found for {row['tld_url']}"
             logger.error(f"{error_msg} {video_id}")
             row["error_msg"] = error_msg
             error_messages.append(row)
