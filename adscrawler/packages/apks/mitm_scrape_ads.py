@@ -692,9 +692,11 @@ def get_creatives(
     row_count = creatives_df.shape[0]
     for _i, row in creatives_df.iterrows():
         i += 1
-        video_id = ".".join(row["url"].split("/")[-1].split(".")[:-1])
-        if video_id.startswith("?"):
-            video_id = video_id[1:]
+        # video_id = ".".join(row["url"].split("/")[-1].split(".")[:-1])
+        url_parts = urllib.parse.urlparse(row["url"])
+        video_id = url_parts.path.split("/")[-1]
+        # if video_id.startswith("?"):
+        # video_id = video_id[1:]
         if "2mdn" in row["tld_url"]:
             if "/id/" in row["url"]:
                 url_parts = urllib.parse.urlparse(row["url"])
@@ -754,9 +756,6 @@ def get_creatives(
                     if "ad_networks" in google_response:
                         try:
                             ad_html = google_response["ad_networks"][0]["ad"]["ad_html"]
-                            ad_info = parse_google_ad(
-                                text=ad_html, database_connection=database_connection
-                            )
                         except Exception:
                             error_msg = (
                                 "doubleclick failing to parse ad_html for VAST response"
@@ -765,6 +764,9 @@ def get_creatives(
                             row["error_msg"] = error_msg
                             error_messages.append(row)
                             continue
+                        ad_info = parse_google_ad(
+                            text=ad_html, database_connection=database_connection
+                        )
                     elif "slots" in google_response:
                         slot_adv = None
                         for slot in google_response["slots"]:
@@ -1194,8 +1196,8 @@ def parse_all_runs_for_store_id(
 def parse_specific_run_for_store_id(
     pub_store_id: str, run_id: int, database_connection: PostgresCon
 ) -> pd.DataFrame:
-    pub_store_id = "com.binance.dev"
-    run_id = 12786
+    pub_store_id = "kr.co.firehands.gostoptest2"
+    run_id = 18262
     mitm_log_path = pathlib.Path(MITM_DIR, f"{pub_store_id}_{run_id}.log")
     if not mitm_log_path.exists():
         key = f"mitm_logs/android/{pub_store_id}/{run_id}.log"
