@@ -1,4 +1,6 @@
 import datetime
+import os
+import pathlib
 import time
 from urllib.error import URLError
 from urllib.parse import unquote_plus
@@ -37,6 +39,7 @@ from adscrawler.dbcon.queries import (
     query_store_ids,
     upsert_df,
 )
+from adscrawler.packages.storage import get_s3_client
 from adscrawler.tools.extract_keywords import get_global_keywords
 
 logger = get_logger(__name__, "scrape_stores")
@@ -416,18 +419,6 @@ def process_scraped(
         validate="m:1",
     ).drop("store_id", axis=1)
     df["country"] = df["country"].str.upper()
-    df = (
-        pd.merge(
-            df,
-            countries_map[["id", "alpha2"]],
-            how="left",
-            left_on=["country"],
-            right_on="alpha2",
-            validate="m:1",
-        )
-        .drop(["country", "alpha2"], axis=1)
-        .rename(columns={"id": "country"})
-    )
     if collections_map is not None and categories_map is not None:
         process_store_rankings(
             df=df,
@@ -436,6 +427,18 @@ def process_scraped(
             categories_map=categories_map,
         )
     if "keyword" in df.columns:
+        df = (
+            pd.merge(
+                df,
+                countries_map[["id", "alpha2"]],
+                how="left",
+                left_on=["country"],
+                right_on="alpha2",
+                validate="m:1",
+            )
+            .drop(["country", "alpha2"], axis=1)
+            .rename(columns={"id": "country"})
+        )
         process_keyword_rankings(
             df=df,
             database_connection=database_connection,
@@ -463,34 +466,21 @@ def process_store_rankings(
     categories_map: pd.DataFrame,
 ) -> None:
     logger.info("Process and save rankings start")
-    df = pd.merge(
-        df,
-        collections_map,
-        how="left",
-        on=["store", "collection"],
-        validate="m:1",
-    ).drop("collection", axis=1)
-    df = pd.merge(
-        df,
-        categories_map,
-        how="left",
-        on=["store", "category"],
-        validate="m:1",
-    ).drop("category", axis=1)
-    upsert_df(
-        database_connection=database_connection,
-        df=df,
-        table_name="app_rankings",
-        key_columns=[
-            "crawled_date",
-            "country",
-            "rank",
-            "store_category",
-            "store_collection",
-            "store_app",
-        ],
-        insert_columns=[],
-    )
+    output_dir = "/tmp/exports/app_rankings"
+    s3_client = get_s3_client()
+    bucket = "adscrawler"
+    for crawled_date, df_crawled_date in df.groupby("crawled_date"):
+        crawled_date = crawled_date.date()
+        for country, df_country in df_crawled_date.groupby("country"):
+            local_path = pathlib.Path(
+                f"{output_dir}/crawled_date={crawled_date}/country={country}/rankings.parquet"
+            )
+            os.makedirs(os.path.dirname(local_path), exist_ok=True)
+            df_country.to_parquet(local_path, index=False)
+            s3_key = f"raw-data/app_rankings/crawled_date={crawled_date}/country={country}/rankings.parquet"
+            logger.info(f"Uploading to S3: {s3_key}")
+            s3_client.upload_file(str(local_path), bucket, s3_key)
+            local_path.unlink()
 
 
 def extract_domains(x: str) -> str:
