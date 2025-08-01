@@ -262,6 +262,7 @@ def scrape_store_ranks(database_connection: PostgresCon, stores: list[int]) -> N
                     collections_map=collections_map,
                     categories_map=categories_map,
                     countries_map=countries_map,
+                    store=2,
                 )
             except Exception as e:
                 logger.exception(
@@ -279,6 +280,7 @@ def scrape_store_ranks(database_connection: PostgresCon, stores: list[int]) -> N
                     collections_map=collections_map,
                     categories_map=categories_map,
                     countries_map=countries_map,
+                    store=1,
                 )
             except Exception as e:
                 logger.exception(f"Scrape google ranks hit error={e}, skipping")
@@ -397,6 +399,7 @@ def process_scraped(
     collections_map: pd.DataFrame | None = None,
     categories_map: pd.DataFrame | None = None,
     countries_map: pd.DataFrame | None = None,
+    store: int | None = None,
 ) -> None:
     insert_new_apps(
         database_connection=database_connection,
@@ -421,6 +424,7 @@ def process_scraped(
     df["country"] = df["country"].str.upper()
     if collections_map is not None and categories_map is not None:
         process_store_rankings(
+            store=store,
             df=df,
             database_connection=database_connection,
             collections_map=collections_map,
@@ -462,11 +466,14 @@ def process_keyword_rankings(
 def process_store_rankings(
     df: pd.DataFrame,
     database_connection: PostgresCon,
+    store: int,
     collections_map: pd.DataFrame,
     categories_map: pd.DataFrame,
 ) -> None:
-    logger.info("Process and save rankings start")
-    output_dir = "/tmp/exports/app_rankings"
+    logger.info(f"Process and save rankings start {store=}")
+    if store is None:
+        raise ValueError("store is required")
+    output_dir = f"/tmp/exports/app_rankings/store={store}"
     s3_client = get_s3_client()
     bucket = "adscrawler"
     for crawled_date, df_crawled_date in df.groupby("crawled_date"):
@@ -477,7 +484,7 @@ def process_store_rankings(
             )
             os.makedirs(os.path.dirname(local_path), exist_ok=True)
             df_country.to_parquet(local_path, index=False)
-            s3_key = f"raw-data/app_rankings/crawled_date={crawled_date}/country={country}/rankings.parquet"
+            s3_key = f"raw-data/app_rankings/store={store}/crawled_date={crawled_date}/country={country}/rankings.parquet"
             logger.info(f"Uploading to S3: {s3_key}")
             s3_client.upload_file(str(local_path), bucket, s3_key)
             local_path.unlink()
