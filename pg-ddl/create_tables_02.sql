@@ -44,28 +44,33 @@ CREATE TABLE store_categories (
     )
 );
 
-CREATE TABLE app_rankings (
-    id serial PRIMARY KEY,
+CREATE TABLE frontend.store_app_ranks_weekly (
+    rank int2 NOT NULL,
+    best_rank int2 NOT NULL,
+    country int2 NOT NULL,
+    store_collection int2 NOT NULL,
+    store_category int2 NOT NULL,
     crawled_date date NOT NULL,
-    country smallint NOT NULL,
-    store_collection smallint NOT NULL,
-    store_category smallint NOT NULL,
-    rank smallint NOT NULL,
-    store_app int NOT NULL,
-    CONSTRAINT fk_store_collection FOREIGN KEY (
-        store_collection
-    ) REFERENCES store_collections (id),
+    store_app int4 NOT NULL,
+    CONSTRAINT app_rankings_unique_test UNIQUE (
+        crawled_date,
+        country,
+        store_collection,
+        store_category,
+        rank
+    ),
+    CONSTRAINT fk_country FOREIGN KEY (country) REFERENCES public.countries (
+        id
+    ),
+    CONSTRAINT fk_store_app FOREIGN KEY (
+        store_app
+    ) REFERENCES public.store_apps (id),
     CONSTRAINT fk_store_category FOREIGN KEY (
         store_category
-    ) REFERENCES store_categories (id),
-    CONSTRAINT fk_country FOREIGN KEY (country) REFERENCES countries (id),
-    CONSTRAINT fk_store_app FOREIGN KEY (store_app) REFERENCES store_apps (id),
-    CONSTRAINT unique_ranking UNIQUE (
-        crawled_date, country,
-        rank,
-        store_collection,
-        store_category
-    )
+    ) REFERENCES public.store_categories (id),
+    CONSTRAINT fk_store_collection FOREIGN KEY (
+        store_collection
+    ) REFERENCES public.store_collections (id)
 );
 
 

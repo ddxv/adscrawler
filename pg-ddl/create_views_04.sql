@@ -101,8 +101,6 @@ WHERE (csac.parent_id IN (
 WITH DATA;
 
 
--- Used for the crawler when checking which apps to download
--- This is called very often, hence the need for an MV
 CREATE MATERIALIZED VIEW public.store_apps_in_latest_rankings
 TABLESPACE pg_default
 AS
@@ -116,7 +114,7 @@ SELECT DISTINCT ON
     sa.rating_count,
     sa.store_id
 FROM
-    app_rankings AS ar
+    frontend.store_app_ranks_weekly AS ar
 LEFT JOIN store_apps AS sa
     ON
         ar.store_app = sa.id
@@ -144,18 +142,20 @@ WHERE
                 'US'::character varying::text,
                 'CN'::character varying::text,
                 'DE'::character varying::text,
+                'ID'::character varying::text,
                 'IN'::character varying::text,
                 'JP'::character varying::text,
                 'FR'::character varying::text,
                 'BR'::character varying::text,
                 'MX'::character varying::text,
-                'KR'::character varying::text
+                'KR'::character varying::text,
+                'RU'::character varying::text
             ]
         )
     )
-    AND ar.rank < 100
+    AND ar.rank < 150
     AND (
-        sa.installs > 100000
-        OR rating_count > 2000
+        sa.installs > 50000::double precision
+        OR sa.rating_count > 1000
     )
 WITH DATA;
