@@ -651,7 +651,7 @@ def store_creatives(
     with open(local_path, "wb") as creative_file:
         creative_file.write(row["response_content"])
 
-    thumb_path = CREATIVES_DIR / f"{md5_hash}.jpg"
+    thumb_path = CREATIVES_DIR / f"thumbs/{md5_hash}.jpg"
 
     # Only generate thumbnail if not already present
     if not thumb_path.exists():
