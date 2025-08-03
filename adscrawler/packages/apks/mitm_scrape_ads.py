@@ -643,15 +643,19 @@ def add_is_creative_content_column(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def store_creatives(
-    row: pd.Series, local_path: pathlib.Path, file_extension: str
-) -> None:
+    row: pd.Series, adv_store_id: str, file_extension: str
+) -> pathlib.Path:
     thumbnail_width = 320
+    local_dir = pathlib.Path(CREATIVES_DIR, adv_store_id)
+    local_dir.mkdir(parents=True, exist_ok=True)
+    thumbs_dir = CREATIVES_DIR / "thumbs"
+    thumbs_dir.mkdir(parents=True, exist_ok=True)
     md5_hash = hashlib.md5(row["response_content"]).hexdigest()
-    local_path = local_path / f"{md5_hash}.{file_extension}"
+    local_path = local_dir / f"{md5_hash}.{file_extension}"
     with open(local_path, "wb") as creative_file:
         creative_file.write(row["response_content"])
 
-    thumb_path = CREATIVES_DIR / f"thumbs/{md5_hash}.jpg"
+    thumb_path = thumbs_dir / f"{md5_hash}.jpg"
 
     # Only generate thumbnail if not already present
     if not thumb_path.exists():
@@ -672,11 +676,12 @@ def store_creatives(
                         f"scale={thumbnail_width}:-1",
                         "-q:v",
                         "2",
+                        "-update",
+                        "1",
                         str(thumb_path),
                     ],
                     check=True,
                     stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
                 )
             elif file_extension.lower() in ("jpg", "jpeg", "png"):
                 # Resize image directly
@@ -690,6 +695,8 @@ def store_creatives(
                         f"scale={thumbnail_width}:-1",
                         "-q:v",
                         "2",
+                        "-update",
+                        "1",
                         str(thumb_path),
                     ],
                     check=True,
@@ -701,6 +708,7 @@ def store_creatives(
         except Exception:
             logger.error(f"Failed to create thumbnail for {local_path}")
             pass
+    return local_path
 
 
 def get_creatives(
@@ -919,11 +927,13 @@ def get_creatives(
                 row["error_msg"] = error_msg
                 error_messages.append(row)
                 continue
-            local_path = pathlib.Path(CREATIVES_DIR, ad_info["adv_store_id"])
-            local_path.mkdir(parents=True, exist_ok=True)
             if do_store_creatives:
-                store_creatives(row, local_path, file_extension)
-
+                local_path = store_creatives(
+                    row,
+                    adv_store_id=ad_info["adv_store_id"],
+                    file_extension=file_extension,
+                )
+                md5_hash = hashlib.md5(row["response_content"]).hexdigest()
             else:
                 local_path = local_path / f"{video_id}.{file_extension}"
                 md5_hash = video_id
@@ -1260,8 +1270,8 @@ def parse_all_runs_for_store_id(
 def parse_specific_run_for_store_id(
     pub_store_id: str, run_id: int, database_connection: PostgresCon
 ) -> pd.DataFrame:
-    pub_store_id = "kr.co.firehands.gostoptest2"
-    run_id = 18262
+    pub_store_id = "com.elt2.sg"
+    run_id = 2441
     mitm_log_path = pathlib.Path(MITM_DIR, f"{pub_store_id}_{run_id}.log")
     if not mitm_log_path.exists():
         key = f"mitm_logs/android/{pub_store_id}/{run_id}.log"
@@ -1397,6 +1407,7 @@ def test_mitm_scrape_ads(database_connection: PostgresCon):
         adv_creatives_df, error_messages = get_creatives(
             df, pub_store_id, database_connection, do_store_creatives=False
         )
+        break
         all_creatives_df = pd.concat(
             [all_creatives_df, adv_creatives_df], ignore_index=True
         )
