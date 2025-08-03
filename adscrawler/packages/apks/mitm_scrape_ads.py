@@ -5,6 +5,7 @@ import html
 import json
 import pathlib
 import re
+import subprocess
 import urllib
 import xml.etree.ElementTree as ET
 
@@ -641,6 +642,67 @@ def add_is_creative_content_column(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def store_creatives(
+    row: pd.Series, local_path: pathlib.Path, file_extension: str
+) -> None:
+    thumbnail_width = 320
+    md5_hash = hashlib.md5(row["response_content"]).hexdigest()
+    local_path = local_path / f"{md5_hash}.{file_extension}"
+    with open(local_path, "wb") as creative_file:
+        creative_file.write(row["response_content"])
+
+    thumb_path = CREATIVES_DIR / f"{md5_hash}.jpg"
+
+    # Only generate thumbnail if not already present
+    if not thumb_path.exists():
+        # Use ffmpeg to create thumbnail (frame at 5s, resized)
+        try:
+            if file_extension.lower() in ("mp4", "webm"):
+                subprocess.run(
+                    [
+                        "ffmpeg",
+                        "-y",
+                        "-ss",
+                        "5",  # seek to 5 seconds
+                        "-i",
+                        str(local_path),
+                        "-vframes",
+                        "1",
+                        "-vf",
+                        f"scale={thumbnail_width}:-1",
+                        "-q:v",
+                        "2",
+                        str(thumb_path),
+                    ],
+                    check=True,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+            elif file_extension.lower() in ("jpg", "jpeg", "png"):
+                # Resize image directly
+                subprocess.run(
+                    [
+                        "ffmpeg",
+                        "-y",
+                        "-i",
+                        str(thumbnail_width),
+                        "-vf",
+                        f"scale={thumbnail_width}:-1",
+                        "-q:v",
+                        "2",
+                        str(thumb_path),
+                    ],
+                    check=True,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+            else:
+                logger.error(f"Unknown file extension: {file_extension} for thumbnail!")
+        except Exception:
+            logger.error(f"Failed to create thumbnail for {local_path}")
+            pass
+
+
 def get_creatives(
     df: pd.DataFrame,
     pub_store_id: str,
@@ -860,10 +922,8 @@ def get_creatives(
             local_path = pathlib.Path(CREATIVES_DIR, ad_info["adv_store_id"])
             local_path.mkdir(parents=True, exist_ok=True)
             if do_store_creatives:
-                md5_hash = hashlib.md5(row["response_content"]).hexdigest()
-                local_path = local_path / f"{md5_hash}.{file_extension}"
-                with open(local_path, "wb") as creative_file:
-                    creative_file.write(row["response_content"])
+                store_creatives(row, local_path, file_extension)
+
             else:
                 local_path = local_path / f"{video_id}.{file_extension}"
                 md5_hash = video_id
@@ -950,6 +1010,10 @@ def get_creatives(
         )
         logger.warning(msg)
     return adv_creatives_df, error_messages
+
+
+def upload_creatives(adv_creatives_df: pd.DataFrame) -> None:
+    upload_creatives_to_s3(adv_creatives_df)
 
 
 def upload_creatives_to_s3(adv_creatives_df: pd.DataFrame) -> None:
@@ -1136,7 +1200,7 @@ def parse_store_id_mitm_log(
         key_columns=key_columns,
         insert_columns=key_columns,
     )
-    upload_creatives_to_s3(adv_creatives_df)
+    upload_creatives(adv_creatives_df)
     return error_messages
 
 
