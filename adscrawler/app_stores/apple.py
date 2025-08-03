@@ -71,7 +71,10 @@ def scrape_ios_ranks(
     collection_keyword: str | None = None,
     country: str = "us",
 ) -> list[dict]:
-    logger.info(f"Scrape iOS ranks for {collection_keyword=} {category_keyword=}")
+    scrape_info = (
+        f"Scrape iOS ranks for {collection_keyword=} {category_keyword=} {country=}"
+    )
+    logger.info(f"{scrape_info} starting")
     scraper = AppStoreScraper()
     # Eg: MAGAZINES_MEN, GAMES_ADVENTURE
     if category_keyword:
@@ -105,9 +108,8 @@ def scrape_ios_ranks(
         }
     ranked_dicts: list[dict] = []
     for _coll_key, coll_value in collections.items():
-        logger.info(f"Collection: {_coll_key}")
         for cat_key, cat_value in categories.items():
-            logger.info(f"Collection: {_coll_key}, category: {cat_key}")
+            logger.info(f"{scrape_info} Collection: {_coll_key}, category: {cat_key}")
             try:
                 scraped_ids = get_app_ids_with_retry(
                     scraper, coll_value=coll_value, cat_value=cat_value, country=country
