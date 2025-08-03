@@ -705,6 +705,7 @@ def store_creatives(
                 )
             else:
                 logger.error(f"Unknown file extension: {file_extension} for thumbnail!")
+
         except Exception:
             logger.error(f"Failed to create thumbnail for {local_path}")
             pass
@@ -1159,6 +1160,7 @@ def parse_store_id_mitm_log(
     adv_creatives_df, error_messages = get_creatives(
         df, pub_store_id, database_connection
     )
+
     if adv_creatives_df.empty:
         if len(error_messages) == 0:
             error_msg = "No creatives or errors"
@@ -1302,6 +1304,16 @@ def scan_all_apps(database_connection: PostgresCon) -> None:
         if not app_failed_df.empty:
             all_failed_df = pd.concat([all_failed_df, app_failed_df], ignore_index=True)
             logger.info(f"Saved {all_failed_df.shape[0]} failed creatives to csv")
+    subprocess.run(
+        [
+            "s3cmd",
+            "sync",
+            "--acl-public",
+            str(CREATIVES_DIR / "thumbs"),
+            "s3://appgoblin-data/creatives/thumbs/",
+        ],
+        check=False,
+    )
 
 
 def download_all_mitms(database_connection: PostgresCon) -> None:
