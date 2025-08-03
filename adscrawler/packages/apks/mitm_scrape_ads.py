@@ -1308,9 +1308,9 @@ def scan_all_apps(database_connection: PostgresCon) -> None:
         [
             "s3cmd",
             "sync",
-            "--acl-public",
             str(CREATIVES_DIR / "thumbs"),
             "s3://appgoblin-data/creatives/thumbs/",
+            "--acl-public",
         ],
         check=False,
     )
