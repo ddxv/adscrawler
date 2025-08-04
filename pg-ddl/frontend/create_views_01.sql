@@ -290,7 +290,7 @@ WITH DATA;
 CREATE INDEX store_apps_overview_idx ON frontend.store_apps_overview_new USING btree (
     store_id
 );
-CREATE UNIQUE INDEX store_apps_overview_unique_idx ON frontend.store_apps_overview_new USING btree (
+CREATE UNIQUE INDEX store_apps_overview_unique_idx ON frontend.store_apps_overview USING btree (
     store, store_id
 );
 

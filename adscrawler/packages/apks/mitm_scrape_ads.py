@@ -654,43 +654,69 @@ def store_creatives(
     local_path = local_dir / f"{md5_hash}.{file_extension}"
     with open(local_path, "wb") as creative_file:
         creative_file.write(row["response_content"])
-
     thumb_path = thumbs_dir / f"{md5_hash}.jpg"
-
     # Only generate thumbnail if not already present
+    seekable_formats = {"mp4", "webm", "gif", "webp"}
+    static_formats = {"jpg", "jpeg", "png"}
     if not thumb_path.exists():
         # Use ffmpeg to create thumbnail (frame at 5s, resized)
         try:
-            if file_extension.lower() in ("mp4", "webm"):
+            ext = file_extension.lower()
+            if ext in seekable_formats:
+                try:
+                    # Attempt to extract a thumbnail at 5s (works for video or animated gif/webp)
+                    subprocess.run(
+                        [
+                            "ffmpeg",
+                            "-y",
+                            "-ss",
+                            "5",
+                            "-i",
+                            str(local_path),
+                            "-vframes",
+                            "1",
+                            "-vf",
+                            f"scale={thumbnail_width}:-1",
+                            "-q:v",
+                            "2",
+                            "-update",
+                            "1",
+                            str(thumb_path),
+                        ],
+                        check=True,
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                    )
+                except subprocess.CalledProcessError:
+                    # Fallback: use first frame (or static image frame)
+                    subprocess.run(
+                        [
+                            "ffmpeg",
+                            "-y",
+                            "-i",
+                            str(local_path),
+                            "-vframes",
+                            "1",
+                            "-vf",
+                            f"scale={thumbnail_width}:-1",
+                            "-q:v",
+                            "2",
+                            "-update",
+                            "1",
+                            str(thumb_path),
+                        ],
+                        check=True,
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                    )
+            elif ext in static_formats:
+                # Static images: no need to seek, just resize
                 subprocess.run(
                     [
                         "ffmpeg",
                         "-y",
-                        "-ss",
-                        "5",  # seek to 5 seconds
                         "-i",
                         str(local_path),
-                        "-vframes",
-                        "1",
-                        "-vf",
-                        f"scale={thumbnail_width}:-1",
-                        "-q:v",
-                        "2",
-                        "-update",
-                        "1",
-                        str(thumb_path),
-                    ],
-                    check=True,
-                    stdout=subprocess.DEVNULL,
-                )
-            elif file_extension.lower() in ("jpg", "jpeg", "png"):
-                # Resize image directly
-                subprocess.run(
-                    [
-                        "ffmpeg",
-                        "-y",
-                        "-i",
-                        str(thumbnail_width),
                         "-vf",
                         f"scale={thumbnail_width}:-1",
                         "-q:v",
@@ -705,7 +731,6 @@ def store_creatives(
                 )
             else:
                 logger.error(f"Unknown file extension: {file_extension} for thumbnail!")
-
         except Exception:
             logger.error(f"Failed to create thumbnail for {local_path}")
             pass
@@ -1272,8 +1297,8 @@ def parse_all_runs_for_store_id(
 def parse_specific_run_for_store_id(
     pub_store_id: str, run_id: int, database_connection: PostgresCon
 ) -> pd.DataFrame:
-    pub_store_id = "com.elt2.sg"
-    run_id = 2441
+    pub_store_id = "de.apuri.free.games"
+    run_id = 19506
     mitm_log_path = pathlib.Path(MITM_DIR, f"{pub_store_id}_{run_id}.log")
     if not mitm_log_path.exists():
         key = f"mitm_logs/android/{pub_store_id}/{run_id}.log"
