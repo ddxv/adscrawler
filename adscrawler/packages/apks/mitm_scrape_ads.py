@@ -1315,20 +1315,16 @@ def parse_specific_run_for_store_id(
 def scan_all_apps(database_connection: PostgresCon) -> None:
     apps_to_scan = query_apps_to_creative_scan(database_connection=database_connection)
     apps_count = apps_to_scan.shape[0]
-    all_failed_df = pd.DataFrame()
     for i, app in apps_to_scan.iterrows():
         pub_store_id = app["store_id"]
         logger.info(f"{i}/{apps_count}: {pub_store_id} start")
         try:
-            app_failed_df = parse_all_runs_for_store_id(
+            _app_failed_df = parse_all_runs_for_store_id(
                 pub_store_id, database_connection
             )
         except Exception as e:
             logger.exception(f"Error parsing {pub_store_id}: {e}")
             continue
-        if not app_failed_df.empty:
-            all_failed_df = pd.concat([all_failed_df, app_failed_df], ignore_index=True)
-            logger.info(f"Saved {all_failed_df.shape[0]} failed creatives to csv")
     subprocess.run(
         [
             "s3cmd",
