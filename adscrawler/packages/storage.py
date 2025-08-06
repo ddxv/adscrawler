@@ -8,6 +8,7 @@ from adscrawler.config import (
     APKS_DIR,
     APKS_INCOMING_DIR,
     CONFIG,
+    CREATIVES_DIR,
     IPAS_DIR,
     IPAS_INCOMING_DIR,
     MITM_DIR,
@@ -124,12 +125,12 @@ def upload_mitm_log_to_s3(
 def upload_ad_creative_to_s3(
     store: int,
     adv_store_id: str,
-    file_path: pathlib.Path,
     md5_hash: str,
     extension: str,
 ) -> None:
     """Upload apk to s3."""
     app_prefix = f"{adv_store_id}/{md5_hash}.{extension}"
+    file_path = pathlib.Path(CREATIVES_DIR, adv_store_id, f"{md5_hash}.{extension}")
     if store == 1:
         prefix = f"ad-creatives/android/{app_prefix}"
     elif store == 2:

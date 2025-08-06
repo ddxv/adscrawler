@@ -642,9 +642,7 @@ def add_is_creative_content_column(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def store_creatives(
-    row: pd.Series, adv_store_id: str, file_extension: str
-) -> pathlib.Path:
+def store_creatives(row: pd.Series, adv_store_id: str, file_extension: str) -> None:
     thumbnail_width = 320
     local_dir = pathlib.Path(CREATIVES_DIR, adv_store_id)
     local_dir.mkdir(parents=True, exist_ok=True)
@@ -734,7 +732,6 @@ def store_creatives(
         except Exception:
             logger.error(f"Failed to create thumbnail for {local_path}")
             pass
-    return local_path
 
 
 def get_creatives(
@@ -954,14 +951,13 @@ def get_creatives(
                 error_messages.append(row)
                 continue
             if do_store_creatives:
-                local_path = store_creatives(
+                store_creatives(
                     row,
                     adv_store_id=ad_info["adv_store_id"],
                     file_extension=file_extension,
                 )
                 md5_hash = hashlib.md5(row["response_content"]).hexdigest()
             else:
-                local_path = local_path / f"{video_id}.{file_extension}"
                 md5_hash = video_id
             if ad_info["adv_store_id"] == "unknown":
                 error_msg = f"Unknown adv_store_id for {row['tld_url']}"
@@ -1033,7 +1029,6 @@ def get_creatives(
                 "mmp_tld": mmp_tld,
                 "md5_hash": md5_hash,
                 "file_extension": file_extension,
-                "local_path": local_path,
             }
         )
         logger.debug(
@@ -1066,7 +1061,6 @@ def upload_creatives_to_s3(adv_creatives_df: pd.DataFrame) -> None:
             upload_ad_creative_to_s3(
                 store=1,
                 adv_store_id=adv_id,
-                file_path=row["local_path"],
                 md5_hash=row["md5_hash"],
                 extension=row["file_extension"],
             )
@@ -1297,8 +1291,8 @@ def parse_all_runs_for_store_id(
 def parse_specific_run_for_store_id(
     pub_store_id: str, run_id: int, database_connection: PostgresCon
 ) -> pd.DataFrame:
-    pub_store_id = "de.apuri.free.games"
-    run_id = 19506
+    pub_store_id = "com.gtsy.passengerexpress"
+    run_id = 9258
     mitm_log_path = pathlib.Path(MITM_DIR, f"{pub_store_id}_{run_id}.log")
     if not mitm_log_path.exists():
         key = f"mitm_logs/android/{pub_store_id}/{run_id}.log"
@@ -1306,7 +1300,7 @@ def parse_specific_run_for_store_id(
         key = mitms[mitms["run_id"] == str(run_id)]["key"].to_numpy()[0]
         mitm_log_path = download_mitm_log_by_key(key, mitm_log_path)
     else:
-        logger.error("mitm not found")
+        logger.error("mitm log found")
     return parse_store_id_mitm_log(
         pub_store_id, run_id, mitm_log_path, database_connection
     )
