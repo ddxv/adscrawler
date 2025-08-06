@@ -83,7 +83,7 @@ scheduled_apps_crawl AS (
                 )
                 OR
                 (
-                    lsvc.updated_at IS NULL
+                    (lsvc.updated_at IS NULL OR lsvc.updated_at < '2025-05-01')
                     AND vc.crawl_result IN (
                         2, 3, 4
                     )
@@ -184,33 +184,41 @@ combined AS (
             OR last_downloaded_at < current_date - interval '180 days'
         )
 ),
+
 final_selection AS (
     SELECT
-    (
-    COALESCE( date_part('day', current_date - last_download_attempt), 10000) +
-        COALESCE( date_part('day', current_date - last_downloaded_at), 100)
-        )/2 *
- GREATEST(
-          COALESCE(installs, 0),
-          COALESCE(rating_count::bigint, 0) * 50
+        *,
+        (
+            coalesce(
+                date_part('day', current_date - last_download_attempt), 10000
+            )
+            + coalesce(date_part('day', current_date - last_downloaded_at), 100)
+        ) / 2
+        * greatest(
+            coalesce(installs, 0),
+            coalesce(rating_count::bigint, 0) * 50
         ) AS mynum,
-        ROW_NUMBER() OVER (
-        ORDER BY
-            mysource DESC,
-                (COALESCE( date_part('day', current_date - last_download_attempt), 10000) +
-            COALESCE( date_part('day', current_date - last_downloaded_at), 100)
-            )/2 *
-        GREATEST(
-          COALESCE(installs, 0),
-          COALESCE(rating_count::bigint, 0) * 50
-        ) DESC NULLS LAST
-        ) AS app_rank,
-        *
+        row_number() OVER (
+            ORDER BY
+                mysource DESC,
+                (
+                    coalesce(
+                        date_part('day', current_date - last_download_attempt),
+                        10000
+                    )
+                    + coalesce(
+                        date_part('day', current_date - last_downloaded_at), 100
+                    )
+                ) / 2
+                * greatest(
+                    coalesce(installs, 0),
+                    coalesce(rating_count::bigint, 0) * 50
+                ) DESC NULLS LAST
+        ) AS app_rank
     FROM
         combined
 )
-SELECT
-    *
+
+SELECT *
 FROM
-    final_selection
-;
+    final_selection;
