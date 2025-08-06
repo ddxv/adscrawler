@@ -113,28 +113,29 @@ CREATE UNIQUE INDEX companies_apps_overview_unique_idx ON frontend.companies_app
     store_id, company_id, category_slug
 );
 
+
 CREATE MATERIALIZED VIEW frontend.store_apps_overview
 TABLESPACE pg_default
-AS
-WITH
-latest_version_codes AS (
-    SELECT DISTINCT ON
-    (store_app)
-        id,
-        store_app,
-        version_code,
-        updated_at AS last_downloaded_at,
-        crawl_result AS download_result
-    FROM
-        version_codes
+AS WITH latest_version_codes AS (
+    SELECT DISTINCT ON (version_codes.store_app)
+        version_codes.id,
+        version_codes.store_app,
+        version_codes.version_code,
+        version_codes.updated_at AS last_downloaded_at,
+        version_codes.crawl_result AS download_result
+    FROM version_codes
     WHERE
-        crawl_result = 1
-        -- HACKY FIX only try for apps that have successuflly been downloaded, but this table still is all history of version_codes in general
-        AND updated_at >= '2025-05-01'
+        version_codes.crawl_result = 1
+        AND version_codes.updated_at
+        >= '2025-05-01 00:00:00'::timestamp without time zone
     ORDER BY
-        store_app ASC,
-        updated_at DESC,
-        string_to_array(version_code, '.')::bigint [] DESC
+        version_codes.store_app ASC,
+        version_codes.updated_at DESC,
+        (
+            string_to_array(
+                version_codes.version_code::text, '.'::text
+            )::bigint []
+        ) DESC
 ),
 
 latest_successful_version_codes AS (
@@ -152,38 +153,32 @@ latest_successful_version_codes AS (
 ),
 
 last_sdk_scan AS (
-    SELECT DISTINCT ON
-    (vc.store_app)
+    SELECT DISTINCT ON (vc.store_app)
         vc.store_app,
-        version_code_id AS version_code,
-        scanned_at,
-        scan_result
-    FROM
-        version_code_sdk_scan_results AS lsscr
+        lsscr.version_code_id AS version_code,
+        lsscr.scanned_at,
+        lsscr.scan_result
+    FROM version_code_sdk_scan_results AS lsscr
     LEFT JOIN version_codes AS vc ON lsscr.version_code_id = vc.id
-    ORDER BY
-        vc.store_app ASC,
-        lsscr.scanned_at DESC
+    ORDER BY vc.store_app ASC, lsscr.scanned_at DESC
 ),
 
 last_successful_sdk_scan AS (
-    SELECT DISTINCT ON
-    (vc.store_app)
+    SELECT DISTINCT ON (vc.store_app)
         vc.id,
         vc.store_app,
         vc.version_code,
         vcss.scanned_at,
         vcss.scan_result
-    FROM
-        version_codes AS vc
-    LEFT JOIN version_code_sdk_scan_results AS vcss
-        ON
-            vc.id = vcss.version_code_id
+    FROM version_codes AS vc
+    LEFT JOIN
+        version_code_sdk_scan_results AS vcss
+        ON vc.id = vcss.version_code_id
     WHERE vcss.scan_result = 1
     ORDER BY
         vc.store_app ASC,
         vcss.scanned_at DESC,
-        string_to_array(vc.version_code, '.')::bigint [] DESC
+        (string_to_array(vc.version_code::text, '.'::text)::bigint []) DESC
 ),
 
 latest_en_descriptions AS (
@@ -199,31 +194,36 @@ latest_en_descriptions AS (
 ),
 
 latest_api_calls AS (
-    SELECT DISTINCT ON
-    (vc.store_app)
-        store_app,
+    SELECT DISTINCT ON (vc.store_app)
+        vc.store_app,
         vasr.run_result,
         vasr.run_at
-    FROM
-        version_codes AS vc
-    LEFT JOIN version_code_api_scan_results AS vasr
+    FROM version_codes AS vc
+    LEFT JOIN
+        version_code_api_scan_results AS vasr
         ON vc.id = vasr.version_code_id
-    WHERE
-        vc.updated_at >= '2025-05-01'
+    WHERE vc.updated_at >= '2025-05-01 00:00:00'::timestamp without time zone
 ),
 
 latest_successful_api_calls AS (
-    SELECT DISTINCT ON
-    (vc.store_app)
-        store_app,
+    SELECT DISTINCT ON (vc.store_app)
+        vc.store_app,
         vasr.run_at
-    FROM
-        version_codes AS vc
-    LEFT JOIN version_code_api_scan_results AS vasr
+    FROM version_codes AS vc
+    LEFT JOIN
+        version_code_api_scan_results AS vasr
         ON vc.id = vasr.version_code_id
     WHERE
         vasr.run_result = 1
-        AND vc.updated_at >= '2025-05-01'
+        AND vc.updated_at >= '2025-05-01 00:00:00'::timestamp without time zone
+),
+
+my_ad_creatives AS (
+    SELECT
+        store_app_pub_id,
+        count(*) AS ad_creative_count
+    FROM creative_records
+    GROUP BY store_app_pub_id
 )
 
 SELECT
@@ -231,7 +231,7 @@ SELECT
     sa.name,
     sa.store_id,
     sa.store,
-    sa.category,
+    cm.mapped_category AS category,
     sa.rating,
     sa.rating_count,
     sa.review_count,
@@ -265,15 +265,19 @@ SELECT
     pd.updated_at AS adstxt_last_crawled,
     pd.crawl_result AS adstxt_crawl_result,
     lss.scanned_at AS sdk_last_crawled,
-    lss.scanned_at AS sdk_crawl_result,
+    lss.scan_result AS sdk_last_crawl_result,
     lsss.scanned_at AS sdk_successful_last_crawled,
     lvc.version_code,
     ld.description,
     ld.description_short,
     lac.run_at AS api_last_crawled,
     lac.run_result,
-    lsac.run_at AS api_successful_last_crawled
+    lsac.run_at AS api_successful_last_crawled,
+    acr.ad_creative_count
 FROM store_apps AS sa
+LEFT JOIN
+    category_mapping AS cm
+    ON sa.category::text = cm.original_category::text
 LEFT JOIN developers AS d ON sa.developer = d.id
 LEFT JOIN app_urls_map AS aum ON sa.id = aum.store_app
 LEFT JOIN pub_domains AS pd ON aum.pub_domain = pd.id
@@ -285,13 +289,17 @@ LEFT JOIN latest_en_descriptions AS ld ON sa.id = ld.store_app
 LEFT JOIN store_app_z_scores AS saz ON sa.id = saz.store_app
 LEFT JOIN latest_api_calls AS lac ON sa.id = lac.store_app
 LEFT JOIN latest_successful_api_calls AS lsac ON sa.id = lsac.store_app
+LEFT JOIN my_ad_creatives AS acr ON sa.id = acr.store_app_pub_id
 WITH DATA;
 
-CREATE INDEX store_apps_overview_idx ON frontend.store_apps_overview_new USING btree (
-    store_id
-);
+
+-- View indexes:
 CREATE UNIQUE INDEX store_apps_overview_unique_idx ON frontend.store_apps_overview USING btree (
     store, store_id
+);
+
+CREATE INDEX store_apps_overview_unique_idx ON frontend.store_apps_overview USING btree (
+    store_id
 );
 
 
