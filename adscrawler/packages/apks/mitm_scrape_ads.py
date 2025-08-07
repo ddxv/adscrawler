@@ -1312,12 +1312,13 @@ def parse_store_id_mitm_log(
         "creative_initial_domain_id",
         "creative_host_domain_id",
     ]
+    creative_records_df["updated_at"] = datetime.datetime.now()
     upsert_df(
         creative_records_df,
         table_name="creative_records",
         database_connection=database_connection,
         key_columns=key_columns,
-        insert_columns=key_columns,
+        insert_columns=key_columns + ["updated_at"],
     )
     upload_creatives(adv_creatives_df)
     return error_messages
@@ -1379,8 +1380,8 @@ def parse_all_runs_for_store_id(
 def parse_specific_run_for_store_id(
     pub_store_id: str, run_id: int, database_connection: PostgresCon
 ) -> pd.DataFrame:
-    pub_store_id = "com.onegame.alienshooter.galaxyinvader"
-    run_id = 39254
+    pub_store_id = "com.vertaler.bnen"
+    run_id = 1724
     mitm_log_path = pathlib.Path(MITM_DIR, f"{pub_store_id}_{run_id}.log")
     if not mitm_log_path.exists():
         key = f"mitm_logs/android/{pub_store_id}/{run_id}.log"
