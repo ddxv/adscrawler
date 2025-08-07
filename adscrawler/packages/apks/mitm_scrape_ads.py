@@ -39,6 +39,12 @@ from adscrawler.packages.storage import (
 logger = get_logger(__name__, "mitm_scrape_ads")
 
 
+class MultipleAdvertiserIdError(Exception):
+    """Raised when multiple advertiser store IDs are found for the same ad."""
+
+    pass
+
+
 IGNORE_CREATIVE_IDS = ["privacy", "google_play_icon_grey_2022", "favicon"]
 
 MMP_TLDS = [
@@ -317,7 +323,7 @@ def parse_urls_for_known_parts(
                 continue
             if adv_store_id:
                 if adv_store_id != resp_adv_id:
-                    raise Exception(
+                    raise MultipleAdvertiserIdError(
                         f"multiple adv_store_id found for {resp_adv_id=} & {adv_store_id=}"
                     )
             adv_store_id = resp_adv_id
@@ -593,11 +599,16 @@ def parse_fyber_ad(sent_video_dict: dict, database_connection: PostgresCon) -> A
     return ad_info
 
 
-def parse_google_ad(text: str, database_connection: PostgresCon) -> AdInfo:
+def parse_google_ad(text: str, database_connection: PostgresCon) -> tuple[AdInfo, str]:
     # with open(f"google_ad_{video_id}.html", "w") as f:
     #     f.write(ad_html)
+    error_msg = None
     all_urls = extract_and_decode_urls(text)
-    ad_parts = parse_urls_for_known_parts(all_urls, database_connection)
+    try:
+        ad_parts = parse_urls_for_known_parts(all_urls, database_connection)
+    except MultipleAdvertiserIdError:
+        error_msg = "multiple adv_store_id found for doubleclick"
+        return AdInfo(adv_store_id=None, ad_network_tld=None, mmp_url=None), error_msg
     try:
         adv_store_id = ad_parts["adv_store_id"]
         ad_network_tld = ad_parts["ad_network_tld"]
@@ -605,17 +616,12 @@ def parse_google_ad(text: str, database_connection: PostgresCon) -> AdInfo:
     except Exception:
         logger.error("No adv_store_id found")
         adv_store_id = None
-    # parsed_url = urllib.parse.urlparse(mmp_url)
-    # query_params = urllib.parse.parse_qs(parsed_url.query)
-    # campaign_name = query_params["c"][0]
-    # af_siteid = query_params["af_siteid"][0]
-    # af_network_id = query_params["pid"][0]
     ad_info = AdInfo(
         adv_store_id=adv_store_id,
         ad_network_tld=ad_network_tld,
         mmp_url=mmp_url,
     )
-    return ad_info
+    return ad_info, error_msg
 
 
 def add_is_creative_content_column(df: pd.DataFrame) -> pd.DataFrame:
@@ -772,6 +778,7 @@ def get_creatives(
     creatives_df = df[(df["is_creative_content"]) & status_code_200].copy()
     creatives_df["creative_size"] = creatives_df["response_size"].fillna(0).astype(int)
     creatives_df = creatives_df[creatives_df["creative_size"] > 50000]
+    creatives_df = creatives_df[creatives_df["response_content"].notna()]
     if creatives_df.empty:
         run_id = df["run_id"].to_numpy()[0]
         pub_store_id = df["pub_store_id"].to_numpy()[0]
@@ -857,9 +864,14 @@ def get_creatives(
                             row["error_msg"] = error_msg
                             error_messages.append(row)
                             continue
-                        ad_info = parse_google_ad(
+                        ad_info, error_msg = parse_google_ad(
                             text=ad_html, database_connection=database_connection
                         )
+                        if error_msg:
+                            row["error_msg"] = error_msg
+                            error_messages.append(row)
+                            logger.error(error_msg)
+                            continue
                     elif "slots" in google_response:
                         slot_adv = None
                         for slot in google_response["slots"]:
@@ -868,9 +880,14 @@ def get_creatives(
                             if video_id in str(slot):
                                 for ad in slot["ads"]:
                                     if video_id in str(ad):
-                                        slots_try = parse_google_ad(
+                                        slots_try, error_msg = parse_google_ad(
                                             str(slot), database_connection
                                         )
+                                        if error_msg:
+                                            row["error_msg"] = error_msg
+                                            error_messages.append(row)
+                                            logger.error(error_msg)
+                                            continue
                                         if slots_try["adv_store_id"] is not None:
                                             ad_info = slots_try
                                             slot_adv = True
@@ -890,9 +907,15 @@ def get_creatives(
                         continue
                 except json.JSONDecodeError:
                     if response_text[0:14] == "<?xml version=":
-                        ad_info = parse_google_ad(
-                            text=response_text, database_connection=database_connection
+                        ad_info, error_msg = parse_google_ad(
+                            text=response_text,
+                            database_connection=database_connection,
                         )
+                        if error_msg:
+                            row["error_msg"] = error_msg
+                            error_messages.append(row)
+                            logger.error(error_msg)
+                            continue
                     elif (
                         response_text[0:15] == "<!DOCTYPE html>"
                         or response_text[0:15] == "document.write("
@@ -1210,7 +1233,7 @@ def parse_store_id_mitm_log(
         table_name="creative_assets",
         database_connection=database_connection,
         key_columns=["store_app_id", "md5_hash"],
-        insert_columns=["store_app_id", "md5_hash", "file_extension"],
+        insert_columns=["store_app_id", "md5_hash", "file_extension", "phash"],
         return_rows=True,
     )
     assets_df = assets_df.rename(columns={"id": "creative_asset_id"})
@@ -1291,8 +1314,8 @@ def parse_all_runs_for_store_id(
 def parse_specific_run_for_store_id(
     pub_store_id: str, run_id: int, database_connection: PostgresCon
 ) -> pd.DataFrame:
-    pub_store_id = "com.gtsy.passengerexpress"
-    run_id = 9258
+    pub_store_id = "com.bubbleshooter.origin.classic.puzzle"
+    run_id = 9369
     mitm_log_path = pathlib.Path(MITM_DIR, f"{pub_store_id}_{run_id}.log")
     if not mitm_log_path.exists():
         key = f"mitm_logs/android/{pub_store_id}/{run_id}.log"
