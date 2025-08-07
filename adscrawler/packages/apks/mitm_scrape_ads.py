@@ -6,9 +6,12 @@ import json
 import pathlib
 import re
 import subprocess
+import tempfile
 import urllib
 import xml.etree.ElementTree as ET
+from io import BytesIO
 
+import imagehash
 import numpy as np
 import pandas as pd
 import protod
@@ -17,6 +20,7 @@ import tldextract
 from bs4 import BeautifulSoup
 from mitmproxy import http
 from mitmproxy.io import FlowReader
+from PIL import Image
 from protod import Renderer
 
 from adscrawler.config import CREATIVES_DIR, MITM_DIR, get_logger
@@ -648,13 +652,55 @@ def add_is_creative_content_column(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def store_creatives(row: pd.Series, adv_store_id: str, file_extension: str) -> None:
+def extract_frame_at(local_path: pathlib.Path, seconds: int) -> Image.Image:
+    with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp:
+        tmp_path = pathlib.Path(tmp.name)
+    subprocess.run(
+        [
+            "ffmpeg",
+            "-y",
+            "-ss",
+            str(seconds),
+            "-i",
+            str(local_path),
+            "-vframes",
+            "1",
+            "-q:v",
+            "2",
+            "-update",
+            "1",
+            str(tmp_path),
+        ],
+        check=True,
+    )
+    img = Image.open(tmp_path)
+    return img
+
+
+def average_hashes(hashes):
+    # imagehash returns a numpy-like object; sum and majority voting works
+    bits = sum([h.hash.astype(int) for h in hashes])
+    majority = (bits >= (len(hashes) / 2)).astype(int)
+    return str(imagehash.ImageHash(majority))
+
+
+def compute_phash_multiple_frames(local_path: pathlib.Path, timestamps=[1, 3, 5]):
+    hashes = [
+        imagehash.phash(extract_frame_at(local_path, seconds)) for seconds in timestamps
+    ]
+    return average_hashes(hashes)
+
+
+def store_creatives(
+    row: pd.Series, adv_store_id: str, file_extension: str
+) -> tuple[str, str]:
     thumbnail_width = 320
     local_dir = pathlib.Path(CREATIVES_DIR, adv_store_id)
     local_dir.mkdir(parents=True, exist_ok=True)
     thumbs_dir = CREATIVES_DIR / "thumbs"
     thumbs_dir.mkdir(parents=True, exist_ok=True)
     md5_hash = hashlib.md5(row["response_content"]).hexdigest()
+    phash = None
     local_path = local_dir / f"{md5_hash}.{file_extension}"
     with open(local_path, "wb") as creative_file:
         creative_file.write(row["response_content"])
@@ -662,8 +708,13 @@ def store_creatives(row: pd.Series, adv_store_id: str, file_extension: str) -> N
     # Only generate thumbnail if not already present
     seekable_formats = {"mp4", "webm", "gif", "webp"}
     static_formats = {"jpg", "jpeg", "png"}
+    if file_extension in seekable_formats:
+        try:
+            phash = compute_phash_multiple_frames(local_path)
+        except Exception:
+            logger.error(f"Failed to compute phash for {local_path}")
+            pass
     if not thumb_path.exists():
-        # Use ffmpeg to create thumbnail (frame at 5s, resized)
         try:
             ext = file_extension.lower()
             if ext in seekable_formats:
@@ -714,7 +765,10 @@ def store_creatives(row: pd.Series, adv_store_id: str, file_extension: str) -> N
                         stderr=subprocess.DEVNULL,
                     )
             elif ext in static_formats:
+                image = Image.open(BytesIO(row["response_content"]))
+                phash = str(imagehash.phash(image))
                 # Static images: no need to seek, just resize
+                phash = str(imagehash.phash(Image.open("tests/data/imagehash.png")))
                 subprocess.run(
                     [
                         "ffmpeg",
@@ -738,6 +792,7 @@ def store_creatives(row: pd.Series, adv_store_id: str, file_extension: str) -> N
         except Exception:
             logger.error(f"Failed to create thumbnail for {local_path}")
             pass
+    return md5_hash, phash
 
 
 def get_creatives(
@@ -855,11 +910,21 @@ def get_creatives(
                     google_response = json.loads(response_text)
                     if "ad_networks" in google_response:
                         try:
-                            ad_html = google_response["ad_networks"][0]["ad"]["ad_html"]
+                            gad = google_response["ad_networks"][0]["ad"]
                         except Exception:
                             error_msg = (
                                 "doubleclick failing to parse ad_html for VAST response"
                             )
+                            logger.error(error_msg)
+                            row["error_msg"] = error_msg
+                            error_messages.append(row)
+                            continue
+                        if "ad_html" in gad:
+                            ad_html = gad["ad_html"]
+                        elif "ad_json" in gad:
+                            ad_html = json.dumps(gad["ad_json"])
+                        else:
+                            error_msg = "doubleclick no ad_html or ad_json"
                             logger.error(error_msg)
                             row["error_msg"] = error_msg
                             error_messages.append(row)
@@ -974,12 +1039,11 @@ def get_creatives(
                 error_messages.append(row)
                 continue
             if do_store_creatives:
-                store_creatives(
+                md5_hash, phash = store_creatives(
                     row,
                     adv_store_id=ad_info["adv_store_id"],
                     file_extension=file_extension,
                 )
-                md5_hash = hashlib.md5(row["response_content"]).hexdigest()
             else:
                 md5_hash = video_id
             if ad_info["adv_store_id"] == "unknown":
@@ -1051,6 +1115,7 @@ def get_creatives(
                 "creative_initial_domain_tld": init_tld,
                 "mmp_tld": mmp_tld,
                 "md5_hash": md5_hash,
+                "phash": phash,
                 "file_extension": file_extension,
             }
         )
@@ -1225,7 +1290,7 @@ def parse_store_id_mitm_log(
     adv_creatives_df["store_app_pub_id"] = pub_db_id
     adv_creatives_df["run_id"] = run_id
     assets_df = adv_creatives_df[
-        ["adv_store_app_id", "md5_hash", "file_extension"]
+        ["adv_store_app_id", "md5_hash", "file_extension", "phash"]
     ].drop_duplicates()
     assets_df = assets_df.rename(columns={"adv_store_app_id": "store_app_id"})
     assets_df = upsert_df(
@@ -1314,8 +1379,8 @@ def parse_all_runs_for_store_id(
 def parse_specific_run_for_store_id(
     pub_store_id: str, run_id: int, database_connection: PostgresCon
 ) -> pd.DataFrame:
-    pub_store_id = "com.bubbleshooter.origin.classic.puzzle"
-    run_id = 9369
+    pub_store_id = "com.onegame.alienshooter.galaxyinvader"
+    run_id = 39254
     mitm_log_path = pathlib.Path(MITM_DIR, f"{pub_store_id}_{run_id}.log")
     if not mitm_log_path.exists():
         key = f"mitm_logs/android/{pub_store_id}/{run_id}.log"
@@ -1457,7 +1522,6 @@ def test_mitm_scrape_ads(database_connection: PostgresCon):
         adv_creatives_df, error_messages = get_creatives(
             df, pub_store_id, database_connection, do_store_creatives=False
         )
-        break
         all_creatives_df = pd.concat(
             [all_creatives_df, adv_creatives_df], ignore_index=True
         )
