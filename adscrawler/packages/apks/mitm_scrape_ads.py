@@ -705,8 +705,8 @@ def store_creatives(
         creative_file.write(row["response_content"])
     thumb_path = thumbs_dir / f"{md5_hash}.jpg"
     # Only generate thumbnail if not already present
-    seekable_formats = {"mp4", "webm", "gif", "webp"}
-    static_formats = {"jpg", "jpeg", "png"}
+    seekable_formats = {"mp4", "webm", "gif"}
+    static_formats = {"jpg", "jpeg", "png", "webp"}
     if file_extension in seekable_formats:
         try:
             phash = str(compute_phash_multiple_frames(local_path))
