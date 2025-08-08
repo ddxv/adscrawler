@@ -6,10 +6,9 @@ import json
 import pathlib
 import re
 import subprocess
-import tempfile
 import urllib
+import uuid
 import xml.etree.ElementTree as ET
-from io import BytesIO
 
 import imagehash
 import numpy as np
@@ -652,23 +651,22 @@ def add_is_creative_content_column(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def extract_frame_at(local_path: pathlib.Path, seconds: int) -> Image.Image:
-    with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp:
-        tmp_path = pathlib.Path(tmp.name)
+def extract_frame_at(local_path: pathlib.Path, second: int) -> Image.Image:
+    tmp_path = pathlib.Path(f"/tmp/frame_{uuid.uuid4()}.jpg")
     subprocess.run(
         [
             "ffmpeg",
             "-y",
             "-ss",
-            str(seconds),
+            str(second),
             "-i",
             str(local_path),
             "-vframes",
             "1",
             "-q:v",
             "2",
-            "-update",
-            "1",
+            "-f",
+            "image2",
             str(tmp_path),
         ],
         check=True,
@@ -684,9 +682,9 @@ def average_hashes(hashes):
     return str(imagehash.ImageHash(majority))
 
 
-def compute_phash_multiple_frames(local_path: pathlib.Path, timestamps=[1, 3, 5]):
+def compute_phash_multiple_frames(local_path: pathlib.Path, seconds=[1, 3, 5]):
     hashes = [
-        imagehash.phash(extract_frame_at(local_path, seconds)) for seconds in timestamps
+        imagehash.phash(extract_frame_at(local_path, second)) for second in seconds
     ]
     return average_hashes(hashes)
 
@@ -714,6 +712,8 @@ def store_creatives(
         except Exception:
             logger.error(f"Failed to compute phash for {local_path}")
             pass
+    else:
+        phash = imagehash.phash(Image.open(local_path))
     if not thumb_path.exists():
         try:
             ext = file_extension.lower()
@@ -765,10 +765,7 @@ def store_creatives(
                         stderr=subprocess.DEVNULL,
                     )
             elif ext in static_formats:
-                image = Image.open(BytesIO(row["response_content"]))
-                phash = str(imagehash.phash(image))
                 # Static images: no need to seek, just resize
-                phash = str(imagehash.phash(Image.open("tests/data/imagehash.png")))
                 subprocess.run(
                     [
                         "ffmpeg",
@@ -799,7 +796,6 @@ def get_creatives(
     df: pd.DataFrame,
     pub_store_id: str,
     database_connection: PostgresCon,
-    do_store_creatives: bool = True,
 ) -> tuple[pd.DataFrame, list]:
     error_messages = []
     if "status_code" not in df.columns:
@@ -1038,14 +1034,18 @@ def get_creatives(
                 row["error_msg"] = error_msg
                 error_messages.append(row)
                 continue
-            if do_store_creatives:
+            try:
                 md5_hash, phash = store_creatives(
                     row,
                     adv_store_id=ad_info["adv_store_id"],
                     file_extension=file_extension,
                 )
-            else:
-                md5_hash = video_id
+            except Exception:
+                error_msg = "Found creative but failed to store!"
+                logger.error(error_msg)
+                row["error_msg"] = error_msg
+                error_messages.append(row)
+                continue
             if ad_info["adv_store_id"] == "unknown":
                 error_msg = f"Unknown adv_store_id for {row['tld_url']}"
                 logger.error(f"Unknown adv_store_id for {row['tld_url']} {video_id}")
@@ -1180,13 +1180,33 @@ def make_creative_records_df(
     assets_df: pd.DataFrame,
     database_connection: PostgresCon,
 ) -> pd.DataFrame:
-    ad_domains_df = query_ad_domains(database_connection=database_connection)
     creative_records_df = adv_creatives_df.merge(
         assets_df[["store_app_id", "md5_hash", "creative_asset_id"]],
         left_on=["adv_store_app_id", "md5_hash"],
         right_on=["store_app_id", "md5_hash"],
         how="left",
     )
+    ad_domains_df = query_ad_domains(database_connection=database_connection)
+    missing_ad_domains = creative_records_df[
+        ~creative_records_df["creative_initial_domain_tld"].isin(
+            ad_domains_df["domain"]
+        )
+    ]
+    if not missing_ad_domains.empty:
+        new_ad_domains = (
+            missing_ad_domains[["creative_initial_domain_tld"]]
+            .drop_duplicates()
+            .rename(columns={"creative_initial_domain_tld": "domain"})
+        )
+        new_ad_domains = upsert_df(
+            table_name="ad_domains",
+            df=new_ad_domains,
+            insert_columns=["domain"],
+            key_columns=["domain"],
+            database_connection=database_connection,
+            return_rows=True,
+        )
+        ad_domains_df = pd.concat([new_ad_domains, ad_domains_df])
     creative_records_df = creative_records_df.merge(
         ad_domains_df[["id", "domain"]].rename(columns={"id": "mmp_domain_id"}),
         left_on="mmp_tld",
@@ -1379,8 +1399,8 @@ def parse_all_runs_for_store_id(
 def parse_specific_run_for_store_id(
     pub_store_id: str, run_id: int, database_connection: PostgresCon
 ) -> pd.DataFrame:
-    pub_store_id = "jp.htv.htv_app"
-    run_id = 38434
+    pub_store_id = "com.furylion.airportlife3d"
+    run_id = 28552
     mitm_log_path = pathlib.Path(MITM_DIR, f"{pub_store_id}_{run_id}.log")
     if not mitm_log_path.exists():
         key = f"mitm_logs/android/{pub_store_id}/{run_id}.log"
@@ -1520,7 +1540,7 @@ def test_mitm_scrape_ads(database_connection: PostgresCon):
         df["pub_store_id"] = pub_store_id
         df["run_id"] = run_id
         adv_creatives_df, error_messages = get_creatives(
-            df, pub_store_id, database_connection, do_store_creatives=False
+            df, pub_store_id, database_connection
         )
         all_creatives_df = pd.concat(
             [all_creatives_df, adv_creatives_df], ignore_index=True
