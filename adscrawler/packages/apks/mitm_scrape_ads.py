@@ -682,11 +682,12 @@ def average_hashes(hashes):
     return str(imagehash.ImageHash(majority))
 
 
-def compute_phash_multiple_frames(local_path: pathlib.Path, seconds=[1, 3, 5]):
+def compute_phash_multiple_frames(local_path: pathlib.Path, seconds=[1, 3, 5]) -> str:
     hashes = [
         imagehash.phash(extract_frame_at(local_path, second)) for second in seconds
     ]
-    return average_hashes(hashes)
+    phash = average_hashes(hashes)
+    return str(phash)
 
 
 def store_creatives(
@@ -708,12 +709,12 @@ def store_creatives(
     static_formats = {"jpg", "jpeg", "png"}
     if file_extension in seekable_formats:
         try:
-            phash = compute_phash_multiple_frames(local_path)
+            phash = str(compute_phash_multiple_frames(local_path))
         except Exception:
             logger.error(f"Failed to compute phash for {local_path}")
             pass
     else:
-        phash = imagehash.phash(Image.open(local_path))
+        phash = str(imagehash.phash(Image.open(local_path)))
     if not thumb_path.exists():
         try:
             ext = file_extension.lower()
