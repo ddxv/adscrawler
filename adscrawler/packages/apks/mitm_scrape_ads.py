@@ -190,7 +190,7 @@ def get_first_sent_video_df(
     df: pd.DataFrame, row: pd.Series, video_id: str
 ) -> pd.Series | None:
     sent_video_df = df[
-        (df["response_text"].astype(str).str.contains(video_id))
+        (df["response_text"].astype(str).str.contains(video_id, regex=False))
         & (df["start_time"] <= row.start_time)
     ].copy()
     if sent_video_df.empty:
@@ -1267,7 +1267,6 @@ def parse_store_id_mitm_log(
     adv_creatives_df, error_messages = get_creatives(
         df, pub_store_id, database_connection
     )
-
     if adv_creatives_df.empty:
         if len(error_messages) == 0:
             error_msg = "No creatives or errors"
@@ -1380,8 +1379,8 @@ def parse_all_runs_for_store_id(
 def parse_specific_run_for_store_id(
     pub_store_id: str, run_id: int, database_connection: PostgresCon
 ) -> pd.DataFrame:
-    pub_store_id = "com.vertaler.bnen"
-    run_id = 1724
+    pub_store_id = "jp.htv.htv_app"
+    run_id = 38434
     mitm_log_path = pathlib.Path(MITM_DIR, f"{pub_store_id}_{run_id}.log")
     if not mitm_log_path.exists():
         key = f"mitm_logs/android/{pub_store_id}/{run_id}.log"
