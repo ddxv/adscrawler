@@ -390,15 +390,21 @@ def parse_urls_for_known_parts(
     )
 
 
-def parse_mtg_ad(sent_video_dict: dict) -> AdInfo:
+def parse_mtg_ad(sent_video_dict: dict, database_connection: PostgresCon) -> AdInfo:
     init_ad_network_tld = "mtgglobals.com"
     ad_response_text = sent_video_dict["response_text"]
-    ad_response = json.loads(ad_response_text)
-    adv_store_id = ad_response["data"]["ads"][0]["package_name"]
-    ad_info = AdInfo(
-        adv_store_id=adv_store_id,
-        init_tld=init_ad_network_tld,
-    )
+    try:
+        ad_response = json.loads(ad_response_text)
+        adv_store_id = ad_response["data"]["ads"][0]["package_name"]
+        ad_info = AdInfo(
+            adv_store_id=adv_store_id,
+            init_tld=init_ad_network_tld,
+        )
+        return ad_info
+    except Exception:
+        pass
+    all_urls = extract_and_decode_urls(ad_response_text)
+    ad_info = parse_urls_for_known_parts(all_urls, database_connection)
     return ad_info
 
 
@@ -960,7 +966,7 @@ def parse_sent_video_df(
         elif "unityads.unity3d.com" in init_url:
             ad_info = parse_unity_ad(sent_video_dict, database_connection)
         elif "mtgglobals.com" in init_url:
-            ad_info = parse_mtg_ad(sent_video_dict)
+            ad_info = parse_mtg_ad(sent_video_dict, database_connection)
         else:
             real_tld = get_tld(init_url)
             error_msg = f"Not a recognized ad network: {real_tld}"
