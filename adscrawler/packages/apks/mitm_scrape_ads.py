@@ -559,13 +559,21 @@ def get_tld(url: str) -> str:
 
 def parse_generic_adnetwork(
     sent_video_dict: dict, database_connection: PostgresCon
-) -> AdInfo:
+) -> tuple[AdInfo, str]:
+    error_msg = None
     ad_response_text = sent_video_dict["response_text"]
     init_tld = get_tld(sent_video_dict["tld_url"])
     all_urls = extract_and_decode_urls(ad_response_text)
-    ad_info = parse_urls_for_known_parts(all_urls, database_connection)
+    try:
+        ad_info = parse_urls_for_known_parts(all_urls, database_connection)
+    except MultipleAdvertiserIdError:
+        error_msg = f"multiple adv_store_id found for {init_tld}"
+        logger.error(error_msg)
+        return AdInfo(
+            adv_store_id=None, found_ad_network_tlds=None, found_mmp_urls=None
+        ), error_msg
     ad_info.init_tld = init_tld
-    return ad_info
+    return ad_info, error_msg
 
 
 def parse_vungle_ad(sent_video_dict: dict, database_connection: PostgresCon) -> AdInfo:
@@ -619,6 +627,7 @@ def parse_google_ad(
     sent_video_dict: dict, video_id: str, database_connection: PostgresCon
 ) -> tuple[AdInfo, str]:
     ad_info = AdInfo(adv_store_id=None, found_ad_network_tlds=None, found_mmp_urls=None)
+    error_msg = None
     if sent_video_dict["response_text"] is None:
         error_msg = "doubleclick no response_text"
         logger.error(f"{error_msg} for {sent_video_dict['tld_url']}")
@@ -958,7 +967,13 @@ def parse_sent_video_df(
             logger.warning(f"{error_msg} for video {video_id[0:10]}")
             row["error_msg"] = error_msg
             error_messages.append(row)
-            ad_info = parse_generic_adnetwork(sent_video_dict, database_connection)
+            ad_info, error_msg = parse_generic_adnetwork(
+                sent_video_dict, database_connection
+            )
+            if error_msg:
+                row["error_msg"] = error_msg
+                error_messages.append(row)
+                continue
         if ad_info["adv_store_id"] is None:
             text = sent_video_dict["response_text"]
             all_urls = extract_and_decode_urls(text)
@@ -1006,6 +1021,27 @@ def parse_sent_video_df(
     return found_ad_infos, error_messages
 
 
+def get_video_id(row: pd.Series) -> str:
+    url_parts = urllib.parse.urlparse(row["url"])
+    video_id = url_parts.path.split("/")[-1]
+    if "2mdn" in row["tld_url"]:
+        if "/id/" in row["url"]:
+            url_parts = urllib.parse.urlparse(row["url"])
+            video_id = url_parts.path.split("/id/")[1].split("/")[0]
+        elif "simgad" in row["url"]:
+            video_id = row["url"].split("/")[-1]
+    if "googlevideo" in row["tld_url"]:
+        url_parts = urllib.parse.urlparse(row["url"])
+        query_params = urllib.parse.parse_qs(url_parts.query)
+        video_id = query_params["ei"][0]
+    if row["tld_url"] == "unity3dusercontent.com":
+        # this isn't the video name, but the id of the content as the name is the quality
+        video_id = row["url"].split("/")[-2]
+    if row["tld_url"] == "adcolony.com":
+        video_id = row["url"].split("/")[-2]
+    return video_id
+
+
 def get_creatives(
     df: pd.DataFrame,
     pub_store_id: str,
@@ -1037,27 +1073,8 @@ def get_creatives(
     row_count = creatives_df.shape[0]
     for _i, row in creatives_df.iterrows():
         i += 1
-        # video_id = ".".join(row["url"].split("/")[-1].split(".")[:-1])
-        url_parts = urllib.parse.urlparse(row["url"])
-        video_id = url_parts.path.split("/")[-1]
-        # if video_id.startswith("?"):
-        # video_id = video_id[1:]
         host_ad_network_tld = get_tld(row["tld_url"])
-        if "2mdn" in row["tld_url"]:
-            if "/id/" in row["url"]:
-                url_parts = urllib.parse.urlparse(row["url"])
-                video_id = url_parts.path.split("/id/")[1].split("/")[0]
-            elif "simgad" in row["url"]:
-                video_id = row["url"].split("/")[-1]
-        if "googlevideo" in row["tld_url"]:
-            url_parts = urllib.parse.urlparse(row["url"])
-            query_params = urllib.parse.parse_qs(url_parts.query)
-            video_id = query_params["ei"][0]
-        if row["tld_url"] == "unity3dusercontent.com":
-            # this isn't the video name, but the id of the content as the name is the quality
-            video_id = row["url"].split("/")[-2]
-        if row["tld_url"] == "adcolony.com":
-            video_id = row["url"].split("/")[-2]
+        video_id = get_video_id(row)
         if video_id == "":
             error_msg = "Video ID is empty"
             row["error_msg"] = error_msg
@@ -1103,7 +1120,7 @@ def get_creatives(
             error_messages.append(row)
             continue
         elif len(found_advs) == 0:
-            error_msg = f"No adv_store_id found for {row['tld_url']}"
+            error_msg = f"No adv_store_id found for {row['tld_url']} {video_id=}"
             logger.error(f"{error_msg} {video_id}")
             row["error_msg"] = error_msg
             error_messages.append(row)
