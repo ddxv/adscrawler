@@ -697,13 +697,8 @@ def get_phash(local_path: pathlib.Path, file_extension: str) -> str:
         try:
             phash = str(compute_phash_multiple_frames(local_path))
         except Exception:
-            logger.error(f"Failed to compute phash for {local_path}")
-            try:
-                phash = str(imagehash.phash(Image.open(local_path)))
-            except Exception:
-                logger.error(f"Failed to compute phash for {local_path}")
-                pass
-    else:
+            logger.error("Failed to compute multiframe phash")
+    if phash is None:
         phash = str(imagehash.phash(Image.open(local_path)))
     return phash
 
@@ -1060,22 +1055,18 @@ def get_creatives(
                     file_extension=file_extension,
                 )
             except Exception:
-                error_msg = "Found creative but unable to compute phash"
-                logger.error(error_msg)
+                error_msg = "Found potential creative but unable to compute phash"
+                logger.error(f"{error_msg} for {row['tld_url']} {video_id}")
                 row["error_msg"] = error_msg
                 error_messages.append(row)
+                continue
             if ad_info["adv_store_id"] == "unknown":
                 error_msg = f"Unknown adv_store_id for {row['tld_url']}"
                 logger.error(f"Unknown adv_store_id for {row['tld_url']} {video_id}")
                 row["error_msg"] = error_msg
                 error_messages.append(row)
                 continue
-            if phash is None:
-                error_msg = "Found potential creative but unable to compute phash"
-                logger.error(f"{error_msg} for {row['tld_url']} {video_id}")
-                row["error_msg"] = error_msg
-                error_messages.append(row)
-                continue
+
             if (
                 ad_info["ad_network_tld"]
                 not in query_ad_domains(database_connection=database_connection)[
