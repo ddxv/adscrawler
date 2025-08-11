@@ -708,9 +708,7 @@ def get_phash(local_path: pathlib.Path, file_extension: str) -> str:
     return phash
 
 
-def store_creatives(
-    row: pd.Series, adv_store_id: str, file_extension: str
-) -> tuple[str, str]:
+def store_creatives(row: pd.Series, adv_store_id: str, file_extension: str) -> str:
     thumbnail_width = 320
     local_dir = pathlib.Path(CREATIVES_DIR, adv_store_id)
     local_dir.mkdir(parents=True, exist_ok=True)
@@ -1056,7 +1054,16 @@ def get_creatives(
                 error_messages.append(row)
                 continue
             try:
-                phash = get_phash(local_path, file_extension)
+                phash = get_phash(
+                    row=row,
+                    adv_store_id=ad_info["adv_store_id"],
+                    file_extension=file_extension,
+                )
+            except Exception:
+                error_msg = "Found creative but unable to compute phash"
+                logger.error(error_msg)
+                row["error_msg"] = error_msg
+                error_messages.append(row)
             if ad_info["adv_store_id"] == "unknown":
                 error_msg = f"Unknown adv_store_id for {row['tld_url']}"
                 logger.error(f"Unknown adv_store_id for {row['tld_url']} {video_id}")
