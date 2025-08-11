@@ -9,6 +9,7 @@ import subprocess
 import urllib
 import uuid
 import xml.etree.ElementTree as ET
+from functools import lru_cache
 
 import imagehash
 import numpy as np
@@ -73,9 +74,10 @@ PLAYSTORE_URL_PARTS = ["play.google.com/store", "market://", "intent://"]
 @dataclasses.dataclass
 class AdInfo:
     adv_store_id: str
-    ad_network_tld: str
-    mmp_url: str | None = None
+    host_ad_network_tld: str | None = None
     init_tld: str | None = None
+    found_ad_network_tlds: list[str] | None = None
+    found_mmp_urls: list[str] | None = None
 
     def __getitem__(self, key: str):
         """Support dictionary-style access to dataclass fields"""
@@ -87,11 +89,11 @@ class AdInfo:
 
     @property
     def mmp_tld(self) -> str | None:
-        if self.mmp_url:
+        if self.found_mmp_urls and len(self.found_mmp_urls) > 0:
             return (
-                tldextract.extract(self.mmp_url).domain
+                tldextract.extract(self.found_mmp_urls[0]).domain
                 + "."
-                + tldextract.extract(self.mmp_url).suffix
+                + tldextract.extract(self.found_mmp_urls[0]).suffix
             )
         return None
 
@@ -203,7 +205,7 @@ def get_sent_video_df(
     if sent_video_df.empty:
         return None
     if sent_video_df.shape[0] > 1:
-        logger.warning("Multiple responses for video found")
+        logger.info("Multiple responses for video found")
     sent_video_df["tld_url"] = sent_video_df["url"].apply(lambda x: get_tld(x))
     return sent_video_df
 
@@ -307,80 +309,91 @@ def adv_id_from_play_url(url: str) -> str:
     return adv_store_id
 
 
+@lru_cache(maxsize=1000)
+def follow_url_redirects(url: str) -> str:
+    """
+    Follows redirects and returns the final URL.
+
+    Cache the results to avoid repeated requests.
+    """
+    try:
+        response = requests.get(url, allow_redirects=True)
+        return response.url
+    except Exception:
+        return url
+
+
 def parse_urls_for_known_parts(
     all_urls: list[str], database_connection: PostgresCon
-) -> dict:
-    mmp_url = None
-    adv_store_id = None
-    ad_network_url = None
-    ad_network_tld = None
+) -> AdInfo:
+    found_mmp_urls = []
+    found_adv_store_ids = []
+    found_ad_network_urls = []
     ad_network_urls = query_ad_domains(database_connection=database_connection)
     for url in all_urls:
+        adv_store_id = None
         tld_url = tldextract.extract(url).domain + "." + tldextract.extract(url).suffix
         if tld_url in MMP_TLDS:
-            mmp_url = url
+            found_mmp_urls.append(url)
         elif match := re.search(r"intent://details\?id=([a-zA-Z0-9._]+)", url):
             adv_store_id = match.group(1)
         elif match := re.search(r"market://details\?id=([a-zA-Z0-9._]+)", url):
             adv_store_id = match.group(1)
         elif "play.google.com" in url and "google.com" in tld_url:
             resp_adv_id = adv_id_from_play_url(url)
-            if not resp_adv_id:
-                continue
-            if adv_store_id:
-                if adv_store_id != resp_adv_id:
-                    raise MultipleAdvertiserIdError(
-                        f"multiple adv_store_id found for {resp_adv_id=} & {adv_store_id=}"
-                    )
-            adv_store_id = resp_adv_id
+            if resp_adv_id:
+                found_adv_store_ids.append(resp_adv_id)
         elif "appsflyer.com" in url:
             adv_store_id = re.search(r"http.*\.appsflyer\.com/([a-zA-Z0-9_.]+)\?", url)[
                 1
             ]
-            mmp_url = url
-        elif tld_url in MMP_TLDS:
-            mmp_url = url
+            found_mmp_urls.append(url)
         elif "tpbid.com" in url:
             url = url.replace("fybernativebrowser://navigate?url=", "")
-            ad_network_url = url
-            ad_network_tld = tld_url
+            found_ad_network_urls.append(url)
             if "/click" in url:
-                response = requests.get(url, allow_redirects=True)
-                final_url = response.url
-                if "play.google.com" in final_url:
-                    resp_adv_id = adv_id_from_play_url(final_url)
-                    if resp_adv_id:
-                        adv_store_id = resp_adv_id
-                else:
-                    logger.error(f"Cant find advertiser Unrecognized click {url=}")
-        elif "inner-active.mobi" in url:
-            ad_network_url = url
-            ad_network_tld = tld_url
-        if tld_url in ad_network_urls["domain"].to_list():
-            # last effort
-            ad_network_url = url
-            ad_network_tld = tld_url
-        # Stop if we have found both URLs
-        if ad_network_url and mmp_url and adv_store_id:
-            break
-    return {
-        "mmp_url": mmp_url,
-        "adv_store_id": adv_store_id,
-        "ad_network_url": ad_network_url,
-        "ad_network_tld": ad_network_tld,
-    }
+                try:
+                    final_url = follow_url_redirects(url)
+                    if "play.google.com" in final_url:
+                        resp_adv_id = adv_id_from_play_url(final_url)
+                        if resp_adv_id:
+                            found_adv_store_ids.append(resp_adv_id)
+                except Exception:
+                    pass
+        if tld_url in ad_network_urls["domain"].to_list() and tld_url not in MMP_TLDS:
+            found_ad_network_urls.append(url)
+        if adv_store_id:
+            found_adv_store_ids.append(adv_store_id)
+    found_mmp_urls = list(set(found_mmp_urls))
+    found_adv_store_ids = list(set(found_adv_store_ids))
+    found_ad_network_tlds = [
+        tldextract.extract(url).domain + "." + tldextract.extract(url).suffix
+        for url in found_ad_network_urls
+    ]
+    found_ad_network_tlds = list(set(found_ad_network_tlds))
+    if len(found_adv_store_ids) == 0:
+        adv_store_id = None
+    elif len(found_adv_store_ids) == 1:
+        adv_store_id = found_adv_store_ids[0]
+    else:
+        raise MultipleAdvertiserIdError(
+            f"multiple adv_store_id found for {found_adv_store_ids=}"
+        )
+    return AdInfo(
+        adv_store_id=adv_store_id,
+        found_mmp_urls=found_mmp_urls,
+        found_ad_network_tlds=found_ad_network_tlds,
+    )
 
 
 def parse_mtg_ad(sent_video_dict: dict) -> AdInfo:
-    ad_network_tld = "mtgglobals.com"
-    mmp_url = None
+    init_ad_network_tld = "mtgglobals.com"
     ad_response_text = sent_video_dict["response_text"]
     ad_response = json.loads(ad_response_text)
     adv_store_id = ad_response["data"]["ads"][0]["package_name"]
     ad_info = AdInfo(
         adv_store_id=adv_store_id,
-        ad_network_tld=ad_network_tld,
-        mmp_url=mmp_url,
+        init_tld=init_ad_network_tld,
     )
     return ad_info
 
@@ -452,6 +465,7 @@ def decode_utf8(view) -> tuple[bytes, str, bool]:
 def parse_bidmachine_ad(
     sent_video_dict: dict, database_connection: PostgresCon
 ) -> AdInfo:
+    init_ad_network_tld = "bidmachine.com"
     if isinstance(sent_video_dict["response_content"], str):
         import ast
 
@@ -463,28 +477,25 @@ def parse_bidmachine_ad(
         renderer=JsonRenderer(),
         str_decoder=decode_utf8,
     )
-    mmp_url = None
     adv_store_id = None
-    ad_network_tld = None
     try:
         adv_store_id = ret[5][6][3][13][2][3]
-        ad_network_tld = ret[5][6][3][13][2][2]
+        additional_ad_network_tld = ret[5][6][3][13][2][2]
     except Exception:
         pass
-    if adv_store_id is None:
-        text = str(ret[5][6][3][13][2][17])
-        urls = extract_and_decode_urls(text)
-        ad_parts = parse_urls_for_known_parts(urls, database_connection)
-    else:
-        ad_parts = {
-            "adv_store_id": adv_store_id,
-            "ad_network_tld": ad_network_tld,
-            "mmp_url": mmp_url,
-        }
-    return ad_parts
+    text = str(ret[5][6][3][13][2][17])
+    urls = extract_and_decode_urls(text)
+    ad_info = parse_urls_for_known_parts(urls, database_connection)
+    if adv_store_id is None and ad_info.adv_store_id is not None:
+        ad_info.adv_store_id = adv_store_id
+    if additional_ad_network_tld is None and ad_info.found_ad_network_tlds:
+        ad_info.found_ad_network_tlds.append(additional_ad_network_tld)
+    ad_info.init_tld = init_ad_network_tld
+    return ad_info
 
 
 def parse_everestop_ad(sent_video_dict: dict) -> AdInfo:
+    init_ad_network_tld = "everestop.io"
     if isinstance(sent_video_dict["response_content"], str):
         import ast
 
@@ -497,19 +508,18 @@ def parse_everestop_ad(sent_video_dict: dict) -> AdInfo:
         str_decoder=decode_utf8,
     )
     adv_store_id = ret[5][6][3][13][2][3]
-    ad_network_tld = ret[5][6][3][13][2][2]
-    mmp_url = None
+    additional_ad_network_tld = ret[5][6][3][13][2][2]
     ad_info = AdInfo(
         adv_store_id=adv_store_id,
-        ad_network_tld=ad_network_tld,
-        mmp_url=mmp_url,
+        init_tld=init_ad_network_tld,
+        found_ad_network_tlds=[additional_ad_network_tld],
     )
     return ad_info
 
 
 def parse_unity_ad(sent_video_dict: dict, database_connection: PostgresCon) -> AdInfo:
-    ad_network_tld = "unity3d.com"
-    mmp_url = None
+    init_ad_network_tld = "unity3d.com"
+    found_mmp_urls = []
     adv_store_id = None
     if "auction-load.unityads.unity3d.com" in sent_video_dict["url"]:
         ad_response_text = sent_video_dict["response_text"]
@@ -522,24 +532,19 @@ def parse_unity_ad(sent_video_dict: dict, database_connection: PostgresCon) -> A
             content = keyresp["content"]
             decoded_content = urllib.parse.unquote(content)
             all_urls = extract_and_decode_urls(decoded_content)
-            ad_parts = parse_urls_for_known_parts(all_urls, database_connection)
-            adv_store_id = ad_parts["adv_store_id"]
-            mmp_url = ad_parts["mmp_url"]
+            ad_info = parse_urls_for_known_parts(all_urls, database_connection)
         adcontent: str = ad_response["media"][mykey]["content"]
         if "referrer" in adcontent:
             referrer = adcontent.split("referrer=")[1].split(",")[0]
             if "adjust_external" in referrer:
-                mmp_url = "adjust.com"
-    else:
-        all_urls = extract_and_decode_urls(sent_video_dict["response_text"])
-        ad_parts = parse_urls_for_known_parts(all_urls, database_connection)
-        adv_store_id = ad_parts["adv_store_id"]
-        mmp_url = ad_parts["mmp_url"]
-    ad_info = AdInfo(
-        adv_store_id=adv_store_id,
-        ad_network_tld=ad_network_tld,
-        mmp_url=mmp_url,
-    )
+                found_mmp_urls.append("adjust.com")
+    all_urls = extract_and_decode_urls(sent_video_dict["response_text"])
+    ad_info = parse_urls_for_known_parts(all_urls, database_connection)
+    if ad_info.adv_store_id is None and adv_store_id is not None:
+        ad_info.adv_store_id = adv_store_id
+    if ad_info.found_mmp_urls is None and found_mmp_urls:
+        ad_info.found_mmp_urls = found_mmp_urls
+    ad_info.init_tld = init_ad_network_tld
     return ad_info
 
 
@@ -552,19 +557,16 @@ def parse_generic_adnetwork(
     sent_video_dict: dict, database_connection: PostgresCon
 ) -> AdInfo:
     ad_response_text = sent_video_dict["response_text"]
+    init_tld = get_tld(sent_video_dict["tld_url"])
     all_urls = extract_and_decode_urls(ad_response_text)
-    ad_parts = parse_urls_for_known_parts(all_urls, database_connection)
-    ad_info = AdInfo(
-        adv_store_id=ad_parts["adv_store_id"],
-        ad_network_tld=ad_parts["ad_network_tld"],
-        mmp_url=ad_parts["mmp_url"],
-    )
+    ad_info = parse_urls_for_known_parts(all_urls, database_connection)
+    ad_info.init_tld = init_tld
     return ad_info
 
 
 def parse_vungle_ad(sent_video_dict: dict, database_connection: PostgresCon) -> AdInfo:
-    ad_network_tld = "vungle.com"
-    mmp_url = None
+    init_ad_network_tld = "vungle.com"
+    found_mmp_urls = None
     adv_store_id = None
     ad_response_text = sent_video_dict["response_text"]
     response_dict = json.loads(ad_response_text)
@@ -577,28 +579,25 @@ def parse_vungle_ad(sent_video_dict: dict, database_connection: PostgresCon) -> 
                 these_urls = urlkeys[x]
                 for url in these_urls:
                     if get_tld(url) in MMP_TLDS:
-                        mmp_url = url
-                        break
+                        found_mmp_urls.append(url)
             except Exception:
                 pass
     except Exception:
         pass
     if not adv_store_id:
         extracted_urls = extract_and_decode_urls(ad_response_text)
-        ad_parts = parse_urls_for_known_parts(extracted_urls, database_connection)
-        adv_store_id = ad_parts["adv_store_id"]
-        mmp_url = ad_parts["mmp_url"]
-    ad_info = AdInfo(
-        adv_store_id=adv_store_id,
-        ad_network_tld=ad_network_tld,
-        mmp_url=mmp_url,
-    )
+        ad_info = parse_urls_for_known_parts(extracted_urls, database_connection)
+    else:
+        ad_info = AdInfo(
+            adv_store_id=adv_store_id,
+            init_tld=init_ad_network_tld,
+            found_mmp_urls=found_mmp_urls,
+        )
     return ad_info
 
 
 def parse_fyber_ad(sent_video_dict: dict, database_connection: PostgresCon) -> AdInfo:
-    ad_network_tld = "fyber.com"
-    mmp_url = None
+    init_ad_network_tld = "fyber.com"
     parsed_urls = []
     text = sent_video_dict["response_text"]
     try:
@@ -607,15 +606,8 @@ def parse_fyber_ad(sent_video_dict: dict, database_connection: PostgresCon) -> A
         pass
     all_urls = extract_and_decode_urls(text=text)
     all_urls = list(set(all_urls + parsed_urls))
-    ad_parts = parse_urls_for_known_parts(all_urls, database_connection)
-    adv_store_id = ad_parts["adv_store_id"]
-    ad_network_tld = ad_parts["ad_network_tld"]
-    mmp_url = ad_parts["mmp_url"]
-    ad_info = AdInfo(
-        adv_store_id=adv_store_id,
-        ad_network_tld=ad_network_tld,
-        mmp_url=mmp_url,
-    )
+    ad_info = parse_urls_for_known_parts(all_urls, database_connection)
+    ad_info.init_tld = init_ad_network_tld
     return ad_info
 
 
@@ -625,22 +617,10 @@ def parse_google_ad(text: str, database_connection: PostgresCon) -> tuple[AdInfo
     error_msg = None
     all_urls = extract_and_decode_urls(text)
     try:
-        ad_parts = parse_urls_for_known_parts(all_urls, database_connection)
+        ad_info = parse_urls_for_known_parts(all_urls, database_connection)
     except MultipleAdvertiserIdError:
         error_msg = "multiple adv_store_id found for doubleclick"
         return AdInfo(adv_store_id=None, ad_network_tld=None, mmp_url=None), error_msg
-    try:
-        adv_store_id = ad_parts["adv_store_id"]
-        ad_network_tld = ad_parts["ad_network_tld"]
-        mmp_url = ad_parts["mmp_url"]
-    except Exception:
-        logger.error("No adv_store_id found")
-        adv_store_id = None
-    ad_info = AdInfo(
-        adv_store_id=adv_store_id,
-        ad_network_tld=ad_network_tld,
-        mmp_url=mmp_url,
-    )
     return ad_info, error_msg
 
 
@@ -859,19 +839,25 @@ def parse_sent_video_df(
     sent_video_dicts = sent_video_df.to_dict(orient="records")
     found_ad_infos = []
     for sent_video_dict in sent_video_dicts:
-        if "vungle.com" in sent_video_dict["tld_url"]:
+        init_url = sent_video_dict["tld_url"]
+        init_tld = (
+            tldextract.extract(init_url).domain
+            + "."
+            + tldextract.extract(init_url).suffix
+        )
+        if "vungle.com" in init_url:
             ad_info = parse_vungle_ad(sent_video_dict, database_connection)
-        elif "bidmachine.io" in sent_video_dict["tld_url"]:
+        elif "bidmachine.io" in init_url:
             ad_info = parse_bidmachine_ad(sent_video_dict, database_connection)
         elif (
-            "fyber.com" in sent_video_dict["tld_url"]
-            or "tpbid.com" in sent_video_dict["tld_url"]
-            or "inner-active.mobi" in sent_video_dict["tld_url"]
+            "fyber.com" in init_url
+            or "tpbid.com" in init_url
+            or "inner-active.mobi" in init_url
         ):
             ad_info = parse_fyber_ad(sent_video_dict, database_connection)
-        elif "everestop.io" in sent_video_dict["tld_url"]:
+        elif "everestop.io" in init_url:
             ad_info = parse_everestop_ad(sent_video_dict)
-        elif "doubleclick.net" in sent_video_dict["tld_url"]:
+        elif "doubleclick.net" in init_url:
             if sent_video_dict["response_text"] is None:
                 error_msg = "doubleclick no response_text"
                 logger.error(f"{error_msg} for {row['tld_url']}")
@@ -974,12 +960,12 @@ def parse_sent_video_df(
                     row["error_msg"] = error_msg
                     error_messages.append(row)
                     continue
-        elif "unityads.unity3d.com" in sent_video_dict["tld_url"]:
+        elif "unityads.unity3d.com" in init_url:
             ad_info = parse_unity_ad(sent_video_dict, database_connection)
-        elif "mtgglobals.com" in sent_video_dict["tld_url"]:
+        elif "mtgglobals.com" in init_url:
             ad_info = parse_mtg_ad(sent_video_dict)
         else:
-            real_tld = get_tld(sent_video_dict["tld_url"])
+            real_tld = get_tld(init_url)
             error_msg = f"Not a recognized ad network: {real_tld}"
             logger.warning(f"{error_msg} for video {video_id[0:10]}")
             row["error_msg"] = error_msg
@@ -1010,8 +996,8 @@ def parse_sent_video_df(
             error_messages.append(row)
             continue
         if ad_info["adv_store_id"] == "unknown":
-            error_msg = f"Unknown adv_store_id for {row['tld_url']}"
-            logger.error(f"Unknown adv_store_id for {row['tld_url']} {video_id}")
+            error_msg = f"Unknown adv_store_id for {init_url}"
+            logger.error(f"Unknown adv_store_id for {init_url} {video_id}")
             row["error_msg"] = error_msg
             error_messages.append(row)
             continue
@@ -1027,11 +1013,7 @@ def parse_sent_video_df(
             row["error_msg"] = error_msg
             error_messages.append(row)
             continue
-        ad_info["init_tld"] = (
-            tldextract.extract(sent_video_dict["tld_url"]).domain
-            + "."
-            + tldextract.extract(sent_video_dict["tld_url"]).suffix
-        )
+        ad_info["init_tld"] = init_tld
         found_ad_infos.append(ad_info)
     return found_ad_infos, error_messages
 
@@ -1072,6 +1054,7 @@ def get_creatives(
         video_id = url_parts.path.split("/")[-1]
         # if video_id.startswith("?"):
         # video_id = video_id[1:]
+        host_ad_network_tld = get_tld(row["tld_url"])
         if "2mdn" in row["tld_url"]:
             if "/id/" in row["url"]:
                 url_parts = urllib.parse.urlparse(row["url"])
@@ -1110,10 +1093,11 @@ def get_creatives(
             row_copy = row.copy()
             row_copy["error_msg"] = found_error_message["error_msg"]
             error_messages.append(row_copy)
-        found_advs = [
-            x["adv_store_id"] for x in found_ad_infos if x["adv_store_id"] != "unknown"
+        found_ad_infos = [x for x in found_ad_infos if x["adv_store_id"] != "unknown"]
+        found_advs = list(set([x["adv_store_id"] for x in found_ad_infos]))
+        mmp_tlds = [
+            x["mmp_tld"] for x in found_ad_infos if x["found_mmp_urls"] is not None
         ]
-        mmp_tlds = [x["mmp_tld"] for x in found_ad_infos if x["mmp_url"] is not None]
         mmp_tlds = list(set(mmp_tlds))
         mmp_tld = None
         if len(mmp_tlds) > 0:
@@ -1138,6 +1122,22 @@ def get_creatives(
             continue
         else:
             adv_store_id = found_advs[0]
+        found_mmp_urls = [
+            x["found_mmp_urls"]
+            for x in found_ad_infos
+            if x["found_mmp_urls"] is not None
+        ]
+        found_mmp_urls = list(
+            set([item for sublist in found_mmp_urls for item in sublist])
+        )
+        found_ad_network_tlds = [
+            x["found_ad_network_tlds"]
+            for x in found_ad_infos
+            if x["found_ad_network_tlds"] is not None
+        ]
+        found_ad_network_tlds = list(
+            set([item for sublist in found_ad_network_tlds for item in sublist])
+        )
         try:
             md5_hash = store_creatives(
                 row,
@@ -1168,8 +1168,6 @@ def get_creatives(
             row["error_msg"] = error_msg
             error_messages.append(row)
             continue
-        ad_network_tlds = [x["ad_network_tld"] for x in found_ad_infos]
-        ad_network_tld = ad_network_tlds[0]
         init_tlds = [x["init_tld"] for x in found_ad_infos]
         init_tld = init_tlds[0]
         adv_store_app_ids = [x["adv_store_app_id"] for x in found_ad_infos]
@@ -1179,8 +1177,10 @@ def get_creatives(
                 "pub_store_id": pub_store_id,
                 "adv_store_id": adv_store_id,
                 "adv_store_app_id": adv_store_app_id,
-                "ad_network_tld": ad_network_tld,
+                "host_ad_network_tld": host_ad_network_tld,
                 "creative_initial_domain_tld": init_tld,
+                "mmp_urls": found_mmp_urls,
+                "found_ad_network_tlds": found_ad_network_tlds,
                 "mmp_tld": mmp_tld,
                 "md5_hash": md5_hash,
                 "phash": phash,
@@ -1188,7 +1188,7 @@ def get_creatives(
             }
         )
         logger.debug(
-            f"{i}/{row_count}: {ad_network_tld} adv={adv_store_id} init_tld={init_tld}"
+            f"{i}/{row_count}: {host_ad_network_tld} adv={adv_store_id} init_tld={init_tld}"
         )
     adv_creatives_df = pd.DataFrame(adv_creatives)
     if adv_creatives_df.empty:
@@ -1243,6 +1243,69 @@ def get_latest_local_mitm(
     return mitm_log_path, run_id
 
 
+def append_missing_domains(
+    ad_domains_df: pd.DataFrame,
+    creative_records_df: pd.DataFrame,
+    database_connection: PostgresCon,
+) -> pd.DataFrame:
+    check_cols = ["creative_initial_domain_tld", "host_ad_network_tld"]
+    for col in check_cols:
+        missing_ad_domains = creative_records_df[
+            ~creative_records_df[col].isin(ad_domains_df["domain"])
+        ]
+        if not missing_ad_domains.empty:
+            new_ad_domains = missing_ad_domains[col].drop_duplicates()
+            new_ad_domains = upsert_df(
+                table_name="ad_domains",
+                df=new_ad_domains,
+                insert_columns=["domain"],
+                key_columns=["domain"],
+                database_connection=database_connection,
+                return_rows=True,
+            )
+            ad_domains_df = pd.concat([new_ad_domains, ad_domains_df])
+    return ad_domains_df
+
+
+def add_additional_domain_id_column(
+    creative_records_df: pd.DataFrame, ad_domains_df: pd.DataFrame
+) -> pd.DataFrame:
+    cr = creative_records_df.copy()
+
+    # Ensure missing values in the list column become empty lists
+    cr["found_ad_network_tlds"] = cr["found_ad_network_tlds"].apply(
+        lambda x: x if isinstance(x, list) else []
+    )
+
+    # Explode and keep the original row index in a column
+    exploded = (
+        cr.explode("found_ad_network_tlds")
+        .reset_index()
+        .rename(columns={"index": "orig_idx"})
+    )
+
+    # Merge on the exploded domain value
+    merged = exploded.merge(
+        ad_domains_df[["domain", "id"]],
+        left_on="found_ad_network_tlds",
+        right_on="domain",
+        how="left",
+    )
+
+    # Group back the matching ids by the original row index
+    grouped = merged.groupby("orig_idx")["id"].apply(
+        lambda ids: [int(i) for i in ids.dropna().unique()]
+    )
+
+    # Ensure every original row has an entry (empty list if no matches)
+    grouped = grouped.reindex(cr.index, fill_value=[])
+
+    # Assign back (aligned by index)
+    cr["additional_ad_network_domain_ids"] = grouped.values
+
+    return cr
+
+
 def make_creative_records_df(
     adv_creatives_df: pd.DataFrame,
     assets_df: pd.DataFrame,
@@ -1255,26 +1318,12 @@ def make_creative_records_df(
         how="left",
     )
     ad_domains_df = query_ad_domains(database_connection=database_connection)
-    missing_ad_domains = creative_records_df[
-        ~creative_records_df["creative_initial_domain_tld"].isin(
-            ad_domains_df["domain"]
-        )
-    ]
-    if not missing_ad_domains.empty:
-        new_ad_domains = (
-            missing_ad_domains[["creative_initial_domain_tld"]]
-            .drop_duplicates()
-            .rename(columns={"creative_initial_domain_tld": "domain"})
-        )
-        new_ad_domains = upsert_df(
-            table_name="ad_domains",
-            df=new_ad_domains,
-            insert_columns=["domain"],
-            key_columns=["domain"],
-            database_connection=database_connection,
-            return_rows=True,
-        )
-        ad_domains_df = pd.concat([new_ad_domains, ad_domains_df])
+    ad_domains_df = append_missing_domains(
+        ad_domains_df, creative_records_df, database_connection
+    )
+    creative_records_df = add_additional_domain_id_column(
+        creative_records_df, ad_domains_df
+    )
     creative_records_df = creative_records_df.merge(
         ad_domains_df[["id", "domain"]].rename(columns={"id": "mmp_domain_id"}),
         left_on="mmp_tld",
@@ -1285,7 +1334,7 @@ def make_creative_records_df(
         ad_domains_df[["id", "domain"]].rename(
             columns={"id": "creative_host_domain_id"}
         ),
-        left_on="ad_network_tld",
+        left_on="host_ad_network_tld",
         right_on="domain",
         how="left",
     )
@@ -1305,6 +1354,8 @@ def make_creative_records_df(
             "creative_initial_domain_id",
             "creative_host_domain_id",
             "mmp_domain_id",
+            "mmp_urls",
+            "additional_ad_network_domain_ids",
         ]
     ]
     check_cols = ["creative_host_domain_id", "mmp_domain_id"]
