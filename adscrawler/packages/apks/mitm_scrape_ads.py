@@ -1036,37 +1036,12 @@ def get_creatives(
                 row["error_msg"] = error_msg
                 error_messages.append(row)
                 continue
-            try:
-                md5_hash = store_creatives(
-                    row,
-                    adv_store_id=ad_info["adv_store_id"],
-                    file_extension=file_extension,
-                )
-            except Exception:
-                error_msg = "Found creative but failed to store!"
-                logger.error(error_msg)
-                row["error_msg"] = error_msg
-                error_messages.append(row)
-                continue
-            try:
-                phash = get_phash(
-                    row=row,
-                    adv_store_id=ad_info["adv_store_id"],
-                    file_extension=file_extension,
-                )
-            except Exception:
-                error_msg = "Found potential creative but unable to compute phash"
-                logger.error(f"{error_msg} for {row['tld_url']} {video_id}")
-                row["error_msg"] = error_msg
-                error_messages.append(row)
-                continue
             if ad_info["adv_store_id"] == "unknown":
                 error_msg = f"Unknown adv_store_id for {row['tld_url']}"
                 logger.error(f"Unknown adv_store_id for {row['tld_url']} {video_id}")
                 row["error_msg"] = error_msg
                 error_messages.append(row)
                 continue
-
             if (
                 ad_info["ad_network_tld"]
                 not in query_ad_domains(database_connection=database_connection)[
@@ -1119,6 +1094,36 @@ def get_creatives(
             continue
         else:
             adv_store_id = found_advs[0]
+        try:
+            md5_hash = store_creatives(
+                row,
+                adv_store_id=adv_store_id,
+                file_extension=file_extension,
+            )
+        except Exception:
+            error_msg = "Found potential creative but failed to store!"
+            logger.error(error_msg)
+            row["error_msg"] = error_msg
+            error_messages.append(row)
+            continue
+        try:
+            phash = get_phash(
+                row=row,
+                adv_store_id=adv_store_id,
+                file_extension=file_extension,
+            )
+        except Exception:
+            error_msg = "Found potential creative but failed to compute phash"
+            logger.error(f"{error_msg} for {row['tld_url']} {video_id}")
+            row["error_msg"] = error_msg
+            error_messages.append(row)
+            continue
+        if phash is None:
+            error_msg = "Found potential creative but failed to compute phash"
+            logger.error(f"{error_msg} for {row['tld_url']} {video_id}")
+            row["error_msg"] = error_msg
+            error_messages.append(row)
+            continue
         ad_network_tlds = [x["ad_network_tld"] for x in found_ad_infos]
         ad_network_tld = ad_network_tlds[0]
         adv_creatives.append(
