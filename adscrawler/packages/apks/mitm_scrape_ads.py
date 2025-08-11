@@ -690,8 +690,11 @@ def compute_phash_multiple_frames(local_path: pathlib.Path, seconds=[1, 3, 5]) -
     return str(phash)
 
 
-def get_phash(local_path: pathlib.Path, file_extension: str) -> str:
+def get_phash(md5_hash: str, adv_store_id: str, file_extension: str) -> str:
     phash = None
+    local_path = (
+        pathlib.Path(CREATIVES_DIR, adv_store_id) / f"{md5_hash}.{file_extension}"
+    )
     seekable_formats = {"mp4", "webm", "gif"}
     if file_extension in seekable_formats:
         try:
@@ -1108,7 +1111,7 @@ def get_creatives(
             continue
         try:
             phash = get_phash(
-                row=row,
+                md5_hash=md5_hash,
                 adv_store_id=adv_store_id,
                 file_extension=file_extension,
             )
@@ -1419,8 +1422,8 @@ def parse_all_runs_for_store_id(
 def parse_specific_run_for_store_id(
     pub_store_id: str, run_id: int, database_connection: PostgresCon
 ) -> pd.DataFrame:
-    pub_store_id = "com.dmg.electonicsstoresimulator"
-    run_id = 40135
+    pub_store_id = "periodtracker.pregnancy.ovulationtracker"
+    run_id = 4211
     mitm_log_path = pathlib.Path(MITM_DIR, f"{pub_store_id}_{run_id}.log")
     if not mitm_log_path.exists():
         key = f"mitm_logs/android/{pub_store_id}/{run_id}.log"
