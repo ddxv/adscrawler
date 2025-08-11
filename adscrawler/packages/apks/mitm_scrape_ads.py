@@ -690,6 +690,24 @@ def compute_phash_multiple_frames(local_path: pathlib.Path, seconds=[1, 3, 5]) -
     return str(phash)
 
 
+def get_phash(local_path: pathlib.Path, file_extension: str) -> str:
+    phash = None
+    seekable_formats = {"mp4", "webm", "gif"}
+    if file_extension in seekable_formats:
+        try:
+            phash = str(compute_phash_multiple_frames(local_path))
+        except Exception:
+            logger.error(f"Failed to compute phash for {local_path}")
+            try:
+                phash = str(imagehash.phash(Image.open(local_path)))
+            except Exception:
+                logger.error(f"Failed to compute phash for {local_path}")
+                pass
+    else:
+        phash = str(imagehash.phash(Image.open(local_path)))
+    return phash
+
+
 def store_creatives(
     row: pd.Series, adv_store_id: str, file_extension: str
 ) -> tuple[str, str]:
@@ -699,7 +717,6 @@ def store_creatives(
     thumbs_dir = CREATIVES_DIR / "thumbs"
     thumbs_dir.mkdir(parents=True, exist_ok=True)
     md5_hash = hashlib.md5(row["response_content"]).hexdigest()
-    phash = None
     local_path = local_dir / f"{md5_hash}.{file_extension}"
     with open(local_path, "wb") as creative_file:
         creative_file.write(row["response_content"])
@@ -707,14 +724,6 @@ def store_creatives(
     # Only generate thumbnail if not already present
     seekable_formats = {"mp4", "webm", "gif"}
     static_formats = {"jpg", "jpeg", "png", "webp"}
-    if file_extension in seekable_formats:
-        try:
-            phash = str(compute_phash_multiple_frames(local_path))
-        except Exception:
-            logger.error(f"Failed to compute phash for {local_path}")
-            pass
-    else:
-        phash = str(imagehash.phash(Image.open(local_path)))
     if not thumb_path.exists():
         try:
             ext = file_extension.lower()
@@ -783,14 +792,13 @@ def store_creatives(
                     ],
                     check=True,
                     stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
                 )
             else:
                 logger.error(f"Unknown file extension: {file_extension} for thumbnail!")
         except Exception:
             logger.error(f"Failed to create thumbnail for {local_path}")
             pass
-    return md5_hash, phash
+    return md5_hash
 
 
 def get_creatives(
@@ -1036,7 +1044,7 @@ def get_creatives(
                 error_messages.append(row)
                 continue
             try:
-                md5_hash, phash = store_creatives(
+                md5_hash = store_creatives(
                     row,
                     adv_store_id=ad_info["adv_store_id"],
                     file_extension=file_extension,
@@ -1047,9 +1055,17 @@ def get_creatives(
                 row["error_msg"] = error_msg
                 error_messages.append(row)
                 continue
+            try:
+                phash = get_phash(local_path, file_extension)
             if ad_info["adv_store_id"] == "unknown":
                 error_msg = f"Unknown adv_store_id for {row['tld_url']}"
                 logger.error(f"Unknown adv_store_id for {row['tld_url']} {video_id}")
+                row["error_msg"] = error_msg
+                error_messages.append(row)
+                continue
+            if phash is None:
+                error_msg = "Found potential creative but unable to compute phash"
+                logger.error(f"{error_msg} for {row['tld_url']} {video_id}")
                 row["error_msg"] = error_msg
                 error_messages.append(row)
                 continue
@@ -1400,8 +1416,8 @@ def parse_all_runs_for_store_id(
 def parse_specific_run_for_store_id(
     pub_store_id: str, run_id: int, database_connection: PostgresCon
 ) -> pd.DataFrame:
-    pub_store_id = "com.furylion.airportlife3d"
-    run_id = 28552
+    pub_store_id = "com.dmg.electonicsstoresimulator"
+    run_id = 40135
     mitm_log_path = pathlib.Path(MITM_DIR, f"{pub_store_id}_{run_id}.log")
     if not mitm_log_path.exists():
         key = f"mitm_logs/android/{pub_store_id}/{run_id}.log"
