@@ -1254,7 +1254,11 @@ def append_missing_domains(
             ~creative_records_df[col].isin(ad_domains_df["domain"])
         ]
         if not missing_ad_domains.empty:
-            new_ad_domains = missing_ad_domains[col].drop_duplicates()
+            new_ad_domains = (
+                missing_ad_domains[[col]]
+                .drop_duplicates()
+                .rename(columns={col: "domain"})
+            )
             new_ad_domains = upsert_df(
                 table_name="ad_domains",
                 df=new_ad_domains,
