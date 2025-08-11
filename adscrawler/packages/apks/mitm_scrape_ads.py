@@ -189,22 +189,21 @@ def parse_mitm_log(
     return df
 
 
-def get_first_sent_video_df(
+def get_sent_video_df(
     df: pd.DataFrame, row: pd.Series, video_id: str
-) -> pd.Series | None:
+) -> pd.DataFrame | None:
     sent_video_df = df[
         (df["response_text"].astype(str).str.contains(video_id, regex=False))
         & (df["start_time"] <= row.start_time)
     ].copy()
     if sent_video_df.empty:
         sent_video_df = df[
-            (df["response_text"].astype(str).str.contains(video_id))
+            (df["response_text"].astype(str).str.contains(video_id, regex=False))
         ].copy()
     if sent_video_df.empty:
         return None
     if sent_video_df.shape[0] > 1:
-        logger.info("Multiple responses for video found, selecting 1")
-        sent_video_df = sent_video_df.head(1).reset_index()
+        logger.warning("Multiple responses for video found")
     sent_video_df["tld_url"] = sent_video_df["url"].apply(lambda x: get_tld(x))
     return sent_video_df
 
@@ -1097,7 +1096,7 @@ def get_creatives(
         if video_id in IGNORE_CREATIVE_IDS:
             logger.info(f"Ignoring video {video_id}.{file_extension}")
             continue
-        sent_video_df = get_first_sent_video_df(df, row, video_id)
+        sent_video_df = get_sent_video_df(df, row, video_id)
         if sent_video_df is None or sent_video_df.empty:
             error_msg = f"No source bidrequest found for {row['tld_url']}"
             logger.error(f"{error_msg} {video_id}")
