@@ -231,15 +231,19 @@ def extract_and_decode_urls(text: str):
     text = html.unescape(text)
     url_pattern = re.compile(
         r"""(?:
-        (?:https?|intent|market|fybernativebrowser):\/\/      # allowed schemes
-        [^\s'"<>\]\)\}]+?                                     # non-greedy match
+        (?:https?|intent|market|fybernativebrowser):\/\/  # allowed schemes
+        [^\s'"<>\]\)\}]+?                                 # non-greedy match
     )
-    (?=[\s"'<>\]\)\},]|$)                                     # must be followed by separator or end
+    (?=[\s"\\;'<>\]\)\},]|$)                              # must be followed by separator or end
     """,
         re.VERBOSE,
     )
     found_urls = url_pattern.findall(text)
     for url in found_urls:
+        if "play.google" in url:
+            pass
+        else:
+            continue
         # print("--------------------------------")
         # print(url)
         decoded_url = urllib.parse.unquote(url)
@@ -337,12 +341,14 @@ def parse_urls_for_known_parts(
             found_mmp_urls.append(url)
         elif match := re.search(r"intent://details\?id=([a-zA-Z0-9._]+)", url):
             adv_store_id = match.group(1)
+            found_adv_store_ids.append(adv_store_id)
         elif match := re.search(r"market://details\?id=([a-zA-Z0-9._]+)", url):
             adv_store_id = match.group(1)
+            found_adv_store_ids.append(adv_store_id)
         elif "play.google.com" in url and "google.com" in tld_url:
-            resp_adv_id = adv_id_from_play_url(url)
-            if resp_adv_id:
-                found_adv_store_ids.append(resp_adv_id)
+            adv_store_id = adv_id_from_play_url(url)
+            if adv_store_id:
+                found_adv_store_ids.append(adv_store_id)
         elif "appsflyer.com" in url:
             adv_store_id = re.search(r"http.*\.appsflyer\.com/([a-zA-Z0-9_.]+)\?", url)[
                 1
@@ -355,15 +361,13 @@ def parse_urls_for_known_parts(
                 try:
                     final_url = follow_url_redirects(url)
                     if "play.google.com" in final_url:
-                        resp_adv_id = adv_id_from_play_url(final_url)
-                        if resp_adv_id:
-                            found_adv_store_ids.append(resp_adv_id)
+                        adv_store_id = adv_id_from_play_url(final_url)
+                        if adv_store_id:
+                            found_adv_store_ids.append(adv_store_id)
                 except Exception:
                     pass
         if tld_url in ad_network_urls["domain"].to_list() and tld_url not in MMP_TLDS:
             found_ad_network_urls.append(url)
-        if adv_store_id:
-            found_adv_store_ids.append(adv_store_id)
     found_mmp_urls = list(set(found_mmp_urls))
     found_adv_store_ids = list(set(found_adv_store_ids))
     found_ad_network_tlds = [
@@ -611,16 +615,95 @@ def parse_fyber_ad(sent_video_dict: dict, database_connection: PostgresCon) -> A
     return ad_info
 
 
-def parse_google_ad(text: str, database_connection: PostgresCon) -> tuple[AdInfo, str]:
-    # with open(f"google_ad_{video_id}.html", "w") as f:
-    #     f.write(ad_html)
-    error_msg = None
-    all_urls = extract_and_decode_urls(text)
+def parse_google_ad(
+    sent_video_dict: dict, video_id: str, database_connection: PostgresCon
+) -> tuple[AdInfo, str]:
+    ad_info = AdInfo(adv_store_id=None, found_ad_network_tlds=None, found_mmp_urls=None)
+    if sent_video_dict["response_text"] is None:
+        error_msg = "doubleclick no response_text"
+        logger.error(f"{error_msg} for {sent_video_dict['tld_url']}")
+        return ad_info, error_msg
+    response_text = sent_video_dict["response_text"]
     try:
-        ad_info = parse_urls_for_known_parts(all_urls, database_connection)
-    except MultipleAdvertiserIdError:
-        error_msg = "multiple adv_store_id found for doubleclick"
-        return AdInfo(adv_store_id=None, ad_network_tld=None, mmp_url=None), error_msg
+        google_response = json.loads(response_text)
+        if "ad_networks" in google_response:
+            try:
+                gad = google_response["ad_networks"][0]["ad"]
+            except Exception:
+                error_msg = "doubleclick failing to parse ad_html for VAST response"
+                logger.error(error_msg)
+                return ad_info, error_msg
+            if "ad_html" in gad:
+                ad_html = gad["ad_html"]
+            elif "ad_json" in gad:
+                ad_html = json.dumps(gad["ad_json"])
+            else:
+                error_msg = "doubleclick no ad_html or ad_json"
+                logger.error(error_msg)
+                return ad_info, error_msg
+            all_urls = extract_and_decode_urls(ad_html)
+            try:
+                ad_info = parse_urls_for_known_parts(all_urls, database_connection)
+            except MultipleAdvertiserIdError:
+                error_msg = "multiple adv_store_id found for doubleclick"
+                logger.error(error_msg)
+                return ad_info, error_msg
+        elif "slots" in google_response:
+            slot_adv = None
+            for slot in google_response["slots"]:
+                if slot_adv is not None:
+                    continue
+                if video_id in str(slot):
+                    for ad in slot["ads"]:
+                        if video_id in str(ad):
+                            all_urls = extract_and_decode_urls(str(slot))
+                            try:
+                                ad_info = parse_urls_for_known_parts(
+                                    all_urls, database_connection
+                                )
+                            except MultipleAdvertiserIdError:
+                                error_msg = (
+                                    "multiple adv_store_id found for doubleclick"
+                                )
+                                logger.error(error_msg)
+                                return ad_info, error_msg
+                            if ad_info["adv_store_id"] is not None:
+                                slot_adv = True
+            if slot_adv is None:
+                error_msg = "doubleclick failing to parse for slots response"
+                logger.error(error_msg)
+                return ad_info, error_msg
+        else:
+            error_msg = "doubleclick new format"
+            logger.error(error_msg)
+            return ad_info, error_msg
+    except json.JSONDecodeError:
+        if response_text[0:14] == "<?xml version=":
+            all_urls = extract_and_decode_urls(response_text)
+            try:
+                ad_info = parse_urls_for_known_parts(all_urls, database_connection)
+            except MultipleAdvertiserIdError:
+                error_msg = "multiple adv_store_id found for doubleclick"
+                logger.error(error_msg)
+                return ad_info, error_msg
+        elif (
+            response_text[0:15] == "<!DOCTYPE html>"
+            or response_text[0:15] == "document.write("
+            or response_text[0:3] == "if "
+        ):
+            found_potential_app = any(
+                [x in response_text for x in PLAYSTORE_URL_PARTS + MMP_TLDS]
+            )
+            if found_potential_app:
+                error_msg = "found potential app! doubleclick"
+            else:
+                error_msg = "doubleclick html / web ad"
+            logger.info(error_msg)
+            return ad_info, error_msg
+        else:
+            error_msg = "doubleclick new format"
+            logger.error(error_msg)
+            return ad_info, error_msg
     return ad_info, error_msg
 
 
@@ -858,108 +941,13 @@ def parse_sent_video_df(
         elif "everestop.io" in init_url:
             ad_info = parse_everestop_ad(sent_video_dict)
         elif "doubleclick.net" in init_url:
-            if sent_video_dict["response_text"] is None:
-                error_msg = "doubleclick no response_text"
-                logger.error(f"{error_msg} for {row['tld_url']}")
+            ad_info, error_msg = parse_google_ad(
+                sent_video_dict, video_id, database_connection
+            )
+            if error_msg:
                 row["error_msg"] = error_msg
                 error_messages.append(row)
                 continue
-            response_text = sent_video_dict["response_text"]
-            try:
-                google_response = json.loads(response_text)
-                if "ad_networks" in google_response:
-                    try:
-                        gad = google_response["ad_networks"][0]["ad"]
-                    except Exception:
-                        error_msg = (
-                            "doubleclick failing to parse ad_html for VAST response"
-                        )
-                        logger.error(error_msg)
-                        row["error_msg"] = error_msg
-                        error_messages.append(row)
-                        continue
-                    if "ad_html" in gad:
-                        ad_html = gad["ad_html"]
-                    elif "ad_json" in gad:
-                        ad_html = json.dumps(gad["ad_json"])
-                    else:
-                        error_msg = "doubleclick no ad_html or ad_json"
-                        logger.error(error_msg)
-                        row["error_msg"] = error_msg
-                        error_messages.append(row)
-                        continue
-                    ad_info, error_msg = parse_google_ad(
-                        text=ad_html, database_connection=database_connection
-                    )
-                    if error_msg:
-                        row["error_msg"] = error_msg
-                        error_messages.append(row)
-                        logger.error(error_msg)
-                        continue
-                elif "slots" in google_response:
-                    slot_adv = None
-                    for slot in google_response["slots"]:
-                        if slot_adv is not None:
-                            continue
-                        if video_id in str(slot):
-                            for ad in slot["ads"]:
-                                if video_id in str(ad):
-                                    slots_try, error_msg = parse_google_ad(
-                                        str(slot), database_connection
-                                    )
-                                    if error_msg:
-                                        row["error_msg"] = error_msg
-                                        error_messages.append(row)
-                                        logger.error(error_msg)
-                                        continue
-                                    if slots_try["adv_store_id"] is not None:
-                                        ad_info = slots_try
-                                        slot_adv = True
-                    if slot_adv is None:
-                        error_msg = "doubleclick failing to parse for slots response"
-                        logger.error(error_msg)
-                        row["error_msg"] = error_msg
-                        error_messages.append(row)
-                        continue
-                else:
-                    error_msg = "doubleclick new format"
-                    logger.error(error_msg)
-                    row["error_msg"] = error_msg
-                    error_messages.append(row)
-                    continue
-            except json.JSONDecodeError:
-                if response_text[0:14] == "<?xml version=":
-                    ad_info, error_msg = parse_google_ad(
-                        text=response_text,
-                        database_connection=database_connection,
-                    )
-                    if error_msg:
-                        row["error_msg"] = error_msg
-                        error_messages.append(row)
-                        logger.error(error_msg)
-                        continue
-                elif (
-                    response_text[0:15] == "<!DOCTYPE html>"
-                    or response_text[0:15] == "document.write("
-                    or response_text[0:3] == "if "
-                ):
-                    found_potential_app = any(
-                        [x in response_text for x in PLAYSTORE_URL_PARTS + MMP_TLDS]
-                    )
-                    if found_potential_app:
-                        error_msg = "found potential app! doubleclick"
-                    else:
-                        error_msg = "doubleclick html / web ad"
-                    logger.info(error_msg)
-                    row["error_msg"] = error_msg
-                    error_messages.append(row)
-                    continue
-                else:
-                    error_msg = "doubleclick new format"
-                    logger.error(error_msg)
-                    row["error_msg"] = error_msg
-                    error_messages.append(row)
-                    continue
         elif "unityads.unity3d.com" in init_url:
             ad_info = parse_unity_ad(sent_video_dict, database_connection)
         elif "mtgglobals.com" in init_url:
