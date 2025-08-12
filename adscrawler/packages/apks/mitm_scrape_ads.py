@@ -1325,7 +1325,7 @@ def add_additional_domain_id_column(
     grouped = grouped.reindex(cr.index, fill_value=[])
 
     # Assign back (aligned by index)
-    cr["additional_ad_network_domain_ids"] = grouped.values
+    cr["additional_ad_domain_ids"] = grouped.values
 
     return cr
 
@@ -1379,7 +1379,7 @@ def make_creative_records_df(
             "creative_host_domain_id",
             "mmp_domain_id",
             "mmp_urls",
-            "additional_ad_network_domain_ids",
+            "additional_ad_domain_ids",
         ]
     ]
     check_cols = ["creative_host_domain_id", "mmp_domain_id"]
@@ -1480,7 +1480,13 @@ def parse_store_id_mitm_log(
         table_name="creative_records",
         database_connection=database_connection,
         key_columns=key_columns,
-        insert_columns=key_columns + ["updated_at"],
+        insert_columns=key_columns
+        + [
+            "updated_at",
+            "mmp_domain_id",
+            "additional_ad_domain_ids",
+            "mmp_urls",
+        ],
     )
     upload_creatives(adv_creatives_df)
     return error_messages
