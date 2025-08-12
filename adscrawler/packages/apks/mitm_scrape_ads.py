@@ -234,21 +234,33 @@ def extract_and_decode_urls(text: str):
         (?:https?|intent|market|fybernativebrowser):\/\/  # allowed schemes
         [^\s'"<>\]\)\}]+?                                 # non-greedy match
     )
-    (?=[\s"\\;'<>\]\)\},]|$)                              # must be followed by separator or end
+    (?=[\s"\\;'<>\]\)\}\{},]|$)                           # must be followed by separator or end
     """,
         re.VERBOSE,
     )
+
+    encoded_delimiters = [
+        "%5D",  # ]
+        "%3E",  # >
+        "%5B",  # [
+        "%3C",  # <
+    ]
+
     found_urls = url_pattern.findall(text)
     for url in found_urls:
-        if "play.google" in url:
-            pass
-        else:
-            continue
         # print("--------------------------------")
-        # print(url)
+        # print("RAW:", url)
+        # Find the earliest encoded delimiter
+        cut_index = len(url)
+        for delim in encoded_delimiters:
+            idx = url.upper().find(delim)  # case-insensitive match
+            if idx != -1 and idx < cut_index:
+                cut_index = idx
+        if cut_index != len(url):
+            url = url[:cut_index]  # Trim at the first encoded delimiter
         decoded_url = urllib.parse.unquote(url)
         urls.append(decoded_url)
-        # print(decoded_url)
+        # print("DECODED:", decoded_url)
     all_urls = list(set(vast_urls + urls))
     return all_urls
 
@@ -339,6 +351,12 @@ def parse_urls_for_known_parts(
         tld_url = tldextract.extract(url).domain + "." + tldextract.extract(url).suffix
         if tld_url in MMP_TLDS:
             found_mmp_urls.append(url)
+            if "appsflyer.com" in tld_url:
+                adv_store_id = re.search(
+                    r"http.*\.appsflyer\.com/([a-zA-Z0-9_.]+)\?", url
+                )[1]
+                if adv_store_id:
+                    found_adv_store_ids.append(adv_store_id)
         elif match := re.search(r"intent://details\?id=([a-zA-Z0-9._]+)", url):
             adv_store_id = match.group(1)
             found_adv_store_ids.append(adv_store_id)
@@ -346,14 +364,9 @@ def parse_urls_for_known_parts(
             adv_store_id = match.group(1)
             found_adv_store_ids.append(adv_store_id)
         elif "play.google.com" in url and "google.com" in tld_url:
-            adv_store_id = adv_id_from_play_url(url)
-            if adv_store_id:
-                found_adv_store_ids.append(adv_store_id)
-        elif "appsflyer.com" in url:
-            adv_store_id = re.search(r"http.*\.appsflyer\.com/([a-zA-Z0-9_.]+)\?", url)[
-                1
-            ]
-            found_mmp_urls.append(url)
+            resp_adv_id = adv_id_from_play_url(url)
+            if resp_adv_id:
+                found_adv_store_ids.append(resp_adv_id)
         elif "tpbid.com" in url:
             url = url.replace("fybernativebrowser://navigate?url=", "")
             found_ad_network_urls.append(url)
@@ -538,17 +551,16 @@ def parse_unity_ad(sent_video_dict: dict, database_connection: PostgresCon) -> A
         keyresp = ad_response["media"][mykey]
         if "bundleId" in keyresp:
             adv_store_id = keyresp["bundleId"]
-        else:
-            content = keyresp["content"]
-            decoded_content = urllib.parse.unquote(content)
-            all_urls = extract_and_decode_urls(decoded_content)
-            ad_info = parse_urls_for_known_parts(all_urls, database_connection)
-        adcontent: str = ad_response["media"][mykey]["content"]
-        if "referrer" in adcontent:
-            referrer = adcontent.split("referrer=")[1].split(",")[0]
-            if "adjust_external" in referrer:
-                found_mmp_urls.append("adjust.com")
-    all_urls = extract_and_decode_urls(sent_video_dict["response_text"])
+        try:
+            adcontent: str = ad_response["media"][mykey]["content"]
+            if "referrer" in adcontent:
+                referrer = adcontent.split("referrer=")[1].split(",")[0]
+                if "adjust_external" in referrer:
+                    found_mmp_urls.append("adjust.com")
+        except Exception:
+            pass
+    text = sent_video_dict["response_text"]
+    all_urls = extract_and_decode_urls(text)
     ad_info = parse_urls_for_known_parts(all_urls, database_connection)
     if ad_info.adv_store_id is None and adv_store_id is not None:
         ad_info.adv_store_id = adv_store_id
@@ -567,9 +579,9 @@ def parse_generic_adnetwork(
     sent_video_dict: dict, database_connection: PostgresCon
 ) -> tuple[AdInfo, str]:
     error_msg = None
-    ad_response_text = sent_video_dict["response_text"]
     init_tld = get_tld(sent_video_dict["tld_url"])
-    all_urls = extract_and_decode_urls(ad_response_text)
+    text = sent_video_dict["response_text"]
+    all_urls = extract_and_decode_urls(text)
     try:
         ad_info = parse_urls_for_known_parts(all_urls, database_connection)
     except MultipleAdvertiserIdError:
@@ -693,7 +705,14 @@ def parse_google_ad(
             logger.error(error_msg)
             return ad_info, error_msg
     except json.JSONDecodeError:
-        if response_text[0:14] == "<?xml version=":
+        if (
+            response_text[0:14] == "<?xml version="
+            or response_text[0:15] == "<!DOCTYPE html>"
+            or response_text[0:15] == "document.write("
+            or response_text[0:3] == "if "
+        ):
+            # These are usually HTML web ads or minified JS and I havent successfully seen any yet
+            # XML does have apps
             all_urls = extract_and_decode_urls(response_text)
             try:
                 ad_info = parse_urls_for_known_parts(all_urls, database_connection)
@@ -701,20 +720,6 @@ def parse_google_ad(
                 error_msg = "multiple adv_store_id found for doubleclick"
                 logger.error(error_msg)
                 return ad_info, error_msg
-        elif (
-            response_text[0:15] == "<!DOCTYPE html>"
-            or response_text[0:15] == "document.write("
-            or response_text[0:3] == "if "
-        ):
-            found_potential_app = any(
-                [x in response_text for x in PLAYSTORE_URL_PARTS + MMP_TLDS]
-            )
-            if found_potential_app:
-                error_msg = "found potential app! doubleclick"
-            else:
-                error_msg = "doubleclick html / web ad"
-            logger.info(error_msg)
-            return ad_info, error_msg
         else:
             error_msg = "doubleclick new format"
             logger.error(error_msg)
@@ -937,7 +942,7 @@ def parse_sent_video_df(
     sent_video_dicts = sent_video_df.to_dict(orient="records")
     found_ad_infos = []
     for sent_video_dict in sent_video_dicts:
-        init_url = sent_video_dict["tld_url"]
+        init_url = sent_video_dict["url"]
         init_tld = (
             tldextract.extract(init_url).domain
             + "."
@@ -1074,6 +1079,7 @@ def get_creatives(
         row = {"run_id": run_id, "pub_store_id": pub_store_id, "error_msg": error_msg}
         error_messages.append(row)
         return pd.DataFrame(), error_messages
+
     i = 0
     adv_creatives = []
     row_count = creatives_df.shape[0]
