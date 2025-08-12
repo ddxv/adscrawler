@@ -1012,8 +1012,8 @@ def parse_sent_video_df(
             error_messages.append(row)
             continue
         if ad_info["adv_store_id"] == "unknown":
-            error_msg = f"Unknown adv_store_id for {init_url}"
-            logger.error(f"Unknown adv_store_id for {init_url} {video_id}")
+            error_msg = f"Unknown adv_store_id for {init_tld}"
+            logger.error(f"Unknown adv_store_id for {init_tld} {video_id}")
             row["error_msg"] = error_msg
             error_messages.append(row)
             continue
