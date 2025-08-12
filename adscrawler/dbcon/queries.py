@@ -858,8 +858,12 @@ def query_keywords_base(database_connection: PostgresCon) -> pd.DataFrame:
 def query_store_app_by_store_id(
     database_connection: PostgresCon,
     store_id: str,
+    case_insensitive: bool = False,
 ) -> int:
-    sel_query = f"""SELECT * FROM store_apps WHERE store_id = '{store_id}'"""
+    if case_insensitive:
+        sel_query = f"""SELECT * FROM store_apps WHERE store_id ILIKE '{store_id}'"""
+    else:
+        sel_query = f"""SELECT * FROM store_apps WHERE store_id = '{store_id}'"""
     df = pd.read_sql(sel_query, con=database_connection.engine)
     if df.empty:
         raise ValueError(f"Store id {store_id} not found")

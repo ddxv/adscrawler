@@ -1021,6 +1021,7 @@ def parse_sent_video_df(
             adv_db_id = query_store_app_by_store_id(
                 store_id=ad_info["adv_store_id"],
                 database_connection=database_connection,
+                case_insensitive=True,
             )
             ad_info["adv_store_app_id"] = adv_db_id
         except Exception:
