@@ -238,14 +238,12 @@ def extract_and_decode_urls(text: str):
     """,
         re.VERBOSE,
     )
-
     encoded_delimiters = [
         "%5D",  # ]
         "%3E",  # >
         "%5B",  # [
         "%3C",  # <
     ]
-
     found_urls = url_pattern.findall(text)
     for url in found_urls:
         # print("--------------------------------")
@@ -782,10 +780,15 @@ def average_hashes(hashes):
     return str(imagehash.ImageHash(majority))
 
 
-def compute_phash_multiple_frames(local_path: pathlib.Path, seconds=[1, 3, 5]) -> str:
-    hashes = [
-        imagehash.phash(extract_frame_at(local_path, second)) for second in seconds
-    ]
+def compute_phash_multiple_frames(
+    local_path: pathlib.Path, seconds=[1, 3, 5, 10]
+) -> str:
+    hashes = []
+    for second in seconds:
+        try:
+            hashes.append(imagehash.phash(extract_frame_at(local_path, second)))
+        except Exception:
+            pass
     phash = average_hashes(hashes)
     return str(phash)
 
@@ -846,7 +849,6 @@ def store_creatives(row: pd.Series, adv_store_id: str, file_extension: str) -> s
                         ],
                         check=True,
                         stdout=subprocess.DEVNULL,
-                        stderr=subprocess.DEVNULL,
                     )
                 except subprocess.CalledProcessError:
                     # Fallback: use first frame (or static image frame)
