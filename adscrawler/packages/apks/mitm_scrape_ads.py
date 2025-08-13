@@ -347,7 +347,7 @@ def parse_urls_for_known_parts(
     for url in all_urls:
         adv_store_id = None
         tld_url = tldextract.extract(url).domain + "." + tldextract.extract(url).suffix
-        if tld_url in MMP_TLDS:
+        if tld_url in MMP_TLDS and ".com/privacy-policy" not in url:
             found_mmp_urls.append(url)
             if "appsflyer.com" in tld_url:
                 adv_store_id = re.search(
@@ -487,6 +487,12 @@ def parse_bidmachine_ad(
     sent_video_dict: dict, database_connection: PostgresCon
 ) -> AdInfo:
     init_ad_network_tld = "bidmachine.com"
+    adv_store_id = None
+    additional_ad_network_tld = None
+    ad_info = AdInfo(
+        adv_store_id=adv_store_id,
+        init_tld=init_ad_network_tld,
+    )
     if isinstance(sent_video_dict["response_content"], str):
         import ast
 
@@ -498,25 +504,38 @@ def parse_bidmachine_ad(
         renderer=JsonRenderer(),
         str_decoder=decode_utf8,
     )
-    adv_store_id = None
     try:
         adv_store_id = ret[5][6][3][13][2][3]
         additional_ad_network_tld = ret[5][6][3][13][2][2]
+        text = str(ret[5][6][3][13][2][17])
+        urls = extract_and_decode_urls(text)
+        ad_info = parse_urls_for_known_parts(urls, database_connection)
     except Exception:
         pass
-    text = str(ret[5][6][3][13][2][17])
-    urls = extract_and_decode_urls(text)
-    ad_info = parse_urls_for_known_parts(urls, database_connection)
-    if adv_store_id is None and ad_info.adv_store_id is not None:
+    try:
+        s = ret[11][2]
+        # missing_padding = len(s) % 4
+        # if missing_padding:
+        #     s += "=" * (4 - missing_padding)
+        # # Wait, this is is the pub_store_id
+        # adv_store_id = json.loads(base64.urlsafe_b64decode(s))[
+        # "sessionCallbackContext"
+        # ]["bundle"]
+    except Exception:
+        pass
+    if adv_store_id and ad_info.adv_store_id is None:
         ad_info.adv_store_id = adv_store_id
-    if additional_ad_network_tld is None and ad_info.found_ad_network_tlds:
+    if additional_ad_network_tld is not None and not ad_info.found_ad_network_tlds:
         ad_info.found_ad_network_tlds.append(additional_ad_network_tld)
     ad_info.init_tld = init_ad_network_tld
+    if ad_info.adv_store_id is None:
+        raise Exception("Bidmachine no adv_store_id found")
     return ad_info
 
 
 def parse_everestop_ad(sent_video_dict: dict) -> AdInfo:
     init_ad_network_tld = "everestop.io"
+
     if isinstance(sent_video_dict["response_content"], str):
         import ast
 
@@ -528,8 +547,12 @@ def parse_everestop_ad(sent_video_dict: dict) -> AdInfo:
         renderer=JsonRenderer(),
         str_decoder=decode_utf8,
     )
-    adv_store_id = ret[5][6][3][13][2][3]
-    additional_ad_network_tld = ret[5][6][3][13][2][2]
+    try:
+        adv_store_id = ret[5][6][3][13][2][3]
+        additional_ad_network_tld = ret[5][6][3][13][2][2]
+    except Exception:
+        pass
+
     ad_info = AdInfo(
         adv_store_id=adv_store_id,
         init_tld=init_ad_network_tld,
@@ -597,8 +620,8 @@ def parse_vungle_ad(sent_video_dict: dict, database_connection: PostgresCon) -> 
     found_mmp_urls = None
     adv_store_id = None
     ad_response_text = sent_video_dict["response_text"]
-    response_dict = json.loads(ad_response_text)
     try:
+        response_dict = json.loads(ad_response_text)
         adv_store_id = response_dict["ads"][0]["ad_markup"]["ad_market_id"]
         check_urls = ["clickUrl", "checkpoint.0", "checkpoint.100"]
         urlkeys = response_dict["ads"][0]["ad_markup"]["tpat"]
@@ -653,6 +676,7 @@ def parse_google_ad(
         google_response = json.loads(response_text)
         if "ad_networks" in google_response:
             try:
+                # This has multiple ads, should handle this better
                 gad = google_response["ad_networks"][0]["ad"]
             except Exception:
                 error_msg = "doubleclick failing to parse ad_html for VAST response"
@@ -1053,6 +1077,8 @@ def get_video_id(row: pd.Series) -> str:
         video_id = row["url"].split("/")[-2]
     if row["tld_url"] == "adcolony.com":
         video_id = row["url"].split("/")[-2]
+        if len(video_id) < 10:
+            video_id = row["url"].split("/")[-1]
     return video_id
 
 
@@ -1109,6 +1135,7 @@ def get_creatives(
         found_ad_infos, found_error_messages = parse_sent_video_df(
             row, pub_store_id, sent_video_df, database_connection, video_id
         )
+
         for found_error_message in found_error_messages:
             row_copy = row.copy()
             row_copy["error_msg"] = found_error_message["error_msg"]
