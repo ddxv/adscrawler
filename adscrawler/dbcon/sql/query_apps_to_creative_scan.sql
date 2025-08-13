@@ -1,6 +1,7 @@
 WITH run_counts AS (
     SELECT
         saac.store_app,
+        saac.run_id,
         sa.store_id,
         count(*) AS api_calls
     FROM
@@ -8,7 +9,7 @@ WITH run_counts AS (
     LEFT JOIN store_apps AS sa ON saac.store_app = sa.id
     WHERE saac.called_at <= current_date - INTERVAL '1 hour'
     GROUP BY
-        store_app, sa.store_id
+        store_app, run_id, sa.store_id
 )
 
 SELECT * FROM run_counts

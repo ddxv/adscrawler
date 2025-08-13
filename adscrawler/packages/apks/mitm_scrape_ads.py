@@ -30,6 +30,7 @@ from adscrawler.dbcon.queries import (
     query_ad_domains,
     query_apps_to_creative_scan,
     query_store_app_by_store_id,
+    query_store_apps_no_creatives,
     upsert_df,
 )
 from adscrawler.packages.storage import (
@@ -1519,11 +1520,8 @@ def parse_store_id_mitm_log(
     return error_messages
 
 
-def parse_all_runs_for_store_id(
-    pub_store_id: str, database_connection: PostgresCon
-) -> pd.DataFrame:
+def parse_all_runs_for_store_id(pub_store_id: str, database_connection: PostgresCon):
     mitms = get_store_id_mitm_s3_keys(store_id=pub_store_id)
-    all_failed_df = pd.DataFrame()
     for _i, mitm in mitms.iterrows():
         key = mitm["key"]
         run_id = mitm["run_id"]
@@ -1567,9 +1565,7 @@ def parse_all_runs_for_store_id(
             ]
         ]
         error_msg_df = error_msg_df[mycols]
-        all_failed_df = pd.concat([all_failed_df, error_msg_df], ignore_index=True)
         log_creative_scan_results(error_msg_df, database_connection)
-    return all_failed_df
 
 
 def parse_specific_run_for_store_id(
@@ -1588,16 +1584,33 @@ def parse_specific_run_for_store_id(
     )
 
 
-def scan_all_apps(database_connection: PostgresCon) -> None:
+def scan_all_apps(
+    database_connection: PostgresCon, limit_store_apps_no_creatives: bool = True
+) -> None:
     apps_to_scan = query_apps_to_creative_scan(database_connection=database_connection)
+    if limit_store_apps_no_creatives:
+        store_apps_no_creatives = query_store_apps_no_creatives(
+            database_connection=database_connection
+        )
+        store_apps_no_creatives["no_creatives"] = True
+        store_apps_no_creatives["run_id"] = store_apps_no_creatives["run_id"].astype(
+            int
+        )
+        filtered_apps = pd.merge(
+            apps_to_scan,
+            store_apps_no_creatives,
+            left_on=["store_id", "run_id"],
+            right_on=["pub_store_id", "run_id"],
+            how="left",
+        )
+        apps_to_scan = filtered_apps[filtered_apps["no_creatives"].isna()]
+        apps_to_scan = apps_to_scan[["store_id", "api_calls"]].drop_duplicates()
     apps_count = apps_to_scan.shape[0]
     for i, app in apps_to_scan.iterrows():
         pub_store_id = app["store_id"]
         logger.info(f"{i}/{apps_count}: {pub_store_id} start")
         try:
-            _app_failed_df = parse_all_runs_for_store_id(
-                pub_store_id, database_connection
-            )
+            parse_all_runs_for_store_id(pub_store_id, database_connection)
         except Exception as e:
             logger.exception(f"Error parsing {pub_store_id}: {e}")
             continue
