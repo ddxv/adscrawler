@@ -1025,7 +1025,7 @@ def parse_sent_video_df(
             )
             ad_info["adv_store_app_id"] = adv_db_id
         except Exception:
-            error_msg = "found potential app! but failed to get db id"
+            error_msg = f"found potential app! but failed to get db id {ad_info['adv_store_id']}"
             logger.error(error_msg)
             row["error_msg"] = error_msg
             error_messages.append(row)
