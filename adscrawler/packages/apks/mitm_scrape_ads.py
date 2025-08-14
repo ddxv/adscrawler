@@ -1,3 +1,4 @@
+import base64
 import dataclasses
 import datetime
 import hashlib
@@ -67,6 +68,8 @@ MMP_TLDS = [
     "arb.ge",
     "branch.io",
     "impression.link",
+    "sng.link",
+    "onelink.me",
 ]
 
 PLAYSTORE_URL_PARTS = ["play.google.com/store", "market://", "intent://"]
@@ -100,8 +103,17 @@ class AdInfo:
 
 
 def parse_mitm_log(
-    mitm_log_path: pathlib.Path,
+    pub_store_id: str,
+    run_id: int,
 ) -> pd.DataFrame:
+    mitm_log_path = pathlib.Path(MITM_DIR, f"{pub_store_id}_{run_id}.log")
+    if mitm_log_path.exists():
+        logger.info("mitm log already exists")
+    else:
+        key = f"mitm_logs/android/{pub_store_id}/{run_id}.log"
+        mitms = get_store_id_mitm_s3_keys(store_id=pub_store_id)
+        key = mitms[mitms["run_id"] == str(run_id)]["key"].to_numpy()[0]
+        mitm_log_path = download_mitm_log_by_key(key, mitm_log_path)
     # Define the log file path
     if not mitm_log_path.exists():
         logger.error(f"mitm log file not found at {mitm_log_path}")
@@ -189,6 +201,7 @@ def parse_mitm_log(
     df["run_id"] = (
         mitm_log_path.as_posix().split("/")[-1].split("_")[-1].replace(".log", "")
     )
+    df["pub_store_id"] = pub_store_id
     return df
 
 
@@ -211,7 +224,7 @@ def get_sent_video_df(
     return sent_video_df
 
 
-def extract_and_decode_urls(text: str):
+def extract_and_decode_urls(text: str) -> list[str]:
     """
     Extracts all URLs from a given text, handles HTML entities and URL encoding.
     """
@@ -229,7 +242,9 @@ def extract_and_decode_urls(text: str):
     # 1. Broad regex for URLs (http, https, fybernativebrowser, etc.)
     # This pattern is made more flexible to capture various URL formats
     urls = []
-    text = html.unescape(text)
+    unesc_text = html.unescape(text)
+    # Sometimes JSON decoded to string became //u0026, this is a workaround to fix it
+    enc_text = text.encode("utf-8").decode("unicode_escape")
     url_pattern = re.compile(
         r"""(?:
         (?:https?|intent|market|fybernativebrowser):\/\/  # allowed schemes
@@ -245,7 +260,12 @@ def extract_and_decode_urls(text: str):
         "%5B",  # [
         "%3C",  # <
     ]
-    found_urls = url_pattern.findall(text)
+    unesc_found_urls = url_pattern.findall(unesc_text)
+    enc_found_urls = url_pattern.findall(enc_text)
+    orig_found_urls = url_pattern.findall(text)
+    found_urls = list(
+        set(vast_urls + unesc_found_urls + enc_found_urls + orig_found_urls)
+    )
     for url in found_urls:
         # print("--------------------------------")
         # print("RAW:", url)
@@ -363,6 +383,8 @@ def parse_urls_for_known_parts(
             adv_store_id = match.group(1)
             found_adv_store_ids.append(adv_store_id)
         elif "play.google.com" in url and "google.com" in tld_url:
+            if "apps/developer?" in url:
+                continue
             resp_adv_id = adv_id_from_play_url(url)
             if resp_adv_id:
                 found_adv_store_ids.append(resp_adv_id)
@@ -404,18 +426,19 @@ def parse_urls_for_known_parts(
 
 def parse_mtg_ad(sent_video_dict: dict, database_connection: PostgresCon) -> AdInfo:
     init_ad_network_tld = "mtgglobals.com"
-    ad_response_text = sent_video_dict["response_text"]
+    text = sent_video_dict["response_text"]
     try:
-        ad_response = json.loads(ad_response_text)
+        ad_response = json.loads(text)
         adv_store_id = ad_response["data"]["ads"][0]["package_name"]
-        ad_info = AdInfo(
-            adv_store_id=adv_store_id,
-            init_tld=init_ad_network_tld,
-        )
-        return ad_info
+        if adv_store_id:
+            ad_info = AdInfo(
+                adv_store_id=adv_store_id,
+                init_tld=init_ad_network_tld,
+            )
+            return ad_info
     except Exception:
         pass
-    all_urls = extract_and_decode_urls(ad_response_text)
+    all_urls = extract_and_decode_urls(text)
     ad_info = parse_urls_for_known_parts(all_urls, database_connection)
     return ad_info
 
@@ -484,6 +507,13 @@ def decode_utf8(view) -> tuple[bytes, str, bool]:
         return view_bytes, "", False
 
 
+def base64decode(s: str) -> str:
+    missing_padding = len(s) % 4
+    if missing_padding:
+        s += "=" * (4 - missing_padding)
+    return base64.urlsafe_b64decode(s)
+
+
 def parse_bidmachine_ad(
     sent_video_dict: dict, database_connection: PostgresCon
 ) -> AdInfo:
@@ -513,8 +543,9 @@ def parse_bidmachine_ad(
         ad_info = parse_urls_for_known_parts(urls, database_connection)
     except Exception:
         pass
-    try:
-        s = ret[11][2]
+
+    if not ad_info.adv_store_id:
+        # s = ret[11][2]
         # missing_padding = len(s) % 4
         # if missing_padding:
         #     s += "=" * (4 - missing_padding)
@@ -522,15 +553,15 @@ def parse_bidmachine_ad(
         # adv_store_id = json.loads(base64.urlsafe_b64decode(s))[
         # "sessionCallbackContext"
         # ]["bundle"]
-    except Exception:
-        pass
-    if adv_store_id and ad_info.adv_store_id is None:
-        ad_info.adv_store_id = adv_store_id
+        try:
+            text = str(ret)
+            urls = extract_and_decode_urls(text)
+            ad_info = parse_urls_for_known_parts(urls, database_connection)
+        except Exception:
+            pass
     if additional_ad_network_tld is not None and not ad_info.found_ad_network_tlds:
         ad_info.found_ad_network_tlds.append(additional_ad_network_tld)
     ad_info.init_tld = init_ad_network_tld
-    if ad_info.adv_store_id is None:
-        raise Exception("Bidmachine no adv_store_id found")
     return ad_info
 
 
@@ -1037,8 +1068,8 @@ def parse_sent_video_df(
             error_messages.append(row)
             continue
         if ad_info["adv_store_id"] == "unknown":
-            error_msg = f"Unknown adv_store_id for {init_tld}"
-            logger.error(f"Unknown adv_store_id for {init_tld} {video_id}")
+            error_msg = f"Unknown adv_store_id for {init_tld=} {video_id=}"
+            logger.error(error_msg)
             row["error_msg"] = error_msg
             error_messages.append(row)
             continue
@@ -1083,33 +1114,13 @@ def get_video_id(row: pd.Series) -> str:
     return video_id
 
 
-def get_creatives(
+def attribute_creatives(
     df: pd.DataFrame,
+    creatives_df: pd.DataFrame,
     pub_store_id: str,
     database_connection: PostgresCon,
 ) -> tuple[pd.DataFrame, list]:
     error_messages = []
-    if "status_code" not in df.columns:
-        run_id = df["run_id"].to_numpy()[0]
-        pub_store_id = df["pub_store_id"].to_numpy()[0]
-        error_msg = "No status code found in df, skipping"
-        logger.error(error_msg)
-        row = {"run_id": run_id, "pub_store_id": pub_store_id, "error_msg": error_msg}
-        error_messages.append(row)
-        return pd.DataFrame(), error_messages
-
-    df = add_file_extension(df)
-    creatives_df = filter_creatives(df)
-
-    if creatives_df.empty:
-        run_id = df["run_id"].to_numpy()[0]
-        pub_store_id = df["pub_store_id"].to_numpy()[0]
-        error_msg = "No creatives to check"
-        logger.error(error_msg)
-        row = {"run_id": run_id, "pub_store_id": pub_store_id, "error_msg": error_msg}
-        error_messages.append(row)
-        return pd.DataFrame(), error_messages
-
     i = 0
     adv_creatives = []
     row_count = creatives_df.shape[0]
@@ -1136,7 +1147,6 @@ def get_creatives(
         found_ad_infos, found_error_messages = parse_sent_video_df(
             row, pub_store_id, sent_video_df, database_connection, video_id
         )
-
         for found_error_message in found_error_messages:
             row_copy = row.copy()
             row_copy["error_msg"] = found_error_message["error_msg"]
@@ -1164,7 +1174,7 @@ def get_creatives(
             continue
         elif len(found_advs) == 0:
             error_msg = f"No adv_store_id found for {row['tld_url']} {video_id=}"
-            logger.error(f"{error_msg} {video_id}")
+            logger.error(error_msg)
             row["error_msg"] = error_msg
             error_messages.append(row)
             continue
@@ -1418,46 +1428,47 @@ def make_creative_records_df(
     return creative_records_df
 
 
-def collect_creative_records_df(
-    pub_store_id: str,
-    run_id: int,
-    mitm_log_path: pathlib.Path,
-    database_connection: PostgresCon,
-) -> pd.DataFrame:
-    df = parse_mitm_log(mitm_log_path)
-    df["pub_store_id"] = pub_store_id
-    if df.empty:
-        error_msg = "No data in mitm df"
-        logger.error(error_msg)
-        row = {"run_id": run_id, "pub_store_id": pub_store_id, "error_msg": error_msg}
-        error_messages = [row]
-        return pd.DataFrame(), error_messages
-    adv_creatives_df, error_messages = get_creatives(
-        df, pub_store_id, database_connection
-    )
-    return adv_creatives_df, error_messages
-
-
 def parse_store_id_mitm_log(
     pub_store_id: str,
     run_id: int,
-    mitm_log_path: pathlib.Path,
     database_connection: PostgresCon,
 ) -> list:
     pub_db_id = query_store_app_by_store_id(
         store_id=pub_store_id, database_connection=database_connection
     )
-    df = parse_mitm_log(mitm_log_path)
-    df["pub_store_id"] = pub_store_id
+    df = parse_mitm_log(pub_store_id, run_id)
     if df.empty:
         error_msg = "No data in mitm df"
         logger.error(error_msg)
         row = {"run_id": run_id, "pub_store_id": pub_store_id, "error_msg": error_msg}
         error_messages = [row]
         return error_messages
-    adv_creatives_df, error_messages = get_creatives(
-        df, pub_store_id, database_connection
+    error_messages = []
+    if "status_code" not in df.columns:
+        run_id = df["run_id"].to_numpy()[0]
+        pub_store_id = df["pub_store_id"].to_numpy()[0]
+        error_msg = "No status code found in df, skipping"
+        logger.error(error_msg)
+        row = {"run_id": run_id, "pub_store_id": pub_store_id, "error_msg": error_msg}
+        error_messages.append(row)
+        return pd.DataFrame(), error_messages
+
+    df = add_file_extension(df)
+    creatives_df = filter_creatives(df)
+
+    if creatives_df.empty:
+        run_id = df["run_id"].to_numpy()[0]
+        pub_store_id = df["pub_store_id"].to_numpy()[0]
+        error_msg = "No creatives to check"
+        logger.error(error_msg)
+        row = {"run_id": run_id, "pub_store_id": pub_store_id, "error_msg": error_msg}
+        error_messages.append(row)
+        return pd.DataFrame(), error_messages
+
+    adv_creatives_df, error_messages = attribute_creatives(
+        df, creatives_df, pub_store_id, database_connection
     )
+
     if adv_creatives_df.empty:
         if len(error_messages) == 0:
             error_msg = "No creatives or errors"
@@ -1523,16 +1534,10 @@ def parse_store_id_mitm_log(
 def parse_all_runs_for_store_id(pub_store_id: str, database_connection: PostgresCon):
     mitms = get_store_id_mitm_s3_keys(store_id=pub_store_id)
     for _i, mitm in mitms.iterrows():
-        key = mitm["key"]
         run_id = mitm["run_id"]
-        filename = f"{pub_store_id}_{run_id}.log"
-        if not pathlib.Path(MITM_DIR, filename).exists():
-            mitm_log_path = download_mitm_log_by_key(key, filename)
-        else:
-            mitm_log_path = pathlib.Path(MITM_DIR, filename)
         try:
             error_messages = parse_store_id_mitm_log(
-                pub_store_id, run_id, mitm_log_path, database_connection
+                pub_store_id, run_id, database_connection
             )
         except Exception:
             error_msg = "CRITICAL uncaught error"
@@ -1571,17 +1576,7 @@ def parse_all_runs_for_store_id(pub_store_id: str, database_connection: Postgres
 def parse_specific_run_for_store_id(
     pub_store_id: str, run_id: int, database_connection: PostgresCon
 ) -> pd.DataFrame:
-    mitm_log_path = pathlib.Path(MITM_DIR, f"{pub_store_id}_{run_id}.log")
-    if mitm_log_path.exists():
-        logger.info("mitm log already exists")
-    else:
-        key = f"mitm_logs/android/{pub_store_id}/{run_id}.log"
-        mitms = get_store_id_mitm_s3_keys(store_id=pub_store_id)
-        key = mitms[mitms["run_id"] == str(run_id)]["key"].to_numpy()[0]
-        mitm_log_path = download_mitm_log_by_key(key, mitm_log_path)
-    return parse_store_id_mitm_log(
-        pub_store_id, run_id, mitm_log_path, database_connection
-    )
+    return parse_store_id_mitm_log(pub_store_id, run_id, database_connection)
 
 
 def scan_all_apps(
@@ -1662,7 +1657,7 @@ def open_all_local_mitms() -> pd.DataFrame:
         logger.info(f"{i}/{num_files}: {mitm_log_path}")
         pub_store_id = mitm_log_path.name.split("_")[0]
         run_id = mitm_log_path.name.split("_")[1].replace(".log", "")
-        df = parse_mitm_log(mitm_log_path)
+        df = parse_mitm_log(pub_store_id, run_id)
         if "response_content_type" in df.columns:
             df = add_is_creative_content_column(df)
             df["response_text"] = np.where(
@@ -1713,23 +1708,3 @@ def get_cloud_s3_client():
         aws_access_key_id=CONFIG["digi-cloud"]["access_key_id"],
         aws_secret_access_key=CONFIG["digi-cloud"]["secret_key"],
     )
-
-
-def test_mitm_scrape_ads(database_connection: PostgresCon):
-    all_mitms_df = pd.read_csv("all_mitms.tsv", sep="\t")
-    all_creatives_df = pd.DataFrame()
-    all_error_messages = []
-    row_count = all_mitms_df[["pub_store_id", "run_id"]].drop_duplicates().shape[0]
-    i = 0
-    for (pub_store_id, run_id), df in all_mitms_df.groupby(["pub_store_id", "run_id"]):
-        i += 1
-        logger.info(f"{i}/{row_count}: {pub_store_id}, {run_id}")
-        df["pub_store_id"] = pub_store_id
-        df["run_id"] = run_id
-        adv_creatives_df, error_messages = get_creatives(
-            df, pub_store_id, database_connection
-        )
-        all_creatives_df = pd.concat(
-            [all_creatives_df, adv_creatives_df], ignore_index=True
-        )
-        all_error_messages.append(error_messages)
