@@ -5,6 +5,7 @@ import time
 from urllib.error import URLError
 from urllib.parse import unquote_plus
 
+import duckdb
 import google_play_scraper
 import pandas as pd
 import tldextract
@@ -24,7 +25,7 @@ from adscrawler.app_stores.google import (
     scrape_google_ranks,
     search_play_store,
 )
-from adscrawler.config import get_logger
+from adscrawler.config import CONFIG, get_logger
 from adscrawler.dbcon.connection import PostgresCon
 from adscrawler.dbcon.queries import (
     delete_app_url_mapping,
@@ -268,6 +269,15 @@ def scrape_store_ranks(database_connection: PostgresCon, stores: list[int]) -> N
                 logger.exception(
                     f"Srape iOS collection={collection_keyword} hit error={e}, skipping",
                 )
+        try:
+            process_weekly_ranks(
+                2,
+                datetime.date.today() - datetime.timedelta(days=15),
+                datetime.date.today(),
+                database_connection,
+            )
+        except Exception:
+            logger.exception("Weekly ranks failed")
 
     if 1 in stores:
         for country in COUNTRY_LIST:
@@ -306,6 +316,15 @@ def scrape_store_ranks(database_connection: PostgresCon, stores: list[int]) -> N
             )
         except Exception:
             logger.exception("ApkCombo RSS feed failed")
+        try:
+            process_weekly_ranks(
+                1,
+                datetime.date.today() - datetime.timedelta(days=15),
+                datetime.date.today(),
+                database_connection,
+            )
+        except Exception:
+            logger.exception("Weekly ranks failed")
 
 
 def insert_new_apps(
@@ -477,7 +496,7 @@ def process_store_rankings(
     s3_client = get_s3_client()
     bucket = "adscrawler"
     for crawled_date, df_crawled_date in df.groupby("crawled_date"):
-        crawled_date = crawled_date.date()
+        crawled_date = crawled_date.strftime("%Y-%m-%d")
         for country, df_country in df_crawled_date.groupby("country"):
             local_path = pathlib.Path(
                 f"{output_dir}/crawled_date={crawled_date}/country={country}/rankings.parquet"
@@ -488,6 +507,154 @@ def process_store_rankings(
             logger.info(f"Uploading to S3: {s3_key}")
             s3_client.upload_file(str(local_path), bucket, s3_key)
             local_path.unlink()
+
+
+def map_database_ids(
+    df: pd.DataFrame, pgcon: PostgresCon, store_id_map: pd.DataFrame
+) -> pd.DataFrame:
+    country_map = query_countries(pgcon)
+    collection_map = query_collections(pgcon)
+    category_map = query_categories(pgcon)
+
+    df["country"] = df["country"].map(country_map.set_index("alpha2")["id"].to_dict())
+    df["store_collection"] = df["collection"].map(
+        collection_map.set_index("collection")["id"].to_dict()
+    )
+    df["store_category"] = df["category"].map(
+        category_map.set_index("category")["id"].to_dict()
+    )
+    df["store_app"] = df["store_id"].map(
+        store_id_map.set_index("store_id")["id"].to_dict()
+    )
+    return df
+
+
+def process_weekly_ranks(
+    store: int,
+    start_date: datetime.date,
+    end_date: datetime.date,
+    database_connection: PostgresCon,
+) -> None:
+    store_id_map = query_store_id_map(database_connection, store)
+
+    # port = start_tunnel("loki")
+    # host = "127.0.0.1"
+    host = CONFIG["loki"]["host"]
+    port = CONFIG["loki"]["remote_port"]
+    endpoint = f"{host}:{port}"
+
+    duckdb_con = duckdb.connect()
+    duckdb_con.execute("INSTALL httpfs; LOAD httpfs;")
+    duckdb_con.execute("SET s3_region='garage';")
+    duckdb_con.execute(f"SET s3_endpoint='{endpoint}';")
+    duckdb_con.execute("SET s3_url_style='path';")
+    duckdb_con.execute("SET s3_url_compatibility_mode=true;")
+    duckdb_con.execute(f"SET s3_access_key_id='{CONFIG['loki']['access_key_id']}';")
+    duckdb_con.execute(f"SET s3_secret_access_key='{CONFIG['loki']['secret_key']}';")
+    duckdb_con.execute("SET s3_use_ssl=false;")
+    duckdb_con.execute("SET temp_directory = '/tmp/duckdb.tmp/';")
+    duckdb_con.execute("SET preserve_insertion_order = false;")
+
+    s3 = get_s3_client()
+
+    for dt in pd.date_range(start_date, end_date, freq="W-MON"):
+        week_str = dt.strftime("%Y-%m-%d")
+        print(f"Processing week_start={week_str}")
+
+        all_parquet_paths = []
+        for ddt in pd.date_range(dt, dt + datetime.timedelta(days=6), freq="D"):
+            ddt_str = ddt.strftime("%Y-%m-%d")
+            print(f"Processing day={ddt_str}")
+            prefix = (
+                f"raw-data/app_rankings/store={store}/crawled_date={ddt_str}/country="
+            )
+            objects = s3.list_objects_v2(Bucket="adscrawler", Prefix=prefix)
+            parquet_paths = [
+                f"s3://adscrawler/{obj['Key']}"
+                for obj in objects.get("Contents", [])
+                if obj["Key"].endswith("rankings.parquet")
+            ]
+            all_parquet_paths += parquet_paths
+        if len(all_parquet_paths) == 0:
+            print(f"No parquet files found for week_start={week_str}")
+            continue
+
+        week_query = f"""WITH all_data AS (
+            SELECT * FROM read_parquet({all_parquet_paths})
+             ),
+         weekly_max_dates AS (
+                      SELECT ar_1.country,
+                         ar_1.collection,
+                         ar_1.category,
+                         date_trunc('week'::text, ar_1.crawled_date::timestamp with time zone) AS week_start,
+                         min(ar_1.rank) AS best_rank,
+                         max(ar_1.crawled_date) AS max_crawled_date
+                        FROM all_data ar_1
+                       GROUP BY ar_1.country, ar_1.collection, ar_1.category, (date_trunc('week'::text, ar_1.crawled_date::timestamp with time zone))
+                     )
+         SELECT ar.rank,
+            wmd.best_rank,
+            ar.country,
+            ar.collection,
+            ar.category,
+            ar.crawled_date,
+            ar.store_id
+           FROM all_data ar
+             JOIN weekly_max_dates wmd ON ar.country = wmd.country 
+             AND ar.collection = wmd.collection 
+             AND ar.category = wmd.category 
+             AND ar.crawled_date = wmd.max_crawled_date
+          ORDER BY ar.country, ar.collection, ar.category, ar.crawled_date, ar.rank
+        """
+
+        wdf = duckdb_con.execute(week_query).df()
+
+        wdf = map_database_ids(wdf, database_connection, store_id_map)
+        wdf = wdf.drop(columns=["store_id", "collection", "category"])
+
+        upsert_df(
+            df=wdf,
+            table_name="store_app_ranks_weekly",
+            schema="frontend",
+            database_connection=database_connection,
+            key_columns=[
+                "country",
+                "store_collection",
+                "store_category",
+                "crawled_date",
+                "rank",
+            ],
+            insert_columns=[
+                "country",
+                "store_collection",
+                "store_category",
+                "crawled_date",
+                "rank",
+                "store_app",
+                "best_rank",
+            ],
+        )
+
+
+def start_tunnel(server_name: str) -> str:
+    from sshtunnel import SSHTunnelForwarder
+
+    from adscrawler.dbcon.connection import get_host_ip
+
+    host = get_host_ip(CONFIG["loki"]["host"])
+
+    ssh_port = CONFIG[server_name].get("ssh_port", 22)
+    remote_port = CONFIG[server_name].get("remote_port", 5432)
+    server = SSHTunnelForwarder(
+        (host, ssh_port),
+        ssh_username=CONFIG[server_name]["os_user"],
+        remote_bind_address=("127.0.0.1", remote_port),
+        ssh_pkey=CONFIG[server_name].get("ssh_pkey"),
+        ssh_private_key_password=CONFIG[server_name].get("ssh_pkey_password"),
+    )
+    server.start()
+    db_port = str(server.local_bind_port)
+    return db_port
 
 
 def extract_domains(x: str) -> str:
