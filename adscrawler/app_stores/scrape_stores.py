@@ -495,8 +495,8 @@ def process_store_rankings(
     output_dir = f"/tmp/exports/app_rankings/store={store}"
     s3_client = get_s3_client()
     bucket = "adscrawler"
+    df["crawled_date"] = df["crawled_date"].dt.strftime("%Y-%m-%d")
     for crawled_date, df_crawled_date in df.groupby("crawled_date"):
-        crawled_date = crawled_date.strftime("%Y-%m-%d")
         for country, df_country in df_crawled_date.groupby("country"):
             local_path = pathlib.Path(
                 f"{output_dir}/crawled_date={crawled_date}/country={country}/rankings.parquet"
