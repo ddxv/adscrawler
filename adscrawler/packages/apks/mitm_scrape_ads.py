@@ -343,7 +343,7 @@ def adv_id_from_play_url(url: str) -> str:
     parsed_gplay = urllib.parse.urlparse(url)
     try:
         adv_store_id = urllib.parse.parse_qs(parsed_gplay.query)["id"][0]
-
+        adv_store_id = adv_store_id.rstrip("!@#$%^&*()+=[]{}|\\:;\"'<>?,/")
     except Exception:
         adv_store_id = None
     return adv_store_id
