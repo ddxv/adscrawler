@@ -6,6 +6,7 @@ import html
 import json
 import pathlib
 import re
+import struct
 import subprocess
 import urllib
 import uuid
@@ -244,7 +245,6 @@ def extract_and_decode_urls(text: str) -> list[str]:
     urls = []
     unesc_text = html.unescape(text)
     # Sometimes JSON decoded to string became //u0026, this is a workaround to fix it
-    enc_text = text.encode("utf-8").decode("unicode_escape")
     url_pattern = re.compile(
         r"""(?:
         (?:https?|intent|market|fybernativebrowser):\/\/  # allowed schemes
@@ -254,18 +254,22 @@ def extract_and_decode_urls(text: str) -> list[str]:
     """,
         re.VERBOSE,
     )
+    try:
+        enc_text = text.encode("utf-8").decode("unicode_escape")
+        enc_found_urls = url_pattern.findall(enc_text)
+    except Exception:
+        enc_found_urls = []
+    unesc_found_urls = url_pattern.findall(unesc_text)
+    orig_found_urls = url_pattern.findall(text)
+    found_urls = list(
+        set(vast_urls + unesc_found_urls + enc_found_urls + orig_found_urls)
+    )
     encoded_delimiters = [
         "%5D",  # ]
         "%3E",  # >
         "%5B",  # [
         "%3C",  # <
     ]
-    unesc_found_urls = url_pattern.findall(unesc_text)
-    enc_found_urls = url_pattern.findall(enc_text)
-    orig_found_urls = url_pattern.findall(text)
-    found_urls = list(
-        set(vast_urls + unesc_found_urls + enc_found_urls + orig_found_urls)
-    )
     for url in found_urls:
         # print("--------------------------------")
         # print("RAW:", url)
@@ -339,6 +343,7 @@ def adv_id_from_play_url(url: str) -> str:
     parsed_gplay = urllib.parse.urlparse(url)
     try:
         adv_store_id = urllib.parse.parse_qs(parsed_gplay.query)["id"][0]
+
     except Exception:
         adv_store_id = None
     return adv_store_id
@@ -359,7 +364,7 @@ def follow_url_redirects(url: str) -> str:
 
 
 def parse_urls_for_known_parts(
-    all_urls: list[str], database_connection: PostgresCon
+    all_urls: list[str], database_connection: PostgresCon, pub_store_id: str
 ) -> AdInfo:
     found_mmp_urls = []
     found_adv_store_ids = []
@@ -404,6 +409,7 @@ def parse_urls_for_known_parts(
             found_ad_network_urls.append(url)
     found_mmp_urls = list(set(found_mmp_urls))
     found_adv_store_ids = list(set(found_adv_store_ids))
+    found_adv_store_ids = [x for x in found_adv_store_ids if x != pub_store_id]
     found_ad_network_tlds = [
         tldextract.extract(url).domain + "." + tldextract.extract(url).suffix
         for url in found_ad_network_urls
@@ -439,7 +445,9 @@ def parse_mtg_ad(sent_video_dict: dict, database_connection: PostgresCon) -> AdI
     except Exception:
         pass
     all_urls = extract_and_decode_urls(text)
-    ad_info = parse_urls_for_known_parts(all_urls, database_connection)
+    ad_info = parse_urls_for_known_parts(
+        all_urls, database_connection, sent_video_dict["pub_store_id"]
+    )
     return ad_info
 
 
@@ -540,7 +548,9 @@ def parse_bidmachine_ad(
         additional_ad_network_tld = ret[5][6][3][13][2][2]
         text = str(ret[5][6][3][13][2][17])
         urls = extract_and_decode_urls(text)
-        ad_info = parse_urls_for_known_parts(urls, database_connection)
+        ad_info = parse_urls_for_known_parts(
+            urls, database_connection, sent_video_dict["pub_store_id"]
+        )
     except Exception:
         pass
 
@@ -556,7 +566,9 @@ def parse_bidmachine_ad(
         try:
             text = str(ret)
             urls = extract_and_decode_urls(text)
-            ad_info = parse_urls_for_known_parts(urls, database_connection)
+            ad_info = parse_urls_for_known_parts(
+                urls, database_connection, sent_video_dict["pub_store_id"]
+            )
         except Exception:
             pass
     if additional_ad_network_tld is not None and not ad_info.found_ad_network_tlds:
@@ -614,7 +626,9 @@ def parse_unity_ad(sent_video_dict: dict, database_connection: PostgresCon) -> A
             pass
     text = sent_video_dict["response_text"]
     all_urls = extract_and_decode_urls(text)
-    ad_info = parse_urls_for_known_parts(all_urls, database_connection)
+    ad_info = parse_urls_for_known_parts(
+        all_urls, database_connection, sent_video_dict["pub_store_id"]
+    )
     if ad_info.adv_store_id is None and adv_store_id is not None:
         ad_info.adv_store_id = adv_store_id
     if ad_info.found_mmp_urls is None and found_mmp_urls:
@@ -636,7 +650,9 @@ def parse_generic_adnetwork(
     text = sent_video_dict["response_text"]
     all_urls = extract_and_decode_urls(text)
     try:
-        ad_info = parse_urls_for_known_parts(all_urls, database_connection)
+        ad_info = parse_urls_for_known_parts(
+            all_urls, database_connection, sent_video_dict["pub_store_id"]
+        )
     except MultipleAdvertiserIdError:
         error_msg = f"multiple adv_store_id found for {init_tld}"
         logger.error(error_msg)
@@ -669,7 +685,9 @@ def parse_vungle_ad(sent_video_dict: dict, database_connection: PostgresCon) -> 
         pass
     if not adv_store_id:
         extracted_urls = extract_and_decode_urls(ad_response_text)
-        ad_info = parse_urls_for_known_parts(extracted_urls, database_connection)
+        ad_info = parse_urls_for_known_parts(
+            extracted_urls, database_connection, sent_video_dict["pub_store_id"]
+        )
     else:
         ad_info = AdInfo(
             adv_store_id=adv_store_id,
@@ -689,7 +707,9 @@ def parse_fyber_ad(sent_video_dict: dict, database_connection: PostgresCon) -> A
         pass
     all_urls = extract_and_decode_urls(text=text)
     all_urls = list(set(all_urls + parsed_urls))
-    ad_info = parse_urls_for_known_parts(all_urls, database_connection)
+    ad_info = parse_urls_for_known_parts(
+        all_urls, database_connection, sent_video_dict["pub_store_id"]
+    )
     ad_info.init_tld = init_ad_network_tld
     return ad_info
 
@@ -724,7 +744,9 @@ def parse_google_ad(
                 return ad_info, error_msg
             all_urls = extract_and_decode_urls(ad_html)
             try:
-                ad_info = parse_urls_for_known_parts(all_urls, database_connection)
+                ad_info = parse_urls_for_known_parts(
+                    all_urls, database_connection, sent_video_dict["pub_store_id"]
+                )
             except MultipleAdvertiserIdError:
                 error_msg = "multiple adv_store_id found for doubleclick"
                 logger.error(error_msg)
@@ -740,7 +762,9 @@ def parse_google_ad(
                             all_urls = extract_and_decode_urls(str(slot))
                             try:
                                 ad_info = parse_urls_for_known_parts(
-                                    all_urls, database_connection
+                                    all_urls,
+                                    database_connection,
+                                    sent_video_dict["pub_store_id"],
                                 )
                             except MultipleAdvertiserIdError:
                                 error_msg = (
@@ -769,7 +793,9 @@ def parse_google_ad(
             # XML does have apps
             all_urls = extract_and_decode_urls(response_text)
             try:
-                ad_info = parse_urls_for_known_parts(all_urls, database_connection)
+                ad_info = parse_urls_for_known_parts(
+                    all_urls, database_connection, sent_video_dict["pub_store_id"]
+                )
             except MultipleAdvertiserIdError:
                 error_msg = "multiple adv_store_id found for doubleclick"
                 logger.error(error_msg)
@@ -968,6 +994,22 @@ def filter_creatives(df: pd.DataFrame) -> pd.DataFrame:
         size_diff / creatives_df["creative_size"] <= PCT_TOL
     )
     creatives_df = creatives_df[creatives_df["size_match"]]
+    # Lots of creatives of the publishing app icon
+    # If this cuts out the advertisers icon as well that seems OK?
+    widths = creatives_df["response_content"].apply(
+        lambda x: struct.unpack(">II", x[16:24])[0]
+        if x.startswith(b"\x89PNG\r\n\x1a\n")
+        else None
+    )
+    heights = creatives_df["response_content"].apply(
+        lambda x: struct.unpack(">II", x[16:24])[1]
+        if x.startswith(b"\x89PNG\r\n\x1a\n")
+        else None
+    )
+    is_square = widths == heights
+    is_png = creatives_df["file_extension"] == "png"
+    is_googleusercontent = creatives_df["tld_url"] == "googleusercontent.com"
+    creatives_df = creatives_df[~(is_png & is_googleusercontent & is_square)]
     return creatives_df
 
 
@@ -1051,7 +1093,9 @@ def parse_sent_video_df(
                 row["error_msg"] = error_msg
                 error_messages.append(row)
                 continue
-            ad_parts = parse_urls_for_known_parts(all_urls, database_connection)
+            ad_parts = parse_urls_for_known_parts(
+                all_urls, database_connection, sent_video_dict["pub_store_id"]
+            )
             if ad_parts["adv_store_id"] is not None:
                 error_msg = "found potential app! adv_store_id"
                 row["error_msg"] = error_msg
@@ -1144,6 +1188,7 @@ def attribute_creatives(
             row["error_msg"] = error_msg
             error_messages.append(row)
             continue
+        sent_video_df["pub_store_id"] = pub_store_id
         found_ad_infos, found_error_messages = parse_sent_video_df(
             row, pub_store_id, sent_video_df, database_connection, video_id
         )
@@ -1433,9 +1478,6 @@ def parse_store_id_mitm_log(
     run_id: int,
     database_connection: PostgresCon,
 ) -> list:
-    pub_db_id = query_store_app_by_store_id(
-        store_id=pub_store_id, database_connection=database_connection
-    )
     df = parse_mitm_log(pub_store_id, run_id)
     if df.empty:
         error_msg = "No data in mitm df"
@@ -1488,6 +1530,9 @@ def parse_store_id_mitm_log(
             "error_msg": msg,
         }
         error_messages.append(row)
+    pub_db_id = query_store_app_by_store_id(
+        store_id=pub_store_id, database_connection=database_connection
+    )
     adv_creatives_df["store_app_pub_id"] = pub_db_id
     adv_creatives_df["run_id"] = run_id
     assets_df = adv_creatives_df[
