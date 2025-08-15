@@ -272,9 +272,9 @@ def scrape_store_ranks(database_connection: PostgresCon, stores: list[int]) -> N
         try:
             process_weekly_ranks(
                 2,
-                datetime.date.today() - datetime.timedelta(days=15),
-                datetime.date.today(),
-                database_connection,
+                start_date=datetime.date.today() - datetime.timedelta(days=15),
+                end_date=datetime.date.today(),
+                database_connection=database_connection,
             )
         except Exception:
             logger.exception("Weekly ranks failed")
@@ -319,9 +319,9 @@ def scrape_store_ranks(database_connection: PostgresCon, stores: list[int]) -> N
         try:
             process_weekly_ranks(
                 1,
-                datetime.date.today() - datetime.timedelta(days=15),
-                datetime.date.today(),
-                database_connection,
+                start_date=datetime.date.today() - datetime.timedelta(days=15),
+                end_date=datetime.date.today(),
+                database_connection=database_connection,
             )
         except Exception:
             logger.exception("Weekly ranks failed")
@@ -538,10 +538,12 @@ def process_weekly_ranks(
 ) -> None:
     store_id_map = query_store_id_map(database_connection, store)
 
-    # port = start_tunnel("loki")
-    # host = "127.0.0.1"
-    host = CONFIG["loki"]["host"]
-    port = CONFIG["loki"]["remote_port"]
+    if database_connection.engine.url.host == "127.0.0.1":
+        port = start_tunnel("loki")
+        host = "127.0.0.1"
+    else:
+        host = CONFIG["loki"]["host"]
+        port = CONFIG["loki"]["remote_port"]
     endpoint = f"{host}:{port}"
 
     duckdb_con = duckdb.connect()
@@ -560,12 +562,12 @@ def process_weekly_ranks(
 
     for dt in pd.date_range(start_date, end_date, freq="W-MON"):
         week_str = dt.strftime("%Y-%m-%d")
-        print(f"Processing week_start={week_str}")
+        logger.info(f"Processing week_start={week_str}")
 
         all_parquet_paths = []
         for ddt in pd.date_range(dt, dt + datetime.timedelta(days=6), freq="D"):
             ddt_str = ddt.strftime("%Y-%m-%d")
-            print(f"Processing day={ddt_str}")
+            logger.info(f"Processing day={ddt_str}")
             prefix = (
                 f"raw-data/app_rankings/store={store}/crawled_date={ddt_str}/country="
             )
@@ -577,7 +579,7 @@ def process_weekly_ranks(
             ]
             all_parquet_paths += parquet_paths
         if len(all_parquet_paths) == 0:
-            print(f"No parquet files found for week_start={week_str}")
+            logger.info(f"No parquet files found for week_start={week_str}")
             continue
 
         week_query = f"""WITH all_data AS (
