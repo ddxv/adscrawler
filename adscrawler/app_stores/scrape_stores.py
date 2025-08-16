@@ -271,7 +271,7 @@ def scrape_store_ranks(database_connection: PostgresCon, stores: list[int]) -> N
                 )
         try:
             process_weekly_ranks(
-                2,
+                1,
                 start_date=datetime.date.today() - datetime.timedelta(days=15),
                 end_date=datetime.date.today(),
                 database_connection=database_connection,
@@ -439,7 +439,7 @@ def process_scraped(
         how="left",
         on=["store", "store_id"],
         validate="m:1",
-    ).drop("store_id", axis=1)
+    )
     df["country"] = df["country"].str.upper()
     if collections_map is not None and categories_map is not None:
         process_store_rankings(
@@ -450,6 +450,7 @@ def process_scraped(
             categories_map=categories_map,
         )
     if "keyword" in df.columns:
+        df = df.drop("store_id", axis=1)
         df = (
             pd.merge(
                 df,
@@ -480,6 +481,24 @@ def process_keyword_rankings(
         insert_columns=[],
     )
     logger.info("keyword rankings inserted")
+
+
+def download_rankings(
+    store: int, crawled_date: datetime.date, country: str
+) -> pd.DataFrame:
+    s3_client = get_s3_client()
+    bucket = "adscrawler"
+    store = 1
+    country = "US"
+    crawled_date = datetime.date(2025, 8, 15)
+    s3_key = f"raw-data/app_rankings/store={store}/crawled_date={crawled_date}/country={country}/rankings.parquet"
+    local_path = pathlib.Path(
+        f"/tmp/exports/app_rankings/store={store}/crawled_date={crawled_date}/country={country}/rankings.parquet"
+    )
+    os.makedirs(os.path.dirname(local_path), exist_ok=True)
+    s3_client.download_file(bucket, s3_key, str(local_path))
+    df = pd.read_parquet(local_path)
+    return df
 
 
 def process_store_rankings(
