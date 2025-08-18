@@ -593,12 +593,12 @@ def process_weekly_ranks(
 
     for dt in pd.date_range(start_date, end_date, freq="W-MON"):
         week_str = dt.strftime("%Y-%m-%d")
-        logger.info(f"Processing week_start={week_str}")
+        logger.info(f"Processing store={store} week_start={week_str}")
 
         all_parquet_paths = []
         for ddt in pd.date_range(dt, dt + datetime.timedelta(days=6), freq="D"):
             ddt_str = ddt.strftime("%Y-%m-%d")
-            logger.info(f"Processing day={ddt_str}")
+            logger.info(f"Processing store={store} day={ddt_str}")
             prefix = (
                 f"raw-data/app_rankings/store={store}/crawled_date={ddt_str}/country="
             )
