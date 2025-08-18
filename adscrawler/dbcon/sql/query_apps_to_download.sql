@@ -87,7 +87,7 @@ scheduled_apps_crawl AS (
                     AND vc.crawl_result IN (
                         2, 3, 4
                     )
-                    AND vc.updated_at < current_date - interval '30 days'
+                    AND vc.updated_at < current_date - interval '2 days'
                 )
             )
         )
