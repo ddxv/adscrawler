@@ -66,30 +66,11 @@ def get_app_ids_with_retry(
     return app_ids
 
 
-def scrape_ios_ranks(
+def get_app_store_collections(
     category_keyword: str | None = None,
     collection_keyword: str | None = None,
     country: str = "us",
-) -> list[dict]:
-    scrape_info = (
-        f"Scrape iOS ranks for {collection_keyword=} {category_keyword=} {country=}"
-    )
-    logger.info(f"{scrape_info} starting")
-    scraper = AppStoreScraper()
-    # Eg: MAGAZINES_MEN, GAMES_ADVENTURE
-    if category_keyword:
-        category_keyword = category_keyword.upper()
-        categories = {
-            k: v
-            for k, v in AppStoreCategories.__dict__.items()
-            if (category_keyword in k.upper()) and (not k.startswith("__"))
-        }
-    else:
-        categories = {
-            k: v
-            for k, v in AppStoreCategories.__dict__.items()
-            if not k.startswith("__")
-        }
+) -> dict:
     # Eg: TOP_PAID / TOP_FREE
     if collection_keyword:
         collection_keyword = collection_keyword.upper()
@@ -106,7 +87,43 @@ def scrape_ios_ranks(
             for k, v in AppStoreCollections.__dict__.items()
             if not k.startswith("__") and "_MAC" not in k
         }
+    return collections
+
+
+def get_app_store_categories(category_keyword: str | None = None) -> dict:
+    # Eg: MAGAZINES_MEN, GAMES_ADVENTURE
+    if category_keyword:
+        category_keyword = category_keyword.upper()
+        categories = {
+            k: v
+            for k, v in AppStoreCategories.__dict__.items()
+            if (category_keyword in k.upper()) and (not k.startswith("__"))
+        }
+    else:
+        categories = {
+            k: v
+            for k, v in AppStoreCategories.__dict__.items()
+            if not k.startswith("__")
+        }
+    return categories
+
+
+def scrape_ios_ranks(
+    category_keyword: str | None = None,
+    collection_keyword: str | None = None,
+    country: str = "us",
+) -> list[dict]:
+    scrape_info = (
+        f"Scrape iOS ranks for {collection_keyword=} {category_keyword=} {country=}"
+    )
+    logger.info(f"{scrape_info} starting")
+    # Eg: MAGAZINES_MEN, GAMES_ADVENTURE
+    collections = get_app_store_collections(
+        collection_keyword=collection_keyword, country=country
+    )
+    categories = get_app_store_categories(category_keyword=category_keyword)
     ranked_dicts: list[dict] = []
+    scraper = AppStoreScraper()
     for _coll_key, coll_value in collections.items():
         for cat_key, cat_value in categories.items():
             logger.info(f"{scrape_info} Collection: {_coll_key}, category: {cat_key}")

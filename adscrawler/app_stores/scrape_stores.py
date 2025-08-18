@@ -271,7 +271,7 @@ def scrape_store_ranks(database_connection: PostgresCon, stores: list[int]) -> N
                 )
         try:
             process_weekly_ranks(
-                1,
+                store=2,
                 start_date=datetime.date.today() - datetime.timedelta(days=15),
                 end_date=datetime.date.today(),
                 database_connection=database_connection,
@@ -318,7 +318,7 @@ def scrape_store_ranks(database_connection: PostgresCon, stores: list[int]) -> N
             logger.exception("ApkCombo RSS feed failed")
         try:
             process_weekly_ranks(
-                1,
+                store=1,
                 start_date=datetime.date.today() - datetime.timedelta(days=15),
                 end_date=datetime.date.today(),
                 database_connection=database_connection,
@@ -530,12 +530,14 @@ def process_store_rankings(
 
 
 def map_database_ids(
-    df: pd.DataFrame, pgcon: PostgresCon, store_id_map: pd.DataFrame
+    df: pd.DataFrame,
+    database_connection: PostgresCon,
+    store_id_map: pd.DataFrame,
+    store: int,
 ) -> pd.DataFrame:
-    country_map = query_countries(pgcon)
-    collection_map = query_collections(pgcon)
-    category_map = query_categories(pgcon)
-
+    country_map = query_countries(database_connection)
+    collection_map = query_collections(database_connection)
+    category_map = query_categories(database_connection)
     df["country"] = df["country"].map(country_map.set_index("alpha2")["id"].to_dict())
     df["store_collection"] = df["collection"].map(
         collection_map.set_index("collection")["id"].to_dict()
@@ -543,6 +545,16 @@ def map_database_ids(
     df["store_category"] = df["category"].map(
         category_map.set_index("category")["id"].to_dict()
     )
+    new_ids = df[~df["store_id"].isin(store_id_map["store_id"])]["store_id"].unique()
+    if len(new_ids) > 0:
+        logger.info(f"New store ids: {new_ids}")
+        new_ids = [{"store": store, "store_id": store_id} for store_id in new_ids]
+        process_scraped(
+            database_connection=database_connection,
+            ranked_dicts=new_ids,
+            crawl_source="process_ranks_parquet",
+        )
+        store_id_map = query_store_id_map(database_connection, store)
     df["store_app"] = df["store_id"].map(
         store_id_map.set_index("store_id")["id"].to_dict()
     )
@@ -631,7 +643,7 @@ def process_weekly_ranks(
 
         wdf = duckdb_con.execute(week_query).df()
 
-        wdf = map_database_ids(wdf, database_connection, store_id_map)
+        wdf = map_database_ids(wdf, database_connection, store_id_map, store)
         wdf = wdf.drop(columns=["store_id", "collection", "category"])
 
         upsert_df(
