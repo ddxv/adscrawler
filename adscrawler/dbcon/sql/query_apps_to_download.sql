@@ -45,6 +45,14 @@ failing_downloads AS (
         store_app
 ),
 
+growth_apps AS (
+    SELECT
+        sa.id AS store_app,
+        saz.store_id
+    FROM frontend.store_apps_z_scores AS saz
+    LEFT JOIN store_apps AS sa ON saz.store_id = sa.store_id
+),
+
 scheduled_apps_crawl AS (
     SELECT
         dc.store_app,
@@ -172,7 +180,12 @@ combined AS (
         rating_count,
         attempt_count,
         last_crawl_result,
-        'scheduled' AS mysource,
+        CASE
+            WHEN
+                store_app IN (SELECT store_app FROM growth_apps)
+                THEN 'top_scheduled'
+            ELSE 'scheduled'
+        END AS mysource,
         last_download_attempt,
         last_downloaded_at
     FROM
