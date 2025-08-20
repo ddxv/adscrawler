@@ -373,7 +373,11 @@ def parse_urls_for_known_parts(
     for url in all_urls:
         adv_store_id = None
         tld_url = tldextract.extract(url).domain + "." + tldextract.extract(url).suffix
-        if tld_url in MMP_TLDS and ".com/privacy-policy" not in url:
+        if (
+            tld_url in MMP_TLDS
+            and ".com/privacy-policy" not in url
+            and "support.appsflyer.com" not in url
+        ):
             found_mmp_urls.append(url)
             if "appsflyer.com" in tld_url:
                 adv_store_id = re.search(
@@ -1189,6 +1193,7 @@ def attribute_creatives(
             error_messages.append(row)
             continue
         sent_video_df["pub_store_id"] = pub_store_id
+
         found_ad_infos, found_error_messages = parse_sent_video_df(
             row, pub_store_id, sent_video_df, database_connection, video_id
         )
