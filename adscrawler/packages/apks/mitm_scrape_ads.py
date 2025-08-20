@@ -377,6 +377,7 @@ def parse_urls_for_known_parts(
             tld_url in MMP_TLDS
             and ".com/privacy-policy" not in url
             and "support.appsflyer.com" not in url
+            and "appsflyer.com/terms-of-use" not in url
         ):
             found_mmp_urls.append(url)
             if "appsflyer.com" in tld_url:
@@ -609,8 +610,11 @@ def parse_everestop_ad(sent_video_dict: dict) -> AdInfo:
     return ad_info
 
 
-def parse_unity_ad(sent_video_dict: dict, database_connection: PostgresCon) -> AdInfo:
+def parse_unity_ad(
+    sent_video_dict: dict, database_connection: PostgresCon
+) -> tuple[AdInfo, str]:
     init_ad_network_tld = "unity3d.com"
+    error_msg = None
     found_mmp_urls = []
     adv_store_id = None
     if "auction-load.unityads.unity3d.com" in sent_video_dict["url"]:
@@ -622,6 +626,10 @@ def parse_unity_ad(sent_video_dict: dict, database_connection: PostgresCon) -> A
             adv_store_id = keyresp["bundleId"]
         try:
             adcontent: str = ad_response["media"][mykey]["content"]
+            # This is the ad html
+            # jsadcontent = json.loads(adcontent)
+            # with open("adhtml.html", "w") as f:
+            #     f.write(jsadcontent["ad_networks"][0]["ad"]["ad_html"])
             if "referrer" in adcontent:
                 referrer = adcontent.split("referrer=")[1].split(",")[0]
                 if "adjust_external" in referrer:
@@ -630,9 +638,16 @@ def parse_unity_ad(sent_video_dict: dict, database_connection: PostgresCon) -> A
             pass
     text = sent_video_dict["response_text"]
     all_urls = extract_and_decode_urls(text)
-    ad_info = parse_urls_for_known_parts(
-        all_urls, database_connection, sent_video_dict["pub_store_id"]
-    )
+    try:
+        ad_info = parse_urls_for_known_parts(
+            all_urls, database_connection, sent_video_dict["pub_store_id"]
+        )
+    except MultipleAdvertiserIdError:
+        error_msg = "multiple adv_store_id found for unity"
+        ad_info = AdInfo(
+            adv_store_id=None, found_ad_network_tlds=None, found_mmp_urls=None
+        )
+        return ad_info, error_msg
     if ad_info.adv_store_id is None and adv_store_id is not None:
         ad_info.adv_store_id = adv_store_id
     if ad_info.found_mmp_urls is None and found_mmp_urls:
@@ -1073,7 +1088,11 @@ def parse_sent_video_df(
                 error_messages.append(row)
                 continue
         elif "unityads.unity3d.com" in init_url:
-            ad_info = parse_unity_ad(sent_video_dict, database_connection)
+            ad_info, error_msg = parse_unity_ad(sent_video_dict, database_connection)
+            if error_msg:
+                row["error_msg"] = error_msg
+                error_messages.append(row)
+                continue
         elif "mtgglobals.com" in init_url:
             ad_info = parse_mtg_ad(sent_video_dict, database_connection)
         else:
@@ -1478,39 +1497,42 @@ def make_creative_records_df(
     return creative_records_df
 
 
+def get_creatives_df(
+    pub_store_id: str, run_id: int
+) -> tuple[pd.DataFrame, pd.DataFrame, str]:
+    df = parse_mitm_log(pub_store_id, run_id)
+    error_msg = None
+    if df.empty:
+        error_msg = "No data in mitm df"
+        logger.error(error_msg)
+        return pd.DataFrame(), pd.DataFrame(), error_msg
+    if "status_code" not in df.columns:
+        error_msg = "No status code found in df, skipping"
+        logger.error(error_msg)
+        return pd.DataFrame(), pd.DataFrame(), error_msg
+    df = add_file_extension(df)
+    creatives_df = filter_creatives(df)
+    if creatives_df.empty:
+        error_msg = "No creatives to check"
+        logger.error(error_msg)
+        return pd.DataFrame(), pd.DataFrame(), error_msg
+    return df, creatives_df, error_msg
+
+
 def parse_store_id_mitm_log(
     pub_store_id: str,
     run_id: int,
     database_connection: PostgresCon,
 ) -> list:
-    df = parse_mitm_log(pub_store_id, run_id)
-    if df.empty:
-        error_msg = "No data in mitm df"
-        logger.error(error_msg)
-        row = {"run_id": run_id, "pub_store_id": pub_store_id, "error_msg": error_msg}
-        error_messages = [row]
-        return error_messages
-    error_messages = []
-    if "status_code" not in df.columns:
-        run_id = df["run_id"].to_numpy()[0]
-        pub_store_id = df["pub_store_id"].to_numpy()[0]
-        error_msg = "No status code found in df, skipping"
-        logger.error(error_msg)
-        row = {"run_id": run_id, "pub_store_id": pub_store_id, "error_msg": error_msg}
-        error_messages.append(row)
-        return pd.DataFrame(), error_messages
-
-    df = add_file_extension(df)
-    creatives_df = filter_creatives(df)
-
-    if creatives_df.empty:
-        run_id = df["run_id"].to_numpy()[0]
-        pub_store_id = df["pub_store_id"].to_numpy()[0]
-        error_msg = "No creatives to check"
-        logger.error(error_msg)
-        row = {"run_id": run_id, "pub_store_id": pub_store_id, "error_msg": error_msg}
-        error_messages.append(row)
-        return pd.DataFrame(), error_messages
+    df, creatives_df, error_message = get_creatives_df(pub_store_id, run_id)
+    if error_message:
+        logger.error(error_message)
+        error_message_info = {
+            "run_id": run_id,
+            "pub_store_id": pub_store_id,
+            "error_msg": error_message,
+        }
+        return [error_message_info]
 
     adv_creatives_df, error_messages = attribute_creatives(
         df, creatives_df, pub_store_id, database_connection
