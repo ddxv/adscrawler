@@ -73,6 +73,11 @@ CREATE TABLE frontend.store_app_ranks_weekly (
     ) REFERENCES public.store_collections (id)
 );
 
+CREATE INDEX idx_ranks_filter
+ON frontend.store_app_ranks_weekly (
+    country, store_collection, store_category, crawled_date
+);
+
 
 -- DROP TABLE public.store_apps;
 CREATE TABLE store_apps (

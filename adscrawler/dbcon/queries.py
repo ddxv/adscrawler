@@ -611,6 +611,7 @@ def query_store_apps(
                             (
                              installs >= {short_update_installs}
                              OR rating_count >= {short_update_ratings}
+                             OR (sa.id in (select store_app from store_apps_in_latest_rankings))
                             )
                             AND sa.updated_at <= '{short_update_date}'
                             AND (crawl_result = 1 OR crawl_result IS NULL)
@@ -665,6 +666,7 @@ def query_store_apps(
             DESC NULLS LAST
         {limit_str}
         """
+    print(sel_query)
     df = pd.read_sql(sel_query, database_connection.engine)
     return df
 
