@@ -28,6 +28,7 @@ dependencies = [
     "cloudscraper",
     "geoip2",
     "boto3",
+    "duckdb",
     "imagehash",
     "protod",
 ]

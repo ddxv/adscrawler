@@ -752,9 +752,9 @@ def start_session() -> subprocess.Popen:
 
     if not ready:
         if waydroid_process.poll() is not None:
-            msg = waydroid_process.stdout
-            err = waydroid_process.stderr
-            msg = f"{function_info} process ended without becoming ready stdout:{msg} stderr:{err}"
+            stdout = waydroid_process.stdout.read() if waydroid_process.stdout else ""
+            stderr = waydroid_process.stderr.read() if waydroid_process.stderr else ""
+            msg = f"{function_info} process ended without becoming ready stdout:{stdout} stderr:{stderr}"
             raise Exception(msg)
         else:
             logger.error(
