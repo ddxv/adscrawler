@@ -114,70 +114,121 @@ CREATE UNIQUE INDEX companies_apps_overview_unique_idx ON frontend.companies_app
 );
 
 
-
 CREATE MATERIALIZED VIEW frontend.store_apps_overview
 TABLESPACE pg_default
 AS WITH latest_version_codes AS (
-         SELECT DISTINCT ON (version_codes.store_app) version_codes.id,
-            version_codes.store_app,
-            version_codes.version_code,
-            version_codes.updated_at AS last_downloaded_at,
-            version_codes.crawl_result AS download_result
-           FROM version_codes
-          WHERE version_codes.crawl_result = 1 AND version_codes.updated_at >= '2025-05-01 00:00:00'::timestamp without time zone
-          ORDER BY version_codes.store_app, version_codes.updated_at DESC, (string_to_array(version_codes.version_code::text, '.'::text)::bigint[]) DESC
-        ), latest_successful_version_codes AS (
-         SELECT DISTINCT ON (vc.store_app) vc.id,
-            vc.store_app,
-            vc.version_code,
-            vc.updated_at,
-            vc.crawl_result
-           FROM version_codes vc
-          WHERE vc.crawl_result = 1
-          ORDER BY vc.store_app, (string_to_array(vc.version_code::text, '.'::text)::bigint[]) DESC
-        ), last_sdk_scan AS (
-         SELECT DISTINCT ON (vc.store_app) vc.store_app,
-            lsscr.version_code_id AS version_code,
-            lsscr.scanned_at,
-            lsscr.scan_result
-           FROM version_code_sdk_scan_results lsscr
-             LEFT JOIN version_codes vc ON lsscr.version_code_id = vc.id
-          ORDER BY vc.store_app, lsscr.scanned_at DESC
-        ), last_successful_sdk_scan AS (
-         SELECT DISTINCT ON (vc.store_app) vc.id,
-            vc.store_app,
-            vc.version_code,
-            vcss.scanned_at,
-            vcss.scan_result
-           FROM version_codes vc
-             LEFT JOIN version_code_sdk_scan_results vcss ON vc.id = vcss.version_code_id
-          WHERE vcss.scan_result = 1
-          ORDER BY vc.store_app, vcss.scanned_at DESC, (string_to_array(vc.version_code::text, '.'::text)::bigint[]) DESC
-        ), latest_en_descriptions AS (
-         SELECT DISTINCT ON (store_apps_descriptions.store_app) store_apps_descriptions.store_app,
-            store_apps_descriptions.description,
-            store_apps_descriptions.description_short
-           FROM store_apps_descriptions
-          WHERE store_apps_descriptions.language_id = 1
-          ORDER BY store_apps_descriptions.store_app, store_apps_descriptions.updated_at DESC
-        ), latest_api_calls AS (
-         SELECT DISTINCT ON (vc.store_app) vc.store_app,
-            vasr.run_result,
-            vasr.run_at
-           FROM version_codes vc
-             LEFT JOIN version_code_api_scan_results vasr ON vasr.version_code_id = vc.id
-          WHERE vc.updated_at >= '2025-05-01 00:00:00'::timestamp without time zone
-        ), latest_successful_api_calls AS (
-         SELECT DISTINCT ON (vc.store_app) vc.store_app,
-            vasr.run_at
-           FROM version_codes vc
-             LEFT JOIN version_code_api_scan_results vasr ON vasr.version_code_id = vc.id
-          WHERE vasr.run_result = 1 AND vc.updated_at >= '2025-05-01 00:00:00'::timestamp without time zone
-        ),
-        my_ad_creatives AS (SELECT store_app_id, count(*) AS ad_creative_count FROM creative_records cr LEFT JOIN creative_assets ca ON cr.creative_asset_id = ca.id
-GROUP BY store_app_id
+    SELECT DISTINCT ON (version_codes.store_app)
+        version_codes.id,
+        version_codes.store_app,
+        version_codes.version_code,
+        version_codes.updated_at AS last_downloaded_at,
+        version_codes.crawl_result AS download_result
+    FROM version_codes
+    WHERE
+        version_codes.crawl_result = 1
+        AND version_codes.updated_at
+        >= '2025-05-01 00:00:00'::timestamp without time zone
+    ORDER BY
+        version_codes.store_app ASC,
+        version_codes.updated_at DESC,
+        (
+            string_to_array(
+                version_codes.version_code::text, '.'::text
+            )::bigint []
+        ) DESC
+),
+
+latest_successful_version_codes AS (
+    SELECT DISTINCT ON (vc.store_app)
+        vc.id,
+        vc.store_app,
+        vc.version_code,
+        vc.updated_at,
+        vc.crawl_result
+    FROM version_codes AS vc
+    WHERE vc.crawl_result = 1
+    ORDER BY
+        vc.store_app,
+        (string_to_array(vc.version_code::text, '.'::text)::bigint []) DESC
+),
+
+last_sdk_scan AS (
+    SELECT DISTINCT ON (vc.store_app)
+        vc.store_app,
+        lsscr.version_code_id AS version_code,
+        lsscr.scanned_at,
+        lsscr.scan_result
+    FROM version_code_sdk_scan_results AS lsscr
+    LEFT JOIN version_codes AS vc ON lsscr.version_code_id = vc.id
+    ORDER BY vc.store_app ASC, lsscr.scanned_at DESC
+),
+
+last_successful_sdk_scan AS (
+    SELECT DISTINCT ON (vc.store_app)
+        vc.id,
+        vc.store_app,
+        vc.version_code,
+        vcss.scanned_at,
+        vcss.scan_result
+    FROM version_codes AS vc
+    LEFT JOIN
+        version_code_sdk_scan_results AS vcss
+        ON vc.id = vcss.version_code_id
+    WHERE vcss.scan_result = 1
+    ORDER BY
+        vc.store_app ASC,
+        vcss.scanned_at DESC,
+        (string_to_array(vc.version_code::text, '.'::text)::bigint []) DESC
+),
+
+latest_en_descriptions AS (
+    SELECT DISTINCT ON (store_apps_descriptions.store_app)
+        store_apps_descriptions.store_app,
+        store_apps_descriptions.description,
+        store_apps_descriptions.description_short
+    FROM store_apps_descriptions
+    WHERE store_apps_descriptions.language_id = 1
+    ORDER BY
+        store_apps_descriptions.store_app ASC,
+        store_apps_descriptions.updated_at DESC
+),
+
+latest_api_calls AS (
+    SELECT DISTINCT ON (vc.store_app)
+        vc.store_app,
+        vasr.run_result,
+        vasr.run_at
+    FROM version_codes AS vc
+    LEFT JOIN
+        version_code_api_scan_results AS vasr
+        ON vc.id = vasr.version_code_id
+    WHERE vc.updated_at >= '2025-05-01 00:00:00'::timestamp without time zone
+),
+
+latest_successful_api_calls AS (
+    SELECT DISTINCT ON (vc.store_app)
+        vc.store_app,
+        vasr.run_at
+    FROM version_codes AS vc
+    LEFT JOIN
+        version_code_api_scan_results AS vasr
+        ON vc.id = vasr.version_code_id
+    WHERE
+        vasr.run_result = 1
+        AND vc.updated_at >= '2025-05-01 00:00:00'::timestamp without time zone
+),
+
+my_ad_creatives AS (
+    SELECT
+        store_app_id,
+        count(*) AS ad_creative_count
+    FROM creative_records AS cr
+    LEFT JOIN creative_assets AS ca ON cr.creative_asset_id = ca.id
+    GROUP BY store_app_id
 )
- SELECT sa.id,
+
+SELECT
+    sa.id,
     sa.name,
     sa.store_id,
     sa.store,
@@ -224,28 +275,33 @@ GROUP BY store_app_id
     lac.run_result,
     lsac.run_at AS api_successful_last_crawled,
     acr.ad_creative_count
-   FROM store_apps sa
-     LEFT JOIN category_mapping cm ON sa.category::text = cm.original_category::text
-     LEFT JOIN developers d ON sa.developer = d.id
-     LEFT JOIN app_urls_map aum ON sa.id = aum.store_app
-     LEFT JOIN pub_domains pd ON aum.pub_domain = pd.id
-     LEFT JOIN latest_version_codes lvc ON sa.id = lvc.store_app
-     LEFT JOIN last_sdk_scan lss ON sa.id = lss.store_app
-     LEFT JOIN last_successful_sdk_scan lsss ON sa.id = lsss.store_app
-     LEFT JOIN latest_successful_version_codes lsvc ON sa.id = lsvc.store_app
-     LEFT JOIN latest_en_descriptions ld ON sa.id = ld.store_app
-     LEFT JOIN store_app_z_scores saz ON sa.id = saz.store_app
-     LEFT JOIN latest_api_calls lac ON sa.id = lac.store_app
-     LEFT JOIN latest_successful_api_calls lsac ON sa.id = lsac.store_app
-     LEFT JOIN my_ad_creatives acr ON sa.id = acr.store_app_id
+FROM store_apps AS sa
+LEFT JOIN
+    category_mapping AS cm
+    ON sa.category::text = cm.original_category::text
+LEFT JOIN developers AS d ON sa.developer = d.id
+LEFT JOIN app_urls_map AS aum ON sa.id = aum.store_app
+LEFT JOIN pub_domains AS pd ON aum.pub_domain = pd.id
+LEFT JOIN latest_version_codes AS lvc ON sa.id = lvc.store_app
+LEFT JOIN last_sdk_scan AS lss ON sa.id = lss.store_app
+LEFT JOIN last_successful_sdk_scan AS lsss ON sa.id = lsss.store_app
+LEFT JOIN latest_successful_version_codes AS lsvc ON sa.id = lsvc.store_app
+LEFT JOIN latest_en_descriptions AS ld ON sa.id = ld.store_app
+LEFT JOIN store_app_z_scores AS saz ON sa.id = saz.store_app
+LEFT JOIN latest_api_calls AS lac ON sa.id = lac.store_app
+LEFT JOIN latest_successful_api_calls AS lsac ON sa.id = lsac.store_app
+LEFT JOIN my_ad_creatives AS acr ON sa.id = acr.store_app_id
 WITH DATA;
 
 
-
 -- View indexes:
-CREATE UNIQUE INDEX store_apps_overview_unique_idx ON frontend.store_apps_overview USING btree (store, store_id);
+CREATE UNIQUE INDEX store_apps_overview_unique_idx ON frontend.store_apps_overview USING btree (
+    store, store_id
+);
 
-CREATE INDEX store_apps_overview_unique_idx ON frontend.store_apps_overview USING btree (store_id);
+CREATE INDEX store_apps_overview_unique_idx ON frontend.store_apps_overview USING btree (
+    store_id
+);
 
 
 CREATE MATERIALIZED VIEW frontend.company_parent_top_apps
@@ -292,7 +348,7 @@ ranked_apps AS (
                         )
                     ) DESC
             )
-        AS app_company_rank,
+            AS app_company_rank,
         row_number()
             OVER (
                 PARTITION BY
@@ -314,7 +370,7 @@ ranked_apps AS (
                         )
                     ) DESC
             )
-        AS app_company_category_rank
+            AS app_company_category_rank
     FROM adtech.combined_store_apps_parent_companies AS csapc
     LEFT JOIN store_apps AS sa ON csapc.store_app = sa.id
     LEFT JOIN adtech.companies AS c ON csapc.company_id = c.id
@@ -415,7 +471,7 @@ ranked_apps AS (
                         )
                     ) DESC
             )
-        AS app_company_rank,
+            AS app_company_rank,
         row_number()
             OVER (
                 PARTITION BY
@@ -437,7 +493,7 @@ ranked_apps AS (
                         )
                     ) DESC
             )
-        AS app_company_category_rank
+            AS app_company_category_rank
     FROM adtech.combined_store_apps_companies AS cac
     LEFT JOIN store_apps AS sa ON cac.store_app = sa.id
     LEFT JOIN adtech.companies AS c ON cac.company_id = c.id
@@ -782,7 +838,7 @@ AS WITH ranked_data AS (
                 PARTITION BY ad.domain, aae.relationship, sa.store
                 ORDER BY (count(DISTINCT aesa.store_app)) DESC
             )
-        AS pubrank
+            AS pubrank
     FROM frontend.adstxt_entries_store_apps AS aesa
     LEFT JOIN store_apps AS sa ON aesa.store_app = sa.id
     LEFT JOIN app_ads_entrys AS aae ON aesa.app_ad_entry_id = aae.id

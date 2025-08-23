@@ -27,6 +27,9 @@ dependencies = [
     "mitmproxy",
     "cloudscraper",
     "geoip2",
+    "boto3",
+    "imagehash",
+    "protod",
 ]
 
 
