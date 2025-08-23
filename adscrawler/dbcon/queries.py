@@ -599,29 +599,29 @@ def query_store_apps(
         - datetime.timedelta(days=max_recrawl_days)
     ).strftime("%Y-%m-%d")
     long_group = f"""(
-                            sa.updated_at <= '{long_update_date}'
-                            AND (
-                                installs < {short_update_installs} 
-                                OR rating_count < {short_update_ratings}
-                            )
-                            AND (crawl_result = 1 OR crawl_result IS NULL)
-                           )
+                       sa.updated_at <= '{long_update_date}'
+                       AND (
+                             installs < {short_update_installs} 
+                             OR rating_count < {short_update_ratings}
+                       )
+                       AND (crawl_result = 1 OR crawl_result IS NULL)
+                    )
                     """
     short_group = f"""(
-                            (
-                             installs >= {short_update_installs}
-                             OR rating_count >= {short_update_ratings}
-                             OR (sa.id in (select store_app from store_apps_in_latest_rankings))
+                        (
+                          installs >= {short_update_installs}
+                          OR rating_count >= {short_update_ratings}
+                          OR (sa.id in (select store_app from store_apps_in_latest_rankings))
                             )
-                            AND sa.updated_at <= '{short_update_date}'
-                            AND (crawl_result = 1 OR crawl_result IS NULL)
+                          AND sa.updated_at <= '{short_update_date}'
+                          AND (crawl_result = 1 OR crawl_result IS NULL)
                         )
-                        """
+                    """
     max_group = f"""(
-                        sa.updated_at <= '{max_recrawl_date}'
-                        OR crawl_result IS NULL
-                        )
-        """
+                      sa.updated_at <= '{max_recrawl_date}'
+                      OR crawl_result IS NULL
+                    )
+                """
     if group == "short":
         installs_and_dates_str = short_group
     elif group == "long":
@@ -653,7 +653,9 @@ def query_store_apps(
         WHERE {where_str}
         ORDER BY
             (CASE
-                WHEN crawl_result IS NULL THEN 0
+                WHEN crawl_result IS NULL 
+                    OR (sa.id in (select store_app from store_apps_in_latest_rankings))
+                THEN 0
                 ELSE 1
             END),
             --sa.updated_at
@@ -666,7 +668,6 @@ def query_store_apps(
             DESC NULLS LAST
         {limit_str}
         """
-    print(sel_query)
     df = pd.read_sql(sel_query, database_connection.engine)
     return df
 
