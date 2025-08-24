@@ -745,23 +745,20 @@ def parse_google_ad(
     response_text = sent_video_dict["response_text"]
     try:
         google_response = json.loads(response_text)
+        big_html = ""
         if "ad_networks" in google_response:
-            try:
-                # This has multiple ads, should handle this better
-                gad = google_response["ad_networks"][0]["ad"]
-            except Exception:
-                error_msg = "doubleclick failing to parse ad_html for VAST response"
-                logger.error(error_msg)
-                return ad_info, error_msg
-            if "ad_html" in gad:
-                ad_html = gad["ad_html"]
-            elif "ad_json" in gad:
-                ad_html = json.dumps(gad["ad_json"])
-            else:
-                error_msg = "doubleclick no ad_html or ad_json"
-                logger.error(error_msg)
-                return ad_info, error_msg
-            all_urls = extract_and_decode_urls(ad_html)
+            for gadn in google_response["ad_networks"]:
+                ad_html = " "
+                if "ad" in gadn:
+                    gad = gadn["ad"]
+                    if "ad_html" in gad:
+                        ad_html = gad["ad_html"]
+                    elif "ad_json" in gad:
+                        ad_html = json.dumps(gad["ad_json"])
+                    else:
+                        pass
+                    big_html += ad_html
+            all_urls = extract_and_decode_urls(big_html)
             try:
                 ad_info = parse_urls_for_known_parts(
                     all_urls, database_connection, sent_video_dict["pub_store_id"]
@@ -1212,6 +1209,7 @@ def attribute_creatives(
             error_messages.append(row)
             continue
         sent_video_df["pub_store_id"] = pub_store_id
+        row['url']
 
         found_ad_infos, found_error_messages = parse_sent_video_df(
             row, pub_store_id, sent_video_df, database_connection, video_id
