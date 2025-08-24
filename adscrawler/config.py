@@ -16,6 +16,7 @@ LOG_DIR = pathlib.Path(CONFIG_DIR, pathlib.Path("logs"))
 MODULE_DIR = pathlib.Path(__file__).resolve().parent
 PACKAGE_DIR = pathlib.Path(__file__).resolve().parent.parent
 SQL_DIR = pathlib.Path(MODULE_DIR, pathlib.Path("dbcon/sql"))
+SSH_KNOWN_HOSTS = pathlib.Path(HOME, pathlib.Path(".ssh/known_hosts"))
 
 GEO_DATA_DIR = pathlib.Path(CONFIG_DIR, pathlib.Path("geo-data"))
 

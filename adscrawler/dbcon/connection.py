@@ -1,14 +1,13 @@
+import asyncio
+import threading
 from contextlib import contextmanager
 from socket import gethostbyname
-import asyncio, asyncssh
-import socket
-import threading
 
+import asyncssh
 import sqlalchemy
 from sqlalchemy.engine import Engine
 
-
-from adscrawler.config import CONFIG, get_logger, SSH_KNOWN_HOSTS
+from adscrawler.config import CONFIG, SSH_KNOWN_HOSTS, get_logger
 
 logger = get_logger(__name__)
 
