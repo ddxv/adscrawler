@@ -14,7 +14,7 @@ dependencies = [
     'google-play-scraper @ git+https://github.com/ddxv/google-play-scraper',
     'tldextract',
     'itunes-app-scraper-dmi @ git+https://github.com/ddxv/itunes-app-scraper.git',
-    'sshtunnel',
+    'asyncssh',
     'selenium',
     'pyyaml',
     "psycopg[binary]",
