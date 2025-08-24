@@ -1081,7 +1081,6 @@ def parse_sent_video_df(
             or "tpbid.com" in init_url
             or "inner-active.mobi" in init_url
         ):
-            if "inner-active.mobi" in init_url:
             ad_info = parse_fyber_ad(sent_video_dict, database_connection)
         elif "everestop.io" in init_url:
             ad_info = parse_everestop_ad(sent_video_dict)
