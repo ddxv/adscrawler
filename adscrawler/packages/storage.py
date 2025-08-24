@@ -16,7 +16,7 @@ from adscrawler.config import (
     XAPKS_INCOMING_DIR,
     get_logger,
 )
-from adscrawler.dbcon.connection import PostgresCon
+from adscrawler.dbcon.connection import PostgresCon, start_ssh_tunnel
 from adscrawler.packages.utils import (
     get_local_file_path,
     get_md5_hash,
@@ -29,48 +29,27 @@ from adscrawler.packages.utils import (
 logger = get_logger(__name__)
 
 
-def start_tunnel(server_name: str) -> str:
-    from sshtunnel import SSHTunnelForwarder
-
-    from adscrawler.dbcon.connection import get_host_ip
-
-    host = get_host_ip(CONFIG["loki"]["host"])
-
-    ssh_port = CONFIG[server_name].get("ssh_port", 22)
-    remote_port = CONFIG[server_name].get("remote_port", 5432)
-    server = SSHTunnelForwarder(
-        (host, ssh_port),
-        ssh_username=CONFIG[server_name]["os_user"],
-        remote_bind_address=("127.0.0.1", remote_port),
-        ssh_pkey=CONFIG[server_name].get("ssh_pkey"),
-        ssh_private_key_password=CONFIG[server_name].get("ssh_pkey_password"),
-    )
-    server.start()
-    db_port = str(server.local_bind_port)
-    return db_port
-
-
 def get_s3_client() -> boto3.client:
     global S3_CLIENT
     if S3_CLIENT is not None:
         return S3_CLIENT
     server_name = "loki"
     """Create and return an S3 client."""
-    if CONFIG["loki"]["host"].startswith("192.168"):
+    if CONFIG[server_name]["host"].startswith("192.168"):
         # On local network connect directly
-        host = f"http://{CONFIG['loki']['host']}"
-        db_port = CONFIG["loki"]["remote_port"]
+        host = f"http://{CONFIG[server_name]['host']}"
+        db_port = CONFIG[server_name]["remote_port"]
     else:
         # SSH port forwarded
         host = "http://127.0.0.1"
-        db_port = start_tunnel(server_name)
+        db_port = start_ssh_tunnel(server_name)
     session = boto3.session.Session()
     S3_CLIENT = session.client(
         "s3",
         region_name="garage",
         endpoint_url=f"{host}:{db_port}",
-        aws_access_key_id=CONFIG["loki"]["access_key_id"],
-        aws_secret_access_key=CONFIG["loki"]["secret_key"],
+        aws_access_key_id=CONFIG[server_name]["access_key_id"],
+        aws_secret_access_key=CONFIG[server_name]["secret_key"],
     )
     return S3_CLIENT
 

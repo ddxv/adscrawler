@@ -726,6 +726,14 @@ def parse_fyber_ad(sent_video_dict: dict, database_connection: PostgresCon) -> A
         pass
     all_urls = extract_and_decode_urls(text=text)
     all_urls = list(set(all_urls + parsed_urls))
+    if "inner-active.mobi" in sent_video_dict["tld_url"]:
+        if "x-ia-app-bundle" in sent_video_dict["response_headers"].keys():
+            adv_store_id = sent_video_dict["response_headers"]["x-ia-app-bundle"]
+            ad_info = AdInfo(
+                adv_store_id=adv_store_id,
+                init_tld=init_ad_network_tld,
+            )
+            return ad_info
     ad_info = parse_urls_for_known_parts(
         all_urls, database_connection, sent_video_dict["pub_store_id"]
     )
@@ -1073,6 +1081,7 @@ def parse_sent_video_df(
             or "tpbid.com" in init_url
             or "inner-active.mobi" in init_url
         ):
+            if "inner-active.mobi" in init_url:
             ad_info = parse_fyber_ad(sent_video_dict, database_connection)
         elif "everestop.io" in init_url:
             ad_info = parse_everestop_ad(sent_video_dict)
@@ -1209,8 +1218,6 @@ def attribute_creatives(
             error_messages.append(row)
             continue
         sent_video_df["pub_store_id"] = pub_store_id
-        row['url']
-
         found_ad_infos, found_error_messages = parse_sent_video_df(
             row, pub_store_id, sent_video_df, database_connection, video_id
         )
@@ -1641,12 +1648,6 @@ def parse_all_runs_for_store_id(pub_store_id: str, database_connection: Postgres
         ]
         error_msg_df = error_msg_df[mycols]
         log_creative_scan_results(error_msg_df, database_connection)
-
-
-def parse_specific_run_for_store_id(
-    pub_store_id: str, run_id: int, database_connection: PostgresCon
-) -> pd.DataFrame:
-    return parse_store_id_mitm_log(pub_store_id, run_id, database_connection)
 
 
 def scan_all_apps(
