@@ -1,11 +1,14 @@
 from contextlib import contextmanager
 from socket import gethostbyname
+import asyncio, asyncssh
+import socket
+import threading
 
 import sqlalchemy
 from sqlalchemy.engine import Engine
-from sshtunnel import SSHTunnelForwarder
 
-from adscrawler.config import CONFIG, get_logger
+
+from adscrawler.config import CONFIG, get_logger, SSH_KNOWN_HOSTS
 
 logger = get_logger(__name__)
 
@@ -66,6 +69,58 @@ class PostgresCon:
             conn.close()
 
 
+def manage_tunnel_thread(
+    host: str,
+    os_user: str,
+    ssh_port: int,
+    remote_port: int,
+    ssh_pkey: str,
+    ssh_pkey_password: str,
+) -> int:
+    result = {}
+
+    def runner():
+        async def main():
+            async with asyncssh.connect(
+                host,
+                username=os_user,
+                port=ssh_port,
+                known_hosts=SSH_KNOWN_HOSTS.as_posix(),
+                client_keys=ssh_pkey,
+                passphrase=ssh_pkey_password,
+                # family=socket.AF_INET,
+            ) as conn:
+                listener = await conn.forward_local_port(
+                    listen_host="localhost",
+                    listen_port=0,
+                    dest_host="127.0.0.1",
+                    dest_port=remote_port,
+                )
+                result["port"] = listener.get_port()
+                await listener.wait_closed()
+
+        asyncio.run(main())
+
+    t = threading.Thread(target=runner, daemon=True)
+    t.start()
+    while "port" not in result:
+        pass  # wait for listener to be ready
+    return result["port"]
+
+
+def start_ssh_tunnel(server_name: str) -> int:
+    ssh_port = CONFIG[server_name].get("ssh_port", 22)
+    remote_port = CONFIG[server_name].get("remote_port", 5432)
+    host = CONFIG[server_name]["host"]
+    os_user = CONFIG[server_name]["os_user"]
+    ssh_pkey = CONFIG[server_name].get("ssh_pkey")
+    ssh_pkey_password = CONFIG[server_name].get("ssh_pkey_password")
+    ssh_local_port = manage_tunnel_thread(
+        host, os_user, ssh_port, remote_port, ssh_pkey, ssh_pkey_password
+    )
+    return ssh_local_port
+
+
 def get_db_connection(
     use_ssh_tunnel: bool = False, server_name: str = "madrone"
 ) -> PostgresCon:
@@ -78,24 +133,15 @@ def get_db_connection(
     Returns:
         PostgresCon: A PostgreSQL connection object.
     """
-    host = get_host_ip(CONFIG[server_name]["host"])
+    # host = get_host_ip(CONFIG[server_name]["host"])
+    host = CONFIG[server_name]["host"]
 
     if use_ssh_tunnel:
-        ssh_port = CONFIG[server_name].get("ssh_port", 22)
-        remote_port = CONFIG[server_name].get("remote_port", 5432)
-        server = SSHTunnelForwarder(
-            (host, ssh_port),
-            ssh_username=CONFIG[server_name]["os_user"],
-            remote_bind_address=("127.0.0.1", remote_port),
-            ssh_pkey=CONFIG[server_name].get("ssh_pkey"),
-            ssh_private_key_password=CONFIG[server_name].get("ssh_pkey_password"),
-        )
-        server.start()
-        db_port = str(server.local_bind_port)
+        ssh_local_port = start_ssh_tunnel(server_name)
         host = "127.0.0.1"
+        db_port = str(ssh_local_port)
     else:
         db_port = "5432"
-
     conn = PostgresCon(server_name, host, db_port)
     conn.set_engine()
     return conn
