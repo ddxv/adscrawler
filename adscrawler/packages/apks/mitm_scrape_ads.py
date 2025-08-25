@@ -48,11 +48,27 @@ logger = get_logger(__name__, "mitm_scrape_ads")
 ABS_TOL = 1024  # bytes
 PCT_TOL = 0.03  # 3%
 
+IGNORE_PRIVACY_URLS = [
+    "/policy.html",
+    "/legal",
+    "/policy",
+    "/privacy",
+    "privacy_policy",
+    "/your-personal-data",
+    "private-policy.html",
+    "/privacypolicy",
+    "privacy-policy",
+    "data-protection",
+    "/data-privacy",
+]
+
 
 class MultipleAdvertiserIdError(Exception):
     """Raised when multiple advertiser store IDs are found for the same ad."""
 
-    pass
+    def __init__(self, found_adv_store_ids):
+        self.found_adv_store_ids = found_adv_store_ids
+        super().__init__(f"multiple adv_store_id found for {found_adv_store_ids}")
 
 
 IGNORE_CREATIVE_IDS = ["privacy", "google_play_icon_grey_2022", "favicon"]
@@ -434,7 +450,11 @@ def parse_urls_for_known_parts(
                             found_adv_store_ids.append(adv_store_id)
                 except Exception:
                     pass
-        if tld_url in ad_network_urls["domain"].to_list() and tld_url not in MMP_TLDS:
+        if (
+            tld_url in ad_network_urls["domain"].to_list()
+            and tld_url not in MMP_TLDS
+            and not any(ignore_url in url.lower() for ignore_url in IGNORE_PRIVACY_URLS)
+        ):
             found_ad_network_urls.append(url)
     found_mmp_urls = list(set(found_mmp_urls))
     found_adv_store_ids = list(set(found_adv_store_ids))
@@ -677,7 +697,7 @@ def parse_unity_ad(
     if ad_info.found_mmp_urls is None and found_mmp_urls:
         ad_info.found_mmp_urls = found_mmp_urls
     ad_info.init_tld = init_ad_network_tld
-    return ad_info
+    return ad_info, error_msg
 
 
 def get_tld(url: str) -> str:
@@ -696,8 +716,10 @@ def parse_generic_adnetwork(
         ad_info = parse_urls_for_known_parts(
             all_urls, database_connection, sent_video_dict["pub_store_id"]
         )
-    except MultipleAdvertiserIdError:
-        error_msg = f"multiple adv_store_id found for {init_tld}"
+    except MultipleAdvertiserIdError as e:
+        error_msg = (
+            f"multiple adv_store_id found for {init_tld}: {e.found_adv_store_ids}"
+        )
         logger.error(error_msg)
         return AdInfo(
             adv_store_id=None, found_ad_network_tlds=None, found_mmp_urls=None
@@ -844,8 +866,8 @@ def parse_google_ad(
                 ad_info = parse_urls_for_known_parts(
                     all_urls, database_connection, sent_video_dict["pub_store_id"]
                 )
-            except MultipleAdvertiserIdError:
-                error_msg = "multiple adv_store_id found for doubleclick"
+            except MultipleAdvertiserIdError as e:
+                error_msg = f"multiple adv_store_id found for doubleclick: {e.found_adv_store_ids}"
                 logger.error(error_msg)
                 return ad_info, error_msg
         else:
@@ -1124,6 +1146,8 @@ def parse_sent_video_df(
                 continue
         elif "mtgglobals.com" in init_url:
             ad_info = parse_mtg_ad(sent_video_dict, database_connection)
+        elif "yandex.ru" in init_url:
+            ad_info = parse_yandex_ad(sent_video_dict, database_connection)
         else:
             real_tld = get_tld(init_url)
             error_msg = f"Not a recognized ad network: {real_tld}"
@@ -1208,6 +1232,9 @@ def get_video_id(row: pd.Series) -> str:
         video_id = row["url"].split("/")[-1]
         if "." in video_id:
             video_id = video_id.split(".")[0]
+    elif "yandex.net" in row["tld_url"]:
+        # /id123/orig
+        video_id = row["url"].split("/")[-2]
     else:
         video_id = url_parts.path.split("/")[-1]
     return video_id
@@ -1564,11 +1591,9 @@ def parse_store_id_mitm_log(
             "error_msg": error_message,
         }
         return [error_message_info]
-
     adv_creatives_df, error_messages = attribute_creatives(
         df, creatives_df, pub_store_id, database_connection
     )
-
     if adv_creatives_df.empty:
         if len(error_messages) == 0:
             error_msg = "No creatives or errors"
