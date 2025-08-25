@@ -620,6 +620,8 @@ def parse_bidmachine_ad(
         ad_info = parse_urls_for_known_parts(
             urls, database_connection, sent_video_dict["pub_store_id"]
         )
+        if not ad_info.adv_store_id and adv_store_id:
+            ad_info.adv_store_id = adv_store_id
     except Exception:
         pass
 
@@ -1285,6 +1287,7 @@ def attribute_creatives(
             error_messages.append(row)
             continue
         file_extension = row["file_extension"]
+        # store_creatives(row, 'cheeck', file_extension)
         if video_id in IGNORE_CREATIVE_IDS:
             logger.info(f"Ignoring video {video_id}.{file_extension}")
             continue
@@ -1308,7 +1311,7 @@ def attribute_creatives(
         mmp_tlds = [
             x["mmp_tld"] for x in found_ad_infos if x["found_mmp_urls"] is not None
         ]
-        mmp_tlds = list(set(mmp_tlds))
+        mmp_tlds = list(set([x for x in mmp_tlds if x is not None]))
         mmp_tld = None
         if len(mmp_tlds) > 0:
             mmp_tld = mmp_tlds[0]
