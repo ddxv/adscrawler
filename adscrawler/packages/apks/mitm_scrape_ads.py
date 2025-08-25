@@ -236,7 +236,7 @@ def get_sent_video_df(
     if sent_video_df.empty:
         return None
     if sent_video_df.shape[0] > 1:
-        logger.info("Multiple responses for video found")
+        logger.info(f"Multiple responses for {video_id=}")
     sent_video_df["tld_url"] = sent_video_df["url"].apply(lambda x: get_tld(x))
     return sent_video_df
 
@@ -1232,13 +1232,17 @@ def parse_sent_video_df(
 
 
 def get_video_id(row: pd.Series) -> str:
-    url_parts = urllib.parse.urlparse(row["url"])
     if "2mdn" in row["tld_url"]:
         if "/id/" in row["url"]:
+            url_parts = urllib.parse.urlparse(row["url"])
             video_id = url_parts.path.split("/id/")[1].split("/")[0]
         elif "simgad" in row["url"]:
             video_id = row["url"].split("/")[-1]
+        else:
+            url_parts = urllib.parse.urlparse(row["url"])
+            video_id = url_parts.path.split("/")[-1]
     elif "googlevideo" in row["tld_url"]:
+        url_parts = urllib.parse.urlparse(row["url"])
         query_params = urllib.parse.parse_qs(url_parts.query)
         video_id = query_params["ei"][0]
     elif row["tld_url"] == "unity3dusercontent.com":
@@ -1256,6 +1260,7 @@ def get_video_id(row: pd.Series) -> str:
         # /id123/orig
         video_id = row["url"].split("/")[-2]
     else:
+        url_parts = urllib.parse.urlparse(row["url"])
         video_id = url_parts.path.split("/")[-1]
     return video_id
 

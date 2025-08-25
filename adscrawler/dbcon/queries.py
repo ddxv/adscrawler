@@ -918,6 +918,15 @@ def get_version_code_dbid(
         raise
 
 
+def get_failed_mitm_logs(database_connection: PostgresCon):
+    sel_query = """SELECT * 
+    FROM logging.creative_scan_results 
+    WHERE error_msg like 'CRITICAL %%';
+    """
+    df = pd.read_sql(sel_query, con=database_connection.engine)
+    return df
+
+
 def get_version_code_by_md5_hash(
     database_connection: PostgresCon, md5_hash: str, store_id: str
 ) -> int | None:

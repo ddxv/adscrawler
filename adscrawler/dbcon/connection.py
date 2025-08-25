@@ -77,6 +77,7 @@ def manage_tunnel_thread(
     ssh_pkey_password: str,
 ) -> int:
     result = {}
+    import socket
 
     def runner():
         async def main():
@@ -87,7 +88,7 @@ def manage_tunnel_thread(
                 known_hosts=SSH_KNOWN_HOSTS.as_posix(),
                 client_keys=ssh_pkey,
                 passphrase=ssh_pkey_password,
-                # family=socket.AF_INET,
+                family=socket.AF_INET,
             ) as conn:
                 listener = await conn.forward_local_port(
                     listen_host="localhost",
@@ -111,6 +112,7 @@ def start_ssh_tunnel(server_name: str) -> int:
     ssh_port = CONFIG[server_name].get("ssh_port", 22)
     remote_port = CONFIG[server_name].get("remote_port", 5432)
     host = CONFIG[server_name]["host"]
+    # host = get_host_ip(CONFIG[server_name]["host"])
     os_user = CONFIG[server_name]["os_user"]
     ssh_pkey = CONFIG[server_name].get("ssh_pkey")
     ssh_pkey_password = CONFIG[server_name].get("ssh_pkey_password")
@@ -132,7 +134,6 @@ def get_db_connection(
     Returns:
         PostgresCon: A PostgreSQL connection object.
     """
-    # host = get_host_ip(CONFIG[server_name]["host"])
     host = CONFIG[server_name]["host"]
 
     if use_ssh_tunnel:
