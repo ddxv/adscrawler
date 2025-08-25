@@ -229,17 +229,41 @@ def extract_and_decode_urls(text: str) -> list[str]:
     """
     Extracts all URLs from a given text, handles HTML entities and URL encoding.
     """
+    vast_urls = []
+    if "<?xml version" in text[0:13]:
+        vast_tree = None
+        try:
+            vast_tree = ET.fromstring(text)
+        except ET.ParseError:
+            try:
+                vast_tree = ET.fromstring(html.unescape(text))
+            except ET.ParseError:
+                pass
+        if vast_tree is not None:
+            try:
+                # Now extract URLs from the inner VAST tree
+                for tag in [
+                    "Impression",
+                    "ClickThrough",
+                    "ClickTracking",
+                    "MediaFile",
+                    "Tracking",
+                ]:
+                    for el in vast_tree.iter(tag):
+                        if el.text:
+                            vast_urls.append(el.text.strip())
+            except Exception:
+                pass
     soup = BeautifulSoup(text, "html.parser")
     # The URLs are located inside a <meta> tag with name="video_fields"
     # The content of this tag contains VAST XML data.
     video_fields_meta = soup.find("meta", {"name": "video_fields"})
-    vast_urls = []
     if video_fields_meta:
         vast_xml_string = html.unescape(video_fields_meta["content"])
-        vast_urls = re.findall(r"<!\[CDATA\[(.*?)\]\]>", vast_xml_string)
+        vast_urls += re.findall(r"<!\[CDATA\[(.*?)\]\]>", vast_xml_string)
     if soup.find("vast"):
-        vast_urls = re.findall(r"<!\[CDATA\[(.*?)\]\]>", text)
-        vast_urls = [x for x in vast_urls if "http" in x]
+        vast_urls += re.findall(r"<!\[CDATA\[(.*?)\]\]>", text)
+        # vast_urls = [x for x in vast_urls if "http" in x]
     # 1. Broad regex for URLs (http, https, fybernativebrowser, etc.)
     # This pattern is made more flexible to capture various URL formats
     urls = []
@@ -324,7 +348,7 @@ def parse_fyber_ad_response(ad_response_text: str) -> list[str]:
                 vast_tree = ET.fromstring(html.unescape(inner_ad_element))
             except ET.ParseError:
                 urls = parse_fyber_html(inner_ad_element)
-        if vast_tree:
+        if vast_tree is not None:
             # Now extract URLs from the inner VAST tree
             for tag in [
                 "Impression",
@@ -1165,24 +1189,27 @@ def parse_sent_video_df(
 
 def get_video_id(row: pd.Series) -> str:
     url_parts = urllib.parse.urlparse(row["url"])
-    video_id = url_parts.path.split("/")[-1]
     if "2mdn" in row["tld_url"]:
         if "/id/" in row["url"]:
-            url_parts = urllib.parse.urlparse(row["url"])
             video_id = url_parts.path.split("/id/")[1].split("/")[0]
         elif "simgad" in row["url"]:
             video_id = row["url"].split("/")[-1]
-    if "googlevideo" in row["tld_url"]:
-        url_parts = urllib.parse.urlparse(row["url"])
+    elif "googlevideo" in row["tld_url"]:
         query_params = urllib.parse.parse_qs(url_parts.query)
         video_id = query_params["ei"][0]
-    if row["tld_url"] == "unity3dusercontent.com":
+    elif row["tld_url"] == "unity3dusercontent.com":
         # this isn't the video name, but the id of the content as the name is the quality
         video_id = row["url"].split("/")[-2]
-    if row["tld_url"] == "adcolony.com":
+    elif row["tld_url"] == "adcolony.com":
         video_id = row["url"].split("/")[-2]
         if len(video_id) < 10:
             video_id = row["url"].split("/")[-1]
+    elif "bigabidserv.com" in row["tld_url"]:
+        video_id = row["url"].split("/")[-1]
+        if "." in video_id:
+            video_id = video_id.split(".")[0]
+    else:
+        video_id = url_parts.path.split("/")[-1]
     return video_id
 
 
@@ -1201,7 +1228,7 @@ def attribute_creatives(
         host_ad_network_tld = get_tld(row["tld_url"])
         video_id = get_video_id(row)
         if video_id == "":
-            error_msg = "Video ID is empty"
+            error_msg = "Bad creative parsing video ID is empty"
             row["error_msg"] = error_msg
             error_messages.append(row)
             continue
