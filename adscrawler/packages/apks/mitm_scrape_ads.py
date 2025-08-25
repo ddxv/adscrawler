@@ -479,6 +479,26 @@ def parse_urls_for_known_parts(
     )
 
 
+def parse_yandex_ad(
+    sent_video_dict: dict, database_connection: PostgresCon, video_id: str
+) -> AdInfo:
+    init_ad_network_tld = "yandex.ru"
+    json_text = json.loads(sent_video_dict["response_text"])
+    matched_ads = [x for x in json_text["native"]["ads"] if video_id in str(x)]
+    if len(matched_ads) == 0:
+        return AdInfo(
+            adv_store_id=None,
+            init_tld=init_ad_network_tld,
+        )
+    text = str(matched_ads)
+    all_urls = extract_and_decode_urls(text)
+    ad_info = parse_urls_for_known_parts(
+        all_urls, database_connection, sent_video_dict["pub_store_id"]
+    )
+    ad_info.init_tld = init_ad_network_tld
+    return ad_info
+
+
 def parse_mtg_ad(sent_video_dict: dict, database_connection: PostgresCon) -> AdInfo:
     init_ad_network_tld = "mtgglobals.com"
     text = sent_video_dict["response_text"]
@@ -1147,7 +1167,7 @@ def parse_sent_video_df(
         elif "mtgglobals.com" in init_url:
             ad_info = parse_mtg_ad(sent_video_dict, database_connection)
         elif "yandex.ru" in init_url:
-            ad_info = parse_yandex_ad(sent_video_dict, database_connection)
+            ad_info = parse_yandex_ad(sent_video_dict, database_connection, video_id)
         else:
             real_tld = get_tld(init_url)
             error_msg = f"Not a recognized ad network: {real_tld}"
