@@ -415,16 +415,23 @@ def parse_urls_for_known_parts(
     for url in all_urls:
         adv_store_id = None
         tld_url = tldextract.extract(url).domain + "." + tldextract.extract(url).suffix
-        if (
-            tld_url in MMP_TLDS
-            and ".com/privacy-policy" not in url
-            and "support.appsflyer.com" not in url
-            and "appsflyer.com/terms-of-use" not in url
-        ):
+        if tld_url in MMP_TLDS:
+            if any(
+                x in url.lower()
+                for x in [
+                    "/privacy-policy",
+                    "support.appsflyer.com",
+                    "/terms-of-use",
+                ]
+            ):
+                continue
             found_mmp_urls.append(url)
+            if "websdk.appsflyer.com" in url:
+                continue
             if "appsflyer.com" in tld_url:
+                print(url)
                 adv_store_id = re.search(
-                    r"http.*\.appsflyer\.com/([a-zA-Z0-9_.]+)\?", url
+                    r"http.*\.appsflyer\.com/([a-zA-Z0-9_.]+)[\?\-]", url
                 )[1]
                 if adv_store_id:
                     found_adv_store_ids.append(adv_store_id)
@@ -486,13 +493,16 @@ def parse_yandex_ad(
 ) -> AdInfo:
     init_ad_network_tld = "yandex.ru"
     json_text = json.loads(sent_video_dict["response_text"])
-    matched_ads = [x for x in json_text["native"]["ads"] if video_id in str(x)]
-    if len(matched_ads) == 0:
-        return AdInfo(
-            adv_store_id=None,
-            init_tld=init_ad_network_tld,
-        )
-    text = str(matched_ads)
+    if "native" in json_text:
+        matched_ads = [x for x in json_text["native"]["ads"] if video_id in str(x)]
+        if len(matched_ads) == 0:
+            return AdInfo(
+                adv_store_id=None,
+                init_tld=init_ad_network_tld,
+            )
+        text = str(matched_ads)
+    else:
+        text = sent_video_dict["response_text"]
     all_urls = extract_and_decode_urls(text)
     ad_info = parse_urls_for_known_parts(
         all_urls, database_connection, sent_video_dict["pub_store_id"]
