@@ -2,6 +2,7 @@ import os
 import pathlib
 
 import boto3
+import numpy as np
 import pandas as pd
 
 from adscrawler.config import (
@@ -249,7 +250,6 @@ def move_local_apk_files_to_s3() -> None:
 
     This is for occasional MANUAL PROCESSING.
     """
-    import numpy as np
 
     apks = get_downloaded_apk_files(extension="apk")
     xapks = get_downloaded_apk_files(extension="xapk")

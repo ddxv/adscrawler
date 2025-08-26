@@ -102,3 +102,5 @@ exclude_rules = [
 
 [tool.sqlfluff.templater.placeholder]
 param_style = 'colon'
+dialect = "postgres"
+exclude_rules = ["L022"]
