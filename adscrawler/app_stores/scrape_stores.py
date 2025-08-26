@@ -11,6 +11,8 @@ import pandas as pd
 import tldextract
 from itunes_app_scraper.util import AppStoreException
 
+from adscrawler.app_stores.apkcombo import get_apkcombo_android_apps
+from adscrawler.app_stores.appbrain import get_appbrain_android_apps
 from adscrawler.app_stores.apple import (
     clean_ios_app_df,
     crawl_ios_developers,
@@ -26,7 +28,7 @@ from adscrawler.app_stores.google import (
     search_play_store,
 )
 from adscrawler.config import CONFIG, get_logger
-from adscrawler.dbcon.connection import PostgresCon
+from adscrawler.dbcon.connection import PostgresCon, start_ssh_tunnel
 from adscrawler.dbcon.queries import (
     delete_app_url_mapping,
     query_categories,
@@ -295,8 +297,6 @@ def scrape_store_ranks(database_connection: PostgresCon, stores: list[int]) -> N
             except Exception as e:
                 logger.exception(f"Scrape google ranks hit error={e}, skipping")
         try:
-            from adscrawler.app_stores.apkcombo import get_apkcombo_android_apps
-
             dicts = get_apkcombo_android_apps()
             process_scraped(
                 database_connection=database_connection,
@@ -306,8 +306,6 @@ def scrape_store_ranks(database_connection: PostgresCon, stores: list[int]) -> N
         except Exception:
             logger.exception("ApkCombo RSS feed failed")
         try:
-            from adscrawler.app_stores.appbrain import get_appbrain_android_apps
-
             dicts = get_appbrain_android_apps()
             process_scraped(
                 database_connection=database_connection,
@@ -570,7 +568,7 @@ def process_weekly_ranks(
     store_id_map = query_store_id_map(database_connection, store)
 
     if database_connection.engine.url.host == "127.0.0.1":
-        port = start_tunnel("loki")
+        port = start_ssh_tunnel("loki")
         host = "127.0.0.1"
     else:
         host = CONFIG["loki"]["host"]
@@ -668,27 +666,6 @@ def process_weekly_ranks(
                 "best_rank",
             ],
         )
-
-
-def start_tunnel(server_name: str) -> str:
-    from sshtunnel import SSHTunnelForwarder
-
-    from adscrawler.dbcon.connection import get_host_ip
-
-    host = get_host_ip(CONFIG["loki"]["host"])
-
-    ssh_port = CONFIG[server_name].get("ssh_port", 22)
-    remote_port = CONFIG[server_name].get("remote_port", 5432)
-    server = SSHTunnelForwarder(
-        (host, ssh_port),
-        ssh_username=CONFIG[server_name]["os_user"],
-        remote_bind_address=("127.0.0.1", remote_port),
-        ssh_pkey=CONFIG[server_name].get("ssh_pkey"),
-        ssh_private_key_password=CONFIG[server_name].get("ssh_pkey_password"),
-    )
-    server.start()
-    db_port = str(server.local_bind_port)
-    return db_port
 
 
 def extract_domains(x: str) -> str:

@@ -1,4 +1,5 @@
 import asyncio
+import socket
 import threading
 from contextlib import contextmanager
 from socket import gethostbyname
@@ -77,7 +78,6 @@ def manage_tunnel_thread(
     ssh_pkey_password: str,
 ) -> int:
     result = {}
-    import socket
 
     def runner():
         async def main():

@@ -93,14 +93,13 @@ disallow_untyped_defs = true
 
 [tool.sqlfluff.core]
 templater = 'placeholder'
-verbose = 2
+verbose = 1
 dialect = 'postgres'
 large_file_skip_byte_limit = 0
 exclude_rules = [
     'AM04', # using *, agreed this should be TODO, 
+    'L022', # Avoid new lines after CTEs to help copy pasting between editors
 ]
 
 [tool.sqlfluff.templater.placeholder]
 param_style = 'colon'
-dialect = "postgres"
-exclude_rules = ["L022"]

@@ -4,6 +4,7 @@ import datetime
 import hashlib
 import html
 import json
+import os
 import pathlib
 import re
 import struct
@@ -13,6 +14,7 @@ import uuid
 import xml.etree.ElementTree as ET
 from functools import lru_cache
 
+import boto3
 import imagehash
 import numpy as np
 import pandas as pd
@@ -25,7 +27,7 @@ from mitmproxy.io import FlowReader
 from PIL import Image
 from protod import Renderer
 
-from adscrawler.config import CREATIVES_DIR, MITM_DIR, get_logger
+from adscrawler.config import CONFIG, CREATIVES_DIR, MITM_DIR, get_logger
 from adscrawler.dbcon.connection import PostgresCon
 from adscrawler.dbcon.queries import (
     log_creative_scan_results,
@@ -94,7 +96,7 @@ PLAYSTORE_URL_PARTS = ["play.google.com/store", "market://", "intent://"]
 
 @dataclasses.dataclass
 class AdInfo:
-    adv_store_id: str
+    adv_store_id: str | None
     host_ad_network_tld: str | None = None
     init_tld: str | None = None
     found_ad_network_tlds: list[str] | None = None
@@ -954,9 +956,7 @@ def average_hashes(hashes):
     return str(imagehash.ImageHash(majority))
 
 
-def compute_phash_multiple_frames(
-    local_path: pathlib.Path, seconds=[1, 3, 5, 10]
-) -> str:
+def compute_phash_multiple_frames(local_path: pathlib.Path, seconds: list[int]) -> str:
     hashes = []
     for second in seconds:
         try:
@@ -975,7 +975,8 @@ def get_phash(md5_hash: str, adv_store_id: str, file_extension: str) -> str:
     seekable_formats = {"mp4", "webm", "gif"}
     if file_extension in seekable_formats:
         try:
-            phash = str(compute_phash_multiple_frames(local_path))
+            seconds = [1, 3, 5, 10]
+            phash = str(compute_phash_multiple_frames(local_path, seconds))
         except Exception:
             logger.error("Failed to compute multiframe phash")
     if phash is None:
@@ -1834,22 +1835,16 @@ def open_all_local_mitms() -> pd.DataFrame:
 
 
 def upload_all_mitms_to_s3() -> None:
-    import os
-
-    BUCKET_NAME = "appgoblin-data"
+    bucket_name = "appgoblin-data"
     client = get_cloud_s3_client()
     client.upload_file(
-        "all_mitms.tsv.xz", Bucket=BUCKET_NAME, Key="mitmcsv/all_mitms.tsv.xz"
+        "all_mitms.tsv.xz", Bucket=bucket_name, Key="mitmcsv/all_mitms.tsv.xz"
     )
     os.system("s3cmd setacl s3://appgoblin-data/mitmcsv/ --acl-public --recursive")
 
 
 def get_cloud_s3_client():
     """Create and return an S3 client."""
-    import boto3
-
-    from adscrawler.config import CONFIG
-
     session = boto3.session.Session()
     return session.client(
         "s3",

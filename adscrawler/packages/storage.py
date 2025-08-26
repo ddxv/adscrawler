@@ -18,6 +18,7 @@ from adscrawler.config import (
     get_logger,
 )
 from adscrawler.dbcon.connection import PostgresCon, start_ssh_tunnel
+from adscrawler.dbcon.queries import query_latest_api_scan_by_store_id
 from adscrawler.packages.utils import (
     get_local_file_path,
     get_md5_hash,
@@ -191,7 +192,6 @@ def get_downloaded_apk_files(extension: str) -> list[str]:
 
 def get_downloaded_mitm_files(database_connection: PostgresCon) -> pd.DataFrame:
     """Get all downloaded files of a given extension."""
-    from adscrawler.dbcon.queries import query_latest_api_scan_by_store_id
 
     main_dir = pathlib.Path("/home/adscrawler/adscrawler/mitmlogs/")
 

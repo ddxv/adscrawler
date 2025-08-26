@@ -111,7 +111,7 @@ def get_parsed_plist(
     paths_df = pd.concat([frameworks_df, bundles_df, special_files_df, macho_df])
     df = pd.concat([ddf, paths_df])
     df["tag"] = ""
-    df.rename(columns={"value": "value_name"}, inplace=True)
+    df = df.rename(columns={"value": "value_name"})
     return version, plist_str, df
 
 
