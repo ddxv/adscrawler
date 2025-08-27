@@ -103,7 +103,10 @@ def get_parsed_plist(
         .apply(lambda row: "".join([str(x) for x in row]), axis=1)
     )
     ddf = ddf[["path", "value"]]
-    version = data["CFBundleVersion"]
+    version_id = data["CFBundleVersion"]
+    version_str = data["CFBundleShortVersionString"]
+    if version_id == "0" and version_str:
+        version_id = version_str
     frameworks_df = ipa_frameworks(tmp_decoded_output_path)
     bundles_df = ipa_bundles(tmp_decoded_output_path)
     special_files_df = special_files(tmp_decoded_output_path)
@@ -112,7 +115,7 @@ def get_parsed_plist(
     df = pd.concat([ddf, paths_df])
     df["tag"] = ""
     df = df.rename(columns={"value": "value_name"})
-    return version, plist_str, df
+    return version_id, plist_str, df
 
 
 def ipa_frameworks(tmp_decoded_output_path: pathlib.Path) -> pd.DataFrame:
