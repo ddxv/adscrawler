@@ -552,6 +552,14 @@ def remove_app(store_id: str) -> None:
     try:
         os.system(f'sudo waydroid shell am force-stop "{store_id}"')
         os.system(f'waydroid app remove "{store_id}"')
+        subprocess.run(
+            ["sudo", "waydroid", "app", "remove", store_id],
+            text=True,
+            capture_output=True,
+            check=True,
+            timeout=20,
+        )
+
         cleanup_waydroid_apk_files(store_id)
         logger.info(f"{function_info} success")
     except Exception as e:
