@@ -292,6 +292,7 @@ def log_download_crawl_results(
     df: pd.DataFrame, database_connection: PostgresCon
 ) -> None:
     insert_columns = ["store_app", "version_code", "crawl_result"]
+    df["version_code"] = df["version_code"].fillna("-1")
     df = df[insert_columns]
     df.to_sql(
         name="store_app_downloads",
