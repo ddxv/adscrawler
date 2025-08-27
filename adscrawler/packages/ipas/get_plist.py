@@ -178,10 +178,9 @@ def special_files(tmp_decoded_output_path: pathlib.Path) -> pd.DataFrame:
 
 
 def process_plist(
-    row: pd.Series,
+    store_id: str,
 ) -> tuple[pd.DataFrame, int, str, str]:
-    store = row.store
-    store_id = row.store_id
+    store = 2
     downloaded_file_path, version_str = download_to_local(
         store=store, store_id=store_id
     )

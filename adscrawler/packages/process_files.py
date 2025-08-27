@@ -2,9 +2,7 @@ import time
 
 import pandas as pd
 
-from adscrawler.config import (
-    get_logger,
-)
+from adscrawler.config import get_logger
 from adscrawler.dbcon.connection import PostgresCon
 from adscrawler.dbcon.queries import (
     get_version_code_dbid,
@@ -80,12 +78,10 @@ def download_apps(
         except FileNotFoundError:
             is_already_in_s3 = False
             s3_key = None
-
         file_path = get_local_file_path(store, store_id)
         external_download = not is_already_in_s3 and not file_path
         has_local_file_but_no_s3 = file_path is not None and not is_already_in_s3
         can_s3_download = file_path is None and is_already_in_s3
-
         if external_download:
             # proceed to regular download
             pass
@@ -98,7 +94,6 @@ def download_apps(
                 f"{store_id=} was already present in S3, this should rarely happen"
             )
             existing_file_path = download_s3_app_by_key(s3_key=s3_key)
-
         try:
             if store == 1:
                 download_result = manage_apk_download(
@@ -135,12 +130,10 @@ def download_apps(
                 move_downloaded_app_to_main_dir(download_result.downloaded_file_path)
         except Exception:
             logger.exception(f"Download for {store_id} failed")
-
         remove_tmp_files(store_id=store_id)
         logger.info(
             f"{store_id=} finished with errors={download_result.error_count} {total_errors=}"
         )
-
         # Handle sleep & errors
         if download_result.error_count == 0:
             if existing_file_path:
@@ -159,7 +152,6 @@ def download_apps(
         if total_errors > 11:
             logger.error(f"Too many errors: {total_errors=} breaking loop")
             break
-
     logger.info("Finished downloading APKs")
 
 
@@ -192,7 +184,7 @@ def process_sdks(
                 )
             elif store == 2:
                 details_df, crawl_result, version_str, raw_txt_str = process_plist(
-                    row=row
+                    store_id=store_id
                 )
             else:
                 raise ValueError(f"Invalid store: {store}")
