@@ -552,7 +552,7 @@ def remove_app(store_id: str) -> None:
     try:
         os.system(f'sudo waydroid shell am force-stop "{store_id}"')
         subprocess.run(
-            ["sudo", "waydroid", "app", "remove", store_id],
+            ["sudo", "waydroid", "shell", "pm", "uninstall", store_id],
             text=True,
             capture_output=True,
             check=True,
