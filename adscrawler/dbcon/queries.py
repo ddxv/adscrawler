@@ -638,6 +638,9 @@ def query_store_apps(
                         """
     where_str = "store IN (" + (", ").join([str(x) for x in stores]) + ")"
     where_str += f""" AND {installs_and_dates_str}"""
+    order_str = "DESC NULLS LAST"
+    if group == "max":
+        order_str = "ASC NULLS FIRST"
     limit_str = ""
     if limit:
         limit_str = f"LIMIT {limit}"
@@ -666,7 +669,7 @@ def query_store_apps(
                     COALESCE(installs, 0),
                     COALESCE(CAST(rating_count AS bigint), 0)*50
                 )
-            DESC NULLS LAST
+            {order_str}
         {limit_str}
         """
     df = pd.read_sql(sel_query, database_connection.engine)
