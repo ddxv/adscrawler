@@ -174,6 +174,7 @@ def process_sdks(
     apps = apps.head(number_of_apps_to_pull)
     for _id, row in apps.iterrows():
         store_id = row.store_id
+        store_app = row.store_app
         version_str = None
         crawl_result = 3
         logger.info(f"SDK processing: {store_id=} start")
@@ -192,7 +193,7 @@ def process_sdks(
         except Exception:
             logger.exception(f"Manifest for {store_id} failed")
         version_code_dbid = get_version_code_dbid(
-            store_app=row.store_app,
+            store_app=store_app,
             version_code=version_str,
             database_connection=database_connection,
         )
