@@ -26,7 +26,9 @@ def move_mitm_to_processed(store_id: str, run_id: int) -> None:
     shutil.move(mitmlog_file, destination_path)
 
 
-def parse_mitm_log(store_id: str, database_connection: PostgresCon) -> pd.DataFrame:
+def parse_mitm_short_log(
+    store_id: str, database_connection: PostgresCon
+) -> pd.DataFrame:
     # Define the log file path
     flows_file = f"traffic_{store_id}.log"
     mitmlog_file = pathlib.Path(MITM_DIR, flows_file)
@@ -86,19 +88,7 @@ def parse_mitm_log(store_id: str, database_connection: PostgresCon) -> pd.DataFr
                             request_data["response_headers"] = dict(
                                 flow.response.headers
                             )
-                            try:
-                                # Limit response content to prevent huge files
-                                response_text = flow.response.get_text()
-                                request_data["response"] = (
-                                    response_text[:1000] + "..."
-                                    if len(response_text) > 1000
-                                    else response_text
-                                )
-                            except Exception:
-                                request_data["response"] = (
-                                    f"[Binary response: {len(flow.response.content)} bytes]"
-                                )
-
+                            request_data["response"] = flow.response
                         requests.append(request_data)
                     except Exception as e:
                         logger.exception(f"Error parsing flow: {e}")

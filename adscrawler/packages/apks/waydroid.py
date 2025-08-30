@@ -225,7 +225,7 @@ def process_mitm_log(
     database_connection: PostgresCon,
 ) -> pd.DataFrame:
     function_info = f"MITM {store_id=}"
-    mdf = mitm_process_log.parse_mitm_log(store_id, database_connection)
+    mdf = mitm_process_log.parse_mitm_short_log(store_id, database_connection)
     logger.info(f"{function_info} log has {mdf.shape[0]} rows")
     if mdf.empty:
         logger.warning(f"{function_info} MITM log returned empty dataframe")

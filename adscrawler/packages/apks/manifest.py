@@ -139,6 +139,7 @@ def process_manifest(row: pd.Series) -> tuple[pd.DataFrame, int, str, str]:
         apk_path, version_str = download_to_local(store=store, store_id=store_id)
         if apk_path is None:
             raise FileNotFoundError(f"APK file not found for {store_id=}")
+
         apk_tmp_decoded_output_path = unzip_apk(store_id=store_id, file_path=apk_path)
 
         manifest_str, details_df = get_parsed_manifest(

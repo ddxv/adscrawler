@@ -180,7 +180,8 @@ def parse_mitm_log(
                         except Exception:
                             request_data["request_text"] = ""
                         try:
-                            request_data["content"] = flow.request.get_text()
+                            request_data["content"] = flow.request.content
+                            # request_data["content"] = flow.request.get_text()
                         except Exception:
                             request_data["content"] = ""
                         # Add response info if available
@@ -703,7 +704,7 @@ def parse_unity_ad(
         if "bundleId" in keyresp:
             adv_store_id = keyresp["bundleId"]
         try:
-            adcontent: str = ad_response["media"][mykey]["content"]
+            adcontent = str(ad_response["media"][mykey]["content"])
             # This is the ad html
             # jsadcontent = json.loads(adcontent)
             # with open("adhtml.html", "w") as f:
@@ -1612,7 +1613,7 @@ def get_creatives_df(
     if creatives_df.empty:
         error_msg = "No creatives to check"
         logger.error(error_msg)
-        return pd.DataFrame(), pd.DataFrame(), error_msg
+        return df, pd.DataFrame(), error_msg
     return df, creatives_df, error_msg
 
 
@@ -1622,6 +1623,7 @@ def parse_store_id_mitm_log(
     database_connection: PostgresCon,
 ) -> list:
     df, creatives_df, error_message = get_creatives_df(pub_store_id, run_id)
+
     if error_message:
         logger.error(error_message)
         error_message_info = {
