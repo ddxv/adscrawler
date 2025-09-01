@@ -84,6 +84,8 @@ scheduled_apps_crawl AS (
                 (
                     lsvc.scan_result = 1
                     AND lsvc.scanned_at < current_date - interval '30 days'
+                    AND ls.scanned_at < current_date - interval '3 days'
+
                 )
                 OR
                 (
