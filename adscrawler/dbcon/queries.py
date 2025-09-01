@@ -766,6 +766,16 @@ def query_apps_to_download(
     return df
 
 
+@lru_cache(maxsize=1)
+def query_sdk_keys(database_connection: PostgresCon) -> pd.DataFrame:
+    sel_query = """SELECT * FROM ad_network_sdk_keys;"""
+    df = pd.read_sql(
+        sel_query,
+        con=database_connection.engine,
+    )
+    return df
+
+
 def query_apps_to_sdk_scan(
     database_connection: PostgresCon,
     store: int,

@@ -45,6 +45,11 @@ from adscrawler.packages.storage import (
     upload_ad_creative_to_s3,
 )
 
+try:
+    from adscrawler.packages.apks.decrypt_applovin import decode_from
+except ImportError:
+    decode_from = None
+
 logger = get_logger(__name__, "mitm_scrape_ads")
 
 ABS_TOL = 1024  # bytes
@@ -121,9 +126,32 @@ class AdInfo:
         return None
 
 
+def decode_network_request(
+    url: str, flowpart: http.HTTPFlow, database_connection: PostgresCon
+) -> str | None:
+    if decode_from and "applovin.com" in url:
+        try:
+            text = decode_from(
+                blob=flowpart.content, database_connection=database_connection
+            )
+            if text is None:
+                logger.error(f"Decode {url[:40]=} failed")
+                try:
+                    text = flowpart.get_text()
+                except Exception:
+                    text = "Unknown decode error"
+        except Exception:
+            text = flowpart.get_text()
+    else:
+        logger.error(f"Unknown Decode Network Request URL: {url}")
+        text = flowpart.get_text()
+    return text
+
+
 def parse_mitm_log(
     pub_store_id: str,
     run_id: int,
+    database_connection: PostgresCon,
 ) -> pd.DataFrame:
     mitm_log_path = pathlib.Path(MITM_DIR, f"{pub_store_id}_{run_id}.log")
     if mitm_log_path.exists():
@@ -155,16 +183,14 @@ def parse_mitm_log(
                             )
                         else:
                             timestamp = None
+                        tld_url = get_tld(flow.request.pretty_url)
+                        url = flow.request.pretty_url
                         # Extract useful data from each flow
                         request_data = {
                             "start_time": flow.timestamp_start,
                             "method": flow.request.method,
-                            "url": flow.request.pretty_url,
-                            "tld_url": tldextract.extract(
-                                flow.request.pretty_url
-                            ).domain
-                            + "."
-                            + tldextract.extract(flow.request.pretty_url).suffix,
+                            "url": url,
+                            "tld_url": tld_url,
                             "host": flow.request.host,
                             "path": flow.request.path,
                             "query_params": dict(flow.request.query),
@@ -175,13 +201,19 @@ def parse_mitm_log(
                             ),
                             "timestamp": timestamp,
                         }
-                        try:
-                            request_data["request_text"] = flow.request.get_text()
-                        except Exception:
-                            request_data["request_text"] = ""
+                        if "applovin.com" in tld_url:
+                            request_data["request_text"] = decode_network_request(
+                                url,
+                                flowpart=flow.request,
+                                database_connection=database_connection,
+                            )
+                        else:
+                            try:
+                                request_data["request_text"] = flow.request.get_text()
+                            except Exception:
+                                request_data["request_text"] = ""
                         try:
                             request_data["content"] = flow.request.content
-                            # request_data["content"] = flow.request.get_text()
                         except Exception:
                             request_data["content"] = ""
                         # Add response info if available
@@ -199,10 +231,21 @@ def parse_mitm_log(
                             request_data["response_size"] = flow.response.headers.get(
                                 "Content-Length", "0"
                             )
+                            if "applovin.com" in tld_url:
+                                request_data["response_text"] = decode_network_request(
+                                    url,
+                                    flowpart=flow.response,
+                                    database_connection=database_connection,
+                                )
+                            else:
+                                try:
+                                    request_data["response_text"] = (
+                                        flow.response.get_text()
+                                    )
+                                except Exception:
+                                    request_data["response_text"] = ""
                             try:
                                 request_data["response_content"] = flow.response.content
-                                response_text = flow.response.get_text()
-                                request_data["response_text"] = response_text
                             except Exception:
                                 pass
                         mitm_requests.append(request_data)
@@ -1596,9 +1639,9 @@ def make_creative_records_df(
 
 
 def get_creatives_df(
-    pub_store_id: str, run_id: int
+    pub_store_id: str, run_id: int, database_connection: PostgresCon
 ) -> tuple[pd.DataFrame, pd.DataFrame, str]:
-    df = parse_mitm_log(pub_store_id, run_id)
+    df = parse_mitm_log(pub_store_id, run_id, database_connection)
     error_msg = None
     if df.empty:
         error_msg = "No data in mitm df"
@@ -1622,7 +1665,9 @@ def parse_store_id_mitm_log(
     run_id: int,
     database_connection: PostgresCon,
 ) -> list:
-    df, creatives_df, error_message = get_creatives_df(pub_store_id, run_id)
+    df, creatives_df, error_message = get_creatives_df(
+        pub_store_id, run_id, database_connection
+    )
 
     if error_message:
         logger.error(error_message)
@@ -1810,7 +1855,7 @@ def download_all_mitms(database_connection: PostgresCon) -> None:
                 pass
 
 
-def open_all_local_mitms() -> pd.DataFrame:
+def open_all_local_mitms(database_connection: PostgresCon) -> pd.DataFrame:
     all_mitms_df = pd.DataFrame()
     i = 0
     num_files = len(list(pathlib.Path(MITM_DIR).glob("*.log")))
@@ -1820,7 +1865,7 @@ def open_all_local_mitms() -> pd.DataFrame:
         logger.info(f"{i}/{num_files}: {mitm_log_path}")
         pub_store_id = mitm_log_path.name.split("_")[0]
         run_id = mitm_log_path.name.split("_")[1].replace(".log", "")
-        df = parse_mitm_log(pub_store_id, run_id)
+        df = parse_mitm_log(pub_store_id, run_id, database_connection)
         if "response_content_type" in df.columns:
             df = add_is_creative_content_column(df)
             df["response_text"] = np.where(
