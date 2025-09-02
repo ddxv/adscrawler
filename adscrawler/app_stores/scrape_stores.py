@@ -769,7 +769,10 @@ def update_app_details(
 ) -> None:
     logger.info(f"{stores=} Update App Details: start")
     df = query_store_apps(
-        stores, database_connection=database_connection, group=group, limit=limit
+        stores,
+        database_connection=database_connection,
+        group=group,
+        limit=limit,
     )
     if df.empty:
         logger.info(

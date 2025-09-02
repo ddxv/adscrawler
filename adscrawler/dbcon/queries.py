@@ -568,12 +568,11 @@ def query_pub_domains(
 
 
 def delete_app_url_mapping(app_url_id: int, database_connection: PostgresCon) -> None:
-    del_query = text("DELETE FROM app_urls_map WHERE id = :app_url_id")
+    del_query = "DELETE FROM app_urls_map WHERE id = %s"
     logger.info(f"{app_url_id=} delete app_urls_map start")
-
     try:
         with database_connection.get_cursor() as cur:
-            cur.execute(del_query, {"app_url_id": app_url_id})
+            cur.execute(del_query, (app_url_id,))
         logger.info(f"{app_url_id=} delete app_urls_map completed successfully")
     except Exception as e:
         logger.error(f"{app_url_id=} delete app_urls_map failed: {e}")

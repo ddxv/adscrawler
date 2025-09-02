@@ -208,7 +208,7 @@ def process_sdks(
                 }
             )
         else:
-            details_df["store_app"] = row.store_app
+            details_df["store_app"] = store_app
             details_df["version_code_id"] = version_code_dbid
             details_df["scan_result"] = crawl_result
 
