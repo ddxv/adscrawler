@@ -201,11 +201,13 @@ def process_sdks(
             raise ValueError(f"Version code dbid is None for {store_id=}")
         if details_df is None or details_df.empty:
             details_df = pd.DataFrame(
-                {
-                    "store_app": row.store_app,
-                    "version_code_id": version_code_dbid,
-                    "scan_result": crawl_result,
-                }
+                [
+                    {
+                        "store_app": store_app,
+                        "version_code_id": version_code_dbid,
+                        "scan_result": crawl_result,
+                    }
+                ]
             )
         else:
             details_df["store_app"] = store_app
