@@ -1,7 +1,9 @@
 """Shared utilities for app stores."""
 
 
-def truncate_utf8_bytes(s: str, max_bytes: int = 2600) -> str:
+def truncate_utf8_bytes(s: str, max_bytes: int = 2400) -> str:
+    if s is None:
+        return ""
     encoded = s.encode("utf-8")
     if len(encoded) <= max_bytes:
         return s
