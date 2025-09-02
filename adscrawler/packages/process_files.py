@@ -198,7 +198,11 @@ def process_sdks(
             database_connection=database_connection,
         )
         if version_code_dbid is None:
-            raise ValueError(f"Version code dbid is None for {store_id=}")
+            # raise ValueError(f"Version code dbid is None for {store_id=}")
+            logger.error(
+                f"Version code dbid is None for {store_id=}, data not recorded!"
+            )
+            continue
         if details_df is None or details_df.empty:
             details_df = pd.DataFrame(
                 [
