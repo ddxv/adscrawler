@@ -1,5 +1,6 @@
 """Download an APK and extract it's manifest."""
 
+import json
 import pathlib
 import subprocess
 from xml.etree import ElementTree
@@ -10,7 +11,7 @@ from adscrawler.config import (
     APK_TMP_UNZIPPED_DIR,
     get_logger,
 )
-from adscrawler.packages.storage import download_to_local
+from adscrawler.packages.storage import download_app_to_local
 from adscrawler.packages.utils import (
     get_version,
     unzip_apk,
@@ -22,19 +23,47 @@ FAILED_VERSION_STR = "-1"
 
 
 def get_parsed_manifest(
-    tmp_decoded_output_path: pathlib.Path, store_id: str
+    apk_tmp_decoded_output_path: pathlib.Path, store_id: str
 ) -> tuple[str, pd.DataFrame]:
-    manifest_filename = pathlib.Path(tmp_decoded_output_path, "AndroidManifest.xml")
+    manifest_filename = pathlib.Path(apk_tmp_decoded_output_path, "AndroidManifest.xml")
     # Load the XML file
     with manifest_filename.open("r") as f:
         manifest_str = f.read()
     tree = ElementTree.parse(manifest_filename)
     root = tree.getroot()
     df = xml_to_dataframe(root)
-    smali_df = get_smali_df(tmp_decoded_output_path, store_id)
-    df = pd.concat([df, smali_df])
+    smali_df = get_smali_df(apk_tmp_decoded_output_path, store_id)
+    jsons_df = get_json_df(apk_tmp_decoded_output_path)
+    df = pd.concat([df, smali_df, jsons_df])
     df = df.drop_duplicates()
     return manifest_str, df
+
+
+def get_json_df(apk_tmp_decoded_output_path: pathlib.Path) -> pd.DataFrame:
+    """Collect jsons in /res/raw directory."""
+    json_df = pd.DataFrame()
+    res_path = pathlib.Path(apk_tmp_decoded_output_path, "res", "raw")
+    if not res_path.exists():
+        return json_df
+    raw_jsons = []
+    for file in res_path.glob("*.json"):
+        try:
+            with file.open("r") as f:
+                file_name = file.name.replace(".json", "")
+                data = json.load(f)
+                for key in data.keys():
+                    store_key = {}
+                    my_path = file_name + "." + key
+                    store_key["path"] = my_path
+                    store_key["found_json"] = str(data[key])
+                    raw_jsons.append(store_key)
+        except Exception as e:
+            logger.error(f"Error loading json file {file}: {e}")
+            pass
+    # flatten the list of jsons where the key is a column and the value is the value
+    jsons_df = pd.DataFrame(raw_jsons)
+    jsons_df = jsons_df.rename(columns={"found_json": "android_name"})
+    return jsons_df
 
 
 def unzipped_apk_paths(mypath: pathlib.Path) -> pd.DataFrame:
@@ -136,7 +165,7 @@ def process_manifest(row: pd.Series) -> tuple[pd.DataFrame, int, str, str]:
     manifest_str = ""
 
     try:
-        apk_path, version_str = download_to_local(store=store, store_id=store_id)
+        apk_path, version_str = download_app_to_local(store=store, store_id=store_id)
         if apk_path is None:
             raise FileNotFoundError(f"APK file not found for {store_id=}")
 

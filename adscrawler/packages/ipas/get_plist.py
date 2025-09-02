@@ -8,7 +8,7 @@ import subprocess
 import pandas as pd
 
 from adscrawler.config import get_logger
-from adscrawler.packages.storage import download_to_local
+from adscrawler.packages.storage import download_app_to_local
 from adscrawler.packages.utils import unzip_ipa
 
 logger = get_logger(__name__)
@@ -181,7 +181,7 @@ def process_plist(
     store_id: str,
 ) -> tuple[pd.DataFrame, int, str, str]:
     store = 2
-    downloaded_file_path, version_str = download_to_local(
+    downloaded_file_path, version_str = download_app_to_local(
         store=store, store_id=store_id
     )
     tmp_decoded_output_path = unzip_ipa(

@@ -479,7 +479,7 @@ def download_mitm_log_by_key(key: str, filename: str) -> pathlib.Path:
 def download_app_by_store_id(
     store: int, store_id: str, version_str: str = None
 ) -> tuple[pathlib.Path, str]:
-    func_info = "download_app_by_store_id "
+    func_info = f"download_app_by_store_id {store_id=} {version_str=}"
     df = get_store_id_apk_s3_keys(store, store_id)
     if df.empty:
         logger.error(f"{store_id=} no apk found in s3")
@@ -548,7 +548,7 @@ def download_s3_app_by_key(
     return final_path
 
 
-def download_to_local(
+def download_app_to_local(
     store: int, store_id: str, version_str: str = None
 ) -> tuple[pathlib.Path, str]:
     file_path = get_local_file_path(store, store_id)

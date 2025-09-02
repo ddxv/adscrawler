@@ -30,7 +30,7 @@ from adscrawler.dbcon.queries import (
 )
 from adscrawler.packages.apks import mitm_process_log
 from adscrawler.packages.apks.weston import restart_weston, start_weston
-from adscrawler.packages.storage import download_to_local, upload_mitm_log_to_s3
+from adscrawler.packages.storage import download_app_to_local, upload_mitm_log_to_s3
 from adscrawler.packages.utils import (
     get_local_file_path,
     get_md5_hash,
@@ -787,7 +787,7 @@ def manual_waydroid_process(
     except FileNotFoundError:
         download_from_s3 = True
     if download_from_s3:
-        apk_path, _version_str = download_to_local(store=store, store_id=store_id)
+        apk_path, _version_str = download_app_to_local(store=store, store_id=store_id)
     if not apk_path or not apk_path.exists():
         raise FileNotFoundError(f"{store_id=} not found")
 
@@ -815,7 +815,7 @@ def process_apks_for_waydroid(
         store_app = row.store_app
         version_str = row.version_string
         try:
-            apk_path, _version_str = download_to_local(
+            apk_path, _version_str = download_app_to_local(
                 store=1, store_id=store_id, version_str=version_str
             )
             if not apk_path:
