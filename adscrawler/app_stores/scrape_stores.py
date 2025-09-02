@@ -326,9 +326,7 @@ def scrape_store_ranks(database_connection: PostgresCon, stores: list[int]) -> N
 
 
 def insert_new_apps(
-    dicts: list[dict],
-    database_connection: PostgresCon,
-    crawl_source: str,
+    dicts: list[dict], database_connection: PostgresCon, crawl_source: str, store: int
 ) -> None:
     df = pd.DataFrame(dicts)
     all_scraped_ids = df["store_id"].unique().tolist()
@@ -340,13 +338,12 @@ def insert_new_apps(
     new_apps_df = df[~(df["store_id"].isin(existing_store_ids))][
         ["store", "store_id"]
     ].drop_duplicates()
-
     if new_apps_df.empty:
-        logger.info(f"Scrape {crawl_source=} no new apps")
+        logger.info(f"Scrape {store=} {crawl_source=} no new apps")
         return
     else:
         logger.info(
-            f"Scrape {crawl_source=} insert new apps to db {new_apps_df.shape=}",
+            f"Scrape {store=} {crawl_source=} insert new apps to db {new_apps_df.shape=}",
         )
         insert_columns = ["store", "store_id"]
         inserted_apps: pd.DataFrame = upsert_df(
@@ -358,6 +355,9 @@ def insert_new_apps(
             return_rows=True,
         )
         if inserted_apps is not None and not inserted_apps.empty:
+            logger.warning(
+                f"No IDs returned for {store=} {crawl_source=} inserted apps {inserted_apps.shape=}"
+            )
             inserted_apps["crawl_source"] = crawl_source
             inserted_apps = inserted_apps.rename(columns={"id": "store_app"})
             insert_columns = ["store", "store_app"]
@@ -422,10 +422,28 @@ def process_scraped(
         database_connection=database_connection,
         dicts=ranked_dicts,
         crawl_source=crawl_source,
+        store=store,
     )
     df = pd.DataFrame(ranked_dicts)
-    if "rank" not in df.columns:
-        return
+    if "rank" in df.columns:
+        save_app_ranks(
+            df,
+            database_connection,
+            store,
+            collections_map,
+            categories_map,
+            countries_map,
+        )
+
+
+def save_app_ranks(
+    df: pd.DataFrame,
+    database_connection: PostgresCon,
+    store: int,
+    collections_map: pd.DataFrame | None = None,
+    categories_map: pd.DataFrame | None = None,
+    countries_map: pd.DataFrame | None = None,
+):
     all_scraped_ids = df["store_id"].unique().tolist()
     new_existing_ids_map = query_store_id_map(
         database_connection,
@@ -443,9 +461,6 @@ def process_scraped(
         process_store_rankings(
             store=store,
             df=df,
-            database_connection=database_connection,
-            collections_map=collections_map,
-            categories_map=categories_map,
         )
     if "keyword" in df.columns:
         df = df.drop("store_id", axis=1)
@@ -501,10 +516,7 @@ def download_rankings(
 
 def process_store_rankings(
     df: pd.DataFrame,
-    database_connection: PostgresCon,
     store: int,
-    collections_map: pd.DataFrame,
-    categories_map: pd.DataFrame,
 ) -> None:
     logger.info(f"Process and save rankings start {store=}")
     if store is None:
