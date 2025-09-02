@@ -1668,7 +1668,6 @@ def parse_store_id_mitm_log(
     df, creatives_df, error_message = get_creatives_df(
         pub_store_id, run_id, database_connection
     )
-
     if error_message:
         logger.error(error_message)
         error_message_info = {

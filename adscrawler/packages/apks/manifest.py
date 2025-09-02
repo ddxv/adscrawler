@@ -55,7 +55,9 @@ def get_json_df(apk_tmp_decoded_output_path: pathlib.Path) -> pd.DataFrame:
                     store_key = {}
                     my_path = file_name + "." + key
                     store_key["path"] = my_path
-                    store_key["found_json"] = str(data[key])
+                    str_data = str(data[key])
+                    str_data = str_data[:500]
+                    store_key["found_json"] = str_data
                     raw_jsons.append(store_key)
         except Exception as e:
             logger.error(f"Error loading json file {file}: {e}")
@@ -152,15 +154,13 @@ def xml_to_dataframe(root: ElementTree.Element) -> pd.DataFrame:
     return df
 
 
-def process_manifest(row: pd.Series) -> tuple[pd.DataFrame, int, str, str]:
+def process_manifest(store_id: str, store: int) -> tuple[pd.DataFrame, int, str, str]:
     """Process an APKs manifest.
     Due to the original implementation, this still downloads, processes manifest and saves the version_details.
     """
     crawl_result = 3
-    store_id = row.store_id
-    store = row.store
     logger.info(f"process_manifest {store_id=} start")
-    details_df = row.to_frame().T
+    details_df = pd.DataFrame()
     version_str = None
     manifest_str = ""
 

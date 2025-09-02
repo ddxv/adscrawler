@@ -181,7 +181,7 @@ def process_sdks(
         try:
             if store == 1:
                 details_df, crawl_result, version_str, raw_txt_str = process_manifest(
-                    row=row
+                    store_id=store_id, store=store
                 )
             elif store == 2:
                 details_df, crawl_result, version_str, raw_txt_str = process_plist(
