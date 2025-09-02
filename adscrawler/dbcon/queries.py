@@ -571,9 +571,13 @@ def delete_app_url_mapping(app_url_id: int, database_connection: PostgresCon) ->
     del_query = text("DELETE FROM app_urls_map WHERE id = :app_url_id")
     logger.info(f"{app_url_id=} delete app_urls_map start")
 
-    with database_connection.engine.connect() as conn:
-        conn.execute(del_query, {"app_url_id": app_url_id})
-        conn.commit()
+    try:
+        with database_connection.get_cursor() as cur:
+            cur.execute(del_query, {"app_url_id": app_url_id})
+        logger.info(f"{app_url_id=} delete app_urls_map completed successfully")
+    except Exception as e:
+        logger.error(f"{app_url_id=} delete app_urls_map failed: {e}")
+        raise
 
 
 def query_store_apps(
@@ -581,6 +585,7 @@ def query_store_apps(
     database_connection: PostgresCon,
     group: str = "short",
     limit: int | None = 1000,
+    log_query: bool = False,
 ) -> pd.DataFrame:
     short_update_days = 6
     short_update_installs = 1000
@@ -672,6 +677,8 @@ def query_store_apps(
             {order_str}
         {limit_str}
         """
+    if log_query:
+        logger.info(sel_query)
     df = pd.read_sql(sel_query, database_connection.engine)
     return df
 
