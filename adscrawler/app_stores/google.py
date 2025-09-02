@@ -65,12 +65,11 @@ def clean_google_play_app_df(df: pd.DataFrame) -> pd.DataFrame:
             "screenshots": "phone_image_urls",
         },
     )
-    df.loc[df["min_installs"].isna() and df["installs"].notnull(), "min_installs"] = (
-        df.loc[
-            df["min_installs"].isna(),
-            "installs",
-        ].astype(str)
-    )
+    can_replace_min_installs = (df["min_installs"].isna()) & (df["installs"].notna())
+    df.loc[can_replace_min_installs, "min_installs"] = df.loc[
+        can_replace_min_installs,
+        "installs",
+    ].astype(str)
     df["min_installs"].str.replace(r"[,+]", "", regex=True).fillna("0").astype(int)
     df = df.assign(
         min_installs=df["min_installs"]
