@@ -6,13 +6,16 @@ from adscrawler.config import CONFIG, get_logger
 from adscrawler.dbcon.connection import PostgresCon
 from adscrawler.dbcon.queries import query_sdk_keys
 
-C1 = CONFIG["applovin"]["C1"]
-C2 = CONFIG["applovin"]["C2"]
-
-CONST_A = base64.b64decode(CONFIG["applovin"]["CONST_A"])
-CONST_B = base64.b64decode(CONFIG["applovin"]["CONST_B"])
 
 logger = get_logger(__name__)
+
+try:
+    C1 = CONFIG["applovin"]["C1"]
+    C2 = CONFIG["applovin"]["C2"]
+    CONST_A = base64.b64decode(CONFIG["applovin"]["CONST_A"])
+    CONST_B = base64.b64decode(CONFIG["applovin"]["CONST_B"])
+except Exception:
+    logger.warning("No applovin config found")
 
 
 def sha1_hex(b: bytes) -> str:
