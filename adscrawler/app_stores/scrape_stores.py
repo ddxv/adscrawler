@@ -302,6 +302,7 @@ def scrape_store_ranks(database_connection: PostgresCon, stores: list[int]) -> N
                 database_connection=database_connection,
                 ranked_dicts=dicts,
                 crawl_source="scrape_rss_apkcombo",
+                store=1,
             )
         except Exception:
             logger.exception("ApkCombo RSS feed failed")
@@ -311,6 +312,7 @@ def scrape_store_ranks(database_connection: PostgresCon, stores: list[int]) -> N
                 database_connection=database_connection,
                 ranked_dicts=dicts,
                 crawl_source="scrape_appbrain",
+                store=1,
             )
         except Exception:
             logger.exception("ApkCombo RSS feed failed")

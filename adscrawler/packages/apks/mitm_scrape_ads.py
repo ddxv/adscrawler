@@ -1820,7 +1820,7 @@ def scan_all_apps(
         [
             "s3cmd",
             "sync",
-            str(CREATIVES_DIR / "thumbs"),
+            str(CREATIVES_DIR / "thumbs") + "/",
             "s3://appgoblin-data/creatives/thumbs/",
             "--acl-public",
         ],
