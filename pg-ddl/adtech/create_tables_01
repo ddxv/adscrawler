@@ -63,3 +63,21 @@ CREATE TABLE adtech.sdk_paths (
 );
 CREATE INDEX sdk_path_pattern_idx ON adtech.sdk_paths USING btree (path_pattern);
 
+
+-- adtech.click_url_redirect_chains definition
+
+-- Drop table
+
+-- DROP TABLE adtech.click_url_redirect_chains;
+
+CREATE TABLE adtech.click_url_redirect_chains (
+	id serial4 NOT NULL,
+	run_id int4 NOT NULL,
+	url text NOT NULL,
+	redirect_url text NOT NULL,
+	CONSTRAINT click_url_redirect_chains_pkey PRIMARY KEY (id),
+	CONSTRAINT click_url_redirect_chains_unique UNIQUE (run_id, url, redirect_url),
+	CONSTRAINT fk_run_id FOREIGN KEY (run_id) REFERENCES public.version_code_api_scan_results(id) ON DELETE CASCADE
+);
+
+
