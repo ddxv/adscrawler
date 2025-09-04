@@ -567,6 +567,17 @@ def query_pub_domains(
     return df
 
 
+@lru_cache(maxsize=1000)
+def get_click_url_redirect_chains(
+    run_id: int, database_connection: PostgresCon
+) -> pd.DataFrame:
+    sel_query = (
+        f"""SELECT * FROM adtech.click_url_redirect_chains WHERE run_id = {run_id}"""
+    )
+    df = pd.read_sql(sel_query, database_connection.engine)
+    return df
+
+
 def delete_app_url_mapping(app_url_id: int, database_connection: PostgresCon) -> None:
     del_query = "DELETE FROM app_urls_map WHERE id = %s"
     logger.info(f"{app_url_id=} delete app_urls_map start")

@@ -12,7 +12,6 @@ import subprocess
 import urllib
 import uuid
 import xml.etree.ElementTree as ET
-from functools import lru_cache
 
 import boto3
 import imagehash
@@ -30,6 +29,7 @@ from protod import Renderer
 from adscrawler.config import CONFIG, CREATIVES_DIR, MITM_DIR, get_logger
 from adscrawler.dbcon.connection import PostgresCon
 from adscrawler.dbcon.queries import (
+    get_click_url_redirect_chains,
     log_creative_scan_results,
     query_ad_domains,
     query_apps_to_creative_scan,
@@ -51,6 +51,8 @@ except ImportError:
     decode_from = None
 
 logger = get_logger(__name__, "mitm_scrape_ads")
+
+ANDROID_USER_AGENT = "Mozilla/5.0 (Linux; Android 13; Pixel 7 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
 
 ABS_TOL = 1024  # bytes
 PCT_TOL = 0.03  # 3%
@@ -83,6 +85,7 @@ IGNORE_CREATIVE_IDS = ["privacy", "google_play_icon_grey_2022", "favicon"]
 MMP_TLDS = [
     "appsflyer.com",
     "adjust.com",
+    "adj.st",
     "adjust.io",
     "singular.com",
     "singular.net",
@@ -287,7 +290,9 @@ def get_sent_video_df(
     return sent_video_df
 
 
-def extract_and_decode_urls(text: str) -> list[str]:
+def extract_and_decode_urls(
+    text: str, run_id: int, database_connection: PostgresCon
+) -> list[str]:
     """
     Extracts all URLs from a given text, handles HTML entities and URL encoding.
     """
@@ -371,12 +376,39 @@ def extract_and_decode_urls(text: str) -> list[str]:
         urls.append(decoded_url)
         # print("DECODED:", decoded_url)
     all_urls = list(set(vast_urls + urls))
+    click_urls = check_click_urls(all_urls, run_id, database_connection)
+    all_urls = list(set(all_urls + click_urls))
     return all_urls
 
 
-def parse_fyber_html(inner_ad_element: str):
+def check_click_urls(
+    all_urls: list[str], run_id: int, database_connection: PostgresCon
+):
+    click_urls = []
+    for url in all_urls:
+        redirect_urls = []
+        if "youappi.com/v1/e/click" in url:
+            redirect_urls = follow_url_redirects(url, run_id, database_connection)
+        elif "tpbid.com" in url and "/click" in url:
+            url = url.replace("fybernativebrowser://navigate?url=", "")
+            if "/click" in url:
+                redirect_urls = follow_url_redirects(url, run_id, database_connection)
+        if len(redirect_urls) > 0:
+            click_urls += redirect_urls
+    click_urls = list(set(click_urls))
+    logger.info(f"Found {len(click_urls)} click URLs")
+    return click_urls
+
+
+def parse_fyber_html(
+    inner_ad_element: str, run_id: int, database_connection: PostgresCon
+):
     # Extract all URLs from the raw HTML content first
-    all_extracted_urls = extract_and_decode_urls(inner_ad_element)
+    all_extracted_urls = extract_and_decode_urls(
+        inner_ad_element,
+        run_id=run_id,
+        database_connection=database_connection,
+    )
     # We're looking for URLs that start with 'fybernativebrowser://navigate?url='
     # or 'https://gotu.tpbid.com/click'
     click_urls = []
@@ -394,7 +426,9 @@ def parse_fyber_html(inner_ad_element: str):
     return click_urls
 
 
-def parse_fyber_ad_response(ad_response_text: str) -> list[str]:
+def parse_fyber_ad_response(
+    ad_response_text: str, run_id: int, database_connection: PostgresCon
+) -> list[str]:
     outer_tree = ET.fromstring(ad_response_text)
     ns = {"tns": "http://www.inner-active.com/SimpleM2M/M2MResponse"}
     ad_element = outer_tree.find(".//tns:Ad", ns)
@@ -409,7 +443,11 @@ def parse_fyber_ad_response(ad_response_text: str) -> list[str]:
             try:
                 vast_tree = ET.fromstring(html.unescape(inner_ad_element))
             except ET.ParseError:
-                urls = parse_fyber_html(inner_ad_element)
+                urls = parse_fyber_html(
+                    inner_ad_element,
+                    run_id=run_id,
+                    database_connection=database_connection,
+                )
         if vast_tree is not None:
             # Now extract URLs from the inner VAST tree
             for tag in [
@@ -435,18 +473,56 @@ def adv_id_from_play_url(url: str) -> str:
     return adv_store_id
 
 
-@lru_cache(maxsize=1000)
-def follow_url_redirects(url: str) -> str:
+def follow_url_redirects(
+    url: str, run_id: int, database_connection: PostgresCon
+) -> list[str]:
     """
     Follows redirects and returns the final URL.
 
     Cache the results to avoid repeated requests.
     """
-    try:
-        response = requests.get(url, allow_redirects=True)
-        return response.url
-    except Exception:
-        return url
+    existing_chain_df = get_click_url_redirect_chains(run_id, database_connection)
+    if not existing_chain_df.empty and url in existing_chain_df["url"].to_list():
+        redirect_urls = existing_chain_df[existing_chain_df["url"] == url][
+            "redirect_url"
+        ].to_list()
+    else:
+        redirect_urls = get_redirect_chain(url)
+        if len(redirect_urls) > 0:
+            chain_df = pd.DataFrame(
+                {"run_id": run_id, "url": url, "redirect_url": redirect_urls}
+            )
+            logger.info(f"Inserting {chain_df.shape[0]} redirect URLs")
+            upsert_df(
+                df=chain_df,
+                database_connection=database_connection,
+                schema="adtech",
+                table_name="click_url_redirect_chains",
+                key_columns=["run_id", "url", "redirect_url"],
+                insert_columns=["run_id", "url", "redirect_url"],
+            )
+    return redirect_urls
+
+
+def get_redirect_chain(url):
+    chain = []
+    cur_url = url
+    while cur_url:
+        try:
+            headers = {"User-Agent": ANDROID_USER_AGENT}
+            # Do NOT allow requests to auto-follow
+            response = requests.get(
+                cur_url, headers=headers, allow_redirects=False, timeout=10
+            )
+            next_url = response.headers.get("Location")
+            chain.append(next_url)
+        except Exception:
+            next_url = None
+            pass
+        if not next_url or not next_url.startswith("http"):
+            break
+        cur_url = next_url
+    return chain
 
 
 def parse_urls_for_known_parts(
@@ -473,13 +549,15 @@ def parse_urls_for_known_parts(
             if "websdk.appsflyer.com" in url:
                 continue
             if "appsflyer.com" in tld_url:
-                print(url)
                 adv_store_id = re.search(
                     r"http.*\.appsflyer\.com/([a-zA-Z0-9_.]+)[\?\-]", url
                 )[1]
                 if adv_store_id:
                     found_adv_store_ids.append(adv_store_id)
         elif match := re.search(r"intent://details\?id=([a-zA-Z0-9._]+)", url):
+            adv_store_id = match.group(1)
+            found_adv_store_ids.append(adv_store_id)
+        elif match := re.search(r"intent://.*package=([a-zA-Z0-9._]+)", url):
             adv_store_id = match.group(1)
             found_adv_store_ids.append(adv_store_id)
         elif match := re.search(r"market://details\?id=([a-zA-Z0-9._]+)", url):
@@ -491,18 +569,9 @@ def parse_urls_for_known_parts(
             resp_adv_id = adv_id_from_play_url(url)
             if resp_adv_id:
                 found_adv_store_ids.append(resp_adv_id)
-        elif "tpbid.com" in url:
+        elif "fybernativebrowser://" in url:
             url = url.replace("fybernativebrowser://navigate?url=", "")
             found_ad_network_urls.append(url)
-            if "/click" in url:
-                try:
-                    final_url = follow_url_redirects(url)
-                    if "play.google.com" in final_url:
-                        adv_store_id = adv_id_from_play_url(final_url)
-                        if adv_store_id:
-                            found_adv_store_ids.append(adv_store_id)
-                except Exception:
-                    pass
         if (
             tld_url in ad_network_urls["domain"].to_list()
             and tld_url not in MMP_TLDS
@@ -532,6 +601,20 @@ def parse_urls_for_known_parts(
     )
 
 
+def parse_youappi_ad(sent_video_dict: dict, database_connection: PostgresCon) -> AdInfo:
+    init_ad_network_tld = "youappi.com"
+    all_urls = extract_and_decode_urls(
+        sent_video_dict["response_text"],
+        run_id=sent_video_dict["run_id"],
+        database_connection=database_connection,
+    )
+    ad_info = parse_urls_for_known_parts(
+        all_urls, database_connection, sent_video_dict["pub_store_id"]
+    )
+    ad_info.init_tld = init_ad_network_tld
+    return ad_info
+
+
 def parse_yandex_ad(
     sent_video_dict: dict, database_connection: PostgresCon, video_id: str
 ) -> AdInfo:
@@ -547,7 +630,9 @@ def parse_yandex_ad(
         text = str(matched_ads)
     else:
         text = sent_video_dict["response_text"]
-    all_urls = extract_and_decode_urls(text)
+    all_urls = extract_and_decode_urls(
+        text, run_id=sent_video_dict["run_id"], database_connection=database_connection
+    )
     ad_info = parse_urls_for_known_parts(
         all_urls, database_connection, sent_video_dict["pub_store_id"]
     )
@@ -569,7 +654,9 @@ def parse_mtg_ad(sent_video_dict: dict, database_connection: PostgresCon) -> AdI
             return ad_info
     except Exception:
         pass
-    all_urls = extract_and_decode_urls(text)
+    all_urls = extract_and_decode_urls(
+        text, run_id=sent_video_dict["run_id"], database_connection=database_connection
+    )
     ad_info = parse_urls_for_known_parts(
         all_urls, database_connection, sent_video_dict["pub_store_id"]
     )
@@ -672,7 +759,11 @@ def parse_bidmachine_ad(
         adv_store_id = ret[5][6][3][13][2][3]
         additional_ad_network_tld = ret[5][6][3][13][2][2]
         text = str(ret[5][6][3][13][2][17])
-        urls = extract_and_decode_urls(text)
+        urls = extract_and_decode_urls(
+            text,
+            run_id=sent_video_dict["run_id"],
+            database_connection=database_connection,
+        )
         ad_info = parse_urls_for_known_parts(
             urls, database_connection, sent_video_dict["pub_store_id"]
         )
@@ -692,7 +783,11 @@ def parse_bidmachine_ad(
         # ]["bundle"]
         try:
             text = str(ret)
-            urls = extract_and_decode_urls(text)
+            urls = extract_and_decode_urls(
+                text,
+                run_id=sent_video_dict["run_id"],
+                database_connection=database_connection,
+            )
             ad_info = parse_urls_for_known_parts(
                 urls, database_connection, sent_video_dict["pub_store_id"]
             )
@@ -759,7 +854,9 @@ def parse_unity_ad(
         except Exception:
             pass
     text = sent_video_dict["response_text"]
-    all_urls = extract_and_decode_urls(text)
+    all_urls = extract_and_decode_urls(
+        text, run_id=sent_video_dict["run_id"], database_connection=database_connection
+    )
     try:
         ad_info = parse_urls_for_known_parts(
             all_urls, database_connection, sent_video_dict["pub_store_id"]
@@ -789,7 +886,9 @@ def parse_generic_adnetwork(
     error_msg = None
     init_tld = get_tld(sent_video_dict["tld_url"])
     text = sent_video_dict["response_text"]
-    all_urls = extract_and_decode_urls(text)
+    all_urls = extract_and_decode_urls(
+        text, run_id=sent_video_dict["run_id"], database_connection=database_connection
+    )
     try:
         ad_info = parse_urls_for_known_parts(
             all_urls, database_connection, sent_video_dict["pub_store_id"]
@@ -827,7 +926,11 @@ def parse_vungle_ad(sent_video_dict: dict, database_connection: PostgresCon) -> 
     except Exception:
         pass
     if not adv_store_id:
-        extracted_urls = extract_and_decode_urls(ad_response_text)
+        extracted_urls = extract_and_decode_urls(
+            ad_response_text,
+            run_id=sent_video_dict["run_id"],
+            database_connection=database_connection,
+        )
         ad_info = parse_urls_for_known_parts(
             extracted_urls, database_connection, sent_video_dict["pub_store_id"]
         )
@@ -845,10 +948,18 @@ def parse_fyber_ad(sent_video_dict: dict, database_connection: PostgresCon) -> A
     parsed_urls = []
     text = sent_video_dict["response_text"]
     try:
-        parsed_urls = parse_fyber_ad_response(text)
+        parsed_urls = parse_fyber_ad_response(
+            text,
+            run_id=sent_video_dict["run_id"],
+            database_connection=database_connection,
+        )
     except Exception:
         pass
-    all_urls = extract_and_decode_urls(text=text)
+    all_urls = extract_and_decode_urls(
+        text=text,
+        run_id=sent_video_dict["run_id"],
+        database_connection=database_connection,
+    )
     all_urls = list(set(all_urls + parsed_urls))
     if "inner-active.mobi" in sent_video_dict["tld_url"]:
         if "x-ia-app-bundle" in sent_video_dict["response_headers"].keys():
@@ -890,7 +1001,9 @@ def parse_google_ad(
                     else:
                         pass
                     big_html += ad_html
-            all_urls = extract_and_decode_urls(big_html)
+            all_urls = extract_and_decode_urls(
+                big_html, sent_video_dict["run_id"], database_connection
+            )
             try:
                 ad_info = parse_urls_for_known_parts(
                     all_urls, database_connection, sent_video_dict["pub_store_id"]
@@ -907,7 +1020,11 @@ def parse_google_ad(
                 if video_id in str(slot):
                     for ad in slot["ads"]:
                         if video_id in str(ad):
-                            all_urls = extract_and_decode_urls(str(slot))
+                            all_urls = extract_and_decode_urls(
+                                str(slot),
+                                run_id=sent_video_dict["run_id"],
+                                database_connection=database_connection,
+                            )
                             try:
                                 ad_info = parse_urls_for_known_parts(
                                     all_urls,
@@ -939,7 +1056,11 @@ def parse_google_ad(
         ):
             # These are usually HTML web ads or minified JS and I havent successfully seen any yet
             # XML does have apps
-            all_urls = extract_and_decode_urls(response_text)
+            all_urls = extract_and_decode_urls(
+                response_text,
+                run_id=sent_video_dict["run_id"],
+                database_connection=database_connection,
+            )
             try:
                 ad_info = parse_urls_for_known_parts(
                     all_urls, database_connection, sent_video_dict["pub_store_id"]
@@ -1186,6 +1307,7 @@ def parse_sent_video_df(
     video_id: str,
 ) -> tuple[list[AdInfo], list[str]]:
     error_messages = []
+    run_id = row["run_id"]
     sent_video_dicts = sent_video_df.to_dict(orient="records")
     found_ad_infos = []
     for sent_video_dict in sent_video_dicts:
@@ -1225,6 +1347,8 @@ def parse_sent_video_df(
             ad_info = parse_mtg_ad(sent_video_dict, database_connection)
         elif "yandex.ru" in init_url:
             ad_info = parse_yandex_ad(sent_video_dict, database_connection, video_id)
+        elif "youappi.com" in init_url:
+            ad_info = parse_youappi_ad(sent_video_dict, database_connection)
         else:
             real_tld = get_tld(init_url)
             error_msg = f"Not a recognized ad network: {real_tld}"
@@ -1240,7 +1364,7 @@ def parse_sent_video_df(
                 continue
         if ad_info["adv_store_id"] is None:
             text = sent_video_dict["response_text"]
-            all_urls = extract_and_decode_urls(text)
+            all_urls = extract_and_decode_urls(text, run_id, database_connection)
             if any([x in all_urls for x in MMP_TLDS + PLAYSTORE_URL_PARTS]):
                 error_msg = "found potential app! mmp or playstore"
                 row["error_msg"] = error_msg
