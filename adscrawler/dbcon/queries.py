@@ -983,3 +983,26 @@ def get_all_api_calls(database_connection: PostgresCon) -> pd.DataFrame:
     sel_query = """SELECT * FROM store_app_api_calls;"""
     df = pd.read_sql(sel_query, con=database_connection.engine)
     return df
+
+
+@lru_cache(maxsize=1)
+def get_all_mmp_tlds(database_connection: PostgresCon) -> pd.DataFrame:
+    sel_query = """SELECT
+                c.id,
+                name,
+                ad."domain" AS mmp_tld
+            FROM
+                adtech.companies c
+            LEFT JOIN adtech.company_categories cc ON
+                c.id = cc.company_id
+            LEFT JOIN adtech.company_domain_mapping cdm ON
+                c.id = cdm.company_id
+            LEFT JOIN ad_domains ad ON
+                cdm.domain_id = ad.id
+            WHERE
+                cc.category_id = 2
+                AND c.id != -2
+            ;
+            """
+    df = pd.read_sql(sel_query, con=database_connection.engine)
+    return df

@@ -29,6 +29,7 @@ from protod import Renderer
 from adscrawler.config import CONFIG, CREATIVES_DIR, MITM_DIR, get_logger
 from adscrawler.dbcon.connection import PostgresCon
 from adscrawler.dbcon.queries import (
+    get_all_mmp_tlds,
     get_click_url_redirect_chains,
     log_creative_scan_results,
     query_ad_domains,
@@ -82,22 +83,6 @@ class MultipleAdvertiserIdError(Exception):
 
 IGNORE_CREATIVE_IDS = ["privacy", "google_play_icon_grey_2022", "favicon"]
 
-MMP_TLDS = [
-    "appsflyer.com",
-    "adjust.com",
-    "adj.st",
-    "adjust.io",
-    "singular.com",
-    "singular.net",
-    "kochava.com",
-    "openattribution.dev",
-    "airbridge.com",
-    "arb.ge",
-    "branch.io",
-    "impression.link",
-    "sng.link",
-    "onelink.me",
-]
 
 PLAYSTORE_URL_PARTS = ["play.google.com/store", "market://", "intent://"]
 
@@ -421,7 +406,7 @@ def parse_fyber_html(
                 click_urls.append(url)
         elif "https://gotu.tpbid.com/click" in url:
             click_urls.append(url)
-        elif get_tld(url) in MMP_TLDS:
+        elif get_tld(url) in get_all_mmp_tlds(database_connection)["mmp_tld"].to_list():
             click_urls.append(url)
     return click_urls
 
@@ -535,7 +520,7 @@ def parse_urls_for_known_parts(
     for url in all_urls:
         adv_store_id = None
         tld_url = tldextract.extract(url).domain + "." + tldextract.extract(url).suffix
-        if tld_url in MMP_TLDS:
+        if tld_url in get_all_mmp_tlds(database_connection)["mmp_tld"].to_list():
             if any(
                 x in url.lower()
                 for x in [
@@ -574,7 +559,8 @@ def parse_urls_for_known_parts(
             found_ad_network_urls.append(url)
         if (
             tld_url in ad_network_urls["domain"].to_list()
-            and tld_url not in MMP_TLDS
+            and tld_url
+            not in get_all_mmp_tlds(database_connection)["mmp_tld"].to_list()
             and not any(ignore_url in url.lower() for ignore_url in IGNORE_PRIVACY_URLS)
         ):
             found_ad_network_urls.append(url)
@@ -919,7 +905,10 @@ def parse_vungle_ad(sent_video_dict: dict, database_connection: PostgresCon) -> 
             try:
                 these_urls = urlkeys[x]
                 for url in these_urls:
-                    if get_tld(url) in MMP_TLDS:
+                    if (
+                        get_tld(url)
+                        in get_all_mmp_tlds(database_connection)["mmp_tld"].to_list()
+                    ):
                         found_mmp_urls.append(url)
             except Exception:
                 pass
@@ -1365,7 +1354,13 @@ def parse_sent_video_df(
         if ad_info["adv_store_id"] is None:
             text = sent_video_dict["response_text"]
             all_urls = extract_and_decode_urls(text, run_id, database_connection)
-            if any([x in all_urls for x in MMP_TLDS + PLAYSTORE_URL_PARTS]):
+            if any(
+                [
+                    x in all_urls
+                    for x in get_all_mmp_tlds(database_connection)["mmp_tld"].to_list()
+                    + PLAYSTORE_URL_PARTS
+                ]
+            ):
                 error_msg = "found potential app! mmp or playstore"
                 row["error_msg"] = error_msg
                 error_messages.append(row)
