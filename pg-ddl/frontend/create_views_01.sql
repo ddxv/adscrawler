@@ -1398,3 +1398,68 @@ WITH DATA;
 CREATE UNIQUE INDEX keyword_scores_unique ON frontend.keyword_scores USING btree (
     store, keyword_id
 )
+
+
+CREATE MATERIALIZED VIEW frontend.company_domains_top_apps
+TABLESPACE pg_default
+AS 
+WITH deduped_data AS (
+         SELECT DISTINCT
+            saac.tld_url AS company_domain,
+            c_1.name AS company_name,
+            sa.store,
+            sa.name,
+            sa.store_id,
+            cm.mapped_category AS app_category,
+            sa.installs_sum_4w AS installs_d30,
+            sa.ratings_sum_4w AS rating_count_d30,
+            FALSE AS sdk,
+            TRUE AS api_call,
+            FALSE AS app_ads_direct
+           FROM store_app_api_calls saac
+             LEFT JOIN store_apps sa_1 ON saac.store_app = sa_1.id
+             LEFT JOIN category_mapping cm ON sa_1.category::text = cm.original_category::text
+             LEFT JOIN ad_domains ad_1 ON saac.tld_url = ad_1.domain::text
+             LEFT JOIN adtech.company_domain_mapping cdm ON ad_1.id = cdm.domain_id
+             LEFT JOIN adtech.companies c_1 ON cdm.company_id = c_1.id
+             LEFT JOIN frontend.store_apps_overview sa ON saac.store_app = sa.id      
+        ),
+ranked_apps AS (
+         SELECT deduped_data.company_domain,
+            deduped_data.company_name,
+            deduped_data.store,
+            deduped_data.name,
+            deduped_data.store_id,
+            deduped_data.app_category,
+            deduped_data.installs_d30,
+            deduped_data.rating_count_d30,
+            deduped_data.sdk,
+            deduped_data.api_call,
+            deduped_data.app_ads_direct,
+            row_number() OVER (PARTITION BY deduped_data.store, deduped_data.company_domain, deduped_data.company_name ORDER BY (GREATEST(COALESCE(deduped_data.rating_count_d30, 0::numeric)::double precision, COALESCE(deduped_data.installs_d30::double precision, 0::double precision))) DESC) AS app_company_rank,
+            row_number() OVER (PARTITION BY deduped_data.store, deduped_data.app_category, deduped_data.company_domain, deduped_data.company_name ORDER BY (GREATEST(COALESCE(deduped_data.rating_count_d30, 0::numeric)::double precision, COALESCE(deduped_data.installs_d30::double precision, 0::double precision))) DESC) AS app_company_category_rank
+           FROM deduped_data
+        )
+ SELECT company_domain,
+    company_name,
+    store,
+    name,
+    store_id,
+    app_category,
+    installs_d30,
+    rating_count_d30,
+    sdk,
+    api_call,
+    app_ads_direct,
+    app_company_rank,
+    app_company_category_rank
+   FROM ranked_apps
+  WHERE app_company_category_rank <= 100
+ ;            
+ 
+ 
+ -- View indexes:
+CREATE INDEX idx_company_top_domains_apps ON frontend.company_domains_top_apps USING btree (company_domain);
+CREATE INDEX idx_company_top_domains_apps_domain_rank ON frontend.company_domains_top_apps USING btree (company_domain, app_company_rank);
+CREATE INDEX idx_query_company_domains_top_apps ON frontend.company_domains_top_apps USING btree (company_domain, app_category, app_company_category_rank, store);
+CREATE UNIQUE INDEX idx_unique_company_domains_top_apps ON frontend.company_domains_top_apps USING btree (company_domain, company_name, store, name, store_id, app_category);
