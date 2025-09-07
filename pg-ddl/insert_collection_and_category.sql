@@ -12,8 +12,7 @@ INSERT INTO store_collections (store, collection) VALUES
 (2, 'TOP_PAID_IOS'),
 (2, 'TOP_PAID_IPAD'),
 (2, 'NEW_IOS'),
-(2, 'NEW_PAID_IOS'),
-(2, 'NEW_FREE_IOS');
+(2, 'NEW_PAID_IOS'), (2, 'NEW_FREE_IOS');
 
 
 -- Insert for Store: 1
@@ -145,3 +144,11 @@ INSERT INTO store_categories (store, category) VALUES
 (2, 'TRAVEL'),
 (2, 'UTILITIES'),
 (2, 'WEATHER');
+
+
+INSERT INTO adtech.categories ("name",url_slug) VALUES
+	 ('Development Tools','development-tools'),
+	 ('Analytics: Attribution','ad-attribution'),
+	 ('Ad Networks','ad-networks'),
+	 ('Business Tools','business-tools'),
+	 ('Analytics: Product','product-analytics');
