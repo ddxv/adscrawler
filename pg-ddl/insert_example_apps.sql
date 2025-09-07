@@ -1,13 +1,3 @@
-INSERT INTO public.platforms ("name") VALUES
-	 ('android'),
-	 ('ios');
-
-
-
-INSERT INTO public.stores ("name",platform) VALUES
-	 ('google',1),
-	 ('itunes',2);
-
 INSERT INTO store_apps (developer,"name",store_id,store,category,rating,review_count,installs,"free",price,"size",minimum_android,developer_email,store_last_updated,content_rating,ad_supported,in_app_purchases,editors_choice,created_at,updated_at,crawl_result,icon_url_512,release_date,rating_count,featured_image_url,phone_image_url_1,phone_image_url_2,phone_image_url_3,tablet_image_url_1,tablet_image_url_2,tablet_image_url_3) VALUES
 	 (505916,'Pixel Art － Color by Number','1274972321',2,'game_board',4.72053,25874.0,NULL,true,0.0,NULL,NULL,NULL,'2025-08-21 08:30:13',NULL,false,true,NULL,'2021-02-06 10:37:34.249232','2025-09-05 00:18:30.657917',1,'https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/4f/2a/ea/4f2aeaaf-cc26-58dd-c42b-43c25bbb30bb/AppIcon-0-0-1x_U007emarketing-0-8-0-85-220.png/512x512bb.jpg','2017-10-16',721388,NULL,NULL,NULL,'https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/3d/ae/98/3dae9814-c424-4a76-324a-ddfdb0700f6d/ebf66349-760c-48aa-8c96-d7f2c3b605ea_iphone8_English__U0028U.S._U0029_03.png/392x696bb.png',NULL,NULL,'https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/45/6d/05/456d0553-f348-8e6c-0573-adbc37f620b3/3387a4b8-6b52-449b-ae6b-349ce3a9142e_ipad_English__U0028U.S._U0029_03.png/576x768bb.png'),
 	 (24702736,'FreePrints – Print Photos','518158653',2,'photo_and_video',4.80074,NULL,NULL,true,0.0,NULL,NULL,NULL,'2025-08-22 06:38:40',NULL,false,false,NULL,'2023-10-13 08:21:46.695412','2025-09-05 00:18:27.464316',1,'https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/5b/59/da/5b59da73-4ed5-045e-ec6e-9e5a314e9850/AppIcon-0-0-1x_U007epad-0-1-0-sRGB-85-220.png/512x512bb.jpg','2012-08-07',725026,NULL,NULL,NULL,'https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/77/84/7b/77847b16-4992-bd6e-cfce-47718d853596/6523f811-34ee-4f2e-aae4-48d01da55260_03_FP_US_2024_Appstore_Screen_5.5_1242x2208.jpg/392x696bb.jpg',NULL,NULL,'https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/2e/49/25/2e4925e5-2173-98c3-2500-9f6fe67073f4/95297e38-0be7-429e-85dc-5bdd5c148201_03_FP_US_2021_Appstore_Screen_2048x2732.jpg/576x768bb.jpg'),
