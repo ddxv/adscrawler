@@ -61,6 +61,13 @@ process_scraped(
     crawl_source="appgoblin_initial_data",
 )
 
+# Set all app updated_at to NULL to so they update at the next crawl
+set_app_updated_at = """UPDATE store_apps SET updated_at = NULL;"""
+
+with database_connection.engine.connect() as conn:
+    conn.execute(text(set_app_updated_at))
+
+# Refresh all materialized views once to get the db in a good state
 
 with open("pg-ddl/schema/full_db_dump.sql") as f:
     full_db_dump = f.read()
