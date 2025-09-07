@@ -1,0 +1,42 @@
+#!/bin/bash
+set -euo pipefail
+
+DB=madrone
+OUTDIR=.
+
+# For actual reproduction, dump full db
+pg_dump -h localhost -U postgres --schema-only --schema=public --schema=logging --schema=adtech --schema=frontend "$DB" > "$OUTDIR/full_db_dump.sql"
+
+
+# List of schemas to dump
+SCHEMAS=("public" "logging" "adtech" "frontend")
+
+# For git diffs and comparison dump all tables/mvs/functions individual
+for schema in "${SCHEMAS[@]}"; do
+  echo "Dumping schema: $schema"
+
+  # Make sure output directory exists
+  mkdir -p "$OUTDIR/$schema"
+
+  # --- Tables ---
+  for t in $(psql -d "$DB" -Atc "select tablename from pg_tables where schemaname='${schema}'"); do
+    echo "  dumping table: $schema.$t"
+    pg_dump -d "$DB" --schema-only --table="${schema}.${t}" > "$OUTDIR/$schema/${t}.sql"
+  done
+
+  # --- Materialized Views ---
+  for mv in $(psql -d "$DB" -Atc "select matviewname from pg_matviews where schemaname='${schema}'"); do
+    echo "  dumping materialized view: $schema.$mv"
+    pg_dump -d "$DB" --schema-only --table="${schema}.${mv}" > "$OUTDIR/$schema/${mv}__matview.sql"
+  done
+
+  # --- Regular Views (optional, add if you want them too) ---
+  for v in $(psql -d "$DB" -Atc "select viewname from pg_views where schemaname='${schema}'"); do
+    echo "  dumping view: $schema.$v"
+    pg_dump -d "$DB" --schema-only --table="${schema}.${v}" > "$OUTDIR/$schema/${v}__view.sql"
+  done
+
+  pg_dump -d "$DB" --schema-only --schema="$schema" --section=pre-data --file="$OUTDIR/$schema/functions.sql"
+done
+
+

@@ -121,6 +121,7 @@ def upsert_df(
     insert_columns: list[str],
     return_rows: bool = False,
     schema: str | None = None,
+    md5_key_columns: list[str] | None = None,
     log: bool = False,
 ) -> pd.DataFrame | None:
     """Perform an "upsert" on a PostgreSQL table from a DataFrame.
@@ -157,7 +158,14 @@ def upsert_df(
 
     columns = SQL(", ").join(map(Identifier, all_columns))
     placeholders = SQL(", ").join(SQL("%s") for _ in all_columns)
-    conflict_columns = SQL(", ").join(map(Identifier, key_columns))
+    if md5_key_columns:
+        non_md5_key_columns = [x for x in key_columns if x not in md5_key_columns]
+        conflict_columns = SQL(" , ").join(
+            [SQL("md5(") + Identifier(col) + SQL(")") for col in md5_key_columns]
+            + [Identifier(col) for col in non_md5_key_columns]
+        )
+    else:
+        conflict_columns = SQL(", ").join(map(Identifier, key_columns))
     update_set = SQL(", ").join(
         SQL("{0} = EXCLUDED.{0}").format(Identifier(col)) for col in all_columns
     )

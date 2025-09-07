@@ -485,6 +485,7 @@ def follow_url_redirects(
                 table_name="click_url_redirect_chains",
                 key_columns=["run_id", "url", "redirect_url"],
                 insert_columns=["run_id", "url", "redirect_url"],
+                md5_key_columns=["url", "redirect_url"],
             )
     return redirect_urls
 
@@ -500,10 +501,11 @@ def get_redirect_chain(url):
                 cur_url, headers=headers, allow_redirects=False, timeout=10
             )
             next_url = response.headers.get("Location")
-            chain.append(next_url)
         except Exception:
             next_url = None
             pass
+        if next_url:
+            chain.append(next_url)
         if not next_url or not next_url.startswith("http"):
             break
         cur_url = next_url
