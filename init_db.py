@@ -36,18 +36,22 @@ os.system(
 
 
 logger.info("Downloading ddxv/appgoblin-data apps")
-url = "https://github.com/ddxv/appgoblin-data/raw/main/data/store_apps.tsv.xz"
-response = requests.get(url)
-response.raise_for_status()  # Check if the request was successful
-
-with lzma.open(BytesIO(response.content), mode="rt") as file:
-    # Step 3: Read the decompressed file into a pandas DataFrame
-    df = pd.read_csv(file, sep="\t")
+APPGOBLIN_DATA_URL = (
+    "https://github.com/ddxv/appgoblin-data/raw/main/data/store_apps.tsv.xz"
+)
 
 
-df["store"] = np.where(df["store"] == "google", 1, 2)
+def get_appgoblin_data():
+    response = requests.get(APPGOBLIN_DATA_URL)
+    response.raise_for_status()  # Check if the request was successful
+    with lzma.open(BytesIO(response.content), mode="rt") as file:
+        # Step 3: Read the decompressed file into a pandas DataFrame
+        df = pd.read_csv(file, sep="\t")
+    df["store"] = np.where(df["store"] == "google", 1, 2)
+    return df[["store", "store_id"]].drop_duplicates().to_dict(orient="records")
 
-app_dict = df[["store", "store_id"]].drop_duplicates().to_dict(orient="records")
+
+app_dict = get_appgoblin_data()
 
 logger.info("Insert dddxv/appgoblin-data apps into db")
 process_scraped(
