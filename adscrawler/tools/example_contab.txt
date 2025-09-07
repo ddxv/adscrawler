@@ -22,7 +22,6 @@
 # 
 # m h  dom mon dow   command
 
-
 # Hourly
 5 * * * * psql -d madrone -c "SELECT snapshot_store_apps();" 
 7 * * * * psql -d madrone -c "SELECT snapshot_pub_domains();"
@@ -38,12 +37,11 @@
 0 */4 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW adtech.company_categories"  >> /var/log/postgresql/refresh_mv.log 2>&1
 20 */8 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW category_mapping" >> /var/log/postgresql/refresh_mv.log 2>&1 
 25 */8 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW mv_app_categories" >> /var/log/postgresql/refresh_mv.log 2>&1 
-
+22 */8 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW store_apps_in_latest_rankings" >> /var/log/postgresql/refresh_mv.log 2>&1 
 
 # Daily
 08 1 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW top_categories" >> /var/log/postgresql/refresh_mv.log 2>&1 
-11 1 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW store_apps_in_latest_rankings" >> /var/log/postgresql/refresh_mv.log 2>&1 
-0 4 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW CONCURRENTLY frontend.keyword_scores"  >> /var/log/postgresql/refresh_mv.log 2>&1
+#0 4 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW CONCURRENTLY frontend.keyword_scores"  >> /var/log/postgresql/refresh_mv.log 2>&1
 
 
 # Zscores
@@ -58,6 +56,12 @@
 33 11 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW apps_new_weekly" >> /var/log/postgresql/refresh_mv.log 2>&1 
 35 11 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW apps_new_monthly" >> /var/log/postgresql/refresh_mv.log 2>&1 
 38 11 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW apps_new_yearly" >> /var/log/postgresql/refresh_mv.log 2>&1 
+
+## Creatives, running often temporarily
+12 */3 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW frontend.advertiser_creative_rankings;" >> /var/log/postgresql/refresh_mv.log 2>&1 
+15 */3 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW frontend.advertiser_creative_rankings_recent_month;" >> /var/log/postgresql/refresh_mv.log 2>&1 
+17 */3 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW  frontend.advertiser_creatives;" >> /var/log/postgresql/refresh_mv.log 2>&1 
+19 */3 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW  frontend.companies_creative_rankings;" >> /var/log/postgresql/refresh_mv.log 2>&1 
 
 # VERY SLOW runs ~3am tw time
 31 18 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW CONCURRENTLY frontend.adstxt_entries_store_apps" >> /var/log/postgresql/refresh_mv.log 2>&1 
@@ -82,7 +86,6 @@
 10 10 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW CONCURRENTLY frontend.company_parent_top_apps" >> /var/log/postgresql/refresh_mv.log 2>&1 
 15 10 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW CONCURRENTLY frontend.company_top_apps" >> /var/log/postgresql/refresh_mv.log 2>&1 
 42 10 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW CONCURRENTLY frontend.companies_apps_overview" >> /var/log/postgresql/refresh_mv.log 2>&1 
-18 11 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW CONCURRENTLY frontend.store_app_ranks_weekly" >> /var/log/postgresql/refresh_mv.log 2>&1 
 
 ## SDK -> Company Flow. Aim to run 2x per day at 11AM and 22PM
 25 11 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW CONCURRENTLY frontend.companies_category_stats" >> /var/log/postgresql/refresh_mv.log 2>&1 

@@ -1,0 +1,13 @@
+[madrone]
+host = "localhost"
+os_user = "root"
+db_user = "postgres"
+# leave password blank if you are using a passwordless database
+db_password = ""
+db = "madrone"
+
+[apple]
+# Only needed for downloading iOS IPAs to decompile
+email = "xxx"
+password = "xxx"
+keychain_passphrase = "xxx"
