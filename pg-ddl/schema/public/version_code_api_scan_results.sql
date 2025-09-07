@@ -30,7 +30,9 @@ CREATE TABLE public.version_code_api_scan_results (
     version_code_id integer NOT NULL,
     run_name text,
     run_result smallint NOT NULL,
-    run_at timestamp without time zone DEFAULT timezone('utc'::text, now()) NOT NULL
+    run_at timestamp without time zone DEFAULT timezone(
+        'utc'::text, now()
+    ) NOT NULL
 );
 
 
@@ -41,12 +43,12 @@ ALTER TABLE public.version_code_api_scan_results OWNER TO postgres;
 --
 
 CREATE SEQUENCE public.version_code_api_scan_results_id_seq
-    AS integer
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
+AS integer
+START WITH 1
+INCREMENT BY 1
+NO MINVALUE
+NO MAXVALUE
+CACHE 1;
 
 
 ALTER SEQUENCE public.version_code_api_scan_results_id_seq OWNER TO postgres;
@@ -62,7 +64,9 @@ ALTER SEQUENCE public.version_code_api_scan_results_id_seq OWNED BY public.versi
 -- Name: version_code_api_scan_results id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.version_code_api_scan_results ALTER COLUMN id SET DEFAULT nextval('public.version_code_api_scan_results_id_seq'::regclass);
+ALTER TABLE ONLY public.version_code_api_scan_results ALTER COLUMN id SET DEFAULT nextval(
+    'public.version_code_api_scan_results_id_seq'::regclass
+);
 
 
 --
@@ -70,7 +74,7 @@ ALTER TABLE ONLY public.version_code_api_scan_results ALTER COLUMN id SET DEFAUL
 --
 
 ALTER TABLE ONLY public.version_code_api_scan_results
-    ADD CONSTRAINT version_code_api_scan_results_pkey PRIMARY KEY (id);
+ADD CONSTRAINT version_code_api_scan_results_pkey PRIMARY KEY (id);
 
 
 --
@@ -78,10 +82,11 @@ ALTER TABLE ONLY public.version_code_api_scan_results
 --
 
 ALTER TABLE ONLY public.version_code_api_scan_results
-    ADD CONSTRAINT version_code_api_scan_results_version_code_id_fkey FOREIGN KEY (version_code_id) REFERENCES public.version_codes(id);
+ADD CONSTRAINT version_code_api_scan_results_version_code_id_fkey FOREIGN KEY (
+    version_code_id
+) REFERENCES public.version_codes (id);
 
 
 --
 -- PostgreSQL database dump complete
 --
-

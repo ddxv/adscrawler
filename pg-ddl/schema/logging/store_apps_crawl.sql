@@ -41,10 +41,11 @@ ALTER TABLE logging.store_apps_crawl OWNER TO postgres;
 -- Name: ix_logging_store_apps_crawl_index; Type: INDEX; Schema: logging; Owner: postgres
 --
 
-CREATE INDEX ix_logging_store_apps_crawl_index ON logging.store_apps_crawl USING btree (index);
+CREATE INDEX ix_logging_store_apps_crawl_index ON logging.store_apps_crawl USING btree (
+    index
+);
 
 
 --
 -- PostgreSQL database dump complete
 --
-

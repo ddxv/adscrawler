@@ -79,7 +79,9 @@ ALTER TABLE logging.keywords_crawled_at OWNER TO postgres;
 --
 
 CREATE TABLE logging.snapshot_pub_domains (
-    updated_at timestamp without time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at timestamp without time zone DEFAULT timezone(
+        'utc'::text, now()
+    ) NOT NULL,
     crawl_result integer,
     total_rows integer,
     avg_days numeric,
@@ -98,7 +100,9 @@ CREATE TABLE logging.store_app_downloads (
     store_app integer NOT NULL,
     version_code text NOT NULL,
     crawl_result smallint NOT NULL,
-    updated_at timestamp without time zone DEFAULT timezone('utc'::text, now()) NOT NULL
+    updated_at timestamp without time zone DEFAULT timezone(
+        'utc'::text, now()
+    ) NOT NULL
 );
 
 
@@ -181,7 +185,9 @@ ALTER TABLE logging.store_apps_crawl OWNER TO postgres;
 --
 
 CREATE TABLE logging.store_apps_snapshot (
-    updated_at timestamp without time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at timestamp without time zone DEFAULT timezone(
+        'utc'::text, now()
+    ) NOT NULL,
     store integer,
     crawl_result integer,
     total_rows integer,
@@ -202,7 +208,9 @@ CREATE TABLE logging.version_code_api_scan_results (
     version_code text,
     apk_hash text,
     crawl_result smallint,
-    updated_at timestamp without time zone DEFAULT timezone('utc'::text, now()) NOT NULL
+    updated_at timestamp without time zone DEFAULT timezone(
+        'utc'::text, now()
+    ) NOT NULL
 );
 
 
@@ -211,4 +219,3 @@ ALTER TABLE logging.version_code_api_scan_results OWNER TO postgres;
 --
 -- PostgreSQL database dump complete
 --
-

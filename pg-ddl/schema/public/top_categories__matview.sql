@@ -26,47 +26,59 @@ SET default_table_access_method = heap;
 --
 
 CREATE MATERIALIZED VIEW public.top_categories AS
- WITH rankedapps AS (
-         SELECT sa.id,
-            sa.developer,
-            sa.name,
-            sa.store_id,
-            sa.store,
-            sa.category,
-            sa.rating,
-            sa.review_count,
-            sa.installs,
-            sa.free,
-            sa.price,
-            sa.size,
-            sa.minimum_android,
-            sa.developer_email,
-            sa.store_last_updated,
-            sa.content_rating,
-            sa.ad_supported,
-            sa.in_app_purchases,
-            sa.editors_choice,
-            sa.created_at,
-            sa.updated_at,
-            sa.crawl_result,
-            sa.icon_url_512,
-            sa.release_date,
-            sa.rating_count,
-            sa.featured_image_url,
-            sa.phone_image_url_1,
-            sa.phone_image_url_2,
-            sa.phone_image_url_3,
-            sa.tablet_image_url_1,
-            sa.tablet_image_url_2,
-            sa.tablet_image_url_3,
-            cm.original_category,
-            cm.mapped_category,
-            row_number() OVER (PARTITION BY sa.store, cm.mapped_category ORDER BY sa.installs DESC NULLS LAST, sa.rating_count DESC NULLS LAST) AS rn
-           FROM (public.store_apps sa
-             JOIN public.category_mapping cm ON (((sa.category)::text = (cm.original_category)::text)))
-          WHERE (sa.crawl_result = 1)
-        )
- SELECT id,
+WITH rankedapps AS (
+    SELECT
+        sa.id,
+        sa.developer,
+        sa.name,
+        sa.store_id,
+        sa.store,
+        sa.category,
+        sa.rating,
+        sa.review_count,
+        sa.installs,
+        sa.free,
+        sa.price,
+        sa.size,
+        sa.minimum_android,
+        sa.developer_email,
+        sa.store_last_updated,
+        sa.content_rating,
+        sa.ad_supported,
+        sa.in_app_purchases,
+        sa.editors_choice,
+        sa.created_at,
+        sa.updated_at,
+        sa.crawl_result,
+        sa.icon_url_512,
+        sa.release_date,
+        sa.rating_count,
+        sa.featured_image_url,
+        sa.phone_image_url_1,
+        sa.phone_image_url_2,
+        sa.phone_image_url_3,
+        sa.tablet_image_url_1,
+        sa.tablet_image_url_2,
+        sa.tablet_image_url_3,
+        cm.original_category,
+        cm.mapped_category,
+        row_number()
+            OVER (
+                PARTITION BY sa.store, cm.mapped_category
+                ORDER BY
+                    sa.installs DESC NULLS LAST, sa.rating_count DESC NULLS LAST
+            )
+            AS rn
+    FROM (
+        public.store_apps AS sa
+        INNER JOIN
+            public.category_mapping AS cm
+            ON (((sa.category)::text = (cm.original_category)::text))
+    )
+    WHERE (sa.crawl_result = 1)
+)
+SELECT
+    id,
     developer,
     name,
     store_id,
@@ -101,9 +113,9 @@ CREATE MATERIALIZED VIEW public.top_categories AS
     original_category,
     mapped_category,
     rn
-   FROM rankedapps
-  WHERE (rn <= 50)
-  WITH NO DATA;
+FROM rankedapps
+WHERE (rn <= 50)
+WITH NO DATA;
 
 
 ALTER MATERIALIZED VIEW public.top_categories OWNER TO postgres;
@@ -112,10 +124,11 @@ ALTER MATERIALIZED VIEW public.top_categories OWNER TO postgres;
 -- Name: idx_top_categories; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE UNIQUE INDEX idx_top_categories ON public.top_categories USING btree (store, mapped_category, store_id);
+CREATE UNIQUE INDEX idx_top_categories ON public.top_categories USING btree (
+    store, mapped_category, store_id
+);
 
 
 --
 -- PostgreSQL database dump complete
 --
-

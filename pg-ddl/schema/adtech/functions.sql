@@ -76,12 +76,12 @@ ALTER TABLE adtech.click_url_redirect_chains OWNER TO postgres;
 --
 
 CREATE SEQUENCE adtech.click_url_redirect_chains_id_seq
-    AS integer
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
+AS integer
+START WITH 1
+INCREMENT BY 1
+NO MINVALUE
+NO MAXVALUE
+CACHE 1;
 
 
 ALTER SEQUENCE adtech.click_url_redirect_chains_id_seq OWNER TO postgres;
@@ -144,12 +144,16 @@ ALTER TABLE adtech.sdks OWNER TO postgres;
 --
 
 CREATE MATERIALIZED VIEW adtech.company_categories AS
- SELECT DISTINCT c.id AS company_id,
+SELECT DISTINCT
+    c.id AS company_id,
     sc.category_id
-   FROM ((adtech.sdk_categories sc
-     LEFT JOIN adtech.sdks sd ON ((sc.sdk_id = sd.id)))
-     JOIN adtech.companies c ON ((sd.company_id = c.id)))
-  WITH NO DATA;
+FROM ((
+    adtech.sdk_categories sc
+    LEFT JOIN adtech.sdks AS sd ON ((sc.sdk_id = sd.id))
+)
+INNER JOIN adtech.companies AS c ON ((sd.company_id = c.id))
+)
+WITH NO DATA;
 
 
 ALTER MATERIALIZED VIEW adtech.company_categories OWNER TO postgres;
@@ -196,13 +200,19 @@ ALTER TABLE adtech.sdk_packages OWNER TO postgres;
 --
 
 CREATE MATERIALIZED VIEW adtech.company_value_string_mapping AS
- SELECT vd.id AS version_string_id,
+SELECT
+    vd.id AS version_string_id,
     sd.company_id,
     sp.sdk_id AS id
-   FROM ((public.version_strings vd
-     JOIN adtech.sdk_packages sp ON ((vd.value_name ~~* ((sp.package_pattern)::text || '%'::text))))
-     LEFT JOIN adtech.sdks sd ON ((sp.sdk_id = sd.id)))
-  WITH NO DATA;
+FROM ((
+    public.version_strings vd
+    INNER JOIN
+        adtech.sdk_packages AS sp
+        ON ((vd.value_name ~~* ((sp.package_pattern)::text || '%'::text)))
+)
+LEFT JOIN adtech.sdks AS sd ON ((sp.sdk_id = sd.id))
+)
+WITH NO DATA;
 
 
 ALTER MATERIALIZED VIEW adtech.company_value_string_mapping OWNER TO postgres;
@@ -225,90 +235,145 @@ ALTER TABLE adtech.sdk_paths OWNER TO postgres;
 --
 
 CREATE MATERIALIZED VIEW adtech.store_apps_companies_sdk AS
- WITH latest_version_codes AS (
-         SELECT DISTINCT ON (version_codes.store_app) version_codes.id,
-            version_codes.store_app,
-            version_codes.version_code
-           FROM public.version_codes
-          WHERE (version_codes.crawl_result = 1)
-          ORDER BY version_codes.store_app, (string_to_array((version_codes.version_code)::text, '.'::text))::bigint[] DESC
-        ), sdk_apps_with_companies AS (
-         SELECT DISTINCT vc.store_app,
-            cvsm.company_id,
-            COALESCE(pc.parent_company_id, cvsm.company_id) AS parent_id
-           FROM (((latest_version_codes vc
-             LEFT JOIN public.version_details_map vdm ON ((vc.id = vdm.version_code)))
-             JOIN adtech.company_value_string_mapping cvsm ON ((vdm.string_id = cvsm.version_string_id)))
-             LEFT JOIN adtech.companies pc ON ((cvsm.company_id = pc.id)))
-        ), sdk_paths_with_companies AS (
-         SELECT DISTINCT vc.store_app,
-            sd.company_id,
-            COALESCE(pc.parent_company_id, sd.company_id) AS parent_id
-           FROM (((((latest_version_codes vc
-             LEFT JOIN public.version_details_map vdm ON ((vc.id = vdm.version_code)))
-             LEFT JOIN public.version_strings vs ON ((vdm.string_id = vs.id)))
-             JOIN adtech.sdk_paths ptm ON ((vs.value_name ~~* ((ptm.path_pattern)::text || '%'::text))))
-             LEFT JOIN adtech.sdks sd ON ((ptm.sdk_id = sd.id)))
-             LEFT JOIN adtech.companies pc ON ((sd.company_id = pc.id)))
-        ), dev_apps_with_companies AS (
-         SELECT DISTINCT sa.id AS store_app,
-            cd.company_id,
-            COALESCE(pc.parent_company_id, cd.company_id) AS parent_id
-           FROM ((adtech.company_developers cd
-             LEFT JOIN public.store_apps sa ON ((cd.developer_id = sa.developer)))
-             LEFT JOIN adtech.companies pc ON ((cd.company_id = pc.id)))
-        ), all_apps_with_companies AS (
-         SELECT sawc.store_app,
-            sawc.company_id,
-            sawc.parent_id
-           FROM sdk_apps_with_companies sawc
-        UNION
-         SELECT spwc.store_app,
-            spwc.company_id,
-            spwc.parent_id
-           FROM sdk_paths_with_companies spwc
-        UNION
-         SELECT dawc.store_app,
-            dawc.company_id,
-            dawc.parent_id
-           FROM dev_apps_with_companies dawc
-        ), distinct_apps_with_cats AS (
-         SELECT DISTINCT aawc.store_app,
-            c.id AS category_id
-           FROM ((all_apps_with_companies aawc
-             LEFT JOIN adtech.company_categories cc ON ((aawc.company_id = cc.company_id)))
-             LEFT JOIN adtech.categories c ON ((cc.category_id = c.id)))
-        ), distinct_store_apps AS (
-         SELECT DISTINCT lvc.store_app
-           FROM latest_version_codes lvc
-        ), all_combinations AS (
-         SELECT sa.store_app,
-            c.id AS category_id
-           FROM (distinct_store_apps sa
-             CROSS JOIN adtech.categories c)
-        ), unmatched_apps AS (
-         SELECT DISTINCT ac.store_app,
-            (- ac.category_id) AS company_id,
-            (- ac.category_id) AS parent_id
-           FROM (all_combinations ac
-             LEFT JOIN distinct_apps_with_cats dawc ON (((ac.store_app = dawc.store_app) AND (ac.category_id = dawc.category_id))))
-          WHERE (dawc.store_app IS NULL)
-        ), final_union AS (
-         SELECT aawc.store_app,
-            aawc.company_id,
-            aawc.parent_id
-           FROM all_apps_with_companies aawc
-        UNION
-         SELECT ua.store_app,
-            ua.company_id,
-            ua.parent_id
-           FROM unmatched_apps ua
-        )
- SELECT store_app,
+WITH latest_version_codes AS (
+    SELECT DISTINCT ON (version_codes.store_app)
+        version_codes.id,
+        version_codes.store_app,
+        version_codes.version_code
+    FROM public.version_codes
+    WHERE (version_codes.crawl_result = 1)
+    ORDER BY
+        version_codes.store_app,
+        (
+            STRING_TO_ARRAY((version_codes.version_code)::text, '.'::text)
+        )::bigint [] DESC
+), sdk_apps_with_companies AS (
+    SELECT DISTINCT
+        vc.store_app,
+        cvsm.company_id,
+        COALESCE(pc.parent_company_id, cvsm.company_id) AS parent_id
+    FROM (((
+        latest_version_codes vc
+        LEFT JOIN
+            public.version_details_map AS vdm
+            ON ((vc.id = vdm.version_code))
+    )
+    INNER JOIN
+        adtech.company_value_string_mapping AS cvsm
+        ON ((vdm.string_id = cvsm.version_string_id))
+    )
+    LEFT JOIN adtech.companies AS pc ON ((cvsm.company_id = pc.id))
+    )
+), sdk_paths_with_companies AS (
+    SELECT DISTINCT
+        vc.store_app,
+        sd.company_id,
+        COALESCE(pc.parent_company_id, sd.company_id) AS parent_id
+    FROM (((((
+        latest_version_codes vc
+        LEFT JOIN
+            public.version_details_map AS vdm
+            ON ((vc.id = vdm.version_code))
+    )
+    LEFT JOIN public.version_strings AS vs ON ((vdm.string_id = vs.id))
+    )
+    INNER JOIN
+        adtech.sdk_paths AS ptm
+        ON ((vs.value_name ~~* ((ptm.path_pattern)::text || '%'::text)))
+    )
+    LEFT JOIN adtech.sdks AS sd ON ((ptm.sdk_id = sd.id))
+    )
+    LEFT JOIN adtech.companies AS pc ON ((sd.company_id = pc.id))
+    )
+), dev_apps_with_companies AS (
+    SELECT DISTINCT
+        sa.id AS store_app,
+        cd.company_id,
+        COALESCE(pc.parent_company_id, cd.company_id) AS parent_id
+    FROM ((
+        adtech.company_developers cd
+        LEFT JOIN public.store_apps AS sa ON ((cd.developer_id = sa.developer))
+    )
+    LEFT JOIN adtech.companies AS pc ON ((cd.company_id = pc.id))
+    )
+), all_apps_with_companies AS (
+    SELECT
+        sawc.store_app,
+        sawc.company_id,
+        sawc.parent_id
+    FROM sdk_apps_with_companies AS sawc
+    UNION
+    SELECT
+        spwc.store_app,
+        spwc.company_id,
+        spwc.parent_id
+    FROM sdk_paths_with_companies AS spwc
+    UNION
+    SELECT
+        dawc.store_app,
+        dawc.company_id,
+        dawc.parent_id
+    FROM dev_apps_with_companies AS dawc
+), distinct_apps_with_cats AS (
+    SELECT DISTINCT
+        aawc.store_app,
+        c.id AS category_id
+    FROM ((
+        all_apps_with_companies aawc
+        LEFT JOIN
+            adtech.company_categories AS cc
+            ON ((aawc.company_id = cc.company_id))
+    )
+    LEFT JOIN adtech.categories AS c ON ((cc.category_id = c.id))
+    )
+), distinct_store_apps AS (
+    SELECT DISTINCT lvc.store_app
+    FROM latest_version_codes AS lvc
+), all_combinations AS (
+    SELECT
+        sa.store_app,
+        c.id AS category_id
+    FROM (
+        distinct_store_apps AS sa
+        CROSS JOIN adtech.categories AS c
+    )
+), unmatched_apps AS (
+    SELECT DISTINCT
+        ac.store_app,
+        (-ac.category_id) AS company_id,
+        (-ac.category_id) AS parent_id
+    FROM (
+        all_combinations AS ac
+        LEFT JOIN
+            distinct_apps_with_cats AS dawc
+            ON
+                (
+                    (
+                        (ac.store_app = dawc.store_app)
+                        AND (ac.category_id = dawc.category_id)
+                    )
+                )
+    )
+    WHERE (dawc.store_app IS null)
+), final_union AS (
+    SELECT
+        aawc.store_app,
+        aawc.company_id,
+        aawc.parent_id
+    FROM all_apps_with_companies AS aawc
+    UNION
+    SELECT
+        ua.store_app,
+        ua.company_id,
+        ua.parent_id
+    FROM unmatched_apps AS ua
+)
+SELECT
+    store_app,
     company_id,
     parent_id
-   FROM final_union
-  WITH NO DATA;
+FROM final_union
+WITH NO DATA;
 
 
 ALTER MATERIALIZED VIEW adtech.store_apps_companies_sdk OWNER TO postgres;
@@ -318,106 +383,176 @@ ALTER MATERIALIZED VIEW adtech.store_apps_companies_sdk OWNER TO postgres;
 --
 
 CREATE MATERIALIZED VIEW adtech.combined_store_apps_companies AS
- WITH api_based_companies AS (
-         SELECT DISTINCT saac.store_app,
-            cm.mapped_category AS app_category,
-            cdm.company_id,
-            c_1.parent_company_id AS parent_id,
-            COALESCE(cad_1.domain, (saac.tld_url)::character varying) AS ad_domain,
-            'api_call'::text AS tag_source
-           FROM ((((((public.store_app_api_calls saac
-             LEFT JOIN public.store_apps sa_1 ON ((saac.store_app = sa_1.id)))
-             LEFT JOIN public.category_mapping cm ON (((sa_1.category)::text = (cm.original_category)::text)))
-             LEFT JOIN public.ad_domains ad_1 ON ((saac.tld_url = (ad_1.domain)::text)))
-             LEFT JOIN adtech.company_domain_mapping cdm ON ((ad_1.id = cdm.domain_id)))
-             LEFT JOIN adtech.companies c_1 ON ((cdm.company_id = c_1.id)))
-             LEFT JOIN public.ad_domains cad_1 ON ((c_1.domain_id = cad_1.id)))
-        ), sdk_based_companies AS (
-         SELECT sac.store_app,
-            cm.mapped_category AS app_category,
-            sac.company_id,
-            sac.parent_id,
-            ad_1.domain AS ad_domain,
-            'sdk'::text AS tag_source
-           FROM ((((adtech.store_apps_companies_sdk sac
-             LEFT JOIN adtech.companies c_1 ON ((sac.company_id = c_1.id)))
-             LEFT JOIN public.ad_domains ad_1 ON ((c_1.domain_id = ad_1.id)))
-             LEFT JOIN public.store_apps sa_1 ON ((sac.store_app = sa_1.id)))
-             LEFT JOIN public.category_mapping cm ON (((sa_1.category)::text = (cm.original_category)::text)))
-        ), distinct_ad_and_pub_domains AS (
-         SELECT DISTINCT pd.url AS publisher_domain_url,
-            ad_1.domain AS ad_domain_url,
-            aae.relationship
-           FROM (((public.app_ads_entrys aae
-             LEFT JOIN public.ad_domains ad_1 ON ((aae.ad_domain = ad_1.id)))
-             LEFT JOIN public.app_ads_map aam ON ((aae.id = aam.app_ads_entry)))
-             LEFT JOIN public.pub_domains pd ON ((aam.pub_domain = pd.id)))
-          WHERE ((pd.crawled_at - aam.updated_at) < '01:00:00'::interval)
-        ), adstxt_based_companies AS (
-         SELECT DISTINCT aum.store_app,
-            cm.mapped_category AS app_category,
-            c_1.id AS company_id,
-            pnv.ad_domain_url AS ad_domain,
-            COALESCE(c_1.parent_company_id, c_1.id) AS parent_id,
-                CASE
-                    WHEN ((pnv.relationship)::text = 'DIRECT'::text) THEN 'app_ads_direct'::text
-                    WHEN ((pnv.relationship)::text = 'RESELLER'::text) THEN 'app_ads_reseller'::text
-                    ELSE 'app_ads_unknown'::text
-                END AS tag_source
-           FROM ((((((public.app_urls_map aum
-             LEFT JOIN public.pub_domains pd ON ((aum.pub_domain = pd.id)))
-             LEFT JOIN distinct_ad_and_pub_domains pnv ON (((pd.url)::text = (pnv.publisher_domain_url)::text)))
-             LEFT JOIN public.ad_domains ad_1 ON (((pnv.ad_domain_url)::text = (ad_1.domain)::text)))
-             LEFT JOIN adtech.companies c_1 ON ((ad_1.id = c_1.domain_id)))
-             LEFT JOIN public.store_apps sa_1 ON ((aum.store_app = sa_1.id)))
-             LEFT JOIN public.category_mapping cm ON (((sa_1.category)::text = (cm.original_category)::text)))
-          WHERE ((sa_1.crawl_result = 1) AND ((pnv.ad_domain_url IS NOT NULL) OR (c_1.id IS NOT NULL)))
-        ), combined_sources AS (
-         SELECT api_based_companies.store_app,
-            api_based_companies.app_category,
-            api_based_companies.company_id,
-            api_based_companies.parent_id,
-            api_based_companies.ad_domain,
-            api_based_companies.tag_source
-           FROM api_based_companies
-        UNION ALL
-         SELECT sdk_based_companies.store_app,
-            sdk_based_companies.app_category,
-            sdk_based_companies.company_id,
-            sdk_based_companies.parent_id,
-            sdk_based_companies.ad_domain,
-            sdk_based_companies.tag_source
-           FROM sdk_based_companies
-        UNION ALL
-         SELECT adstxt_based_companies.store_app,
-            adstxt_based_companies.app_category,
-            adstxt_based_companies.company_id,
-            adstxt_based_companies.parent_id,
-            adstxt_based_companies.ad_domain,
-            adstxt_based_companies.tag_source
-           FROM adstxt_based_companies
+WITH api_based_companies AS (
+    SELECT DISTINCT
+        saac.store_app,
+        cm.mapped_category AS app_category,
+        cdm.company_id,
+        c_1.parent_company_id AS parent_id,
+        'api_call'::text AS tag_source,
+        COALESCE(cad_1.domain, (saac.tld_url)::character varying) AS ad_domain
+    FROM ((((((
+        public.store_app_api_calls saac
+        LEFT JOIN public.store_apps AS sa_1 ON ((saac.store_app = sa_1.id))
+    )
+    LEFT JOIN
+        public.category_mapping AS cm
+        ON (((sa_1.category)::text = (cm.original_category)::text))
+    )
+    LEFT JOIN
+        public.ad_domains AS ad_1
+        ON ((saac.tld_url = (ad_1.domain)::text))
+    )
+    LEFT JOIN
+        adtech.company_domain_mapping AS cdm
+        ON ((ad_1.id = cdm.domain_id))
+    )
+    LEFT JOIN adtech.companies AS c_1 ON ((cdm.company_id = c_1.id))
+    )
+    LEFT JOIN public.ad_domains AS cad_1 ON ((c_1.domain_id = cad_1.id))
+    )
+), sdk_based_companies AS (
+    SELECT
+        sac.store_app,
+        cm.mapped_category AS app_category,
+        sac.company_id,
+        sac.parent_id,
+        ad_1.domain AS ad_domain,
+        'sdk'::text AS tag_source
+    FROM ((((
+        adtech.store_apps_companies_sdk sac
+        LEFT JOIN adtech.companies AS c_1 ON ((sac.company_id = c_1.id))
+    )
+    LEFT JOIN public.ad_domains AS ad_1 ON ((c_1.domain_id = ad_1.id))
+    )
+    LEFT JOIN public.store_apps AS sa_1 ON ((sac.store_app = sa_1.id))
+    )
+    LEFT JOIN
+        public.category_mapping AS cm
+        ON (((sa_1.category)::text = (cm.original_category)::text))
+    )
+), distinct_ad_and_pub_domains AS (
+    SELECT DISTINCT
+        pd.url AS publisher_domain_url,
+        ad_1.domain AS ad_domain_url,
+        aae.relationship
+    FROM (((
+        public.app_ads_entrys aae
+        LEFT JOIN public.ad_domains AS ad_1 ON ((aae.ad_domain = ad_1.id))
+    )
+    LEFT JOIN public.app_ads_map AS aam ON ((aae.id = aam.app_ads_entry))
+    )
+    LEFT JOIN public.pub_domains AS pd ON ((aam.pub_domain = pd.id))
+    )
+    WHERE ((pd.crawled_at - aam.updated_at) < '01:00:00'::interval)
+), adstxt_based_companies AS (
+    SELECT DISTINCT
+        aum.store_app,
+        cm.mapped_category AS app_category,
+        c_1.id AS company_id,
+        pnv.ad_domain_url AS ad_domain,
+        COALESCE(c_1.parent_company_id, c_1.id) AS parent_id,
+        CASE
+            WHEN
+                ((pnv.relationship)::text = 'DIRECT'::text)
+                THEN 'app_ads_direct'::text
+            WHEN
+                ((pnv.relationship)::text = 'RESELLER'::text)
+                THEN 'app_ads_reseller'::text
+            ELSE 'app_ads_unknown'::text
+        END AS tag_source
+    FROM ((((((
+        public.app_urls_map aum
+        LEFT JOIN public.pub_domains AS pd ON ((aum.pub_domain = pd.id))
+    )
+    LEFT JOIN
+        distinct_ad_and_pub_domains AS pnv
+        ON (((pd.url)::text = (pnv.publisher_domain_url)::text))
+    )
+    LEFT JOIN
+        public.ad_domains AS ad_1
+        ON (((pnv.ad_domain_url)::text = (ad_1.domain)::text))
+    )
+    LEFT JOIN adtech.companies AS c_1 ON ((ad_1.id = c_1.domain_id))
+    )
+    LEFT JOIN public.store_apps AS sa_1 ON ((aum.store_app = sa_1.id))
+    )
+    LEFT JOIN
+        public.category_mapping AS cm
+        ON (((sa_1.category)::text = (cm.original_category)::text))
+    )
+    WHERE
+        (
+            (sa_1.crawl_result = 1)
+            AND ((pnv.ad_domain_url IS NOT null) OR (c_1.id IS NOT null))
         )
- SELECT cs.ad_domain,
+), combined_sources AS (
+    SELECT
+        api_based_companies.store_app,
+        api_based_companies.app_category,
+        api_based_companies.company_id,
+        api_based_companies.parent_id,
+        api_based_companies.ad_domain,
+        api_based_companies.tag_source
+    FROM api_based_companies
+    UNION ALL
+    SELECT
+        sdk_based_companies.store_app,
+        sdk_based_companies.app_category,
+        sdk_based_companies.company_id,
+        sdk_based_companies.parent_id,
+        sdk_based_companies.ad_domain,
+        sdk_based_companies.tag_source
+    FROM sdk_based_companies
+    UNION ALL
+    SELECT
+        adstxt_based_companies.store_app,
+        adstxt_based_companies.app_category,
+        adstxt_based_companies.company_id,
+        adstxt_based_companies.parent_id,
+        adstxt_based_companies.ad_domain,
+        adstxt_based_companies.tag_source
+    FROM adstxt_based_companies
+)
+SELECT
+    cs.ad_domain,
     cs.store_app,
     sa.category AS app_category,
     c.id AS company_id,
     COALESCE(c.parent_company_id, c.id) AS parent_id,
-        CASE
-            WHEN (sa.sdk_successful_last_crawled IS NOT NULL) THEN bool_or((cs.tag_source = 'sdk'::text))
-            ELSE NULL::boolean
-        END AS sdk,
-        CASE
-            WHEN (sa.api_successful_last_crawled IS NOT NULL) THEN bool_or((cs.tag_source = 'api_call'::text))
-            ELSE NULL::boolean
-        END AS api_call,
-    bool_or((cs.tag_source = 'app_ads_direct'::text)) AS app_ads_direct,
-    bool_or((cs.tag_source = 'app_ads_reseller'::text)) AS app_ads_reseller
-   FROM (((combined_sources cs
-     LEFT JOIN frontend.store_apps_overview sa ON ((cs.store_app = sa.id)))
-     LEFT JOIN public.ad_domains ad ON (((cs.ad_domain)::text = (ad.domain)::text)))
-     LEFT JOIN adtech.companies c ON ((ad.id = c.domain_id)))
-  GROUP BY cs.ad_domain, cs.store_app, sa.category, c.id, c.parent_company_id, sa.sdk_successful_last_crawled, sa.api_successful_last_crawled
-  WITH NO DATA;
+    CASE
+        WHEN
+            (sa.sdk_successful_last_crawled IS NOT null)
+            THEN BOOL_OR((cs.tag_source = 'sdk'::text))
+        ELSE null::boolean
+    END AS sdk,
+    CASE
+        WHEN
+            (sa.api_successful_last_crawled IS NOT null)
+            THEN BOOL_OR((cs.tag_source = 'api_call'::text))
+        ELSE null::boolean
+    END AS api_call,
+    BOOL_OR((cs.tag_source = 'app_ads_direct'::text)) AS app_ads_direct,
+    BOOL_OR((cs.tag_source = 'app_ads_reseller'::text)) AS app_ads_reseller
+FROM (((
+    combined_sources cs
+    LEFT JOIN frontend.store_apps_overview AS sa ON ((cs.store_app = sa.id))
+)
+LEFT JOIN
+    public.ad_domains AS ad
+    ON (((cs.ad_domain)::text = (ad.domain)::text))
+)
+LEFT JOIN adtech.companies AS c ON ((ad.id = c.domain_id))
+)
+GROUP BY
+    cs.ad_domain,
+    cs.store_app,
+    sa.category,
+    c.id,
+    c.parent_company_id,
+    sa.sdk_successful_last_crawled,
+    sa.api_successful_last_crawled
+WITH NO DATA;
 
 
 ALTER MATERIALIZED VIEW adtech.combined_store_apps_companies OWNER TO postgres;
@@ -427,22 +562,34 @@ ALTER MATERIALIZED VIEW adtech.combined_store_apps_companies OWNER TO postgres;
 --
 
 CREATE MATERIALIZED VIEW adtech.combined_store_apps_parent_companies AS
- SELECT COALESCE(ad.domain, csac.ad_domain) AS ad_domain,
+SELECT
     csac.store_app,
     csac.app_category,
     csac.parent_id AS company_id,
-    bool_or(csac.sdk) AS sdk,
-    bool_or(csac.api_call) AS api_call,
-    bool_or(csac.app_ads_direct) AS app_ads_direct
-   FROM ((adtech.combined_store_apps_companies csac
-     LEFT JOIN adtech.companies c ON ((csac.parent_id = c.id)))
-     LEFT JOIN public.ad_domains ad ON ((c.domain_id = ad.id)))
-  WHERE (csac.parent_id IN ( SELECT DISTINCT pc.id
-           FROM (adtech.companies pc
-             LEFT JOIN adtech.companies c_1 ON ((pc.id = c_1.parent_company_id)))
-          WHERE (c_1.id IS NOT NULL)))
-  GROUP BY COALESCE(ad.domain, csac.ad_domain), csac.store_app, csac.app_category, csac.parent_id
-  WITH NO DATA;
+    COALESCE(ad.domain, csac.ad_domain) AS ad_domain,
+    BOOL_OR(csac.sdk) AS sdk,
+    BOOL_OR(csac.api_call) AS api_call,
+    BOOL_OR(csac.app_ads_direct) AS app_ads_direct
+FROM ((
+    adtech.combined_store_apps_companies csac
+    LEFT JOIN adtech.companies AS c ON ((csac.parent_id = c.id))
+)
+LEFT JOIN public.ad_domains AS ad ON ((c.domain_id = ad.id))
+)
+WHERE (csac.parent_id IN (
+    SELECT DISTINCT pc.id
+    FROM (
+        adtech.companies AS pc
+        LEFT JOIN adtech.companies AS c_1 ON ((pc.id = c_1.parent_company_id))
+    )
+    WHERE (c_1.id IS NOT null)
+))
+GROUP BY
+    COALESCE(ad.domain, csac.ad_domain),
+    csac.store_app,
+    csac.app_category,
+    csac.parent_id
+WITH NO DATA;
 
 
 ALTER MATERIALIZED VIEW adtech.combined_store_apps_parent_companies OWNER TO postgres;
@@ -507,10 +654,11 @@ ALTER TABLE adtech.sdks ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
 -- Name: click_url_redirect_chains id; Type: DEFAULT; Schema: adtech; Owner: postgres
 --
 
-ALTER TABLE ONLY adtech.click_url_redirect_chains ALTER COLUMN id SET DEFAULT nextval('adtech.click_url_redirect_chains_id_seq'::regclass);
+ALTER TABLE ONLY adtech.click_url_redirect_chains ALTER COLUMN id SET DEFAULT NEXTVAL(
+    'adtech.click_url_redirect_chains_id_seq'::regclass
+);
 
 
 --
 -- PostgreSQL database dump complete
 --
-

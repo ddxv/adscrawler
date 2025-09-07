@@ -26,18 +26,23 @@ SET default_table_access_method = heap;
 --
 
 CREATE MATERIALIZED VIEW frontend.adstxt_ad_domain_overview AS
- SELECT ad.domain AS ad_domain_url,
+SELECT
+    ad.domain AS ad_domain_url,
     aae.relationship,
     sa.store,
     count(DISTINCT aae.publisher_id) AS publisher_id_count,
     count(DISTINCT sa.developer) AS developer_count,
     count(DISTINCT aesa.store_app) AS app_count
-   FROM (((frontend.adstxt_entries_store_apps aesa
-     LEFT JOIN public.store_apps sa ON ((aesa.store_app = sa.id)))
-     LEFT JOIN public.app_ads_entrys aae ON ((aesa.app_ad_entry_id = aae.id)))
-     LEFT JOIN public.ad_domains ad ON ((aesa.ad_domain_id = ad.id)))
-  GROUP BY ad.domain, aae.relationship, sa.store
-  WITH NO DATA;
+FROM (((
+    frontend.adstxt_entries_store_apps aesa
+    LEFT JOIN public.store_apps AS sa ON ((aesa.store_app = sa.id))
+)
+LEFT JOIN public.app_ads_entrys AS aae ON ((aesa.app_ad_entry_id = aae.id))
+)
+LEFT JOIN public.ad_domains AS ad ON ((aesa.ad_domain_id = ad.id))
+)
+GROUP BY ad.domain, aae.relationship, sa.store
+WITH NO DATA;
 
 
 ALTER MATERIALIZED VIEW frontend.adstxt_ad_domain_overview OWNER TO postgres;
@@ -46,17 +51,20 @@ ALTER MATERIALIZED VIEW frontend.adstxt_ad_domain_overview OWNER TO postgres;
 -- Name: adstxt_ad_domain_overview_idx; Type: INDEX; Schema: frontend; Owner: postgres
 --
 
-CREATE INDEX adstxt_ad_domain_overview_idx ON frontend.adstxt_ad_domain_overview USING btree (ad_domain_url);
+CREATE INDEX adstxt_ad_domain_overview_idx ON frontend.adstxt_ad_domain_overview USING btree (
+    ad_domain_url
+);
 
 
 --
 -- Name: adstxt_ad_domain_overview_unique_idx; Type: INDEX; Schema: frontend; Owner: postgres
 --
 
-CREATE UNIQUE INDEX adstxt_ad_domain_overview_unique_idx ON frontend.adstxt_ad_domain_overview USING btree (ad_domain_url, relationship, store);
+CREATE UNIQUE INDEX adstxt_ad_domain_overview_unique_idx ON frontend.adstxt_ad_domain_overview USING btree (
+    ad_domain_url, relationship, store
+);
 
 
 --
 -- PostgreSQL database dump complete
 --
-

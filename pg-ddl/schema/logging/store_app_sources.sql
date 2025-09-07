@@ -39,7 +39,7 @@ ALTER TABLE logging.store_app_sources OWNER TO postgres;
 --
 
 ALTER TABLE ONLY logging.store_app_sources
-    ADD CONSTRAINT store_app_sources_pk PRIMARY KEY (store, store_app);
+ADD CONSTRAINT store_app_sources_pk PRIMARY KEY (store, store_app);
 
 
 --
@@ -47,7 +47,9 @@ ALTER TABLE ONLY logging.store_app_sources
 --
 
 ALTER TABLE ONLY logging.store_app_sources
-    ADD CONSTRAINT store_app_sources_app_fk FOREIGN KEY (store_app) REFERENCES public.store_apps(id) ON DELETE CASCADE;
+ADD CONSTRAINT store_app_sources_app_fk FOREIGN KEY (
+    store_app
+) REFERENCES public.store_apps (id) ON DELETE CASCADE;
 
 
 --
@@ -55,10 +57,11 @@ ALTER TABLE ONLY logging.store_app_sources
 --
 
 ALTER TABLE ONLY logging.store_app_sources
-    ADD CONSTRAINT store_app_sources_store_fk FOREIGN KEY (store) REFERENCES public.stores(id);
+ADD CONSTRAINT store_app_sources_store_fk FOREIGN KEY (
+    store
+) REFERENCES public.stores (id);
 
 
 --
 -- PostgreSQL database dump complete
 --
-

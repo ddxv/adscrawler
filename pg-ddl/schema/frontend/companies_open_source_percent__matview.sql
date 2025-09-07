@@ -26,17 +26,22 @@ SET default_table_access_method = heap;
 --
 
 CREATE MATERIALIZED VIEW frontend.companies_open_source_percent AS
- SELECT ad.domain AS company_domain,
+SELECT
+    ad.domain AS company_domain,
     avg(
         CASE
             WHEN sd.is_open_source THEN 1
             ELSE 0
-        END) AS percent_open_source
-   FROM ((adtech.sdks sd
-     LEFT JOIN adtech.companies c ON ((sd.company_id = c.id)))
-     LEFT JOIN public.ad_domains ad ON ((c.domain_id = ad.id)))
-  GROUP BY ad.domain
-  WITH NO DATA;
+        END
+    ) AS percent_open_source
+FROM ((
+    adtech.sdks sd
+    LEFT JOIN adtech.companies AS c ON ((sd.company_id = c.id))
+)
+LEFT JOIN public.ad_domains AS ad ON ((c.domain_id = ad.id))
+)
+GROUP BY ad.domain
+WITH NO DATA;
 
 
 ALTER MATERIALIZED VIEW frontend.companies_open_source_percent OWNER TO postgres;
@@ -45,10 +50,11 @@ ALTER MATERIALIZED VIEW frontend.companies_open_source_percent OWNER TO postgres
 -- Name: companies_open_source_percent_unique; Type: INDEX; Schema: frontend; Owner: postgres
 --
 
-CREATE UNIQUE INDEX companies_open_source_percent_unique ON frontend.companies_open_source_percent USING btree (company_domain);
+CREATE UNIQUE INDEX companies_open_source_percent_unique ON frontend.companies_open_source_percent USING btree (
+    company_domain
+);
 
 
 --
 -- PostgreSQL database dump complete
 --
-

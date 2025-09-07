@@ -38,7 +38,7 @@ ALTER TABLE adtech.company_domain_mapping OWNER TO postgres;
 --
 
 ALTER TABLE ONLY adtech.company_domain_mapping
-    ADD CONSTRAINT company_domain_mapping_pkey PRIMARY KEY (company_id, domain_id);
+ADD CONSTRAINT company_domain_mapping_pkey PRIMARY KEY (company_id, domain_id);
 
 
 --
@@ -46,7 +46,9 @@ ALTER TABLE ONLY adtech.company_domain_mapping
 --
 
 ALTER TABLE ONLY adtech.company_domain_mapping
-    ADD CONSTRAINT company_domain_mapping_company_id_fkey FOREIGN KEY (company_id) REFERENCES adtech.companies(id);
+ADD CONSTRAINT company_domain_mapping_company_id_fkey FOREIGN KEY (
+    company_id
+) REFERENCES adtech.companies (id);
 
 
 --
@@ -54,10 +56,11 @@ ALTER TABLE ONLY adtech.company_domain_mapping
 --
 
 ALTER TABLE ONLY adtech.company_domain_mapping
-    ADD CONSTRAINT company_domain_mapping_domain_id_fkey FOREIGN KEY (domain_id) REFERENCES public.ad_domains(id);
+ADD CONSTRAINT company_domain_mapping_domain_id_fkey FOREIGN KEY (
+    domain_id
+) REFERENCES public.ad_domains (id);
 
 
 --
 -- PostgreSQL database dump complete
 --
-

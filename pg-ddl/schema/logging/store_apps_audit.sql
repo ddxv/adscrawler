@@ -42,10 +42,11 @@ ALTER TABLE logging.store_apps_audit OWNER TO postgres;
 -- Name: store_apps_audit_stamp_idx; Type: INDEX; Schema: logging; Owner: postgres
 --
 
-CREATE INDEX store_apps_audit_stamp_idx ON logging.store_apps_audit USING btree (stamp);
+CREATE INDEX store_apps_audit_stamp_idx ON logging.store_apps_audit USING btree (
+    stamp
+);
 
 
 --
 -- PostgreSQL database dump complete
 --
-

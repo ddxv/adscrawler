@@ -26,12 +26,16 @@ SET default_table_access_method = heap;
 --
 
 CREATE MATERIALIZED VIEW adtech.company_categories AS
- SELECT DISTINCT c.id AS company_id,
+SELECT DISTINCT
+    c.id AS company_id,
     sc.category_id
-   FROM ((adtech.sdk_categories sc
-     LEFT JOIN adtech.sdks sd ON ((sc.sdk_id = sd.id)))
-     JOIN adtech.companies c ON ((sd.company_id = c.id)))
-  WITH NO DATA;
+FROM ((
+    adtech.sdk_categories sc
+    LEFT JOIN adtech.sdks AS sd ON ((sc.sdk_id = sd.id))
+)
+INNER JOIN adtech.companies AS c ON ((sd.company_id = c.id))
+)
+WITH NO DATA;
 
 
 ALTER MATERIALIZED VIEW adtech.company_categories OWNER TO postgres;
@@ -39,4 +43,3 @@ ALTER MATERIALIZED VIEW adtech.company_categories OWNER TO postgres;
 --
 -- PostgreSQL database dump complete
 --
-

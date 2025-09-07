@@ -39,12 +39,12 @@ ALTER TABLE public.user_requested_scan OWNER TO postgres;
 --
 
 CREATE SEQUENCE public.user_requested_scan_id_seq
-    AS integer
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
+AS integer
+START WITH 1
+INCREMENT BY 1
+NO MINVALUE
+NO MAXVALUE
+CACHE 1;
 
 
 ALTER SEQUENCE public.user_requested_scan_id_seq OWNER TO postgres;
@@ -60,7 +60,9 @@ ALTER SEQUENCE public.user_requested_scan_id_seq OWNED BY public.user_requested_
 -- Name: user_requested_scan id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.user_requested_scan ALTER COLUMN id SET DEFAULT nextval('public.user_requested_scan_id_seq'::regclass);
+ALTER TABLE ONLY public.user_requested_scan ALTER COLUMN id SET DEFAULT NEXTVAL(
+    'public.user_requested_scan_id_seq'::regclass
+);
 
 
 --
@@ -68,10 +70,9 @@ ALTER TABLE ONLY public.user_requested_scan ALTER COLUMN id SET DEFAULT nextval(
 --
 
 ALTER TABLE ONLY public.user_requested_scan
-    ADD CONSTRAINT user_requested_scan_pkey PRIMARY KEY (id);
+ADD CONSTRAINT user_requested_scan_pkey PRIMARY KEY (id);
 
 
 --
 -- PostgreSQL database dump complete
 --
-

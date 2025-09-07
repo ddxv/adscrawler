@@ -26,17 +26,28 @@ SET default_table_access_method = heap;
 --
 
 CREATE MATERIALIZED VIEW frontend.advertiser_creative_rankings_recent_month AS
- WITH creative_rankings AS (
-         SELECT ca_1.md5_hash,
-            ca_1.file_extension,
-            ca_1.store_app_id AS advertiser_store_app_id,
-            vcasr_1.run_at,
-            row_number() OVER (PARTITION BY ca_1.store_app_id ORDER BY vcasr_1.run_at DESC) AS rn
-           FROM ((public.creative_records cr_1
-             LEFT JOIN public.creative_assets ca_1 ON ((cr_1.creative_asset_id = ca_1.id)))
-             LEFT JOIN public.version_code_api_scan_results vcasr_1 ON ((cr_1.run_id = vcasr_1.id)))
-        )
- SELECT saa.name AS advertiser_name,
+WITH creative_rankings AS (
+    SELECT
+        ca_1.md5_hash,
+        ca_1.file_extension,
+        ca_1.store_app_id AS advertiser_store_app_id,
+        vcasr_1.run_at,
+        row_number()
+            OVER (PARTITION BY ca_1.store_app_id ORDER BY vcasr_1.run_at DESC)
+            AS rn
+    FROM ((
+        public.creative_records cr_1
+        LEFT JOIN
+            public.creative_assets AS ca_1
+            ON ((cr_1.creative_asset_id = ca_1.id))
+    )
+    LEFT JOIN
+        public.version_code_api_scan_results AS vcasr_1
+        ON ((cr_1.run_id = vcasr_1.id))
+    )
+)
+SELECT
+    saa.name AS advertiser_name,
     saa.store_id AS advertiser_store_id,
     saa.icon_url_512 AS advertiser_icon_url_512,
     count(DISTINCT ca.md5_hash) AS unique_creatives,
@@ -45,19 +56,30 @@ CREATE MATERIALIZED VIEW frontend.advertiser_creative_rankings_recent_month AS
     max(vcasr.run_at) AS last_seen,
     array_agg(DISTINCT ca.file_extension) AS file_types,
     avg(sap.installs) AS avg_publisher_installs,
-    ARRAY( SELECT crk.md5_hash
-           FROM creative_rankings crk
-          WHERE ((crk.advertiser_store_app_id = saa.id) AND (crk.rn <= 5))
-          ORDER BY crk.rn) AS top_md5_hashes
-   FROM ((((public.creative_records cr
-     LEFT JOIN public.creative_assets ca ON ((cr.creative_asset_id = ca.id)))
-     LEFT JOIN frontend.store_apps_overview sap ON ((cr.store_app_pub_id = sap.id)))
-     LEFT JOIN frontend.store_apps_overview saa ON ((ca.store_app_id = saa.id)))
-     LEFT JOIN public.version_code_api_scan_results vcasr ON ((cr.run_id = vcasr.id)))
-  WHERE (vcasr.run_at >= (now() - '1 mon'::interval))
-  GROUP BY saa.name, saa.store_id, saa.icon_url_512, saa.id
-  ORDER BY (count(DISTINCT cr.store_app_pub_id)) DESC
-  WITH NO DATA;
+    array(
+        SELECT crk.md5_hash
+        FROM creative_rankings AS crk
+        WHERE ((crk.advertiser_store_app_id = saa.id) AND (crk.rn <= 5))
+        ORDER BY crk.rn
+    ) AS top_md5_hashes
+FROM ((((
+    public.creative_records cr
+    LEFT JOIN public.creative_assets AS ca ON ((cr.creative_asset_id = ca.id))
+)
+LEFT JOIN
+    frontend.store_apps_overview AS sap
+    ON ((cr.store_app_pub_id = sap.id))
+)
+LEFT JOIN frontend.store_apps_overview AS saa ON ((ca.store_app_id = saa.id))
+)
+LEFT JOIN
+    public.version_code_api_scan_results AS vcasr
+    ON ((cr.run_id = vcasr.id))
+)
+WHERE (vcasr.run_at >= (now() - '1 mon'::interval))
+GROUP BY saa.name, saa.store_id, saa.icon_url_512, saa.id
+ORDER BY (count(DISTINCT cr.store_app_pub_id)) DESC
+WITH NO DATA;
 
 
 ALTER MATERIALIZED VIEW frontend.advertiser_creative_rankings_recent_month OWNER TO postgres;
@@ -65,4 +87,3 @@ ALTER MATERIALIZED VIEW frontend.advertiser_creative_rankings_recent_month OWNER
 --
 -- PostgreSQL database dump complete
 --
-

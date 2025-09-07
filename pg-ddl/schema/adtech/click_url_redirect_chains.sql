@@ -40,12 +40,12 @@ ALTER TABLE adtech.click_url_redirect_chains OWNER TO postgres;
 --
 
 CREATE SEQUENCE adtech.click_url_redirect_chains_id_seq
-    AS integer
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
+AS integer
+START WITH 1
+INCREMENT BY 1
+NO MINVALUE
+NO MAXVALUE
+CACHE 1;
 
 
 ALTER SEQUENCE adtech.click_url_redirect_chains_id_seq OWNER TO postgres;
@@ -61,7 +61,9 @@ ALTER SEQUENCE adtech.click_url_redirect_chains_id_seq OWNED BY adtech.click_url
 -- Name: click_url_redirect_chains id; Type: DEFAULT; Schema: adtech; Owner: postgres
 --
 
-ALTER TABLE ONLY adtech.click_url_redirect_chains ALTER COLUMN id SET DEFAULT nextval('adtech.click_url_redirect_chains_id_seq'::regclass);
+ALTER TABLE ONLY adtech.click_url_redirect_chains ALTER COLUMN id SET DEFAULT nextval(
+    'adtech.click_url_redirect_chains_id_seq'::regclass
+);
 
 
 --
@@ -69,14 +71,16 @@ ALTER TABLE ONLY adtech.click_url_redirect_chains ALTER COLUMN id SET DEFAULT ne
 --
 
 ALTER TABLE ONLY adtech.click_url_redirect_chains
-    ADD CONSTRAINT click_url_redirect_chains_pkey PRIMARY KEY (id);
+ADD CONSTRAINT click_url_redirect_chains_pkey PRIMARY KEY (id);
 
 
 --
 -- Name: click_url_redirect_chains_unique; Type: INDEX; Schema: adtech; Owner: postgres
 --
 
-CREATE UNIQUE INDEX click_url_redirect_chains_unique ON adtech.click_url_redirect_chains USING btree (run_id, md5(url), md5(redirect_url));
+CREATE UNIQUE INDEX click_url_redirect_chains_unique ON adtech.click_url_redirect_chains USING btree (
+    run_id, md5(url), md5(redirect_url)
+);
 
 
 --
@@ -84,10 +88,11 @@ CREATE UNIQUE INDEX click_url_redirect_chains_unique ON adtech.click_url_redirec
 --
 
 ALTER TABLE ONLY adtech.click_url_redirect_chains
-    ADD CONSTRAINT fk_run_id FOREIGN KEY (run_id) REFERENCES public.version_code_api_scan_results(id) ON DELETE CASCADE;
+ADD CONSTRAINT fk_run_id FOREIGN KEY (
+    run_id
+) REFERENCES public.version_code_api_scan_results (id) ON DELETE CASCADE;
 
 
 --
 -- PostgreSQL database dump complete
 --
-

@@ -38,7 +38,7 @@ ALTER TABLE logging.keywords_crawled_at OWNER TO postgres;
 --
 
 ALTER TABLE ONLY logging.keywords_crawled_at
-    ADD CONSTRAINT keywords_crawled_at_pk PRIMARY KEY (keyword);
+ADD CONSTRAINT keywords_crawled_at_pk PRIMARY KEY (keyword);
 
 
 --
@@ -46,10 +46,11 @@ ALTER TABLE ONLY logging.keywords_crawled_at
 --
 
 ALTER TABLE ONLY logging.keywords_crawled_at
-    ADD CONSTRAINT keywords_crawled_at_fk FOREIGN KEY (keyword) REFERENCES public.keywords(id);
+ADD CONSTRAINT keywords_crawled_at_fk FOREIGN KEY (
+    keyword
+) REFERENCES public.keywords (id);
 
 
 --
 -- PostgreSQL database dump complete
 --
-

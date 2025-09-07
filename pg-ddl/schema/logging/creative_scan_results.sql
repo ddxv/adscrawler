@@ -44,4 +44,3 @@ ALTER TABLE logging.creative_scan_results OWNER TO postgres;
 --
 -- PostgreSQL database dump complete
 --
-

@@ -34,8 +34,8 @@ CREATE TABLE public.creative_records (
     creative_asset_id integer NOT NULL,
     updated_at timestamp with time zone DEFAULT now(),
     mmp_domain_id integer,
-    mmp_urls text[],
-    additional_ad_domain_ids integer[]
+    mmp_urls text [],
+    additional_ad_domain_ids integer []
 );
 
 
@@ -46,12 +46,12 @@ ALTER TABLE public.creative_records OWNER TO postgres;
 --
 
 CREATE SEQUENCE public.creative_records_id_seq
-    AS integer
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
+AS integer
+START WITH 1
+INCREMENT BY 1
+NO MINVALUE
+NO MAXVALUE
+CACHE 1;
 
 
 ALTER SEQUENCE public.creative_records_id_seq OWNER TO postgres;
@@ -67,7 +67,9 @@ ALTER SEQUENCE public.creative_records_id_seq OWNED BY public.creative_records.i
 -- Name: creative_records id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.creative_records ALTER COLUMN id SET DEFAULT nextval('public.creative_records_id_seq'::regclass);
+ALTER TABLE ONLY public.creative_records ALTER COLUMN id SET DEFAULT nextval(
+    'public.creative_records_id_seq'::regclass
+);
 
 
 --
@@ -75,7 +77,13 @@ ALTER TABLE ONLY public.creative_records ALTER COLUMN id SET DEFAULT nextval('pu
 --
 
 ALTER TABLE ONLY public.creative_records
-    ADD CONSTRAINT creative_records_creative_initial_domain_id_creative_host_d_key UNIQUE (creative_initial_domain_id, creative_host_domain_id, run_id, store_app_pub_id, creative_asset_id);
+ADD CONSTRAINT creative_records_creative_initial_domain_id_creative_host_d_key UNIQUE (
+    creative_initial_domain_id,
+    creative_host_domain_id,
+    run_id,
+    store_app_pub_id,
+    creative_asset_id
+);
 
 
 --
@@ -83,7 +91,7 @@ ALTER TABLE ONLY public.creative_records
 --
 
 ALTER TABLE ONLY public.creative_records
-    ADD CONSTRAINT creative_records_pkey PRIMARY KEY (id);
+ADD CONSTRAINT creative_records_pkey PRIMARY KEY (id);
 
 
 --
@@ -91,7 +99,9 @@ ALTER TABLE ONLY public.creative_records
 --
 
 ALTER TABLE ONLY public.creative_records
-    ADD CONSTRAINT creative_records_creative_asset_id_fkey FOREIGN KEY (creative_asset_id) REFERENCES public.creative_assets(id);
+ADD CONSTRAINT creative_records_creative_asset_id_fkey FOREIGN KEY (
+    creative_asset_id
+) REFERENCES public.creative_assets (id);
 
 
 --
@@ -99,7 +109,9 @@ ALTER TABLE ONLY public.creative_records
 --
 
 ALTER TABLE ONLY public.creative_records
-    ADD CONSTRAINT creative_records_creative_host_domain_id_fkey FOREIGN KEY (creative_host_domain_id) REFERENCES public.ad_domains(id);
+ADD CONSTRAINT creative_records_creative_host_domain_id_fkey FOREIGN KEY (
+    creative_host_domain_id
+) REFERENCES public.ad_domains (id);
 
 
 --
@@ -107,7 +119,9 @@ ALTER TABLE ONLY public.creative_records
 --
 
 ALTER TABLE ONLY public.creative_records
-    ADD CONSTRAINT creative_records_creative_initial_domain_id_fkey FOREIGN KEY (creative_initial_domain_id) REFERENCES public.ad_domains(id);
+ADD CONSTRAINT creative_records_creative_initial_domain_id_fkey FOREIGN KEY (
+    creative_initial_domain_id
+) REFERENCES public.ad_domains (id);
 
 
 --
@@ -115,7 +129,9 @@ ALTER TABLE ONLY public.creative_records
 --
 
 ALTER TABLE ONLY public.creative_records
-    ADD CONSTRAINT creative_records_mmp_domain_id_fkey FOREIGN KEY (mmp_domain_id) REFERENCES public.ad_domains(id);
+ADD CONSTRAINT creative_records_mmp_domain_id_fkey FOREIGN KEY (
+    mmp_domain_id
+) REFERENCES public.ad_domains (id);
 
 
 --
@@ -123,7 +139,9 @@ ALTER TABLE ONLY public.creative_records
 --
 
 ALTER TABLE ONLY public.creative_records
-    ADD CONSTRAINT creative_records_run_id_fkey FOREIGN KEY (run_id) REFERENCES public.version_code_api_scan_results(id);
+ADD CONSTRAINT creative_records_run_id_fkey FOREIGN KEY (
+    run_id
+) REFERENCES public.version_code_api_scan_results (id);
 
 
 --
@@ -131,10 +149,11 @@ ALTER TABLE ONLY public.creative_records
 --
 
 ALTER TABLE ONLY public.creative_records
-    ADD CONSTRAINT creative_records_store_app_pub_id_fkey FOREIGN KEY (store_app_pub_id) REFERENCES public.store_apps(id);
+ADD CONSTRAINT creative_records_store_app_pub_id_fkey FOREIGN KEY (
+    store_app_pub_id
+) REFERENCES public.store_apps (id);
 
 
 --
 -- PostgreSQL database dump complete
 --
-

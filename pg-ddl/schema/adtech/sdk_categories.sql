@@ -38,7 +38,7 @@ ALTER TABLE adtech.sdk_categories OWNER TO postgres;
 --
 
 ALTER TABLE ONLY adtech.sdk_categories
-    ADD CONSTRAINT sdk_categories_pkey PRIMARY KEY (sdk_id, category_id);
+ADD CONSTRAINT sdk_categories_pkey PRIMARY KEY (sdk_id, category_id);
 
 
 --
@@ -46,7 +46,9 @@ ALTER TABLE ONLY adtech.sdk_categories
 --
 
 ALTER TABLE ONLY adtech.sdk_categories
-    ADD CONSTRAINT fk_category FOREIGN KEY (category_id) REFERENCES adtech.categories(id) ON DELETE CASCADE;
+ADD CONSTRAINT fk_category FOREIGN KEY (
+    category_id
+) REFERENCES adtech.categories (id) ON DELETE CASCADE;
 
 
 --
@@ -54,10 +56,11 @@ ALTER TABLE ONLY adtech.sdk_categories
 --
 
 ALTER TABLE ONLY adtech.sdk_categories
-    ADD CONSTRAINT fk_sdk FOREIGN KEY (sdk_id) REFERENCES adtech.sdks(id) ON DELETE CASCADE;
+ADD CONSTRAINT fk_sdk FOREIGN KEY (sdk_id) REFERENCES adtech.sdks (
+    id
+) ON DELETE CASCADE;
 
 
 --
 -- PostgreSQL database dump complete
 --
-

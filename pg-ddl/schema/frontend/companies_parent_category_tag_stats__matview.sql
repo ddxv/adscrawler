@@ -26,33 +26,61 @@ SET default_table_access_method = heap;
 --
 
 CREATE MATERIALIZED VIEW frontend.companies_parent_category_tag_stats AS
- WITH d30_counts AS (
-         SELECT sahw.store_app,
-            sum(sahw.installs_diff) AS d30_installs,
-            sum(sahw.rating_count_diff) AS d30_rating_count
-           FROM public.store_apps_history_weekly sahw
-          WHERE ((sahw.week_start > (CURRENT_DATE - '31 days'::interval)) AND (sahw.country_id = 840) AND ((sahw.installs_diff > (0)::numeric) OR (sahw.rating_count_diff > 0)))
-          GROUP BY sahw.store_app
-        ), distinct_apps_group AS (
-         SELECT sa.store,
-            csac.store_app,
-            csac.app_category,
-            tag.tag_source,
-            COALESCE(ad.domain, csac.ad_domain) AS company_domain,
-            c.name AS company_name,
-            sa.installs,
-            sa.rating_count
-           FROM ((((adtech.combined_store_apps_companies csac
-             LEFT JOIN adtech.companies c ON ((csac.parent_id = c.id)))
-             LEFT JOIN public.ad_domains ad ON ((c.domain_id = ad.id)))
-             LEFT JOIN public.store_apps sa ON ((csac.store_app = sa.id)))
-             CROSS JOIN LATERAL ( VALUES ('sdk'::text,csac.sdk), ('api_call'::text,csac.api_call), ('app_ads_direct'::text,csac.app_ads_direct), ('app_ads_reseller'::text,csac.app_ads_reseller)) tag(tag_source, present))
-          WHERE ((tag.present IS TRUE) AND (csac.parent_id IN ( SELECT DISTINCT pc.id
-                   FROM (adtech.companies pc
-                     LEFT JOIN adtech.companies c_1 ON ((pc.id = c_1.parent_company_id)))
-                  WHERE (c_1.id IS NOT NULL))))
+WITH d30_counts AS (
+    SELECT
+        sahw.store_app,
+        sum(sahw.installs_diff) AS d30_installs,
+        sum(sahw.rating_count_diff) AS d30_rating_count
+    FROM public.store_apps_history_weekly AS sahw
+    WHERE
+        (
+            (sahw.week_start > (current_date - '31 days'::interval))
+            AND (sahw.country_id = 840)
+            AND (
+                (sahw.installs_diff > (0)::numeric)
+                OR (sahw.rating_count_diff > 0)
+            )
         )
- SELECT dag.store,
+    GROUP BY sahw.store_app
+), distinct_apps_group AS (
+    SELECT
+        sa.store,
+        csac.store_app,
+        csac.app_category,
+        tag.tag_source,
+        c.name AS company_name,
+        sa.installs,
+        sa.rating_count,
+        coalesce(ad.domain, csac.ad_domain) AS company_domain
+    FROM ((((
+        adtech.combined_store_apps_companies csac
+        LEFT JOIN adtech.companies AS c ON ((csac.parent_id = c.id))
+    )
+    LEFT JOIN public.ad_domains AS ad ON ((c.domain_id = ad.id))
+    )
+    LEFT JOIN public.store_apps AS sa ON ((csac.store_app = sa.id))
+    )
+    CROSS JOIN
+        LATERAL (
+            VALUES ('sdk'::text, csac.sdk),
+            ('api_call'::text, csac.api_call),
+            ('app_ads_direct'::text, csac.app_ads_direct),
+            ('app_ads_reseller'::text, csac.app_ads_reseller)
+        ) AS tag (tag_source, present)
+    )
+    WHERE ((tag.present IS true) AND (csac.parent_id IN (
+        SELECT DISTINCT pc.id
+        FROM (
+            adtech.companies AS pc
+            LEFT JOIN
+                adtech.companies AS c_1
+                ON ((pc.id = c_1.parent_company_id))
+        )
+        WHERE (c_1.id IS NOT null)
+    )))
+)
+SELECT
+    dag.store,
     dag.app_category,
     dag.tag_source,
     dag.company_domain,
@@ -62,10 +90,17 @@ CREATE MATERIALIZED VIEW frontend.companies_parent_category_tag_stats AS
     sum(dc.d30_rating_count) AS rating_count_d30,
     sum(dag.installs) AS installs_total,
     sum(dag.rating_count) AS rating_count_total
-   FROM (distinct_apps_group dag
-     LEFT JOIN d30_counts dc ON ((dag.store_app = dc.store_app)))
-  GROUP BY dag.store, dag.app_category, dag.tag_source, dag.company_domain, dag.company_name
-  WITH NO DATA;
+FROM (
+    distinct_apps_group AS dag
+    LEFT JOIN d30_counts AS dc ON ((dag.store_app = dc.store_app))
+)
+GROUP BY
+    dag.store,
+    dag.app_category,
+    dag.tag_source,
+    dag.company_domain,
+    dag.company_name
+WITH NO DATA;
 
 
 ALTER MATERIALIZED VIEW frontend.companies_parent_category_tag_stats OWNER TO postgres;
@@ -74,17 +109,20 @@ ALTER MATERIALIZED VIEW frontend.companies_parent_category_tag_stats OWNER TO po
 -- Name: companies_parent_category_tag_stats_idx; Type: INDEX; Schema: frontend; Owner: postgres
 --
 
-CREATE UNIQUE INDEX companies_parent_category_tag_stats_idx ON frontend.companies_parent_category_tag_stats USING btree (store, company_domain, company_name, app_category, tag_source);
+CREATE UNIQUE INDEX companies_parent_category_tag_stats_idx ON frontend.companies_parent_category_tag_stats USING btree (
+    store, company_domain, company_name, app_category, tag_source
+);
 
 
 --
 -- Name: companies_parent_category_tag_stats_query_idx; Type: INDEX; Schema: frontend; Owner: postgres
 --
 
-CREATE INDEX companies_parent_category_tag_stats_query_idx ON frontend.companies_parent_category_tag_stats USING btree (company_domain);
+CREATE INDEX companies_parent_category_tag_stats_query_idx ON frontend.companies_parent_category_tag_stats USING btree (
+    company_domain
+);
 
 
 --
 -- PostgreSQL database dump complete
 --
-

@@ -26,18 +26,26 @@ SET default_table_access_method = heap;
 --
 
 CREATE MATERIALIZED VIEW frontend.companies_version_details_count AS
- SELECT savd.store,
+SELECT
+    savd.store,
     savd.company_name,
     savd.company_domain,
     vs.xml_path,
     vs.value_name,
     count(DISTINCT savd.store_id) AS app_count
-   FROM (frontend.store_apps_version_details savd
-     LEFT JOIN public.version_strings vs ON ((savd.version_string_id = vs.id)))
-  GROUP BY savd.store, savd.company_name, savd.company_domain, vs.xml_path, vs.value_name
-  ORDER BY (count(DISTINCT savd.store_id)) DESC
- LIMIT 1000
-  WITH NO DATA;
+FROM (
+    frontend.store_apps_version_details AS savd
+    LEFT JOIN public.version_strings AS vs ON ((savd.version_string_id = vs.id))
+)
+GROUP BY
+    savd.store,
+    savd.company_name,
+    savd.company_domain,
+    vs.xml_path,
+    vs.value_name
+ORDER BY (count(DISTINCT savd.store_id)) DESC
+LIMIT 1000
+WITH NO DATA;
 
 
 ALTER MATERIALIZED VIEW frontend.companies_version_details_count OWNER TO postgres;
@@ -46,10 +54,11 @@ ALTER MATERIALIZED VIEW frontend.companies_version_details_count OWNER TO postgr
 -- Name: companies_apps_version_details_count_unique_idx; Type: INDEX; Schema: frontend; Owner: postgres
 --
 
-CREATE UNIQUE INDEX companies_apps_version_details_count_unique_idx ON frontend.companies_version_details_count USING btree (store, company_name, company_domain, xml_path, value_name);
+CREATE UNIQUE INDEX companies_apps_version_details_count_unique_idx ON frontend.companies_version_details_count USING btree (
+    store, company_name, company_domain, xml_path, value_name
+);
 
 
 --
 -- PostgreSQL database dump complete
 --
-

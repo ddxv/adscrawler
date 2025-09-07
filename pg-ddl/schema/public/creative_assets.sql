@@ -41,12 +41,12 @@ ALTER TABLE public.creative_assets OWNER TO postgres;
 --
 
 CREATE SEQUENCE public.creative_assets_id_seq
-    AS integer
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
+AS integer
+START WITH 1
+INCREMENT BY 1
+NO MINVALUE
+NO MAXVALUE
+CACHE 1;
 
 
 ALTER SEQUENCE public.creative_assets_id_seq OWNER TO postgres;
@@ -62,7 +62,9 @@ ALTER SEQUENCE public.creative_assets_id_seq OWNED BY public.creative_assets.id;
 -- Name: creative_assets id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.creative_assets ALTER COLUMN id SET DEFAULT nextval('public.creative_assets_id_seq'::regclass);
+ALTER TABLE ONLY public.creative_assets ALTER COLUMN id SET DEFAULT nextval(
+    'public.creative_assets_id_seq'::regclass
+);
 
 
 --
@@ -70,7 +72,7 @@ ALTER TABLE ONLY public.creative_assets ALTER COLUMN id SET DEFAULT nextval('pub
 --
 
 ALTER TABLE ONLY public.creative_assets
-    ADD CONSTRAINT creative_assets_pkey PRIMARY KEY (id);
+ADD CONSTRAINT creative_assets_pkey PRIMARY KEY (id);
 
 
 --
@@ -78,7 +80,9 @@ ALTER TABLE ONLY public.creative_assets
 --
 
 ALTER TABLE ONLY public.creative_assets
-    ADD CONSTRAINT creative_assets_store_app_id_md5_hash_key UNIQUE (store_app_id, md5_hash);
+ADD CONSTRAINT creative_assets_store_app_id_md5_hash_key UNIQUE (
+    store_app_id, md5_hash
+);
 
 
 --
@@ -86,10 +90,11 @@ ALTER TABLE ONLY public.creative_assets
 --
 
 ALTER TABLE ONLY public.creative_assets
-    ADD CONSTRAINT creative_assets_store_app_id_fkey FOREIGN KEY (store_app_id) REFERENCES public.store_apps(id);
+ADD CONSTRAINT creative_assets_store_app_id_fkey FOREIGN KEY (
+    store_app_id
+) REFERENCES public.store_apps (id);
 
 
 --
 -- PostgreSQL database dump complete
 --
-

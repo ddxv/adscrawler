@@ -26,7 +26,9 @@ SET default_table_access_method = heap;
 --
 
 CREATE TABLE logging.snapshot_pub_domains (
-    updated_at timestamp without time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at timestamp without time zone DEFAULT timezone(
+        'utc'::text, now()
+    ) NOT NULL,
     crawl_result integer,
     total_rows integer,
     avg_days numeric,
@@ -40,4 +42,3 @@ ALTER TABLE logging.snapshot_pub_domains OWNER TO postgres;
 --
 -- PostgreSQL database dump complete
 --
-

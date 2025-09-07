@@ -37,4 +37,3 @@ ALTER TABLE logging.store_app_no_creatives OWNER TO postgres;
 --
 -- PostgreSQL database dump complete
 --
-

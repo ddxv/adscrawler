@@ -30,7 +30,9 @@ CREATE TABLE logging.version_code_api_scan_results (
     version_code text,
     apk_hash text,
     crawl_result smallint,
-    updated_at timestamp without time zone DEFAULT timezone('utc'::text, now()) NOT NULL
+    updated_at timestamp without time zone DEFAULT timezone(
+        'utc'::text, now()
+    ) NOT NULL
 );
 
 
@@ -39,4 +41,3 @@ ALTER TABLE logging.version_code_api_scan_results OWNER TO postgres;
 --
 -- PostgreSQL database dump complete
 --
-

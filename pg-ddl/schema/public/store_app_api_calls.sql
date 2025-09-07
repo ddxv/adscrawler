@@ -48,12 +48,12 @@ ALTER TABLE public.store_app_api_calls OWNER TO postgres;
 --
 
 CREATE SEQUENCE public.store_app_api_calls_id_seq
-    AS integer
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
+AS integer
+START WITH 1
+INCREMENT BY 1
+NO MINVALUE
+NO MAXVALUE
+CACHE 1;
 
 
 ALTER SEQUENCE public.store_app_api_calls_id_seq OWNER TO postgres;
@@ -69,7 +69,9 @@ ALTER SEQUENCE public.store_app_api_calls_id_seq OWNED BY public.store_app_api_c
 -- Name: store_app_api_calls id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.store_app_api_calls ALTER COLUMN id SET DEFAULT nextval('public.store_app_api_calls_id_seq'::regclass);
+ALTER TABLE ONLY public.store_app_api_calls ALTER COLUMN id SET DEFAULT nextval(
+    'public.store_app_api_calls_id_seq'::regclass
+);
 
 
 --
@@ -77,7 +79,7 @@ ALTER TABLE ONLY public.store_app_api_calls ALTER COLUMN id SET DEFAULT nextval(
 --
 
 ALTER TABLE ONLY public.store_app_api_calls
-    ADD CONSTRAINT store_app_api_calls_pkey PRIMARY KEY (id);
+ADD CONSTRAINT store_app_api_calls_pkey PRIMARY KEY (id);
 
 
 --
@@ -85,7 +87,9 @@ ALTER TABLE ONLY public.store_app_api_calls
 --
 
 ALTER TABLE ONLY public.store_app_api_calls
-    ADD CONSTRAINT unique_store_app_api_calls UNIQUE (store_app, tld_url, url, host, status_code, called_at);
+ADD CONSTRAINT unique_store_app_api_calls UNIQUE (
+    store_app, tld_url, url, host, status_code, called_at
+);
 
 
 --
@@ -93,7 +97,9 @@ ALTER TABLE ONLY public.store_app_api_calls
 --
 
 ALTER TABLE ONLY public.store_app_api_calls
-    ADD CONSTRAINT fk_country FOREIGN KEY (country_id) REFERENCES public.countries(id);
+ADD CONSTRAINT fk_country FOREIGN KEY (
+    country_id
+) REFERENCES public.countries (id);
 
 
 --
@@ -101,7 +107,9 @@ ALTER TABLE ONLY public.store_app_api_calls
 --
 
 ALTER TABLE ONLY public.store_app_api_calls
-    ADD CONSTRAINT store_app_api_call_fk FOREIGN KEY (store_app) REFERENCES public.store_apps(id) ON DELETE CASCADE;
+ADD CONSTRAINT store_app_api_call_fk FOREIGN KEY (
+    store_app
+) REFERENCES public.store_apps (id) ON DELETE CASCADE;
 
 
 --
@@ -109,10 +117,11 @@ ALTER TABLE ONLY public.store_app_api_calls
 --
 
 ALTER TABLE ONLY public.store_app_api_calls
-    ADD CONSTRAINT store_app_api_calls_api_scan_id_fkey FOREIGN KEY (run_id) REFERENCES public.version_code_api_scan_results(id);
+ADD CONSTRAINT store_app_api_calls_api_scan_id_fkey FOREIGN KEY (
+    run_id
+) REFERENCES public.version_code_api_scan_results (id);
 
 
 --
 -- PostgreSQL database dump complete
 --
-

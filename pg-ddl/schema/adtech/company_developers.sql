@@ -38,7 +38,7 @@ ALTER TABLE adtech.company_developers OWNER TO postgres;
 --
 
 ALTER TABLE ONLY adtech.company_developers
-    ADD CONSTRAINT company_developers_pkey PRIMARY KEY (company_id, developer_id);
+ADD CONSTRAINT company_developers_pkey PRIMARY KEY (company_id, developer_id);
 
 
 --
@@ -46,10 +46,11 @@ ALTER TABLE ONLY adtech.company_developers
 --
 
 ALTER TABLE ONLY adtech.company_developers
-    ADD CONSTRAINT fk_company_developers_category FOREIGN KEY (developer_id) REFERENCES public.developers(id);
+ADD CONSTRAINT fk_company_developers_category FOREIGN KEY (
+    developer_id
+) REFERENCES public.developers (id);
 
 
 --
 -- PostgreSQL database dump complete
 --
-

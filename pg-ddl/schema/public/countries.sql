@@ -46,7 +46,7 @@ ALTER TABLE public.countries OWNER TO postgres;
 --
 
 ALTER TABLE ONLY public.countries
-    ADD CONSTRAINT countries_al2 UNIQUE (alpha2);
+ADD CONSTRAINT countries_al2 UNIQUE (alpha2);
 
 
 --
@@ -54,7 +54,7 @@ ALTER TABLE ONLY public.countries
 --
 
 ALTER TABLE ONLY public.countries
-    ADD CONSTRAINT countries_al3 UNIQUE (alpha3);
+ADD CONSTRAINT countries_al3 UNIQUE (alpha3);
 
 
 --
@@ -62,10 +62,9 @@ ALTER TABLE ONLY public.countries
 --
 
 ALTER TABLE ONLY public.countries
-    ADD CONSTRAINT countries_pk PRIMARY KEY (id);
+ADD CONSTRAINT countries_pk PRIMARY KEY (id);
 
 
 --
 -- PostgreSQL database dump complete
 --
-

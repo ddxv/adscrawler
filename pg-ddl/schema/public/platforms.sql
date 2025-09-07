@@ -38,12 +38,12 @@ ALTER TABLE public.platforms OWNER TO james;
 --
 
 CREATE SEQUENCE public.newtable_id_seq
-    AS integer
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
+AS integer
+START WITH 1
+INCREMENT BY 1
+NO MINVALUE
+NO MAXVALUE
+CACHE 1;
 
 
 ALTER SEQUENCE public.newtable_id_seq OWNER TO james;
@@ -59,7 +59,9 @@ ALTER SEQUENCE public.newtable_id_seq OWNED BY public.platforms.id;
 -- Name: platforms id; Type: DEFAULT; Schema: public; Owner: james
 --
 
-ALTER TABLE ONLY public.platforms ALTER COLUMN id SET DEFAULT nextval('public.newtable_id_seq'::regclass);
+ALTER TABLE ONLY public.platforms ALTER COLUMN id SET DEFAULT nextval(
+    'public.newtable_id_seq'::regclass
+);
 
 
 --
@@ -67,7 +69,7 @@ ALTER TABLE ONLY public.platforms ALTER COLUMN id SET DEFAULT nextval('public.ne
 --
 
 ALTER TABLE ONLY public.platforms
-    ADD CONSTRAINT platforms_pk PRIMARY KEY (id);
+ADD CONSTRAINT platforms_pk PRIMARY KEY (id);
 
 
 --
@@ -75,10 +77,9 @@ ALTER TABLE ONLY public.platforms
 --
 
 ALTER TABLE ONLY public.platforms
-    ADD CONSTRAINT platforms_un UNIQUE (name);
+ADD CONSTRAINT platforms_un UNIQUE (name);
 
 
 --
 -- PostgreSQL database dump complete
 --
-

@@ -38,7 +38,7 @@ ALTER TABLE logging.developers_crawled_at OWNER TO postgres;
 --
 
 ALTER TABLE ONLY logging.developers_crawled_at
-    ADD CONSTRAINT developers_crawled_at_pk PRIMARY KEY (developer);
+ADD CONSTRAINT developers_crawled_at_pk PRIMARY KEY (developer);
 
 
 --
@@ -46,10 +46,11 @@ ALTER TABLE ONLY logging.developers_crawled_at
 --
 
 ALTER TABLE ONLY logging.developers_crawled_at
-    ADD CONSTRAINT newtable_fk FOREIGN KEY (developer) REFERENCES public.developers(id);
+ADD CONSTRAINT newtable_fk FOREIGN KEY (
+    developer
+) REFERENCES public.developers (id);
 
 
 --
 -- PostgreSQL database dump complete
 --
-

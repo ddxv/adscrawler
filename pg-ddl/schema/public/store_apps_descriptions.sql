@@ -44,12 +44,12 @@ ALTER TABLE public.store_apps_descriptions OWNER TO postgres;
 --
 
 CREATE SEQUENCE public.store_apps_descriptions_id_seq
-    AS integer
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
+AS integer
+START WITH 1
+INCREMENT BY 1
+NO MINVALUE
+NO MAXVALUE
+CACHE 1;
 
 
 ALTER SEQUENCE public.store_apps_descriptions_id_seq OWNER TO postgres;
@@ -65,7 +65,9 @@ ALTER SEQUENCE public.store_apps_descriptions_id_seq OWNED BY public.store_apps_
 -- Name: store_apps_descriptions id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.store_apps_descriptions ALTER COLUMN id SET DEFAULT nextval('public.store_apps_descriptions_id_seq'::regclass);
+ALTER TABLE ONLY public.store_apps_descriptions ALTER COLUMN id SET DEFAULT nextval(
+    'public.store_apps_descriptions_id_seq'::regclass
+);
 
 
 --
@@ -73,7 +75,7 @@ ALTER TABLE ONLY public.store_apps_descriptions ALTER COLUMN id SET DEFAULT next
 --
 
 ALTER TABLE ONLY public.store_apps_descriptions
-    ADD CONSTRAINT store_apps_descriptions_pkey PRIMARY KEY (id);
+ADD CONSTRAINT store_apps_descriptions_pkey PRIMARY KEY (id);
 
 
 --
@@ -81,14 +83,18 @@ ALTER TABLE ONLY public.store_apps_descriptions
 --
 
 ALTER TABLE ONLY public.store_apps_descriptions
-    ADD CONSTRAINT store_apps_descriptions_store_app_language_id_description_d_key UNIQUE (store_app, language_id, description, description_short);
+ADD CONSTRAINT store_apps_descriptions_store_app_language_id_description_d_key UNIQUE (
+    store_app, language_id, description, description_short
+);
 
 
 --
 -- Name: idx_description_tsv; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE INDEX idx_description_tsv ON public.store_apps_descriptions USING gin (description_tsv);
+CREATE INDEX idx_description_tsv ON public.store_apps_descriptions USING gin (
+    description_tsv
+);
 
 
 --
@@ -96,7 +102,9 @@ CREATE INDEX idx_description_tsv ON public.store_apps_descriptions USING gin (de
 --
 
 ALTER TABLE ONLY public.store_apps_descriptions
-    ADD CONSTRAINT store_apps_descriptions_language_id_fkey FOREIGN KEY (language_id) REFERENCES public.languages(id) ON DELETE CASCADE;
+ADD CONSTRAINT store_apps_descriptions_language_id_fkey FOREIGN KEY (
+    language_id
+) REFERENCES public.languages (id) ON DELETE CASCADE;
 
 
 --
@@ -104,10 +112,11 @@ ALTER TABLE ONLY public.store_apps_descriptions
 --
 
 ALTER TABLE ONLY public.store_apps_descriptions
-    ADD CONSTRAINT store_apps_descriptions_store_app_fkey FOREIGN KEY (store_app) REFERENCES public.store_apps(id) ON DELETE CASCADE;
+ADD CONSTRAINT store_apps_descriptions_store_app_fkey FOREIGN KEY (
+    store_app
+) REFERENCES public.store_apps (id) ON DELETE CASCADE;
 
 
 --
 -- PostgreSQL database dump complete
 --
-

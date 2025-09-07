@@ -26,7 +26,8 @@ SET default_table_access_method = heap;
 --
 
 CREATE MATERIALIZED VIEW frontend.advertiser_creatives AS
- SELECT saa.store_id AS advertiser_store_id,
+SELECT
+    saa.store_id AS advertiser_store_id,
     cr.run_id,
     vcasr.run_at,
     sap.name AS pub_name,
@@ -37,33 +38,57 @@ CREATE MATERIALIZED VIEW frontend.advertiser_creatives AS
     ad.domain AS ad_domain,
     acd.domain AS ad_domain_company_domain,
     ac.name AS ad_domain_company_name,
-    COALESCE(ca.phash, ca.md5_hash) AS vhash,
     ca.md5_hash,
     ca.file_extension,
     sap.icon_url_512 AS pub_icon_url_512,
     mmp.name AS mmp_name,
     mmpd.domain AS mmp_domain,
     cr.mmp_urls,
-    ( SELECT array_agg(ad_domains.domain) AS array_agg
-           FROM public.ad_domains
-          WHERE (ad_domains.id = ANY (cr.additional_ad_domain_ids))) AS additional_ad_domain_urls
-   FROM (((((((((((((((public.creative_records cr
-     LEFT JOIN public.creative_assets ca ON ((cr.creative_asset_id = ca.id)))
-     LEFT JOIN frontend.store_apps_overview sap ON ((cr.store_app_pub_id = sap.id)))
-     LEFT JOIN frontend.store_apps_overview saa ON ((ca.store_app_id = saa.id)))
-     LEFT JOIN public.version_code_api_scan_results vcasr ON ((cr.run_id = vcasr.id)))
-     LEFT JOIN public.ad_domains hd ON ((cr.creative_host_domain_id = hd.id)))
-     LEFT JOIN public.ad_domains ad ON ((cr.creative_initial_domain_id = ad.id)))
-     LEFT JOIN adtech.company_domain_mapping hcdm ON ((hd.id = hcdm.domain_id)))
-     LEFT JOIN adtech.company_domain_mapping acdm ON ((hd.id = acdm.domain_id)))
-     LEFT JOIN adtech.companies hc ON ((hcdm.company_id = hc.id)))
-     LEFT JOIN adtech.companies ac ON ((acdm.company_id = ac.id)))
-     LEFT JOIN public.ad_domains hcd ON ((hc.domain_id = hcd.id)))
-     LEFT JOIN public.ad_domains acd ON ((ac.domain_id = acd.id)))
-     LEFT JOIN adtech.company_domain_mapping cdm ON ((cr.mmp_domain_id = cdm.domain_id)))
-     LEFT JOIN adtech.companies mmp ON ((cdm.company_id = mmp.id)))
-     LEFT JOIN public.ad_domains mmpd ON ((cr.mmp_domain_id = mmpd.id)))
-  WITH NO DATA;
+    COALESCE(ca.phash, ca.md5_hash) AS vhash,
+    (
+        SELECT ARRAY_AGG(ad_domains.domain) AS array_agg
+        FROM public.ad_domains
+        WHERE (ad_domains.id = ANY(cr.additional_ad_domain_ids))
+    ) AS additional_ad_domain_urls
+FROM (((((((((((((((
+    public.creative_records cr
+    LEFT JOIN public.creative_assets AS ca ON ((cr.creative_asset_id = ca.id))
+)
+LEFT JOIN
+    frontend.store_apps_overview AS sap
+    ON ((cr.store_app_pub_id = sap.id))
+)
+LEFT JOIN frontend.store_apps_overview AS saa ON ((ca.store_app_id = saa.id))
+)
+LEFT JOIN
+    public.version_code_api_scan_results AS vcasr
+    ON ((cr.run_id = vcasr.id))
+)
+LEFT JOIN public.ad_domains AS hd ON ((cr.creative_host_domain_id = hd.id))
+)
+LEFT JOIN public.ad_domains AS ad ON ((cr.creative_initial_domain_id = ad.id))
+)
+LEFT JOIN adtech.company_domain_mapping AS hcdm ON ((hd.id = hcdm.domain_id))
+)
+LEFT JOIN adtech.company_domain_mapping AS acdm ON ((hd.id = acdm.domain_id))
+)
+LEFT JOIN adtech.companies AS hc ON ((hcdm.company_id = hc.id))
+)
+LEFT JOIN adtech.companies AS ac ON ((acdm.company_id = ac.id))
+)
+LEFT JOIN public.ad_domains AS hcd ON ((hc.domain_id = hcd.id))
+)
+LEFT JOIN public.ad_domains AS acd ON ((ac.domain_id = acd.id))
+)
+LEFT JOIN
+    adtech.company_domain_mapping AS cdm
+    ON ((cr.mmp_domain_id = cdm.domain_id))
+)
+LEFT JOIN adtech.companies AS mmp ON ((cdm.company_id = mmp.id))
+)
+LEFT JOIN public.ad_domains AS mmpd ON ((cr.mmp_domain_id = mmpd.id))
+)
+WITH NO DATA;
 
 
 ALTER MATERIALIZED VIEW frontend.advertiser_creatives OWNER TO postgres;
@@ -71,4 +96,3 @@ ALTER MATERIALIZED VIEW frontend.advertiser_creatives OWNER TO postgres;
 --
 -- PostgreSQL database dump complete
 --
-

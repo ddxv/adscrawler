@@ -26,13 +26,19 @@ SET default_table_access_method = heap;
 --
 
 CREATE MATERIALIZED VIEW adtech.company_value_string_mapping AS
- SELECT vd.id AS version_string_id,
+SELECT
+    vd.id AS version_string_id,
     sd.company_id,
     sp.sdk_id AS id
-   FROM ((public.version_strings vd
-     JOIN adtech.sdk_packages sp ON ((vd.value_name ~~* ((sp.package_pattern)::text || '%'::text))))
-     LEFT JOIN adtech.sdks sd ON ((sp.sdk_id = sd.id)))
-  WITH NO DATA;
+FROM ((
+    public.version_strings vd
+    INNER JOIN
+        adtech.sdk_packages AS sp
+        ON ((vd.value_name ~~* ((sp.package_pattern)::text || '%'::text)))
+)
+LEFT JOIN adtech.sdks AS sd ON ((sp.sdk_id = sd.id))
+)
+WITH NO DATA;
 
 
 ALTER MATERIALIZED VIEW adtech.company_value_string_mapping OWNER TO postgres;
@@ -40,4 +46,3 @@ ALTER MATERIALIZED VIEW adtech.company_value_string_mapping OWNER TO postgres;
 --
 -- PostgreSQL database dump complete
 --
-

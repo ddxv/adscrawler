@@ -29,7 +29,9 @@ CREATE TABLE logging.store_app_downloads (
     store_app integer NOT NULL,
     version_code text NOT NULL,
     crawl_result smallint NOT NULL,
-    updated_at timestamp without time zone DEFAULT timezone('utc'::text, now()) NOT NULL
+    updated_at timestamp without time zone DEFAULT timezone(
+        'utc'::text, now()
+    ) NOT NULL
 );
 
 
@@ -40,10 +42,11 @@ ALTER TABLE logging.store_app_downloads OWNER TO postgres;
 --
 
 ALTER TABLE ONLY logging.store_app_downloads
-    ADD CONSTRAINT store_app_download_fk FOREIGN KEY (store_app) REFERENCES public.store_apps(id);
+ADD CONSTRAINT store_app_download_fk FOREIGN KEY (
+    store_app
+) REFERENCES public.store_apps (id);
 
 
 --
 -- PostgreSQL database dump complete
 --
-

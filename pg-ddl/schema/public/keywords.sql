@@ -38,12 +38,12 @@ ALTER TABLE public.keywords OWNER TO postgres;
 --
 
 CREATE SEQUENCE public.keywords_id_seq
-    AS integer
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
+AS integer
+START WITH 1
+INCREMENT BY 1
+NO MINVALUE
+NO MAXVALUE
+CACHE 1;
 
 
 ALTER SEQUENCE public.keywords_id_seq OWNER TO postgres;
@@ -59,7 +59,9 @@ ALTER SEQUENCE public.keywords_id_seq OWNED BY public.keywords.id;
 -- Name: keywords id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.keywords ALTER COLUMN id SET DEFAULT nextval('public.keywords_id_seq'::regclass);
+ALTER TABLE ONLY public.keywords ALTER COLUMN id SET DEFAULT nextval(
+    'public.keywords_id_seq'::regclass
+);
 
 
 --
@@ -67,7 +69,7 @@ ALTER TABLE ONLY public.keywords ALTER COLUMN id SET DEFAULT nextval('public.key
 --
 
 ALTER TABLE ONLY public.keywords
-    ADD CONSTRAINT keywords_pkey PRIMARY KEY (id);
+ADD CONSTRAINT keywords_pkey PRIMARY KEY (id);
 
 
 --
@@ -75,10 +77,9 @@ ALTER TABLE ONLY public.keywords
 --
 
 ALTER TABLE ONLY public.keywords
-    ADD CONSTRAINT unique_keyword UNIQUE (keyword_text);
+ADD CONSTRAINT unique_keyword UNIQUE (keyword_text);
 
 
 --
 -- PostgreSQL database dump complete
 --
-

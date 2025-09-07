@@ -43,14 +43,18 @@ ALTER TABLE frontend.store_app_ranks_weekly OWNER TO postgres;
 --
 
 ALTER TABLE ONLY frontend.store_app_ranks_weekly
-    ADD CONSTRAINT app_rankings_unique_test UNIQUE (crawled_date, country, store_collection, store_category, rank);
+ADD CONSTRAINT app_rankings_unique_test UNIQUE (
+    crawled_date, country, store_collection, store_category, rank
+);
 
 
 --
 -- Name: idx_ranks_filter; Type: INDEX; Schema: frontend; Owner: postgres
 --
 
-CREATE INDEX idx_ranks_filter ON frontend.store_app_ranks_weekly USING btree (country, store_collection, store_category, crawled_date);
+CREATE INDEX idx_ranks_filter ON frontend.store_app_ranks_weekly USING btree (
+    country, store_collection, store_category, crawled_date
+);
 
 
 --
@@ -58,7 +62,9 @@ CREATE INDEX idx_ranks_filter ON frontend.store_app_ranks_weekly USING btree (co
 --
 
 ALTER TABLE ONLY frontend.store_app_ranks_weekly
-    ADD CONSTRAINT fk_country FOREIGN KEY (country) REFERENCES public.countries(id);
+ADD CONSTRAINT fk_country FOREIGN KEY (country) REFERENCES public.countries (
+    id
+);
 
 
 --
@@ -66,7 +72,9 @@ ALTER TABLE ONLY frontend.store_app_ranks_weekly
 --
 
 ALTER TABLE ONLY frontend.store_app_ranks_weekly
-    ADD CONSTRAINT fk_store_app FOREIGN KEY (store_app) REFERENCES public.store_apps(id);
+ADD CONSTRAINT fk_store_app FOREIGN KEY (
+    store_app
+) REFERENCES public.store_apps (id);
 
 
 --
@@ -74,7 +82,9 @@ ALTER TABLE ONLY frontend.store_app_ranks_weekly
 --
 
 ALTER TABLE ONLY frontend.store_app_ranks_weekly
-    ADD CONSTRAINT fk_store_category FOREIGN KEY (store_category) REFERENCES public.store_categories(id);
+ADD CONSTRAINT fk_store_category FOREIGN KEY (
+    store_category
+) REFERENCES public.store_categories (id);
 
 
 --
@@ -82,10 +92,11 @@ ALTER TABLE ONLY frontend.store_app_ranks_weekly
 --
 
 ALTER TABLE ONLY frontend.store_app_ranks_weekly
-    ADD CONSTRAINT fk_store_collection FOREIGN KEY (store_collection) REFERENCES public.store_collections(id);
+ADD CONSTRAINT fk_store_collection FOREIGN KEY (
+    store_collection
+) REFERENCES public.store_collections (id);
 
 
 --
 -- PostgreSQL database dump complete
 --
-
