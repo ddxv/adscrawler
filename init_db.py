@@ -3,15 +3,17 @@ This script is an example of how to initialize the database with the full databa
 It also downloads the ddxv/appgoblin-data apps and inserts them into the database.
 """
 
-import requests
 import lzma
-import pandas as pd
-from io import BytesIO
-from adscrawler.dbcon.connection import get_db_connection
 import os
-from adscrawler.config import get_logger
-from adscrawler.app_stores.scrape_stores import process_scraped
+from io import BytesIO
+
 import numpy as np
+import pandas as pd
+import requests
+
+from adscrawler.app_stores.scrape_stores import process_scraped
+from adscrawler.config import get_logger
+from adscrawler.dbcon.connection import get_db_connection
 
 logger = get_logger(__name__)
 

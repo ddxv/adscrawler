@@ -146,9 +146,9 @@ INSERT INTO store_categories (store, category) VALUES
 (2, 'WEATHER');
 
 
-INSERT INTO adtech.categories ("name",url_slug) VALUES
-	 ('Development Tools','development-tools'),
-	 ('Analytics: Attribution','ad-attribution'),
-	 ('Ad Networks','ad-networks'),
-	 ('Business Tools','business-tools'),
-	 ('Analytics: Product','product-analytics');
+INSERT INTO adtech.categories (name, url_slug) VALUES
+('Development Tools', 'development-tools'),
+('Analytics: Attribution', 'ad-attribution'),
+('Ad Networks', 'ad-networks'),
+('Business Tools', 'business-tools'),
+('Analytics: Product', 'product-analytics');
