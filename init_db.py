@@ -10,6 +10,7 @@ from io import BytesIO
 import numpy as np
 import pandas as pd
 import requests
+from sqlalchemy import text
 
 from adscrawler.app_stores.scrape_stores import process_scraped
 from adscrawler.config import get_logger
@@ -59,3 +60,27 @@ process_scraped(
     ranked_dicts=app_dict,
     crawl_source="appgoblin_initial_data",
 )
+
+
+with open("pg-ddl/schema/full_db_dump.sql") as f:
+    full_db_dump = f.read()
+
+# Find all CREATE MATERIALIZED VIEW statements
+create_mv_statements = [
+    statement
+    for statement in full_db_dump.split(";")
+    if "CREATE MATERIALIZED VIEW" in statement
+]
+
+
+for statement in create_mv_statements:
+    mv_name = statement.split("CREATE MATERIALIZED VIEW")[1].split(" ")[1]
+    with database_connection.engine.connect() as conn:
+        trans = conn.begin()
+        try:
+            conn.execute(text(f"REFRESH MATERIALIZED VIEW {mv_name}"))
+            trans.commit()
+            print(f"✓ Successfully refreshed: {mv_name}")
+        except Exception as e:
+            trans.rollback()
+            print(f"✗ Failed to refresh {mv_name}: {str(e)}")

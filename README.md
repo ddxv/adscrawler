@@ -24,9 +24,12 @@ These steps make it a bit more challenging to collect app-ads.txt, as the first 
 - Python environment: Python 3.12/3.13
 - Requires: NodeJS
 - PostgreSQL: 17
-- Init db using pg-ddl/schema/full_db_dump.sql
 - Setup python environment `python3.12 -m venv .virtualenv` & `source .virtualenv/bin/activate`
 - `uv pip install -r pyproject.toml`
+- Setup your database. The files here use the name 'madrone', but this can be easily changed
+- Add a password to your default db user if you dont have one yet `ALTER USER postgres WITH PASSWORD 'xxx';`
+- `cp example_config.toml ~/config/adscrawler/config.toml` and edit any needed values. For using all locally, the main thing that needs to be modified is the `xxx` for postgres pass.
+- In your virtualenv, init db `python db_init.py`
 - `npm install --save google-play-scraper`
 
 # Prep before running (optional)
