@@ -686,13 +686,12 @@ def process_weekly_ranks(
                          ar_1.collection,
                          ar_1.category,
                          date_trunc('week'::text, ar_1.crawled_date::timestamp with time zone) AS week_start,
-                         min(ar_1.rank) AS best_rank,
                          max(ar_1.crawled_date) AS max_crawled_date
                         FROM all_data ar_1
                        GROUP BY ar_1.country, ar_1.collection, ar_1.category, (date_trunc('week'::text, ar_1.crawled_date::timestamp with time zone))
-                     )
-         SELECT ar.rank,
-            wmd.best_rank,
+                     ),
+         weekly_app_ranks as (SELECT ar.rank,
+            min(ar.rank) AS best_rank,
             ar.country,
             ar.collection,
             ar.category,
@@ -703,7 +702,10 @@ def process_weekly_ranks(
              AND ar.collection = wmd.collection 
              AND ar.category = wmd.category 
              AND ar.crawled_date = wmd.max_crawled_date
-          ORDER BY ar.country, ar.collection, ar.category, ar.crawled_date, ar.rank
+             GROUP BY ar.rank, ar.country, ar.collection, ar.category, ar.crawled_date, ar.store_id
+             )
+        SELECT war.rank, war.best_rank, war.country, war.collection, war.category, war.crawled_date, war.store_id FROM weekly_app_ranks war
+          ORDER BY war.country, war.collection, war.category, war.crawled_date, war.rank
         """
 
         wdf = duckdb_con.execute(week_query).df()
