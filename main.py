@@ -87,11 +87,10 @@ class ProcessManager:
             action="store_true",
         )
         parser.add_argument(
-            "-g",
-            "--update-app-store-details-group",
-            default="",
+            "--workers",
+            default="1",
             type=str,
-            help="Interval group to update, string of short or long, if left blank updates all",
+            help="Number of workers to use for updating app store details",
         )
         parser.add_argument(
             "-a",
@@ -155,13 +154,6 @@ class ProcessManager:
                 x for x in found_processes if any(p in x for p in self.args.platforms)
             ]
 
-        if self.args.update_app_store_details_group:
-            found_processes = [
-                x
-                for x in found_processes
-                if self.args.update_app_store_details_group in x
-            ]
-
         return len(found_processes) > 1
 
     def check_apk_download_processes(self) -> bool:
@@ -173,12 +165,6 @@ class ProcessManager:
                 x for x in found_processes if any(p in x for p in self.args.platforms)
             ]
 
-        if self.args.update_app_store_details_group:
-            found_processes = [
-                x
-                for x in found_processes
-                if self.args.update_app_store_details_group in x
-            ]
         return len(found_processes) > 1
 
     def check_process_sdks_processes(self) -> bool:
@@ -190,12 +176,6 @@ class ProcessManager:
                 x for x in found_processes if any(p in x for p in self.args.platforms)
             ]
 
-        if self.args.update_app_store_details_group:
-            found_processes = [
-                x
-                for x in found_processes
-                if self.args.update_app_store_details_group in x
-            ]
         return len(found_processes) > 1
 
     def check_waydroid_processes(self) -> bool:
@@ -209,12 +189,6 @@ class ProcessManager:
                 x for x in found_processes if any(p in x for p in self.args.platforms)
             ]
 
-        if self.args.update_app_store_details_group:
-            found_processes = [
-                x
-                for x in found_processes
-                if self.args.update_app_store_details_group in x
-            ]
         return len(found_processes) > 1
 
     def check_ads_txt_download_processes(self) -> bool:
@@ -307,11 +281,12 @@ class ProcessManager:
                 logger.exception(f"Crawling developers for {store=} failed")
 
     def update_app_details(self, stores: list[int]) -> None:
-        limit: int | None = None if self.args.no_limits else 5000
+        limit: int | None = None if self.args.no_limits else 200_000
         update_app_details(
-            stores,
-            self.pgcon,
-            group=self.args.update_app_store_details_group,
+            stores=stores,
+            database_connection=self.pgcon,
+            use_ssh_tunnel=self.args.use_ssh_tunnel,
+            workers=int(self.args.workers),
             limit=limit,
         )
 

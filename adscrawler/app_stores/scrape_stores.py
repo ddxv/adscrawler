@@ -2,6 +2,7 @@ import datetime
 import os
 import pathlib
 import time
+from concurrent.futures import ThreadPoolExecutor
 from urllib.error import URLError
 from urllib.parse import unquote_plus
 
@@ -28,7 +29,7 @@ from adscrawler.app_stores.google import (
     search_play_store,
 )
 from adscrawler.config import CONFIG, get_logger
-from adscrawler.dbcon.connection import PostgresCon, start_ssh_tunnel
+from adscrawler.dbcon.connection import PostgresCon, get_db_connection, start_ssh_tunnel
 from adscrawler.dbcon.queries import (
     delete_app_url_mapping,
     query_categories,
@@ -46,6 +47,7 @@ from adscrawler.packages.storage import get_s3_client
 from adscrawler.tools.extract_keywords import get_global_keywords
 
 logger = get_logger(__name__, "scrape_stores")
+
 
 COUNTRY_LIST = [
     "us",
@@ -197,6 +199,53 @@ COUNTRY_LIST = [
     "mk",
     "si",
 ]
+
+
+def process_chunk(df_chunk, use_ssh_tunnel):
+    database_connection = get_db_connection(use_ssh_tunnel=use_ssh_tunnel)
+    database_connection.set_engine()
+    logger.info(
+        f"Processing chunk {df_chunk.index[0]}-{df_chunk.index[-1]} ({len(df_chunk)} apps)"
+    )
+    try:
+        for _, row in df_chunk.iterrows():
+            if "app_url_id" in row:
+                app_url_id = row.app_url_id
+                app_url_id = None if pd.isna(app_url_id) else int(app_url_id)
+            else:
+                app_url_id = None
+            update_all_app_info(
+                row.store, row.store_id, database_connection, app_url_id
+            )
+    except Exception:
+        logger.exception(
+            f"Error processing chunk {df_chunk.index[0]}-{df_chunk.index[-1]}"
+        )
+    finally:
+        logger.info(f"Finished chunk {df_chunk.index[0]}-{df_chunk.index[-1]}")
+        if database_connection and hasattr(database_connection, "engine"):
+            database_connection.engine.dispose()
+            logger.debug(
+                f"Disposed database engine for chunk {df_chunk.index[0]}-{df_chunk.index[-1]}"
+            )
+
+
+def update_app_details(database_connection, stores, use_ssh_tunnel, workers, limit):
+    log_info = f"Update app details: {stores=}"
+    df = query_store_apps(stores, database_connection, limit=limit, log_query=False)
+    logger.info(f"{log_info} start {len(df)} apps")
+
+    chunk_size = 1000
+    chunks = [df.iloc[i : i + chunk_size] for i in range(0, len(df), chunk_size)]
+
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        futures = [
+            executor.submit(process_chunk, chunk, use_ssh_tunnel) for chunk in chunks
+        ]
+        for f in futures:
+            f.result()
+
+    logger.info(f"{log_info} finished")
 
 
 def crawl_keyword_cranks(database_connection: PostgresCon) -> None:
@@ -775,48 +824,6 @@ def crawl_developers_for_new_store_ids(
                 logger.exception(f"{row_info=} failed!")
 
 
-def update_app_details(
-    stores: list[int],
-    database_connection: PostgresCon,
-    group: str,
-    limit: int | None = 1000,
-) -> None:
-    logger.info(f"{stores=} Update App Details: start")
-    df = query_store_apps(
-        stores,
-        database_connection=database_connection,
-        group=group,
-        limit=limit,
-    )
-    if df.empty:
-        logger.info(
-            f"{stores=} Update App Details: no apps to update no apps to update"
-        )
-        return
-    crawl_stores_for_app_details(df, database_connection)
-    logger.info(f"{stores=} Update App Details: finished")
-
-
-def crawl_stores_for_app_details(
-    df: pd.DataFrame,
-    database_connection: PostgresCon,
-) -> None:
-    info = f"Update App Details {df.shape[0]}"
-    logger.info(info + " start!")
-    for index, row in df.iterrows():
-        store_id = row.store_id
-        store = row.store
-        logger.info(f"{store=} {info}/{index=} start")
-        if "app_url_id" in row:
-            app_url_id = row.app_url_id
-            app_url_id = None if pd.isna(app_url_id) else int(app_url_id)
-        else:
-            app_url_id = None
-        update_all_app_info(store, store_id, database_connection, app_url_id)
-        logger.info(f"{store=} {info}/{index=} finished")
-    logger.info(info + " finished!")
-
-
 def update_all_app_info(
     store: int,
     store_id: str,
@@ -890,8 +897,8 @@ def scrape_app(
     language: str,
 ) -> pd.DataFrame:
     scrape_info = f"{store=}, {store_id=}, {country=}, {language=}"
-    max_retries = 2
-    base_delay = 2
+    max_retries = 1
+    base_delay = 1
     retries = 0
 
     logger.info(f"{scrape_info} scrape start")
