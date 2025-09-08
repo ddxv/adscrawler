@@ -203,7 +203,6 @@ COUNTRY_LIST = [
 
 def process_chunk(df_chunk, use_ssh_tunnel):
     database_connection = get_db_connection(use_ssh_tunnel=use_ssh_tunnel)
-    database_connection.set_engine()
     logger.info(
         f"Processing chunk {df_chunk.index[0]}-{df_chunk.index[-1]} ({len(df_chunk)} apps)"
     )

@@ -44,7 +44,7 @@ class PostgresCon:
             else:
                 db_login = f"postgresql+psycopg://{self.db_user}"
             db_uri = f"{db_login}@{self.db_ip}:{self.db_port}/{self.db_name}"
-            logger.info(f"Adscrawler connecting to PostgreSQL {self.db_name}")
+            logger.info(f"Prep PostgreSQL: {self.db_name}")
             self.engine = sqlalchemy.create_engine(
                 db_uri,
                 connect_args={"connect_timeout": 10, "application_name": "adscrawler"},

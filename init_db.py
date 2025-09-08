@@ -21,7 +21,6 @@ logger = get_logger(__name__)
 use_tunnel = False
 database_connection = get_db_connection(use_ssh_tunnel=use_tunnel)
 
-database_connection.set_engine()
 
 logger.info("Creating database")
 os.system("sudo -u postgres createdb madrone")
