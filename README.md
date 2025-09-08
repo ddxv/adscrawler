@@ -6,7 +6,7 @@ Scrapers:
 
 - pull apps from app store and google play store top lists
 - pull apps from some 3rd party stores
-- unzip/decompile Android APKs and iOS IPAs to look for 3rd party tracking/advertising tools
+- unzip/decompile Android APKs and iOS IPAs to look for 3rd party tracking/advertising tools, requires _manual_ setup of apktool and ipatool
 - App-ads.txt files are crawled based on the Interactive Advertising Bureau's Tech Lab specs. https://iabtechlab.com/ads-txt/
 - Implementation of [Waydroid emulator with MITM to capture HTTPs API traffic](https://github.com/ddxv/mobile-network-traffic) (requires _manual_ steps for the headless implementation, please reach out if you need help)
 
