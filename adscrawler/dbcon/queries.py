@@ -601,27 +601,36 @@ def delete_app_url_mapping(app_url_id: int, database_connection: PostgresCon) ->
 def query_store_apps(
     stores: list[int],
     database_connection: PostgresCon,
-    group: str = "short",
     limit: int | None = 1000,
     log_query: bool = False,
 ) -> pd.DataFrame:
-    short_update_days = 6
+    short_update_days = 1
     short_update_installs = 1000
     short_update_ratings = 100
     short_update_date = (
         datetime.datetime.now(tz=datetime.UTC)
         - datetime.timedelta(days=short_update_days)
     ).strftime("%Y-%m-%d")
-    long_update_days = 13
+    long_update_days = 2
     long_update_date = (
         datetime.datetime.now(tz=datetime.UTC)
         - datetime.timedelta(days=long_update_days)
     ).strftime("%Y-%m-%d")
-    max_recrawl_days = 29
+    max_recrawl_days = 15
     max_recrawl_date = (
         datetime.datetime.now(tz=datetime.UTC)
         - datetime.timedelta(days=max_recrawl_days)
     ).strftime("%Y-%m-%d")
+    short_group = f"""(
+                        (
+                          installs >= {short_update_installs}
+                          OR rating_count >= {short_update_ratings}
+                          OR (sa.id in (select store_app from store_apps_in_latest_rankings))
+                            )
+                          AND sa.updated_at <= '{short_update_date}'
+                          AND (crawl_result = 1 OR crawl_result IS NULL OR sa.created_at <= '{long_update_date}')
+                        )
+                    """
     long_group = f"""(
                        sa.updated_at <= '{long_update_date}'
                        AND (
@@ -631,29 +640,12 @@ def query_store_apps(
                        AND (crawl_result = 1 OR crawl_result IS NULL)
                     )
                     """
-    short_group = f"""(
-                        (
-                          installs >= {short_update_installs}
-                          OR rating_count >= {short_update_ratings}
-                          OR (sa.id in (select store_app from store_apps_in_latest_rankings))
-                            )
-                          AND sa.updated_at <= '{short_update_date}'
-                          AND (crawl_result = 1 OR crawl_result IS NULL)
-                        )
-                    """
     max_group = f"""(
                       sa.updated_at <= '{max_recrawl_date}'
                       OR crawl_result IS NULL
                     )
                 """
-    if group == "short":
-        installs_and_dates_str = short_group
-    elif group == "long":
-        installs_and_dates_str = long_group
-    elif group == "max":
-        installs_and_dates_str = max_group
-    else:
-        installs_and_dates_str = f"""(
+    installs_and_dates_str = f"""(
                         {short_group}
                         OR {long_group}
                         OR {max_group}
@@ -661,9 +653,6 @@ def query_store_apps(
                         """
     where_str = "store IN (" + (", ").join([str(x) for x in stores]) + ")"
     where_str += f""" AND {installs_and_dates_str}"""
-    order_str = "DESC NULLS LAST"
-    if group == "max":
-        order_str = "ASC NULLS FIRST"
     limit_str = ""
     if limit:
         limit_str = f"LIMIT {limit}"
@@ -692,7 +681,7 @@ def query_store_apps(
                     COALESCE(installs, 0),
                     COALESCE(CAST(rating_count AS bigint), 0)*50
                 )
-            {order_str}
+            DESC NULLS LAST
         {limit_str}
         """
     if log_query:
