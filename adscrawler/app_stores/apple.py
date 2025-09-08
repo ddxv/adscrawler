@@ -338,14 +338,20 @@ def scrape_app_ios(store_id: str, country: str, language: str) -> dict:
     result: dict = scraper.get_app_details(
         store_id, country=country, add_ratings=True, timeout=10, lang=language
     )
+    logger.info(f"Scrape app finish {store_id=} {country=}")
+    return result
+
+
+def scrape_itunes_additional_html(result: dict, store_id: str, country: str) -> dict:
     try:
+        # This is slow and returns 401 often, so use sparingly
         html_res = scrape_store_html(store_id=store_id, country=country)
         result["in_app_purchases"] = html_res["in_app_purchases"]
         result["ad_supported"] = html_res["ad_supported"]
         result["sellerUrl"] = get_developer_url(result, html_res["urls"])
     except Exception as e:
         logger.warning(f"Failed to get developer url for {store_id=} {country=} {e}")
-    logger.info(f"Scrape app finish {store_id=} {country=}")
+    result["additional_html_scraped_at"] = datetime.datetime.now(tz=datetime.UTC)
     return result
 
 

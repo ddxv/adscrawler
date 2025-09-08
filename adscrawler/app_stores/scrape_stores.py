@@ -19,6 +19,7 @@ from adscrawler.app_stores.apple import (
     crawl_ios_developers,
     scrape_app_ios,
     scrape_ios_ranks,
+    scrape_itunes_additional_html,
     search_app_store_for_ids,
 )
 from adscrawler.app_stores.google import (
@@ -32,6 +33,7 @@ from adscrawler.config import CONFIG, get_logger
 from adscrawler.dbcon.connection import PostgresCon, get_db_connection, start_ssh_tunnel
 from adscrawler.dbcon.queries import (
     delete_app_url_mapping,
+    get_store_app_columns,
     query_categories,
     query_collections,
     query_countries,
@@ -213,7 +215,11 @@ def process_chunk(df_chunk, use_ssh_tunnel):
             else:
                 app_url_id = None
             update_all_app_info(
-                row.store, row.store_id, database_connection, app_url_id
+                row.store,
+                row.store_id,
+                database_connection,
+                app_url_id,
+                html_scraped_at=row.additional_html_scraped_at,
             )
     except Exception:
         logger.exception(
@@ -827,9 +833,10 @@ def update_all_app_info(
     store_id: str,
     database_connection: PostgresCon,
     app_url_id: int | None = None,
+    html_scraped_at: datetime.datetime | None = None,
 ) -> None:
     info = f"{store=} {store_id=}"
-    app_df = scrape_and_save_app(store, store_id, database_connection)
+    app_df = scrape_and_save_app(store, store_id, database_connection, html_scraped_at)
     if "store_app" not in app_df.columns:
         logger.error(f"{info} store_app db id not in app_df columns")
         return
@@ -870,11 +877,21 @@ def update_all_app_info(
     logger.info(f"{info} finished")
 
 
-def scrape_from_store(store: int, store_id: str, country: str, language: str) -> dict:
+def scrape_from_store(
+    store: int,
+    store_id: str,
+    country: str,
+    language: str,
+    html_scraped_at: datetime.datetime | None = None,
+) -> dict:
     if store == 1:
         result_dict = scrape_app_gp(store_id, country=country, language=language)
     elif store == 2:
         result_dict = scrape_app_ios(store_id, country=country, language=language)
+        if html_scraped_at is None or html_scraped_at < datetime.datetime.now(
+            tz=datetime.UTC
+        ) - datetime.timedelta(days=30):
+            result_dict = scrape_itunes_additional_html(result_dict, store_id, country)
     else:
         logger.error(f"Store not supported {store=}")
     return result_dict
@@ -893,6 +910,7 @@ def scrape_app(
     store_id: str,
     country: str,
     language: str,
+    html_scraped_at: datetime.datetime | None = None,
 ) -> pd.DataFrame:
     scrape_info = f"{store=}, {store_id=}, {country=}, {language=}"
     max_retries = 1
@@ -907,6 +925,7 @@ def scrape_app(
                 store_id=store_id,
                 country=country,
                 language=language,
+                html_scraped_at=html_scraped_at,
             )
             crawl_result = 1
             break  # If successful, break out of the retry loop
@@ -1000,6 +1019,7 @@ def scrape_and_save_app(
     store: int,
     store_id: str,
     database_connection: PostgresCon,
+    html_scraped_at: datetime.datetime | None = None,
 ) -> pd.DataFrame:
     # Pulling for more countries will want to track rating, review count, and histogram
     app_country_list = ["us"]
@@ -1009,7 +1029,11 @@ def scrape_and_save_app(
         for language in app_language_list:
             info = f"{store=}, {store_id=}, {country=}, {language}"
             app_df = scrape_app(
-                store=store, store_id=store_id, country=country, language=language
+                store=store,
+                store_id=store_id,
+                country=country,
+                language=language,
+                html_scraped_at=html_scraped_at,
             )
             logger.info(f"{info} save to db start")
             app_df = save_apps_df(
@@ -1030,7 +1054,9 @@ def save_apps_df(
     key_columns = ["store", "store_id"]
     if (apps_df["crawl_result"] == 1).all() and apps_df["developer_id"].notna().all():
         apps_df = save_developer_info(apps_df, database_connection)
-    insert_columns = [x for x in STORE_APP_COLUMNS if x in apps_df.columns]
+    insert_columns = [
+        x for x in get_store_app_columns(database_connection) if x in apps_df.columns
+    ]
     store_apps_df = upsert_df(
         table_name=table_name,
         df=apps_df,
@@ -1246,36 +1272,3 @@ def log_crawl_results(app_df: pd.DataFrame, database_connection: PostgresCon) ->
         con=database_connection.engine,
         if_exists="append",
     )
-
-
-STORE_APP_COLUMNS = [
-    "developer",
-    "name",
-    "store_id",
-    "store",
-    "category",
-    "rating",
-    "installs",
-    "free",
-    "price",
-    "size",
-    "minimum_android",
-    "review_count",
-    "rating_count",
-    "release_date",
-    "content_rating",
-    "store_last_updated",
-    "developer_email",
-    "ad_supported",
-    "in_app_purchases",
-    "editors_choice",
-    "crawl_result",
-    "icon_url_512",
-    "featured_image_url",
-    "phone_image_url_1",
-    "phone_image_url_2",
-    "phone_image_url_3",
-    "tablet_image_url_1",
-    "tablet_image_url_2",
-    "tablet_image_url_3",
-]

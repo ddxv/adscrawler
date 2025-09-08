@@ -598,6 +598,20 @@ def delete_app_url_mapping(app_url_id: int, database_connection: PostgresCon) ->
         raise
 
 
+@lru_cache(maxsize=1)
+def get_store_app_columns(database_connection: PostgresCon) -> list[str]:
+    sel_query = """SELECT * FROM store_apps LIMIT 1"""
+    df = pd.read_sql(sel_query, database_connection.engine)
+    columns = df.columns.tolist()
+    # Auto generated columns
+    columns = [
+        x
+        for x in columns
+        if x not in ["id", "updated_at", "created_at", "textsearchable_index_col"]
+    ]
+    return columns
+
+
 def query_store_apps(
     stores: list[int],
     database_connection: PostgresCon,
@@ -661,7 +675,8 @@ def query_store_apps(
             sa.id as store_app, 
             store_id, 
             sa.updated_at, 
-            aum.id as app_url_id  
+            aum.id as app_url_id,
+            sa.additional_html_scraped_at
         FROM 
             store_apps sa
         LEFT JOIN app_urls_map aum
