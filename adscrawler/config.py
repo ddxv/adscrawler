@@ -195,9 +195,6 @@ with open(CONFIG_FILE_PATH, "rb") as f:
 DATE_FORMAT = "%Y-%m-%d"
 
 
-logger.info("Logger and Config loaded")
-
-
 DEVLEOPER_IGNORE_TLDS = [
     "00webhostapp.com",
     "bitballoon.com",
@@ -225,3 +222,5 @@ DEVLEOPER_IGNORE_TLDS = [
     "wordpress.com",
     "youtube.com",
 ]
+
+logger.info("Logger and Config loaded")
