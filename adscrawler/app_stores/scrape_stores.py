@@ -1174,7 +1174,7 @@ def insert_global_keywords(database_connection: PostgresCon) -> None:
     """Insert global keywords into the database.
     NOTE: This takes about ~5-8GB of RAM for 50k keywords and 200k descriptions. For now run manually.
     """
-    from adscrawler.tools.extract_keywords import get_global_keywords
+    from adscrawler.tools.extract_keywords import get_global_keywords  # noqa: PLC0415
 
     global_keywords = get_global_keywords(database_connection)
     global_keywords_df = pd.DataFrame(global_keywords, columns=["keyword_text"])
