@@ -924,7 +924,7 @@ def scrape_app(
                 logger.warning(f"{scrape_info} failed to find app")
             else:
                 crawl_result = 4
-                logger.error(f"{scrape_info} unexpected error: {error=}")
+                logger.exception(f"{scrape_info} unexpected error: {error=}")
             break
         except URLError as error:
             logger.warning(f"{scrape_info} {error=}")
