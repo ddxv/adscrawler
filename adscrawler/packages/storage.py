@@ -61,7 +61,7 @@ def download_mitm_log_from_s3(
 ) -> None:
     s3_client = get_s3_client()
     s3_client.download_file(
-        Bucket="adscrawler",
+        Bucket=CONFIG["s3"]["bucket"],
         Key=f"mitm/android/{store_id}.log",
         Filename=f"traffic_{store_id}.log",
     )
@@ -92,7 +92,7 @@ def upload_mitm_log_to_s3(
     }
     s3_client = get_s3_client()
     response = s3_client.put_object(
-        Bucket="adscrawler",
+        Bucket=CONFIG["s3"]["bucket"],
         Key=s3_key,
         Body=file_path.read_bytes(),
         Metadata=metadata,
@@ -124,7 +124,7 @@ def upload_ad_creative_to_s3(
     }
     s3_client = get_s3_client()
     response = s3_client.put_object(
-        Bucket="adscrawler",
+        Bucket=CONFIG["s3"]["bucket"],
         Key=prefix,
         Body=file_path.read_bytes(),
         Metadata=metadata,
@@ -158,7 +158,7 @@ def upload_apk_to_s3(
     }
     s3_client = get_s3_client()
     response = s3_client.put_object(
-        Bucket="adscrawler",
+        Bucket=CONFIG["s3"]["bucket"],
         Key=prefix,
         Body=file_path.read_bytes(),
         Metadata=metadata,
@@ -233,7 +233,7 @@ def move_local_mitm_files_to_s3(database_connection: PostgresCon) -> None:
             "run_id": str(run_id),
         }
         response = s3_client.put_object(
-            Bucket="adscrawler",
+            Bucket=CONFIG["s3"]["bucket"],
             Key=s3_key,
             Body=file_path.read_bytes(),
             Metadata=metadata,
@@ -326,7 +326,7 @@ def move_local_apk_files_to_s3() -> None:
             metadata = {"store_id": store_id, "version_code": "failed", "md5": "failed"}
         s3_client = get_s3_client()
         response = s3_client.put_object(
-            Bucket="adscrawler",
+            Bucket=CONFIG["s3"]["bucket"],
             Key=s3_key,
             Body=file_path.read_bytes(),
             Metadata=metadata,
@@ -350,7 +350,7 @@ def get_app_creatives_s3_keys(store: int, store_id: str) -> pd.DataFrame:
         raise ValueError(f"Invalid store: {store}")
     logger.info(f"Getting {store_id=} s3 keys start")
     s3_client = get_s3_client()
-    response = s3_client.list_objects_v2(Bucket="adscrawler", Prefix=prefix)
+    response = s3_client.list_objects_v2(Bucket=CONFIG["s3"]["bucket"], Prefix=prefix)
     objects_data = []
     if response["KeyCount"] == 0:
         logger.error(f"{store_id=} no creatives found in s3")
@@ -383,7 +383,7 @@ def get_store_id_mitm_s3_keys(store_id: str) -> pd.DataFrame:
         raise ValueError(f"Invalid store: {store}")
     logger.info(f"Getting {store_id=} s3 keys start")
     s3_client = get_s3_client()
-    response = s3_client.list_objects_v2(Bucket="adscrawler", Prefix=prefix)
+    response = s3_client.list_objects_v2(Bucket=CONFIG["s3"]["bucket"], Prefix=prefix)
     objects_data = []
     if response["KeyCount"] == 0:
         logger.error(f"{store_id=} no mitm log found in s3")
@@ -420,7 +420,7 @@ def get_store_id_apk_s3_keys(store: int, store_id: str) -> pd.DataFrame:
         raise ValueError(f"Invalid store: {store}")
     logger.info(f"Getting {store_id=} s3 keys start")
     s3_client = get_s3_client()
-    response = s3_client.list_objects_v2(Bucket="adscrawler", Prefix=prefix)
+    response = s3_client.list_objects_v2(Bucket=CONFIG["s3"]["bucket"], Prefix=prefix)
     objects_data = []
     if response["KeyCount"] == 0:
         logger.error(f"{store_id=} no apk found in s3")
@@ -467,7 +467,7 @@ def download_mitm_log_by_key(key: str, filename: str) -> pathlib.Path:
     s3_client = get_s3_client()
     with open(downloaded_file_path, "wb") as f:
         s3_client.download_fileobj(
-            Bucket="adscrawler",
+            Bucket=CONFIG["s3"]["bucket"],
             Key=key,
             Fileobj=f,
         )
@@ -507,7 +507,7 @@ def download_app_by_store_id(
     s3_client = get_s3_client()
     with open(downloaded_file_path, "wb") as f:
         s3_client.download_fileobj(
-            Bucket="adscrawler",
+            Bucket=CONFIG["s3"]["bucket"],
             Key=key,
             Fileobj=f,
         )
@@ -536,7 +536,7 @@ def download_s3_app_by_key(
     s3_client = get_s3_client()
     with open(local_path, "wb") as f:
         s3_client.download_fileobj(
-            Bucket="adscrawler",
+            Bucket=CONFIG["s3"]["bucket"],
             Key=s3_key,
             Fileobj=f,
         )
