@@ -898,12 +898,13 @@ def scrape_app(
     language: str,
 ) -> pd.DataFrame:
     scrape_info = f"{store=}, {store_id=}, {country=}, {language=}"
-    max_retries = 1
+    max_retries = 2
     base_delay = 1
     retries = 0
 
     logger.info(f"{scrape_info} scrape start")
     while retries <= max_retries:
+        retries += 1
         try:
             result_dict = scrape_from_store(
                 store=store,
@@ -916,19 +917,18 @@ def scrape_app(
         except google_play_scraper.exceptions.NotFoundError:
             crawl_result = 3
             logger.warning(f"{scrape_info} failed to find app")
-            break  # If app not found, break out of the retry loop as retrying won't help
+            break
         except AppStoreException as error:
             if "No app found" in str(error):
                 crawl_result = 3
                 logger.warning(f"{scrape_info} failed to find app")
-                break  # Similarly, if app not found, break out of the retry loop
             else:
                 crawl_result = 4
                 logger.error(f"{scrape_info} unexpected error: {error=}")
+            break
         except URLError as error:
             logger.warning(f"{scrape_info} {error=}")
             crawl_result = 4
-            retries += 1
             if retries <= max_retries:
                 sleep_time = base_delay * (2**retries)
                 logger.info(f"{scrape_info} Retrying in {sleep_time} seconds...")
