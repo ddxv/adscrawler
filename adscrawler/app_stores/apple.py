@@ -41,6 +41,7 @@ def get_app_ids_with_retry(
     max_delay = 30
     retries = 0
     app_ids: list[str] = []
+    log_info = f"{coll_value=} {cat_value=} {country=}"
     while len(app_ids) == 0 and retries < max_retries:
         try:
             app_ids = scraper.get_app_ids_for_collection(
@@ -55,14 +56,12 @@ def get_app_ids_with_retry(
                 raise e
             delay = min(base_delay * (2**retries) + random.uniform(0, 1), max_delay)
             logger.warning(
-                f"Attempt {retries} failed. Retrying in {delay:.2f} seconds..."
+                f"{log_info=} attempt {retries} failed. Retrying in {delay:.2f} seconds..."
             )
             time.sleep(delay)
         retries += 1
     if len(app_ids) == 0:
-        logger.info(
-            f"Collection: {coll_value}, category: {cat_value} failed to load apps!"
-        )
+        logger.info(f"{log_info=} failed to load apps!")
     return app_ids
 
 
@@ -381,8 +380,11 @@ def clean_ios_app_df(df: pd.DataFrame) -> pd.DataFrame:
     try:
         # Complicated way to get around many games having very random selections like "games + shopping"
         # TODO: Just store categories as list!
-        df.loc[df["category"] == "Games", "category"] = "game_" + df.loc[
-            df["category"] == "Games",
+        cat_is_games = df["category"] == "Games"
+        genre_is_not_games = df["genres"] != "Games"
+        rows_to_update = cat_is_games & genre_is_not_games
+        df.loc[rows_to_update, "category"] = "game_" + df.loc[
+            rows_to_update,
             "genres",
         ].apply(
             lambda x: [

@@ -207,14 +207,19 @@ def process_chunk(df_chunk, use_ssh_tunnel):
     )
     try:
         for _, row in df_chunk.iterrows():
-            update_all_app_info(
-                row.store,
-                row.store_id,
-                database_connection,
-            )
-    except Exception:
+            try:
+                update_all_app_info(
+                    row.store,
+                    row.store_id,
+                    database_connection,
+                )
+            except Exception as e:
+                logger.exception(
+                    f"store={row.store}, store_id={row.store_id} update_all_app_info failed with {e}"
+                )
+    except Exception as e:
         logger.exception(
-            f"Error processing chunk {df_chunk.index[0]}-{df_chunk.index[-1]}"
+            f"Error processing chunk {df_chunk.index[0]}-{df_chunk.index[-1]} with {e}"
         )
     finally:
         logger.info(f"Finished chunk {df_chunk.index[0]}-{df_chunk.index[-1]}")
