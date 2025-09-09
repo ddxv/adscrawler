@@ -547,11 +547,11 @@ def process_keyword_rankings(
     logger.info("keyword rankings inserted")
 
 
-def download_rankings(
+def manual_download_rankings(
     store: int, crawled_date: datetime.date, country: str
 ) -> pd.DataFrame:
     s3_client = get_s3_client()
-    bucket = "adscrawler"
+    bucket = CONFIG["s3"]["bucket"]
     store = 1
     country = "US"
     crawled_date = datetime.date(2025, 8, 15)
@@ -574,7 +574,7 @@ def process_store_rankings(
         raise ValueError("store is required")
     output_dir = f"/tmp/exports/app_rankings/store={store}"
     s3_client = get_s3_client()
-    bucket = "adscrawler"
+    bucket = CONFIG["s3"]["bucket"]
     for crawled_date, df_crawled_date in df.groupby("crawled_date"):
         if isinstance(crawled_date, datetime.date):
             crawled_date = crawled_date.strftime("%Y-%m-%d")
@@ -631,11 +631,11 @@ def process_weekly_ranks(
     store_id_map = query_store_id_map(database_connection, store)
 
     if database_connection.engine.url.host == "127.0.0.1":
-        port = start_ssh_tunnel("loki")
+        port = start_ssh_tunnel("s3")
         host = "127.0.0.1"
     else:
-        host = CONFIG["loki"]["host"]
-        port = CONFIG["loki"]["remote_port"]
+        host = CONFIG["s3"]["host"]
+        port = CONFIG["s3"]["remote_port"]
     endpoint = f"{host}:{port}"
 
     duckdb_con = duckdb.connect()
@@ -644,13 +644,14 @@ def process_weekly_ranks(
     duckdb_con.execute(f"SET s3_endpoint='{endpoint}';")
     duckdb_con.execute("SET s3_url_style='path';")
     duckdb_con.execute("SET s3_url_compatibility_mode=true;")
-    duckdb_con.execute(f"SET s3_access_key_id='{CONFIG['loki']['access_key_id']}';")
-    duckdb_con.execute(f"SET s3_secret_access_key='{CONFIG['loki']['secret_key']}';")
+    duckdb_con.execute(f"SET s3_access_key_id='{CONFIG['s3']['access_key_id']}';")
+    duckdb_con.execute(f"SET s3_secret_access_key='{CONFIG['s3']['secret_key']}';")
     duckdb_con.execute("SET s3_use_ssl=false;")
     duckdb_con.execute("SET temp_directory = '/tmp/duckdb.tmp/';")
     duckdb_con.execute("SET preserve_insertion_order = false;")
 
     s3 = get_s3_client()
+    bucket = CONFIG["s3"]["bucket"]
 
     for dt in pd.date_range(start_date, end_date, freq="W-MON"):
         week_str = dt.strftime("%Y-%m-%d")
@@ -663,9 +664,9 @@ def process_weekly_ranks(
             prefix = (
                 f"raw-data/app_rankings/store={store}/crawled_date={ddt_str}/country="
             )
-            objects = s3.list_objects_v2(Bucket="adscrawler", Prefix=prefix)
+            objects = s3.list_objects_v2(Bucket=bucket, Prefix=prefix)
             parquet_paths = [
-                f"s3://adscrawler/{obj['Key']}"
+                f"s3://{bucket}/{obj['Key']}"
                 for obj in objects.get("Contents", [])
                 if obj["Key"].endswith("rankings.parquet")
             ]

@@ -35,7 +35,7 @@ def get_s3_client() -> boto3.client:
     global S3_CLIENT
     if S3_CLIENT is not None:
         return S3_CLIENT
-    server_name = "loki"
+    server_name = "s3"
     """Create and return an S3 client."""
     if CONFIG[server_name]["host"].startswith("192.168"):
         # On local network connect directly
