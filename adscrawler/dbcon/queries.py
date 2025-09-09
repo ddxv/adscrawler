@@ -675,12 +675,9 @@ def query_store_apps(
             sa.id as store_app, 
             store_id, 
             sa.updated_at, 
-            aum.id as app_url_id,
             sa.additional_html_scraped_at
         FROM 
             store_apps sa
-        LEFT JOIN app_urls_map aum
-            ON aum.store_app = sa.id
         WHERE {where_str}
         ORDER BY
             (CASE

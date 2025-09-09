@@ -333,12 +333,10 @@ def get_developer_url(result: dict, urls: dict) -> str:
 
 def scrape_app_ios(store_id: str, country: str, language: str) -> dict:
     # NOTE: averageUserRating, Rating_count, Histogram are country specific
-    logger.info(f"Scrape app start {store_id=} {country=} {language=}")
     scraper = AppStoreScraper()
     result: dict = scraper.get_app_details(
         store_id, country=country, add_ratings=True, timeout=10, lang=language
     )
-    logger.info(f"Scrape app finish {store_id=} {country=}")
     return result
 
 

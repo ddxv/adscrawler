@@ -19,7 +19,6 @@ from adscrawler.app_stores.apple import (
     crawl_ios_developers,
     scrape_app_ios,
     scrape_ios_ranks,
-    scrape_itunes_additional_html,
     search_app_store_for_ids,
 )
 from adscrawler.app_stores.google import (
@@ -32,7 +31,6 @@ from adscrawler.app_stores.google import (
 from adscrawler.config import CONFIG, get_logger
 from adscrawler.dbcon.connection import PostgresCon, get_db_connection, start_ssh_tunnel
 from adscrawler.dbcon.queries import (
-    delete_app_url_mapping,
     get_store_app_columns,
     query_categories,
     query_collections,
@@ -209,17 +207,10 @@ def process_chunk(df_chunk, use_ssh_tunnel):
     )
     try:
         for _, row in df_chunk.iterrows():
-            if "app_url_id" in row:
-                app_url_id = row.app_url_id
-                app_url_id = None if pd.isna(app_url_id) else int(app_url_id)
-            else:
-                app_url_id = None
             update_all_app_info(
                 row.store,
                 row.store_id,
                 database_connection,
-                app_url_id,
-                html_scraped_at=row.additional_html_scraped_at,
             )
     except Exception:
         logger.exception(
@@ -834,18 +825,11 @@ def update_all_app_info(
     store: int,
     store_id: str,
     database_connection: PostgresCon,
-    app_url_id: int | None = None,
-    html_scraped_at: datetime.datetime | None = None,
 ) -> None:
     info = f"{store=} {store_id=}"
-    app_df = scrape_and_save_app(store, store_id, database_connection, html_scraped_at)
+    app_df = scrape_and_save_app(store, store_id, database_connection)
     if "store_app" not in app_df.columns:
         logger.error(f"{info} store_app db id not in app_df columns")
-        return
-    if (
-        "url" not in app_df.columns or not app_df["url"].to_numpy()
-    ) and app_url_id is not None:
-        delete_app_url_mapping(app_url_id, database_connection)
         return
     if app_df["crawl_result"].to_numpy()[0] != 1:
         logger.info(f"{info} crawl not successful, don't update further")
@@ -876,7 +860,7 @@ def update_all_app_info(
             key_columns=key_columns,
             database_connection=database_connection,
         )
-    logger.info(f"{info} finished")
+    logger.info(f"{info} finished inserting pub_domains")
 
 
 def scrape_from_store(
@@ -884,16 +868,11 @@ def scrape_from_store(
     store_id: str,
     country: str,
     language: str,
-    html_scraped_at: datetime.datetime | None = None,
 ) -> dict:
     if store == 1:
         result_dict = scrape_app_gp(store_id, country=country, language=language)
     elif store == 2:
         result_dict = scrape_app_ios(store_id, country=country, language=language)
-        if html_scraped_at is None or html_scraped_at < datetime.datetime.now(
-            tz=datetime.UTC
-        ) - datetime.timedelta(days=30):
-            result_dict = scrape_itunes_additional_html(result_dict, store_id, country)
     else:
         logger.error(f"Store not supported {store=}")
     return result_dict
@@ -912,7 +891,6 @@ def scrape_app(
     store_id: str,
     country: str,
     language: str,
-    html_scraped_at: datetime.datetime | None = None,
 ) -> pd.DataFrame:
     scrape_info = f"{store=}, {store_id=}, {country=}, {language=}"
     max_retries = 1
@@ -927,7 +905,6 @@ def scrape_app(
                 store_id=store_id,
                 country=country,
                 language=language,
-                html_scraped_at=html_scraped_at,
             )
             crawl_result = 1
             break  # If successful, break out of the retry loop
@@ -1021,7 +998,6 @@ def scrape_and_save_app(
     store: int,
     store_id: str,
     database_connection: PostgresCon,
-    html_scraped_at: datetime.datetime | None = None,
 ) -> pd.DataFrame:
     # Pulling for more countries will want to track rating, review count, and histogram
     app_country_list = ["us"]
@@ -1029,13 +1005,12 @@ def scrape_and_save_app(
     app_language_list = ["en"]
     for country in app_country_list:
         for language in app_language_list:
-            info = f"{store=}, {store_id=}, {country=}, {language}"
+            info = f"{store=}, {store_id=}, {country=}, {language=}"
             app_df = scrape_app(
                 store=store,
                 store_id=store_id,
                 country=country,
                 language=language,
-                html_scraped_at=html_scraped_at,
             )
             logger.info(f"{info} save to db start")
             app_df = save_apps_df(
@@ -1043,7 +1018,7 @@ def scrape_and_save_app(
                 database_connection=database_connection,
             )
             logger.info(f"{info} save to db finish")
-    crawl_result = app_df["crawl_result"].to_numpy()[0]
+    crawl_result = int(app_df["crawl_result"].to_numpy()[0])
     logger.info(f"{info} {crawl_result=} scraped and saved app")
     return app_df
 
