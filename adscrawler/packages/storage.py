@@ -41,9 +41,12 @@ def get_s3_endpoint(key_name: str) -> str:
     elif CONFIG[key_name].get("remote_port"):
         # Self hosted S3 on same network
         port = CONFIG["s3"]["remote_port"]
+        # NOTE: Current self hosted S3 uses HTTP
+        host = f"http://{host}"
     if port:
         endpoint = f"{host}:{port}"
     else:
+        # External hosted S3 like DigitalOcean Spaces
         if host.startswith("https"):
             endpoint = host
         else:
@@ -63,8 +66,6 @@ def get_s3_client() -> boto3.client:
 
     key_name = "s3"
     endpoint_url = get_s3_endpoint(key_name)
-    if not endpoint_url.startswith("http"):
-        endpoint_url = f"https://{endpoint_url}"
     session = boto3.session.Session()
     S3_CLIENT = session.client(
         "s3",
