@@ -31,6 +31,7 @@ dependencies = [
     "duckdb",
     "imagehash",
     "protod",
+    "pyarrow",
 ]
 
 
