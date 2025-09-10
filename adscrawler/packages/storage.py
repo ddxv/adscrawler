@@ -63,6 +63,8 @@ def get_s3_client() -> boto3.client:
 
     key_name = "s3"
     endpoint_url = get_s3_endpoint(key_name)
+    if not endpoint_url.startswith("http"):
+        endpoint_url = f"https://{endpoint_url}"
     session = boto3.session.Session()
     S3_CLIENT = session.client(
         "s3",
