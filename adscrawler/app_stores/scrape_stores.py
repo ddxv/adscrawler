@@ -633,8 +633,14 @@ def process_weekly_ranks(
     s3_region = CONFIG[key_name]["region_name"]
     # DuckDB uses S3 endpoint url
     endpoint = get_s3_endpoint(key_name)
+    # DuckDB may
     store_id_map = query_store_id_map(database_connection, store)
     duckdb_con = duckdb.connect()
+    if "http://" in endpoint:
+        duckdb_con.execute("SET s3_use_ssl=false;")
+        endpoint = endpoint.replace("http://", "")
+    elif "https://" in endpoint:
+        endpoint = endpoint.replace("https://", "")
     duckdb_con.execute("INSTALL httpfs; LOAD httpfs;")
     duckdb_con.execute(f"SET s3_region='{s3_region}';")
     duckdb_con.execute(f"SET s3_endpoint='{endpoint}';")
@@ -642,7 +648,6 @@ def process_weekly_ranks(
     duckdb_con.execute("SET s3_url_compatibility_mode=true;")
     duckdb_con.execute(f"SET s3_access_key_id='{CONFIG[key_name]['access_key_id']}';")
     duckdb_con.execute(f"SET s3_secret_access_key='{CONFIG[key_name]['secret_key']}';")
-    duckdb_con.execute("SET s3_use_ssl=false;")
     duckdb_con.execute("SET temp_directory = '/tmp/duckdb.tmp/';")
     duckdb_con.execute("SET preserve_insertion_order = false;")
 
