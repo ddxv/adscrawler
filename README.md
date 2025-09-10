@@ -19,11 +19,13 @@ Scrapers:
 - Python environment: Python 3.12/3.13
 - Setup python environment `python3.12 -m venv .virtualenv` & `source .virtualenv/bin/activate`
 - `uv pip install -r pyproject.toml`
-- `cp example_config.toml ~/config/adscrawler/config.toml` and edit any needed values. For using all locally, the main thing that needs to be modified is the `xxx` for postgres pass.
+- `cp example_config.toml ~/config/adscrawler/config.toml` and edit any needed values. For using all locally, the main thing that needs to be modified is the `xxx` for postgres pass and S3 host.
 - In your virtualenv, init db `python db_init.py` -> Initializes MVs, inserts 3m+ apps' store_ids from https://github.com/ddxv/appgoblin-data
 
 - Google Play App Ranks Require: NodeJS
 - `npm install --save google-play-scraper`
+
+- an S3 bucket used by app ranks, APK/IPA download, MITM
 
 ## Run
 

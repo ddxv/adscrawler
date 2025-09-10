@@ -11,3 +11,24 @@ db = "madrone"
 email = "xxx"
 password = "xxx"
 keychain_passphrase = "xxx"
+
+
+[s3]
+bucket = "bucket-name"
+host = "s3.us-west-01.host.com"
+access_key_id = "access-key-id"
+secret_key = "secret-key"
+region_name = "us-west-01"
+
+# This is an example of a self hosted S3 bucket
+# [s3]
+# bucket = "adscrawler"
+# host = "192.168.1.100"
+# os_user = "remoteuser"
+# ssh_pkey = "/home/localuser/.ssh/mykey"
+# ssh_pkey_password = "my_ssh_key_password"
+# ssh_port = 8811 # optional
+# remote_port = 3900
+# access_key_id = "remote_access_key_id"
+# secret_key = "remote_secret_key"
+# region_name = "garage"

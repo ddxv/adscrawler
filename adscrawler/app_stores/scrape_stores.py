@@ -29,7 +29,7 @@ from adscrawler.app_stores.google import (
     search_play_store,
 )
 from adscrawler.config import CONFIG, get_logger
-from adscrawler.dbcon.connection import PostgresCon, get_db_connection, start_ssh_tunnel
+from adscrawler.dbcon.connection import PostgresCon, get_db_connection
 from adscrawler.dbcon.queries import (
     get_store_app_columns,
     query_categories,
@@ -43,7 +43,7 @@ from adscrawler.dbcon.queries import (
     query_store_ids,
     upsert_df,
 )
-from adscrawler.packages.storage import get_s3_client
+from adscrawler.packages.storage import get_s3_client, get_s3_endpoint
 
 logger = get_logger(__name__, "scrape_stores")
 
@@ -628,31 +628,25 @@ def process_weekly_ranks(
     end_date: datetime.date,
     database_connection: PostgresCon,
 ) -> None:
+    key_name = "s3"
+    bucket = CONFIG[key_name]["bucket"]
+    s3_region = CONFIG[key_name]["region_name"]
+    # DuckDB uses S3 endpoint url
+    endpoint = get_s3_endpoint(key_name)
     store_id_map = query_store_id_map(database_connection, store)
-
-    if database_connection.engine.url.host == "127.0.0.1":
-        port = start_ssh_tunnel("s3")
-        host = "127.0.0.1"
-    else:
-        host = CONFIG["s3"]["host"]
-        port = CONFIG["s3"]["remote_port"]
-    endpoint = f"{host}:{port}"
-
     duckdb_con = duckdb.connect()
     duckdb_con.execute("INSTALL httpfs; LOAD httpfs;")
-    duckdb_con.execute("SET s3_region='garage';")
+    duckdb_con.execute(f"SET s3_region='{s3_region}';")
     duckdb_con.execute(f"SET s3_endpoint='{endpoint}';")
     duckdb_con.execute("SET s3_url_style='path';")
     duckdb_con.execute("SET s3_url_compatibility_mode=true;")
-    duckdb_con.execute(f"SET s3_access_key_id='{CONFIG['s3']['access_key_id']}';")
-    duckdb_con.execute(f"SET s3_secret_access_key='{CONFIG['s3']['secret_key']}';")
+    duckdb_con.execute(f"SET s3_access_key_id='{CONFIG[key_name]['access_key_id']}';")
+    duckdb_con.execute(f"SET s3_secret_access_key='{CONFIG[key_name]['secret_key']}';")
     duckdb_con.execute("SET s3_use_ssl=false;")
     duckdb_con.execute("SET temp_directory = '/tmp/duckdb.tmp/';")
     duckdb_con.execute("SET preserve_insertion_order = false;")
 
     s3 = get_s3_client()
-    bucket = CONFIG["s3"]["bucket"]
-
     for dt in pd.date_range(start_date, end_date, freq="W-MON"):
         week_str = dt.strftime("%Y-%m-%d")
         logger.info(f"Processing store={store} week_start={week_str}")
@@ -660,7 +654,6 @@ def process_weekly_ranks(
         all_parquet_paths = []
         for ddt in pd.date_range(dt, dt + datetime.timedelta(days=6), freq="D"):
             ddt_str = ddt.strftime("%Y-%m-%d")
-            logger.info(f"Processing store={store} day={ddt_str}")
             prefix = (
                 f"raw-data/app_rankings/store={store}/crawled_date={ddt_str}/country="
             )

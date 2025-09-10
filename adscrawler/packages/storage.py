@@ -31,27 +31,45 @@ from adscrawler.packages.utils import (
 logger = get_logger(__name__)
 
 
+def get_s3_endpoint(key_name: str) -> str:
+    host = CONFIG[key_name]["host"]
+    port = None
+    if CONFIG[key_name].get("use_ssh", False):
+        # Use SSH tunnel for remote self hosted S3
+        port = start_ssh_tunnel(key_name)
+        host = "http://127.0.0.1"
+    elif CONFIG[key_name].get("remote_port"):
+        # Self hosted S3 on same network
+        port = CONFIG["s3"]["remote_port"]
+    if port:
+        endpoint = f"{host}:{port}"
+    else:
+        if host.startswith("https"):
+            endpoint = host
+        else:
+            endpoint = f"https://{host}"
+    return endpoint
+
+
 def get_s3_client() -> boto3.client:
+    """Create and return an S3 client.
+
+    This supports both self hosted and regular cloud S3. For the self hosted it also supports SSH port forwarding if the S3 is not public.
+
+    """
     global S3_CLIENT
     if S3_CLIENT is not None:
         return S3_CLIENT
-    server_name = "s3"
-    """Create and return an S3 client."""
-    if CONFIG[server_name]["host"].startswith("192.168"):
-        # On local network connect directly
-        host = f"http://{CONFIG[server_name]['host']}"
-        db_port = CONFIG[server_name]["remote_port"]
-    else:
-        # SSH port forwarded
-        host = "http://127.0.0.1"
-        db_port = start_ssh_tunnel(server_name)
+
+    key_name = "s3"
+    endpoint_url = get_s3_endpoint(key_name)
     session = boto3.session.Session()
     S3_CLIENT = session.client(
         "s3",
-        region_name="garage",
-        endpoint_url=f"{host}:{db_port}",
-        aws_access_key_id=CONFIG[server_name]["access_key_id"],
-        aws_secret_access_key=CONFIG[server_name]["secret_key"],
+        region_name=CONFIG[key_name]["region_name"],
+        endpoint_url=endpoint_url,
+        aws_access_key_id=CONFIG[key_name]["access_key_id"],
+        aws_secret_access_key=CONFIG[key_name]["secret_key"],
     )
     return S3_CLIENT
 
