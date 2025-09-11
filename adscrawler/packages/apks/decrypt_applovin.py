@@ -1,11 +1,9 @@
 import base64
 import hashlib
-import sys
 
 from adscrawler.config import CONFIG, get_logger
 from adscrawler.dbcon.connection import PostgresCon
 from adscrawler.dbcon.queries import query_sdk_keys
-
 
 logger = get_logger(__name__)
 
@@ -115,7 +113,7 @@ def decode_v1_from(user_input: bytes, sdk_prefix32: str) -> str | None:
     except Exception as e:
         return f"Error: Invalid Base64 string. {e}"
     if len(raw_data) <= 16:
-        print("Error: Data is too short to contain an 8-byte seed.", file=sys.stderr)
+        logger.debug("Error: Data is too short to contain an 8-byte seed.")
         return b""
     # Generate key from SDK prefix and CONST_A
     ckey = hashlib.sha256(CONST_A + sdk_prefix32.encode("utf-8")).digest()
