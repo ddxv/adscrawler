@@ -233,7 +233,7 @@ class ProcessManager:
         self.pgcon = get_db_connection(use_ssh_tunnel=self.args.use_ssh_tunnel)
 
     def main(self) -> None:
-        logger.info(f"Main starting with args: {self.args.command}")
+        logger.info(f"Main starting with args: {self.args}")
         platforms: list[str] = self.args.platforms or ["google", "apple"]
         _stores: list[int | None] = [
             1 if "google" in platforms else None,
