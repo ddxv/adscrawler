@@ -235,6 +235,7 @@ def parse_mitm_log(
                             try:
                                 request_data["response_content"] = flow.response.content
                             except Exception:
+                                request_data["response_content"] = b""
                                 pass
                         mitm_requests.append(request_data)
                     except Exception as e:
