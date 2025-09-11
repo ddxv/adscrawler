@@ -43,7 +43,9 @@ Scrapers:
 
 - `--workers` Number of workers to use for updating app store details. Default: `1`.
 
-- `-n, --new-apps-check` This populates the app rank data. It is also the source of new apps. Crawl the iTunes and Play Store front pages to discover new apps. Checks top apps for each category and collection.
+- `-n, --new-apps-check` This crawls app rank data and stores to S3. It is also the source of new apps. Crawl the iTunes and Play Store front pages to discover new apps. Checks top apps for each category and collection.
+
+- `--import-ranks-from-s3` This imports the stored S3 data into a weekly table for frontend to use.
 
 - `-d, --new-apps-check-devs` Crawl developers' pages to find new apps.
 
