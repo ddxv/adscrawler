@@ -2762,16 +2762,17 @@ INSERT INTO countries (
 ),
 (
     891,
-    'CS',
-    'SCG',
-    'Serbia and Montenegro',
-    'Serbien und Montenegro',
-    'Serbia and Montenegro',
-    'Serbia y Montenegro',
-    'Serbie-et-Monténégro',
-    'Serbia e Montenegro',
-    'Servië en Montenegro'
+    'RS',
+    'SRB',
+    'Serbia',
+    'Serbien',
+    'Serbia',
+    'Serbia',
+    'Serbie',
+    'Serbia',
+    'Servië'
 ),
+(892, 'ME', 'MNE', 'Montenegro', 'Montenegro', 'Montenegro', 'Montenegro', 'Montenegro', 'Montenegro', 'Montenegro'),
 (
     894,
     'ZM',
