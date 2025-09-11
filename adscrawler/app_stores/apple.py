@@ -36,9 +36,9 @@ def lookupby_id(app_id: str) -> dict:
 def get_app_ids_with_retry(
     scraper: AppStoreScraper, coll_value: str, cat_value: str, country: str
 ) -> list[str]:
-    max_retries = 3
-    base_delay = 2
-    max_delay = 30
+    max_retries = 2
+    base_delay = 1
+    max_delay = 10
     retries = 0
     app_ids: list[str] = []
     log_info = f"{coll_value=} {cat_value=} {country=}"
