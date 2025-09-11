@@ -321,7 +321,7 @@ def scrape_store_ranks(database_connection: PostgresCon, stores: list[int]) -> N
                     f"Srape iOS collection={collection_keyword} hit error={e}, skipping",
                 )
         try:
-            process_weekly_ranks(
+            import_ranks_from_s3(
                 store=2,
                 start_date=datetime.date.today() - datetime.timedelta(days=15),
                 end_date=datetime.date.today(),
@@ -365,15 +365,6 @@ def scrape_store_ranks(database_connection: PostgresCon, stores: list[int]) -> N
             )
         except Exception:
             logger.exception("ApkCombo RSS feed failed")
-        try:
-            process_weekly_ranks(
-                store=1,
-                start_date=datetime.date.today() - datetime.timedelta(days=15),
-                end_date=datetime.date.today(),
-                database_connection=database_connection,
-            )
-        except Exception:
-            logger.exception("Weekly ranks failed")
 
 
 def insert_new_apps(
@@ -622,7 +613,7 @@ def map_database_ids(
     return df
 
 
-def process_weekly_ranks(
+def import_ranks_from_s3(
     store: int,
     start_date: datetime.date,
     end_date: datetime.date,

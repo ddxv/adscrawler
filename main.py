@@ -1,12 +1,14 @@
 import argparse
 import os
 import sys
+import datetime
 
 from adscrawler.app_stores.scrape_stores import (
     crawl_developers_for_new_store_ids,
     crawl_keyword_cranks,
     scrape_store_ranks,
     update_app_details,
+    import_ranks_from_s3,
 )
 from adscrawler.config import get_logger
 from adscrawler.dbcon.connection import PostgresCon, get_db_connection
@@ -110,6 +112,11 @@ class ProcessManager:
         parser.add_argument(
             "--creative-scan-all-apps",
             help="Scan all apps for creatives",
+            action="store_true",
+        )
+        parser.add_argument(
+            "--import-ranks-from-s3",
+            help="Import ranks from s3",
             action="store_true",
         )
 
@@ -226,7 +233,7 @@ class ProcessManager:
         self.pgcon = get_db_connection(use_ssh_tunnel=self.args.use_ssh_tunnel)
 
     def main(self) -> None:
-        logger.info(f"Main starting with args: {self.args}")
+        logger.info(f"Main starting with args: {self.args.command}")
         platforms: list[str] = self.args.platforms or ["google", "apple"]
         _stores: list[int | None] = [
             1 if "google" in platforms else None,
@@ -237,6 +244,9 @@ class ProcessManager:
 
         if self.args.new_apps_check:
             self.scrape_new_apps(stores)
+
+        if self.args.import_ranks_from_s3:
+            self.import_ranks_from_s3(stores)
 
         if self.args.new_apps_check_devs:
             self.scrape_new_apps_devs(stores)
@@ -263,6 +273,20 @@ class ProcessManager:
             self.crawl_keywords()
 
         logger.info("Adscrawler exiting main")
+
+    def import_ranks_from_s3(self, stores: list[int]) -> None:
+        start_date = datetime.date.today() - datetime.timedelta(days=15)
+        end_date = datetime.date.today()
+        for store in stores:
+            try:
+                import_ranks_from_s3(
+                    database_connection=self.pgcon,
+                    store=store,
+                    start_date=start_date,
+                    end_date=end_date,
+                )
+            except Exception:
+                logger.exception(f"Importing weekly ranks from s3 for {store=} failed")
 
     def scrape_new_apps(self, stores: list[int]) -> None:
         try:
