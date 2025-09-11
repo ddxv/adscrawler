@@ -320,15 +320,6 @@ def scrape_store_ranks(database_connection: PostgresCon, stores: list[int]) -> N
                 logger.exception(
                     f"Srape iOS collection={collection_keyword} hit error={e}, skipping",
                 )
-        try:
-            import_ranks_from_s3(
-                store=2,
-                start_date=datetime.date.today() - datetime.timedelta(days=15),
-                end_date=datetime.date.today(),
-                database_connection=database_connection,
-            )
-        except Exception:
-            logger.exception("Weekly ranks failed")
 
     if 1 in stores:
         for country in COUNTRY_LIST:
@@ -633,7 +624,6 @@ def import_ranks_from_s3(
         endpoint = endpoint.replace("http://", "")
     elif "https://" in endpoint:
         endpoint = endpoint.replace("https://", "")
-    logger.info(f"DuckDB endpoint {endpoint=}")
     duckdb_con.execute("INSTALL httpfs; LOAD httpfs;")
     duckdb_con.execute(f"SET s3_region='{s3_region}';")
     duckdb_con.execute(f"SET s3_endpoint='{endpoint}';")
