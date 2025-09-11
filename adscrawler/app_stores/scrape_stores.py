@@ -656,63 +656,73 @@ def import_ranks_from_s3(
             logger.info(f"No parquet files found for week_start={week_str}")
             continue
 
-        week_query = f"""WITH all_data AS (
-            SELECT * FROM read_parquet({all_parquet_paths})
-             ),
-         weekly_max_dates AS (
-                      SELECT ar_1.country,
-                         ar_1.collection,
-                         ar_1.category,
-                         date_trunc('week'::text, ar_1.crawled_date::timestamp with time zone) AS week_start,
-                         max(ar_1.crawled_date) AS max_crawled_date
-                        FROM all_data ar_1
-                       GROUP BY ar_1.country, ar_1.collection, ar_1.category, (date_trunc('week'::text, ar_1.crawled_date::timestamp with time zone))
-                     ),
-         weekly_app_ranks as (SELECT ar.rank,
-            min(ar.rank) AS best_rank,
-            ar.country,
-            ar.collection,
-            ar.category,
-            ar.crawled_date,
-            ar.store_id
-           FROM all_data ar
-             JOIN weekly_max_dates wmd ON ar.country = wmd.country 
-             AND ar.collection = wmd.collection 
-             AND ar.category = wmd.category 
-             AND ar.crawled_date = wmd.max_crawled_date
-             GROUP BY ar.rank, ar.country, ar.collection, ar.category, ar.crawled_date, ar.store_id
-             )
-        SELECT war.rank, war.best_rank, war.country, war.collection, war.category, war.crawled_date, war.store_id FROM weekly_app_ranks war
-          ORDER BY war.country, war.collection, war.category, war.crawled_date, war.rank
-        """
-        logger.info(
-            f"DuckDB query s3 for {store=} week_start={week_str} parquet files={len(all_parquet_paths)}"
-        )
-        wdf = duckdb_con.execute(week_query).df()
-        wdf = map_database_ids(wdf, database_connection, store_id_map, store)
-        wdf = wdf.drop(columns=["store_id", "collection", "category"])
-        upsert_df(
-            df=wdf,
-            table_name="store_app_ranks_weekly",
-            schema="frontend",
-            database_connection=database_connection,
-            key_columns=[
-                "country",
-                "store_collection",
-                "store_category",
-                "crawled_date",
-                "rank",
-            ],
-            insert_columns=[
-                "country",
-                "store_collection",
-                "store_category",
-                "crawled_date",
-                "rank",
-                "store_app",
-                "best_rank",
-            ],
-        )
+        week_countries = [
+            x.split("country=")[1].split("/")[0]
+            for x in all_parquet_paths
+            if "country=" in x
+        ]
+        week_countries = list(set(week_countries))
+        for country in week_countries:
+            country_parquet_paths = [
+                x for x in all_parquet_paths if f"country={country}" in x
+            ]
+            week_query = f"""WITH all_data AS (
+                SELECT * FROM read_parquet({country_parquet_paths})
+                 ),
+             weekly_max_dates AS (
+                          SELECT ar_1.country,
+                             ar_1.collection,
+                             ar_1.category,
+                             date_trunc('week'::text, ar_1.crawled_date::timestamp with time zone) AS week_start,
+                             max(ar_1.crawled_date) AS max_crawled_date
+                            FROM all_data ar_1
+                           GROUP BY ar_1.country, ar_1.collection, ar_1.category, (date_trunc('week'::text, ar_1.crawled_date::timestamp with time zone))
+                         ),
+             weekly_app_ranks as (SELECT ar.rank,
+                min(ar.rank) AS best_rank,
+                ar.country,
+                ar.collection,
+                ar.category,
+                ar.crawled_date,
+                ar.store_id
+               FROM all_data ar
+                 JOIN weekly_max_dates wmd ON ar.country = wmd.country 
+                 AND ar.collection = wmd.collection 
+                 AND ar.category = wmd.category 
+                 AND ar.crawled_date = wmd.max_crawled_date
+                 GROUP BY ar.rank, ar.country, ar.collection, ar.category, ar.crawled_date, ar.store_id
+                 )
+            SELECT war.rank, war.best_rank, war.country, war.collection, war.category, war.crawled_date, war.store_id FROM weekly_app_ranks war
+              ORDER BY war.country, war.collection, war.category, war.crawled_date, war.rank
+            """
+            logger.info(
+                f"DuckDB query s3 for {store=} week_start={week_str} parquet files={len(all_parquet_paths)}"
+            )
+            wdf = duckdb_con.execute(week_query).df()
+            wdf = map_database_ids(wdf, database_connection, store_id_map, store)
+            wdf = wdf.drop(columns=["store_id", "collection", "category"])
+            upsert_df(
+                df=wdf,
+                table_name="store_app_ranks_weekly",
+                schema="frontend",
+                database_connection=database_connection,
+                key_columns=[
+                    "country",
+                    "store_collection",
+                    "store_category",
+                    "crawled_date",
+                    "rank",
+                ],
+                insert_columns=[
+                    "country",
+                    "store_collection",
+                    "store_category",
+                    "crawled_date",
+                    "rank",
+                    "store_app",
+                    "best_rank",
+                ],
+            )
 
 
 def extract_domains(x: str) -> str:

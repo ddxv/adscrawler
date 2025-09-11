@@ -2772,7 +2772,18 @@ INSERT INTO countries (
     'Serbia',
     'Servië'
 ),
-(892, 'ME', 'MNE', 'Montenegro', 'Montenegro', 'Montenegro', 'Montenegro', 'Montenegro', 'Montenegro', 'Montenegro'),
+(
+    892,
+    'ME',
+    'MNE',
+    'Montenegro',
+    'Montenegro',
+    'Montenegro',
+    'Montenegro',
+    'Montenegro',
+    'Montenegro',
+    'Montenegro'
+),
 (
     894,
     'ZM',
