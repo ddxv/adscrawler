@@ -622,6 +622,7 @@ def import_ranks_from_s3(
     key_name = "s3"
     bucket = CONFIG[key_name]["bucket"]
     s3_region = CONFIG[key_name]["region_name"]
+    logger.info(f"Importing ranks from s3 {bucket=} in {s3_region=}")
     # DuckDB uses S3 endpoint url
     endpoint = get_s3_endpoint(key_name)
     # DuckDB may
@@ -632,6 +633,7 @@ def import_ranks_from_s3(
         endpoint = endpoint.replace("http://", "")
     elif "https://" in endpoint:
         endpoint = endpoint.replace("https://", "")
+    logger.info(f"DuckDB endpoint {endpoint=}")
     duckdb_con.execute("INSTALL httpfs; LOAD httpfs;")
     duckdb_con.execute(f"SET s3_region='{s3_region}';")
     duckdb_con.execute(f"SET s3_endpoint='{endpoint}';")
@@ -693,12 +695,12 @@ def import_ranks_from_s3(
         SELECT war.rank, war.best_rank, war.country, war.collection, war.category, war.crawled_date, war.store_id FROM weekly_app_ranks war
           ORDER BY war.country, war.collection, war.category, war.crawled_date, war.rank
         """
-
+        logger.info(
+            f"DuckDB query s3 for {store=} week_start={week_str} parquet files={len(all_parquet_paths)}"
+        )
         wdf = duckdb_con.execute(week_query).df()
-
         wdf = map_database_ids(wdf, database_connection, store_id_map, store)
         wdf = wdf.drop(columns=["store_id", "collection", "category"])
-
         upsert_df(
             df=wdf,
             table_name="store_app_ranks_weekly",
