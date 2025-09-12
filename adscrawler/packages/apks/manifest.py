@@ -53,7 +53,7 @@ def get_json_df(apk_tmp_decoded_output_path: pathlib.Path) -> pd.DataFrame:
                 data = json.load(f)
                 for key in data.keys():
                     store_key = {}
-                    my_path = file_name + "." + key
+                    my_path = "res.raw." + file_name + "." + key
                     store_key["path"] = my_path
                     str_data = str(data[key])
                     str_data = str_data[:500]
