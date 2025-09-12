@@ -27,11 +27,14 @@ def move_mitm_to_processed(store_id: str, run_id: int) -> None:
 
 
 def parse_mitm_short_log(
-    store_id: str, database_connection: PostgresCon
+    store_id: str,
+    database_connection: PostgresCon,
+    mitmlog_file: pathlib.Path | None = None,
 ) -> pd.DataFrame:
-    # Define the log file path
-    flows_file = f"traffic_{store_id}.log"
-    mitmlog_file = pathlib.Path(MITM_DIR, flows_file)
+    # If the mitmlog_file is not provided, use the default file name from Waydroid
+    if mitmlog_file is None:
+        flows_file = f"traffic_{store_id}.log"
+        mitmlog_file = pathlib.Path(MITM_DIR, flows_file)
 
     if not mitmlog_file.exists():
         logger.error(f"mitm log file not found at {mitmlog_file}")

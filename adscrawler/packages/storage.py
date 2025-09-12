@@ -402,7 +402,7 @@ def get_store_id_mitm_s3_keys(store_id: str) -> pd.DataFrame:
         prefix = f"mitm/ios/{store_id}/"
     else:
         raise ValueError(f"Invalid store: {store}")
-    logger.info(f"Getting {store_id=} s3 keys start")
+    logger.info(f"S3 getting {store_id=} mitm logs start")
     s3_client = get_s3_client()
     response = s3_client.list_objects_v2(Bucket=CONFIG["s3"]["bucket"], Prefix=prefix)
     objects_data = []
@@ -428,7 +428,7 @@ def get_store_id_mitm_s3_keys(store_id: str) -> pd.DataFrame:
             }
         )
     df = pd.DataFrame(objects_data)
-    logger.info(f"Found {store_id=} s3 keys: {df.shape[0]}")
+    logger.info(f"S3 found {store_id=} mitm logs: {df.shape[0]}")
     return df
 
 
@@ -574,7 +574,7 @@ def download_app_to_local(
 ) -> tuple[pathlib.Path, str]:
     file_path = get_local_file_path(store, store_id)
     if file_path:
-        logger.info(f"{store_id=} already downloaded")
+        logger.info(f"{store_id=} app already downloaded")
         return file_path, version_str
     file_path, version_str = download_app_by_store_id(
         store=store, store_id=store_id, version_str=version_str

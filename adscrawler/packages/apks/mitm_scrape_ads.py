@@ -1959,7 +1959,7 @@ def download_all_mitms(database_connection: PostgresCon) -> None:
         pub_store_id = app["store_id"]
         # Check if any log files exist for this pub_store_id
         if list(pathlib.Path(MITM_DIR).glob(f"{pub_store_id}_*.log")):
-            logger.info(f"{pub_store_id} already downloaded")
+            logger.info(f"{pub_store_id} a mitm log is already downloaded")
             continue
         try:
             mitms = get_store_id_mitm_s3_keys(store_id=pub_store_id)
