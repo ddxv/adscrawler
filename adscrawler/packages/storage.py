@@ -54,7 +54,7 @@ def get_s3_endpoint(key_name: str) -> str:
     return endpoint
 
 
-def get_s3_client() -> boto3.client:
+def get_s3_client(key_name: str = "s3") -> boto3.client:
     """Create and return an S3 client.
 
     This supports both self hosted and regular cloud S3. For the self hosted it also supports SSH port forwarding if the S3 is not public.
@@ -64,7 +64,6 @@ def get_s3_client() -> boto3.client:
     if S3_CLIENT is not None:
         return S3_CLIENT
 
-    key_name = "s3"
     endpoint_url = get_s3_endpoint(key_name)
     session = boto3.session.Session()
     S3_CLIENT = session.client(

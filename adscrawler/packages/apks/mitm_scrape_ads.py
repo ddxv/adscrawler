@@ -13,7 +13,6 @@ import urllib
 import uuid
 import xml.etree.ElementTree as ET
 
-import boto3
 import imagehash
 import numpy as np
 import pandas as pd
@@ -26,7 +25,7 @@ from mitmproxy.io import FlowReader
 from PIL import Image
 from protod import Renderer
 
-from adscrawler.config import CONFIG, CREATIVES_DIR, MITM_DIR, get_logger
+from adscrawler.config import CREATIVES_DIR, MITM_DIR, get_logger
 from adscrawler.dbcon.connection import PostgresCon
 from adscrawler.dbcon.queries import (
     get_all_mmp_tlds,
@@ -42,6 +41,7 @@ from adscrawler.packages.storage import (
     download_mitm_log_by_key,
     download_mitm_log_by_store_id,
     get_app_creatives_s3_keys,
+    get_s3_client,
     get_store_id_mitm_s3_keys,
     upload_ad_creative_to_s3,
 )
@@ -2014,20 +2014,8 @@ def open_all_local_mitms(database_connection: PostgresCon) -> pd.DataFrame:
 
 def upload_all_mitms_to_s3() -> None:
     bucket_name = "appgoblin-data"
-    client = get_cloud_s3_client()
+    client = get_s3_client()
     client.upload_file(
         "all_mitms.tsv.xz", Bucket=bucket_name, Key="mitmcsv/all_mitms.tsv.xz"
     )
     os.system("s3cmd setacl s3://appgoblin-data/mitmcsv/ --acl-public --recursive")
-
-
-def get_cloud_s3_client():
-    """Create and return an S3 client."""
-    session = boto3.session.Session()
-    return session.client(
-        "s3",
-        region_name="sgp1",
-        endpoint_url="https://sgp1.digitaloceanspaces.com",
-        aws_access_key_id=CONFIG["digi-cloud"]["access_key_id"],
-        aws_secret_access_key=CONFIG["digi-cloud"]["secret_key"],
-    )

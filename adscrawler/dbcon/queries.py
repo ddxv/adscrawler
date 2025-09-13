@@ -507,6 +507,19 @@ def query_countries(database_connection: PostgresCon) -> pd.DataFrame:
 
 
 @lru_cache(maxsize=1)
+def query_companies(database_connection: PostgresCon) -> pd.DataFrame:
+    sel_query = """SELECT
+        *
+        FROM
+        adtech.companies c
+        left join ad_domains ad on c.domain_id = ad.id
+        ;
+        """
+    df = pd.read_sql(sel_query, database_connection.engine)
+    return df
+
+
+@lru_cache(maxsize=1)
 def query_languages(database_connection: PostgresCon) -> pd.DataFrame:
     sel_query = """SELECT
         *
