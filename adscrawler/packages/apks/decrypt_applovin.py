@@ -1,19 +1,14 @@
 import base64
 import hashlib
+import gzip
+import zlib
+
 
 from adscrawler.config import CONFIG, get_logger
 from adscrawler.dbcon.connection import PostgresCon
 from adscrawler.dbcon.queries import query_sdk_keys
 
 logger = get_logger(__name__)
-
-try:
-    C1 = CONFIG["applovin"]["C1"]
-    C2 = CONFIG["applovin"]["C2"]
-    CONST_A = base64.b64decode(CONFIG["applovin"]["CONST_A"])
-    CONST_B = base64.b64decode(CONFIG["applovin"]["CONST_B"])
-except Exception:
-    logger.warning("No applovin config found")
 
 
 def sha1_hex(b: bytes) -> str:
@@ -39,9 +34,6 @@ def to_signed_64(n: int) -> int:
 
 
 def try_decompress(data: bytes):
-    import gzip
-    import zlib
-
     # Try gzip first (MAX uses gzip if length > threshold), then zlib variants, then none
     try:
         return gzip.decompress(data), "gzip"
@@ -56,6 +48,8 @@ def try_decompress(data: bytes):
 
 
 def decode_from(blob: bytes, database_connection: PostgresCon) -> str | None:
+    const_a = base64.b64decode(CONFIG["applovin"]["CONST_A"])
+    const_b = base64.b64decode(CONFIG["applovin"]["CONST_B"])
     m = blob.split(b":")
     version = m[0]
     sha1_seen = m[1]
@@ -85,13 +79,15 @@ def decode_from(blob: bytes, database_connection: PostgresCon) -> str | None:
 
     sha1_seen = sha1_seen.decode()
 
+    # TODO: These should have been asserting that sha1_seen == sha1_hex(my_const)
+    # but need to check this actually was workign for both v1 and v2
     if version == b"1":
-        my_const = CONST_A
-        assert sha1_hex(my_const) == sha1_hex(CONST_A), "Invalid sha1"
+        my_const = const_a
+        assert sha1_hex(my_const) == sha1_hex(const_a), "Invalid sha1"
         found_text = decode_v1_from(payload, sdk_prefix32)
     elif version == b"2":
-        my_const = CONST_B
-        assert sha1_hex(my_const) == sha1_hex(CONST_B), "Invalid sha1"
+        my_const = const_b
+        assert sha1_hex(my_const) == sha1_hex(const_b), "Invalid sha1"
         found_text = decode_v2_from(blob, sdk_prefix32)
     else:
         raise ValueError(f"Invalid version: {version}")
@@ -116,7 +112,9 @@ def decode_v1_from(user_input: bytes, sdk_prefix32: str) -> str | None:
         logger.debug("Error: Data is too short to contain an 8-byte seed.")
         return b""
     # Generate key from SDK prefix and CONST_A
-    ckey = hashlib.sha256(CONST_A + sdk_prefix32.encode("utf-8")).digest()
+    ckey = hashlib.sha256(
+        CONFIG["applovin"]["CONST_A"] + sdk_prefix32.encode("utf-8")
+    ).digest()
 
     # The first 8 bytes are the encrypted seed
     encrypted_seed_bytes = bytearray(raw_data[:8])
@@ -133,7 +131,7 @@ def decode_v1_from(user_input: bytes, sdk_prefix32: str) -> str | None:
     # Process 8 bytes at a time (matching Java's 8-byte block processing)
     for block_start in range(0, len(ciphertext), 8):
         # Get current 8-byte block
-        block_end = min(block_start + len(ciphertext), block_start + 8)
+        # block_end = min(block_start + len(ciphertext), block_start + 8)
 
         # Generate PRNG value for this block position
         # The Java code uses block_start as the counter/offset
@@ -141,10 +139,10 @@ def decode_v1_from(user_input: bytes, sdk_prefix32: str) -> str | None:
         x = seed + counter
 
         # First transformation: x = (x ^ (x >>> 33)) * C1
-        x = to_signed_64((x ^ (x >> 33)) * C1)
+        x = to_signed_64((x ^ (x >> 33)) * CONFIG["applovin"]["C1"])
 
         # Second transformation: x = (x ^ (x >>> 29)) * C2
-        x = to_signed_64((x ^ (x >> 29)) * C2)
+        x = to_signed_64((x ^ (x >> 29)) * CONFIG["applovin"]["C2"])
 
         # Final transformation: prng_val = x ^ (x >>> 32)
         prng_val = to_signed_64(x ^ (x >> 32))
@@ -187,7 +185,9 @@ def decode_v2_from(blob: bytes, sdk_prefix32: str) -> str | None:
     payload_start = len(b":".join(m[:3])) + 1  # +1 for the colon after sdk_prefix
     seed_enc_le = int.from_bytes(blob[payload_start + 8 : payload_start + 16], "little")
     payload = blob[payload_start + 16 :]
-    digest = hashlib.sha256(CONST_B + sdk_prefix32.encode("utf-8")).digest()
+    digest = hashlib.sha256(
+        CONFIG["applovin"]["CONST_B"] + sdk_prefix32.encode("utf-8")
+    ).digest()
     # Try several 64-bit derivations from the digest to XOR with seed_enc (robust across minor variants).
     candidates = []
     for off in (0, 8, 16, 24):
@@ -225,16 +225,16 @@ def decode_v2_from(blob: bytes, sdk_prefix32: str) -> str | None:
 
 def mix64(seed: int, b_index: int) -> int:
     """Reproduce the 64-bit mixing stream used in i4 (Little-Endian expansion per 8-byte stripe)."""
-    MASK = (1 << 64) - 1
-    cc1 = (1 << 64) + (C1)
-    cc2 = (1 << 64) + (C2)
-    z = (seed + b_index) & MASK
-    x = (z ^ (z >> 33)) & MASK
-    x = (x * cc1) & MASK
-    x = (x ^ (x >> 29)) & MASK
-    x = (x * cc2) & MASK
-    x = (x ^ (x >> 32)) & MASK
-    return x & MASK
+    mask = (1 << 64) - 1
+    cc1 = (1 << 64) + (CONFIG["applovin"]["C1"])
+    cc2 = (1 << 64) + (CONFIG["applovin"]["C2"])
+    z = (seed + b_index) & mask
+    x = (z ^ (z >> 33)) & mask
+    x = (x * cc1) & mask
+    x = (x ^ (x >> 29)) & mask
+    x = (x * cc2) & mask
+    x = (x ^ (x >> 32)) & mask
+    return x & mask
 
 
 def xor_permute(data: bytes, seed: int, key: bytes) -> bytes:
