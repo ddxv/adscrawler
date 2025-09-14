@@ -1,14 +1,14 @@
 import argparse
+import datetime
 import os
 import sys
-import datetime
 
 from adscrawler.app_stores.scrape_stores import (
     crawl_developers_for_new_store_ids,
     crawl_keyword_cranks,
+    import_ranks_from_s3,
     scrape_store_ranks,
     update_app_details,
-    import_ranks_from_s3,
 )
 from adscrawler.config import get_logger
 from adscrawler.dbcon.connection import PostgresCon, get_db_connection

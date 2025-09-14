@@ -198,7 +198,6 @@ def process_sdks(
             database_connection=database_connection,
         )
         if version_code_dbid is None:
-            # raise ValueError(f"Version code dbid is None for {store_id=}")
             logger.error(
                 f"Version code dbid is None for {store_id=}, data not recorded!"
             )

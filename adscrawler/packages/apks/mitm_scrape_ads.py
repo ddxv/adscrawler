@@ -2014,7 +2014,7 @@ def open_all_local_mitms(database_connection: PostgresCon) -> pd.DataFrame:
 
 def upload_all_mitms_to_s3() -> None:
     bucket_name = "appgoblin-data"
-    client = get_s3_client()
+    client = get_s3_client("digi-cloud")
     client.upload_file(
         "all_mitms.tsv.xz", Bucket=bucket_name, Key="mitmcsv/all_mitms.tsv.xz"
     )

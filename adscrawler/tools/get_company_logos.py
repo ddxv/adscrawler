@@ -242,10 +242,10 @@ def upload_company_logo_to_s3(
         logger.error(f"Failed to upload {domain} logo to S3")
 
 
-def main():
+def update_company_logos():
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-    use_ssh_tunnel = True
+    use_ssh_tunnel = Fa
     database_connection = get_db_connection(use_ssh_tunnel=use_ssh_tunnel)
 
     companies = query_companies(database_connection=database_connection)
@@ -267,7 +267,3 @@ def main():
             )
             logger.info(f"Uploaded {input_domain} logo to S3")
             sleep(2)
-
-
-if __name__ == "__main__":
-    main()
