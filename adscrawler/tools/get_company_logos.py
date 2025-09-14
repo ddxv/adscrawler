@@ -22,7 +22,7 @@ from PIL import Image
 
 from adscrawler.config import CONFIG, get_logger
 from adscrawler.dbcon.connection import get_db_connection
-from adscrawler.dbcon.queries import query_companies
+from adscrawler.dbcon.queries import query_companies, update_company_logo_url
 from adscrawler.packages.storage import get_s3_client
 
 logger = get_logger(__name__)
@@ -151,7 +151,7 @@ def find_linkedin_url(html: str) -> list[str]:
     return list(set(linkedin_urls))
 
 
-def process_site(domain: str) -> str:
+def process_site(domain: str) -> str | None:
     try:
         r = requests.get(f"https://{domain}", headers=HEADERS, timeout=10)
         if r.status_code != 200:
@@ -220,7 +220,8 @@ def check_logo_exists_s3(domain: str) -> str | None:
     for obj in response["Contents"]:
         filename = obj["Key"].split("/")[-1]
         if filename.startswith("logo_"):
-            return filename
+            return str(filename)
+    return None
 
 
 def upload_company_logo_to_s3(
@@ -242,19 +243,29 @@ def upload_company_logo_to_s3(
         logger.error(f"Failed to upload {domain} logo to S3")
 
 
-def update_company_logos():
+def update_company_logos() -> None:
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-    use_ssh_tunnel = Fa
+    use_ssh_tunnel = True
     database_connection = get_db_connection(use_ssh_tunnel=use_ssh_tunnel)
 
     companies = query_companies(database_connection=database_connection)
-    domains = companies["domain"].tolist()
-    for input_domain in domains:
+
+    for _, row in companies.iterrows():
+        input_domain = row["company_domain"]
+        company_id = row["company_id"]
         filename = check_logo_exists_s3(input_domain)
-        if filename:
+        if filename and row["company_logo_url"]:
             logger.info(f"{input_domain} logo already in S3")
             continue
+        if filename and not row["company_logo_url"]:
+            logger.info(f"Updating {input_domain} logo url to {filename}")
+            logo_url = f"input_domain/{filename}"
+            update_company_logo_url(
+                company_id=company_id,
+                logo_url=logo_url,
+                database_connection=database_connection,
+            )
         else:
             logger.info(f"Processing: {input_domain}")
             filename = process_site(input_domain)
@@ -265,5 +276,12 @@ def update_company_logos():
                 domain=input_domain,
                 file_path=pathlib.Path(OUTPUT_DIR, input_domain, filename),
             )
-            logger.info(f"Uploaded {input_domain} logo to S3")
+
+            logger.info(f"Uploaded {input_domain}  to S3")
+            logo_url = f"input_domain/{filename}"
+            update_company_logo_url(
+                company_id=company_id,
+                logo_url=filename,
+                database_connection=database_connection,
+            )
             sleep(2)

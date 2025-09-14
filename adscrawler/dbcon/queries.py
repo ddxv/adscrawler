@@ -509,7 +509,12 @@ def query_countries(database_connection: PostgresCon) -> pd.DataFrame:
 @lru_cache(maxsize=1)
 def query_companies(database_connection: PostgresCon) -> pd.DataFrame:
     sel_query = """SELECT
-        *
+        c.id as company_id,
+        c.name as company_name,
+        c.parent_company_id as parent_company_id,
+        c.logo_url as company_logo_url,
+        ad.id as company_domain_id,
+        ad.domain as company_domain
         FROM
         adtech.companies c
         left join ad_domains ad on c.domain_id = ad.id
@@ -517,6 +522,14 @@ def query_companies(database_connection: PostgresCon) -> pd.DataFrame:
         """
     df = pd.read_sql(sel_query, database_connection.engine)
     return df
+
+
+def update_company_logo_url(
+    company_id: int, logo_url: str, database_connection: PostgresCon
+) -> None:
+    update_query = """UPDATE adtech.companies SET logo_url = %s WHERE id = %s"""
+    with database_connection.get_cursor() as cur:
+        cur.execute(update_query, (logo_url, company_id))
 
 
 @lru_cache(maxsize=1)

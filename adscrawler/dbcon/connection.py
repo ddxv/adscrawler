@@ -56,7 +56,7 @@ class PostgresCon:
             raise
 
     @contextmanager
-    def get_cursor(self) -> None:
+    def get_cursor(self):
         """Context manager for database connection and cursor."""
         conn = self.engine.raw_connection()
         try:
@@ -82,8 +82,8 @@ def manage_tunnel_thread(
 ) -> int:
     result = {}
 
-    def runner():
-        async def main():
+    def runner() -> None:
+        async def main() -> None:
             async with asyncssh.connect(
                 host,
                 username=os_user,
