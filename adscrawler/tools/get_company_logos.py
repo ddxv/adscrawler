@@ -230,12 +230,15 @@ def upload_company_logo_to_s3(
 ) -> None:
     """Upload apk to s3."""
     filename = file_path.name
+    file_format = file_path.suffix[1:]
+    image_format = "image/" + file_format
     s3_client = get_s3_client("digi-cloud")
     response = s3_client.put_object(
         Bucket=CONFIG["digi-cloud"]["bucket"],
         Key=f"company-logos/{domain}/{filename}",
         ACL="public-read",
         Body=file_path.read_bytes(),
+        ExtraArgs={"ContentType": image_format},
     )
     if response["ResponseMetadata"]["HTTPStatusCode"] == 200:
         logger.info(f"Uploaded {domain} logo to S3")
@@ -260,7 +263,7 @@ def update_company_logos() -> None:
             continue
         if filename and not row["company_logo_url"]:
             logger.info(f"Updating {input_domain} logo url to {filename}")
-            logo_url = f"input_domain/{filename}"
+            logo_url = f"company-logos/{input_domain}/{filename}"
             update_company_logo_url(
                 company_id=company_id,
                 logo_url=logo_url,
