@@ -1,8 +1,7 @@
 import base64
-import hashlib
 import gzip
+import hashlib
 import zlib
-
 
 from adscrawler.config import CONFIG, get_logger
 from adscrawler.dbcon.connection import PostgresCon

@@ -10,13 +10,10 @@ import numpy as np
 import pandas as pd
 
 from adscrawler.config import (
-    ANDROID_SDK,
-    APKS_DIR,
     MITM_DIR,
     PACKAGE_DIR,
     WAYDROID_INTERNAL_EMULATED_DIR,
     WAYDROID_MEDIA_DIR,
-    XAPKS_DIR,
     XAPKS_TMP_UNZIP_DIR,
     get_logger,
 )
@@ -107,24 +104,6 @@ def insert_api_calls(
         mitm_process_log.move_mitm_to_processed(store_id, run_id)
 
         logger.info(f"inserted {mdf.shape[0]} api calls")
-
-
-def extract_and_sign_xapk(store_id: str) -> None:
-    """Extract and sign an xapk to creat apk file.
-    This method works but requires dependencies on Android SDK for apksigner and APKEditor
-
-    Additionally, it requires using a (debug) keystore.
-
-    Currently not using this method.
-    """
-    xapk_path = pathlib.Path(XAPKS_DIR, f"{store_id}.xapk")
-    os.system(f"java -jar APKEditor.jar m -i {xapk_path.as_posix()}")
-    # APKEditor merged APKs must be signed to install
-    apk_path = pathlib.Path(APKS_DIR, f"{store_id}.apk")
-    merged_apk_path = pathlib.Path(XAPKS_DIR, f"{store_id}_merged.apk")
-    os.system(
-        f"{ANDROID_SDK}/apksigner sign --ks ~/.android/debug.keystore  --ks-key-alias androiddebugkey   --ks-pass pass:android   --key-pass pass:android   --out {apk_path}  {merged_apk_path}"
-    )
 
 
 def run_app(

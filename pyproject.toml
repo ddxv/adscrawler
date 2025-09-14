@@ -72,7 +72,6 @@ lint.ignore = [
     "E501",    # line length
     "W291",    # trailing space at end of line
     "E501",    # line length 
-    "PD901",   # Pandas dataframes called 'df' 
     "ERA001",  # no commented out code 
     "D103",    # Docstrings for all functions
     "D102",    # Docstrings for all methods
