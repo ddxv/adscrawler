@@ -307,16 +307,18 @@ def extract_and_decode_urls(
                             vast_urls.append(el.text.strip())
             except Exception:
                 pass
-    soup = BeautifulSoup(text, "html.parser")
-    # The URLs are located inside a <meta> tag with name="video_fields"
-    # The content of this tag contains VAST XML data.
-    video_fields_meta = soup.find("meta", {"name": "video_fields"})
-    if video_fields_meta:
-        vast_xml_string = html.unescape(video_fields_meta["content"])
-        vast_urls += re.findall(r"<!\[CDATA\[(.*?)\]\]>", vast_xml_string)
-    if soup.find("vast"):
-        vast_urls += re.findall(r"<!\[CDATA\[(.*?)\]\]>", text)
-        # vast_urls = [x for x in vast_urls if "http" in x]
+    if text.strip().startswith("<") and (
+        '<meta name="video_fields"' in text.lower() or "<vast" in text.lower()
+    ):
+        soup = BeautifulSoup(text, "html.parser")
+        # The URLs are located inside a <meta> tag with name="video_fields"
+        # The content of this tag contains VAST XML data.
+        video_fields_meta = soup.find("meta", {"name": "video_fields"})
+        if video_fields_meta:
+            vast_xml_string = html.unescape(video_fields_meta["content"])
+            vast_urls += re.findall(r"<!\[CDATA\[(.*?)\]\]>", vast_xml_string)
+        if soup.find("vast"):
+            vast_urls += re.findall(r"<!\[CDATA\[(.*?)\]\]>", text)
     # 1. Broad regex for URLs (http, https, fybernativebrowser, etc.)
     # This pattern is made more flexible to capture various URL formats
     urls = []
