@@ -13,10 +13,10 @@ import os
 import pathlib
 import re
 from io import BytesIO
-from time import sleep
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urlparse
 
 import requests
+import tldextract
 from bs4 import BeautifulSoup
 from PIL import Image
 
@@ -61,49 +61,17 @@ FAVICON_FILENAMES = [
 ]
 
 
-def guess_candidates(base_url: str, html: str) -> list[str]:
-    soup = BeautifulSoup(html, "html.parser")
-    candidates = []
-
-    # --- icons explicitly in HTML ---
-    for link in soup.find_all("link", href=True):
-        rel = " ".join(link.get("rel") or [])
-        if ICON_REL_PAT.search(rel):
-            candidates.append(link["href"])
-
-    # --- explicit favicon guesses ---
-    parsed = urlparse(base_url)
-    root = f"{parsed.scheme}://{parsed.netloc}"
-    for fname in FAVICON_FILENAMES:
-        candidates.append(root + fname)
-
-    # --- meta og:image etc. (fallback only) ---
-    for meta_name in ("og:image", "twitter:image"):
-        tag = soup.find("meta", attrs={"property": meta_name}) or soup.find(
-            "meta", attrs={"name": meta_name}
-        )
-        if tag and tag.get("content"):
-            candidates.append(tag["content"])
-
-    # --- logo-looking <img> ---
-    for img in soup.find_all("img", src=True):
-        src = img["src"]
-        alt = img.get("alt", "")
-        if LOGO_IMG_PAT.search(src) or LOGO_IMG_PAT.search(alt):
-            candidates.append(src)
-
-    # resolve URLs
-    out = []
-    for c in candidates:
-        if not c:
-            continue
-        if c.startswith("//"):
-            c = parsed.scheme + ":" + c
-        if not c.startswith("http"):
-            c = urljoin(base_url, c)
-        if c not in out:
-            out.append(c)
-    return out
+def try_guessing(domain: str) -> list[str]:
+    logger.info("Try Guessing LinkedIn")
+    linkedin_base_url = "https://www.linkedin.com/company/"
+    company_name = tldextract.extract(domain).domain
+    l_r = requests.get(linkedin_base_url + company_name, headers=HEADERS, timeout=10)
+    linkedin_candidates = parse_linkedin(html=l_r.text)
+    if linkedin_candidates:
+        file_name = process_candidates(linkedin_candidates, domain)
+        if file_name:
+            return file_name
+    return None
 
 
 def fetch_image(url: str) -> bytes | None:
@@ -131,7 +99,7 @@ def pick_best(images: list[tuple[str, bytes]]) -> tuple[str, bytes] | None:
             # Scoring: prefer square-ish, then larger size
             score = area
             if 0.9 <= aspect_ratio <= 1.1:  # ~square
-                print(f"square: {url}")
+                logger.info(f"found squre logo: {url}")
                 score *= 3  # triple weight if square
 
             if score > best_score:
@@ -142,31 +110,97 @@ def pick_best(images: list[tuple[str, bytes]]) -> tuple[str, bytes] | None:
     return best
 
 
-def find_linkedin_url(html: str) -> list[str]:
-    linkedin_urls = []
+def find_other_domains(other_tld: str, html: str) -> list[str]:
+    other_urls = []
     soup = BeautifulSoup(html, "html.parser")
     for link in soup.find_all("a", href=True):
-        if "linkedin.com" in link["href"]:
-            linkedin_urls.append(link["href"])
-    return list(set(linkedin_urls))
+        if other_tld in link["href"]:
+            other_urls.append(link["href"])
+    return list(set(other_urls))
 
 
-def process_site(domain: str) -> str | None:
+def parse_github(html: str) -> list[str]:
+    github_urls = []
+    soup = BeautifulSoup(html, "html.parser")
+    header = soup.body.main.header  # only look inside <head>
+    if not header:
+        return []
+    for img in header.find_all("img", src=True):
+        src = img["src"]
+        alt = img.get("alt", "")
+        if "avatar" in src or "avatar" in alt:
+            github_urls.append(src)
+    return list(set(github_urls))
+
+
+def process_site(domain: str, check_domain: str) -> str | None:
+    candidates = []
+    if "github.com-" in check_domain:
+        check_domain = check_domain.replace("github.com-", "github.com/")
     try:
-        r = requests.get(f"https://{domain}", headers=HEADERS, timeout=10)
+        logger.info(f"Try loading: {check_domain}")
+        r = requests.get(f"https://{check_domain}", headers=HEADERS, timeout=10)
         if r.status_code != 200:
-            logger.error(f"Failed to get {domain}")
+            logger.error(f"Failed to get {check_domain}")
             return None
     except Exception:
-        logger.error(f"Failed to get {domain}")
+        logger.error(f"Failed to get {check_domain}")
         return None
-    linkedin_urls = find_linkedin_url(r.text)
-    print(linkedin_urls)
-    if not linkedin_urls:
-        return None
-    for linkedin_url in linkedin_urls:
-        l_r = requests.get(linkedin_url, headers=HEADERS, timeout=10)
-        candidates = parse_linkedin(html=l_r.text)
+    html = r.text
+    if "github.com" in check_domain:
+        logger.info("Found github.com in domain")
+        candidates = parse_github(html=html)
+    linkedin_urls = find_other_domains(other_tld="linkedin.com", html=html)
+    github_urls = []
+    if "github.com" not in check_domain:
+        github_urls = find_other_domains(other_tld="github.com", html=html)
+    if linkedin_urls and len(linkedin_urls) > 0:
+        logger.info(f"Found {len(linkedin_urls)} linkedin urls")
+        for linkedin_url in linkedin_urls:
+            l_r = requests.get(linkedin_url, headers=HEADERS, timeout=10)
+            linkedin_candidates = parse_linkedin(html=l_r.text)
+            if linkedin_candidates:
+                candidates += linkedin_candidates
+    if github_urls and len(github_urls) > 0:
+        logger.info(f"Found {len(github_urls)} github urls")
+        for github_url in github_urls:
+            if not github_url.startswith("https://"):
+                # Normalize domain if it has a typo like githbub.com
+                github_url = re.sub(r"(^.*\.?)github\.com", r"github.com", github_url)
+                github_url = "https://" + github_url
+            g_r = requests.get(github_url, headers=HEADERS, timeout=10)
+            github_candidates = parse_github(html=g_r.text)
+            if github_candidates:
+                candidates += github_candidates
+    # instagram_urls = find_instagram_url(r.text)
+    # if instagram_urls and len(instagram_urls) > 0:
+    #     for instagram_url in instagram_urls:
+    #         session = requests.Session()
+    #         i_r = session.get(instagram_url, headers=HEADERS, timeout=10)
+    #         session.get(url, headers=HEADERS, timeout=10)
+    #         i_r.text
+    #         candidates = parse_instagram(html=i_r.text)
+    #         if candidates:
+    #             file_name = process_candidates(candidates, domain)
+    #             if file_name:
+    #                 return file_name
+    if candidates:
+        file_name = process_candidates(candidates, domain)
+        if file_name:
+            return file_name
+    return None
+
+
+def find_instagram_url(html: str) -> list[str]:
+    instagram_urls = []
+    soup = BeautifulSoup(html, "html.parser")
+    for link in soup.find_all("a", href=True):
+        if "instagram.com" in link["href"]:
+            instagram_urls.append(link["href"])
+    return list(set(instagram_urls))
+
+
+def process_candidates(candidates: list[str], domain: str) -> str | None:
     images = []
     for c in candidates:
         data = fetch_image(c)
@@ -229,16 +263,17 @@ def upload_company_logo_to_s3(
     file_path: pathlib.Path,
 ) -> None:
     """Upload apk to s3."""
-    filename = file_path.name
+    f_name = file_path.name
     file_format = file_path.suffix[1:]
     image_format = "image/" + file_format
     s3_client = get_s3_client("digi-cloud")
     response = s3_client.put_object(
         Bucket=CONFIG["digi-cloud"]["bucket"],
-        Key=f"company-logos/{domain}/{filename}",
+        Key=f"company-logos/{domain}/{f_name}",
         ACL="public-read",
         Body=file_path.read_bytes(),
-        ExtraArgs={"ContentType": image_format},
+        # ExtraArgs={"ContentType": image_format},
+        ContentType=image_format,
     )
     if response["ResponseMetadata"]["HTTPStatusCode"] == 200:
         logger.info(f"Uploaded {domain} logo to S3")
@@ -248,43 +283,50 @@ def upload_company_logo_to_s3(
 
 def update_company_logos() -> None:
     os.makedirs(OUTPUT_DIR, exist_ok=True)
-
     use_ssh_tunnel = True
     database_connection = get_db_connection(use_ssh_tunnel=use_ssh_tunnel)
-
     companies = query_companies(database_connection=database_connection)
 
-    for _, row in companies.iterrows():
-        input_domain = row["company_domain"]
+    companies = companies[companies["company_logo_url"].isna()]
+
+    i = 0
+    for _i, row in companies.iterrows():
+        logger.info(f"Start i={i}/{companies.shape[0]}")
+        i += 1
+        domain = row["company_domain"]
         company_id = row["company_id"]
-        filename = check_logo_exists_s3(input_domain)
+        filename = check_logo_exists_s3(domain)
         if filename and row["company_logo_url"]:
-            logger.info(f"{input_domain} logo already in S3")
+            logger.info(f"{domain} ok")
             continue
         if filename and not row["company_logo_url"]:
-            logger.info(f"Updating {input_domain} logo url to {filename}")
-            logo_url = f"company-logos/{input_domain}/{filename}"
+            logger.info(f"Updating {domain} logo url to {filename}")
+            logo_url = f"company-logos/{domain}/{filename}"
             update_company_logo_url(
                 company_id=company_id,
                 logo_url=logo_url,
                 database_connection=database_connection,
             )
         else:
-            logger.info(f"Processing: {input_domain}")
-            filename = process_site(input_domain)
+            try_these = ["", "/about", "/company", "/about-us", "/about-company"]
+            if "github.com" in domain:
+                try_these = [""]
+            for try_this in try_these:
+                check_domain = domain + try_this
+                filename = process_site(domain=domain, check_domain=check_domain)
             if not filename:
-                logger.info(f"No logo found for {input_domain}")
-                continue
+                filename = try_guessing(domain=domain)
+                if not filename:
+                    logger.info(f"No logo found for {domain}")
+                    continue
             upload_company_logo_to_s3(
-                domain=input_domain,
-                file_path=pathlib.Path(OUTPUT_DIR, input_domain, filename),
+                domain=domain,
+                file_path=pathlib.Path(OUTPUT_DIR, domain, filename),
             )
-
-            logger.info(f"Uploaded {input_domain}  to S3")
-            logo_url = f"input_domain/{filename}"
+            logger.info(f"Uploaded {domain}  to S3")
+            logo_url = f"company-logos/{domain}/{filename}"
             update_company_logo_url(
                 company_id=company_id,
-                logo_url=filename,
+                logo_url=logo_url,
                 database_connection=database_connection,
             )
-            sleep(2)
