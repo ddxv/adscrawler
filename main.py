@@ -12,7 +12,10 @@ from adscrawler.app_stores.scrape_stores import (
 )
 from adscrawler.config import get_logger
 from adscrawler.dbcon.connection import PostgresCon, get_db_connection
-from adscrawler.packages.apks.mitm_scrape_ads import scan_all_apps
+from adscrawler.packages.apks.mitm_scrape_ads import (
+    parse_store_id_mitm_log,
+    scan_all_apps,
+)
 from adscrawler.packages.apks.waydroid import (
     manual_waydroid_process,
     process_apks_for_waydroid,
@@ -110,10 +113,28 @@ class ProcessManager:
             "--no-limits", help="Run queries without limits", action="store_true"
         )
         parser.add_argument(
+            "-s",
+            "--store-id",
+            help="String of store id to launch in waydroid",
+        )
+
+        ### OPTIONS FOR CREATIVE SCAN
+        parser.add_argument(
             "--creative-scan-all-apps",
             help="Scan all apps for creatives",
             action="store_true",
         )
+        parser.add_argument(
+            "--creative-scan-single-app",
+            help="Scan a single app for creatives, requires --store-id and --run-id",
+            action="store_true",
+        )
+        ### OPTIONS FOR IMPORT RANKS FROM S3
+        parser.add_argument(
+            "--run-id",
+            help="String of run id to scan for creatives",
+        )
+        ### OPTIONS FOR IMPORT RANKS FROM S3
         parser.add_argument(
             "--import-ranks-from-s3",
             help="Import ranks from s3",
@@ -121,11 +142,7 @@ class ProcessManager:
         )
 
         ### OPTIONS FOR MANUAL/LOCAL WAYDROID PROCESSING
-        parser.add_argument(
-            "-s",
-            "--store-id",
-            help="String of store id to launch in wayroid",
-        )
+
         parser.add_argument(
             "--redownload-geo-dbs",
             help="Redownload geo dbs",
@@ -269,6 +286,9 @@ class ProcessManager:
         if self.args.creative_scan_all_apps:
             self.creative_scan_all_apps()
 
+        if self.args.creative_scan_single_app:
+            self.creative_scan_single_app()
+
         if self.args.crawl_keywords:
             self.crawl_keywords()
 
@@ -353,6 +373,14 @@ class ProcessManager:
 
     def creative_scan_all_apps(self) -> None:
         scan_all_apps(database_connection=self.pgcon)
+
+    def creative_scan_single_app(self) -> None:
+        error_messages = parse_store_id_mitm_log(
+            database_connection=self.pgcon,
+            pub_store_id=self.args.store_id,
+            run_id=self.args.run_id,
+        )
+        logger.info(f"Error messages: {error_messages}")
 
     def waydroid_mitm(self) -> None:
         update_geo_dbs(redownload=self.args.redownload_geo_dbs)
