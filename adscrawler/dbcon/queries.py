@@ -518,6 +518,7 @@ def query_companies(database_connection: PostgresCon) -> pd.DataFrame:
         FROM
         adtech.companies c
         left join ad_domains ad on c.domain_id = ad.id
+        where c.id > 0
         ;
         """
     df = pd.read_sql(sel_query, database_connection.engine)
