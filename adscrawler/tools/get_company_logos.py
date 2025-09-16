@@ -122,7 +122,10 @@ def find_other_domains(other_tld: str, html: str) -> list[str]:
 def parse_github(html: str) -> list[str]:
     github_urls = []
     soup = BeautifulSoup(html, "html.parser")
-    header = soup.body.main.header  # only look inside <head>
+    try:
+        header = soup.body.main.header  # only look inside <head>
+    except Exception:
+        return []
     if not header:
         return []
     for img in header.find_all("img", src=True):

@@ -51,6 +51,7 @@ APK_TMP_PARTIALS_DIR = pathlib.Path(TMP_DIR, "apk-partials")
 APK_TMP_UNZIPPED_DIR = pathlib.Path(TMP_DIR, "apks-unzipped")
 XAPKS_TMP_UNZIP_DIR = pathlib.Path(TMP_DIR, "xapks-unzipped")
 IPAS_TMP_UNZIPPED_DIR = pathlib.Path(TMP_DIR, "ipas-unzipped")
+APP_ICONS_TMP_DIR = pathlib.Path(TMP_DIR, "app-icons")
 
 # Putting files in WAYDROID_MEDIA_DIR will put them in the internal emulated directory
 WAYDROID_MEDIA_DIR = pathlib.Path(HOME, ".local/share/waydroid/data/media")
@@ -108,6 +109,7 @@ def check_dirs() -> None:
         XAPKS_INCOMING_DIR,
         IPAS_INCOMING_DIR,
         GEO_DATA_DIR,
+        APP_ICONS_TMP_DIR,
     ]
     for _dir in dirs:
         if not pathlib.Path.exists(_dir):

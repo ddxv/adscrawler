@@ -92,6 +92,11 @@ class ProcessManager:
             action="store_true",
         )
         parser.add_argument(
+            "--process-icons",
+            help="When running update app store details, resize and upload app icon to S3",
+            action="store_true",
+        )
+        parser.add_argument(
             "--workers",
             default="1",
             type=str,
@@ -330,6 +335,7 @@ class ProcessManager:
             database_connection=self.pgcon,
             use_ssh_tunnel=self.args.use_ssh_tunnel,
             workers=int(self.args.workers),
+            process_icon=self.args.process_icons,
             limit=limit,
         )
 

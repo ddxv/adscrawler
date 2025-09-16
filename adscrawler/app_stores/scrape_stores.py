@@ -3,14 +3,18 @@ import os
 import pathlib
 import time
 from concurrent.futures import ThreadPoolExecutor
+from io import BytesIO
 from urllib.error import URLError
 from urllib.parse import unquote_plus
 
 import duckdb
 import google_play_scraper
+import imagehash
 import pandas as pd
+import requests
 import tldextract
 from itunes_app_scraper.util import AppStoreException
+from PIL import Image
 
 from adscrawler.app_stores.apkcombo import get_apkcombo_android_apps
 from adscrawler.app_stores.appbrain import get_appbrain_android_apps
@@ -28,7 +32,7 @@ from adscrawler.app_stores.google import (
     scrape_google_ranks,
     search_play_store,
 )
-from adscrawler.config import CONFIG, get_logger
+from adscrawler.config import APP_ICONS_TMP_DIR, CONFIG, get_logger
 from adscrawler.dbcon.connection import PostgresCon, get_db_connection
 from adscrawler.dbcon.queries import (
     get_store_app_columns,
@@ -200,7 +204,7 @@ COUNTRY_LIST = [
 ]
 
 
-def process_chunk(df_chunk, use_ssh_tunnel):
+def process_chunk(df_chunk, use_ssh_tunnel, process_icon):
     database_connection = get_db_connection(use_ssh_tunnel=use_ssh_tunnel)
     logger.info(
         f"Processing chunk {df_chunk.index[0]}-{df_chunk.index[-1]} ({len(df_chunk)} apps)"
@@ -212,6 +216,7 @@ def process_chunk(df_chunk, use_ssh_tunnel):
                     row.store,
                     row.store_id,
                     database_connection,
+                    process_icon,
                 )
             except Exception as e:
                 logger.exception(
@@ -230,7 +235,9 @@ def process_chunk(df_chunk, use_ssh_tunnel):
             )
 
 
-def update_app_details(database_connection, stores, use_ssh_tunnel, workers, limit):
+def update_app_details(
+    database_connection, stores, use_ssh_tunnel, workers, process_icon, limit
+):
     log_info = f"Update app details: {stores=}"
     df = query_store_apps(stores, database_connection, limit=limit, log_query=False)
     logger.info(f"{log_info} start {len(df)} apps")
@@ -240,7 +247,8 @@ def update_app_details(database_connection, stores, use_ssh_tunnel, workers, lim
 
     with ThreadPoolExecutor(max_workers=workers) as executor:
         futures = [
-            executor.submit(process_chunk, chunk, use_ssh_tunnel) for chunk in chunks
+            executor.submit(process_chunk, chunk, use_ssh_tunnel, process_icon)
+            for chunk in chunks
         ]
         for f in futures:
             f.result()
@@ -822,9 +830,10 @@ def update_all_app_info(
     store: int,
     store_id: str,
     database_connection: PostgresCon,
+    process_icon,
 ) -> None:
     info = f"{store=} {store_id=}"
-    app_df = scrape_and_save_app(store, store_id, database_connection)
+    app_df = scrape_and_save_app(store, store_id, database_connection, process_icon)
     if "store_app" not in app_df.columns:
         logger.error(f"{info} store_app db id not in app_df columns")
         return
@@ -888,6 +897,7 @@ def scrape_app(
     store_id: str,
     country: str,
     language: str,
+    process_icon: bool = False,
 ) -> pd.DataFrame:
     scrape_info = f"{store=}, {store_id=}, {country=}, {language=}"
     max_retries = 2
@@ -955,6 +965,14 @@ def scrape_app(
         df["description_short"] = ""
     df.loc[df["description_short"].isna(), "description_short"] = ""
 
+    if process_icon and crawl_result == 1:
+        try:
+            icon_url_100 = process_app_icon(store_id, df["icon_url_512"].to_numpy()[0])
+            if icon_url_100 is not None:
+                df["icon_url_100"] = icon_url_100
+        except Exception:
+            logger.exception(f"{scrape_info} failed to process app icon")
+
     logger.info(f"{scrape_info} scrape finished")
     return df
 
@@ -995,6 +1013,7 @@ def scrape_and_save_app(
     store: int,
     store_id: str,
     database_connection: PostgresCon,
+    process_icon: bool = False,
 ) -> pd.DataFrame:
     # Pulling for more countries will want to track rating, review count, and histogram
     app_country_list = ["us"]
@@ -1008,6 +1027,7 @@ def scrape_and_save_app(
                 store_id=store_id,
                 country=country,
                 language=language,
+                process_icon=process_icon,
             )
             logger.info(f"{info} save to db start")
             app_df = save_apps_df(
@@ -1246,3 +1266,38 @@ def log_crawl_results(app_df: pd.DataFrame, database_connection: PostgresCon) ->
         con=database_connection.engine,
         if_exists="append",
     )
+
+
+def process_app_icon(store_id: str, url: str) -> str | None:
+    # Fetch image
+    f_name = None
+    try:
+        response = requests.get(url)
+    except Exception:
+        logger.error(f"Failed to fetch image from {url}")
+        return None
+    img = Image.open(BytesIO(response.content))
+    ext = response.headers["Content-Type"].split("/")[1]
+    # Resize to 100x100
+    img_resized = img.resize((100, 100), Image.LANCZOS)
+    phash = str(imagehash.phash(img_resized))
+    f_name = f"{phash}.{ext}"
+    file_path = pathlib.Path(APP_ICONS_TMP_DIR, f"{phash}.{ext}")
+    # Save as PNG
+    img_resized.save(file_path, format="PNG")
+    # Upload to S3
+    image_format = "image/" + ext
+    s3_key = "digi-cloud"
+    s3_client = get_s3_client(s3_key)
+    response = s3_client.put_object(
+        Bucket=CONFIG[s3_key]["bucket"],
+        Key=f"app-icons/{store_id}/{f_name}",
+        ACL="public-read",
+        Body=file_path.read_bytes(),
+        ContentType=image_format,
+    )
+    if response["ResponseMetadata"]["HTTPStatusCode"] == 200:
+        logger.info(f"Uploaded {store_id} app icon to S3")
+    else:
+        logger.error(f"Failed to upload {store_id} app icon to S3")
+    return f_name
