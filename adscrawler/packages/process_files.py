@@ -105,14 +105,6 @@ def download_apps(
                     store_id=store_id,
                     existing_local_file_path=existing_file_path,
                 )
-            insert_version_code(
-                version_str=download_result.version_str,
-                store_app=row.store_app,
-                crawl_result=download_result.crawl_result,
-                database_connection=database_connection,
-                return_rows=False,
-                apk_hash=download_result.md5_hash,
-            )
             if (
                 download_result.downloaded_file_path
                 and download_result.crawl_result in [1, 3]
@@ -128,6 +120,14 @@ def download_apps(
                     download_result.downloaded_file_path,
                 )
                 move_downloaded_app_to_main_dir(download_result.downloaded_file_path)
+            insert_version_code(
+                version_str=download_result.version_str,
+                store_app=row.store_app,
+                crawl_result=download_result.crawl_result,
+                database_connection=database_connection,
+                return_rows=False,
+                apk_hash=download_result.md5_hash,
+            )
         except Exception:
             logger.exception(f"Download for {store_id} failed")
         remove_tmp_files(store_id=store_id)
