@@ -57,6 +57,7 @@ class ProcessManager:
             help="If included prevent running if script already running",
             action="store_true",
         )
+        parser.add_argument("--limit-query-rows", type=int, default=200_000)
         parser.add_argument(
             "-n",
             "--new-apps-check",
@@ -113,9 +114,6 @@ class ProcessManager:
             "--crawl-keywords",
             help="Crawl keywords",
             action="store_true",
-        )
-        parser.add_argument(
-            "--no-limits", help="Run queries without limits", action="store_true"
         )
         parser.add_argument(
             "-s",
@@ -329,19 +327,17 @@ class ProcessManager:
                 logger.exception(f"Crawling developers for {store=} failed")
 
     def update_app_details(self, stores: list[int]) -> None:
-        limit: int | None = None if self.args.no_limits else 200_000
         update_app_details(
             stores=stores,
             database_connection=self.pgcon,
             use_ssh_tunnel=self.args.use_ssh_tunnel,
             workers=int(self.args.workers),
             process_icon=self.args.process_icons,
-            limit=limit,
+            limit=self.args.limit_query_rows,
         )
 
     def crawl_app_ads(self) -> None:
-        limit: int | None = None if self.args.no_limits else 5000
-        crawl_app_ads(self.pgcon, limit=limit)
+        crawl_app_ads(self.pgcon, limit=self.args.limit_query_rows)
 
     def download_apks(self, stores: list[int]) -> None:
         if self.args.store_id:

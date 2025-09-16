@@ -49,6 +49,8 @@ Scrapers:
 
 - `-d, --new-apps-check-devs` Crawl developers' pages to find new apps.
 
+- `--limit-query-rows` Number of rows per run, default 200,000.
+
 ### Scrape App-Ads.txt
 
 - `-a, --app-ads-txt-scrape` Crawl developer URLs for `app-ads.txt` files. Requires store IDs and app details to be scraped first.
@@ -58,8 +60,6 @@ Scrapers:
 - `--download-apks` Download APK files for Android or iOS apps.
 
 - `--process-sdks` Process APKs, IPAs, and manifest files to extract SDK information.
-
-- `--no-limits` Run queries without applying limits.
 
 - `-k, --crawl-keywords` Crawl keywords from app stores.
 
