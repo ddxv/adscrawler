@@ -31,19 +31,22 @@ SELECT
     cr.run_id,
     vcasr.run_at,
     sap.name AS pub_name,
+    saa.name AS adv_name,
     sap.store_id AS pub_store_id,
+    saa.store_id AS adv_store_id,
     hd.domain AS host_domain,
-    hcd.domain AS host_domain_company_domain,
     hc.name AS host_domain_company_name,
     ad.domain AS ad_domain,
-    acd.domain AS ad_domain_company_domain,
     ac.name AS ad_domain_company_name,
     ca.md5_hash,
     ca.file_extension,
     sap.icon_url_512 AS pub_icon_url_512,
+    saa.icon_url_512 AS adv_icon_url_512,
     mmp.name AS mmp_name,
     mmpd.domain AS mmp_domain,
     cr.mmp_urls,
+    COALESCE(hcd.domain, hd.domain) AS host_domain_company_domain,
+    COALESCE(acd.domain, ad.domain) AS ad_domain_company_domain,
     COALESCE(ca.phash, ca.md5_hash) AS vhash,
     (
         SELECT ARRAY_AGG(ad_domains.domain) AS array_agg
@@ -70,7 +73,7 @@ LEFT JOIN public.ad_domains AS ad ON ((cr.creative_initial_domain_id = ad.id))
 )
 LEFT JOIN adtech.company_domain_mapping AS hcdm ON ((hd.id = hcdm.domain_id))
 )
-LEFT JOIN adtech.company_domain_mapping AS acdm ON ((hd.id = acdm.domain_id))
+LEFT JOIN adtech.company_domain_mapping AS acdm ON ((ad.id = acdm.domain_id))
 )
 LEFT JOIN adtech.companies AS hc ON ((hcdm.company_id = hc.id))
 )

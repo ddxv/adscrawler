@@ -62,7 +62,9 @@ CREATE TABLE public.store_apps (
         to_tsvector(
             'simple'::regconfig, (coalesce(name, ''::character varying))::text
         )
-    ) STORED
+    ) STORED,
+    additional_html_scraped_at timestamp without time zone,
+    icon_url_100 text
 );
 
 

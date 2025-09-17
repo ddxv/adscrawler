@@ -63,6 +63,7 @@ WITH adv_mmp AS (
 SELECT
     saa.name AS advertiser_name,
     saa.store_id AS advertiser_store_id,
+    saa.icon_url_100 AS advertiser_icon_url_100,
     saa.icon_url_512 AS advertiser_icon_url_512,
     saa.category AS advertiser_category,
     saa.installs AS advertiser_installs,
@@ -87,7 +88,7 @@ LEFT JOIN
     frontend.store_apps_overview AS sap
     ON ((cr.store_app_pub_id = sap.id))
 )
-LEFT JOIN frontend.store_apps_overview AS saa ON ((ca.store_app_id = saa.id))
+LEFT JOIN public.store_apps AS saa ON ((ca.store_app_id = saa.id))
 )
 LEFT JOIN
     public.version_code_api_scan_results AS vcasr

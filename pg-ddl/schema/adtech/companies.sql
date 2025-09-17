@@ -30,7 +30,8 @@ CREATE TABLE adtech.companies (
     name character varying NOT NULL,
     parent_company_id integer,
     description text,
-    domain_id integer NOT NULL
+    domain_id integer NOT NULL,
+    logo_url text
 );
 
 

@@ -408,7 +408,8 @@ CREATE TABLE adtech.companies (
     name character varying NOT NULL,
     parent_company_id integer,
     description text,
-    domain_id integer NOT NULL
+    domain_id integer NOT NULL,
+    logo_url text
 );
 
 
@@ -577,7 +578,9 @@ CREATE TABLE public.store_apps (
     tablet_image_url_1 character varying,
     tablet_image_url_2 character varying,
     tablet_image_url_3 character varying,
-    textsearchable_index_col tsvector GENERATED ALWAYS AS (to_tsvector('simple'::regconfig, (COALESCE(name, ''::character varying))::text)) STORED
+    textsearchable_index_col tsvector GENERATED ALWAYS AS (to_tsvector('simple'::regconfig, (COALESCE(name, ''::character varying))::text)) STORED,
+    additional_html_scraped_at timestamp without time zone,
+    icon_url_100 text
 );
 
 
@@ -1537,99 +1540,6 @@ CREATE MATERIALIZED VIEW frontend.adstxt_publishers_overview AS
 ALTER MATERIALIZED VIEW frontend.adstxt_publishers_overview OWNER TO postgres;
 
 --
--- Name: advertiser_creative_rankings; Type: MATERIALIZED VIEW; Schema: frontend; Owner: postgres
---
-
-CREATE MATERIALIZED VIEW frontend.advertiser_creative_rankings AS
- WITH adv_mmp AS (
-         SELECT DISTINCT ca_1.store_app_id AS advertiser_store_app_id,
-            cr_1.mmp_domain_id,
-            ad.domain AS mmp_domain
-           FROM ((public.creative_records cr_1
-             LEFT JOIN public.creative_assets ca_1 ON ((cr_1.creative_asset_id = ca_1.id)))
-             LEFT JOIN public.ad_domains ad ON ((cr_1.mmp_domain_id = ad.id)))
-          WHERE (cr_1.mmp_domain_id IS NOT NULL)
-        ), creative_rankings AS (
-         SELECT ca_1.md5_hash,
-            ca_1.file_extension,
-            ca_1.store_app_id AS advertiser_store_app_id,
-            vcasr_1.run_at,
-            row_number() OVER (PARTITION BY ca_1.store_app_id ORDER BY vcasr_1.run_at DESC) AS rn
-           FROM ((public.creative_records cr_1
-             LEFT JOIN public.creative_assets ca_1 ON ((cr_1.creative_asset_id = ca_1.id)))
-             LEFT JOIN public.version_code_api_scan_results vcasr_1 ON ((cr_1.run_id = vcasr_1.id)))
-        )
- SELECT saa.name AS advertiser_name,
-    saa.store_id AS advertiser_store_id,
-    saa.icon_url_512 AS advertiser_icon_url_512,
-    saa.category AS advertiser_category,
-    saa.installs AS advertiser_installs,
-    count(DISTINCT ca.md5_hash) AS unique_creatives,
-    count(DISTINCT cr.store_app_pub_id) AS unique_publishers,
-    min(vcasr.run_at) AS first_seen,
-    max(vcasr.run_at) AS last_seen,
-    array_agg(DISTINCT ca.file_extension) AS file_types,
-    avg(sap.installs) AS avg_publisher_installs,
-    array_agg(DISTINCT adv_mmp.mmp_domain) AS mmp_domains,
-    ARRAY( SELECT crk.md5_hash
-           FROM creative_rankings crk
-          WHERE ((crk.advertiser_store_app_id = saa.id) AND (crk.rn <= 5))
-          ORDER BY crk.rn) AS top_md5_hashes
-   FROM (((((public.creative_records cr
-     LEFT JOIN public.creative_assets ca ON ((cr.creative_asset_id = ca.id)))
-     LEFT JOIN frontend.store_apps_overview sap ON ((cr.store_app_pub_id = sap.id)))
-     LEFT JOIN frontend.store_apps_overview saa ON ((ca.store_app_id = saa.id)))
-     LEFT JOIN public.version_code_api_scan_results vcasr ON ((cr.run_id = vcasr.id)))
-     LEFT JOIN adv_mmp ON ((ca.store_app_id = adv_mmp.advertiser_store_app_id)))
-  GROUP BY saa.name, saa.store_id, saa.icon_url_512, saa.category, saa.installs, saa.id
-  ORDER BY (count(DISTINCT ca.md5_hash)) DESC
-  WITH NO DATA;
-
-
-ALTER MATERIALIZED VIEW frontend.advertiser_creative_rankings OWNER TO postgres;
-
---
--- Name: advertiser_creative_rankings_recent_month; Type: MATERIALIZED VIEW; Schema: frontend; Owner: postgres
---
-
-CREATE MATERIALIZED VIEW frontend.advertiser_creative_rankings_recent_month AS
- WITH creative_rankings AS (
-         SELECT ca_1.md5_hash,
-            ca_1.file_extension,
-            ca_1.store_app_id AS advertiser_store_app_id,
-            vcasr_1.run_at,
-            row_number() OVER (PARTITION BY ca_1.store_app_id ORDER BY vcasr_1.run_at DESC) AS rn
-           FROM ((public.creative_records cr_1
-             LEFT JOIN public.creative_assets ca_1 ON ((cr_1.creative_asset_id = ca_1.id)))
-             LEFT JOIN public.version_code_api_scan_results vcasr_1 ON ((cr_1.run_id = vcasr_1.id)))
-        )
- SELECT saa.name AS advertiser_name,
-    saa.store_id AS advertiser_store_id,
-    saa.icon_url_512 AS advertiser_icon_url_512,
-    count(DISTINCT ca.md5_hash) AS unique_creatives,
-    count(DISTINCT cr.store_app_pub_id) AS unique_publishers,
-    min(vcasr.run_at) AS first_seen,
-    max(vcasr.run_at) AS last_seen,
-    array_agg(DISTINCT ca.file_extension) AS file_types,
-    avg(sap.installs) AS avg_publisher_installs,
-    ARRAY( SELECT crk.md5_hash
-           FROM creative_rankings crk
-          WHERE ((crk.advertiser_store_app_id = saa.id) AND (crk.rn <= 5))
-          ORDER BY crk.rn) AS top_md5_hashes
-   FROM ((((public.creative_records cr
-     LEFT JOIN public.creative_assets ca ON ((cr.creative_asset_id = ca.id)))
-     LEFT JOIN frontend.store_apps_overview sap ON ((cr.store_app_pub_id = sap.id)))
-     LEFT JOIN frontend.store_apps_overview saa ON ((ca.store_app_id = saa.id)))
-     LEFT JOIN public.version_code_api_scan_results vcasr ON ((cr.run_id = vcasr.id)))
-  WHERE (vcasr.run_at >= (now() - '1 mon'::interval))
-  GROUP BY saa.name, saa.store_id, saa.icon_url_512, saa.id
-  ORDER BY (count(DISTINCT cr.store_app_pub_id)) DESC
-  WITH NO DATA;
-
-
-ALTER MATERIALIZED VIEW frontend.advertiser_creative_rankings_recent_month OWNER TO postgres;
-
---
 -- Name: advertiser_creatives; Type: MATERIALIZED VIEW; Schema: frontend; Owner: postgres
 --
 
@@ -1638,17 +1548,20 @@ CREATE MATERIALIZED VIEW frontend.advertiser_creatives AS
     cr.run_id,
     vcasr.run_at,
     sap.name AS pub_name,
+    saa.name AS adv_name,
     sap.store_id AS pub_store_id,
+    saa.store_id AS adv_store_id,
     hd.domain AS host_domain,
-    hcd.domain AS host_domain_company_domain,
+    COALESCE(hcd.domain, hd.domain) AS host_domain_company_domain,
     hc.name AS host_domain_company_name,
     ad.domain AS ad_domain,
-    acd.domain AS ad_domain_company_domain,
+    COALESCE(acd.domain, ad.domain) AS ad_domain_company_domain,
     ac.name AS ad_domain_company_name,
     COALESCE(ca.phash, ca.md5_hash) AS vhash,
     ca.md5_hash,
     ca.file_extension,
     sap.icon_url_512 AS pub_icon_url_512,
+    saa.icon_url_512 AS adv_icon_url_512,
     mmp.name AS mmp_name,
     mmpd.domain AS mmp_domain,
     cr.mmp_urls,
@@ -1663,7 +1576,7 @@ CREATE MATERIALIZED VIEW frontend.advertiser_creatives AS
      LEFT JOIN public.ad_domains hd ON ((cr.creative_host_domain_id = hd.id)))
      LEFT JOIN public.ad_domains ad ON ((cr.creative_initial_domain_id = ad.id)))
      LEFT JOIN adtech.company_domain_mapping hcdm ON ((hd.id = hcdm.domain_id)))
-     LEFT JOIN adtech.company_domain_mapping acdm ON ((hd.id = acdm.domain_id)))
+     LEFT JOIN adtech.company_domain_mapping acdm ON ((ad.id = acdm.domain_id)))
      LEFT JOIN adtech.companies hc ON ((hcdm.company_id = hc.id)))
      LEFT JOIN adtech.companies ac ON ((acdm.company_id = ac.id)))
      LEFT JOIN public.ad_domains hcd ON ((hc.domain_id = hcd.id)))
@@ -1746,6 +1659,237 @@ CREATE MATERIALIZED VIEW frontend.api_call_countries AS
 
 
 ALTER MATERIALIZED VIEW frontend.api_call_countries OWNER TO postgres;
+
+--
+-- Name: apps_new_monthly; Type: MATERIALIZED VIEW; Schema: frontend; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW frontend.apps_new_monthly AS
+ WITH rankedapps AS (
+         SELECT sa_1.id,
+            sa_1.name,
+            sa_1.store_id,
+            sa_1.store,
+            sa_1.category,
+            sa_1.rating,
+            sa_1.review_count,
+            sa_1.installs,
+            sa_1.installs_sum_1w,
+            sa_1.installs_sum_4w,
+            sa_1.ratings_sum_1w,
+            sa_1.ratings_sum_4w,
+            sa_1.store_last_updated,
+            sa_1.ad_supported,
+            sa_1.in_app_purchases,
+            sa_1.created_at,
+            sa_1.updated_at,
+            sa_1.crawl_result,
+            sa_1.icon_url_512,
+            sa_1.release_date,
+            sa_1.rating_count,
+            sa_1.featured_image_url,
+            sa_1.phone_image_url_1,
+            sa_1.phone_image_url_2,
+            sa_1.phone_image_url_3,
+            sa_1.tablet_image_url_1,
+            sa_1.tablet_image_url_2,
+            sa_1.tablet_image_url_3,
+            row_number() OVER (PARTITION BY sa_1.store, sa_1.category ORDER BY sa_1.installs DESC NULLS LAST, sa_1.rating_count DESC NULLS LAST) AS rn
+           FROM frontend.store_apps_overview sa_1
+          WHERE ((sa_1.release_date >= (CURRENT_DATE - '30 days'::interval)) AND (sa_1.created_at >= (CURRENT_DATE - '45 days'::interval)) AND (sa_1.crawl_result = 1))
+        )
+ SELECT ra.id,
+    ra.name,
+    ra.store_id,
+    ra.store,
+    ra.category,
+    ra.rating,
+    ra.review_count,
+    ra.installs,
+    ra.installs_sum_1w,
+    ra.installs_sum_4w,
+    ra.ratings_sum_1w,
+    ra.ratings_sum_4w,
+    ra.store_last_updated,
+    ra.ad_supported,
+    ra.in_app_purchases,
+    ra.created_at,
+    ra.updated_at,
+    ra.crawl_result,
+    sa.icon_url_100,
+    ra.icon_url_512,
+    ra.release_date,
+    ra.rating_count,
+    ra.featured_image_url,
+    ra.phone_image_url_1,
+    ra.phone_image_url_2,
+    ra.phone_image_url_3,
+    ra.tablet_image_url_1,
+    ra.tablet_image_url_2,
+    ra.tablet_image_url_3,
+    ra.category AS app_category,
+    ra.rn
+   FROM (rankedapps ra
+     LEFT JOIN public.store_apps sa ON ((sa.id = ra.id)))
+  WHERE (ra.rn <= 100)
+  WITH NO DATA;
+
+
+ALTER MATERIALIZED VIEW frontend.apps_new_monthly OWNER TO postgres;
+
+--
+-- Name: apps_new_weekly; Type: MATERIALIZED VIEW; Schema: frontend; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW frontend.apps_new_weekly AS
+ WITH rankedapps AS (
+         SELECT sa_1.id,
+            sa_1.name,
+            sa_1.store_id,
+            sa_1.store,
+            sa_1.category,
+            sa_1.rating,
+            sa_1.review_count,
+            sa_1.installs,
+            sa_1.installs_sum_1w,
+            sa_1.installs_sum_4w,
+            sa_1.ratings_sum_1w,
+            sa_1.ratings_sum_4w,
+            sa_1.store_last_updated,
+            sa_1.ad_supported,
+            sa_1.in_app_purchases,
+            sa_1.created_at,
+            sa_1.updated_at,
+            sa_1.crawl_result,
+            sa_1.icon_url_512,
+            sa_1.release_date,
+            sa_1.rating_count,
+            sa_1.featured_image_url,
+            sa_1.phone_image_url_1,
+            sa_1.phone_image_url_2,
+            sa_1.phone_image_url_3,
+            sa_1.tablet_image_url_1,
+            sa_1.tablet_image_url_2,
+            sa_1.tablet_image_url_3,
+            row_number() OVER (PARTITION BY sa_1.store, sa_1.category ORDER BY sa_1.installs DESC NULLS LAST, sa_1.rating_count DESC NULLS LAST) AS rn
+           FROM frontend.store_apps_overview sa_1
+          WHERE ((sa_1.release_date >= (CURRENT_DATE - '7 days'::interval)) AND (sa_1.created_at >= (CURRENT_DATE - '11 days'::interval)) AND (sa_1.crawl_result = 1))
+        )
+ SELECT ra.id,
+    ra.name,
+    ra.store_id,
+    ra.store,
+    ra.category,
+    ra.rating,
+    ra.review_count,
+    ra.installs,
+    ra.installs_sum_1w,
+    ra.installs_sum_4w,
+    ra.ratings_sum_1w,
+    ra.ratings_sum_4w,
+    ra.store_last_updated,
+    ra.ad_supported,
+    ra.in_app_purchases,
+    ra.created_at,
+    ra.updated_at,
+    ra.crawl_result,
+    sa.icon_url_100,
+    ra.icon_url_512,
+    ra.release_date,
+    ra.rating_count,
+    ra.featured_image_url,
+    ra.phone_image_url_1,
+    ra.phone_image_url_2,
+    ra.phone_image_url_3,
+    ra.tablet_image_url_1,
+    ra.tablet_image_url_2,
+    ra.tablet_image_url_3,
+    ra.category AS app_category,
+    ra.rn
+   FROM (rankedapps ra
+     LEFT JOIN public.store_apps sa ON ((sa.id = ra.id)))
+  WHERE (ra.rn <= 100)
+  WITH NO DATA;
+
+
+ALTER MATERIALIZED VIEW frontend.apps_new_weekly OWNER TO postgres;
+
+--
+-- Name: apps_new_yearly; Type: MATERIALIZED VIEW; Schema: frontend; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW frontend.apps_new_yearly AS
+ WITH rankedapps AS (
+         SELECT sa_1.id,
+            sa_1.name,
+            sa_1.store_id,
+            sa_1.store,
+            sa_1.category,
+            sa_1.rating,
+            sa_1.review_count,
+            sa_1.installs,
+            sa_1.installs_sum_1w,
+            sa_1.installs_sum_4w,
+            sa_1.ratings_sum_1w,
+            sa_1.ratings_sum_4w,
+            sa_1.store_last_updated,
+            sa_1.ad_supported,
+            sa_1.in_app_purchases,
+            sa_1.created_at,
+            sa_1.updated_at,
+            sa_1.crawl_result,
+            sa_1.icon_url_512,
+            sa_1.release_date,
+            sa_1.rating_count,
+            sa_1.featured_image_url,
+            sa_1.phone_image_url_1,
+            sa_1.phone_image_url_2,
+            sa_1.phone_image_url_3,
+            sa_1.tablet_image_url_1,
+            sa_1.tablet_image_url_2,
+            sa_1.tablet_image_url_3,
+            row_number() OVER (PARTITION BY sa_1.store, sa_1.category ORDER BY sa_1.installs DESC NULLS LAST, sa_1.rating_count DESC NULLS LAST) AS rn
+           FROM frontend.store_apps_overview sa_1
+          WHERE ((sa_1.release_date >= (CURRENT_DATE - '365 days'::interval)) AND (sa_1.created_at >= (CURRENT_DATE - '380 days'::interval)) AND (sa_1.crawl_result = 1))
+        )
+ SELECT ra.id,
+    ra.name,
+    ra.store_id,
+    ra.store,
+    ra.category,
+    ra.rating,
+    ra.review_count,
+    ra.installs,
+    ra.installs_sum_1w,
+    ra.installs_sum_4w,
+    ra.ratings_sum_1w,
+    ra.ratings_sum_4w,
+    ra.store_last_updated,
+    ra.ad_supported,
+    ra.in_app_purchases,
+    ra.created_at,
+    ra.updated_at,
+    ra.crawl_result,
+    sa.icon_url_100,
+    ra.icon_url_512,
+    ra.release_date,
+    ra.rating_count,
+    ra.featured_image_url,
+    ra.phone_image_url_1,
+    ra.phone_image_url_2,
+    ra.phone_image_url_3,
+    ra.tablet_image_url_1,
+    ra.tablet_image_url_2,
+    ra.tablet_image_url_3,
+    ra.category AS app_category,
+    ra.rn
+   FROM (rankedapps ra
+     LEFT JOIN public.store_apps sa ON ((sa.id = ra.id)))
+  WHERE (ra.rn <= 100)
+  WITH NO DATA;
+
+
+ALTER MATERIALIZED VIEW frontend.apps_new_yearly OWNER TO postgres;
 
 --
 -- Name: category_tag_stats; Type: MATERIALIZED VIEW; Schema: frontend; Owner: postgres
@@ -2340,8 +2484,8 @@ CREATE MATERIALIZED VIEW frontend.company_parent_top_apps AS
             deduped_data.sdk,
             deduped_data.api_call,
             deduped_data.app_ads_direct,
-            row_number() OVER (PARTITION BY deduped_data.store, deduped_data.company_domain, deduped_data.company_name ORDER BY GREATEST((COALESCE(deduped_data.rating_count_d30, (0)::numeric))::double precision, COALESCE((deduped_data.installs_d30)::double precision, (0)::double precision)) DESC) AS app_company_rank,
-            row_number() OVER (PARTITION BY deduped_data.store, deduped_data.app_category, deduped_data.company_domain, deduped_data.company_name ORDER BY GREATEST((COALESCE(deduped_data.rating_count_d30, (0)::numeric))::double precision, COALESCE((deduped_data.installs_d30)::double precision, (0)::double precision)) DESC) AS app_company_category_rank
+            row_number() OVER (PARTITION BY deduped_data.store, deduped_data.company_domain, deduped_data.company_name ORDER BY (COALESCE((deduped_data.sdk)::integer, 0) + COALESCE((deduped_data.api_call)::integer, 0)) DESC, GREATEST((COALESCE(deduped_data.rating_count_d30, (0)::numeric))::double precision, COALESCE((deduped_data.installs_d30)::double precision, (0)::double precision)) DESC) AS app_company_rank,
+            row_number() OVER (PARTITION BY deduped_data.store, deduped_data.app_category, deduped_data.company_domain, deduped_data.company_name ORDER BY (COALESCE((deduped_data.sdk)::integer, 0) + COALESCE((deduped_data.api_call)::integer, 0)) DESC, GREATEST((COALESCE(deduped_data.rating_count_d30, (0)::numeric))::double precision, COALESCE((deduped_data.installs_d30)::double precision, (0)::double precision)) DESC) AS app_company_category_rank
            FROM deduped_data
         )
  SELECT company_domain,
@@ -2358,6 +2502,7 @@ CREATE MATERIALIZED VIEW frontend.company_parent_top_apps AS
     app_company_rank,
     app_company_category_rank
    FROM ranked_apps
+  WHERE (app_company_category_rank <= 20)
   WITH NO DATA;
 
 
@@ -2396,8 +2541,8 @@ CREATE MATERIALIZED VIEW frontend.company_top_apps AS
             deduped_data.sdk,
             deduped_data.api_call,
             deduped_data.app_ads_direct,
-            row_number() OVER (PARTITION BY deduped_data.store, deduped_data.company_domain, deduped_data.company_name ORDER BY GREATEST((COALESCE(deduped_data.rating_count_d30, (0)::numeric))::double precision, COALESCE((deduped_data.installs_d30)::double precision, (0)::double precision)) DESC) AS app_company_rank,
-            row_number() OVER (PARTITION BY deduped_data.store, deduped_data.app_category, deduped_data.company_domain, deduped_data.company_name ORDER BY GREATEST((COALESCE(deduped_data.rating_count_d30, (0)::numeric))::double precision, COALESCE((deduped_data.installs_d30)::double precision, (0)::double precision)) DESC) AS app_company_category_rank
+            row_number() OVER (PARTITION BY deduped_data.store, deduped_data.company_domain, deduped_data.company_name ORDER BY (COALESCE((deduped_data.sdk)::integer, 0) + COALESCE((deduped_data.api_call)::integer, 0)) DESC, GREATEST((COALESCE(deduped_data.rating_count_d30, (0)::numeric))::double precision, COALESCE((deduped_data.installs_d30)::double precision, (0)::double precision)) DESC) AS app_company_rank,
+            row_number() OVER (PARTITION BY deduped_data.store, deduped_data.app_category, deduped_data.company_domain, deduped_data.company_name ORDER BY (COALESCE((deduped_data.sdk)::integer, 0) + COALESCE((deduped_data.api_call)::integer, 0)) DESC, GREATEST((COALESCE(deduped_data.rating_count_d30, (0)::numeric))::double precision, COALESCE((deduped_data.installs_d30)::double precision, (0)::double precision)) DESC) AS app_company_category_rank
            FROM deduped_data
         )
  SELECT company_domain,
@@ -2414,7 +2559,7 @@ CREATE MATERIALIZED VIEW frontend.company_top_apps AS
     app_company_rank,
     app_company_category_rank
    FROM ranked_apps
-  WHERE (app_company_category_rank <= 100)
+  WHERE (app_company_category_rank <= 20)
   WITH NO DATA;
 
 
@@ -3111,82 +3256,64 @@ ALTER MATERIALIZED VIEW public.apps_new_monthly OWNER TO postgres;
 
 CREATE MATERIALIZED VIEW public.apps_new_weekly AS
  WITH rankedapps AS (
-         SELECT sa.id,
-            sa.developer,
-            sa.name,
-            sa.store_id,
-            sa.store,
-            sa.category,
-            sa.rating,
-            sa.review_count,
-            sa.installs,
-            sa.free,
-            sa.price,
-            sa.size,
-            sa.minimum_android,
-            sa.developer_email,
-            sa.store_last_updated,
-            sa.content_rating,
-            sa.ad_supported,
-            sa.in_app_purchases,
-            sa.editors_choice,
-            sa.created_at,
-            sa.updated_at,
-            sa.crawl_result,
-            sa.icon_url_512,
-            sa.release_date,
-            sa.rating_count,
-            sa.featured_image_url,
-            sa.phone_image_url_1,
-            sa.phone_image_url_2,
-            sa.phone_image_url_3,
-            sa.tablet_image_url_1,
-            sa.tablet_image_url_2,
-            sa.tablet_image_url_3,
-            cm.original_category,
-            cm.mapped_category,
-            row_number() OVER (PARTITION BY sa.store, cm.mapped_category ORDER BY sa.installs DESC NULLS LAST, sa.rating_count DESC NULLS LAST) AS rn
-           FROM (public.store_apps sa
-             JOIN public.category_mapping cm ON (((sa.category)::text = (cm.original_category)::text)))
-          WHERE ((sa.release_date >= (CURRENT_DATE - '7 days'::interval)) AND (sa.crawl_result = 1))
+         SELECT sa_1.id,
+            sa_1.name,
+            sa_1.store_id,
+            sa_1.store,
+            sa_1.category,
+            sa_1.rating,
+            sa_1.review_count,
+            sa_1.installs,
+            sa_1.store_last_updated,
+            sa_1.ad_supported,
+            sa_1.in_app_purchases,
+            sa_1.created_at,
+            sa_1.updated_at,
+            sa_1.crawl_result,
+            sa_1.icon_url_512,
+            sa_1.release_date,
+            sa_1.rating_count,
+            sa_1.featured_image_url,
+            sa_1.phone_image_url_1,
+            sa_1.phone_image_url_2,
+            sa_1.phone_image_url_3,
+            sa_1.tablet_image_url_1,
+            sa_1.tablet_image_url_2,
+            sa_1.tablet_image_url_3,
+            row_number() OVER (PARTITION BY sa_1.store, sa_1.category ORDER BY sa_1.installs DESC NULLS LAST, sa_1.rating_count DESC NULLS LAST) AS rn
+           FROM frontend.store_apps_overview sa_1
+          WHERE ((sa_1.release_date >= (CURRENT_DATE - '7 days'::interval)) AND (sa_1.crawl_result = 1))
         )
- SELECT id,
-    developer,
-    name,
-    store_id,
-    store,
-    category,
-    rating,
-    review_count,
-    installs,
-    free,
-    price,
-    size,
-    minimum_android,
-    developer_email,
-    store_last_updated,
-    content_rating,
-    ad_supported,
-    in_app_purchases,
-    editors_choice,
-    created_at,
-    updated_at,
-    crawl_result,
-    icon_url_512,
-    release_date,
-    rating_count,
-    featured_image_url,
-    phone_image_url_1,
-    phone_image_url_2,
-    phone_image_url_3,
-    tablet_image_url_1,
-    tablet_image_url_2,
-    tablet_image_url_3,
-    original_category,
-    mapped_category,
-    rn
-   FROM rankedapps
-  WHERE (rn <= 100)
+ SELECT ra.id,
+    ra.name,
+    ra.store_id,
+    ra.store,
+    ra.category,
+    ra.rating,
+    ra.review_count,
+    ra.installs,
+    ra.store_last_updated,
+    ra.ad_supported,
+    ra.in_app_purchases,
+    ra.created_at,
+    ra.updated_at,
+    ra.crawl_result,
+    sa.icon_url_100,
+    ra.icon_url_512,
+    ra.release_date,
+    ra.rating_count,
+    ra.featured_image_url,
+    ra.phone_image_url_1,
+    ra.phone_image_url_2,
+    ra.phone_image_url_3,
+    ra.tablet_image_url_1,
+    ra.tablet_image_url_2,
+    ra.tablet_image_url_3,
+    ra.category AS app_category,
+    ra.rn
+   FROM (rankedapps ra
+     LEFT JOIN public.store_apps sa ON ((sa.id = ra.id)))
+  WHERE (ra.rn <= 100)
   WITH NO DATA;
 
 
@@ -4307,6 +4434,109 @@ ALTER TABLE ONLY public.version_code_sdk_scan_results ALTER COLUMN id SET DEFAUL
 
 
 --
+-- Name: store_apps store_apps_pkey; Type: CONSTRAINT; Schema: public; Owner: james
+--
+
+ALTER TABLE ONLY public.store_apps
+    ADD CONSTRAINT store_apps_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: advertiser_creative_rankings; Type: MATERIALIZED VIEW; Schema: frontend; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW frontend.advertiser_creative_rankings AS
+ WITH adv_mmp AS (
+         SELECT DISTINCT ca_1.store_app_id AS advertiser_store_app_id,
+            cr_1.mmp_domain_id,
+            ad.domain AS mmp_domain
+           FROM ((public.creative_records cr_1
+             LEFT JOIN public.creative_assets ca_1 ON ((cr_1.creative_asset_id = ca_1.id)))
+             LEFT JOIN public.ad_domains ad ON ((cr_1.mmp_domain_id = ad.id)))
+          WHERE (cr_1.mmp_domain_id IS NOT NULL)
+        ), creative_rankings AS (
+         SELECT ca_1.md5_hash,
+            ca_1.file_extension,
+            ca_1.store_app_id AS advertiser_store_app_id,
+            vcasr_1.run_at,
+            row_number() OVER (PARTITION BY ca_1.store_app_id ORDER BY vcasr_1.run_at DESC) AS rn
+           FROM ((public.creative_records cr_1
+             LEFT JOIN public.creative_assets ca_1 ON ((cr_1.creative_asset_id = ca_1.id)))
+             LEFT JOIN public.version_code_api_scan_results vcasr_1 ON ((cr_1.run_id = vcasr_1.id)))
+        )
+ SELECT saa.name AS advertiser_name,
+    saa.store_id AS advertiser_store_id,
+    saa.icon_url_100 AS advertiser_icon_url_100,
+    saa.icon_url_512 AS advertiser_icon_url_512,
+    saa.category AS advertiser_category,
+    saa.installs AS advertiser_installs,
+    count(DISTINCT ca.md5_hash) AS unique_creatives,
+    count(DISTINCT cr.store_app_pub_id) AS unique_publishers,
+    min(vcasr.run_at) AS first_seen,
+    max(vcasr.run_at) AS last_seen,
+    array_agg(DISTINCT ca.file_extension) AS file_types,
+    avg(sap.installs) AS avg_publisher_installs,
+    array_agg(DISTINCT adv_mmp.mmp_domain) AS mmp_domains,
+    ARRAY( SELECT crk.md5_hash
+           FROM creative_rankings crk
+          WHERE ((crk.advertiser_store_app_id = saa.id) AND (crk.rn <= 5))
+          ORDER BY crk.rn) AS top_md5_hashes
+   FROM (((((public.creative_records cr
+     LEFT JOIN public.creative_assets ca ON ((cr.creative_asset_id = ca.id)))
+     LEFT JOIN frontend.store_apps_overview sap ON ((cr.store_app_pub_id = sap.id)))
+     LEFT JOIN public.store_apps saa ON ((ca.store_app_id = saa.id)))
+     LEFT JOIN public.version_code_api_scan_results vcasr ON ((cr.run_id = vcasr.id)))
+     LEFT JOIN adv_mmp ON ((ca.store_app_id = adv_mmp.advertiser_store_app_id)))
+  GROUP BY saa.name, saa.store_id, saa.icon_url_512, saa.category, saa.installs, saa.id
+  ORDER BY (count(DISTINCT ca.md5_hash)) DESC
+  WITH NO DATA;
+
+
+ALTER MATERIALIZED VIEW frontend.advertiser_creative_rankings OWNER TO postgres;
+
+--
+-- Name: advertiser_creative_rankings_recent_month; Type: MATERIALIZED VIEW; Schema: frontend; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW frontend.advertiser_creative_rankings_recent_month AS
+ WITH creative_rankings AS (
+         SELECT ca_1.md5_hash,
+            ca_1.file_extension,
+            ca_1.store_app_id AS advertiser_store_app_id,
+            vcasr_1.run_at,
+            row_number() OVER (PARTITION BY ca_1.store_app_id ORDER BY vcasr_1.run_at DESC) AS rn
+           FROM ((public.creative_records cr_1
+             LEFT JOIN public.creative_assets ca_1 ON ((cr_1.creative_asset_id = ca_1.id)))
+             LEFT JOIN public.version_code_api_scan_results vcasr_1 ON ((cr_1.run_id = vcasr_1.id)))
+        )
+ SELECT saa.name AS advertiser_name,
+    saa.store_id AS advertiser_store_id,
+    saa.icon_url_100 AS advertiser_icon_url_100,
+    saa.icon_url_512 AS advertiser_icon_url_512,
+    count(DISTINCT ca.md5_hash) AS unique_creatives,
+    count(DISTINCT cr.store_app_pub_id) AS unique_publishers,
+    min(vcasr.run_at) AS first_seen,
+    max(vcasr.run_at) AS last_seen,
+    array_agg(DISTINCT ca.file_extension) AS file_types,
+    avg(sap.installs) AS avg_publisher_installs,
+    ARRAY( SELECT crk.md5_hash
+           FROM creative_rankings crk
+          WHERE ((crk.advertiser_store_app_id = saa.id) AND (crk.rn <= 5))
+          ORDER BY crk.rn) AS top_md5_hashes
+   FROM ((((public.creative_records cr
+     LEFT JOIN public.creative_assets ca ON ((cr.creative_asset_id = ca.id)))
+     LEFT JOIN frontend.store_apps_overview sap ON ((cr.store_app_pub_id = sap.id)))
+     LEFT JOIN public.store_apps saa ON ((ca.store_app_id = saa.id)))
+     LEFT JOIN public.version_code_api_scan_results vcasr ON ((cr.run_id = vcasr.id)))
+  WHERE (vcasr.run_at >= (now() - '1 mon'::interval))
+  GROUP BY saa.name, saa.store_id, saa.icon_url_512, saa.id
+  ORDER BY (count(DISTINCT cr.store_app_pub_id)) DESC
+  WITH NO DATA;
+
+
+ALTER MATERIALIZED VIEW frontend.advertiser_creative_rankings_recent_month OWNER TO postgres;
+
+--
 -- Name: categories categories_pkey; Type: CONSTRAINT; Schema: adtech; Owner: postgres
 --
 
@@ -4715,14 +4945,6 @@ ALTER TABLE ONLY public.store_apps_descriptions
 
 
 --
--- Name: store_apps store_apps_pkey; Type: CONSTRAINT; Schema: public; Owner: james
---
-
-ALTER TABLE ONLY public.store_apps
-    ADD CONSTRAINT store_apps_pkey PRIMARY KEY (id);
-
-
---
 -- Name: store_apps store_apps_un; Type: CONSTRAINT; Schema: public; Owner: james
 --
 
@@ -5101,6 +5323,27 @@ CREATE UNIQUE INDEX frontend_store_apps_z_scores_unique ON frontend.store_apps_z
 
 
 --
+-- Name: idx_apps_fr_new_monthly; Type: INDEX; Schema: frontend; Owner: postgres
+--
+
+CREATE UNIQUE INDEX idx_apps_fr_new_monthly ON frontend.apps_new_monthly USING btree (store, app_category, store_id);
+
+
+--
+-- Name: idx_apps_fr_new_weekly; Type: INDEX; Schema: frontend; Owner: postgres
+--
+
+CREATE UNIQUE INDEX idx_apps_fr_new_weekly ON frontend.apps_new_weekly USING btree (store, app_category, store_id);
+
+
+--
+-- Name: idx_apps_fr_new_yearly; Type: INDEX; Schema: frontend; Owner: postgres
+--
+
+CREATE UNIQUE INDEX idx_apps_fr_new_yearly ON frontend.apps_new_yearly USING btree (store, app_category, store_id);
+
+
+--
 -- Name: idx_category_tag_stats; Type: INDEX; Schema: frontend; Owner: postgres
 --
 
@@ -5307,7 +5550,7 @@ CREATE UNIQUE INDEX idx_apps_new_monthly ON public.apps_new_monthly USING btree 
 -- Name: idx_apps_new_weekly; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE UNIQUE INDEX idx_apps_new_weekly ON public.apps_new_weekly USING btree (store, mapped_category, store_id);
+CREATE UNIQUE INDEX idx_apps_new_weekly ON public.apps_new_weekly USING btree (store, app_category, store_id);
 
 
 --

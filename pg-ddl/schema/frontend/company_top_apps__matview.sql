@@ -68,6 +68,10 @@ WITH deduped_data AS (
                     deduped_data.company_domain,
                     deduped_data.company_name
                 ORDER BY
+                    (
+                        coalesce((deduped_data.sdk)::integer, 0)
+                        + coalesce((deduped_data.api_call)::integer, 0)
+                    ) DESC,
                     greatest(
                         (
                             coalesce(
@@ -89,6 +93,10 @@ WITH deduped_data AS (
                     deduped_data.company_domain,
                     deduped_data.company_name
                 ORDER BY
+                    (
+                        coalesce((deduped_data.sdk)::integer, 0)
+                        + coalesce((deduped_data.api_call)::integer, 0)
+                    ) DESC,
                     greatest(
                         (
                             coalesce(
@@ -119,7 +127,7 @@ SELECT
     app_company_rank,
     app_company_category_rank
 FROM ranked_apps
-WHERE (app_company_category_rank <= 100)
+WHERE (app_company_category_rank <= 20)
 WITH NO DATA;
 
 
