@@ -142,6 +142,11 @@ WITH latest_version_codes AS (
             ON ((cr.creative_asset_id = ca.id))
     )
     GROUP BY ca.store_app_id
+), my_mon_creatives AS (
+    SELECT DISTINCT
+        1 AS ad_mon_creatives,
+        creative_records.store_app_pub_id
+    FROM public.creative_records
 )
 SELECT
     sa.id,
@@ -167,6 +172,7 @@ SELECT
     sa.created_at,
     sa.updated_at,
     sa.crawl_result,
+    sa.icon_url_100,
     sa.icon_url_512,
     sa.release_date,
     sa.featured_image_url,
@@ -190,8 +196,9 @@ SELECT
     lac.run_at AS api_last_crawled,
     lac.run_result,
     lsac.run_at AS api_successful_last_crawled,
-    acr.ad_creative_count
-FROM (((((((((((((
+    acr.ad_creative_count,
+    amc.ad_mon_creatives
+FROM ((((((((((((((
     public.store_apps sa
     LEFT JOIN
         public.category_mapping AS cm
@@ -220,6 +227,8 @@ LEFT JOIN latest_api_calls AS lac ON ((sa.id = lac.store_app))
 LEFT JOIN latest_successful_api_calls AS lsac ON ((sa.id = lsac.store_app))
 )
 LEFT JOIN my_ad_creatives AS acr ON ((sa.id = acr.store_app_id))
+)
+LEFT JOIN my_mon_creatives AS amc ON ((sa.id = amc.store_app_pub_id))
 )
 WITH NO DATA;
 

@@ -97,6 +97,10 @@ CREATE MATERIALIZED VIEW frontend.store_apps_overview AS
            FROM (public.creative_records cr
              LEFT JOIN public.creative_assets ca ON ((cr.creative_asset_id = ca.id)))
           GROUP BY ca.store_app_id
+        ), my_mon_creatives AS (
+         SELECT DISTINCT 1 AS ad_mon_creatives,
+            creative_records.store_app_pub_id
+           FROM public.creative_records
         )
  SELECT sa.id,
     sa.name,
@@ -121,6 +125,7 @@ CREATE MATERIALIZED VIEW frontend.store_apps_overview AS
     sa.created_at,
     sa.updated_at,
     sa.crawl_result,
+    sa.icon_url_100,
     sa.icon_url_512,
     sa.release_date,
     sa.featured_image_url,
@@ -144,8 +149,9 @@ CREATE MATERIALIZED VIEW frontend.store_apps_overview AS
     lac.run_at AS api_last_crawled,
     lac.run_result,
     lsac.run_at AS api_successful_last_crawled,
-    acr.ad_creative_count
-   FROM (((((((((((((public.store_apps sa
+    acr.ad_creative_count,
+    amc.ad_mon_creatives
+   FROM ((((((((((((((public.store_apps sa
      LEFT JOIN public.category_mapping cm ON (((sa.category)::text = (cm.original_category)::text)))
      LEFT JOIN public.developers d ON ((sa.developer = d.id)))
      LEFT JOIN public.app_urls_map aum ON ((sa.id = aum.store_app)))
@@ -159,6 +165,7 @@ CREATE MATERIALIZED VIEW frontend.store_apps_overview AS
      LEFT JOIN latest_api_calls lac ON ((sa.id = lac.store_app)))
      LEFT JOIN latest_successful_api_calls lsac ON ((sa.id = lsac.store_app)))
      LEFT JOIN my_ad_creatives acr ON ((sa.id = acr.store_app_id)))
+     LEFT JOIN my_mon_creatives amc ON ((sa.id = amc.store_app_pub_id)))
   WITH NO DATA;
 
 
@@ -956,13 +963,15 @@ CREATE MATERIALIZED VIEW frontend.companies_creative_rankings AS
     vd.md5_hash,
     vd.file_extension,
     ad.domain AS company_domain,
+    sa.name AS advertiser_name,
     sa.store_id AS advertiser_store_id,
+    sa.icon_url_100,
     sa.icon_url_512,
     vd.last_seen
    FROM (((visually_distinct vd
      LEFT JOIN adtech.companies c ON ((vd.company_id = c.id)))
      LEFT JOIN public.ad_domains ad ON ((c.domain_id = ad.id)))
-     LEFT JOIN frontend.store_apps_overview sa ON ((vd.advertiser_store_app_id = sa.id)))
+     LEFT JOIN public.store_apps sa ON ((vd.advertiser_store_app_id = sa.id)))
   WHERE (c.id IS NOT NULL)
   ORDER BY vd.last_seen DESC
   WITH NO DATA;

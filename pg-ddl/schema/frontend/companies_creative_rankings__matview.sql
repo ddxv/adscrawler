@@ -95,7 +95,9 @@ SELECT DISTINCT
     vd.md5_hash,
     vd.file_extension,
     ad.domain AS company_domain,
+    sa.name AS advertiser_name,
     sa.store_id AS advertiser_store_id,
+    sa.icon_url_100,
     sa.icon_url_512,
     vd.last_seen
 FROM (((
@@ -104,9 +106,7 @@ FROM (((
 )
 LEFT JOIN public.ad_domains AS ad ON ((c.domain_id = ad.id))
 )
-LEFT JOIN
-    frontend.store_apps_overview AS sa
-    ON ((vd.advertiser_store_app_id = sa.id))
+LEFT JOIN public.store_apps AS sa ON ((vd.advertiser_store_app_id = sa.id))
 )
 WHERE (c.id IS NOT null)
 ORDER BY vd.last_seen DESC
