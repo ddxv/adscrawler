@@ -5543,21 +5543,21 @@ CREATE INDEX developers_name_idx ON public.developers USING gin (to_tsvector('si
 -- Name: idx_apps_new_monthly; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE UNIQUE INDEX idx_apps_new_monthly ON public.apps_new_monthly USING btree (store, mapped_category, store_id);
+CREATE UNIQUE INDEX idx_apps_new_monthly ON frontend.apps_new_monthly USING btree (store, app_category, store_id);
 
 
 --
 -- Name: idx_apps_new_weekly; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE UNIQUE INDEX idx_apps_new_weekly ON public.apps_new_weekly USING btree (store, app_category, store_id);
+CREATE UNIQUE INDEX idx_apps_new_weekly_f ON frontend.apps_new_weekly USING btree (store, app_category, store_id);
 
 
 --
 -- Name: idx_apps_new_yearly; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE UNIQUE INDEX idx_apps_new_yearly ON public.apps_new_yearly USING btree (store, mapped_category, store_id);
+CREATE UNIQUE INDEX idx_apps_new_yearly ON frontend.apps_new_yearly USING btree (store, app_category, store_id);
 
 
 --
@@ -6233,4 +6233,5 @@ GRANT ALL ON SCHEMA public TO PUBLIC;
 --
 -- PostgreSQL database dump complete
 --
+
 
