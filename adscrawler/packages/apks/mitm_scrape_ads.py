@@ -1,3 +1,4 @@
+import ast
 import base64
 import dataclasses
 import datetime
@@ -12,6 +13,7 @@ import subprocess
 import urllib
 import uuid
 import xml.etree.ElementTree as ET
+from typing import Any
 
 import imagehash
 import numpy as np
@@ -95,12 +97,12 @@ class AdInfo:
     found_ad_network_tlds: list[str] | None = None
     found_mmp_urls: list[str] | None = None
 
-    def __getitem__(self, key: str):
-        """Support dictionary-style access to dataclass fields"""
+    def __getitem__(self, key: str) -> Any:
+        """Support dictionary-style access to dataclass fields."""
         return getattr(self, key)
 
-    def __setitem__(self, key: str, value):
-        """Support dictionary-style assignment to dataclass fields"""
+    def __setitem__(self, key: str, value: Any) -> None:
+        """Support dictionary-style assignment to dataclass fields."""
         setattr(self, key, value)
 
     @property
@@ -117,6 +119,7 @@ class AdInfo:
 def decode_network_request(
     url: str, flowpart: http.HTTPFlow, database_connection: PostgresCon
 ) -> str | None:
+    """Decodes network request content, handling AppLovin-specific decoding when needed."""
     if decode_from and "applovin.com" in url:
         try:
             text = decode_from(
@@ -141,6 +144,7 @@ def parse_mitm_log(
     run_id: int,
     database_connection: PostgresCon,
 ) -> pd.DataFrame:
+    """Parses MITM proxy log files and extracts HTTP request/response data into a DataFrame."""
     mitm_log_path = pathlib.Path(MITM_DIR, f"{pub_store_id}_{run_id}.log")
     if mitm_log_path.exists():
         logger.info("mitm log already exists")
@@ -260,6 +264,7 @@ def parse_mitm_log(
 def get_sent_video_df(
     df: pd.DataFrame, row: pd.Series, video_id: str
 ) -> pd.DataFrame | None:
+    """Retrieves DataFrame rows containing the specified video ID from the given DataFrame."""
     sent_video_df = df[
         (df["response_text"].astype(str).str.contains(video_id, regex=False))
         & (df["start_time"] <= row.start_time)
@@ -279,6 +284,7 @@ def get_sent_video_df(
 def extract_and_decode_urls(
     text: str, run_id: int, database_connection: PostgresCon
 ) -> list[str]:
+    """Extracts and decodes all URLs from text content, handling various encoding formats."""
     """
     Extracts all URLs from a given text, handles HTML entities and URL encoding.
     """
@@ -371,7 +377,8 @@ def extract_and_decode_urls(
 
 def check_click_urls(
     all_urls: list[str], run_id: int, database_connection: PostgresCon
-):
+) -> list[str]:
+    """Checks URLs for click tracking and follows redirects to find final destination URLs."""
     click_urls = []
     for url in all_urls:
         redirect_urls = []
@@ -390,7 +397,8 @@ def check_click_urls(
 
 def parse_fyber_html(
     inner_ad_element: str, run_id: int, database_connection: PostgresCon
-):
+) -> list[str]:
+    """Parses Fyber HTML content to extract click URLs and ad network URLs."""
     # Extract all URLs from the raw HTML content first
     all_extracted_urls = extract_and_decode_urls(
         inner_ad_element,
@@ -417,6 +425,7 @@ def parse_fyber_html(
 def parse_fyber_ad_response(
     ad_response_text: str, run_id: int, database_connection: PostgresCon
 ) -> list[str]:
+    """Parses Fyber ad response XML to extract VAST URLs and click tracking URLs."""
     outer_tree = ET.fromstring(ad_response_text)
     ns = {"tns": "http://www.inner-active.com/SimpleM2M/M2MResponse"}
     ad_element = outer_tree.find(".//tns:Ad", ns)
@@ -451,7 +460,8 @@ def parse_fyber_ad_response(
     return urls
 
 
-def adv_id_from_play_url(url: str) -> str:
+def adv_id_from_play_url(url: str) -> str | None:
+    """Extracts advertiser store ID from Google Play Store URLs."""
     parsed_gplay = urllib.parse.urlparse(url)
     try:
         adv_store_id = urllib.parse.parse_qs(parsed_gplay.query)["id"][0]
@@ -464,6 +474,7 @@ def adv_id_from_play_url(url: str) -> str:
 def follow_url_redirects(
     url: str, run_id: int, database_connection: PostgresCon
 ) -> list[str]:
+    """Follows URL redirects and returns the final destination URL chain."""
     """
     Follows redirects and returns the final URL.
 
@@ -493,7 +504,8 @@ def follow_url_redirects(
     return redirect_urls
 
 
-def get_redirect_chain(url):
+def get_redirect_chain(url: str) -> list[str]:
+    """Follows HTTP redirects for a given URL and returns the complete redirect chain."""
     chain = []
     cur_url = url
     while cur_url:
@@ -518,6 +530,7 @@ def get_redirect_chain(url):
 def parse_urls_for_known_parts(
     all_urls: list[str], database_connection: PostgresCon, pub_store_id: str
 ) -> AdInfo:
+    """Parses URLs to extract advertiser store IDs, MMP URLs, and ad network domains."""
     found_mmp_urls = []
     found_adv_store_ids = []
     found_ad_network_urls = []
@@ -592,7 +605,10 @@ def parse_urls_for_known_parts(
     )
 
 
-def parse_youappi_ad(sent_video_dict: dict, database_connection: PostgresCon) -> AdInfo:
+def parse_youappi_ad(
+    sent_video_dict: dict[str, Any], database_connection: PostgresCon
+) -> AdInfo:
+    """Parses YouAppi ad response to extract advertiser information and URLs."""
     init_ad_network_tld = "youappi.com"
     all_urls = extract_and_decode_urls(
         sent_video_dict["response_text"],
@@ -607,8 +623,9 @@ def parse_youappi_ad(sent_video_dict: dict, database_connection: PostgresCon) ->
 
 
 def parse_yandex_ad(
-    sent_video_dict: dict, database_connection: PostgresCon, video_id: str
+    sent_video_dict: dict[str, Any], database_connection: PostgresCon, video_id: str
 ) -> AdInfo:
+    """Parses Yandex ad response to extract advertiser information and URLs."""
     init_ad_network_tld = "yandex.ru"
     json_text = json.loads(sent_video_dict["response_text"])
     if "native" in json_text:
@@ -631,7 +648,10 @@ def parse_yandex_ad(
     return ad_info
 
 
-def parse_mtg_ad(sent_video_dict: dict, database_connection: PostgresCon) -> AdInfo:
+def parse_mtg_ad(
+    sent_video_dict: dict[str, Any], database_connection: PostgresCon
+) -> AdInfo:
+    """Parses MTG ad response to extract advertiser package name and URLs."""
     init_ad_network_tld = "mtgglobals.com"
     text = sent_video_dict["response_text"]
     try:
@@ -655,14 +675,16 @@ def parse_mtg_ad(sent_video_dict: dict, database_connection: PostgresCon) -> AdI
 
 
 class JsonRenderer(Renderer):
-    def __init__(self):
-        self.result = dict()
-        self.current = self.result
+    def __init__(self) -> None:
+        self.result: dict[str, Any] = dict()
+        self.current: dict[str, Any] = self.result
 
-    def _add(self, id, item):
-        self.current[id] = item
+    def _add(self, field_id: str, item: Any) -> None:
+        """Adds an item to the current result dictionary."""
+        self.current[field_id] = item
 
-    def _build_tmp_item(self, chunk):
+    def _build_tmp_item(self, chunk: Any) -> Any:
+        """Builds a temporary item using a temporary renderer."""
         # use a temporary renderer to build
         jr = JsonRenderer()
         chunk.render(jr)
@@ -672,23 +694,28 @@ class JsonRenderer(Renderer):
         for _, item in tmp_dict.items():
             return item
 
-    def build_result(self):
+    def build_result(self) -> dict[str, Any]:
+        """Returns the built result dictionary."""
         return self.result
 
-    def render_repeated_fields(self, repeated):
+    def render_repeated_fields(self, repeated: Any) -> None:
+        """Renders repeated fields into an array."""
         arr = []
         for ch in repeated.items:
             arr.append(self._build_tmp_item(ch))
         self._add(repeated.idtype.id, arr)
 
-    def render_varint(self, varint):
+    def render_varint(self, varint: Any) -> None:
+        """Renders a varint field."""
         self._add(varint.idtype.id, varint.i64)
 
-    def render_fixed(self, fixed):
+    def render_fixed(self, fixed: Any) -> None:
+        """Renders a fixed field."""
         self._add(fixed.idtype.id, fixed.i)
 
-    def render_struct(self, struct):
-        curr = None
+    def render_struct(self, struct: Any) -> None:
+        """Renders a struct field."""
+        curr: Any = None
 
         if struct.as_fields:
             curr = {}
@@ -708,7 +735,8 @@ class JsonRenderer(Renderer):
 #   encoding name: str
 #   decoding succeeded: bool
 # )
-def decode_utf8(view) -> tuple[bytes, str, bool]:
+def decode_utf8(view: Any) -> tuple[bytes, str, bool]:
+    """Attempts to decode bytes as UTF-8 and returns the result with success status."""
     view_bytes = view.tobytes()
     try:
         utf8 = "UTF-8"
@@ -718,7 +746,8 @@ def decode_utf8(view) -> tuple[bytes, str, bool]:
         return view_bytes, "", False
 
 
-def base64decode(s: str) -> str:
+def base64decode(s: str) -> bytes:
+    """Decodes a base64 string with proper padding."""
     missing_padding = len(s) % 4
     if missing_padding:
         s += "=" * (4 - missing_padding)
@@ -726,8 +755,9 @@ def base64decode(s: str) -> str:
 
 
 def parse_bidmachine_ad(
-    sent_video_dict: dict, database_connection: PostgresCon
+    sent_video_dict: dict[str, Any], database_connection: PostgresCon
 ) -> AdInfo:
+    """Parses BidMachine ad response using protobuf decoding to extract advertiser information."""
     init_ad_network_tld = "bidmachine.com"
     adv_store_id = None
     additional_ad_network_tld = None
@@ -736,8 +766,6 @@ def parse_bidmachine_ad(
         init_tld=init_ad_network_tld,
     )
     if isinstance(sent_video_dict["response_content"], str):
-        import ast
-
         sent_video_dict["response_content"] = ast.literal_eval(
             sent_video_dict["response_content"]
         )
@@ -790,12 +818,11 @@ def parse_bidmachine_ad(
     return ad_info
 
 
-def parse_everestop_ad(sent_video_dict: dict) -> AdInfo:
+def parse_everestop_ad(sent_video_dict: dict[str, Any]) -> AdInfo:
+    """Parses Everestop ad response using protobuf decoding to extract advertiser information."""
     init_ad_network_tld = "everestop.io"
 
     if isinstance(sent_video_dict["response_content"], str):
-        import ast
-
         sent_video_dict["response_content"] = ast.literal_eval(
             sent_video_dict["response_content"]
         )
@@ -819,8 +846,9 @@ def parse_everestop_ad(sent_video_dict: dict) -> AdInfo:
 
 
 def parse_unity_ad(
-    sent_video_dict: dict, database_connection: PostgresCon
-) -> tuple[AdInfo, str]:
+    sent_video_dict: dict[str, Any], database_connection: PostgresCon
+) -> tuple[AdInfo, str | None]:
+    """Parses Unity ad response to extract advertiser information and bundle ID."""
     init_ad_network_tld = "unity3d.com"
     error_msg = None
     found_mmp_urls = []
@@ -867,13 +895,15 @@ def parse_unity_ad(
 
 
 def get_tld(url: str) -> str:
+    """Extracts the top-level domain from a URL."""
     tld = tldextract.extract(url).domain + "." + tldextract.extract(url).suffix
     return tld
 
 
 def parse_generic_adnetwork(
-    sent_video_dict: dict, database_connection: PostgresCon
-) -> tuple[AdInfo, str]:
+    sent_video_dict: dict[str, Any], database_connection: PostgresCon
+) -> tuple[AdInfo, str | None]:
+    """Parses generic ad network responses to extract advertiser information."""
     error_msg = None
     init_tld = get_tld(sent_video_dict["tld_url"])
     text = sent_video_dict["response_text"]
@@ -896,7 +926,10 @@ def parse_generic_adnetwork(
     return ad_info, error_msg
 
 
-def parse_vungle_ad(sent_video_dict: dict, database_connection: PostgresCon) -> AdInfo:
+def parse_vungle_ad(
+    sent_video_dict: dict[str, Any], database_connection: PostgresCon
+) -> AdInfo:
+    """Parses Vungle ad response to extract advertiser market ID and tracking URLs."""
     init_ad_network_tld = "vungle.com"
     found_mmp_urls = None
     adv_store_id = None
@@ -937,7 +970,10 @@ def parse_vungle_ad(sent_video_dict: dict, database_connection: PostgresCon) -> 
     return ad_info
 
 
-def parse_fyber_ad(sent_video_dict: dict, database_connection: PostgresCon) -> AdInfo:
+def parse_fyber_ad(
+    sent_video_dict: dict[str, Any], database_connection: PostgresCon
+) -> AdInfo:
+    """Parses Fyber ad response to extract advertiser information and URLs."""
     init_ad_network_tld = "fyber.com"
     parsed_urls = []
     text = sent_video_dict["response_text"]
@@ -971,8 +1007,9 @@ def parse_fyber_ad(sent_video_dict: dict, database_connection: PostgresCon) -> A
 
 
 def parse_google_ad(
-    sent_video_dict: dict, video_id: str, database_connection: PostgresCon
-) -> tuple[AdInfo, str]:
+    sent_video_dict: dict[str, Any], video_id: str, database_connection: PostgresCon
+) -> tuple[AdInfo, str | None]:
+    """Parses Google DoubleClick ad response to extract advertiser information."""
     ad_info = AdInfo(adv_store_id=None, found_ad_network_tlds=None, found_mmp_urls=None)
     error_msg = None
     if sent_video_dict["response_text"] is None:
@@ -1071,6 +1108,7 @@ def parse_google_ad(
 
 
 def add_is_creative_content_column(df: pd.DataFrame) -> pd.DataFrame:
+    """Adds a column indicating whether the response contains creative content (images/videos)."""
     is_creative_content_response = (
         df["response_content_type"]
         .fillna("")
@@ -1095,6 +1133,7 @@ def add_is_creative_content_column(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def extract_frame_at(local_path: pathlib.Path, second: int) -> Image.Image:
+    """Extracts a single frame from a video file at the specified second."""
     tmp_path = pathlib.Path(f"/tmp/frame_{uuid.uuid4()}.jpg")
     subprocess.run(
         [
@@ -1118,7 +1157,8 @@ def extract_frame_at(local_path: pathlib.Path, second: int) -> Image.Image:
     return img
 
 
-def average_hashes(hashes):
+def average_hashes(hashes: list[imagehash.ImageHash]) -> str:
+    """Computes the average hash from multiple image hashes using majority voting."""
     # imagehash returns a numpy-like object; sum and majority voting works
     bits = sum([h.hash.astype(int) for h in hashes])
     majority = (bits >= (len(hashes) / 2)).astype(int)
@@ -1126,6 +1166,7 @@ def average_hashes(hashes):
 
 
 def compute_phash_multiple_frames(local_path: pathlib.Path, seconds: list[int]) -> str:
+    """Computes perceptual hash from multiple video frames at specified time points."""
     hashes = []
     for second in seconds:
         try:
@@ -1137,6 +1178,7 @@ def compute_phash_multiple_frames(local_path: pathlib.Path, seconds: list[int]) 
 
 
 def get_phash(md5_hash: str, adv_store_id: str, file_extension: str) -> str:
+    """Generates a perceptual hash for a creative file, using multiple frames for videos."""
     phash = None
     local_path = (
         pathlib.Path(CREATIVES_DIR, adv_store_id) / f"{md5_hash}.{file_extension}"
@@ -1154,6 +1196,7 @@ def get_phash(md5_hash: str, adv_store_id: str, file_extension: str) -> str:
 
 
 def store_creatives(row: pd.Series, adv_store_id: str, file_extension: str) -> str:
+    """Stores creative files locally and generates thumbnails, returning the MD5 hash."""
     thumbnail_width = 320
     local_dir = pathlib.Path(CREATIVES_DIR, adv_store_id)
     local_dir.mkdir(parents=True, exist_ok=True)
@@ -1244,6 +1287,7 @@ def store_creatives(row: pd.Series, adv_store_id: str, file_extension: str) -> s
 
 
 def filter_creatives(df: pd.DataFrame) -> pd.DataFrame:
+    """Filters DataFrame to include only valid creative content based on size and format criteria."""
     status_code_200 = df["status_code"] == 200
     df = add_is_creative_content_column(df)
     creatives_df = df[(df["is_creative_content"]) & status_code_200].copy()
@@ -1276,6 +1320,7 @@ def filter_creatives(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def add_file_extension(df: pd.DataFrame) -> pd.DataFrame:
+    """Adds file extension column to DataFrame based on URL or content type."""
     df["file_extension"] = df["url"].apply(lambda x: x.split(".")[-1])
     ext_too_long = (df["file_extension"].str.len() > 4) & (
         df["response_content_type"].fillna("").str.contains("/")
@@ -1299,7 +1344,8 @@ def parse_sent_video_df(
     sent_video_df: pd.DataFrame,
     database_connection: PostgresCon,
     video_id: str,
-) -> tuple[list[AdInfo], list[str]]:
+) -> tuple[list[AdInfo], list[dict[str, Any]]]:
+    """Parses video data to extract advertiser information from various ad networks."""
     error_messages = []
     run_id = row["run_id"]
     sent_video_dicts = sent_video_df.to_dict(orient="records")
@@ -1413,6 +1459,7 @@ def parse_sent_video_df(
 
 
 def get_video_id(row: pd.Series) -> str:
+    """Extracts video ID from URL based on the ad network domain."""
     if "2mdn" in row["tld_url"]:
         if "/id/" in row["url"]:
             url_parts = urllib.parse.urlparse(row["url"])
@@ -1451,7 +1498,8 @@ def attribute_creatives(
     creatives_df: pd.DataFrame,
     pub_store_id: str,
     database_connection: PostgresCon,
-) -> tuple[pd.DataFrame, list]:
+) -> tuple[pd.DataFrame, list[dict[str, Any]]]:
+    """Attributes creative content to advertisers by analyzing ad network responses."""
     error_messages = []
     i = 0
     adv_creatives = []
@@ -1592,10 +1640,12 @@ def attribute_creatives(
 
 
 def upload_creatives(adv_creatives_df: pd.DataFrame) -> None:
+    """Uploads creative files to S3 storage."""
     upload_creatives_to_s3(adv_creatives_df)
 
 
 def upload_creatives_to_s3(adv_creatives_df: pd.DataFrame) -> None:
+    """Uploads creative files to S3, checking for existing files to avoid duplicates."""
     for adv_id, adv_creatives_df_adv in adv_creatives_df.groupby("adv_store_id"):
         try:
             s3_keys = get_app_creatives_s3_keys(store=1, store_id=adv_id)
@@ -1618,6 +1668,7 @@ def upload_creatives_to_s3(adv_creatives_df: pd.DataFrame) -> None:
 def get_latest_local_mitm(
     store_id: str, force_re_download: bool = False
 ) -> tuple[pathlib.Path, int]:
+    """Gets the latest local MITM log file for a store ID or downloads it if needed."""
     mitm_logs = list(pathlib.Path(MITM_DIR).glob(f"{store_id}_*.log"))
     if mitm_logs and not force_re_download:
         max_run_id = 0
@@ -1640,6 +1691,7 @@ def append_missing_domains(
     creative_records_df: pd.DataFrame,
     database_connection: PostgresCon,
 ) -> pd.DataFrame:
+    """Adds missing ad domains to the database and returns updated domain DataFrame."""
     check_cols = ["creative_initial_domain_tld", "host_ad_network_tld"]
     for col in check_cols:
         missing_ad_domains = creative_records_df[
@@ -1666,6 +1718,7 @@ def append_missing_domains(
 def add_additional_domain_id_column(
     creative_records_df: pd.DataFrame, ad_domains_df: pd.DataFrame
 ) -> pd.DataFrame:
+    """Adds additional ad domain IDs column by exploding and merging domain lists."""
     cr = creative_records_df.copy()
 
     # Ensure missing values in the list column become empty lists
@@ -1697,7 +1750,7 @@ def add_additional_domain_id_column(
     grouped = grouped.reindex(cr.index, fill_value=[])
 
     # Assign back (aligned by index)
-    cr["additional_ad_domain_ids"] = grouped.values
+    cr["additional_ad_domain_ids"] = grouped.to_numpy()
 
     return cr
 
@@ -1707,6 +1760,7 @@ def make_creative_records_df(
     assets_df: pd.DataFrame,
     database_connection: PostgresCon,
 ) -> pd.DataFrame:
+    """Creates creative records DataFrame with domain IDs and asset relationships."""
     creative_records_df = adv_creatives_df.merge(
         assets_df[["store_app_id", "md5_hash", "creative_asset_id"]],
         left_on=["adv_store_app_id", "md5_hash"],
@@ -1764,7 +1818,8 @@ def make_creative_records_df(
 
 def get_creatives_df(
     pub_store_id: str, run_id: int, database_connection: PostgresCon
-) -> tuple[pd.DataFrame, pd.DataFrame, str]:
+) -> tuple[pd.DataFrame, pd.DataFrame, str | None]:
+    """Retrieves and filters creative content from MITM log data."""
     df = parse_mitm_log(pub_store_id, run_id, database_connection)
     error_msg = None
     if df.empty:
@@ -1788,7 +1843,8 @@ def parse_store_id_mitm_log(
     pub_store_id: str,
     run_id: int,
     database_connection: PostgresCon,
-) -> list:
+) -> list[dict[str, Any]]:
+    """Parses MITM log for a specific store ID and processes creative content."""
     df, creatives_df, error_message = get_creatives_df(
         pub_store_id, run_id, database_connection
     )
@@ -1868,7 +1924,10 @@ def parse_store_id_mitm_log(
     return error_messages
 
 
-def parse_all_runs_for_store_id(pub_store_id: str, database_connection: PostgresCon):
+def parse_all_runs_for_store_id(
+    pub_store_id: str, database_connection: PostgresCon
+) -> None:
+    """Parses all MITM runs for a store ID and logs results to database."""
     mitms = get_store_id_mitm_s3_keys(store_id=pub_store_id)
     for _i, mitm in mitms.iterrows():
         run_id = mitm["run_id"]
@@ -1913,6 +1972,7 @@ def parse_all_runs_for_store_id(pub_store_id: str, database_connection: Postgres
 def scan_all_apps(
     database_connection: PostgresCon, limit_store_apps_no_creatives: bool = True
 ) -> None:
+    """Scans all apps for creative content and uploads thumbnails to S3."""
     apps_to_scan = query_apps_to_creative_scan(database_connection=database_connection)
     if limit_store_apps_no_creatives:
         store_apps_no_creatives = query_store_apps_no_creatives(
@@ -1953,6 +2013,7 @@ def scan_all_apps(
 
 
 def download_all_mitms(database_connection: PostgresCon) -> None:
+    """Downloads all MITM log files from S3 for apps that need creative scanning."""
     apps_to_download = query_apps_to_creative_scan(
         database_connection=database_connection
     )
@@ -1979,6 +2040,7 @@ def download_all_mitms(database_connection: PostgresCon) -> None:
 
 
 def open_all_local_mitms(database_connection: PostgresCon) -> pd.DataFrame:
+    """Opens and processes all local MITM log files into a combined DataFrame."""
     all_mitms_df = pd.DataFrame()
     i = 0
     num_files = len(list(pathlib.Path(MITM_DIR).glob("*.log")))
@@ -2015,6 +2077,7 @@ def open_all_local_mitms(database_connection: PostgresCon) -> pd.DataFrame:
 
 
 def upload_all_mitms_to_s3() -> None:
+    """Uploads processed MITM data to S3 storage."""
     bucket_name = "appgoblin-data"
     client = get_s3_client("digi-cloud")
     client.upload_file(

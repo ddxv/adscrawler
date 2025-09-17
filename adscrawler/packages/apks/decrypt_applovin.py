@@ -109,7 +109,7 @@ def decode_v1_from(user_input: bytes, sdk_prefix32: str) -> str | None:
         return f"Error: Invalid Base64 string. {e}"
     if len(raw_data) <= 16:
         logger.debug("Error: Data is too short to contain an 8-byte seed.")
-        return b""
+        return ""
     # Generate key from SDK prefix and CONST_A
     ckey = hashlib.sha256(
         CONFIG["applovin"]["CONST_A"] + sdk_prefix32.encode("utf-8")
