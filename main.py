@@ -120,7 +120,6 @@ class ProcessManager:
             "--store-id",
             help="String of store id to launch in waydroid",
         )
-
         ### OPTIONS FOR CREATIVE SCAN
         parser.add_argument(
             "--creative-scan-all-apps",
@@ -132,7 +131,6 @@ class ProcessManager:
             help="Scan a single app for creatives, requires --store-id and --run-id",
             action="store_true",
         )
-        ### OPTIONS FOR IMPORT RANKS FROM S3
         parser.add_argument(
             "--run-id",
             help="String of run id to scan for creatives",
@@ -143,9 +141,13 @@ class ProcessManager:
             help="Import ranks from s3",
             action="store_true",
         )
-
+        parser.add_argument(
+            "--period",
+            help="Period to group imported ranks from s3, default week, options are week or day",
+            type=str,
+            default="week",
+        )
         ### OPTIONS FOR MANUAL/LOCAL WAYDROID PROCESSING
-
         parser.add_argument(
             "--redownload-geo-dbs",
             help="Redownload geo dbs",
@@ -157,7 +159,6 @@ class ProcessManager:
             type=int,
             default=180,
         )
-
         args, _ = parser.parse_known_args()
         return args
 
@@ -298,8 +299,15 @@ class ProcessManager:
         logger.info("Adscrawler exiting main")
 
     def import_ranks_from_s3(self, stores: list[int]) -> None:
-        start_date = datetime.date.today() - datetime.timedelta(days=15)
-        end_date = datetime.date.today()
+        period = self.args.period
+        if period == "week":
+            start_date = datetime.date.today() - datetime.timedelta(days=15)
+            end_date = datetime.date.today()
+        elif period == "day":
+            start_date = datetime.date.today() - datetime.timedelta(days=5)
+            end_date = datetime.date.today()
+        else:
+            raise ValueError(f"Invalid period {period}")
         for store in stores:
             try:
                 import_ranks_from_s3(
@@ -307,9 +315,12 @@ class ProcessManager:
                     store=store,
                     start_date=start_date,
                     end_date=end_date,
+                    period=period,
                 )
             except Exception:
-                logger.exception(f"Importing weekly ranks from s3 for {store=} failed")
+                logger.exception(
+                    f"Importing {self.args.period} ranks from s3 for {store=} failed"
+                )
 
     def scrape_new_apps(self, stores: list[int]) -> None:
         try:

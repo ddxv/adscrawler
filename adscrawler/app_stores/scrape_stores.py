@@ -617,7 +617,16 @@ def import_ranks_from_s3(
     start_date: datetime.date,
     end_date: datetime.date,
     database_connection: PostgresCon,
+    period: str = "week",
 ) -> None:
+    if period == "week":
+        days = 6
+        freq = "W-MON"
+    elif period == "day":
+        days = 1
+        freq = "D"
+    else:
+        raise ValueError(f"Invalid period {period}")
     key_name = "s3"
     bucket = CONFIG[key_name]["bucket"]
     s3_region = CONFIG[key_name]["region_name"]
@@ -641,14 +650,12 @@ def import_ranks_from_s3(
     duckdb_con.execute(f"SET s3_secret_access_key='{CONFIG[key_name]['secret_key']}';")
     duckdb_con.execute("SET temp_directory = '/tmp/duckdb.tmp/';")
     duckdb_con.execute("SET preserve_insertion_order = false;")
-
     s3 = get_s3_client()
-    for dt in pd.date_range(start_date, end_date, freq="W-MON"):
-        week_str = dt.strftime("%Y-%m-%d")
-        logger.info(f"Processing store={store} week_start={week_str}")
-
+    for dt in pd.date_range(start_date, end_date, freq=freq):
+        period_date_str = dt.strftime("%Y-%m-%d")
+        logger.info(f"Processing store={store} period_start={period_date_str}")
         all_parquet_paths = []
-        for ddt in pd.date_range(dt, dt + datetime.timedelta(days=6), freq="D"):
+        for ddt in pd.date_range(dt, dt + datetime.timedelta(days=days), freq="D"):
             ddt_str = ddt.strftime("%Y-%m-%d")
             prefix = (
                 f"raw-data/app_rankings/store={store}/crawled_date={ddt_str}/country="
@@ -661,32 +668,31 @@ def import_ranks_from_s3(
             ]
             all_parquet_paths += parquet_paths
         if len(all_parquet_paths) == 0:
-            logger.info(f"No parquet files found for week_start={week_str}")
+            logger.info(f"No parquet files found for period_start={period_date_str}")
             continue
-
-        week_countries = [
+        countries_in_period = [
             x.split("country=")[1].split("/")[0]
             for x in all_parquet_paths
             if "country=" in x
         ]
-        week_countries = list(set(week_countries))
-        for country in week_countries:
+        countries_in_period = list(set(countries_in_period))
+        for country in countries_in_period:
             country_parquet_paths = [
                 x for x in all_parquet_paths if f"country={country}" in x
             ]
-            week_query = f"""WITH all_data AS (
+            period_query = f"""WITH all_data AS (
                 SELECT * FROM read_parquet({country_parquet_paths})
                  ),
-             weekly_max_dates AS (
+             period_max_dates AS (
                           SELECT ar_1.country,
                              ar_1.collection,
                              ar_1.category,
-                             date_trunc('week'::text, ar_1.crawled_date::timestamp with time zone) AS week_start,
+                             date_trunc('{period}'::text, ar_1.crawled_date::timestamp with time zone) AS period_start,
                              max(ar_1.crawled_date) AS max_crawled_date
                             FROM all_data ar_1
-                           GROUP BY ar_1.country, ar_1.collection, ar_1.category, (date_trunc('week'::text, ar_1.crawled_date::timestamp with time zone))
+                           GROUP BY ar_1.country, ar_1.collection, ar_1.category, (date_trunc('{period}'::text, ar_1.crawled_date::timestamp with time zone))
                          ),
-             weekly_app_ranks as (SELECT ar.rank,
+             period_app_ranks as (SELECT ar.rank,
                 min(ar.rank) AS best_rank,
                 ar.country,
                 ar.collection,
@@ -694,19 +700,19 @@ def import_ranks_from_s3(
                 ar.crawled_date,
                 ar.store_id
                FROM all_data ar
-                 JOIN weekly_max_dates wmd ON ar.country = wmd.country 
-                 AND ar.collection = wmd.collection 
-                 AND ar.category = wmd.category 
-                 AND ar.crawled_date = wmd.max_crawled_date
+                 JOIN period_max_dates pmd ON ar.country = pmd.country 
+                 AND ar.collection = pmd.collection 
+                 AND ar.category = pmd.category 
+                 AND ar.crawled_date = pmd.max_crawled_date
                  GROUP BY ar.rank, ar.country, ar.collection, ar.category, ar.crawled_date, ar.store_id
                  )
-            SELECT war.rank, war.best_rank, war.country, war.collection, war.category, war.crawled_date, war.store_id FROM weekly_app_ranks war
-              ORDER BY war.country, war.collection, war.category, war.crawled_date, war.rank
+            SELECT par.rank, par.best_rank, par.country, par.collection, par.category, par.crawled_date, par.store_id FROM period_app_ranks par
+              ORDER BY par.country, par.collection, par.category, par.crawled_date, par.rank
             """
             logger.info(
-                f"DuckDB query s3 for {store=} week_start={week_str} parquet files={len(all_parquet_paths)}"
+                f"DuckDB query s3 for {store=} period_start={period_date_str} parquet files={len(all_parquet_paths)}"
             )
-            wdf = duckdb_con.execute(week_query).df()
+            wdf = duckdb_con.execute(period_query).df()
             wdf = map_database_ids(wdf, database_connection, store_id_map, store)
             wdf = wdf.drop(columns=["store_id", "collection", "category"])
             upsert_df(
