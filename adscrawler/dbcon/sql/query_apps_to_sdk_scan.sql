@@ -63,7 +63,8 @@ scheduled_apps_crawl AS (
         'regular' AS mysource,
         ls.scan_result AS last_analyzed_result,
         ls.scanned_at AS last_scanned_at,
-        lsvc.scanned_at AS last_scuccess_scanned_at
+        lsvc.scanned_at AS last_scuccess_scanned_at,
+        vc.id AS latest_version_code_db_id
     FROM
         store_apps_in_latest_rankings AS dc
     RIGHT JOIN latest_version_codes AS vc
@@ -122,7 +123,8 @@ user_requested_apps_crawl AS (
         'user' AS mysource,
         ls.scan_result AS last_analyzed_result,
         ls.scanned_at AS last_scanned_at,
-        lsvc.scanned_at AS last_scuccess_scanned_at
+        lsvc.scanned_at AS last_scuccess_scanned_at,
+        lvc.id AS latest_version_code_db_id
     FROM
         user_requested_scan AS urs
     LEFT JOIN store_apps AS sa
@@ -157,7 +159,8 @@ SELECT
     mysource,
     last_analyzed_result,
     last_scanned_at,
-    last_scuccess_scanned_at
+    last_scuccess_scanned_at,
+    latest_version_code_db_id
 FROM
     user_requested_apps_crawl
 UNION ALL
@@ -170,6 +173,7 @@ SELECT
     mysource,
     last_analyzed_result,
     last_scanned_at,
-    last_scuccess_scanned_at
+    last_scuccess_scanned_at,
+    latest_version_code_db_id
 FROM
     scheduled_apps_crawl;

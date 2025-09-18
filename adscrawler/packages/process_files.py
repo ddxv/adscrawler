@@ -189,7 +189,6 @@ def process_sdks(
                 )
             else:
                 raise ValueError(f"Invalid store: {store}")
-            time.sleep(1)
         except Exception:
             logger.exception(f"Manifest for {store_id} failed")
         version_code_dbid = get_version_code_dbid(
@@ -198,10 +197,13 @@ def process_sdks(
             database_connection=database_connection,
         )
         if version_code_dbid is None:
-            logger.error(
-                f"Version code dbid is None for {store_id=}, data not recorded!"
-            )
-            continue
+            if row["latest_version_code_db_id"] is not None:
+                version_code_dbid = row["latest_version_code_db_id"]
+            else:
+                logger.error(
+                    f"Version code dbid is None for {store_id=}, data not recorded!"
+                )
+                continue
         if details_df is None or details_df.empty:
             details_df = pd.DataFrame(
                 [
