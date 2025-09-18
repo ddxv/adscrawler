@@ -2,6 +2,7 @@
 
 ## Notes for syncing when wanting to update all changes made on remote to git
 
+0. Move to `cd pg-ddl`
 1. Remotely run export script. This exports the schema tables/views/functions
    `ssh ads-db 'bash -s' < ./appgoblin_pg_export.sh`
 
