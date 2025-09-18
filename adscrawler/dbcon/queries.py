@@ -644,6 +644,7 @@ def query_store_apps(
     database_connection: PostgresCon,
     limit: int | None = 1000,
     log_query: bool = False,
+    process_icon: bool = False,
 ) -> pd.DataFrame:
     short_update_days = 1
     short_update_installs = 1000
@@ -697,11 +698,16 @@ def query_store_apps(
     limit_str = ""
     if limit:
         limit_str = f"LIMIT {limit}"
+    if process_icon:
+        icon_str = "icon_url_100,"
+    else:
+        icon_str = ""
     sel_query = f"""SELECT 
             store, 
             sa.id as store_app, 
             store_id, 
             sa.updated_at, 
+            {icon_str}
             sa.additional_html_scraped_at
         FROM 
             store_apps sa

@@ -212,11 +212,14 @@ def process_chunk(df_chunk, use_ssh_tunnel, process_icon):
     try:
         for _, row in df_chunk.iterrows():
             try:
+                if process_icon:
+                    app_existing_icon_url = row.icon_url_100
                 update_all_app_info(
                     row.store,
                     row.store_id,
                     database_connection,
                     process_icon,
+                    app_existing_icon_url,
                 )
             except Exception as e:
                 logger.exception(
@@ -239,7 +242,14 @@ def update_app_details(
     database_connection, stores, use_ssh_tunnel, workers, process_icon, limit
 ):
     log_info = f"Update app details: {stores=}"
-    df = query_store_apps(stores, database_connection, limit=limit, log_query=False)
+    df = query_store_apps(
+        stores,
+        database_connection,
+        limit=limit,
+        log_query=False,
+        process_icon=process_icon,
+    )
+
     logger.info(f"{log_info} start {len(df)} apps")
 
     chunk_size = 1000
@@ -836,10 +846,13 @@ def update_all_app_info(
     store: int,
     store_id: str,
     database_connection: PostgresCon,
-    process_icon,
+    process_icon: bool,
+    app_existing_icon_url: str | None = None,
 ) -> None:
     info = f"{store=} {store_id=}"
-    app_df = scrape_and_save_app(store, store_id, database_connection, process_icon)
+    app_df = scrape_and_save_app(
+        store, store_id, database_connection, process_icon, app_existing_icon_url
+    )
     if "store_app" not in app_df.columns:
         logger.error(f"{info} store_app db id not in app_df columns")
         return
@@ -904,6 +917,7 @@ def scrape_app(
     country: str,
     language: str,
     process_icon: bool = False,
+    app_existing_icon_url: str | None = None,
 ) -> pd.DataFrame:
     scrape_info = f"{store=}, {store_id=}, {country=}, {language=}"
     max_retries = 2
@@ -971,7 +985,7 @@ def scrape_app(
         df["description_short"] = ""
     df.loc[df["description_short"].isna(), "description_short"] = ""
 
-    if process_icon and crawl_result == 1:
+    if process_icon and crawl_result == 1 and not app_existing_icon_url:
         try:
             icon_url_100 = process_app_icon(store_id, df["icon_url_512"].to_numpy()[0])
             if icon_url_100 is not None:
@@ -1020,6 +1034,7 @@ def scrape_and_save_app(
     store_id: str,
     database_connection: PostgresCon,
     process_icon: bool = False,
+    app_existing_icon_url: str | None = None,
 ) -> pd.DataFrame:
     # Pulling for more countries will want to track rating, review count, and histogram
     app_country_list = ["us"]
@@ -1034,6 +1049,7 @@ def scrape_and_save_app(
                 country=country,
                 language=language,
                 process_icon=process_icon,
+                app_existing_icon_url=app_existing_icon_url,
             )
             logger.info(f"{info} save to db start")
             app_df = save_apps_df(
