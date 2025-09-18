@@ -51,8 +51,14 @@ from adscrawler.packages.storage import get_s3_client, get_s3_endpoint
 
 logger = get_logger(__name__, "scrape_stores")
 
+# Pulling for more countries will want to track rating, review count, and histogram
+APP_DETAILS_COUNTRY_LIST = ["us"]
 
-COUNTRY_LIST = [
+# Pulling for more languages to track descriptions, reviews, titles, etc.
+APP_DETAILS_LANGUAGE_LIST = ["en"]
+
+# Daily ranks on the app stores
+RANKS_COUNTRY_LIST = [
     "us",
     "cn",
     "de",
@@ -320,7 +326,7 @@ def scrape_store_ranks(database_connection: PostgresCon, stores: list[int]) -> N
     categories_map = categories_map.rename(columns={"id": "store_category"})
     if 2 in stores:
         collection_keyword = "TOP"
-        for country in COUNTRY_LIST:
+        for country in RANKS_COUNTRY_LIST:
             try:
                 ranked_dicts = scrape_ios_ranks(
                     collection_keyword=collection_keyword, country=country
@@ -340,7 +346,7 @@ def scrape_store_ranks(database_connection: PostgresCon, stores: list[int]) -> N
                 )
 
     if 1 in stores:
-        for country in COUNTRY_LIST:
+        for country in RANKS_COUNTRY_LIST:
             try:
                 ranked_dicts = scrape_google_ranks(country=country)
                 process_scraped(
@@ -1036,12 +1042,8 @@ def scrape_and_save_app(
     process_icon: bool = False,
     app_existing_icon_url: str | None = None,
 ) -> pd.DataFrame:
-    # Pulling for more countries will want to track rating, review count, and histogram
-    app_country_list = ["us"]
-    # Pulling for more languages to track descriptions, reviews, titles, etc.
-    app_language_list = ["en"]
-    for country in app_country_list:
-        for language in app_language_list:
+    for country in APP_DETAILS_COUNTRY_LIST:
+        for language in APP_DETAILS_LANGUAGE_LIST:
             info = f"{store=}, {store_id=}, {country=}, {language=}"
             app_df = scrape_app(
                 store=store,
@@ -1267,6 +1269,7 @@ def upsert_store_apps_history(
         "rating",
         "rating_count",
         "histogram",
+        "store_last_updated",
     ]
     key_columns = ["store_app", "country_id", "crawled_date"]
     upsert_df(
