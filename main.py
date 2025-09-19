@@ -122,6 +122,11 @@ class ProcessManager:
         )
         ### OPTIONS FOR CREATIVE SCAN
         parser.add_argument(
+            "--creative-scan-new-apps",
+            help="Scan new apps for creatives",
+            action="store_true",
+        )
+        parser.add_argument(
             "--creative-scan-all-apps",
             help="Scan all apps for creatives",
             action="store_true",
@@ -290,6 +295,9 @@ class ProcessManager:
         if self.args.creative_scan_all_apps:
             self.creative_scan_all_apps()
 
+        if self.args.creative_scan_new_apps:
+            self.creative_scan_new_apps()
+
         if self.args.creative_scan_single_app:
             self.creative_scan_single_app()
 
@@ -386,6 +394,9 @@ class ProcessManager:
 
     def creative_scan_all_apps(self) -> None:
         scan_all_apps(database_connection=self.pgcon)
+
+    def creative_scan_new_apps(self) -> None:
+        scan_all_apps(database_connection=self.pgcon, only_new_apps=True)
 
     def creative_scan_single_app(self) -> None:
         error_messages = parse_store_id_mitm_log(

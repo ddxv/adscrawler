@@ -894,6 +894,18 @@ def query_apps_to_creative_scan(database_connection: PostgresCon) -> pd.DataFram
     return df
 
 
+def query_creative_records(database_connection: PostgresCon) -> pd.DataFrame:
+    df = pd.read_sql(
+        """SELECT 
+          DISTINCT 
+          pub_store_id, csr.run_id 
+        FROM 
+        logging.creative_scan_results csr""",
+        con=database_connection.engine,
+    )
+    return df
+
+
 def query_all_store_app_descriptions(
     database_connection: PostgresCon,
 ) -> pd.DataFrame:

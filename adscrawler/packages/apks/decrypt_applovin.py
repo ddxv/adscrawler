@@ -98,13 +98,13 @@ def decode_from(blob: bytes, database_connection: PostgresCon) -> str | None:
         return None
 
 
-def decode_v1_from(user_input: bytes, sdk_prefix32: str) -> str | None:
+def decode_v1_from(payload: bytes, sdk_prefix32: str) -> str | None:
     """
     Fixed V1 decoder based on careful analysis of the Java code
     """
     try:
         # Step 1: Decode custom base64
-        raw_data = base64_custom_decode(user_input.decode("utf-8"))
+        raw_data = base64_custom_decode(payload.decode("utf-8"))
     except Exception as e:
         return f"Error: Invalid Base64 string. {e}"
     if len(raw_data) <= 16:
@@ -112,7 +112,7 @@ def decode_v1_from(user_input: bytes, sdk_prefix32: str) -> str | None:
         return ""
     # Generate key from SDK prefix and CONST_A
     ckey = hashlib.sha256(
-        CONFIG["applovin"]["CONST_A"] + sdk_prefix32.encode("utf-8")
+        CONFIG["applovin"]["CONST_A"].encode("utf-8") + sdk_prefix32.encode("utf-8")
     ).digest()
 
     # The first 8 bytes are the encrypted seed
@@ -185,7 +185,7 @@ def decode_v2_from(blob: bytes, sdk_prefix32: str) -> str | None:
     seed_enc_le = int.from_bytes(blob[payload_start + 8 : payload_start + 16], "little")
     payload = blob[payload_start + 16 :]
     digest = hashlib.sha256(
-        CONFIG["applovin"]["CONST_B"] + sdk_prefix32.encode("utf-8")
+        CONFIG["applovin"]["CONST_B"].encode("utf-8") + sdk_prefix32.encode("utf-8")
     ).digest()
     # Try several 64-bit derivations from the digest to XOR with seed_enc (robust across minor variants).
     candidates = []
