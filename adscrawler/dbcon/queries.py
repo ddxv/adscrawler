@@ -513,6 +513,7 @@ def query_companies(database_connection: PostgresCon) -> pd.DataFrame:
         c.name as company_name,
         c.parent_company_id as parent_company_id,
         c.logo_url as company_logo_url,
+        c.linkedin_url as company_linkedin_url,
         ad.id as company_domain_id,
         ad.domain as company_domain
         FROM
@@ -1004,7 +1005,7 @@ def get_version_code_dbid(
         raise
 
 
-def get_failed_mitm_logs(database_connection: PostgresCon):
+def get_failed_mitm_logs(database_connection: PostgresCon) -> pd.DataFrame:
     sel_query = """SELECT * 
     FROM logging.creative_scan_results 
     WHERE error_msg like 'CRITICAL %%';

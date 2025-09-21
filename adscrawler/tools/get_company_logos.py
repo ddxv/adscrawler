@@ -43,7 +43,7 @@ LOGO_IMG_PAT = re.compile(r"logo|brand|icon", re.I)
 def normalize_url(domain_or_url: str) -> str:
     domain_or_url = domain_or_url.strip()
     if domain_or_url.startswith("http"):
-        return domain_or_url
+        return domain_or_url.replace("http://", "https://")
     return "https://" + domain_or_url
 
 
@@ -61,7 +61,7 @@ FAVICON_FILENAMES = [
 ]
 
 
-def try_guessing(domain: str) -> list[str]:
+def try_guessing(domain: str) -> str | None:
     logger.info("Try Guessing LinkedIn")
     linkedin_base_url = "https://www.linkedin.com/company/"
     company_name = tldextract.extract(domain).domain
@@ -136,7 +136,9 @@ def parse_github(html: str) -> list[str]:
     return list(set(github_urls))
 
 
-def process_site(domain: str, check_domain: str) -> str | None:
+def process_site(
+    domain: str, check_domain: str, official_linkedin_url: str | None = None
+) -> str | None:
     candidates = []
     if "github.com-" in check_domain:
         check_domain = check_domain.replace("github.com-", "github.com/")
@@ -153,13 +155,17 @@ def process_site(domain: str, check_domain: str) -> str | None:
     if "github.com" in check_domain:
         logger.info("Found github.com in domain")
         candidates = parse_github(html=html)
-    linkedin_urls = find_other_domains(other_tld="linkedin.com", html=html)
+    if official_linkedin_url:
+        linkedin_urls = [official_linkedin_url]
+    else:
+        linkedin_urls = find_other_domains(other_tld="linkedin.com", html=html)
     github_urls = []
     if "github.com" not in check_domain:
         github_urls = find_other_domains(other_tld="github.com", html=html)
     if linkedin_urls and len(linkedin_urls) > 0:
         logger.info(f"Found {len(linkedin_urls)} linkedin urls")
         for linkedin_url in linkedin_urls:
+            linkedin_url = normalize_url(linkedin_url)
             l_r = requests.get(linkedin_url, headers=HEADERS, timeout=10)
             linkedin_candidates = parse_linkedin(html=l_r.text)
             if linkedin_candidates:
@@ -167,10 +173,10 @@ def process_site(domain: str, check_domain: str) -> str | None:
     if github_urls and len(github_urls) > 0:
         logger.info(f"Found {len(github_urls)} github urls")
         for github_url in github_urls:
-            if not github_url.startswith("https://"):
-                # Normalize domain if it has a typo like githbub.com
-                github_url = re.sub(r"(^.*\.?)github\.com", r"github.com", github_url)
-                github_url = "https://" + github_url
+            github_url = re.sub(r"(^.*\.?)github\.com", r"github.com", github_url)
+            if "/" in github_url.split(".com/")[1]:
+                github_url = "/".join(github_url.split("/")[:-1])
+            github_url = "https://" + github_url
             g_r = requests.get(github_url, headers=HEADERS, timeout=10)
             github_candidates = parse_github(html=g_r.text)
             if github_candidates:
@@ -289,14 +295,16 @@ def update_company_logos() -> None:
     use_ssh_tunnel = True
     database_connection = get_db_connection(use_ssh_tunnel=use_ssh_tunnel)
     companies = query_companies(database_connection=database_connection)
-
-    companies = companies[companies["company_logo_url"].isna()]
-
+    companies = companies[
+        (companies["company_logo_url"].isna()) | (companies["company_logo_url"] == "")
+    ]
+    logger.info(f"Processing {companies.shape[0]} companies")
     i = 0
     for _i, row in companies.iterrows():
-        logger.info(f"Start i={i}/{companies.shape[0]}")
         i += 1
         domain = row["company_domain"]
+        official_linkedin_url = row["company_linkedin_url"]
+        logger.info(f"Start i={i}/{companies.shape[0]} {domain}")
         company_id = row["company_id"]
         filename = check_logo_exists_s3(domain)
         if filename and row["company_logo_url"]:
@@ -316,7 +324,13 @@ def update_company_logos() -> None:
                 try_these = [""]
             for try_this in try_these:
                 check_domain = domain + try_this
-                filename = process_site(domain=domain, check_domain=check_domain)
+                filename = process_site(
+                    domain=domain,
+                    check_domain=check_domain,
+                    official_linkedin_url=official_linkedin_url,
+                )
+                if filename:
+                    break
             if not filename:
                 filename = try_guessing(domain=domain)
                 if not filename:
