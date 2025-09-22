@@ -2005,7 +2005,9 @@ def scan_all_apps(
         ]
         logger.info(f"Apps to scan (limited to new apps): {apps_to_scan.shape[0]}")
     apps_count = apps_to_scan.shape[0]
-    for i, app in apps_to_scan.iterrows():
+    i = 0
+    for _i, app in apps_to_scan.iterrows():
+        i += 1
         pub_store_id = app["store_id"]
         logger.info(f"{i}/{apps_count}: {pub_store_id} start")
         try:
