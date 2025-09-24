@@ -406,8 +406,9 @@ def get_store_id_mitm_s3_keys(store_id: str) -> pd.DataFrame:
     response = s3_client.list_objects_v2(Bucket=CONFIG["s3"]["bucket"], Prefix=prefix)
     objects_data = []
     if response["KeyCount"] == 0:
-        logger.error(f"{store_id=} no mitm log found in s3")
-        raise FileNotFoundError(f"{store_id=} no mitm log found in s3")
+        msg = f"{store_id=} no mitm logs found in s3"
+        logger.error(msg)
+        raise FileNotFoundError(msg)
     for obj in response["Contents"]:
         key = obj["Key"]
         key_parts = key.split("/")
