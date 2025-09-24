@@ -336,6 +336,7 @@ def scrape_app_ios(store_id: str, country: str, language: str) -> dict:
     result_dict: dict = scraper.get_app_details(
         store_id, country=country, add_ratings=True, timeout=10, lang=language
     )
+    logger.info(f"{store_id=}, {country=}, {language=} ios store scraped")
     return result_dict
 
 
@@ -395,7 +396,7 @@ def clean_ios_app_df(df: pd.DataFrame) -> pd.DataFrame:
             ][0],
         )
     except Exception as e:
-        logger.warning(
+        logger.debug(
             f"store_id={df['store_id'].to_numpy()[0]} split genre IDs failed {e}",
         )
     df = df.assign(

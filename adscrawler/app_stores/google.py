@@ -30,14 +30,14 @@ def scrape_app_gp(store_id: str, country: str, language: str = "en") -> dict:
     ## UNIQUE PER LANGUAGE
     yt_us["description"] == yt_de["description"]
     """
-    result: dict = google_play_scraper.app(
+    result_dict: dict = google_play_scraper.app(
         store_id,
         lang=language,
         country=country,
         timeout=10,
     )
     logger.info(f"{store_id=}, {country=}, {language=} play store scraped")
-    return result
+    return result_dict
 
 
 def clean_google_play_app_df(df: pd.DataFrame) -> pd.DataFrame:
@@ -107,7 +107,7 @@ def clean_google_play_app_df(df: pd.DataFrame) -> pd.DataFrame:
                 lambda x: langdetect.detect(x)
             )
         except langdetect.lang_detect_exception.LangDetectException:
-            logger.warning(
+            logger.debug(
                 f"Unable to detect language for {df['store_id'].to_numpy()[0]}"
             )
             # This is not a language code, so later join will fail and description keywords ignored
