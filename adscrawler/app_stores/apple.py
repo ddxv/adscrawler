@@ -333,10 +333,10 @@ def get_developer_url(result: dict, urls: dict) -> str:
 def scrape_app_ios(store_id: str, country: str, language: str) -> dict:
     # NOTE: averageUserRating, Rating_count, Histogram are country specific
     scraper = AppStoreScraper()
-    result: dict = scraper.get_app_details(
+    result_dict: dict = scraper.get_app_details(
         store_id, country=country, add_ratings=True, timeout=10, lang=language
     )
-    return result
+    return result_dict
 
 
 def scrape_itunes_additional_html(result: dict, store_id: str, country: str) -> dict:
@@ -378,7 +378,8 @@ def clean_ios_app_df(df: pd.DataFrame) -> pd.DataFrame:
     if "price" not in df.columns:
         df["price"] = 0
     try:
-        # Complicated way to get around many games having very random selections like "games + shopping"
+        # Complicated way to get around many games having genre lists
+        # Best case "Games,Puzzles" worst case like "Games,Shopping,Puzzles"
         # TODO: Just store categories as list!
         cat_is_games = df["category"] == "Games"
         genre_is_not_games = df["genres"] != "Games"
