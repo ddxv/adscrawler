@@ -8,10 +8,11 @@ logger = get_logger(__name__)
 
 
 WESTON_SOCKET_NAME = "wayland-98"
+XDG_RUNTIME_DIR = "/run/user/1000"
 
 
 def restart_weston() -> None:
-    if is_weston_running():
+    if is_weston_process_running():
         logger.info("Weston already running, killing...")
         kill_weston()
     start_weston()
@@ -22,6 +23,10 @@ def kill_weston() -> None:
 
 
 def is_weston_running() -> bool:
+    return is_weston_process_running() and is_weston_socket_exists()
+
+
+def is_weston_process_running() -> bool:
     try:
         result = subprocess.run(
             ["pgrep", "-af", f"weston.*-S {WESTON_SOCKET_NAME}"],
@@ -36,15 +41,18 @@ def is_weston_running() -> bool:
         return False
 
 
+def is_weston_socket_exists() -> bool:
+    socket_path = os.path.join(XDG_RUNTIME_DIR, WESTON_SOCKET_NAME)
+    return os.path.exists(socket_path)
+
+
 def start_weston() -> subprocess.Popen | None:
     logger.info("Starting Weston")
     os.environ["WAYLAND_DISPLAY"] = WESTON_SOCKET_NAME
-    xdg_runtime_dir = "/run/user/1000"
+    os.environ["XDG_RUNTIME_DIR"] = XDG_RUNTIME_DIR
 
-    os.environ["XDG_RUNTIME_DIR"] = xdg_runtime_dir
-
-    if is_weston_running():
-        logger.info(f"Weston already running with socket '{WESTON_SOCKET_NAME}'")
+    if is_weston_process_running():
+        logger.info("Weston process already running, not starting again")
         return
 
     weston_process = subprocess.Popen(
@@ -57,6 +65,7 @@ def start_weston() -> subprocess.Popen | None:
             "--scale=1",
             "-S",
             WESTON_SOCKET_NAME,
+            "--idle-time=0",
         ],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,

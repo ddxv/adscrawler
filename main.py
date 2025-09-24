@@ -425,7 +425,7 @@ class ProcessManager:
             try:
                 process_apks_for_waydroid(database_connection=self.pgcon)
             except Exception:
-                logger.exception("Android run waydroid app failing")
+                logger.exception("Process APKs with Waydroid failed")
 
     def crawl_keywords(self) -> None:
         crawl_keyword_cranks(database_connection=self.pgcon)

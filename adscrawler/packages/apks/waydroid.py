@@ -26,7 +26,11 @@ from adscrawler.dbcon.queries import (
     query_store_app_by_store_id,
 )
 from adscrawler.packages.apks import mitm_process_log
-from adscrawler.packages.apks.weston import restart_weston, start_weston
+from adscrawler.packages.apks.weston import (
+    is_weston_running,
+    restart_weston,
+    start_weston,
+)
 from adscrawler.packages.storage import download_app_to_local, upload_mitm_log_to_s3
 from adscrawler.packages.utils import (
     get_local_file_path,
@@ -322,13 +326,13 @@ def restart_session() -> subprocess.Popen | None:
     logger.info("Waydroid session restart")
     os.system("waydroid session stop")
 
-    if not check_wayland_display():
+    if not is_wayland_env_set() and not is_weston_running():
         _weston_process = start_weston()
-        if not check_wayland_display():
-            restart_weston()
-            if not check_wayland_display():
-                logger.error("Weston already running but waydroid display not found")
-                raise Exception("Weston already running but waydroid display not found")
+    else:
+        restart_weston()
+        if not is_wayland_env_set() or not is_weston_running():
+            logger.error("Weston already running but waydroid display not found")
+            raise Exception("Weston already running but waydroid display not found")
 
     waydroid_process = start_session()
     if not waydroid_process:
@@ -341,17 +345,17 @@ def restart_session() -> subprocess.Popen | None:
     return waydroid_process
 
 
-def check_wayland_display() -> bool:
+def is_wayland_env_set() -> bool:
     display = os.environ.get("WAYLAND_DISPLAY")
     xdg_dir = os.environ.get("XDG_RUNTIME_DIR")
     display_is_set = display is not None
     xdg_dir_is_set = xdg_dir is not None
     msg = f"XDG_RUNTIME_DIR:{xdg_dir} WAYLAND_DISPLAY:{display}"
     if display_is_set and xdg_dir_is_set:
-        msg = f"Weston check OK: {msg}"
+        msg = f"Wayland env check OK: {msg}"
         logger.info(msg)
     else:
-        msg = f"Weston check NOK: {msg}"
+        msg = f"Wayland env check NOK: {msg}"
         logger.error(msg)
     return display_is_set and xdg_dir_is_set
 
