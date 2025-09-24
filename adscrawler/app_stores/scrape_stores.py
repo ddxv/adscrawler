@@ -999,7 +999,6 @@ def scrape_app(
         except Exception:
             logger.exception(f"{scrape_info} failed to process app icon")
 
-    logger.info(f"{scrape_info} scrape finished")
     return df
 
 
@@ -1058,9 +1057,8 @@ def scrape_and_save_app(
                 apps_df=app_df,
                 database_connection=database_connection,
             )
-            logger.info(f"{info} save to db finish")
-    crawl_result = int(app_df["crawl_result"].to_numpy()[0])
-    logger.info(f"{info} {crawl_result=} scraped and saved app")
+            crawl_result = int(app_df["crawl_result"].to_numpy()[0])
+            logger.info(f"{info} {crawl_result=} saved to db")
     return app_df
 
 
