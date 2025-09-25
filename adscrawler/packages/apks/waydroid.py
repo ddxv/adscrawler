@@ -326,13 +326,20 @@ def restart_session() -> subprocess.Popen | None:
     logger.info("Waydroid session restart")
     os.system("waydroid session stop")
 
-    if not is_wayland_env_set() and not is_weston_running():
-        _weston_process = start_weston()
-    else:
+    if is_wayland_env_set() or is_weston_running():
+        logger.info("Restarting Weston since env not fully set")
         restart_weston()
-        if not is_wayland_env_set() or not is_weston_running():
-            logger.error("Weston already running but waydroid display not found")
-            raise Exception("Weston already running but waydroid display not found")
+        if not is_wayland_env_set():
+            msg = "Weston restart failed wayland env not set"
+            logger.error(msg)
+            raise Exception(msg)
+        if not is_weston_running():
+            msg = "Weston restart failed weston not running"
+            logger.error(msg)
+            raise Exception(msg)
+    else:
+        logger.info("Starting Weston since wayland env not set and weston not running")
+        _weston_process = start_weston()
 
     waydroid_process = start_session()
     if not waydroid_process:
