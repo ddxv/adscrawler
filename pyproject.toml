@@ -54,7 +54,9 @@ adscrawler = ["*.js"]
 
 [tool.ruff]
 target-version = "py313"
-lint.select = [
+
+[tool.ruff.lint]
+select = [
     "A",   # flake8 builtins 
     "E",   # errors 
     "W",   # pycodestyle Warnings 
@@ -68,10 +70,9 @@ lint.select = [
     "PLE", # pyflake
     "PD",  # pandas-vet
 ]
-lint.ignore = [
+ignore = [
     "E501",    # line length
     "W291",    # trailing space at end of line
-    "E501",    # line length 
     "ERA001",  # no commented out code 
     "D103",    # Docstrings for all functions
     "D102",    # Docstrings for all methods
@@ -83,8 +84,8 @@ lint.ignore = [
     "RET504",  # Unnecessary assignment to variable for returning, I prefer it for readability
     "PD015",   # Use df.merge instead of pd.merge, I prefer the latter for readability
 ]
-lint.unfixable = ["B"]
-lint.fixable = ["ALL"]
+unfixable = ["B"]
+fixable = ["ALL"]
 
 [tool.mypy]
 warn_return_any = true
