@@ -1,8 +1,8 @@
 [project]
 authors = [{ name = "James O'Claire" }]
 name = "adscrawler"
-description = "project description adscrawler"
-requires-python = ">= 3.11"
+description = "A monorepo for crawling app stores, app-ads.txt, waydroid, ad creatives, and more."
+requires-python = ">= 3.12"
 dynamic = ["version"]
 
 
@@ -53,7 +53,7 @@ find = {}
 adscrawler = ["*.js"]
 
 [tool.ruff]
-target-version = "py311"
+target-version = "py313"
 lint.select = [
     "A",   # flake8 builtins 
     "E",   # errors 
