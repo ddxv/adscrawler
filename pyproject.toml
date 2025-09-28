@@ -99,7 +99,7 @@ dialect = 'postgres'
 large_file_skip_byte_limit = 0
 exclude_rules = [
     'AM04', # using *, agreed this should be TODO, 
-    'L022', # Avoid new lines after CTEs to help copy pasting between editors
+    'LT08', # Avoid new lines after CTEs to help copy pasting between editors
 ]
 
 [tool.sqlfluff.templater.placeholder]
