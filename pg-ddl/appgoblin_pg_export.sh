@@ -24,19 +24,19 @@ for schema in "${SCHEMAS[@]}"; do
 
   # --- Tables ---
   for t in $(sudo -u postgres psql -d "$DB" -Atc "select tablename from pg_tables where schemaname='${schema}'"); do
-    echo "  dumping table: $schema.$t"
+    echo "  dumping schema table: $schema.$t"
     sudo -u postgres pg_dump -d "$DB" --schema-only --table="${schema}.${t}" > "$OUTDIR/$schema/${t}.sql"
   done
 
   # --- Materialized Views ---
   for mv in $(sudo -u postgres psql -d "$DB" -Atc "select matviewname from pg_matviews where schemaname='${schema}'"); do
-    echo "  dumping materialized view: $schema.$mv"
+    echo "  dumping schema materialized view: $schema.$mv"
     sudo -u postgres pg_dump -d "$DB" --schema-only --table="${schema}.${mv}" > "$OUTDIR/$schema/${mv}__matview.sql"
   done
 
   # --- Regular Views (optional, add if you want them too) ---
   for v in $(sudo -u postgres psql -d "$DB" -Atc "select viewname from pg_views where schemaname='${schema}'"); do
-    echo "  dumping view: $schema.$v"
+    echo "  dumping schema view: $schema.$v"
     sudo -u postgres pg_dump -d "$DB" --schema-only --table="${schema}.${v}" > "$OUTDIR/$schema/${v}__view.sql"
   done
 

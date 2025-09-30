@@ -2,8 +2,10 @@
 -- PostgreSQL database dump
 --
 
--- Dumped from database version 17.5 (Ubuntu 17.5-1.pgdg24.04+1)
--- Dumped by pg_dump version 17.5 (Ubuntu 17.5-1.pgdg24.04+1)
+\restrict 5jTUaMtMiT5aod1nq3osfXun3GXD0ydxnoPfLEbBs8bkbSxfT5ZOmJL3AIEBQ1J
+
+-- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
+-- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -409,7 +411,8 @@ CREATE TABLE adtech.companies (
     parent_company_id integer,
     description text,
     domain_id integer NOT NULL,
-    logo_url text
+    logo_url text,
+    linkedin_url character varying
 );
 
 
@@ -837,7 +840,8 @@ CREATE TABLE public.store_apps_country_history (
     histogram bigint[] DEFAULT ARRAY[]::integer[],
     installs bigint,
     id integer NOT NULL,
-    country_id smallint
+    country_id smallint,
+    store_last_updated date
 );
 
 
@@ -1547,6 +1551,172 @@ CREATE MATERIALIZED VIEW frontend.adstxt_publishers_overview AS
 ALTER MATERIALIZED VIEW frontend.adstxt_publishers_overview OWNER TO postgres;
 
 --
+-- Name: advertiser_creative_rankings; Type: MATERIALIZED VIEW; Schema: frontend; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW frontend.advertiser_creative_rankings AS
+ WITH adv_mmp AS (
+         SELECT DISTINCT ca_1.store_app_id AS advertiser_store_app_id,
+            cr_1.mmp_domain_id,
+            ad.domain AS mmp_domain
+           FROM ((public.creative_records cr_1
+             LEFT JOIN public.creative_assets ca_1 ON ((cr_1.creative_asset_id = ca_1.id)))
+             LEFT JOIN public.ad_domains ad ON ((cr_1.mmp_domain_id = ad.id)))
+          WHERE (cr_1.mmp_domain_id IS NOT NULL)
+        ), ad_network_domain_ids AS (
+         SELECT ca_1.store_app_id AS advertiser_store_app_id,
+            COALESCE(icp.domain_id, ic.domain_id) AS domain_id
+           FROM ((((public.creative_records cr_1
+             LEFT JOIN public.creative_assets ca_1 ON ((cr_1.creative_asset_id = ca_1.id)))
+             JOIN adtech.company_domain_mapping icdm ON ((cr_1.creative_initial_domain_id = icdm.domain_id)))
+             LEFT JOIN adtech.companies ic ON ((icdm.company_id = ic.id)))
+             LEFT JOIN adtech.companies icp ON ((ic.parent_company_id = icp.id)))
+        UNION
+         SELECT ca_1.store_app_id AS advertiser_store_app_id,
+            COALESCE(hcp.domain_id, hc.domain_id) AS domain_id
+           FROM ((((public.creative_records cr_1
+             LEFT JOIN public.creative_assets ca_1 ON ((cr_1.creative_asset_id = ca_1.id)))
+             JOIN adtech.company_domain_mapping hcdm ON ((cr_1.creative_host_domain_id = hcdm.domain_id)))
+             LEFT JOIN adtech.companies hc ON ((hcdm.company_id = hc.id)))
+             LEFT JOIN adtech.companies hcp ON ((hc.parent_company_id = hcp.id)))
+        ), ad_network_domains AS (
+         SELECT adi.advertiser_store_app_id,
+            ad.domain AS ad_network_domain
+           FROM (ad_network_domain_ids adi
+             LEFT JOIN public.ad_domains ad ON ((adi.domain_id = ad.id)))
+        ), creative_rankings AS (
+         SELECT ca_1.md5_hash,
+            ca_1.file_extension,
+            ca_1.store_app_id AS advertiser_store_app_id,
+            vcasr_1.run_at,
+            row_number() OVER (PARTITION BY ca_1.store_app_id ORDER BY vcasr_1.run_at DESC) AS rn
+           FROM ((public.creative_records cr_1
+             LEFT JOIN public.creative_assets ca_1 ON ((cr_1.creative_asset_id = ca_1.id)))
+             LEFT JOIN public.version_code_api_scan_results vcasr_1 ON ((cr_1.run_id = vcasr_1.id)))
+        )
+ SELECT saa.name AS advertiser_name,
+    saa.store_id AS advertiser_store_id,
+    saa.icon_url_100 AS advertiser_icon_url_100,
+    saa.icon_url_512 AS advertiser_icon_url_512,
+    saa.category AS advertiser_category,
+    saa.installs AS advertiser_installs,
+    saa.rating,
+    saa.rating_count,
+    saa.installs_sum_1w,
+    saa.installs_sum_4w,
+    count(DISTINCT ca.md5_hash) AS unique_creatives,
+    count(DISTINCT cr.store_app_pub_id) AS unique_publishers,
+    min(vcasr.run_at) AS first_seen,
+    max(vcasr.run_at) AS last_seen,
+    array_agg(DISTINCT ca.file_extension) AS file_types,
+    array_agg(DISTINCT adis.ad_network_domain) AS ad_network_domains,
+    avg(sap.installs) AS avg_publisher_installs,
+    NULLIF(array_agg(DISTINCT adv_mmp.mmp_domain) FILTER (WHERE (adv_mmp.mmp_domain IS NOT NULL)), '{}'::character varying[]) AS mmp_domains,
+    ARRAY( SELECT crk.md5_hash
+           FROM creative_rankings crk
+          WHERE ((crk.advertiser_store_app_id = saa.id) AND (crk.rn <= 5))
+          ORDER BY crk.rn) AS top_md5_hashes
+   FROM ((((((public.creative_records cr
+     LEFT JOIN public.creative_assets ca ON ((cr.creative_asset_id = ca.id)))
+     LEFT JOIN frontend.store_apps_overview sap ON ((cr.store_app_pub_id = sap.id)))
+     LEFT JOIN frontend.store_apps_overview saa ON ((ca.store_app_id = saa.id)))
+     LEFT JOIN public.version_code_api_scan_results vcasr ON ((cr.run_id = vcasr.id)))
+     LEFT JOIN adv_mmp ON ((ca.store_app_id = adv_mmp.advertiser_store_app_id)))
+     LEFT JOIN ad_network_domains adis ON ((ca.store_app_id = adis.advertiser_store_app_id)))
+  GROUP BY saa.name, saa.store_id, saa.icon_url_512, saa.category, saa.installs, saa.id, saa.icon_url_100, saa.rating, saa.rating_count, saa.installs_sum_1w, saa.installs_sum_4w
+  ORDER BY (count(DISTINCT ca.md5_hash)) DESC
+  WITH NO DATA;
+
+
+ALTER MATERIALIZED VIEW frontend.advertiser_creative_rankings OWNER TO postgres;
+
+--
+-- Name: advertiser_creative_rankings_recent_month; Type: MATERIALIZED VIEW; Schema: frontend; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW frontend.advertiser_creative_rankings_recent_month AS
+ WITH adv_mmp AS (
+         SELECT DISTINCT ca_1.store_app_id AS advertiser_store_app_id,
+            cr_1.mmp_domain_id,
+            ad.domain AS mmp_domain
+           FROM ((public.creative_records cr_1
+             LEFT JOIN public.creative_assets ca_1 ON ((cr_1.creative_asset_id = ca_1.id)))
+             LEFT JOIN public.ad_domains ad ON ((cr_1.mmp_domain_id = ad.id)))
+          WHERE (cr_1.mmp_domain_id IS NOT NULL)
+        ), ad_network_domain_ids AS (
+         SELECT ca_1.store_app_id AS advertiser_store_app_id,
+            COALESCE(icp.domain_id, ic.domain_id) AS domain_id
+           FROM (((((public.creative_records cr_1
+             LEFT JOIN public.creative_assets ca_1 ON ((cr_1.creative_asset_id = ca_1.id)))
+             JOIN adtech.company_domain_mapping icdm ON ((cr_1.creative_initial_domain_id = icdm.domain_id)))
+             LEFT JOIN adtech.companies ic ON ((icdm.company_id = ic.id)))
+             LEFT JOIN adtech.companies icp ON ((ic.parent_company_id = icp.id)))
+             LEFT JOIN public.version_code_api_scan_results vcasr_1 ON ((cr_1.run_id = vcasr_1.id)))
+          WHERE (vcasr_1.run_at >= (now() - '1 mon'::interval))
+        UNION
+         SELECT ca_1.store_app_id AS advertiser_store_app_id,
+            COALESCE(hcp.domain_id, hc.domain_id) AS domain_id
+           FROM (((((public.creative_records cr_1
+             LEFT JOIN public.creative_assets ca_1 ON ((cr_1.creative_asset_id = ca_1.id)))
+             JOIN adtech.company_domain_mapping hcdm ON ((cr_1.creative_host_domain_id = hcdm.domain_id)))
+             LEFT JOIN adtech.companies hc ON ((hcdm.company_id = hc.id)))
+             LEFT JOIN adtech.companies hcp ON ((hc.parent_company_id = hcp.id)))
+             LEFT JOIN public.version_code_api_scan_results vcasr_1 ON ((cr_1.run_id = vcasr_1.id)))
+          WHERE (vcasr_1.run_at >= (now() - '1 mon'::interval))
+        ), ad_network_domains AS (
+         SELECT adi.advertiser_store_app_id,
+            ad.domain AS ad_network_domain
+           FROM (ad_network_domain_ids adi
+             LEFT JOIN public.ad_domains ad ON ((adi.domain_id = ad.id)))
+        ), creative_rankings AS (
+         SELECT ca_1.md5_hash,
+            ca_1.file_extension,
+            ca_1.store_app_id AS advertiser_store_app_id,
+            vcasr_1.run_at,
+            row_number() OVER (PARTITION BY ca_1.store_app_id ORDER BY vcasr_1.run_at DESC) AS rn
+           FROM ((public.creative_records cr_1
+             LEFT JOIN public.creative_assets ca_1 ON ((cr_1.creative_asset_id = ca_1.id)))
+             LEFT JOIN public.version_code_api_scan_results vcasr_1 ON ((cr_1.run_id = vcasr_1.id)))
+          WHERE (vcasr_1.run_at >= (now() - '1 mon'::interval))
+        )
+ SELECT saa.name AS advertiser_name,
+    saa.store_id AS advertiser_store_id,
+    saa.icon_url_100 AS advertiser_icon_url_100,
+    saa.icon_url_512 AS advertiser_icon_url_512,
+    saa.category AS advertiser_category,
+    saa.installs AS advertiser_installs,
+    saa.rating,
+    saa.rating_count,
+    saa.installs_sum_1w,
+    saa.installs_sum_4w,
+    count(DISTINCT ca.md5_hash) AS unique_creatives,
+    count(DISTINCT cr.store_app_pub_id) AS unique_publishers,
+    min(vcasr.run_at) AS first_seen,
+    max(vcasr.run_at) AS last_seen,
+    array_agg(DISTINCT ca.file_extension) AS file_types,
+    array_agg(DISTINCT adis.ad_network_domain) AS ad_network_domains,
+    avg(sap.installs) AS avg_publisher_installs,
+    NULLIF(array_agg(DISTINCT adv_mmp.mmp_domain) FILTER (WHERE (adv_mmp.mmp_domain IS NOT NULL)), '{}'::character varying[]) AS mmp_domains,
+    ARRAY( SELECT crk.md5_hash
+           FROM creative_rankings crk
+          WHERE ((crk.advertiser_store_app_id = saa.id) AND (crk.rn <= 5))
+          ORDER BY crk.rn) AS top_md5_hashes
+   FROM ((((((public.creative_records cr
+     LEFT JOIN public.creative_assets ca ON ((cr.creative_asset_id = ca.id)))
+     LEFT JOIN frontend.store_apps_overview sap ON ((cr.store_app_pub_id = sap.id)))
+     LEFT JOIN frontend.store_apps_overview saa ON ((ca.store_app_id = saa.id)))
+     LEFT JOIN public.version_code_api_scan_results vcasr ON ((cr.run_id = vcasr.id)))
+     LEFT JOIN adv_mmp ON ((ca.store_app_id = adv_mmp.advertiser_store_app_id)))
+     LEFT JOIN ad_network_domains adis ON ((ca.store_app_id = adis.advertiser_store_app_id)))
+  WHERE (vcasr.run_at >= (now() - '1 mon'::interval))
+  GROUP BY saa.name, saa.store_id, saa.icon_url_512, saa.category, saa.installs, saa.id, saa.icon_url_100, saa.rating, saa.rating_count, saa.installs_sum_1w, saa.installs_sum_4w
+  ORDER BY (count(DISTINCT ca.md5_hash)) DESC
+  WITH NO DATA;
+
+
+ALTER MATERIALIZED VIEW frontend.advertiser_creative_rankings_recent_month OWNER TO postgres;
+
+--
 -- Name: advertiser_creatives; Type: MATERIALIZED VIEW; Schema: frontend; Owner: postgres
 --
 
@@ -1567,12 +1737,14 @@ CREATE MATERIALIZED VIEW frontend.advertiser_creatives AS
     COALESCE(ca.phash, ca.md5_hash) AS vhash,
     ca.md5_hash,
     ca.file_extension,
+    sap.icon_url_100 AS pub_icon_url_100,
+    saa.icon_url_100 AS adv_icon_url_100,
     sap.icon_url_512 AS pub_icon_url_512,
     saa.icon_url_512 AS adv_icon_url_512,
     mmp.name AS mmp_name,
     mmpd.domain AS mmp_domain,
     cr.mmp_urls,
-    ( SELECT array_agg(ad_domains.domain) AS array_agg
+    ( SELECT COALESCE(array_agg(ad_domains.domain), '{}'::character varying[]) AS array_agg
            FROM public.ad_domains
           WHERE (ad_domains.id = ANY (cr.additional_ad_domain_ids))) AS additional_ad_domain_urls
    FROM (((((((((((((((public.creative_records cr
@@ -2178,14 +2350,22 @@ CREATE MATERIALIZED VIEW frontend.companies_creative_rankings AS
     vd.file_extension,
     ad.domain AS company_domain,
     sa.name AS advertiser_name,
+    sa.store,
     sa.store_id AS advertiser_store_id,
     sa.icon_url_100,
     sa.icon_url_512,
+    sa.installs,
+    sa.rating_count,
+    sa.rating,
+    sa.installs_sum_1w,
+    sa.ratings_sum_1w,
+    sa.installs_sum_4w,
+    sa.ratings_sum_4w,
     vd.last_seen
    FROM (((visually_distinct vd
      LEFT JOIN adtech.companies c ON ((vd.company_id = c.id)))
      LEFT JOIN public.ad_domains ad ON ((c.domain_id = ad.id)))
-     LEFT JOIN public.store_apps sa ON ((vd.advertiser_store_app_id = sa.id)))
+     LEFT JOIN frontend.store_apps_overview sa ON ((vd.advertiser_store_app_id = sa.id)))
   WHERE (c.id IS NOT NULL)
   ORDER BY vd.last_seen DESC
   WITH NO DATA;
@@ -2688,37 +2868,21 @@ CREATE MATERIALIZED VIEW frontend.latest_sdk_scanned_apps AS
 ALTER MATERIALIZED VIEW frontend.latest_sdk_scanned_apps OWNER TO postgres;
 
 --
--- Name: store_app_api_companies; Type: MATERIALIZED VIEW; Schema: frontend; Owner: postgres
+-- Name: store_app_ranks_daily; Type: TABLE; Schema: frontend; Owner: postgres
 --
 
-CREATE MATERIALIZED VIEW frontend.store_app_api_companies AS
- WITH latest_run_per_app AS (
-         SELECT DISTINCT ON (saac_1.store_app) saac_1.store_app,
-            saac_1.run_id
-           FROM (public.store_app_api_calls saac_1
-             JOIN public.version_code_api_scan_results vcasr ON ((saac_1.run_id = vcasr.id)))
-          ORDER BY saac_1.store_app, vcasr.run_at DESC
-        )
- SELECT DISTINCT sa.store_id,
-    saac.tld_url AS company_domain,
-    c.id AS company_id,
-    c.name AS company_name,
-    co.alpha2 AS country
-   FROM (((((((((latest_run_per_app lrpa
-     LEFT JOIN public.store_app_api_calls saac ON ((lrpa.run_id = saac.run_id)))
-     LEFT JOIN public.ad_domains ad ON ((saac.tld_url = (ad.domain)::text)))
-     LEFT JOIN public.store_apps sa ON ((saac.store_app = sa.id)))
-     LEFT JOIN adtech.company_domain_mapping cdm ON ((ad.id = cdm.domain_id)))
-     LEFT JOIN adtech.companies c ON ((cdm.company_id = c.id)))
-     LEFT JOIN public.ad_domains cad ON ((c.domain_id = cad.id)))
-     LEFT JOIN adtech.companies pc ON ((c.parent_company_id = pc.id)))
-     LEFT JOIN public.ad_domains pcad ON ((pc.domain_id = pcad.id)))
-     LEFT JOIN public.countries co ON ((saac.country_id = co.id)))
-  ORDER BY sa.store_id DESC
-  WITH NO DATA;
+CREATE TABLE frontend.store_app_ranks_daily (
+    rank smallint NOT NULL,
+    best_rank smallint NOT NULL,
+    country smallint NOT NULL,
+    store_collection smallint NOT NULL,
+    store_category smallint NOT NULL,
+    crawled_date date NOT NULL,
+    store_app integer NOT NULL
+);
 
 
-ALTER MATERIALIZED VIEW frontend.store_app_api_companies OWNER TO postgres;
+ALTER TABLE frontend.store_app_ranks_daily OWNER TO postgres;
 
 --
 -- Name: store_app_ranks_weekly; Type: TABLE; Schema: frontend; Owner: postgres
@@ -2736,6 +2900,46 @@ CREATE TABLE frontend.store_app_ranks_weekly (
 
 
 ALTER TABLE frontend.store_app_ranks_weekly OWNER TO postgres;
+
+--
+-- Name: store_app_ranks_latest; Type: MATERIALIZED VIEW; Schema: frontend; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW frontend.store_app_ranks_latest AS
+ WITH latest_crawled_date AS (
+         SELECT arr.store_collection,
+            arr.country,
+            max(arr.crawled_date) AS crawled_date
+           FROM frontend.store_app_ranks_weekly arr
+          GROUP BY arr.store_collection, arr.country
+        )
+ SELECT ar.rank,
+    sa.name,
+    sa.store_id,
+    sa.store,
+    sa.installs,
+    sa.rating_count,
+    sa.rating,
+    sa.review_count,
+    sa.installs_sum_1w,
+    sa.installs_sum_4w,
+    sa.ratings_sum_1w,
+    sa.ratings_sum_4w,
+    sa.icon_url_100,
+    sa.icon_url_512,
+    ar.store_collection,
+    ar.store_category,
+    c.alpha2 AS country,
+    ar.crawled_date
+   FROM (((frontend.store_app_ranks_weekly ar
+     JOIN latest_crawled_date lcd ON (((ar.store_collection = lcd.store_collection) AND (ar.country = lcd.country) AND (ar.crawled_date = lcd.crawled_date))))
+     JOIN public.countries c ON ((ar.country = c.id)))
+     LEFT JOIN frontend.store_apps_overview sa ON ((ar.store_app = sa.id)))
+  ORDER BY ar.rank
+  WITH NO DATA;
+
+
+ALTER MATERIALIZED VIEW frontend.store_app_ranks_latest OWNER TO postgres;
 
 --
 -- Name: store_apps_z_scores; Type: MATERIALIZED VIEW; Schema: frontend; Owner: postgres
@@ -4200,109 +4404,6 @@ ALTER TABLE ONLY public.version_code_sdk_scan_results ALTER COLUMN id SET DEFAUL
 
 
 --
--- Name: store_apps store_apps_pkey; Type: CONSTRAINT; Schema: public; Owner: james
---
-
-ALTER TABLE ONLY public.store_apps
-    ADD CONSTRAINT store_apps_pkey PRIMARY KEY (id);
-
-
---
--- Name: advertiser_creative_rankings; Type: MATERIALIZED VIEW; Schema: frontend; Owner: postgres
---
-
-CREATE MATERIALIZED VIEW frontend.advertiser_creative_rankings AS
- WITH adv_mmp AS (
-         SELECT DISTINCT ca_1.store_app_id AS advertiser_store_app_id,
-            cr_1.mmp_domain_id,
-            ad.domain AS mmp_domain
-           FROM ((public.creative_records cr_1
-             LEFT JOIN public.creative_assets ca_1 ON ((cr_1.creative_asset_id = ca_1.id)))
-             LEFT JOIN public.ad_domains ad ON ((cr_1.mmp_domain_id = ad.id)))
-          WHERE (cr_1.mmp_domain_id IS NOT NULL)
-        ), creative_rankings AS (
-         SELECT ca_1.md5_hash,
-            ca_1.file_extension,
-            ca_1.store_app_id AS advertiser_store_app_id,
-            vcasr_1.run_at,
-            row_number() OVER (PARTITION BY ca_1.store_app_id ORDER BY vcasr_1.run_at DESC) AS rn
-           FROM ((public.creative_records cr_1
-             LEFT JOIN public.creative_assets ca_1 ON ((cr_1.creative_asset_id = ca_1.id)))
-             LEFT JOIN public.version_code_api_scan_results vcasr_1 ON ((cr_1.run_id = vcasr_1.id)))
-        )
- SELECT saa.name AS advertiser_name,
-    saa.store_id AS advertiser_store_id,
-    saa.icon_url_100 AS advertiser_icon_url_100,
-    saa.icon_url_512 AS advertiser_icon_url_512,
-    saa.category AS advertiser_category,
-    saa.installs AS advertiser_installs,
-    count(DISTINCT ca.md5_hash) AS unique_creatives,
-    count(DISTINCT cr.store_app_pub_id) AS unique_publishers,
-    min(vcasr.run_at) AS first_seen,
-    max(vcasr.run_at) AS last_seen,
-    array_agg(DISTINCT ca.file_extension) AS file_types,
-    avg(sap.installs) AS avg_publisher_installs,
-    array_agg(DISTINCT adv_mmp.mmp_domain) AS mmp_domains,
-    ARRAY( SELECT crk.md5_hash
-           FROM creative_rankings crk
-          WHERE ((crk.advertiser_store_app_id = saa.id) AND (crk.rn <= 5))
-          ORDER BY crk.rn) AS top_md5_hashes
-   FROM (((((public.creative_records cr
-     LEFT JOIN public.creative_assets ca ON ((cr.creative_asset_id = ca.id)))
-     LEFT JOIN frontend.store_apps_overview sap ON ((cr.store_app_pub_id = sap.id)))
-     LEFT JOIN public.store_apps saa ON ((ca.store_app_id = saa.id)))
-     LEFT JOIN public.version_code_api_scan_results vcasr ON ((cr.run_id = vcasr.id)))
-     LEFT JOIN adv_mmp ON ((ca.store_app_id = adv_mmp.advertiser_store_app_id)))
-  GROUP BY saa.name, saa.store_id, saa.icon_url_512, saa.category, saa.installs, saa.id
-  ORDER BY (count(DISTINCT ca.md5_hash)) DESC
-  WITH NO DATA;
-
-
-ALTER MATERIALIZED VIEW frontend.advertiser_creative_rankings OWNER TO postgres;
-
---
--- Name: advertiser_creative_rankings_recent_month; Type: MATERIALIZED VIEW; Schema: frontend; Owner: postgres
---
-
-CREATE MATERIALIZED VIEW frontend.advertiser_creative_rankings_recent_month AS
- WITH creative_rankings AS (
-         SELECT ca_1.md5_hash,
-            ca_1.file_extension,
-            ca_1.store_app_id AS advertiser_store_app_id,
-            vcasr_1.run_at,
-            row_number() OVER (PARTITION BY ca_1.store_app_id ORDER BY vcasr_1.run_at DESC) AS rn
-           FROM ((public.creative_records cr_1
-             LEFT JOIN public.creative_assets ca_1 ON ((cr_1.creative_asset_id = ca_1.id)))
-             LEFT JOIN public.version_code_api_scan_results vcasr_1 ON ((cr_1.run_id = vcasr_1.id)))
-        )
- SELECT saa.name AS advertiser_name,
-    saa.store_id AS advertiser_store_id,
-    saa.icon_url_100 AS advertiser_icon_url_100,
-    saa.icon_url_512 AS advertiser_icon_url_512,
-    count(DISTINCT ca.md5_hash) AS unique_creatives,
-    count(DISTINCT cr.store_app_pub_id) AS unique_publishers,
-    min(vcasr.run_at) AS first_seen,
-    max(vcasr.run_at) AS last_seen,
-    array_agg(DISTINCT ca.file_extension) AS file_types,
-    avg(sap.installs) AS avg_publisher_installs,
-    ARRAY( SELECT crk.md5_hash
-           FROM creative_rankings crk
-          WHERE ((crk.advertiser_store_app_id = saa.id) AND (crk.rn <= 5))
-          ORDER BY crk.rn) AS top_md5_hashes
-   FROM ((((public.creative_records cr
-     LEFT JOIN public.creative_assets ca ON ((cr.creative_asset_id = ca.id)))
-     LEFT JOIN frontend.store_apps_overview sap ON ((cr.store_app_pub_id = sap.id)))
-     LEFT JOIN public.store_apps saa ON ((ca.store_app_id = saa.id)))
-     LEFT JOIN public.version_code_api_scan_results vcasr ON ((cr.run_id = vcasr.id)))
-  WHERE (vcasr.run_at >= (now() - '1 mon'::interval))
-  GROUP BY saa.name, saa.store_id, saa.icon_url_512, saa.id
-  ORDER BY (count(DISTINCT cr.store_app_pub_id)) DESC
-  WITH NO DATA;
-
-
-ALTER MATERIALIZED VIEW frontend.advertiser_creative_rankings_recent_month OWNER TO postgres;
-
---
 -- Name: categories categories_pkey; Type: CONSTRAINT; Schema: adtech; Owner: postgres
 --
 
@@ -4420,6 +4521,14 @@ ALTER TABLE ONLY adtech.sdk_paths
 
 ALTER TABLE ONLY adtech.sdks
     ADD CONSTRAINT unique_sdk_slug UNIQUE (sdk_slug);
+
+
+--
+-- Name: store_app_ranks_daily app_rankings_unique_daily; Type: CONSTRAINT; Schema: frontend; Owner: postgres
+--
+
+ALTER TABLE ONLY frontend.store_app_ranks_daily
+    ADD CONSTRAINT app_rankings_unique_daily UNIQUE (crawled_date, country, store_collection, store_category, rank);
 
 
 --
@@ -4708,6 +4817,14 @@ ALTER TABLE ONLY public.store_apps_descriptions
 
 ALTER TABLE ONLY public.store_apps_descriptions
     ADD CONSTRAINT store_apps_descriptions_store_app_language_id_description_d_key UNIQUE (store_app, language_id, description, description_short);
+
+
+--
+-- Name: store_apps store_apps_pkey; Type: CONSTRAINT; Schema: public; Owner: james
+--
+
+ALTER TABLE ONLY public.store_apps
+    ADD CONSTRAINT store_apps_pkey PRIMARY KEY (id);
 
 
 --
@@ -5208,10 +5325,24 @@ CREATE INDEX idx_query_company_top_apps ON frontend.company_top_apps USING btree
 
 
 --
+-- Name: idx_ranks_daily_filter; Type: INDEX; Schema: frontend; Owner: postgres
+--
+
+CREATE INDEX idx_ranks_daily_filter ON frontend.store_app_ranks_daily USING btree (country, store_collection, store_category, crawled_date);
+
+
+--
 -- Name: idx_ranks_filter; Type: INDEX; Schema: frontend; Owner: postgres
 --
 
 CREATE INDEX idx_ranks_filter ON frontend.store_app_ranks_weekly USING btree (country, store_collection, store_category, crawled_date);
+
+
+--
+-- Name: idx_store_app_ranks_latest_filter_sort; Type: INDEX; Schema: frontend; Owner: postgres
+--
+
+CREATE UNIQUE INDEX idx_store_app_ranks_latest_filter_sort ON frontend.store_app_ranks_latest USING btree (store_collection, store_category, country, rank);
 
 
 --
@@ -5247,6 +5378,13 @@ CREATE UNIQUE INDEX keyword_scores_unique ON frontend.keyword_scores USING btree
 --
 
 CREATE UNIQUE INDEX latest_sdk_scanned_apps_unique_index ON frontend.latest_sdk_scanned_apps USING btree (version_code, crawl_result, store, store_id);
+
+
+--
+-- Name: sarw_crawled_store_collection_category_country_idx; Type: INDEX; Schema: frontend; Owner: postgres
+--
+
+CREATE INDEX sarw_crawled_store_collection_category_country_idx ON frontend.store_app_ranks_weekly USING btree (crawled_date, store_app, store_collection, store_category, country);
 
 
 --
@@ -5612,10 +5750,26 @@ ALTER TABLE ONLY frontend.store_app_ranks_weekly
 
 
 --
+-- Name: store_app_ranks_daily fk_country; Type: FK CONSTRAINT; Schema: frontend; Owner: postgres
+--
+
+ALTER TABLE ONLY frontend.store_app_ranks_daily
+    ADD CONSTRAINT fk_country FOREIGN KEY (country) REFERENCES public.countries(id);
+
+
+--
 -- Name: store_app_ranks_weekly fk_store_app; Type: FK CONSTRAINT; Schema: frontend; Owner: postgres
 --
 
 ALTER TABLE ONLY frontend.store_app_ranks_weekly
+    ADD CONSTRAINT fk_store_app FOREIGN KEY (store_app) REFERENCES public.store_apps(id);
+
+
+--
+-- Name: store_app_ranks_daily fk_store_app; Type: FK CONSTRAINT; Schema: frontend; Owner: postgres
+--
+
+ALTER TABLE ONLY frontend.store_app_ranks_daily
     ADD CONSTRAINT fk_store_app FOREIGN KEY (store_app) REFERENCES public.store_apps(id);
 
 
@@ -5628,10 +5782,26 @@ ALTER TABLE ONLY frontend.store_app_ranks_weekly
 
 
 --
+-- Name: store_app_ranks_daily fk_store_category; Type: FK CONSTRAINT; Schema: frontend; Owner: postgres
+--
+
+ALTER TABLE ONLY frontend.store_app_ranks_daily
+    ADD CONSTRAINT fk_store_category FOREIGN KEY (store_category) REFERENCES public.store_categories(id);
+
+
+--
 -- Name: store_app_ranks_weekly fk_store_collection; Type: FK CONSTRAINT; Schema: frontend; Owner: postgres
 --
 
 ALTER TABLE ONLY frontend.store_app_ranks_weekly
+    ADD CONSTRAINT fk_store_collection FOREIGN KEY (store_collection) REFERENCES public.store_collections(id);
+
+
+--
+-- Name: store_app_ranks_daily fk_store_collection; Type: FK CONSTRAINT; Schema: frontend; Owner: postgres
+--
+
+ALTER TABLE ONLY frontend.store_app_ranks_daily
     ADD CONSTRAINT fk_store_collection FOREIGN KEY (store_collection) REFERENCES public.store_collections(id);
 
 
@@ -6006,4 +6176,6 @@ GRANT ALL ON SCHEMA public TO PUBLIC;
 --
 -- PostgreSQL database dump complete
 --
+
+\unrestrict 5jTUaMtMiT5aod1nq3osfXun3GXD0ydxnoPfLEbBs8bkbSxfT5ZOmJL3AIEBQ1J
 

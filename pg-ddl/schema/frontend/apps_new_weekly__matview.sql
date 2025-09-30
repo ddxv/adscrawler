@@ -2,8 +2,10 @@
 -- PostgreSQL database dump
 --
 
--- Dumped from database version 17.5 (Ubuntu 17.5-1.pgdg24.04+1)
--- Dumped by pg_dump version 17.5 (Ubuntu 17.5-1.pgdg24.04+1)
+\restrict ySPdyGYkTZ7dkt4QN16Ye1KEvl8fgDT61ohwpTgxMXBzRaa4hAVbAcY9tc6JA8I
+
+-- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
+-- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -144,3 +146,5 @@ CREATE UNIQUE INDEX idx_apps_new_weekly_f ON frontend.apps_new_weekly USING btre
 --
 -- PostgreSQL database dump complete
 --
+
+\unrestrict ySPdyGYkTZ7dkt4QN16Ye1KEvl8fgDT61ohwpTgxMXBzRaa4hAVbAcY9tc6JA8I

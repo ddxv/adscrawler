@@ -2,8 +2,10 @@
 -- PostgreSQL database dump
 --
 
--- Dumped from database version 17.5 (Ubuntu 17.5-1.pgdg24.04+1)
--- Dumped by pg_dump version 17.5 (Ubuntu 17.5-1.pgdg24.04+1)
+\restrict ApflmhID5p2QdyMvswbXonHuwoTFjEPOcRO4PrLQmUC91j6YSjZpxxf4RrGWAZL
+
+-- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
+-- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -54,3 +56,5 @@ ADD CONSTRAINT keywords_crawled_at_fk FOREIGN KEY (
 --
 -- PostgreSQL database dump complete
 --
+
+\unrestrict ApflmhID5p2QdyMvswbXonHuwoTFjEPOcRO4PrLQmUC91j6YSjZpxxf4RrGWAZL

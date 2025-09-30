@@ -2,8 +2,10 @@
 -- PostgreSQL database dump
 --
 
--- Dumped from database version 17.5 (Ubuntu 17.5-1.pgdg24.04+1)
--- Dumped by pg_dump version 17.5 (Ubuntu 17.5-1.pgdg24.04+1)
+\restrict kLF1e6wkjWIky8eMzp7Qy8aGOvejM6VtnVYKtB28rmEkeBL7glGrX21hcLosu2L
+
+-- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
+-- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -95,3 +97,5 @@ CREATE UNIQUE INDEX idx_store_apps_created_atx ON public.store_apps_created_at U
 --
 -- PostgreSQL database dump complete
 --
+
+\unrestrict kLF1e6wkjWIky8eMzp7Qy8aGOvejM6VtnVYKtB28rmEkeBL7glGrX21hcLosu2L

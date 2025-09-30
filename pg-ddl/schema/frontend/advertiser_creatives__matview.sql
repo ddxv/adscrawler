@@ -2,8 +2,10 @@
 -- PostgreSQL database dump
 --
 
--- Dumped from database version 17.5 (Ubuntu 17.5-1.pgdg24.04+1)
--- Dumped by pg_dump version 17.5 (Ubuntu 17.5-1.pgdg24.04+1)
+\restrict 66Wzj7gTS2jkHDblWddNPVAayWyd1OjahHblNuv2AB4D3d0X2ami9CQVAD9RUgK
+
+-- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
+-- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -40,6 +42,8 @@ SELECT
     ac.name AS ad_domain_company_name,
     ca.md5_hash,
     ca.file_extension,
+    sap.icon_url_100 AS pub_icon_url_100,
+    saa.icon_url_100 AS adv_icon_url_100,
     sap.icon_url_512 AS pub_icon_url_512,
     saa.icon_url_512 AS adv_icon_url_512,
     mmp.name AS mmp_name,
@@ -49,7 +53,9 @@ SELECT
     COALESCE(acd.domain, ad.domain) AS ad_domain_company_domain,
     COALESCE(ca.phash, ca.md5_hash) AS vhash,
     (
-        SELECT ARRAY_AGG(ad_domains.domain) AS array_agg
+        SELECT
+            COALESCE(ARRAY_AGG(ad_domains.domain), '{}'::character varying [])
+                AS array_agg
         FROM public.ad_domains
         WHERE (ad_domains.id = ANY(cr.additional_ad_domain_ids))
     ) AS additional_ad_domain_urls
@@ -99,3 +105,5 @@ ALTER MATERIALIZED VIEW frontend.advertiser_creatives OWNER TO postgres;
 --
 -- PostgreSQL database dump complete
 --
+
+\unrestrict 66Wzj7gTS2jkHDblWddNPVAayWyd1OjahHblNuv2AB4D3d0X2ami9CQVAD9RUgK

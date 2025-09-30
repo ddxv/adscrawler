@@ -2,8 +2,10 @@
 -- PostgreSQL database dump
 --
 
--- Dumped from database version 17.5 (Ubuntu 17.5-1.pgdg24.04+1)
--- Dumped by pg_dump version 17.5 (Ubuntu 17.5-1.pgdg24.04+1)
+\restrict 3FK2OiYr8ZRrebn0nhN5m1UIclzpX3hSbMYxqZCpg3fXI7gkLlFElpaa24LXpBY
+
+-- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
+-- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -58,6 +60,15 @@ CREATE INDEX idx_ranks_filter ON frontend.store_app_ranks_weekly USING btree (
 
 
 --
+-- Name: sarw_crawled_store_collection_category_country_idx; Type: INDEX; Schema: frontend; Owner: postgres
+--
+
+CREATE INDEX sarw_crawled_store_collection_category_country_idx ON frontend.store_app_ranks_weekly USING btree (
+    crawled_date, store_app, store_collection, store_category, country
+);
+
+
+--
 -- Name: store_app_ranks_weekly fk_country; Type: FK CONSTRAINT; Schema: frontend; Owner: postgres
 --
 
@@ -100,3 +111,5 @@ ADD CONSTRAINT fk_store_collection FOREIGN KEY (
 --
 -- PostgreSQL database dump complete
 --
+
+\unrestrict 3FK2OiYr8ZRrebn0nhN5m1UIclzpX3hSbMYxqZCpg3fXI7gkLlFElpaa24LXpBY

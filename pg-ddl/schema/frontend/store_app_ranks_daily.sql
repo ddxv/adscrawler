@@ -2,8 +2,10 @@
 -- PostgreSQL database dump
 --
 
--- Dumped from database version 17.5 (Ubuntu 17.5-1.pgdg24.04+1)
--- Dumped by pg_dump version 17.5 (Ubuntu 17.5-1.pgdg24.04+1)
+\restrict Kwt16AeEqT34IVcJt6y8et8eS6DtEDsViPwWau3rbkSrtumdj77MV2v4nQ1xY9l
+
+-- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
+-- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -39,20 +41,20 @@ CREATE TABLE frontend.store_app_ranks_daily (
 ALTER TABLE frontend.store_app_ranks_daily OWNER TO postgres;
 
 --
--- Name: store_app_ranks_daily app_rankings_unique_test; Type: CONSTRAINT; Schema: frontend; Owner: postgres
+-- Name: store_app_ranks_daily app_rankings_unique_daily; Type: CONSTRAINT; Schema: frontend; Owner: postgres
 --
 
 ALTER TABLE ONLY frontend.store_app_ranks_daily
-ADD CONSTRAINT app_rankings_unique_test UNIQUE (
+ADD CONSTRAINT app_rankings_unique_daily UNIQUE (
     crawled_date, country, store_collection, store_category, rank
 );
 
 
 --
--- Name: idx_ranks_filter; Type: INDEX; Schema: frontend; Owner: postgres
+-- Name: idx_ranks_daily_filter; Type: INDEX; Schema: frontend; Owner: postgres
 --
 
-CREATE INDEX idx_ranks_filter ON frontend.store_app_ranks_daily USING btree (
+CREATE INDEX idx_ranks_daily_filter ON frontend.store_app_ranks_daily USING btree (
     country, store_collection, store_category, crawled_date
 );
 
@@ -100,3 +102,5 @@ ADD CONSTRAINT fk_store_collection FOREIGN KEY (
 --
 -- PostgreSQL database dump complete
 --
+
+\unrestrict Kwt16AeEqT34IVcJt6y8et8eS6DtEDsViPwWau3rbkSrtumdj77MV2v4nQ1xY9l

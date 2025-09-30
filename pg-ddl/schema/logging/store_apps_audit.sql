@@ -2,8 +2,10 @@
 -- PostgreSQL database dump
 --
 
--- Dumped from database version 17.5 (Ubuntu 17.5-1.pgdg24.04+1)
--- Dumped by pg_dump version 17.5 (Ubuntu 17.5-1.pgdg24.04+1)
+\restrict yu8baTi6pynO93oEGWLUjsExgQ9UZO4mJzUOQDU5TkKGdxM4Hs4Cqt3NZUvhV2P
+
+-- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
+-- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -50,3 +52,5 @@ CREATE INDEX store_apps_audit_stamp_idx ON logging.store_apps_audit USING btree 
 --
 -- PostgreSQL database dump complete
 --
+
+\unrestrict yu8baTi6pynO93oEGWLUjsExgQ9UZO4mJzUOQDU5TkKGdxM4Hs4Cqt3NZUvhV2P

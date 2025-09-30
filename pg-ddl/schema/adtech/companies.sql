@@ -2,8 +2,10 @@
 -- PostgreSQL database dump
 --
 
--- Dumped from database version 17.5 (Ubuntu 17.5-1.pgdg24.04+1)
--- Dumped by pg_dump version 17.5 (Ubuntu 17.5-1.pgdg24.04+1)
+\restrict fgMekCKBMtPc3C4nPEvPXc8UBpifFtrMyqZQ1wfuVC5RHomfWIU1KzysZLvkHvo
+
+-- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
+-- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -31,7 +33,8 @@ CREATE TABLE adtech.companies (
     parent_company_id integer,
     description text,
     domain_id integer NOT NULL,
-    logo_url text
+    logo_url text,
+    linkedin_url character varying
 );
 
 
@@ -98,3 +101,5 @@ ADD CONSTRAINT fk_companies_parent FOREIGN KEY (
 --
 -- PostgreSQL database dump complete
 --
+
+\unrestrict fgMekCKBMtPc3C4nPEvPXc8UBpifFtrMyqZQ1wfuVC5RHomfWIU1KzysZLvkHvo

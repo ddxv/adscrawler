@@ -2,8 +2,10 @@
 -- PostgreSQL database dump
 --
 
--- Dumped from database version 17.5 (Ubuntu 17.5-1.pgdg24.04+1)
--- Dumped by pg_dump version 17.5 (Ubuntu 17.5-1.pgdg24.04+1)
+\restrict TTo4gi0x76dcxDbKonwHeUe3chd6k27Fa9mmpgIChfpkIcHJBm3Ju8CM6hdKwro
+
+-- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
+-- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -75,4 +77,6 @@ CREATE UNIQUE INDEX keyword_scores_unique ON frontend.keyword_scores USING btree
 --
 -- PostgreSQL database dump complete
 --
+
+\unrestrict TTo4gi0x76dcxDbKonwHeUe3chd6k27Fa9mmpgIChfpkIcHJBm3Ju8CM6hdKwro
 

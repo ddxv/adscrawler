@@ -2,8 +2,10 @@
 -- PostgreSQL database dump
 --
 
--- Dumped from database version 17.5 (Ubuntu 17.5-1.pgdg24.04+1)
--- Dumped by pg_dump version 17.5 (Ubuntu 17.5-1.pgdg24.04+1)
+\restrict NsfYgKznKQvSWebPU9rQ22rvQeApXjX8h7jUPGc3pGAyeiUTY75nATxY6XVOP7v
+
+-- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
+-- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -50,3 +52,5 @@ ADD CONSTRAINT store_app_download_fk FOREIGN KEY (
 --
 -- PostgreSQL database dump complete
 --
+
+\unrestrict NsfYgKznKQvSWebPU9rQ22rvQeApXjX8h7jUPGc3pGAyeiUTY75nATxY6XVOP7v

@@ -2,8 +2,10 @@
 -- PostgreSQL database dump
 --
 
--- Dumped from database version 17.5 (Ubuntu 17.5-1.pgdg24.04+1)
--- Dumped by pg_dump version 17.5 (Ubuntu 17.5-1.pgdg24.04+1)
+\restrict rwZpLeSjqzM29UuKcMSiTdjPgyG0BE7HYv6Rfw6xFa4HcMgqmFcd8p6egl321e1
+
+-- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
+-- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -54,3 +56,5 @@ ADD CONSTRAINT fk_company_developers_category FOREIGN KEY (
 --
 -- PostgreSQL database dump complete
 --
+
+\unrestrict rwZpLeSjqzM29UuKcMSiTdjPgyG0BE7HYv6Rfw6xFa4HcMgqmFcd8p6egl321e1

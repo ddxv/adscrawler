@@ -2,8 +2,10 @@
 -- PostgreSQL database dump
 --
 
--- Dumped from database version 17.5 (Ubuntu 17.5-1.pgdg24.04+1)
--- Dumped by pg_dump version 17.5 (Ubuntu 17.5-1.pgdg24.04+1)
+\restrict NFQauvdvF9YWViSkCeOacemt56A3kbU4utFYMUKjN673OWs37LjXgEG83JecfZ6
+
+-- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
+-- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -126,3 +128,5 @@ CREATE INDEX companies_parent_category_tag_stats_query_idx ON frontend.companies
 --
 -- PostgreSQL database dump complete
 --
+
+\unrestrict NFQauvdvF9YWViSkCeOacemt56A3kbU4utFYMUKjN673OWs37LjXgEG83JecfZ6

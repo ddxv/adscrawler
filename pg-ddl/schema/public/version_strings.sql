@@ -2,8 +2,10 @@
 -- PostgreSQL database dump
 --
 
--- Dumped from database version 17.5 (Ubuntu 17.5-1.pgdg24.04+1)
--- Dumped by pg_dump version 17.5 (Ubuntu 17.5-1.pgdg24.04+1)
+\restrict DyMT7CDCYIVKyKxMbv75v2jXrNiP9OKZgyAlCGE5341puVyvJlSPGCggERLpcP4
+
+-- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
+-- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -68,3 +70,5 @@ ADD CONSTRAINT version_strings_unique UNIQUE (xml_path, tag, value_name);
 --
 -- PostgreSQL database dump complete
 --
+
+\unrestrict DyMT7CDCYIVKyKxMbv75v2jXrNiP9OKZgyAlCGE5341puVyvJlSPGCggERLpcP4

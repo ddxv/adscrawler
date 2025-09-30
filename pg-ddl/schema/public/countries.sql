@@ -2,8 +2,10 @@
 -- PostgreSQL database dump
 --
 
--- Dumped from database version 17.5 (Ubuntu 17.5-1.pgdg24.04+1)
--- Dumped by pg_dump version 17.5 (Ubuntu 17.5-1.pgdg24.04+1)
+\restrict rAIddj4zRfDCpgJjIg30Oha37YdYJaianYFEvBH3xKbo2W5sCnamvHwD6lqv6ps
+
+-- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
+-- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -68,3 +70,5 @@ ADD CONSTRAINT countries_pk PRIMARY KEY (id);
 --
 -- PostgreSQL database dump complete
 --
+
+\unrestrict rAIddj4zRfDCpgJjIg30Oha37YdYJaianYFEvBH3xKbo2W5sCnamvHwD6lqv6ps

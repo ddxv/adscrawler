@@ -2,8 +2,10 @@
 -- PostgreSQL database dump
 --
 
--- Dumped from database version 17.5 (Ubuntu 17.5-1.pgdg24.04+1)
--- Dumped by pg_dump version 17.5 (Ubuntu 17.5-1.pgdg24.04+1)
+\restrict 7D0dh4B9DrYXnSnLiRTegAmzG4v7ABBthFzKrfYA3GxUaiVp7jEWOeTFI907UYV
+
+-- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
+-- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -96,9 +98,17 @@ SELECT DISTINCT
     vd.file_extension,
     ad.domain AS company_domain,
     sa.name AS advertiser_name,
+    sa.store,
     sa.store_id AS advertiser_store_id,
     sa.icon_url_100,
     sa.icon_url_512,
+    sa.installs,
+    sa.rating_count,
+    sa.rating,
+    sa.installs_sum_1w,
+    sa.ratings_sum_1w,
+    sa.installs_sum_4w,
+    sa.ratings_sum_4w,
     vd.last_seen
 FROM (((
     visually_distinct vd
@@ -106,7 +116,9 @@ FROM (((
 )
 LEFT JOIN public.ad_domains AS ad ON ((c.domain_id = ad.id))
 )
-LEFT JOIN public.store_apps AS sa ON ((vd.advertiser_store_app_id = sa.id))
+LEFT JOIN
+    frontend.store_apps_overview AS sa
+    ON ((vd.advertiser_store_app_id = sa.id))
 )
 WHERE (c.id IS NOT null)
 ORDER BY vd.last_seen DESC
@@ -118,3 +130,5 @@ ALTER MATERIALIZED VIEW frontend.companies_creative_rankings OWNER TO postgres;
 --
 -- PostgreSQL database dump complete
 --
+
+\unrestrict 7D0dh4B9DrYXnSnLiRTegAmzG4v7ABBthFzKrfYA3GxUaiVp7jEWOeTFI907UYV

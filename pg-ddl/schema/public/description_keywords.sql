@@ -2,8 +2,10 @@
 -- PostgreSQL database dump
 --
 
--- Dumped from database version 17.5 (Ubuntu 17.5-1.pgdg24.04+1)
--- Dumped by pg_dump version 17.5 (Ubuntu 17.5-1.pgdg24.04+1)
+\restrict dkS8kRuEwbfBV8AVrnbdfwrpldmfV5pz7yW3ZwZT4GOl42rFHYh7R1I4EGv0eUw
+
+-- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
+-- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -107,3 +109,5 @@ ADD CONSTRAINT description_keywords_keyword_id_fkey FOREIGN KEY (
 --
 -- PostgreSQL database dump complete
 --
+
+\unrestrict dkS8kRuEwbfBV8AVrnbdfwrpldmfV5pz7yW3ZwZT4GOl42rFHYh7R1I4EGv0eUw

@@ -2,8 +2,10 @@
 -- PostgreSQL database dump
 --
 
--- Dumped from database version 17.5 (Ubuntu 17.5-1.pgdg24.04+1)
--- Dumped by pg_dump version 17.5 (Ubuntu 17.5-1.pgdg24.04+1)
+\restrict 6PApaf9BxSZk2Znnl093YeD73TdWrMKDIqfGnb8SBStS3o5hJBVI6AAqAoFBhrD
+
+-- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
+-- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -94,3 +96,5 @@ ADD CONSTRAINT stores_fk FOREIGN KEY (platform) REFERENCES public.platforms (
 --
 -- PostgreSQL database dump complete
 --
+
+\unrestrict 6PApaf9BxSZk2Znnl093YeD73TdWrMKDIqfGnb8SBStS3o5hJBVI6AAqAoFBhrD

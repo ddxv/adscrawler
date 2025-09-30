@@ -2,8 +2,10 @@
 -- PostgreSQL database dump
 --
 
--- Dumped from database version 17.5 (Ubuntu 17.5-1.pgdg24.04+1)
--- Dumped by pg_dump version 17.5 (Ubuntu 17.5-1.pgdg24.04+1)
+\restrict g0O57a52n1z0ePC0dXkCGqe7vWE5pFRRojDzMqLktLHKxiiYsRbibSJ7MGxDzsE
+
+-- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
+-- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -132,3 +134,5 @@ CREATE UNIQUE INDEX idx_top_categories ON public.top_categories USING btree (
 --
 -- PostgreSQL database dump complete
 --
+
+\unrestrict g0O57a52n1z0ePC0dXkCGqe7vWE5pFRRojDzMqLktLHKxiiYsRbibSJ7MGxDzsE
