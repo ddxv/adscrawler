@@ -340,7 +340,6 @@ def scrape_app_ios(store_id: str, country: str, language: str) -> dict:
     return result_dict
 
 
-
 def scrape_itunes_additional_html(result: dict, store_id: str, country: str) -> dict:
     try:
         # This is slow and returns 401 often, so use sparingly

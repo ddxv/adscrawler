@@ -96,7 +96,7 @@ disallow_untyped_defs = true
 templater = 'placeholder'
 verbose = 1
 dialect = 'postgres'
-large_file_skip_byte_limit = 0
+large_file_skip_byte_limit = 20000
 exclude_rules = [
     'AM04', # using *, agreed this should be TODO, 
     'LT08', # Avoid new lines after CTEs to help copy pasting between editors

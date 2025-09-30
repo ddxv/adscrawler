@@ -77,7 +77,8 @@ all_scheduled_to_run AS (
         (ls.run_at <= current_date - interval '120 days' OR ls.run_at IS NULL)
         AND sa.store = :store
         AND (fr.failed_attempts < 1 OR fr.failed_attempts IS NULL)
-    ORDER BY sa.installs DESC),
+    ORDER BY sa.installs DESC
+),
 monthly_ads_scheduled_to_run AS (
     SELECT
         lvc.store_app,
@@ -104,7 +105,7 @@ monthly_ads_scheduled_to_run AS (
         (ls.run_at <= current_date - interval '29 days' OR ls.run_at IS NULL)
         AND sa.store = :store
         AND sa.ad_supported
-        AND sa."free"
+        AND sa.free
         AND (fr.failed_attempts < 1 OR fr.failed_attempts IS NULL)
         AND sa.id IN (SELECT store_app_pub_id FROM creative_records)
     ORDER BY sa.installs DESC
@@ -187,5 +188,4 @@ SELECT
     NULL AS user_requested_at,
     'scheduled_ads' AS mysource
 FROM monthly_ads_scheduled_to_run
-WHERE store_id NOT IN (SELECT store_id FROM user_requested_apps_crawl)
-;
+WHERE store_id NOT IN (SELECT store_id FROM user_requested_apps_crawl);
