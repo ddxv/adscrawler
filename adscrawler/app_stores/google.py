@@ -60,6 +60,7 @@ def clean_google_play_app_df(df: pd.DataFrame) -> pd.DataFrame:
             "developerWebsite": "url",
             "developerId": "developer_id",
             "developer": "developer_name",
+            "developerEmail":"developer_email",
             "genreId": "category",
             "headerImage": "featured_image_url",
             "screenshots": "phone_image_urls",
