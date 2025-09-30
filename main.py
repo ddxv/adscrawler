@@ -309,10 +309,10 @@ class ProcessManager:
     def import_ranks_from_s3(self, stores: list[int]) -> None:
         period = self.args.period
         if period == "week":
-            start_date = datetime.date.today() - datetime.timedelta(days=15)
+            start_date = datetime.date.today() - datetime.timedelta(days=8)
             end_date = datetime.date.today()
         elif period == "day":
-            start_date = datetime.date.today() - datetime.timedelta(days=5)
+            start_date = datetime.date.today() - datetime.timedelta(days=3)
             end_date = datetime.date.today()
         else:
             raise ValueError(f"Invalid period {period}")

@@ -628,6 +628,23 @@ def map_database_ids(
     return df
 
 
+def get_s3_rank_parquet_paths(
+    s3, bucket: str, dt: pd.DatetimeIndex, days: int, store: int
+) -> list[str]:
+    all_parquet_paths = []
+    for ddt in pd.date_range(dt, dt + datetime.timedelta(days=days), freq="D"):
+        ddt_str = ddt.strftime("%Y-%m-%d")
+        prefix = f"raw-data/app_rankings/store={store}/crawled_date={ddt_str}/country="
+        objects = s3.list_objects_v2(Bucket=bucket, Prefix=prefix)
+        parquet_paths = [
+            f"s3://{bucket}/{obj['Key']}"
+            for obj in objects.get("Contents", [])
+            if obj["Key"].endswith("rankings.parquet")
+        ]
+        all_parquet_paths += parquet_paths
+    return all_parquet_paths
+
+
 def import_ranks_from_s3(
     store: int,
     start_date: datetime.date,
@@ -638,18 +655,17 @@ def import_ranks_from_s3(
     if period == "week":
         days = 6
         freq = "W-MON"
+        table_suffix = "weekly"
     elif period == "day":
         days = 1
         freq = "D"
+        table_suffix = "daily"
     else:
         raise ValueError(f"Invalid period {period}")
-    key_name = "s3"
-    bucket = CONFIG[key_name]["bucket"]
-    s3_region = CONFIG[key_name]["region_name"]
-    logger.info(f"Importing ranks from s3 {bucket=} in {s3_region=}")
+    s3_config_key = "s3"
+    s3_region = CONFIG[s3_config_key]["region_name"]
     # DuckDB uses S3 endpoint url
-    endpoint = get_s3_endpoint(key_name)
-    # DuckDB may
+    endpoint = get_s3_endpoint(s3_config_key)
     store_id_map = query_store_id_map(database_connection, store)
     duckdb_con = duckdb.connect()
     if "http://" in endpoint:
@@ -662,27 +678,22 @@ def import_ranks_from_s3(
     duckdb_con.execute(f"SET s3_endpoint='{endpoint}';")
     duckdb_con.execute("SET s3_url_style='path';")
     duckdb_con.execute("SET s3_url_compatibility_mode=true;")
-    duckdb_con.execute(f"SET s3_access_key_id='{CONFIG[key_name]['access_key_id']}';")
-    duckdb_con.execute(f"SET s3_secret_access_key='{CONFIG[key_name]['secret_key']}';")
+    duckdb_con.execute(
+        f"SET s3_access_key_id='{CONFIG[s3_config_key]['access_key_id']}';"
+    )
+    duckdb_con.execute(
+        f"SET s3_secret_access_key='{CONFIG[s3_config_key]['secret_key']}';"
+    )
     duckdb_con.execute("SET temp_directory = '/tmp/duckdb.tmp/';")
     duckdb_con.execute("SET preserve_insertion_order = false;")
     s3 = get_s3_client()
+    bucket = CONFIG[s3_config_key]["bucket"]
+    logger.info(f"Importing ranks from S3 {bucket=} in {s3_region=}")
     for dt in pd.date_range(start_date, end_date, freq=freq):
         period_date_str = dt.strftime("%Y-%m-%d")
         logger.info(f"Processing store={store} period_start={period_date_str}")
-        all_parquet_paths = []
-        for ddt in pd.date_range(dt, dt + datetime.timedelta(days=days), freq="D"):
-            ddt_str = ddt.strftime("%Y-%m-%d")
-            prefix = (
-                f"raw-data/app_rankings/store={store}/crawled_date={ddt_str}/country="
-            )
-            objects = s3.list_objects_v2(Bucket=bucket, Prefix=prefix)
-            parquet_paths = [
-                f"s3://{bucket}/{obj['Key']}"
-                for obj in objects.get("Contents", [])
-                if obj["Key"].endswith("rankings.parquet")
-            ]
-            all_parquet_paths += parquet_paths
+        all_parquet_paths = get_s3_rank_parquet_paths(s3, bucket, dt, days, store)
+
         if len(all_parquet_paths) == 0:
             logger.info(f"No parquet files found for period_start={period_date_str}")
             continue
@@ -696,7 +707,30 @@ def import_ranks_from_s3(
             country_parquet_paths = [
                 x for x in all_parquet_paths if f"country={country}" in x
             ]
-            period_query = f"""WITH all_data AS (
+            process_parquets_and_insert(
+                country_parquet_paths=country_parquet_paths,
+                period=period,
+                period_date_str=period_date_str,
+                store=store,
+                table_suffix=table_suffix,
+                duckdb_con=duckdb_con,
+                database_connection=database_connection,
+                store_id_map=store_id_map,
+            )
+
+
+def process_parquets_and_insert(
+    country_parquet_paths: list[str],
+    period: str,
+    period_date_str: str,
+    store: int,
+    table_suffix: str,
+    duckdb_con,
+    database_connection: PostgresCon,
+    store_id_map: pd.DataFrame,
+):
+    """Process parquet files for a specific country and insert into the database."""
+    period_query = f"""WITH all_data AS (
                 SELECT * FROM read_parquet({country_parquet_paths})
                  ),
              period_max_dates AS (
@@ -725,34 +759,34 @@ def import_ranks_from_s3(
             SELECT par.rank, par.best_rank, par.country, par.collection, par.category, par.crawled_date, par.store_id FROM period_app_ranks par
               ORDER BY par.country, par.collection, par.category, par.crawled_date, par.rank
             """
-            logger.info(
-                f"DuckDB query s3 for {store=} period_start={period_date_str} parquet files={len(all_parquet_paths)}"
-            )
-            wdf = duckdb_con.execute(period_query).df()
-            wdf = map_database_ids(wdf, database_connection, store_id_map, store)
-            wdf = wdf.drop(columns=["store_id", "collection", "category"])
-            upsert_df(
-                df=wdf,
-                table_name="store_app_ranks_weekly",
-                schema="frontend",
-                database_connection=database_connection,
-                key_columns=[
-                    "country",
-                    "store_collection",
-                    "store_category",
-                    "crawled_date",
-                    "rank",
-                ],
-                insert_columns=[
-                    "country",
-                    "store_collection",
-                    "store_category",
-                    "crawled_date",
-                    "rank",
-                    "store_app",
-                    "best_rank",
-                ],
-            )
+    logger.info(
+        f"DuckDB {store=} period_start={period_date_str} files={len(country_parquet_paths)}"
+    )
+    wdf = duckdb_con.execute(period_query).df()
+    wdf = map_database_ids(wdf, database_connection, store_id_map, store)
+    wdf = wdf.drop(columns=["store_id", "collection", "category"])
+    upsert_df(
+        df=wdf,
+        table_name=f"store_app_ranks_{table_suffix}",
+        schema="frontend",
+        database_connection=database_connection,
+        key_columns=[
+            "country",
+            "store_collection",
+            "store_category",
+            "crawled_date",
+            "rank",
+        ],
+        insert_columns=[
+            "country",
+            "store_collection",
+            "store_category",
+            "crawled_date",
+            "rank",
+            "store_app",
+            "best_rank",
+        ],
+    )
 
 
 def extract_domains(x: str) -> str:
