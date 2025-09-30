@@ -220,6 +220,8 @@ def process_chunk(df_chunk, use_ssh_tunnel, process_icon):
             try:
                 if process_icon:
                     app_existing_icon_url = row.icon_url_100
+                else:
+                    app_existing_icon_url = None
                 update_all_app_info(
                     row.store,
                     row.store_id,
