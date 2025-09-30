@@ -184,7 +184,7 @@ def scrape_store_html(store_id: str, country: str) -> dict:
         f"Scrape store html for {store_id=} {country=} looking for developer site"
     )
     url = f"https://apps.apple.com/{country}/app/-/id{store_id}"
-    headers = {"User-Agent": "Mozilla/5.0"}  # Prevent blocking by some websites
+    headers = {"User-Agent": "Mozilla/5.0"}
     response = requests.get(url, headers=headers)
 
     html = response.text
@@ -194,11 +194,9 @@ def scrape_store_html(store_id: str, country: str) -> dict:
         return {}
 
     soup = BeautifulSoup(response.text, "html.parser")
-
     in_app_purchase_element = soup.find(
         "li", class_="inline-list__item--bulleted", string="Offers In-App Purchases"
     )
-
     has_in_app_purchases = in_app_purchase_element is not None
 
     try:
@@ -257,7 +255,7 @@ def get_privacy_details(html: str, country: str, store_id: str) -> bool:
     token = match.group(1)
 
     # Make request to the API for privacy details
-    api_url = f"https://amp-api.apps.apple.com/v1/catalog/{country}/apps/{store_id}?platform=web&fields=privacyDetails"
+    api_url = f"https://amp-api-edge.apps.apple.com/v1/catalog/{country}/apps/{store_id}?platform=web&fields=privacyDetails"
     api_headers = {
         "Origin": "https://apps.apple.com",
         "Authorization": f"Bearer {token}",
@@ -268,6 +266,7 @@ def get_privacy_details(html: str, country: str, store_id: str) -> bool:
     response.raise_for_status()
 
     data = response.json()
+
     if not data.get("data") or len(data["data"]) == 0:
         raise ValueError("App not found (404)")
     return data["data"][0]["attributes"]["privacyDetails"]
@@ -339,6 +338,7 @@ def scrape_app_ios(store_id: str, country: str, language: str) -> dict:
     )
     logger.info(f"{store_id=}, {country=}, {language=} ios store scraped")
     return result_dict
+
 
 
 def scrape_itunes_additional_html(result: dict, store_id: str, country: str) -> dict:
