@@ -24,6 +24,7 @@ from adscrawler.dbcon.queries import (
     upsert_df,
 )
 from adscrawler.mitm_ad_parser.models import AdInfo, MultipleAdvertiserIdError
+from adscrawler.mitm_ad_parser.utils import get_tld
 
 logger = get_logger(__name__, "mitm_scrape_ads")
 
@@ -652,12 +653,6 @@ def parse_unity_ad(
         ad_info.found_mmp_urls = found_mmp_urls
     ad_info.init_tld = init_ad_network_tld
     return ad_info, error_msg
-
-
-def get_tld(url: str) -> str:
-    """Extracts the top-level domain from a URL."""
-    tld = tldextract.extract(url).domain + "." + tldextract.extract(url).suffix
-    return tld
 
 
 def parse_generic_adnetwork(

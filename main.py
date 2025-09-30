@@ -12,7 +12,7 @@ from adscrawler.app_stores.scrape_stores import (
 )
 from adscrawler.config import get_logger
 from adscrawler.dbcon.connection import PostgresCon, get_db_connection
-from adscrawler.packages.apks.mitm_scrape_ads import (
+from adscrawler.mitm_ad_parser.mitm_scrape_ads import (
     parse_store_id_mitm_log,
     scan_all_apps,
 )
