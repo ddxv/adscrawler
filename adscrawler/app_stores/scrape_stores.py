@@ -614,7 +614,7 @@ def map_database_ids(
     )
     new_ids = df[~df["store_id"].isin(store_id_map["store_id"])]["store_id"].unique()
     if len(new_ids) > 0:
-        logger.info(f"New store ids: {new_ids}")
+        logger.info(f"Found new store ids: {len(new_ids)}")
         new_ids = [{"store": store, "store_id": store_id} for store_id in new_ids]
         process_scraped(
             database_connection=database_connection,
@@ -707,10 +707,12 @@ def import_ranks_from_s3(
             country_parquet_paths = [
                 x for x in all_parquet_paths if f"country={country}" in x
             ]
+            logger.info(
+                f"DuckDB {store=} period_start={period_date_str} {country=} files={len(country_parquet_paths)}"
+            )
             process_parquets_and_insert(
                 country_parquet_paths=country_parquet_paths,
                 period=period,
-                period_date_str=period_date_str,
                 store=store,
                 table_suffix=table_suffix,
                 duckdb_con=duckdb_con,
@@ -722,7 +724,6 @@ def import_ranks_from_s3(
 def process_parquets_and_insert(
     country_parquet_paths: list[str],
     period: str,
-    period_date_str: str,
     store: int,
     table_suffix: str,
     duckdb_con,
@@ -737,10 +738,10 @@ def process_parquets_and_insert(
                           SELECT ar_1.country,
                              ar_1.collection,
                              ar_1.category,
-                             date_trunc('{period}'::text, ar_1.crawled_date::timestamp with time zone) AS period_start,
+                             date_trunc('{period}'::text, ar_1.crawled_date::VARCHAR::DATE) AS period_start,
                              max(ar_1.crawled_date) AS max_crawled_date
                             FROM all_data ar_1
-                           GROUP BY ar_1.country, ar_1.collection, ar_1.category, (date_trunc('{period}'::text, ar_1.crawled_date::timestamp with time zone))
+                           GROUP BY ar_1.country, ar_1.collection, ar_1.category, (date_trunc('{period}'::text, ar_1.crawled_date::VARCHAR::DATE))
                          ),
              period_app_ranks as (SELECT ar.rank,
                 min(ar.rank) AS best_rank,
@@ -759,9 +760,6 @@ def process_parquets_and_insert(
             SELECT par.rank, par.best_rank, par.country, par.collection, par.category, par.crawled_date, par.store_id FROM period_app_ranks par
               ORDER BY par.country, par.collection, par.category, par.crawled_date, par.rank
             """
-    logger.info(
-        f"DuckDB {store=} period_start={period_date_str} files={len(country_parquet_paths)}"
-    )
     wdf = duckdb_con.execute(period_query).df()
     wdf = map_database_ids(wdf, database_connection, store_id_map, store)
     wdf = wdf.drop(columns=["store_id", "collection", "category"])
