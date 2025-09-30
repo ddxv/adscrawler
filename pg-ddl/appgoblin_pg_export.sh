@@ -8,7 +8,7 @@ rm -rf "$OUTDIR/"
 
 mkdir -p "$OUTDIR/"
 
-# For actual reproduction, dump full db
+# dump full db
 sudo -u postgres pg_dump -U postgres --schema-only --schema=public --schema=logging --schema=adtech --schema=frontend "$DB" > "$OUTDIR/full_db_dump.sql"
 
 
@@ -40,7 +40,6 @@ for schema in "${SCHEMAS[@]}"; do
     sudo -u postgres pg_dump -d "$DB" --schema-only --table="${schema}.${v}" > "$OUTDIR/$schema/${v}__view.sql"
   done
 
-  sudo -u postgres pg_dump -d "$DB" --schema-only --schema="$schema" --section=pre-data > "$OUTDIR/$schema/functions.sql"
 done
 
 

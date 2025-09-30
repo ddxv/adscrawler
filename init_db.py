@@ -53,7 +53,7 @@ def get_appgoblin_data():
 
 app_dict = get_appgoblin_data()
 
-logger.info("Insert dddxv/appgoblin-data apps into db")
+logger.info("Insert ddxv/appgoblin-data apps into db")
 process_scraped(
     database_connection=database_connection,
     ranked_dicts=app_dict,
@@ -67,7 +67,6 @@ with database_connection.engine.connect() as conn:
     conn.execute(text(set_app_updated_at))
 
 # Refresh all materialized views once to get the db in a good state
-
 with open("pg-ddl/schema/full_db_dump.sql") as f:
     full_db_dump = f.read()
 
