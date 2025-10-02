@@ -2,7 +2,7 @@ import datetime
 import os
 import pathlib
 import time
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ProcessPoolExecutor
 from io import BytesIO
 from urllib.error import URLError
 from urllib.parse import unquote_plus
@@ -263,7 +263,7 @@ def update_app_details(
     chunk_size = 1000
     chunks = [df.iloc[i : i + chunk_size] for i in range(0, len(df), chunk_size)]
 
-    with ThreadPoolExecutor(max_workers=workers) as executor:
+    with ProcessPoolExecutor(max_workers=workers) as executor:
         futures = [
             executor.submit(process_chunk, chunk, use_ssh_tunnel, process_icon)
             for chunk in chunks
