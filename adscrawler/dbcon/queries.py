@@ -665,8 +665,7 @@ def query_store_apps(
         - datetime.timedelta(days=max_recrawl_days)
     ).strftime("%Y-%m-%d")
     year_ago_date = (
-        datetime.datetime.now(tz=datetime.UTC)
-        - datetime.timedelta(days=365)
+        datetime.datetime.now(tz=datetime.UTC) - datetime.timedelta(days=365)
     ).strftime("%Y-%m-%d")
     short_group = f"""(
                         (
@@ -680,7 +679,7 @@ def query_store_apps(
                     """
     long_group = f"""(
                        sa.updated_at <= '{long_update_date}'
-                       AND (crawl_result = 1 OR crawl_result IS NULL OR sa.store_last_updated_at >= '{year_ago_date}')
+                       AND (crawl_result = 1 OR crawl_result IS NULL OR sa.store_last_updated >= '{year_ago_date}')
                     )
                     """
     max_group = f"""(
