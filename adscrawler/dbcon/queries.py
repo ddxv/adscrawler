@@ -639,7 +639,6 @@ def get_store_app_columns(database_connection: PostgresCon) -> list[str]:
     ]
     return columns
 
-
 def query_store_apps(
     stores: list[int],
     database_connection: PostgresCon,
@@ -650,40 +649,41 @@ def query_store_apps(
     short_update_days = 1
     short_update_installs = 1000
     short_update_ratings = 100
-    short_update_date = (
+    short_update_ts = (
         datetime.datetime.now(tz=datetime.UTC)
         - datetime.timedelta(days=short_update_days)
-    ).strftime("%Y-%m-%d")
+    )
     long_update_days = 2
-    long_update_date = (
+    long_update_ts = (
         datetime.datetime.now(tz=datetime.UTC)
         - datetime.timedelta(days=long_update_days)
-    ).strftime("%Y-%m-%d")
+    )
     max_recrawl_days = 15
-    max_recrawl_date = (
+    max_recrawl_ts = (
         datetime.datetime.now(tz=datetime.UTC)
         - datetime.timedelta(days=max_recrawl_days)
-    ).strftime("%Y-%m-%d")
-    year_ago_date = (
-        datetime.datetime.now(tz=datetime.UTC) - datetime.timedelta(days=365)
-    ).strftime("%Y-%m-%d")
+    )
+    year_ago_ts = (
+        datetime.datetime.now(tz=datetime.UTC)
+        - datetime.timedelta(days=365)
+    )
     short_group = f"""(
                         (
                           installs >= {short_update_installs}
                           OR rating_count >= {short_update_ratings}
                           OR (sa.id in (select store_app from store_apps_in_latest_rankings))
                             )
-                          AND sa.updated_at <= '{short_update_date}'
-                          AND (crawl_result = 1 OR crawl_result IS NULL OR sa.created_at >= '{long_update_date}')
+                          AND sa.updated_at <= '{short_update_ts}'
+                          AND (crawl_result = 1 OR crawl_result IS NULL OR sa.created_at >= '{long_update_ts}')
                         )
                     """
     long_group = f"""(
-                       sa.updated_at <= '{long_update_date}'
-                       AND (crawl_result = 1 OR crawl_result IS NULL OR sa.store_last_updated >= '{year_ago_date}')
+                       sa.updated_at <= '{long_update_ts}'
+                       AND (crawl_result = 1 OR crawl_result IS NULL OR sa.store_last_updated >= '{year_ago_ts}')
                     )
                     """
     max_group = f"""(
-                      sa.updated_at <= '{max_recrawl_date}'
+                      sa.updated_at <= '{max_recrawl_ts}'
                       OR crawl_result IS NULL
                     )
                 """
