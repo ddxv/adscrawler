@@ -9,7 +9,7 @@ from psycopg.sql import SQL, Composed, Identifier
 from sqlalchemy import text
 from sqlalchemy.sql.elements import TextClause
 
-from adscrawler.config import SQL_DIR, get_logger
+from adscrawler.config import CONFIG, SQL_DIR, get_logger
 from adscrawler.dbcon.connection import PostgresCon
 
 logger = get_logger(__name__)
@@ -639,6 +639,7 @@ def get_store_app_columns(database_connection: PostgresCon) -> list[str]:
     ]
     return columns
 
+
 def query_store_apps(
     stores: list[int],
     database_connection: PostgresCon,
@@ -646,27 +647,39 @@ def query_store_apps(
     log_query: bool = False,
     process_icon: bool = False,
 ) -> pd.DataFrame:
-    short_update_days = 1
-    short_update_installs = 1000
-    short_update_ratings = 100
-    short_update_ts = (
-        datetime.datetime.now(tz=datetime.UTC)
-        - datetime.timedelta(days=short_update_days)
+    if "crawl-settings" in CONFIG:
+        short_update_days = CONFIG["crawl-controls"].getint(
+            "short_update_days", fallback=1
+        )
+        short_update_installs = CONFIG["crawl-controls"].getint(
+            "short_update_installs", fallback=1000
+        )
+        short_update_ratings = CONFIG["crawl-controls"].getint(
+            "short_update_ratings", fallback=100
+        )
+        long_update_days = CONFIG["crawl-controls"].getint(
+            "long_update_days", fallback=2
+        )
+        max_recrawl_days = CONFIG["crawl-controls"].getint(
+            "max_recrawl_days", fallback=15
+        )
+    else:
+        short_update_days = 1
+        short_update_days = 1
+        short_update_installs = 1000
+        short_update_ratings = 100
+        long_update_days = 2
+        max_recrawl_days = 15
+    short_update_ts = datetime.datetime.now(tz=datetime.UTC) - datetime.timedelta(
+        days=short_update_days
     )
-    long_update_days = 2
-    long_update_ts = (
-        datetime.datetime.now(tz=datetime.UTC)
-        - datetime.timedelta(days=long_update_days)
+    long_update_ts = datetime.datetime.now(tz=datetime.UTC) - datetime.timedelta(
+        days=long_update_days
     )
-    max_recrawl_days = 15
-    max_recrawl_ts = (
-        datetime.datetime.now(tz=datetime.UTC)
-        - datetime.timedelta(days=max_recrawl_days)
+    max_recrawl_ts = datetime.datetime.now(tz=datetime.UTC) - datetime.timedelta(
+        days=max_recrawl_days
     )
-    year_ago_ts = (
-        datetime.datetime.now(tz=datetime.UTC)
-        - datetime.timedelta(days=365)
-    )
+    year_ago_ts = datetime.datetime.now(tz=datetime.UTC) - datetime.timedelta(days=365)
     short_group = f"""(
                         (
                           installs >= {short_update_installs}

@@ -32,3 +32,11 @@ region_name = "us-west-01"
 # access_key_id = "remote_access_key_id"
 # secret_key = "remote_secret_key"
 # region_name = "garage"
+
+
+[crawl-settings]
+short_update_days = 1
+short_update_installs = 1000
+short_update_ratings = 100
+long_update_days = 2
+max_recrawl_days = 15
