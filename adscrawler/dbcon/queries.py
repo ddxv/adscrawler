@@ -719,7 +719,11 @@ def query_store_apps(
                 THEN 0
                 ELSE 1
             END),
-            --sa.updated_at
+            (CASE
+                WHEN sa.updated_at < '{max_recrawl_ts}'
+                THEN 0
+                ELSE 1
+            END),
             COALESCE(review_count, 0
                 ) + 
             GREATEST(
