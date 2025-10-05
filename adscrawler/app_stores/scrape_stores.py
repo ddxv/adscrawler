@@ -2,7 +2,7 @@ import datetime
 import os
 import pathlib
 import time
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from io import BytesIO
 from urllib.error import URLError
 from urllib.parse import unquote_plus
@@ -246,7 +246,6 @@ def process_chunk(df_chunk, use_ssh_tunnel, process_icon):
             )
 
 
-from concurrent.futures import as_completed
 
 
 def update_app_details(
