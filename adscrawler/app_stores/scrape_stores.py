@@ -246,10 +246,16 @@ def process_chunk(df_chunk, use_ssh_tunnel, process_icon):
             )
 
 
+from concurrent.futures import as_completed
+
+
 def update_app_details(
     database_connection, stores, use_ssh_tunnel, workers, process_icon, limit
 ):
+    """Process apps with dynamic work queue - simple and efficient."""
     log_info = f"Update app details: {stores=}"
+
+    # Query apps to process
     df = query_store_apps(
         stores,
         database_connection,
@@ -257,21 +263,57 @@ def update_app_details(
         log_query=False,
         process_icon=process_icon,
     )
-
     logger.info(f"{log_info} start {len(df)} apps")
 
-    chunk_size = 1000
+    # Calculate optimal chunk size: aim for 3-10x more chunks than workers
+    chunk_size = max(50, min(1000, len(df) // (workers * 5)))
     chunks = [df.iloc[i : i + chunk_size] for i in range(0, len(df), chunk_size)]
 
-    with ProcessPoolExecutor(max_workers=workers) as executor:
-        futures = [
-            executor.submit(process_chunk, chunk, use_ssh_tunnel, process_icon)
-            for chunk in chunks
-        ]
-        for f in futures:
-            f.result()
+    total_chunks = len(chunks)
+    logger.info(
+        f"Processing {len(df)} apps in {total_chunks} chunks of ~{chunk_size} apps each"
+    )
 
-    logger.info(f"{log_info} finished")
+    completed_count = 0
+    failed_count = 0
+
+    with ProcessPoolExecutor(max_workers=workers) as executor:
+        # Submit all chunks, but stagger the first wave to avoid API thundering herd
+        future_to_idx = {}
+        for idx, chunk in enumerate(chunks):
+            future = executor.submit(process_chunk, chunk, use_ssh_tunnel, process_icon)
+            future_to_idx[future] = idx
+
+            # Only stagger the initial batch to avoid simultaneous API burst
+            if idx < workers:
+                time.sleep(0.5)  # 500ms between initial worker starts
+
+        logger.info(f"All {total_chunks} chunks submitted (first {workers} staggered)")
+
+        # Process results as they complete
+        for future in as_completed(future_to_idx):
+            chunk_idx = future_to_idx[future]
+
+            try:
+                _result = future.result()
+                completed_count += 1
+
+                if completed_count % 10 == 0 or completed_count == total_chunks:
+                    logger.info(
+                        f"Progress: {completed_count}/{total_chunks} chunks "
+                        f"({completed_count / total_chunks * 100:.1f}%) | "
+                        f"Failed: {failed_count}"
+                    )
+
+            except Exception as e:
+                failed_count += 1
+                logger.error(f"Chunk {chunk_idx} failed: {e}")
+
+    logger.info(
+        f"{log_info} finished | Completed: {completed_count} | Failed: {failed_count}"
+    )
+
+    return completed_count, failed_count
 
 
 def crawl_keyword_cranks(database_connection: PostgresCon) -> None:
@@ -959,7 +1001,7 @@ def scrape_app(
     process_icon: bool = False,
     app_existing_icon_url: str | None = None,
 ) -> pd.DataFrame:
-    scrape_info = f"{store=}, {store_id=}, {country=}, {language=}"
+    scrape_info = f"{store=}, {country=}, {language=}, {store_id=}, "
     max_retries = 2
     base_delay = 1
     retries = 0
@@ -1077,7 +1119,6 @@ def scrape_and_save_app(
 ) -> pd.DataFrame:
     for country in APP_DETAILS_COUNTRY_LIST:
         for language in APP_DETAILS_LANGUAGE_LIST:
-            info = f"{store=}, {store_id=}, {country=}, {language=}"
             app_df = scrape_app(
                 store=store,
                 store_id=store_id,
@@ -1086,12 +1127,13 @@ def scrape_and_save_app(
                 process_icon=process_icon,
                 app_existing_icon_url=app_existing_icon_url,
             )
+            crawl_result = int(app_df["crawl_result"].to_numpy()[0])
+            info = f"{store=}, {country=}, {language=}, {store_id=}, {crawl_result=}"
             logger.info(f"{info} save to db start")
             app_df = save_apps_df(
                 apps_df=app_df,
                 database_connection=database_connection,
             )
-            crawl_result = int(app_df["crawl_result"].to_numpy()[0])
             logger.info(f"{info} {crawl_result=} saved to db")
     return app_df
 
