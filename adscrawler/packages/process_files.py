@@ -73,6 +73,10 @@ def download_apps(
                 ]
             if s3df.empty:
                 raise FileNotFoundError(f"No S3 key found for {store_id=}")
+            if max(s3df["last_modified"]) < pd.Timestamp.now(tz="UTC") - pd.Timedelta(
+                days=1
+            ):
+                raise FileNotFoundError(f"S3 key for {store_id=} is old")
             s3_key = s3df.sort_values(by="version_code", ascending=False)["key"][0]
             is_already_in_s3 = True
         except FileNotFoundError:
@@ -131,9 +135,12 @@ def download_apps(
         except Exception:
             logger.exception(f"Download for {store_id} failed")
         remove_tmp_files(store_id=store_id)
-        logger.info(
-            f"{store_id=} finished with errors={download_result.error_count} {total_errors=}"
+        errors_msg = (
+            f" with errors={download_result.error_count}"
+            if download_result.error_count > 0
+            else ""
         )
+        logger.info(f"{store_id=} finished{errors_msg} {total_errors=}")
         # Handle sleep & errors
         if download_result.error_count == 0:
             if existing_file_path:

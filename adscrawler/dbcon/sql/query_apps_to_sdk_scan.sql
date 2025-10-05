@@ -4,17 +4,17 @@ WITH latest_version_codes AS (
         id,
         store_app,
         version_code,
-        updated_at AS last_downloaded_at,
+        created_at AS last_downloaded_at,
         crawl_result AS download_result
     FROM
         version_codes
     WHERE
         crawl_result = 1
         -- HACKY FIX only try for apps that have successuflly been downloaded, but this table still is all history of version_codes in general
-        AND updated_at >= '2025-05-01'
+        AND created_at >= '2025-05-01'
     ORDER BY
         store_app ASC,
-        updated_at DESC,
+        created_at DESC,
         string_to_array(version_code, '.')::bigint [] DESC
 ),
 
@@ -143,7 +143,8 @@ user_requested_apps_crawl AS (
             OR lsvc.scanned_at IS NULL
         )
         AND (
-            lvc.last_downloaded_at < current_date - interval '1 days'
+            lvc.last_downloaded_at
+            < (current_timestamp AT TIME ZONE 'UTC') - interval '1 hour'
             OR lvc.last_downloaded_at IS NULL
         )
         AND sa.store = :store

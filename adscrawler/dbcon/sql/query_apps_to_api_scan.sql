@@ -4,7 +4,7 @@ WITH latest_version_codes AS (
         id,
         store_app,
         version_code,
-        updated_at AS last_downloaded_at,
+        created_at AS last_downloaded_at,
         crawl_result AS download_result
     FROM
         version_codes
@@ -12,10 +12,10 @@ WITH latest_version_codes AS (
         crawl_result = 1
         -- HACKY FIX only try for apps that have successuflly been downloaded, 
         -- but this table still is all history of version_codes in general
-        AND updated_at >= '2025-05-01'
+        AND created_at >= '2025-05-01'
     ORDER BY
         store_app ASC,
-        updated_at DESC,
+        created_at DESC,
         string_to_array(version_code, '.')::bigint [] DESC
 ),
 last_scanned AS (

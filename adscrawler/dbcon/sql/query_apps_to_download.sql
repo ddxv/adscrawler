@@ -13,14 +13,13 @@ WITH latest_version_codes AS (
         updated_at DESC,
         string_to_array(version_code, '.')::bigint [] DESC
 ),
-
 latest_success_version_codes AS (
     SELECT DISTINCT ON
     (store_app)
         id,
         store_app,
         version_code,
-        updated_at,
+        created_at,
         crawl_result
     FROM
         version_codes
@@ -31,7 +30,6 @@ latest_success_version_codes AS (
         updated_at DESC,
         string_to_array(version_code, '.')::bigint [] DESC
 ),
-
 failing_downloads AS (
     SELECT
         store_app,
@@ -44,7 +42,6 @@ failing_downloads AS (
     GROUP BY
         store_app
 ),
-
 growth_apps AS (
     SELECT
         sa.id AS store_app,
@@ -52,7 +49,6 @@ growth_apps AS (
     FROM frontend.store_apps_z_scores AS saz
     LEFT JOIN store_apps AS sa ON saz.store_id = sa.store_id
 ),
-
 scheduled_apps_crawl AS (
     SELECT
         dc.store_app,
@@ -62,7 +58,7 @@ scheduled_apps_crawl AS (
         dc.rating_count,
         vc.crawl_result AS last_crawl_result,
         vc.updated_at AS last_download_attempt,
-        lsvc.updated_at AS last_downloaded_at,
+        lsvc.created_at AS last_downloaded_at,
         coalesce(fd.attempt_count, 0) AS attempt_count
     FROM
         store_apps_in_latest_rankings AS dc
@@ -91,7 +87,7 @@ scheduled_apps_crawl AS (
                 )
                 OR
                 (
-                    (lsvc.updated_at IS NULL OR lsvc.updated_at < '2025-05-01')
+                    (lsvc.created_at IS NULL OR lsvc.created_at < '2025-05-01')
                     AND vc.crawl_result IN (
                         2, 3, 4
                     )
@@ -100,7 +96,6 @@ scheduled_apps_crawl AS (
             )
         )
 ),
-
 user_requested_apps_crawl AS (
     SELECT DISTINCT ON
     (sa.id)
@@ -112,7 +107,7 @@ user_requested_apps_crawl AS (
         urs.created_at AS user_last_requested,
         lvc.crawl_result AS last_crawl_result,
         lvc.updated_at AS last_download_attempt,
-        lsvc.updated_at AS last_downloaded_at,
+        lsvc.created_at AS last_downloaded_at,
         coalesce(fd.attempt_count, 0) AS attempt_count
     FROM
         user_requested_scan AS urs
@@ -131,16 +126,16 @@ user_requested_apps_crawl AS (
     WHERE
         (
             (
-                lsvc.updated_at < urs.created_at
+                lsvc.created_at < urs.created_at
                 AND (
                     (
-                        sa.store_last_updated > lsvc.updated_at
-                        AND lsvc.updated_at > '2025-05-01'
+                        sa.store_last_updated > lsvc.created_at
+                        AND lsvc.created_at > '2025-05-01'
                     )
-                    OR lsvc.updated_at < '2025-05-01'
+                    OR lsvc.created_at < '2025-05-01'
                 )
             )
-            OR lsvc.updated_at IS NULL
+            OR lsvc.created_at IS NULL
         )
         AND (
             lvc.updated_at < current_date - interval '1 days'
@@ -154,7 +149,6 @@ user_requested_apps_crawl AS (
         sa.id ASC,
         urs.created_at DESC
 ),
-
 combined AS (
     SELECT
         store_app,
@@ -197,7 +191,6 @@ combined AS (
             OR last_downloaded_at < current_date - interval '180 days'
         )
 ),
-
 final_selection AS (
     SELECT
         *,
@@ -231,7 +224,6 @@ final_selection AS (
     FROM
         combined
 )
-
 SELECT *
 FROM
     final_selection;
