@@ -687,7 +687,7 @@ def query_store_apps(
                           OR (sa.id in (select store_app from store_apps_in_latest_rankings))
                             )
                           AND sa.updated_at <= '{short_update_ts}'
-                          AND (crawl_result = 1 OR crawl_result IS NULL OR sa.created_at >= '{long_update_ts}')
+                          AND (crawl_result = 1 OR crawl_result IS NULL OR sa.created_at >= '{long_update_ts}' OR sa.store_last_updated >= '{year_ago_ts}')
                         )
                     """
     long_group = f"""(
