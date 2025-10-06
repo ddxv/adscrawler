@@ -197,6 +197,9 @@ def get_downloaded_apk_files(extension: str) -> list[str]:
         main_dir = XAPKS_DIR
     elif extension == "ipa":
         main_dir = IPAS_DIR
+    elif extension == "xapk-incoming":
+        main_dir = XAPKS_INCOMING_DIR
+        extension = "xapk"
     else:
         raise ValueError(f"Invalid extension: {extension}")
     files = []
@@ -273,11 +276,15 @@ def move_local_apk_files_to_s3() -> None:
 
     apks = get_downloaded_apk_files(extension="apk")
     xapks = get_downloaded_apk_files(extension="xapk")
+    xapks_incoming = get_downloaded_apk_files(extension="xapk-incoming")
     ipas = get_downloaded_apk_files(extension="ipa")
+
+
 
     files = (
         [{"file_type": "apk", "package_name": apk} for apk in apks]
         + [{"file_type": "xapk", "package_name": xapk} for xapk in xapks]
+        + [{"file_type": "xapk", "package_name": xapk_incoming} for xapk_incoming in xapks_incoming]
         + [{"file_type": "ipa", "package_name": ipa} for ipa in ipas]
     )
     fdf = pd.DataFrame(files)
@@ -312,7 +319,7 @@ def move_local_apk_files_to_s3() -> None:
     logger.info(f"Missing files: {missing_files.shape[0]}")
     logger.info(f"Failed files: {failed_files.shape[0]}")
 
-    for _, row in df.iterrows():
+    for _, row in fdf.iterrows():
         logger.info(f"Processing {row['package_name']}")
         store_id = row.package_name
         extension = row.file_type
