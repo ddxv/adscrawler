@@ -648,21 +648,13 @@ def query_store_apps(
     process_icon: bool = False,
 ) -> pd.DataFrame:
     if "crawl-settings" in CONFIG:
-        short_update_days = CONFIG["crawl-settings"].get(
-            "short_update_days", 1
-        )
+        short_update_days = CONFIG["crawl-settings"].get("short_update_days", 1)
         short_update_installs = CONFIG["crawl-settings"].get(
             "short_update_installs", 1000
         )
-        short_update_ratings = CONFIG["crawl-settings"].get(
-            "short_update_ratings", 100
-        )
-        long_update_days = CONFIG["crawl-settings"].get(
-            "long_update_days", 2
-        )
-        max_recrawl_days = CONFIG["crawl-settings"].get(
-            "max_recrawl_days", 15
-        )
+        short_update_ratings = CONFIG["crawl-settings"].get("short_update_ratings", 100)
+        long_update_days = CONFIG["crawl-settings"].get("long_update_days", 2)
+        max_recrawl_days = CONFIG["crawl-settings"].get("max_recrawl_days", 15)
     else:
         short_update_days = 1
         short_update_days = 1

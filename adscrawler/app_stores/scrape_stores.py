@@ -246,8 +246,6 @@ def process_chunk(df_chunk, use_ssh_tunnel, process_icon):
             )
 
 
-
-
 def update_app_details(
     database_connection, stores, use_ssh_tunnel, workers, process_icon, limit
 ):
