@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict cdvOSq48Zl2SYHDgD3S9Z4ShOP6NTtizRmmjr9pQBOA73RMt43AHLxaFHdp4SWM
+\restrict mWQz83vsQFfnJUBx76kzs6vC8qICbWkvI7nS0P3sPvoknj9b3heDr7eY9m3KbRk
 
 -- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 -- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
@@ -33,7 +33,8 @@ CREATE TABLE public.version_codes (
     version_code character varying NOT NULL,
     updated_at timestamp without time zone DEFAULT timezone('utc'::text, now()),
     crawl_result smallint NOT NULL,
-    apk_hash character varying(32)
+    apk_hash character varying(32),
+    created_at timestamp without time zone DEFAULT timezone('utc'::text, now())
 );
 
 
@@ -90,4 +91,4 @@ ADD CONSTRAINT vc_fk_store_app FOREIGN KEY (
 -- PostgreSQL database dump complete
 --
 
-\unrestrict cdvOSq48Zl2SYHDgD3S9Z4ShOP6NTtizRmmjr9pQBOA73RMt43AHLxaFHdp4SWM
+\unrestrict mWQz83vsQFfnJUBx76kzs6vC8qICbWkvI7nS0P3sPvoknj9b3heDr7eY9m3KbRk

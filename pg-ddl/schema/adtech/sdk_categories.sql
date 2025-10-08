@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict zOEBU0qvDUNc3Dp9KswclcgDWS9km3KGP6gkH3aVvYItbeAW84y1pOskfxWwDRx
+\restrict pM7ltU4eEBe2otRei66TPrVFPGHrbzfbSSdR607YGgJxTHdDloIi5VPBTVrOQar
 
 -- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 -- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
@@ -67,4 +67,4 @@ ADD CONSTRAINT fk_sdk FOREIGN KEY (sdk_id) REFERENCES adtech.sdks (
 -- PostgreSQL database dump complete
 --
 
-\unrestrict zOEBU0qvDUNc3Dp9KswclcgDWS9km3KGP6gkH3aVvYItbeAW84y1pOskfxWwDRx
+\unrestrict pM7ltU4eEBe2otRei66TPrVFPGHrbzfbSSdR607YGgJxTHdDloIi5VPBTVrOQar

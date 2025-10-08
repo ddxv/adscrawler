@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 66Wzj7gTS2jkHDblWddNPVAayWyd1OjahHblNuv2AB4D3d0X2ami9CQVAD9RUgK
+\restrict uVImMLgjP5ZQ9k9IQIebMD9PJm2DQZHNvV8hWTxLHVXhqsAa7RZRXpqljeXW9Dc
 
 -- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 -- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
@@ -106,4 +106,4 @@ ALTER MATERIALIZED VIEW frontend.advertiser_creatives OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 66Wzj7gTS2jkHDblWddNPVAayWyd1OjahHblNuv2AB4D3d0X2ami9CQVAD9RUgK
+\unrestrict uVImMLgjP5ZQ9k9IQIebMD9PJm2DQZHNvV8hWTxLHVXhqsAa7RZRXpqljeXW9Dc

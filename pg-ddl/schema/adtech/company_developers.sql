@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict rwZpLeSjqzM29UuKcMSiTdjPgyG0BE7HYv6Rfw6xFa4HcMgqmFcd8p6egl321e1
+\restrict NFqnY1ixXF3VxjHjUQ7ohB2EmI1n1RtQDVCqK9WCVw8Gw8cIEtUSeVDJybvwMzS
 
 -- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 -- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
@@ -57,4 +57,4 @@ ADD CONSTRAINT fk_company_developers_category FOREIGN KEY (
 -- PostgreSQL database dump complete
 --
 
-\unrestrict rwZpLeSjqzM29UuKcMSiTdjPgyG0BE7HYv6Rfw6xFa4HcMgqmFcd8p6egl321e1
+\unrestrict NFqnY1ixXF3VxjHjUQ7ohB2EmI1n1RtQDVCqK9WCVw8Gw8cIEtUSeVDJybvwMzS

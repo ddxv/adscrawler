@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 5jTUaMtMiT5aod1nq3osfXun3GXD0ydxnoPfLEbBs8bkbSxfT5ZOmJL3AIEBQ1J
+\restrict K9vLqWejxPqTCUaJBzxlIGnnLBebP1lMfDhuZ60nSIJA3c6hw7F7jXYqki1iWWF
 
 -- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 -- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
@@ -599,7 +599,8 @@ CREATE TABLE public.version_codes (
     version_code character varying NOT NULL,
     updated_at timestamp without time zone DEFAULT timezone('utc'::text, now()),
     crawl_result smallint NOT NULL,
-    apk_hash character varying(32)
+    apk_hash character varying(32),
+    created_at timestamp without time zone DEFAULT timezone('utc'::text, now())
 );
 
 
@@ -2868,23 +2869,6 @@ CREATE MATERIALIZED VIEW frontend.latest_sdk_scanned_apps AS
 ALTER MATERIALIZED VIEW frontend.latest_sdk_scanned_apps OWNER TO postgres;
 
 --
--- Name: store_app_ranks_daily; Type: TABLE; Schema: frontend; Owner: postgres
---
-
-CREATE TABLE frontend.store_app_ranks_daily (
-    rank smallint NOT NULL,
-    best_rank smallint NOT NULL,
-    country smallint NOT NULL,
-    store_collection smallint NOT NULL,
-    store_category smallint NOT NULL,
-    crawled_date date NOT NULL,
-    store_app integer NOT NULL
-);
-
-
-ALTER TABLE frontend.store_app_ranks_daily OWNER TO postgres;
-
---
 -- Name: store_app_ranks_weekly; Type: TABLE; Schema: frontend; Owner: postgres
 --
 
@@ -2900,6 +2884,79 @@ CREATE TABLE frontend.store_app_ranks_weekly (
 
 
 ALTER TABLE frontend.store_app_ranks_weekly OWNER TO postgres;
+
+--
+-- Name: store_categories; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.store_categories (
+    id smallint NOT NULL,
+    store smallint NOT NULL,
+    category character varying NOT NULL
+);
+
+
+ALTER TABLE public.store_categories OWNER TO postgres;
+
+--
+-- Name: store_collections; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.store_collections (
+    id smallint NOT NULL,
+    store smallint NOT NULL,
+    collection character varying NOT NULL
+);
+
+
+ALTER TABLE public.store_collections OWNER TO postgres;
+
+--
+-- Name: store_app_ranks_best_monthly; Type: MATERIALIZED VIEW; Schema: frontend; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW frontend.store_app_ranks_best_monthly AS
+ WITH overview_ranks AS (
+         SELECT sa.store_id,
+            c.alpha2 AS country,
+            sc.collection,
+            sca.category,
+            min(sarw.best_rank) AS best_rank
+           FROM ((((frontend.store_app_ranks_weekly sarw
+             LEFT JOIN public.store_apps sa ON ((sarw.store_app = sa.id)))
+             LEFT JOIN public.store_collections sc ON ((sarw.store_collection = sc.id)))
+             LEFT JOIN public.store_categories sca ON ((sarw.store_category = sca.id)))
+             LEFT JOIN public.countries c ON ((sarw.country = c.id)))
+          WHERE (sarw.crawled_date >= (CURRENT_DATE - '30 days'::interval))
+          GROUP BY sa.store_id, c.alpha2, sc.collection, sca.category
+        )
+ SELECT store_id,
+    country,
+    collection,
+    category,
+    best_rank
+   FROM overview_ranks
+  WITH NO DATA;
+
+
+ALTER MATERIALIZED VIEW frontend.store_app_ranks_best_monthly OWNER TO postgres;
+
+--
+-- Name: store_app_ranks_daily; Type: TABLE; Schema: frontend; Owner: postgres
+--
+
+CREATE TABLE frontend.store_app_ranks_daily (
+    rank smallint NOT NULL,
+    best_rank smallint NOT NULL,
+    country smallint NOT NULL,
+    store_collection smallint NOT NULL,
+    store_category smallint NOT NULL,
+    crawled_date date NOT NULL,
+    store_app integer NOT NULL
+);
+
+
+ALTER TABLE frontend.store_app_ranks_daily OWNER TO postgres;
 
 --
 -- Name: store_app_ranks_latest; Type: MATERIALIZED VIEW; Schema: frontend; Owner: postgres
@@ -3446,6 +3503,43 @@ ALTER SEQUENCE public.creative_assets_id_seq OWNED BY public.creative_assets.id;
 
 
 --
+-- Name: creative_assets_new; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.creative_assets_new (
+    id integer NOT NULL,
+    md5_hash character varying NOT NULL,
+    file_extension character varying NOT NULL,
+    phash character varying,
+    created_at timestamp without time zone DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+
+ALTER TABLE public.creative_assets_new OWNER TO postgres;
+
+--
+-- Name: creative_assets_new_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.creative_assets_new_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.creative_assets_new_id_seq OWNER TO postgres;
+
+--
+-- Name: creative_assets_new_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.creative_assets_new_id_seq OWNED BY public.creative_assets_new.id;
+
+
+--
 -- Name: creative_records_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
 --
 
@@ -3694,6 +3788,36 @@ ALTER SEQUENCE public.store_app_api_calls_id_seq OWNED BY public.store_app_api_c
 
 
 --
+-- Name: store_app_z_scores_history; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.store_app_z_scores_history (
+    target_week date NOT NULL,
+    store character varying NOT NULL,
+    store_app numeric NOT NULL,
+    store_id character varying NOT NULL,
+    app_name character varying NOT NULL,
+    app_category character varying,
+    in_app_purchases boolean,
+    ad_supported boolean,
+    icon_url_100 text,
+    icon_url_512 text,
+    installs bigint,
+    rating_count bigint,
+    installs_sum_1w numeric,
+    ratings_sum_1w numeric,
+    baseline_installs_2w numeric,
+    baseline_ratings_2w numeric,
+    installs_pct_increase numeric,
+    ratings_pct_increase numeric,
+    installs_z_score_1w numeric,
+    ratings_z_score_1w numeric
+);
+
+
+ALTER TABLE public.store_app_z_scores_history OWNER TO postgres;
+
+--
 -- Name: store_apps_country_history_idx_seq; Type: SEQUENCE; Schema: public; Owner: postgres
 --
 
@@ -3857,19 +3981,6 @@ CREATE MATERIALIZED VIEW public.store_apps_updated_at AS
 ALTER MATERIALIZED VIEW public.store_apps_updated_at OWNER TO postgres;
 
 --
--- Name: store_categories; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE public.store_categories (
-    id smallint NOT NULL,
-    store smallint NOT NULL,
-    category character varying NOT NULL
-);
-
-
-ALTER TABLE public.store_categories OWNER TO postgres;
-
---
 -- Name: store_categories_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
 --
 
@@ -3882,19 +3993,6 @@ ALTER TABLE public.store_categories ALTER COLUMN id ADD GENERATED BY DEFAULT AS 
     CACHE 1
 );
 
-
---
--- Name: store_collections; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE public.store_collections (
-    id smallint NOT NULL,
-    store smallint NOT NULL,
-    collection character varying NOT NULL
-);
-
-
-ALTER TABLE public.store_collections OWNER TO postgres;
 
 --
 -- Name: store_collections_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
@@ -4327,6 +4425,13 @@ ALTER TABLE ONLY public.creative_assets ALTER COLUMN id SET DEFAULT nextval('pub
 
 
 --
+-- Name: creative_assets_new id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.creative_assets_new ALTER COLUMN id SET DEFAULT nextval('public.creative_assets_new_id_seq'::regclass);
+
+
+--
 -- Name: creative_records id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
@@ -4668,6 +4773,22 @@ ALTER TABLE ONLY public.crawl_results
 
 
 --
+-- Name: creative_assets_new creative_assets_new_md5_hash_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.creative_assets_new
+    ADD CONSTRAINT creative_assets_new_md5_hash_key UNIQUE (md5_hash);
+
+
+--
+-- Name: creative_assets_new creative_assets_new_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.creative_assets_new
+    ADD CONSTRAINT creative_assets_new_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: creative_assets creative_assets_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -4793,6 +4914,14 @@ ALTER TABLE ONLY public.pub_domains
 
 ALTER TABLE ONLY public.store_app_api_calls
     ADD CONSTRAINT store_app_api_calls_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: store_app_z_scores_history store_app_z_scores_history_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.store_app_z_scores_history
+    ADD CONSTRAINT store_app_z_scores_history_pkey PRIMARY KEY (target_week, store_id);
 
 
 --
@@ -5339,6 +5468,13 @@ CREATE INDEX idx_ranks_filter ON frontend.store_app_ranks_weekly USING btree (co
 
 
 --
+-- Name: idx_store_app_ranks_best_monthly_store; Type: INDEX; Schema: frontend; Owner: postgres
+--
+
+CREATE INDEX idx_store_app_ranks_best_monthly_store ON frontend.store_app_ranks_best_monthly USING btree (store_id);
+
+
+--
 -- Name: idx_store_app_ranks_latest_filter_sort; Type: INDEX; Schema: frontend; Owner: postgres
 --
 
@@ -5385,6 +5521,13 @@ CREATE UNIQUE INDEX latest_sdk_scanned_apps_unique_index ON frontend.latest_sdk_
 --
 
 CREATE INDEX sarw_crawled_store_collection_category_country_idx ON frontend.store_app_ranks_weekly USING btree (crawled_date, store_app, store_collection, store_category, country);
+
+
+--
+-- Name: store_app_ranks_best_monthly_uidx; Type: INDEX; Schema: frontend; Owner: postgres
+--
+
+CREATE UNIQUE INDEX store_app_ranks_best_monthly_uidx ON frontend.store_app_ranks_best_monthly USING btree (store_id, country, collection, category);
 
 
 --
@@ -5469,6 +5612,13 @@ CREATE INDEX developers_developer_id_idx ON public.developers USING btree (devel
 --
 
 CREATE INDEX developers_name_idx ON public.developers USING gin (to_tsvector('simple'::regconfig, (name)::text));
+
+
+--
+-- Name: idx_creative_assets_phash; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_creative_assets_phash ON public.creative_assets_new USING btree (phash) WHERE (phash IS NOT NULL);
 
 
 --
@@ -5910,14 +6060,6 @@ ALTER TABLE ONLY public.creative_assets
 
 
 --
--- Name: creative_records creative_records_creative_asset_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.creative_records
-    ADD CONSTRAINT creative_records_creative_asset_id_fkey FOREIGN KEY (creative_asset_id) REFERENCES public.creative_assets(id);
-
-
---
 -- Name: creative_records creative_records_creative_host_domain_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -6177,5 +6319,5 @@ GRANT ALL ON SCHEMA public TO PUBLIC;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 5jTUaMtMiT5aod1nq3osfXun3GXD0ydxnoPfLEbBs8bkbSxfT5ZOmJL3AIEBQ1J
+\unrestrict K9vLqWejxPqTCUaJBzxlIGnnLBebP1lMfDhuZ60nSIJA3c6hw7F7jXYqki1iWWF
 

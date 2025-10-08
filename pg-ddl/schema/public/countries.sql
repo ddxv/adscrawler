@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict rAIddj4zRfDCpgJjIg30Oha37YdYJaianYFEvBH3xKbo2W5sCnamvHwD6lqv6ps
+\restrict Fffz3wiyFVDrw5eyCSTlEeYTAh238g6JMtIK1fGSsDaUNtr67kMKfrcoewxDkCS
 
 -- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 -- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
@@ -71,4 +71,4 @@ ADD CONSTRAINT countries_pk PRIMARY KEY (id);
 -- PostgreSQL database dump complete
 --
 
-\unrestrict rAIddj4zRfDCpgJjIg30Oha37YdYJaianYFEvBH3xKbo2W5sCnamvHwD6lqv6ps
+\unrestrict Fffz3wiyFVDrw5eyCSTlEeYTAh238g6JMtIK1fGSsDaUNtr67kMKfrcoewxDkCS

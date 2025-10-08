@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict mZufVE5xfS8QEueH638qvFFd5SCgIId4b77Vh4Q44uY8V5njMPeWGOdk86hkezf
+\restrict bk3N6trz59g4DB5tuPakco1O4c6rDSz5jLPOiIA2FxKp19MpdV4CG4EBNfYZW7U
 
 -- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 -- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
@@ -97,16 +97,6 @@ ADD CONSTRAINT creative_records_pkey PRIMARY KEY (id);
 
 
 --
--- Name: creative_records creative_records_creative_asset_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.creative_records
-ADD CONSTRAINT creative_records_creative_asset_id_fkey FOREIGN KEY (
-    creative_asset_id
-) REFERENCES public.creative_assets (id);
-
-
---
 -- Name: creative_records creative_records_creative_host_domain_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -160,4 +150,4 @@ ADD CONSTRAINT creative_records_store_app_pub_id_fkey FOREIGN KEY (
 -- PostgreSQL database dump complete
 --
 
-\unrestrict mZufVE5xfS8QEueH638qvFFd5SCgIId4b77Vh4Q44uY8V5njMPeWGOdk86hkezf
+\unrestrict bk3N6trz59g4DB5tuPakco1O4c6rDSz5jLPOiIA2FxKp19MpdV4CG4EBNfYZW7U
