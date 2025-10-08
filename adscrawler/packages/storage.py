@@ -279,12 +279,13 @@ def move_local_apk_files_to_s3() -> None:
     xapks_incoming = get_downloaded_apk_files(extension="xapk-incoming")
     ipas = get_downloaded_apk_files(extension="ipa")
 
-
-
     files = (
         [{"file_type": "apk", "package_name": apk} for apk in apks]
         + [{"file_type": "xapk", "package_name": xapk} for xapk in xapks]
-        + [{"file_type": "xapk", "package_name": xapk_incoming} for xapk_incoming in xapks_incoming]
+        + [
+            {"file_type": "xapk", "package_name": xapk_incoming}
+            for xapk_incoming in xapks_incoming
+        ]
         + [{"file_type": "ipa", "package_name": ipa} for ipa in ipas]
     )
     fdf = pd.DataFrame(files)

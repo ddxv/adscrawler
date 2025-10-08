@@ -26,6 +26,7 @@ QUERY_APPS_TO_DOWNLOAD = load_sql_file("query_apps_to_download.sql")
 QUERY_APPS_TO_SDK_SCAN = load_sql_file("query_apps_to_sdk_scan.sql")
 QUERY_APPS_TO_API_SCAN = load_sql_file("query_apps_to_api_scan.sql")
 QUERY_APPS_TO_CREATIVE_SCAN = load_sql_file("query_apps_to_creative_scan.sql")
+QUERY_ZSCORES = load_sql_file("query_simplified_store_app_z_scores.sql")
 
 
 def insert_df(
@@ -830,6 +831,15 @@ def query_apps_to_download(
         QUERY_APPS_TO_DOWNLOAD,
         con=database_connection.engine,
         params={"store": store},
+    )
+    return df
+
+
+def query_zscores(database_connection: PostgresCon, target_week: str) -> pd.DataFrame:
+    df = pd.read_sql(
+        QUERY_ZSCORES,
+        con=database_connection.engine,
+        params={"target_week": target_week},
     )
     return df
 

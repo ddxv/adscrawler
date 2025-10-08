@@ -1057,6 +1057,7 @@ def scrape_app(
     result_dict["country"] = country.upper()
 
     df = pd.DataFrame([result_dict])
+
     if crawl_result == 1:
         df = clean_scraped_df(df=df, store=store)
 
