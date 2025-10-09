@@ -166,16 +166,23 @@ def manual_reprocess_mitm(
     apps_df = query_apps_mitm_in_s3(database_connection=database_connection)
 
     rows = apps_df.shape[0]
-    for _i, app in apps_df.iterrows():
+    store_id_missing_mitm_logs = []
+    ndf = apps_df[_i:].copy()
+    for _i, app in ndf.iterrows():
         logger.info(f"Processing {_i}/{rows} {app['store_id']}")
         store_id = app["store_id"]
         store_app = app["store_app"]
         run_id = app["run_id"]
-        mdf = parse_log(
-            store_id=store_id,
-            run_id=run_id,
-            database_connection=database_connection,
-        )
+        try:
+            mdf = parse_log(
+                store_id=store_id,
+                run_id=run_id,
+                database_connection=database_connection,
+            )
+        except FileNotFoundError:
+            logger.error(f"MITM log not found for {store_id=} {run_id=}")
+            store_id_missing_mitm_logs.append(store_id)
+            continue
         if mdf.empty:
             logger.warning("MITM log is empty")
             continue
@@ -195,6 +202,7 @@ def record_mitm_to_db(
     database_connection: PostgresCon,
 ) -> None:
     mdf["run_id"] = run_id
+    # mdf['mitm_uuid'] = mdf['mitm_uuid'].str[:-2] + '11'
     gdf = mitm_logs.make_ip_geo_snapshot_df(
         mdf[["mitm_uuid", "ip_address"]].copy(), database_connection
     )

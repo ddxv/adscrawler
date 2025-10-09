@@ -2,6 +2,7 @@ import datetime
 import pathlib
 import shutil
 import struct
+from mitmproxy.exceptions import FlowReadException
 
 import numpy as np
 import pandas as pd
@@ -144,79 +145,16 @@ def parse_log(
     parsed_flows = []
     with open(mitm_log_path, "rb") as f:
         reader = FlowReader(f)
-        for flow in reader.stream():
-            if not isinstance(flow, (http.HTTPFlow, tcp.TCPFlow)):
-                # These should be inspected and added
-                msg = f"Non HTTPFlow found in mitm log {mitm_log_path}"
-                logger.exception(msg)
-                raise ValueError(msg)
-            mitm_uuid = flow.id
-            called_at = datetime.datetime.fromtimestamp(flow.timestamp_start)
-            try:
-                if isinstance(flow, http.HTTPFlow):
-                    url = flow.request.pretty_url
-                    tld_url = get_tld(url)
-                    if tld_url == ".":
-                        tld_url = None
-                    if flow.response:
-                        try:
-                            # Try decoded content first (may fail if encoding is unknown)
-                            response_size_bytes = len(flow.response.content or b"")
-                        except Exception:
-                            # Fall back to raw bytes if decoding fails
-                            response_size_bytes = len(flow.response.raw_content or b"")
-                    else:
-                        response_size_bytes = 0
-                    # Extract useful data from each flow
-                    flow_data = {
-                        "mitm_uuid": mitm_uuid,
-                        "flow_type": "http",
-                        "tld_url": tld_url,
-                        "status_code": (
-                            flow.response.status_code if flow.response else -1
-                        ),
-                        "ip_address": flow.request.host,
-                        "request_mime_type": flow.request.headers.get(
-                            "Content-Type", ""
-                        ),
-                        "response_mime_type": (
-                            flow.response.headers.get("Content-Type", None)
-                            if flow.response
-                            else None
-                        ),
-                        "response_size_bytes": response_size_bytes,
-                        "url": url,
-                        "called_at": called_at,
-                        # "method": flow.request.method,
-                    }
-                    if include_all:
-                        flow_data = append_additional_mitm_data(
-                            flow=flow,
-                            flow_data=flow_data,
-                            tld_url=tld_url,
-                            url=url,
-                            database_connection=database_connection,
-                        )
-                elif isinstance(flow, tcp.TCPFlow):
-                    flow_data = {
-                        "mitm_uuid": mitm_uuid,
-                        "flow_type": "tcp",
-                        "tld_url": None,
-                        "status_code": -1,
-                        "ip_address": flow.server_conn.address[0],
-                        "request_mime_type": None,
-                        "response_mime_type": None,
-                        "response_size_bytes": sum(
-                            len(m.content) for m in flow.messages
-                        ),
-                        "url": None,
-                        "called_at": called_at,
-                    }
+        try:
+            for flow in reader.stream():
+                flow_data = process_flow(
+                    flow,
+                    include_all=include_all,
+                    database_connection=database_connection,
+                )
                 parsed_flows.append(flow_data)
-            except Exception as e:
-                raise Exception from e
-                logger.exception(f"Error parsing flow: {e}")
-                continue
+        except FlowReadException:
+            logger.warning(f"FlowReadException, bad mitm file, {mitm_log_path}")
     no_logs_found_msg = "No HTTP requests found in mitm log"
     if not parsed_flows:
         logger.warning(no_logs_found_msg)
@@ -235,6 +173,92 @@ def parse_log(
     )
     df["pub_store_id"] = store_id
     return df
+
+
+def process_flow(
+    flow: http.HTTPFlow | tcp.TCPFlow,
+    include_all: bool,
+    database_connection: PostgresCon,
+) -> dict:
+    if not isinstance(flow, (http.HTTPFlow, tcp.TCPFlow)):
+        # These should be inspected and added
+        msg = f"Non HTTPFlow found in mitm log {mitm_log_path}"
+        logger.exception(msg)
+        raise ValueError(msg)
+    mitm_uuid = flow.id
+    called_at = datetime.datetime.fromtimestamp(flow.timestamp_start)
+    if isinstance(flow, http.HTTPFlow):
+        url = flow.request.pretty_url
+        if ":" == url[0]:
+            # Sometimes pretty url formatting fails
+            http_scheme = "http://"
+            if flow.server_conn.tls:
+                http_scheme = "https://"
+            url = (
+                http_scheme
+                + flow.request.headers.get("Host", flow.request.host)
+                + flow.request.path
+            )
+        tld_url = get_tld(url)
+        if tld_url == ".":
+            tld_url = None
+        if flow.response:
+            try:
+                # Try decoded content first (may fail if encoding is unknown)
+                response_size_bytes = len(flow.response.content or b"")
+            except Exception:
+                # Fall back to raw bytes if decoding fails
+                response_size_bytes = len(flow.response.raw_content or b"")
+        else:
+            response_size_bytes = 0
+        # Extract useful data from each flow
+        host = flow.request.host
+        if host is None or host == "":
+            host = flow.server_conn.address[0]
+        flow_data = {
+            "mitm_uuid": mitm_uuid,
+            "flow_type": "http",
+            "tld_url": tld_url,
+            "status_code": (flow.response.status_code if flow.response else -1),
+            "ip_address": host,
+            "request_mime_type": flow.request.headers.get("Content-Type", ""),
+            "response_mime_type": (
+                flow.response.headers.get("Content-Type", None)
+                if flow.response
+                else None
+            ),
+            "response_size_bytes": response_size_bytes,
+            "url": url,
+            "called_at": called_at,
+            # "method": flow.request.method,
+        }
+        if include_all:
+            flow_data = append_additional_mitm_data(
+                flow=flow,
+                flow_data=flow_data,
+                tld_url=tld_url,
+                url=url,
+                database_connection=database_connection,
+            )
+    elif isinstance(flow, tcp.TCPFlow):
+        flow_data = {
+            "mitm_uuid": mitm_uuid,
+            "flow_type": "tcp",
+            "tld_url": None,
+            "status_code": -1,
+            "ip_address": flow.server_conn.address[0],
+            "request_mime_type": None,
+            "response_mime_type": None,
+            "response_size_bytes": sum(len(m.content) for m in flow.messages),
+            "url": None,
+            "called_at": called_at,
+        }
+    else:
+        # These should be inspected and added
+        msg = f"Non HTTPFlow found in mitm log {mitm_log_path}"
+        logger.exception(msg)
+        raise ValueError(msg)
+    return flow_data
 
 
 def append_additional_mitm_data(
@@ -349,11 +373,12 @@ def add_file_extension(df: pd.DataFrame) -> pd.DataFrame:
 
 def add_is_creative_content_column(df: pd.DataFrame) -> pd.DataFrame:
     """Adds a column indicating whether the response contains creative content (images/videos)."""
+    creative_types = r"\b(?:image|video)/(?:jpeg|jpg|png|gif|webp|webm|mp4|mpeg|avi|quicktime)\b"
     is_creative_content_response = (
         df["response_content_type"]
         .fillna("")
         .str.contains(
-            r"\b(?:image|video)/(?:jpeg|jpg|png|gif|webp|webm|mp4|mpeg|avi|quicktime)\b",
+            creative_types,
             case=False,
             regex=True,
         )
@@ -362,7 +387,7 @@ def add_is_creative_content_column(df: pd.DataFrame) -> pd.DataFrame:
         df["response_content_type"]
         .fillna("")
         .str.contains(
-            r"\b(?:image|video)/(?:jpeg|jpg|png|gif|webp|webm|mp4|mpeg|avi|quicktime)\b",
+            creative_types
             case=False,
             regex=True,
         )

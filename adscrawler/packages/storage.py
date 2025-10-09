@@ -466,22 +466,6 @@ def get_store_id_apk_s3_keys(store: int, store_id: str) -> pd.DataFrame:
     return df
 
 
-def download_mitm_log_by_store_id(store_id: str) -> pathlib.Path:
-    func_info = "download_mitm_log_by_store_id "
-    df = get_store_id_mitm_s3_keys(store_id)
-    if df.empty:
-        logger.error(f"{store_id=} no apk found in s3")
-        raise FileNotFoundError(f"{store_id=} no apk found in s3")
-    df["run_id"] = df["run_id"].astype(int)
-    df = df.sort_values(by="run_id").tail(1)
-    key = df["key"].to_numpy()[0]
-    run_id = df["run_id"].to_numpy()[0]
-    filename = f"{store_id}_{run_id}.log"
-    downloaded_file_path = download_mitm_log_by_key(key, filename)
-    logger.info(f"{func_info} to local finished")
-    return downloaded_file_path
-
-
 def download_mitm_log_by_key(key: str, filename: str) -> pathlib.Path:
     downloaded_file_path = pathlib.Path(MITM_DIR, filename)
     s3_client = get_s3_client()

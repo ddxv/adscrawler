@@ -1,17 +1,26 @@
-WITH run_counts AS (
+WITH
+has_creatives AS (
+    SELECT *
+    FROM
+        api_calls
+    WHERE
+        request_mime_type
+        ~* '(?:image|video)/(?:jpeg|jpg|png|gif|webp|webm|mp4|mpeg|avi|quicktime)'
+        OR response_mime_type
+        ~* '(?:image|video)/(?:jpeg|jpg|png|gif|webp|webm|mp4|mpeg|avi|quicktime)'
+),
+run_counts AS (
     SELECT
-        saac.store_app,
-        saac.run_id,
+        ac.store_app,
+        ac.run_id,
         sa.store_id,
         count(*) AS api_calls
     FROM
-        store_app_api_calls AS saac
-    LEFT JOIN store_apps AS sa ON saac.store_app = sa.id
-    WHERE saac.called_at <= current_date - INTERVAL '1 hour'
+        has_creatives AS ac
+    LEFT JOIN store_apps AS sa ON ac.store_app = sa.id
+    WHERE ac.called_at <= current_date - INTERVAL '1 hour'
     GROUP BY
         store_app, run_id, sa.store_id
 )
-
 SELECT * FROM run_counts
-WHERE api_calls > 0
-ORDER BY api_calls DESC;
+WHERE api_calls > 1;
