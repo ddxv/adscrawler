@@ -133,7 +133,6 @@ def parse_log(
     if mitm_log_path.exists():
         logger.info("mitm log already exists")
     else:
-        key = f"mitm_logs/android/{pub_store_id}/{run_id}.log"
         mitms = get_store_id_mitm_s3_keys(store_id=pub_store_id)
         key = mitms[mitms["run_id"] == str(run_id)]["key"].to_numpy()[0]
         mitm_log_path = download_mitm_log_by_key(key, mitm_log_path)

@@ -24,6 +24,7 @@ from adscrawler.dbcon.queries import (
     log_version_code_scan_crawl_results,
     query_apps_to_api_scan,
     query_store_app_by_store_id,
+    query_apps_mitm_in_s3,
 )
 from adscrawler.mitm_ad_parser import mitm_logs
 from adscrawler.packages.apks.weston import (
@@ -132,7 +133,7 @@ def run_app(
             "run_at": datetime.datetime.now(tz=datetime.UTC),
         }
     )
-    # Main table recording if the api scan was successful
+    # Main table recording if the api scan was successful, generates run_id
     run_df = insert_df(
         df=crawl_df,
         table_name="version_code_api_scan_results",
@@ -142,33 +143,82 @@ def run_app(
 
     if not mdf.empty:
         run_id = run_df["id"].to_numpy()[0]
-        mdf["run_id"] = run_id
-        gdf = mitm_logs.make_ip_geo_snapshot_df(
-            mdf[["mitm_uuid", "ip_address"]], database_connection
-        ).rename(columns={"id": "ip_geo_snapshot_id"})
-        gdf = insert_df(gdf, "ip_geo_snapshots", database_connection, return_rows=True)
-        gdf["country_id"] = np.where(
-            np.isnan(gdf["country_id"]), None, mdf["country_id"]
-        )
-        pd.merge(
-            mdf,
-            gdf[["ip_geo_snapshot_id", "mitm_uuid"]],
-            left_on="mitm_uuid",
-            right_on="mitm_uuid",
-            how="left",
-            validate="1:1",
-        )
-        insert_api_calls(
-            database_connection=database_connection,
+        record_mitm_to_db(
+            run_id=run_id,
             mdf=mdf,
-        )
-        upload_mitm_log_to_s3(
-            store=1,
             store_id=store_id,
             version_str=version_str,
-            run_id=run_id,
+            database_connection=database_connection,
         )
-        mitm_logs.move_to_processed(store_id, run_id)
+
+
+def manual_reprocess_mitm(
+    run_id: int,
+    store_id: str,
+    store_app: int,
+    version_str: str,
+    database_connection: PostgresCon,
+) -> None:
+
+    apps_df = query_apps_mitm_in_s3(database_connection=database_connection)
+
+    for _i, app in apps_df.iterrows():
+        store_id = app["store_id"]
+        store_app = app["id"]
+        version_str = app["version_str"]
+        run_id = app["run_id"]
+        mdf = mitm_logs.parse_log(
+            pub_store_id=store_id,
+            run_id=run_id,
+            database_connection=database_connection,
+        )
+        if mdf.empty:
+            logger.warning("MITM log is empty")
+        else:
+            logger.info("MITM log has {mdf.shape[0]} rows")
+            mdf["url"] = mdf["url"].str[0:1000]
+            mdf["store_app"] = store_app
+        record_mitm_to_db(
+            run_id=run_id,
+            mdf=mdf,
+            store_id=store_id,
+            version_str=version_str,
+            database_connection=database_connection,
+        )
+
+
+def record_mitm_to_db(
+    run_id: int,
+    mdf: pd.DataFrame,
+    store_id: str,
+    version_str: str,
+    database_connection: PostgresCon,
+) -> None:
+    mdf["run_id"] = run_id
+    gdf = mitm_logs.make_ip_geo_snapshot_df(
+        mdf[["mitm_uuid", "ip_address"]], database_connection
+    ).rename(columns={"id": "ip_geo_snapshot_id"})
+    gdf = insert_df(gdf, "ip_geo_snapshots", database_connection, return_rows=True)
+    gdf["country_id"] = np.where(np.isnan(gdf["country_id"]), None, mdf["country_id"])
+    pd.merge(
+        mdf,
+        gdf[["ip_geo_snapshot_id", "mitm_uuid"]],
+        left_on="mitm_uuid",
+        right_on="mitm_uuid",
+        how="left",
+        validate="1:1",
+    )
+    insert_api_calls(
+        database_connection=database_connection,
+        mdf=mdf,
+    )
+    upload_mitm_log_to_s3(
+        store=1,
+        store_id=store_id,
+        version_str=version_str,
+        run_id=run_id,
+    )
+    mitm_logs.move_to_processed(store_id, run_id)
 
 
 def insert_api_calls(
@@ -176,7 +226,7 @@ def insert_api_calls(
     mdf: pd.DataFrame,
 ) -> int:
     insert_columns = [
-        "run_id`",
+        "run_id",
         "store_app",
         "mitm_uuid",
         "tld_url",

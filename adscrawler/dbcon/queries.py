@@ -26,6 +26,7 @@ QUERY_APPS_TO_DOWNLOAD = load_sql_file("query_apps_to_download.sql")
 QUERY_APPS_TO_SDK_SCAN = load_sql_file("query_apps_to_sdk_scan.sql")
 QUERY_APPS_TO_API_SCAN = load_sql_file("query_apps_to_api_scan.sql")
 QUERY_APPS_TO_CREATIVE_SCAN = load_sql_file("query_apps_to_creative_scan.sql")
+QUERY_APPS_MITM_IN_S3 = load_sql_file("query_apps_mitm_in_s3.sql")
 QUERY_ZSCORES = load_sql_file("query_simplified_store_app_z_scores.sql")
 
 
