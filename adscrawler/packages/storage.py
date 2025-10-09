@@ -19,6 +19,7 @@ from adscrawler.config import (
 )
 from adscrawler.dbcon.connection import PostgresCon, start_ssh_tunnel
 from adscrawler.dbcon.queries import query_latest_api_scan_by_store_id
+from adscrawler.mitm_ad_parser import mitm_logs
 from adscrawler.packages.utils import (
     get_local_file_path,
     get_md5_hash,
@@ -110,6 +111,7 @@ def upload_mitm_log_to_s3(
         logger.info(f"Uploaded {store_id} mitm log to S3")
     else:
         logger.error(f"Failed to upload {store_id} mitm log to S3")
+    mitm_logs.move_to_processed(store_id, run_id)
 
 
 def upload_ad_creative_to_s3(

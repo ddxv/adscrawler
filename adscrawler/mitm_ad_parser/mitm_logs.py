@@ -5,7 +5,7 @@ import struct
 
 import numpy as np
 import pandas as pd
-from mitmproxy import http
+from mitmproxy import http, tcp
 from mitmproxy.io import FlowReader
 
 from adscrawler.config import MITM_DIR, get_logger
@@ -120,21 +120,23 @@ def make_ip_geo_snapshot_df(
 
 
 def parse_log(
-    pub_store_id: str,
+    store_id: str,
     run_id: int | None,
     database_connection: PostgresCon,
     include_all: bool = False,
 ) -> pd.DataFrame:
     """Parses MITM proxy log files and extracts HTTP request/response data into a DataFrame."""
     if run_id is None:
-        mitm_log_path = pathlib.Path(MITM_DIR, f"traffic_{pub_store_id}.log")
+        mitm_log_path = pathlib.Path(MITM_DIR, f"traffic_{store_id}.log")
     else:
-        mitm_log_path = pathlib.Path(MITM_DIR, f"{pub_store_id}_{run_id}.log")
-    if mitm_log_path.exists():
-        logger.info("mitm log already exists")
-    else:
-        mitms = get_store_id_mitm_s3_keys(store_id=pub_store_id)
-        key = mitms[mitms["run_id"] == str(run_id)]["key"].to_numpy()[0]
+        mitm_log_path = pathlib.Path(MITM_DIR, f"{store_id}_{run_id}.log")
+    if not mitm_log_path.exists() and run_id is not None:
+        mitms = get_store_id_mitm_s3_keys(store_id=store_id)
+        mitms = mitms[mitms["run_id"] == str(run_id)]
+        if mitms.empty:
+            logger.error(f"No mitm log found for {store_id} {run_id}")
+            return pd.DataFrame()
+        key = mitms.iloc[0]["key"]
         mitm_log_path = download_mitm_log_by_key(key, mitm_log_path)
     if not mitm_log_path.exists():
         logger.error(f"mitm log file not found at {mitm_log_path}")
@@ -143,49 +145,73 @@ def parse_log(
     with open(mitm_log_path, "rb") as f:
         reader = FlowReader(f)
         for flow in reader.stream():
-            if isinstance(flow, http.HTTPFlow):
-                timestamp = datetime.datetime.fromtimestamp(flow.timestamp_start)
-            else:
+            if not isinstance(flow, (http.HTTPFlow, tcp.TCPFlow)):
                 # These should be inspected and added
                 msg = f"Non HTTPFlow found in mitm log {mitm_log_path}"
                 logger.exception(msg)
                 raise ValueError(msg)
+            mitm_uuid = flow.id
+            called_at = datetime.datetime.fromtimestamp(flow.timestamp_start)
             try:
-                url = flow.request.pretty_url
-                tld_url = get_tld(url)
-                response_size_bytes = (
-                    len(flow.response.content or b"") if flow.response else 0
-                )
-                # Extract useful data from each flow
-                flow_data = {
-                    "mitm_uuid": flow.id,
-                    "tld_url": tld_url,
-                    "status_code": (
-                        flow.response.get("status_code", -1) if flow.response else -1
-                    ),
-                    "host": flow.request.host,
-                    "headers": dict(flow.request.headers),
-                    "request_mime_type": flow.request.headers.get("Content-Type", ""),
-                    "response_mime_type": (
-                        flow.response.headers.get("Content-Type", None)
-                        if flow.response
-                        else None
-                    ),
-                    "response_size_bytes": response_size_bytes,
-                    "url": url,
-                    "called_at": timestamp,
-                    # "method": flow.request.method,
-                }
-                if include_all:
-                    flow_data = append_additional_mitm_data(
-                        flow=flow,
-                        flow_data=flow_data,
-                        tld_url=tld_url,
-                        url=url,
-                        database_connection=database_connection,
-                    )
+                if isinstance(flow, http.HTTPFlow):
+                    url = flow.request.pretty_url
+                    tld_url = get_tld(url)
+                    if flow.response:
+                        try:
+                            # Try decoded content first (may fail if encoding is unknown)
+                            response_size_bytes = len(flow.response.content or b"")
+                        except Exception:
+                            # Fall back to raw bytes if decoding fails
+                            response_size_bytes = len(flow.response.raw_content or b"")
+                    flow.response.raw_content
+                    # Extract useful data from each flow
+                    flow_data = {
+                        "mitm_uuid": mitm_uuid,
+                        "flow_type": "http",
+                        "tld_url": tld_url,
+                        "status_code": (
+                            flow.response.status_code if flow.response else -1
+                        ),
+                        "ip_address": flow.request.host,
+                        "request_mime_type": flow.request.headers.get(
+                            "Content-Type", ""
+                        ),
+                        "response_mime_type": (
+                            flow.response.headers.get("Content-Type", None)
+                            if flow.response
+                            else None
+                        ),
+                        "response_size_bytes": response_size_bytes,
+                        "url": url,
+                        "called_at": called_at,
+                        # "method": flow.request.method,
+                    }
+                    if include_all:
+                        flow_data = append_additional_mitm_data(
+                            flow=flow,
+                            flow_data=flow_data,
+                            tld_url=tld_url,
+                            url=url,
+                            database_connection=database_connection,
+                        )
+                elif isinstance(flow, tcp.TCPFlow):
+                    flow_data = {
+                        "mitm_uuid": mitm_uuid,
+                        "flow_type": "tcp",
+                        "tld_url": None,
+                        "status_code": -1,
+                        "ip_address": flow.server_conn.address[0],
+                        "request_mime_type": None,
+                        "response_mime_type": None,
+                        "response_size_bytes": sum(
+                            len(m.content) for m in flow.messages
+                        ),
+                        "url": None,
+                        "called_at": called_at,
+                    }
                 parsed_flows.append(flow_data)
             except Exception as e:
+                break
                 logger.exception(f"Error parsing flow: {e}")
                 continue
     no_logs_found_msg = "No HTTP requests found in mitm log"
@@ -204,7 +230,7 @@ def parse_log(
     df["run_id"] = (
         mitm_log_path.as_posix().split("/")[-1].split("_")[-1].replace(".log", "")
     )
-    df["pub_store_id"] = pub_store_id
+    df["pub_store_id"] = store_id
     return df
 
 
