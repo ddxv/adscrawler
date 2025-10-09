@@ -425,7 +425,7 @@ def parse_store_id_mitm_log(
     adv_creatives_df["store_app_pub_id"] = pub_db_id
     adv_creatives_df["run_id"] = run_id
     assets_df = adv_creatives_df[
-        ["adv_store_app_id", "md5_hash", "file_extension", "phash"]
+        ["md5_hash", "file_extension", "phash"]
     ].drop_duplicates()
     assets_df = assets_df.rename(columns={"adv_store_app_id": "store_app_id"})
     assets_df = upsert_df(
@@ -512,7 +512,6 @@ def parse_all_runs_for_store_id(
 
 def scan_all_apps(
     database_connection: PostgresCon,
-    limit_store_apps_no_creatives: bool = True,
     only_new_apps: bool = False,
 ) -> None:
     """Scans all apps for creative content and uploads thumbnails to S3."""
@@ -520,24 +519,6 @@ def scan_all_apps(
         database_connection=database_connection
     )
     logger.info(f"MITM logs to scan: {mitm_runs_to_scan.shape[0]}")
-    # if limit_store_apps_no_creatives:
-    #     store_apps_no_creatives = query_store_apps_no_creatives(
-    #         database_connection=database_connection
-    #     )
-    #     store_apps_no_creatives["no_creatives"] = True
-    #     store_apps_no_creatives["run_id"] = store_apps_no_creatives["run_id"].astype(
-    #         int
-    #     )
-    #     filtered_apps = pd.merge(
-    #         apps_to_scan,
-    #         store_apps_no_creatives,
-    #         left_on=["store_id", "run_id"],
-    #         right_on=["pub_store_id", "run_id"],
-    #         how="left",
-    #     )
-    #     apps_to_scan = filtered_apps[filtered_apps["no_creatives"].isna()]
-    #     apps_to_scan = apps_to_scan[["store_id", "api_calls"]].drop_duplicates()
-    #     logger.info(f"Apps to scan (limited to no creatives): {apps_to_scan.shape[0]}")
     if only_new_apps:
         creative_records = query_creative_records(
             database_connection=database_connection
@@ -554,7 +535,6 @@ def scan_all_apps(
         run_id = runlog["run_id"]
         logger.info(f"{i}/{mitms_count}: {pub_store_id} start")
         try:
-            # parse_all_runs_for_store_id(pub_store_id, database_connection)
             error_messages = parse_store_id_mitm_log(
                 pub_store_id, run_id, database_connection
             )
