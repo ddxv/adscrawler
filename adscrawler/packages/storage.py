@@ -1,5 +1,6 @@
 import os
 import pathlib
+import shutil
 
 import boto3
 import numpy as np
@@ -111,7 +112,18 @@ def upload_mitm_log_to_s3(
         logger.info(f"Uploaded {store_id} mitm log to S3")
     else:
         logger.error(f"Failed to upload {store_id} mitm log to S3")
-    mitm_logs.move_to_processed(store_id, run_id)
+    move_to_processed(store_id, run_id)
+
+
+def move_to_processed(store_id: str, run_id: int) -> None:
+    flows_file = f"traffic_{store_id}.log"
+    final_flows_file = f"{store_id}_{run_id}.log"
+    mitmlog_file = pathlib.Path(MITM_DIR, flows_file)
+    destination_path = pathlib.Path(MITM_DIR, final_flows_file)
+    if not mitmlog_file.exists():
+        logger.error(f"mitm log file not found at {mitmlog_file}")
+        raise FileNotFoundError
+    shutil.move(mitmlog_file, destination_path)
 
 
 def upload_ad_creative_to_s3(

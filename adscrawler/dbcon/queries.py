@@ -979,10 +979,10 @@ def query_keywords_base(database_connection: PostgresCon) -> pd.DataFrame:
     return df
 
 
-def query_store_apps_no_creatives(database_connection: PostgresCon) -> pd.DataFrame:
-    sel_query = """SELECT * FROM logging.store_app_no_creatives;"""
-    df = pd.read_sql(sel_query, con=database_connection.engine)
-    return df
+# def query_store_apps_no_creatives(database_connection: PostgresCon) -> pd.DataFrame:
+#     sel_query = """SELECT * FROM logging.store_app_no_creatives;"""
+#     df = pd.read_sql(sel_query, con=database_connection.engine)
+#     return df
 
 
 def query_store_app_by_store_id(

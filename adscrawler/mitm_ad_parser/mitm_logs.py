@@ -1,6 +1,5 @@
 import datetime
 import pathlib
-import shutil
 import struct
 from mitmproxy.exceptions import FlowReadException
 
@@ -66,16 +65,16 @@ def get_creatives_df(
     pub_store_id: str, run_id: int, database_connection: PostgresCon
 ) -> tuple[pd.DataFrame, pd.DataFrame, str | None]:
     """Retrieves and filters creative content from MITM log data."""
-    df = parse_log(pub_store_id, run_id, database_connection)
+    df = parse_log(pub_store_id, run_id, database_connection, include_all=True)
     error_msg = None
     if df.empty:
         error_msg = "No data in mitm df"
         logger.error(error_msg)
         return pd.DataFrame(), pd.DataFrame(), error_msg
-    if "status_code" not in df.columns:
-        error_msg = "No status code found in df, skipping"
-        logger.error(error_msg)
-        return pd.DataFrame(), pd.DataFrame(), error_msg
+    # if "status_code" not in df.columns:
+    #     error_msg = "No status code found in df, skipping"
+    #     logger.error(error_msg)
+    #     return pd.DataFrame(), pd.DataFrame(), error_msg
     df = add_file_extension(df)
     creatives_df = filter_creatives(df)
     if creatives_df.empty:
@@ -83,17 +82,6 @@ def get_creatives_df(
         logger.error(error_msg)
         return df, pd.DataFrame(), error_msg
     return df, creatives_df, error_msg
-
-
-def move_to_processed(store_id: str, run_id: int) -> None:
-    flows_file = f"traffic_{store_id}.log"
-    final_flows_file = f"{store_id}_{run_id}.log"
-    mitmlog_file = pathlib.Path(MITM_DIR, flows_file)
-    destination_path = pathlib.Path(MITM_DIR, final_flows_file)
-    if not mitmlog_file.exists():
-        logger.error(f"mitm log file not found at {mitmlog_file}")
-        raise FileNotFoundError
-    shutil.move(mitmlog_file, destination_path)
 
 
 def make_ip_geo_snapshot_df(
@@ -205,7 +193,7 @@ def process_flow(
         if flow.response:
             try:
                 # Try decoded content first (may fail if encoding is unknown)
-                response_size_bytes = len(flow.response.content or b"")
+                response_size_bytes = len(flow.response.content)
             except Exception:
                 # Fall back to raw bytes if decoding fails
                 response_size_bytes = len(flow.response.raw_content or b"")
@@ -292,9 +280,6 @@ def append_additional_mitm_data(
             flow_data["status_code"] = flow.response.status_code
         except Exception:
             flow_data["status_code"] = -1
-        flow_data["response_content_type"] = flow.response.headers.get(
-            "Content-Type", ""
-        )
         flow_data["response_size"] = flow.response.headers.get("Content-Length", "0")
         if "applovin.com" in tld_url:
             flow_data["response_text"] = decode_network_request(
@@ -356,7 +341,7 @@ def add_file_extension(df: pd.DataFrame) -> pd.DataFrame:
     """Adds file extension column to DataFrame based on URL or content type."""
     df["file_extension"] = df["url"].apply(lambda x: x.split(".")[-1])
     ext_too_long = (df["file_extension"].str.len() > 4) & (
-        df["response_content_type"].fillna("").str.contains("/")
+        df["response_mime_type"].fillna("").str.contains("/")
     )
 
     def get_subtype(x):
@@ -365,7 +350,7 @@ def add_file_extension(df: pd.DataFrame) -> pd.DataFrame:
 
     df["file_extension"] = np.where(
         ext_too_long,
-        df["response_content_type"].fillna("").apply(get_subtype),
+        df["response_mime_type"].fillna("").apply(get_subtype),
         df["file_extension"],
     )
     return df
@@ -373,9 +358,11 @@ def add_file_extension(df: pd.DataFrame) -> pd.DataFrame:
 
 def add_is_creative_content_column(df: pd.DataFrame) -> pd.DataFrame:
     """Adds a column indicating whether the response contains creative content (images/videos)."""
-    creative_types = r"\b(?:image|video)/(?:jpeg|jpg|png|gif|webp|webm|mp4|mpeg|avi|quicktime)\b"
+    creative_types = (
+        r"\b(?:image|video)/(?:jpeg|jpg|png|gif|webp|webm|mp4|mpeg|avi|quicktime)\b"
+    )
     is_creative_content_response = (
-        df["response_content_type"]
+        df["response_mime_type"]
         .fillna("")
         .str.contains(
             creative_types,
@@ -384,10 +371,10 @@ def add_is_creative_content_column(df: pd.DataFrame) -> pd.DataFrame:
         )
     )
     is_creative_content_request = (
-        df["response_content_type"]
+        df["response_mime_type"]
         .fillna("")
         .str.contains(
-            creative_types
+            creative_types,
             case=False,
             regex=True,
         )

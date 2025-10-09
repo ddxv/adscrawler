@@ -39,7 +39,7 @@ def find_sent_video_df(
     """Retrieves DataFrame rows containing the specified video ID from the given DataFrame."""
     sent_video_df = df[
         (df["response_text"].astype(str).str.contains(video_id, regex=False))
-        & (df["start_time"] <= row.start_time)
+        & (df["called_at"] <= row.called_at)
     ].copy()
     if sent_video_df.empty:
         sent_video_df = df[
@@ -528,24 +528,24 @@ def scan_all_apps(
     """Scans all apps for creative content and uploads thumbnails to S3."""
     apps_to_scan = query_apps_to_creative_scan(database_connection=database_connection)
     logger.info(f"Apps to scan: {apps_to_scan.shape[0]}")
-    if limit_store_apps_no_creatives:
-        store_apps_no_creatives = query_store_apps_no_creatives(
-            database_connection=database_connection
-        )
-        store_apps_no_creatives["no_creatives"] = True
-        store_apps_no_creatives["run_id"] = store_apps_no_creatives["run_id"].astype(
-            int
-        )
-        filtered_apps = pd.merge(
-            apps_to_scan,
-            store_apps_no_creatives,
-            left_on=["store_id", "run_id"],
-            right_on=["pub_store_id", "run_id"],
-            how="left",
-        )
-        apps_to_scan = filtered_apps[filtered_apps["no_creatives"].isna()]
-        apps_to_scan = apps_to_scan[["store_id", "api_calls"]].drop_duplicates()
-        logger.info(f"Apps to scan (limited to no creatives): {apps_to_scan.shape[0]}")
+    # if limit_store_apps_no_creatives:
+    #     store_apps_no_creatives = query_store_apps_no_creatives(
+    #         database_connection=database_connection
+    #     )
+    #     store_apps_no_creatives["no_creatives"] = True
+    #     store_apps_no_creatives["run_id"] = store_apps_no_creatives["run_id"].astype(
+    #         int
+    #     )
+    #     filtered_apps = pd.merge(
+    #         apps_to_scan,
+    #         store_apps_no_creatives,
+    #         left_on=["store_id", "run_id"],
+    #         right_on=["pub_store_id", "run_id"],
+    #         how="left",
+    #     )
+    #     apps_to_scan = filtered_apps[filtered_apps["no_creatives"].isna()]
+    #     apps_to_scan = apps_to_scan[["store_id", "api_calls"]].drop_duplicates()
+    #     logger.info(f"Apps to scan (limited to no creatives): {apps_to_scan.shape[0]}")
     if only_new_apps:
         creative_records = query_creative_records(
             database_connection=database_connection

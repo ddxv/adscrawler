@@ -240,6 +240,7 @@ def insert_api_calls(
         "status_code",
         "request_mime_type",
         "response_mime_type",
+        "response_size_bytes",
         "url",
         "ip_geo_snapshot_id",
         "called_at",

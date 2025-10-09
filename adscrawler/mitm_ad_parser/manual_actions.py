@@ -61,7 +61,7 @@ def open_all_local_mitms(database_connection: PostgresCon) -> pd.DataFrame:
         pub_store_id = mitm_log_path.name.split("_")[0]
         run_id = mitm_log_path.name.split("_")[1].replace(".log", "")
         df = parse_log(pub_store_id, run_id, database_connection)
-        if "response_content_type" in df.columns:
+        if "response_mime_type" in df.columns:
             df = add_is_creative_content_column(df)
             df["response_text"] = np.where(
                 df["is_creative_content"], "", df["response_text"]
