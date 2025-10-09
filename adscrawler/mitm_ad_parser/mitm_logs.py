@@ -1,11 +1,11 @@
 import datetime
 import pathlib
 import struct
-from mitmproxy.exceptions import FlowReadException
 
 import numpy as np
 import pandas as pd
 from mitmproxy import http, tcp
+from mitmproxy.exceptions import FlowReadException
 from mitmproxy.io import FlowReader
 
 from adscrawler.config import MITM_DIR, get_logger
@@ -280,7 +280,6 @@ def append_additional_mitm_data(
             flow_data["status_code"] = flow.response.status_code
         except Exception:
             flow_data["status_code"] = -1
-        flow_data["response_size"] = flow.response.headers.get("Content-Length", "0")
         if "applovin.com" in tld_url:
             flow_data["response_text"] = decode_network_request(
                 url,
@@ -305,7 +304,9 @@ def filter_creatives(df: pd.DataFrame) -> pd.DataFrame:
     status_code_200 = df["status_code"] == 200
     df = add_is_creative_content_column(df)
     creatives_df = df[(df["is_creative_content"]) & status_code_200].copy()
-    creatives_df["creative_size"] = creatives_df["response_size"].fillna(0).astype(int)
+    creatives_df["creative_size"] = (
+        creatives_df["response_size_bytes"].fillna(0).astype(int)
+    )
     creatives_df = creatives_df[creatives_df["creative_size"] > 50000]
     creatives_df = creatives_df[creatives_df["response_content"].notna()]
     creatives_df["actual_size"] = creatives_df["response_content"].str.len()

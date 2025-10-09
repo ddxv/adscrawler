@@ -20,7 +20,6 @@ from adscrawler.config import (
 )
 from adscrawler.dbcon.connection import PostgresCon, start_ssh_tunnel
 from adscrawler.dbcon.queries import query_latest_api_scan_by_store_id
-from adscrawler.mitm_ad_parser import mitm_logs
 from adscrawler.packages.utils import (
     get_local_file_path,
     get_md5_hash,
@@ -127,22 +126,15 @@ def move_to_processed(store_id: str, run_id: int) -> None:
 
 
 def upload_ad_creative_to_s3(
-    store: int,
-    adv_store_id: str,
     md5_hash: str,
     extension: str,
 ) -> None:
     """Upload apk to s3."""
-    app_prefix = f"{adv_store_id}/{md5_hash}.{extension}"
-    file_path = pathlib.Path(CREATIVES_DIR, adv_store_id, f"{md5_hash}.{extension}")
-    if store == 1:
-        prefix = f"ad-creatives/android/{app_prefix}"
-    elif store == 2:
-        prefix = f"ad-creatives/ios/{app_prefix}"
-    else:
-        raise ValueError(f"Invalid store: {store}")
+    # app_prefix = f"{adv_store_id}/{md5_hash}.{extension}"
+    creative_hash_prefix = md5_hash[0:3]
+    file_path = pathlib.Path(CREATIVES_DIR, "raw", f"{md5_hash}.{extension}")
+    prefix = f"creatives/raw/{creative_hash_prefix}/{md5_hash}.{extension}"
     metadata = {
-        "store_id": adv_store_id,
         "md5": md5_hash,
     }
     s3_client = get_s3_client()
@@ -153,9 +145,9 @@ def upload_ad_creative_to_s3(
         Metadata=metadata,
     )
     if response["ResponseMetadata"]["HTTPStatusCode"] == 200:
-        logger.info(f"Uploaded {adv_store_id} creative to S3")
+        logger.info("Uploaded  creative to S3")
     else:
-        logger.error(f"Failed to upload {adv_store_id} creative to S3")
+        logger.error("Failed to upload creative to S3")
 
 
 def upload_apk_to_s3(
@@ -372,38 +364,6 @@ def move_local_apk_files_to_s3() -> None:
         )
 
 
-def get_app_creatives_s3_keys(store: int, store_id: str) -> pd.DataFrame:
-    if store == 1:
-        prefix = f"ad-creatives/android/{store_id}/"
-    elif store == 2:
-        prefix = f"ad-creatives/ios/{store_id}/"
-    else:
-        raise ValueError(f"Invalid store: {store}")
-    logger.info(f"Getting {store_id=} s3 keys start")
-    s3_client = get_s3_client()
-    response = s3_client.list_objects_v2(Bucket=CONFIG["s3"]["bucket"], Prefix=prefix)
-    objects_data = []
-    if response["KeyCount"] == 0:
-        logger.error(f"{store_id=} no creatives found in s3")
-        raise FileNotFoundError(f"{store_id=} no creatives found in s3")
-    for obj in response["Contents"]:
-        key_parts = obj["Key"].split("/")[-1].split(".")
-        md5_hash = key_parts[0]
-        extension = key_parts[1]
-        objects_data.append(
-            {
-                "key": obj["Key"],
-                "store_id": store_id,
-                "md5_hash": md5_hash,
-                "extension": extension,
-                "last_modified": obj["LastModified"],
-            }
-        )
-    df = pd.DataFrame(objects_data)
-    logger.info(f"Got {store_id=} s3 keys: {df.shape[0]}")
-    return df
-
-
 def get_store_id_mitm_s3_keys(store_id: str) -> pd.DataFrame:
     store = 1
     if store == 1:
@@ -577,6 +537,24 @@ def download_app_to_local(
     if file_path is None:
         raise FileNotFoundError(f"{store_id=} no file found: {file_path=}")
     return file_path, version_str
+
+
+def creative_exists_in_s3(md5_hash: str, extension: str, store: int) -> bool:
+    """Check if a creative already exists in S3 (fast)."""
+    hash_prefix = md5_hash[0:3]
+    if store == 1:
+        s3_key = f"creatives/raw/{hash_prefix}/{md5_hash}.{extension}"
+    elif store == 2:
+        s3_key = f"creatives/raw/{hash_prefix}/{md5_hash}.{extension}"
+    else:
+        raise ValueError(f"Invalid store: {store}")
+
+    s3_client = get_s3_client()
+    try:
+        s3_client.head_object(Bucket=CONFIG["s3"]["bucket"], Key=s3_key)
+        return True
+    except s3_client.exceptions.NoSuchKey:
+        return False
 
 
 S3_CLIENT = None

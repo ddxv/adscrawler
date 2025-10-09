@@ -3,11 +3,14 @@ WITH has_creatives AS (
     FROM
         api_calls
     WHERE
-        request_mime_type
-        ~* '(image|video)/(jpeg|jpg|png|gif|webp|webm|mp4|mpeg|avi|quicktime)'
-        OR
-        response_mime_type
-        ~* '(image|video)/(jpeg|jpg|png|gif|webp|webm|mp4|mpeg|avi|quicktime)'
+        (
+            request_mime_type
+            ~* '(image|video)/(jpeg|jpg|png|gif|webp|webm|mp4|mpeg|avi|quicktime)'
+            OR
+            response_mime_type
+            ~* '(image|video)/(jpeg|jpg|png|gif|webp|webm|mp4|mpeg|avi|quicktime)'
+        ) AND response_status_code = 200
+        AND actual_response_size > 50000
 ),
 run_counts AS (
     SELECT

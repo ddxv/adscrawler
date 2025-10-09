@@ -14,7 +14,6 @@ from adscrawler.dbcon.queries import (
     query_apps_to_creative_scan,
     query_creative_records,
     query_store_app_by_store_id,
-    query_store_apps_no_creatives,
     upsert_df,
 )
 from adscrawler.mitm_ad_parser.creative_processor import get_phash, store_creatives
@@ -22,7 +21,7 @@ from adscrawler.mitm_ad_parser.mitm_logs import get_creatives_df
 from adscrawler.mitm_ad_parser.network_parsers import parse_sent_video_df
 from adscrawler.mitm_ad_parser.utils import get_tld
 from adscrawler.packages.storage import (
-    get_app_creatives_s3_keys,
+    creative_exists_in_s3,
     get_store_id_mitm_s3_keys,
     upload_ad_creative_to_s3,
 )
@@ -234,25 +233,16 @@ def attribute_creatives(
     return adv_creatives_df, error_messages
 
 
-def upload_creatives(adv_creatives_df: pd.DataFrame) -> None:
-    """Uploads creative files to S3 storage."""
-    upload_creatives_to_s3(adv_creatives_df)
-
-
 def upload_creatives_to_s3(adv_creatives_df: pd.DataFrame) -> None:
     """Uploads creative files to S3, checking for existing files to avoid duplicates."""
     for adv_id, adv_creatives_df_adv in adv_creatives_df.groupby("adv_store_id"):
-        try:
-            s3_keys = get_app_creatives_s3_keys(store=1, store_id=adv_id)
-            s3_keys_md5_hashes = s3_keys["md5_hash"].to_numpy()
-        except FileNotFoundError:
-            s3_keys_md5_hashes = []
         for _i, row in adv_creatives_df_adv.iterrows():
-            if row["md5_hash"] in s3_keys_md5_hashes:
+            md5_hash = row["md5_hash"]
+            extension = row["file_extension"]
+            if creative_exists_in_s3(md5_hash, extension):
                 logger.info(f"Creative {row['md5_hash']} already in S3")
                 continue
             upload_ad_creative_to_s3(
-                store=1,
                 adv_store_id=adv_id,
                 md5_hash=row["md5_hash"],
                 extension=row["file_extension"],
@@ -426,7 +416,7 @@ def parse_store_id_mitm_log(
         row = {
             "run_id": run_id,
             "pub_store_id": pub_store_id,
-            "error_msg": msg,
+            "error_msg": msg + 1,
         }
         error_messages.append(row)
     pub_db_id = query_store_app_by_store_id(
@@ -471,7 +461,7 @@ def parse_store_id_mitm_log(
             "mmp_urls",
         ],
     )
-    upload_creatives(adv_creatives_df)
+    upload_creatives_to_s3(adv_creatives_df)
     return error_messages
 
 
@@ -526,8 +516,10 @@ def scan_all_apps(
     only_new_apps: bool = False,
 ) -> None:
     """Scans all apps for creative content and uploads thumbnails to S3."""
-    apps_to_scan = query_apps_to_creative_scan(database_connection=database_connection)
-    logger.info(f"Apps to scan: {apps_to_scan.shape[0]}")
+    mitm_runs_to_scan = query_apps_to_creative_scan(
+        database_connection=database_connection
+    )
+    logger.info(f"MITM logs to scan: {mitm_runs_to_scan.shape[0]}")
     # if limit_store_apps_no_creatives:
     #     store_apps_no_creatives = query_store_apps_no_creatives(
     #         database_connection=database_connection
@@ -550,21 +542,54 @@ def scan_all_apps(
         creative_records = query_creative_records(
             database_connection=database_connection
         )
-        apps_to_scan = apps_to_scan[
-            ~apps_to_scan["store_id"].isin(creative_records["pub_store_id"])
+        mitm_runs_to_scan = mitm_runs_to_scan[
+            ~mitm_runs_to_scan["run_id"].isin(creative_records["run_id"])
         ]
-        logger.info(f"Apps to scan (limited to new apps): {apps_to_scan.shape[0]}")
-    apps_count = apps_to_scan.shape[0]
+        logger.info(f"Apps to scan (limited to new apps): {mitm_runs_to_scan.shape[0]}")
+    mitms_count = mitm_runs_to_scan.shape[0]
     i = 0
-    for _i, app in apps_to_scan.iterrows():
+    for _i, runlog in mitm_runs_to_scan.iterrows():
         i += 1
-        pub_store_id = app["store_id"]
-        logger.info(f"{i}/{apps_count}: {pub_store_id} start")
+        pub_store_id = runlog["store_id"]
+        run_id = runlog["run_id"]
+        logger.info(f"{i}/{mitms_count}: {pub_store_id} start")
         try:
-            parse_all_runs_for_store_id(pub_store_id, database_connection)
-        except Exception as e:
-            logger.exception(f"Error parsing {pub_store_id}: {e}")
+            # parse_all_runs_for_store_id(pub_store_id, database_connection)
+            error_messages = parse_store_id_mitm_log(
+                pub_store_id, run_id, database_connection
+            )
+        except Exception:
+            error_msg = "CRITICAL uncaught error"
+            logger.exception(f"{error_msg}")
+            row = {
+                "run_id": run_id,
+                "pub_store_id": pub_store_id,
+                "error_msg": error_msg,
+            }
+            error_messages = [row]
+        if len(error_messages) == 0:
             continue
+        d = [x for x in error_messages if type(x) is dict]
+        s = [x for x in error_messages if type(x) is pd.Series]
+        error_msg_df = pd.concat([pd.DataFrame(d), pd.DataFrame(s)], ignore_index=True)
+        mycols = [
+            x
+            for x in error_msg_df.columns
+            if x
+            in [
+                "url",
+                "tld_url",
+                "path",
+                "content_type",
+                "run_id",
+                "pub_store_id",
+                "file_extension",
+                "creative_size",
+                "error_msg",
+            ]
+        ]
+        error_msg_df = error_msg_df[mycols]
+        log_creative_scan_results(error_msg_df, database_connection)
     subprocess.run(
         [
             "s3cmd",

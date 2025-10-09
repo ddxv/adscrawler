@@ -167,8 +167,8 @@ def manual_reprocess_mitm(
 
     rows = apps_df.shape[0]
     store_id_missing_mitm_logs = []
-    ndf = apps_df[_i:].copy()
-    for _i, app in ndf.iterrows():
+    # ndf = apps_df[_i:].copy()
+    for _i, app in apps_df.iterrows():
         logger.info(f"Processing {_i}/{rows} {app['store_id']}")
         store_id = app["store_id"]
         store_app = app["store_app"]
