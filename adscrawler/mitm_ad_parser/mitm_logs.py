@@ -156,6 +156,8 @@ def parse_log(
                 if isinstance(flow, http.HTTPFlow):
                     url = flow.request.pretty_url
                     tld_url = get_tld(url)
+                    if tld_url == ".":
+                        tld_url = None
                     if flow.response:
                         try:
                             # Try decoded content first (may fail if encoding is unknown)
@@ -163,7 +165,8 @@ def parse_log(
                         except Exception:
                             # Fall back to raw bytes if decoding fails
                             response_size_bytes = len(flow.response.raw_content or b"")
-                    flow.response.raw_content
+                    else:
+                        response_size_bytes = 0
                     # Extract useful data from each flow
                     flow_data = {
                         "mitm_uuid": mitm_uuid,
@@ -211,7 +214,7 @@ def parse_log(
                     }
                 parsed_flows.append(flow_data)
             except Exception as e:
-                break
+                raise Exception from e
                 logger.exception(f"Error parsing flow: {e}")
                 continue
     no_logs_found_msg = "No HTTP requests found in mitm log"

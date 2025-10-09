@@ -27,6 +27,7 @@ from adscrawler.dbcon.queries import (
     query_store_app_by_store_id,
 )
 from adscrawler.mitm_ad_parser import mitm_logs
+from adscrawler.mitm_ad_parser.mitm_logs import parse_log
 from adscrawler.packages.apks.weston import (
     is_weston_running,
     restart_weston,
@@ -170,7 +171,7 @@ def manual_reprocess_mitm(
         store_id = app["store_id"]
         store_app = app["store_app"]
         run_id = app["run_id"]
-        mdf = mitm_logs.parse_log(
+        mdf = parse_log(
             store_id=store_id,
             run_id=run_id,
             database_connection=database_connection,
