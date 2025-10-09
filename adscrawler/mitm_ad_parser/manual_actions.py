@@ -12,7 +12,7 @@ from adscrawler.dbcon.queries import (
 )
 from adscrawler.mitm_ad_parser.mitm_scrape_ads import (
     add_is_creative_content_column,
-    parse_mitm_log,
+    parse_log,
 )
 from adscrawler.packages.storage import (
     download_mitm_log_by_key,
@@ -60,7 +60,7 @@ def open_all_local_mitms(database_connection: PostgresCon) -> pd.DataFrame:
         logger.info(f"{i}/{num_files}: {mitm_log_path}")
         pub_store_id = mitm_log_path.name.split("_")[0]
         run_id = mitm_log_path.name.split("_")[1].replace(".log", "")
-        df = parse_mitm_log(pub_store_id, run_id, database_connection)
+        df = parse_log(pub_store_id, run_id, database_connection)
         if "response_content_type" in df.columns:
             df = add_is_creative_content_column(df)
             df["response_text"] = np.where(

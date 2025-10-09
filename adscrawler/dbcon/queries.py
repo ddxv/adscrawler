@@ -77,11 +77,13 @@ def insert_df(
     else:
         returning_clause = SQL("")
 
-    insert_query = SQL("""
+    insert_query = SQL(
+        """
         INSERT INTO {table} ({columns})
         VALUES ({placeholders})
         {returning_clause}
-    """).format(
+    """
+    ).format(
         table=table_identifier,
         columns=columns,
         placeholders=placeholders,
@@ -172,12 +174,14 @@ def upsert_df(
     )
 
     # Upsert query without RETURNING clause
-    upsert_query = SQL("""
+    upsert_query = SQL(
+        """
         INSERT INTO {table} ({columns})
         VALUES ({placeholders})
         ON CONFLICT ({conflict_columns})
         DO UPDATE SET {update_set}
-    """).format(
+    """
+    ).format(
         table=table_identifier,
         columns=columns,
         placeholders=placeholders,
@@ -189,10 +193,12 @@ def upsert_df(
         SQL("{} = ANY(%s)").format(Identifier(col)) for col in key_columns
     )
 
-    select_query = SQL("""
+    select_query = SQL(
+        """
         SELECT * FROM {table}
         WHERE {where_conditions}
-    """).format(table=table_identifier, where_conditions=sel_where_conditions)
+    """
+    ).format(table=table_identifier, where_conditions=sel_where_conditions)
     if log:
         logger.info(f"Upsert query: {upsert_query.as_string(raw_conn)}")
         logger.info(f"Select query: {select_query.as_string(raw_conn)}")
@@ -366,7 +372,8 @@ def query_latest_api_scan_by_store_id(
     store_ids: list[str], database_connection: PostgresCon
 ) -> pd.DataFrame:
     store_ids_str = "'" + "','".join(store_ids) + "'"
-    sel_query = text(f"""WITH last_successful_scanned AS (
+    sel_query = text(
+        f"""WITH last_successful_scanned AS (
             SELECT DISTINCT ON
             (vc.store_app) vc.version_code, vc.store_app, vasr.id as run_id
             FROM
@@ -382,7 +389,8 @@ def query_latest_api_scan_by_store_id(
                 on lss.store_app = sa.id
             where sa.store_id IN ({store_ids_str})
             ;
-    """)
+    """
+    )
     df = pd.read_sql(sel_query, database_connection.engine)
     return df
 

@@ -25,7 +25,7 @@ from adscrawler.dbcon.queries import (
     query_apps_to_api_scan,
     query_store_app_by_store_id,
 )
-from adscrawler.packages.apks import mitm_process_log
+from adscrawler.mitm_ad_parser import mitm_logs
 from adscrawler.packages.apks.weston import (
     is_weston_running,
     restart_weston,
@@ -47,69 +47,6 @@ ANDROID_PERMISSION_ACTIVITY = (
 )
 
 
-def insert_api_calls(
-    version_code_id: int,
-    store_id: str,
-    version_str: str,
-    database_connection: PostgresCon,
-    crawl_result: int,
-    run_name: str,
-    mdf: pd.DataFrame,
-) -> int:
-    logger.info(f"insert_crawled_at {crawl_result=}")
-    insert_columns = ["version_code_id", "run_name", "run_result", "run_at"]
-    df = pd.DataFrame(
-        {
-            "version_code_id": [version_code_id],
-            "run_name": [run_name],
-            "run_result": [crawl_result],
-            "run_at": datetime.datetime.now(tz=datetime.UTC),
-        }
-    )
-    df = df[insert_columns]
-    run_df = insert_df(
-        df=df,
-        table_name="version_code_api_scan_results",
-        database_connection=database_connection,
-        return_rows=True,
-    )
-    if not mdf.empty:
-        run_id = run_df["id"].to_numpy()[0]
-        mdf["run_id"] = run_id
-        insert_columns = [
-            "store_app",
-            "tld_url",
-            "url",
-            "host",
-            "status_code",
-            "called_at",
-            "run_id",
-            "country_id",
-            "state_iso",
-            "city_name",
-            "org",
-        ]
-        mdf = mdf[insert_columns]
-        mdf["country_id"] = np.where(
-            np.isnan(mdf["country_id"]), None, mdf["country_id"]
-        )
-        insert_df(
-            df=mdf,
-            table_name="store_app_api_calls",
-            database_connection=database_connection,
-            insert_columns=insert_columns,
-        )
-        upload_mitm_log_to_s3(
-            store=1,
-            store_id=store_id,
-            version_str=version_str,
-            run_id=run_id,
-        )
-        mitm_process_log.move_mitm_to_processed(store_id, run_id)
-
-        logger.info(f"inserted {mdf.shape[0]} api calls")
-
-
 def run_app(
     database_connection: PostgresCon,
     apk_path: pathlib.Path,
@@ -126,7 +63,6 @@ def run_app(
     mitm_script = pathlib.Path(PACKAGE_DIR, "adscrawler/packages/apks/mitm_start.sh")
     os.system(f"{mitm_script.as_posix()} -d")
     mdf = pd.DataFrame()
-
     try:
         version_str, version_code_id = launch_and_track_app(
             store_id,
@@ -135,12 +71,7 @@ def run_app(
             apk_path,
             timeout=timeout,
         )
-        try:
-            mdf = process_mitm_log(store_id, store_app, database_connection)
-            crawl_result = 1
-        except Exception as e:
-            crawl_result = 3
-            logger.exception(f"{function_info} mitm log ingestion failed: {e}")
+        crawl_result = 1
     except Exception:
         crawl_result = 2
         logger.exception(f"{function_info} launch_and_track_app failed")
@@ -157,6 +88,7 @@ def run_app(
 
     md5_hash = get_md5_hash(apk_path)
     logger.info(f"{function_info} log: {md5_hash=} {version_code_id=} {crawl_result=}")
+    # Log to logging table
     log_version_code_scan_crawl_results(
         store_app=store_app,
         version_code_id=version_code_id,
@@ -176,17 +108,93 @@ def run_app(
         )
         return
 
-    insert_api_calls(
-        version_code_id=version_code_id,
-        store_id=store_id,
-        version_str=version_str,
+    try:
+        mdf = mitm_logs.parse_log(
+            pub_store_id=store_id, run_id=None, database_connection=database_connection
+        )
+        if mdf.empty:
+            logger.warning("MITM log is empty")
+        else:
+            logger.info("MITM log has {mdf.shape[0]} rows")
+            mdf["url"] = mdf["url"].str[0:1000]
+            mdf["store_app"] = store_app
+    except Exception:
+        logger.exception(f"{function_info} process_mitm_log failed")
+        mdf = pd.DataFrame()
+        crawl_result = 2
+
+    logger.info(f"insert version_code_api_scan_results {crawl_result=}")
+    crawl_df = pd.DataFrame(
+        {
+            "version_code_id": [version_code_id],
+            "run_name": [run_name],
+            "run_result": [crawl_result],
+            "run_at": datetime.datetime.now(tz=datetime.UTC),
+        }
+    )
+    # Main table recording if the api scan was successful
+    run_df = insert_df(
+        df=crawl_df,
+        table_name="version_code_api_scan_results",
         database_connection=database_connection,
-        crawl_result=crawl_result,
-        run_name=run_name,
-        mdf=mdf,
+        return_rows=True,
     )
 
-    logger.info(f"{function_info} success: {mdf.shape[0]} api calls saved to db")
+    if not mdf.empty:
+        run_id = run_df["id"].to_numpy()[0]
+        mdf["run_id"] = run_id
+        gdf = mitm_logs.make_ip_geo_snapshot_df(
+            mdf[["mitm_uuid", "ip_address"]], database_connection
+        ).rename(columns={"id": "ip_geo_snapshot_id"})
+        gdf = insert_df(gdf, "ip_geo_snapshots", database_connection, return_rows=True)
+        gdf["country_id"] = np.where(
+            np.isnan(gdf["country_id"]), None, mdf["country_id"]
+        )
+        pd.merge(
+            mdf,
+            gdf[["ip_geo_snapshot_id", "mitm_uuid"]],
+            left_on="mitm_uuid",
+            right_on="mitm_uuid",
+            how="left",
+            validate="1:1",
+        )
+        insert_api_calls(
+            database_connection=database_connection,
+            mdf=mdf,
+        )
+        upload_mitm_log_to_s3(
+            store=1,
+            store_id=store_id,
+            version_str=version_str,
+            run_id=run_id,
+        )
+        mitm_logs.move_to_processed(store_id, run_id)
+
+
+def insert_api_calls(
+    database_connection: PostgresCon,
+    mdf: pd.DataFrame,
+) -> int:
+    insert_columns = [
+        "run_id`",
+        "store_app",
+        "mitm_uuid",
+        "tld_url",
+        "status_code",
+        "request_mime_type",
+        "response_mime_type",
+        "url",
+        "ip_geo_snapshot_id",
+        "called_at",
+    ]
+    mdf = mdf[insert_columns]
+    insert_df(
+        df=mdf,
+        table_name="store_app_api_calls",
+        database_connection=database_connection,
+        insert_columns=insert_columns,
+    )
+    logger.info(f"inserted {mdf.shape[0]} api calls")
 
 
 def get_version_via_apktool(
@@ -200,36 +208,6 @@ def get_version_via_apktool(
     version_str = get_version(apktool_info_path)
     version_code_id = get_version_code_dbid(store_app, version_str, database_connection)
     return version_str, version_code_id
-
-
-def process_mitm_log(
-    store_id: str,
-    store_app: int,
-    database_connection: PostgresCon,
-) -> pd.DataFrame:
-    function_info = f"MITM {store_id=}"
-    mdf = mitm_process_log.parse_mitm_short_log(store_id, database_connection)
-    logger.info(f"{function_info} log has {mdf.shape[0]} rows")
-    if mdf.empty:
-        logger.warning(f"{function_info} MITM log returned empty dataframe")
-    else:
-        mdf = mdf.rename(columns={"timestamp": "called_at"})
-        mdf["url"] = mdf["url"].str[0:1000]
-        mdf = mdf[
-            [
-                "url",
-                "host",
-                "called_at",
-                "status_code",
-                "tld_url",
-                "country_id",
-                "state_iso",
-                "city_name",
-                "org",
-            ]
-        ].drop_duplicates()
-        mdf["store_app"] = store_app
-    return mdf
 
 
 def process_app_for_waydroid(

@@ -76,17 +76,6 @@ def get_s3_client(key_name: str = "s3") -> boto3.client:
     return S3_CLIENT
 
 
-def download_mitm_log_from_s3(
-    store_id: str,
-) -> None:
-    s3_client = get_s3_client()
-    s3_client.download_file(
-        Bucket=CONFIG["s3"]["bucket"],
-        Key=f"mitm/android/{store_id}.log",
-        Filename=f"traffic_{store_id}.log",
-    )
-
-
 def upload_mitm_log_to_s3(
     store: int,
     store_id: str,
