@@ -1,13 +1,13 @@
-WITH
-has_creatives AS (
+WITH has_creatives AS (
     SELECT *
     FROM
         api_calls
     WHERE
         request_mime_type
-        ~* '(?:image|video)/(?:jpeg|jpg|png|gif|webp|webm|mp4|mpeg|avi|quicktime)'
-        OR response_mime_type
-        ~* '(?:image|video)/(?:jpeg|jpg|png|gif|webp|webm|mp4|mpeg|avi|quicktime)'
+        ~* '(image|video)/(jpeg|jpg|png|gif|webp|webm|mp4|mpeg|avi|quicktime)'
+        OR
+        response_mime_type
+        ~* '(image|video)/(jpeg|jpg|png|gif|webp|webm|mp4|mpeg|avi|quicktime)'
 ),
 run_counts AS (
     SELECT
@@ -20,7 +20,7 @@ run_counts AS (
     LEFT JOIN store_apps AS sa ON ac.store_app = sa.id
     WHERE ac.called_at <= current_date - INTERVAL '1 hour'
     GROUP BY
-        store_app, run_id, sa.store_id
+        ac.store_app, ac.run_id, sa.store_id
 )
 SELECT * FROM run_counts
 WHERE api_calls > 1;
