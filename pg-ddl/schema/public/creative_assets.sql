@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict OaY3IzyfT3BiBt0AgbstpBNcjkde0clE48JpKA62QNdjb8agx44z6gPeYXvwXmX
+\restrict ZQR6Rget8asQXbmGXvLPOHqjDlPWdo1WJ0RXaKJjfQt3IhQbpjg1y3apu9TTJZS
 
 -- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 -- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
@@ -29,20 +29,22 @@ SET default_table_access_method = heap;
 
 CREATE TABLE public.creative_assets (
     id integer NOT NULL,
-    store_app_id integer NOT NULL,
     md5_hash character varying NOT NULL,
     file_extension character varying NOT NULL,
-    phash character varying
+    phash character varying,
+    created_at timestamp without time zone DEFAULT timezone(
+        'utc'::text, now()
+    ) NOT NULL
 );
 
 
 ALTER TABLE public.creative_assets OWNER TO postgres;
 
 --
--- Name: creative_assets_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+-- Name: creative_assets_new_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
 --
 
-CREATE SEQUENCE public.creative_assets_id_seq
+CREATE SEQUENCE public.creative_assets_new_id_seq
 AS integer
 START WITH 1
 INCREMENT BY 1
@@ -51,13 +53,13 @@ NO MAXVALUE
 CACHE 1;
 
 
-ALTER SEQUENCE public.creative_assets_id_seq OWNER TO postgres;
+ALTER SEQUENCE public.creative_assets_new_id_seq OWNER TO postgres;
 
 --
--- Name: creative_assets_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+-- Name: creative_assets_new_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
 --
 
-ALTER SEQUENCE public.creative_assets_id_seq OWNED BY public.creative_assets.id;
+ALTER SEQUENCE public.creative_assets_new_id_seq OWNED BY public.creative_assets.id;
 
 
 --
@@ -65,40 +67,37 @@ ALTER SEQUENCE public.creative_assets_id_seq OWNED BY public.creative_assets.id;
 --
 
 ALTER TABLE ONLY public.creative_assets ALTER COLUMN id SET DEFAULT nextval(
-    'public.creative_assets_id_seq'::regclass
+    'public.creative_assets_new_id_seq'::regclass
 );
 
 
 --
--- Name: creative_assets creative_assets_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+-- Name: creative_assets creative_assets_new_md5_hash_key; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.creative_assets
-ADD CONSTRAINT creative_assets_pkey PRIMARY KEY (id);
+ADD CONSTRAINT creative_assets_new_md5_hash_key UNIQUE (md5_hash);
 
 
 --
--- Name: creative_assets creative_assets_store_app_id_md5_hash_key; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.creative_assets
-ADD CONSTRAINT creative_assets_store_app_id_md5_hash_key UNIQUE (
-    store_app_id, md5_hash
-);
-
-
---
--- Name: creative_assets creative_assets_store_app_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+-- Name: creative_assets creative_assets_new_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.creative_assets
-ADD CONSTRAINT creative_assets_store_app_id_fkey FOREIGN KEY (
-    store_app_id
-) REFERENCES public.store_apps (id);
+ADD CONSTRAINT creative_assets_new_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: idx_creative_assets_phash; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_creative_assets_phash ON public.creative_assets USING btree (
+    phash
+) WHERE (phash IS NOT null);
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict OaY3IzyfT3BiBt0AgbstpBNcjkde0clE48JpKA62QNdjb8agx44z6gPeYXvwXmX
+\unrestrict ZQR6Rget8asQXbmGXvLPOHqjDlPWdo1WJ0RXaKJjfQt3IhQbpjg1y3apu9TTJZS

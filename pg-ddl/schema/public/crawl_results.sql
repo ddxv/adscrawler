@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict tzeObkNkz99FiIEPiwUeI4kVJRe1rm1xYeqbjXm0l7WUJtdnPQyNVycTNU62Rq9
+\restrict UlWHxhMTsNO9dmstWoC1X8ABUKfsSbYglHal7lysa1ZekFz7CSHXdNwTDbF52px
 
 -- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 -- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
@@ -61,4 +61,4 @@ ADD CONSTRAINT crawl_results_pkey PRIMARY KEY (id);
 -- PostgreSQL database dump complete
 --
 
-\unrestrict tzeObkNkz99FiIEPiwUeI4kVJRe1rm1xYeqbjXm0l7WUJtdnPQyNVycTNU62Rq9
+\unrestrict UlWHxhMTsNO9dmstWoC1X8ABUKfsSbYglHal7lysa1ZekFz7CSHXdNwTDbF52px

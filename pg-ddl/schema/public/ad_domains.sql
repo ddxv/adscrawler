@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict eX5WXuk3FzJyb4nsgRsaWjndUNkzKe6xVH2l9e68KfFiaxseYCMbNvyCbuFT1tv
+\restrict ci6oflE4k6Bcc7neK2mT46eWMWGzTzchRZCLRmG9Sjd0GuguBO1hrJLQpNgg6g6
 
 -- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 -- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
@@ -78,4 +78,4 @@ CREATE TRIGGER ad_domains_updated_at BEFORE UPDATE ON public.ad_domains FOR EACH
 -- PostgreSQL database dump complete
 --
 
-\unrestrict eX5WXuk3FzJyb4nsgRsaWjndUNkzKe6xVH2l9e68KfFiaxseYCMbNvyCbuFT1tv
+\unrestrict ci6oflE4k6Bcc7neK2mT46eWMWGzTzchRZCLRmG9Sjd0GuguBO1hrJLQpNgg6g6

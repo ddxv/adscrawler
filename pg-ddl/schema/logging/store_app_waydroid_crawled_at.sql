@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 6OE33qAw6JwdcdoMqRRpXgBvz4Pfma4BOGlWxfx4KXJqNDz1YOkAXIYIXTMDC6u
+\restrict l5v24W7MSivgMnsOKk6NzdyzSz0jx6XMiORb64dlgdlcE10mu53p3B0vTlv9MpO
 
 -- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 -- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
@@ -69,4 +69,4 @@ ADD CONSTRAINT waydroid_store_apps_crawl_fk FOREIGN KEY (
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 6OE33qAw6JwdcdoMqRRpXgBvz4Pfma4BOGlWxfx4KXJqNDz1YOkAXIYIXTMDC6u
+\unrestrict l5v24W7MSivgMnsOKk6NzdyzSz0jx6XMiORb64dlgdlcE10mu53p3B0vTlv9MpO

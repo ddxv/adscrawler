@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict kevY486p63WR3LlNrtgTW46fAWvClS9L2Ro5RBaNyZJGaEIi33WGoCZhncwR44N
+\restrict V5vI5slTm4fJraAHcMTYVT5RF54DPWMDJMcTnfigmA1ftjjuJEEyhRwp7MEJzex
 
 -- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 -- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
@@ -112,4 +112,4 @@ ADD CONSTRAINT fk_store_collection FOREIGN KEY (
 -- PostgreSQL database dump complete
 --
 
-\unrestrict kevY486p63WR3LlNrtgTW46fAWvClS9L2Ro5RBaNyZJGaEIi33WGoCZhncwR44N
+\unrestrict V5vI5slTm4fJraAHcMTYVT5RF54DPWMDJMcTnfigmA1ftjjuJEEyhRwp7MEJzex

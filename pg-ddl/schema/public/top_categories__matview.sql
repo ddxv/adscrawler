@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict B9lMSlSgZQGMMOSCJNfE4mijazfaJEhXQbCA7ul54dZMvLJ3OnWFt5VXT3MrkPg
+\restrict Sdi4dqGkIHrDiLqpsY8hUYmC5hUSeij8fjUwPQNOkNahujhuWCRe2ZCPkMQJrPu
 
 -- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 -- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
@@ -135,4 +135,4 @@ CREATE UNIQUE INDEX idx_top_categories ON public.top_categories USING btree (
 -- PostgreSQL database dump complete
 --
 
-\unrestrict B9lMSlSgZQGMMOSCJNfE4mijazfaJEhXQbCA7ul54dZMvLJ3OnWFt5VXT3MrkPg
+\unrestrict Sdi4dqGkIHrDiLqpsY8hUYmC5hUSeij8fjUwPQNOkNahujhuWCRe2ZCPkMQJrPu

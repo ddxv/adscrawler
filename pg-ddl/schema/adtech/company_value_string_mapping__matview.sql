@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict VWCgN9AN3znc39QbsPlbM0TCzWBwYqoq5bGRfILlgHKrlgS5afblgWDnMudSRbM
+\restrict 8d7wTq1v17sqUZJMF05J0NCwN6dThUaRzBTlOV0R7pJqwekgEE3lFFBpeQmZRXS
 
 -- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 -- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
@@ -49,4 +49,4 @@ ALTER MATERIALIZED VIEW adtech.company_value_string_mapping OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict VWCgN9AN3znc39QbsPlbM0TCzWBwYqoq5bGRfILlgHKrlgS5afblgWDnMudSRbM
+\unrestrict 8d7wTq1v17sqUZJMF05J0NCwN6dThUaRzBTlOV0R7pJqwekgEE3lFFBpeQmZRXS

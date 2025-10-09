@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict UdgfhvDoRqzTOOMoJytKiwlOz53lic1nrw44A5aVRIX3jYlE21G67kHzJJp39O5
+\restrict EkT8SPGIbQGwQb5n5GpcOnE02wFqbuv9wkEDlYd9aqpxUyK1nRiTaIlZ7JqTKmG
 
 -- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 -- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
@@ -94,4 +94,4 @@ ALTER MATERIALIZED VIEW frontend.company_domain_country OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict UdgfhvDoRqzTOOMoJytKiwlOz53lic1nrw44A5aVRIX3jYlE21G67kHzJJp39O5
+\unrestrict EkT8SPGIbQGwQb5n5GpcOnE02wFqbuv9wkEDlYd9aqpxUyK1nRiTaIlZ7JqTKmG

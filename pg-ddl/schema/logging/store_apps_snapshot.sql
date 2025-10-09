@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict Etde8dZUdVrh3KfKW42OcSKrpR9aLGylYBwD0I0xRRtK7KrzSjiqbHspOjgXuwY
+\restrict Zgw9OHS8xe2istgb2yAA1MJTOoBzjZ0qUcyW1AWzDg5fvDSO2505hZ5FEAJe9dn
 
 -- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 -- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
@@ -46,4 +46,4 @@ ALTER TABLE logging.store_apps_snapshot OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict Etde8dZUdVrh3KfKW42OcSKrpR9aLGylYBwD0I0xRRtK7KrzSjiqbHspOjgXuwY
+\unrestrict Zgw9OHS8xe2istgb2yAA1MJTOoBzjZ0qUcyW1AWzDg5fvDSO2505hZ5FEAJe9dn

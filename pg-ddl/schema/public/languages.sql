@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict h2FZs8YYdrEsgz9sEb8wOHVYE7z6lqtIZjkWmtFf4H5uzgZz6HViMx7LLeE2YmG
+\restrict m40DQHphx80tC0TaQmPSm3Pen6C0Qwx6BMaFCSN9Gsop4k9KN3DwUbDYqTnzaVm
 
 -- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 -- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
@@ -86,4 +86,4 @@ ADD CONSTRAINT language_unique_key UNIQUE (language_slug);
 -- PostgreSQL database dump complete
 --
 
-\unrestrict h2FZs8YYdrEsgz9sEb8wOHVYE7z6lqtIZjkWmtFf4H5uzgZz6HViMx7LLeE2YmG
+\unrestrict m40DQHphx80tC0TaQmPSm3Pen6C0Qwx6BMaFCSN9Gsop4k9KN3DwUbDYqTnzaVm
