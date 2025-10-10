@@ -8,7 +8,7 @@ import tldextract
 
 from .config import DEVLEOPER_IGNORE_TLDS, get_logger
 from .dbcon.connection import PostgresCon
-from .dbcon.queries import query_pub_domains, upsert_df
+from .dbcon.queries import query_pub_domains_to_crawl_ads_txt, upsert_df
 
 """
     Pulling, parsing and save to db for app-ads.txt
@@ -253,19 +253,23 @@ def clean_raw_txt_df(txt_df: pd.DataFrame) -> pd.DataFrame:
     if dropped_rows > 0:
         logger.warning(f"Dropped rows: {dropped_rows}")
     txt_df = txt_df[keep_rows]
+    txt_df = txt_df.rename(columns={"domain": "domain_name"})
     if txt_df.empty:
         raise AdsTxtEmptyError("AdsTxtDF Empty")
     return txt_df
 
 
 def crawl_app_ads(database_connection: PostgresCon, limit: int | None = 5000) -> None:
-    df = query_pub_domains(
+    df = query_pub_domains_to_crawl_ads_txt(
         database_connection=database_connection, limit=limit, exclude_recent_days=7
     )
     logger.info(f"Start crawl app-ads from pub domains: {df.shape[0]}")
     for _i, row in df.iterrows():
         url = row.url
-        scrape_app_ads_url(url=url, database_connection=database_connection)
+        domain_id = row.id
+        scrape_app_ads_url(
+            url=url, domain_id=domain_id, database_connection=database_connection
+        )
     logger.info("Crawl app-ads from pub domains finished")
 
 
@@ -274,7 +278,9 @@ class ResultDict(TypedDict):
     url: str
 
 
-def scrape_app_ads_url(url: str, database_connection: PostgresCon) -> None:
+def scrape_app_ads_url(
+    url: str, domain_id: int, database_connection: PostgresCon
+) -> None:
     info = f"{url=} scrape app-ads.txt"
     logger.info(f"{info} start")
     result_dict = ResultDict(url=url, crawl_result=4)
@@ -296,23 +302,22 @@ def scrape_app_ads_url(url: str, database_connection: PostgresCon) -> None:
     except Exception as error:
         logger.exception(f"{info} unknown ERROR: {error}")
         result_dict["crawl_result"] = 4
-    insert_columns = ["url", "crawl_result"]
+    insert_columns = ["domain_id", "crawl_result"]
     pub_domain_df = pd.DataFrame([result_dict])
+    pub_domain_df["domain_id"] = domain_id
     pub_domain_df["crawl_result"] = pub_domain_df["crawl_result"].astype(int)
     pub_domain_df = upsert_df(
-        table_name="pub_domains",
+        table_name="adstxt_crawl_results",
         df=pub_domain_df,
         insert_columns=insert_columns,
-        key_columns=["url"],
+        key_columns=["domain_id"],
         database_connection=database_connection,
         return_rows=True,
     )
     if result_dict["crawl_result"] != 1:
         return
-    insert_columns = ["domain"]
-    found_domains = (
-        txt_df[["domain"]].drop_duplicates().rename(columns={"domain": "domain_name"})
-    )
+    insert_columns = ["domain_name"]
+    found_domains = txt_df[["domain_name"]].drop_duplicates()
     domain_df = upsert_df(
         table_name="domains",
         df=found_domains,
@@ -325,7 +330,7 @@ def scrape_app_ads_url(url: str, database_connection: PostgresCon) -> None:
         txt_df,
         domain_df,
         how="left",
-        on=["domain"],
+        on=["domain_name"],
         validate="many_to_one",
     ).rename(columns={"id": "ad_domain"})
     app_df["pub_domain"] = pub_domain_df["id"].astype(object)[0]

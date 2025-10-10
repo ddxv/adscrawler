@@ -574,7 +574,7 @@ def query_store_ids(
     return ids
 
 
-def query_pub_domains(
+def query_pub_domains_to_crawl_ads_txt(
     database_connection: PostgresCon,
     limit: None | int = 10000,
     exclude_recent_days: int = 2,
@@ -595,7 +595,7 @@ def query_pub_domains(
     if limit:
         limit_str = f"LIMIT {limit}"
     sel_query = f"""SELECT
-            DISTINCT pd.id, pd.domain_name as url, pd.crawled_at
+            DISTINCT pd.id, pd.domain_name as url, pdcr.crawled_at
         FROM
             app_urls_map aum
         LEFT JOIN domains pd ON
