@@ -18,7 +18,7 @@ use_tunnel = True
 database_connection = get_db_connection(use_ssh_tunnel=use_tunnel)
 
 
-def get_existing_mvs():
+def get_existing_mvs() -> set:
     """Get list of materialized views that currently exist in the database."""
     query = """
         SELECT schemaname || '.' || matviewname as mv_name
@@ -30,7 +30,7 @@ def get_existing_mvs():
         return {row[0] for row in result}
 
 
-def get_mv_files():
+def get_mv_files() -> list[Path]:
     """Find all __matview.sql files in pg-ddl/schema/{public,frontend,adtech}/"""
     schemas = ["public", "frontend", "adtech"]
     all_mv_files = []
@@ -49,7 +49,7 @@ def get_mv_files():
     return sorted(all_mv_files)
 
 
-def extract_mv_name_from_file(file_content, file_path):
+def extract_mv_name_from_file(file_content: str, file_path: str) -> str | None:
     """Extract the materialized view name from CREATE MATERIALIZED VIEW statement."""
     name_match = re.search(
         r"CREATE MATERIALIZED VIEW\s+(?:IF NOT EXISTS\s+)?([a-zA-Z_][a-zA-Z0-9_.]*)",
@@ -72,7 +72,7 @@ def extract_mv_name_from_file(file_content, file_path):
     return None
 
 
-def drop_mv(mv_name):
+def drop_mv(mv_name: str) -> None:
     """Drop a materialized view by name."""
     drop_statement = f"DROP MATERIALIZED VIEW IF EXISTS {mv_name} CASCADE;"
     with database_connection.engine.connect() as conn:
@@ -86,7 +86,7 @@ def drop_mv(mv_name):
             logger.error(f"Failed to drop {mv_name}: {str(e)}")
 
 
-def drop_all_mvs(mv_files):
+def drop_all_mvs(mv_files: list[Path]) -> None:
     dont_drop = ["audit_dates"]
     for mv_file in mv_files:
         if mv_file in dont_drop:
@@ -105,7 +105,7 @@ def drop_all_mvs(mv_files):
         drop_mv(mv_name)
 
 
-def create_all_mvs(mv_files):
+def create_all_mvs(mv_files: list[Path]) -> None:
     existing_mvs = get_existing_mvs()
     logger.info(f"Found {len(existing_mvs)} existing MVs")
 
@@ -147,7 +147,7 @@ def create_all_mvs(mv_files):
                 break
 
 
-def main():
+def main() -> None:
     mv_files = get_mv_files()
 
     # drop_all_mvs(mv_files)
