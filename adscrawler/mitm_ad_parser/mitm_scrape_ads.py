@@ -11,13 +11,13 @@ from adscrawler.dbcon.connection import PostgresCon
 from adscrawler.dbcon.queries import (
     log_creative_scan_results,
     query_ad_domains,
+    query_api_calls_for_mitm_uuids,
     query_apps_to_creative_scan,
     query_creative_records,
-    query_store_app_by_store_id,
     upsert_df,
 )
 from adscrawler.mitm_ad_parser.creative_processor import get_phash, store_creatives
-from adscrawler.mitm_ad_parser.mitm_logs import get_creatives_df
+from adscrawler.mitm_ad_parser.mitm_logs import get_mitm_df
 from adscrawler.mitm_ad_parser.network_parsers import parse_sent_video_df
 from adscrawler.mitm_ad_parser.utils import get_tld
 from adscrawler.packages.storage import (
@@ -89,7 +89,6 @@ def get_video_id(row: pd.Series) -> str:
 
 def attribute_creatives(
     df: pd.DataFrame,
-    creatives_df: pd.DataFrame,
     pub_store_id: str,
     database_connection: PostgresCon,
 ) -> tuple[pd.DataFrame, list[dict[str, Any]]]:
@@ -97,8 +96,8 @@ def attribute_creatives(
     error_messages = []
     i = 0
     adv_creatives = []
-    row_count = creatives_df.shape[0]
-    for _i, row in creatives_df.iterrows():
+    row_count = df[df["is_creative"]].shape[0]
+    for _i, row in df[df["is_creative"]].iterrows():
         i += 1
         host_ad_network_tld = get_tld(row["tld_url"])
         video_id = get_video_id(row)
@@ -208,15 +207,16 @@ def attribute_creatives(
         adv_store_app_id = adv_store_app_ids[0]
         adv_creatives.append(
             {
+                "mitm_uuid": row["mitm_uuid"],
                 "pub_store_id": pub_store_id,
-                "adv_store_id": adv_store_id,
-                "adv_store_app_id": adv_store_app_id,
+                "md5_hash": md5_hash,
                 "host_ad_network_tld": host_ad_network_tld,
                 "creative_initial_domain_tld": init_tld,
+                "adv_store_id": adv_store_id,
+                "advertiser_store_app_id": adv_store_app_id,
                 "mmp_urls": found_mmp_urls,
                 "found_ad_network_tlds": found_ad_network_tlds,
                 "mmp_tld": mmp_tld,
-                "md5_hash": md5_hash,
                 "phash": phash,
                 "file_extension": file_extension,
             }
@@ -235,19 +235,17 @@ def attribute_creatives(
 
 def upload_creatives_to_s3(adv_creatives_df: pd.DataFrame) -> None:
     """Uploads creative files to S3, checking for existing files to avoid duplicates."""
-    for adv_id, adv_creatives_df_adv in adv_creatives_df.groupby("adv_store_id"):
-        for _i, row in adv_creatives_df_adv.iterrows():
-            md5_hash = row["md5_hash"]
-            extension = row["file_extension"]
-            if creative_exists_in_s3(md5_hash, extension):
-                logger.info(f"Creative {row['md5_hash']} already in S3")
-                continue
-            upload_ad_creative_to_s3(
-                adv_store_id=adv_id,
-                md5_hash=row["md5_hash"],
-                extension=row["file_extension"],
-            )
-            logger.info(f"Uploaded {row['md5_hash']} to S3")
+    for _i, row in adv_creatives_df.iterrows():
+        md5_hash = row["md5_hash"]
+        extension = row["file_extension"]
+        if creative_exists_in_s3(md5_hash, extension):
+            logger.info(f"Creative {row['md5_hash']} already in S3")
+            continue
+        upload_ad_creative_to_s3(
+            md5_hash=row["md5_hash"],
+            extension=row["file_extension"],
+        )
+        logger.info(f"Uploaded {row['md5_hash']} to S3")
 
 
 def append_missing_domains(
@@ -325,10 +323,21 @@ def make_creative_records_df(
     database_connection: PostgresCon,
 ) -> pd.DataFrame:
     """Creates creative records DataFrame with domain IDs and asset relationships."""
+    # This could just query for mitm_uuids
+    api_calls_df = query_api_calls_for_mitm_uuids(
+        database_connection=database_connection,
+        mitm_uuids=adv_creatives_df["mitm_uuid"].astype(str).tolist(),
+    ).rename(columns={"id": "api_call_id"})
+    api_calls_df["mitm_uuid"] = api_calls_df["mitm_uuid"].astype(str)
+    adv_creatives_df = adv_creatives_df.merge(
+        api_calls_df[["api_call_id", "mitm_uuid"]],
+        on=["mitm_uuid"],
+        how="left",
+        validate="1:1",
+    )
     creative_records_df = adv_creatives_df.merge(
-        assets_df[["store_app_id", "md5_hash", "creative_asset_id"]],
-        left_on=["adv_store_app_id", "md5_hash"],
-        right_on=["store_app_id", "md5_hash"],
+        assets_df[["md5_hash", "creative_asset_id"]],
+        on="md5_hash",
         how="left",
     )
     ad_domains_df = query_ad_domains(database_connection=database_connection)
@@ -337,12 +346,6 @@ def make_creative_records_df(
     )
     creative_records_df = add_additional_domain_id_column(
         creative_records_df, ad_domains_df
-    )
-    creative_records_df = creative_records_df.merge(
-        ad_domains_df[["id", "domain"]].rename(columns={"id": "mmp_domain_id"}),
-        left_on="mmp_tld",
-        right_on="domain",
-        how="left",
     )
     creative_records_df = creative_records_df.merge(
         ad_domains_df[["id", "domain"]].rename(
@@ -360,19 +363,33 @@ def make_creative_records_df(
         right_on="domain",
         how="left",
     )
+    creative_records_df = creative_records_df.merge(
+        ad_domains_df[["id", "domain"]].rename(columns={"id": "mmp_domain_id"}),
+        left_on="mmp_tld",
+        right_on="domain",
+        how="left",
+    )
     creative_records_df = creative_records_df[
         [
-            "store_app_pub_id",
+            "api_call_id",
             "creative_asset_id",
-            "run_id",
-            "creative_initial_domain_id",
             "creative_host_domain_id",
+            "creative_initial_domain_id",
+            "advertiser_store_app_id",
+            "advertiser_domain_id",
             "mmp_domain_id",
             "mmp_urls",
             "additional_ad_domain_ids",
         ]
     ]
-    check_cols = ["creative_host_domain_id", "mmp_domain_id"]
+    # Nullable IDs, watch out for Int64
+    check_cols = [
+        "creative_initial_domain_id",
+        "mmp_domain_id",
+        "advertiser_store_app_id",
+        "advertiser_domain_id",
+        "mmp_domain_id",
+    ]
     for col in check_cols:
         creative_records_df[col] = np.where(
             creative_records_df[col].isna(), None, creative_records_df[col]
@@ -386,9 +403,7 @@ def parse_store_id_mitm_log(
     database_connection: PostgresCon,
 ) -> list[dict[str, Any]]:
     """Parses MITM log for a specific store ID and processes creative content."""
-    df, creatives_df, error_message = get_creatives_df(
-        pub_store_id, run_id, database_connection
-    )
+    df, error_message = get_mitm_df(pub_store_id, run_id, database_connection)
     if error_message:
         logger.error(error_message)
         error_message_info = {
@@ -398,7 +413,7 @@ def parse_store_id_mitm_log(
         }
         return [error_message_info]
     adv_creatives_df, error_messages = attribute_creatives(
-        df, creatives_df, pub_store_id, database_connection
+        df, pub_store_id, database_connection
     )
     if adv_creatives_df.empty:
         if len(error_messages) == 0:
@@ -416,38 +431,28 @@ def parse_store_id_mitm_log(
         row = {
             "run_id": run_id,
             "pub_store_id": pub_store_id,
-            "error_msg": msg + 1,
+            "error_msg": msg,
         }
         error_messages.append(row)
-    pub_db_id = query_store_app_by_store_id(
-        store_id=pub_store_id, database_connection=database_connection
-    )
-    adv_creatives_df["store_app_pub_id"] = pub_db_id
-    adv_creatives_df["run_id"] = run_id
     assets_df = adv_creatives_df[
         ["md5_hash", "file_extension", "phash"]
     ].drop_duplicates()
-    assets_df = assets_df.rename(columns={"adv_store_app_id": "store_app_id"})
     assets_df = upsert_df(
         assets_df,
         table_name="creative_assets",
         database_connection=database_connection,
-        key_columns=["store_app_id", "md5_hash"],
-        insert_columns=["store_app_id", "md5_hash", "file_extension", "phash"],
+        key_columns=["md5_hash"],
+        insert_columns=["md5_hash", "file_extension", "phash"],
         return_rows=True,
     )
     assets_df = assets_df.rename(columns={"id": "creative_asset_id"})
+    # Future feature
+    adv_creatives_df["advertiser_domain_id"] = None
     creative_records_df = make_creative_records_df(
         adv_creatives_df, assets_df, database_connection
     )
-    key_columns = [
-        "store_app_pub_id",
-        "creative_asset_id",
-        "run_id",
-        "creative_initial_domain_id",
-        "creative_host_domain_id",
-    ]
-    creative_records_df["updated_at"] = datetime.datetime.now()
+    key_columns = ["api_call_id"]
+    creative_records_df["updated_at"] = datetime.datetime.now(tz=datetime.UTC)
     upsert_df(
         creative_records_df,
         table_name="creative_records",
@@ -455,10 +460,15 @@ def parse_store_id_mitm_log(
         key_columns=key_columns,
         insert_columns=key_columns
         + [
-            "updated_at",
+            "creative_asset_id",
+            "creative_initial_domain_id",
+            "creative_host_domain_id",
+            "advertiser_store_app_id",
+            "advertiser_domain_id",
             "mmp_domain_id",
             "additional_ad_domain_ids",
             "mmp_urls",
+            "updated_at",
         ],
     )
     upload_creatives_to_s3(adv_creatives_df)

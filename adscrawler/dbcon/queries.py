@@ -1063,8 +1063,19 @@ def get_version_code_by_md5_hash(
         raise
 
 
-def get_all_api_calls(database_connection: PostgresCon) -> pd.DataFrame:
-    sel_query = """SELECT * FROM store_app_api_calls;"""
+def query_api_calls_for_mitm_uuids(
+    database_connection: PostgresCon, mitm_uuids: list[str]
+) -> pd.DataFrame:
+    uuids = "'" + "','".join(mitm_uuids) + "'"
+    sel_query = f"""SELECT * FROM api_calls WHERE mitm_uuid IN ({uuids});"""
+    df = pd.read_sql(sel_query, con=database_connection.engine)
+    return df
+
+
+def query_api_calls_for_run(
+    database_connection: PostgresCon, run_id: int
+) -> pd.DataFrame:
+    sel_query = f"""SELECT * FROM store_app_api_calls WHERE run_id = {run_id};"""
     df = pd.read_sql(sel_query, con=database_connection.engine)
     return df
 

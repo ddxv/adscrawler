@@ -61,11 +61,11 @@ def decode_network_request(
     return text
 
 
-def get_creatives_df(
-    pub_store_id: str, run_id: int, database_connection: PostgresCon
-) -> tuple[pd.DataFrame, pd.DataFrame, str | None]:
+def get_mitm_df(
+    store_id: str, run_id: int, database_connection: PostgresCon
+) -> tuple[pd.DataFrame, str | None]:
     """Retrieves and filters creative content from MITM log data."""
-    df = parse_log(pub_store_id, run_id, database_connection, include_all=True)
+    df = parse_log(store_id, run_id, database_connection, include_all=True)
     error_msg = None
     if df.empty:
         error_msg = "No data in mitm df"
@@ -76,12 +76,12 @@ def get_creatives_df(
     #     logger.error(error_msg)
     #     return pd.DataFrame(), pd.DataFrame(), error_msg
     df = add_file_extension(df)
-    creatives_df = filter_creatives(df)
-    if creatives_df.empty:
+    df = add_is_creative_column(df)
+    if df["is_creative"].sum() == 0:
         error_msg = "No creatives to check"
         logger.error(error_msg)
-        return df, pd.DataFrame(), error_msg
-    return df, creatives_df, error_msg
+        return df, error_msg
+    return df, error_msg
 
 
 def make_ip_geo_snapshot_df(
@@ -299,45 +299,6 @@ def append_additional_mitm_data(
     return flow_data
 
 
-def filter_creatives(df: pd.DataFrame) -> pd.DataFrame:
-    """Filters DataFrame to include only valid creative content based on size and format criteria."""
-    status_code_200 = df["status_code"] == 200
-    df = add_is_creative_content_column(df)
-    creatives_df = df[(df["is_creative_content"]) & status_code_200].copy()
-    creatives_df["creative_size"] = (
-        creatives_df["response_size_bytes"].fillna(0).astype(int)
-    )
-    creatives_df = creatives_df[creatives_df["creative_size"] > 50000]
-    creatives_df = creatives_df[creatives_df["response_content"].notna()]
-    creatives_df["actual_size"] = creatives_df["response_content"].str.len()
-    size_diff = abs(creatives_df["creative_size"] - creatives_df["actual_size"])
-    creatives_df["size_match"] = (size_diff <= ABS_TOL) | (
-        size_diff / creatives_df["creative_size"] <= PCT_TOL
-    )
-    creatives_df = creatives_df[creatives_df["size_match"]]
-    # Lots of creatives of the publishing app icon
-    # If this cuts out the advertisers icon as well that seems OK?
-    widths = creatives_df["response_content"].apply(
-        lambda x: (
-            struct.unpack(">II", x[16:24])[0]
-            if x.startswith(b"\x89PNG\r\n\x1a\n")
-            else None
-        )
-    )
-    heights = creatives_df["response_content"].apply(
-        lambda x: (
-            struct.unpack(">II", x[16:24])[1]
-            if x.startswith(b"\x89PNG\r\n\x1a\n")
-            else None
-        )
-    )
-    is_square = widths == heights
-    is_png = creatives_df["file_extension"] == "png"
-    is_googleusercontent = creatives_df["tld_url"] == "googleusercontent.com"
-    creatives_df = creatives_df[~(is_png & is_googleusercontent & is_square)]
-    return creatives_df
-
-
 def add_file_extension(df: pd.DataFrame) -> pd.DataFrame:
     """Adds file extension column to DataFrame based on URL or content type."""
     df["file_extension"] = df["url"].apply(lambda x: x.split(".")[-1])
@@ -357,7 +318,7 @@ def add_file_extension(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def add_is_creative_content_column(df: pd.DataFrame) -> pd.DataFrame:
+def add_is_creative_column(df: pd.DataFrame) -> pd.DataFrame:
     """Adds a column indicating whether the response contains creative content (images/videos)."""
     creative_types = (
         r"\b(?:image|video)/(?:jpeg|jpg|png|gif|webp|webm|mp4|mpeg|avi|quicktime)\b"
@@ -382,4 +343,35 @@ def add_is_creative_content_column(df: pd.DataFrame) -> pd.DataFrame:
     )
     is_creative_content = is_creative_content_response | is_creative_content_request
     df["is_creative_content"] = is_creative_content
+    status_code_200 = df["status_code"] == 200
+    is_large_enough = df["response_size_bytes"] > 50000
+    response_content_ok = df["response_content"].notna()
+    df["is_creative_content"] = (
+        df["is_creative_content"]
+        & status_code_200
+        & is_large_enough
+        & response_content_ok
+    )
+    # Lots of creatives of the publishing app icon
+    # If this cuts out the advertisers icon as well that seems OK?
+    is_square = df.loc[df["is_creative_content"], "response_content"].apply(
+        lambda x: (
+            struct.unpack(">II", x[16:24])[0]
+            if x.startswith(b"\x89PNG\r\n\x1a\n")
+            else None
+        )
+    ) == df.loc[df["is_creative_content"], "response_content"].apply(
+        lambda x: (
+            struct.unpack(">II", x[16:24])[1]
+            if x.startswith(b"\x89PNG\r\n\x1a\n")
+            else None
+        )
+    )
+    is_png = df["file_extension"] == "png"
+    is_googleusercontent = df["tld_url"] == "googleusercontent.com"
+    df["is_creative"] = np.where(
+        df["is_creative_content"] & ~(is_png & is_googleusercontent & is_square),
+        True,
+        False,
+    )
     return df

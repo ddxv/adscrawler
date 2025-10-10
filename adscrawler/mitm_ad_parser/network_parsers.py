@@ -674,9 +674,10 @@ def parse_generic_adnetwork(
             f"multiple adv_store_id found for {init_tld}: {e.found_adv_store_ids}"
         )
         logger.error(error_msg)
-        return AdInfo(
-            adv_store_id=None, found_ad_network_tlds=None, found_mmp_urls=None
-        ), error_msg
+        return (
+            AdInfo(adv_store_id=None, found_ad_network_tlds=None, found_mmp_urls=None),
+            error_msg,
+        )
     ad_info.init_tld = init_tld
     return ad_info, error_msg
 

@@ -176,7 +176,9 @@ def get_logger(mod_name: str, sep_file: str | None = "main") -> logging.Logger:
 # Set global handling of uncaught exceptions
 sys.excepthook = handle_exception
 
+
 logger = get_logger(__name__)
+
 
 CONFIG_FILENAME = "config.toml"
 

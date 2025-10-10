@@ -25,6 +25,7 @@ from adscrawler.dbcon.queries import (
     query_apps_mitm_in_s3,
     query_apps_to_api_scan,
     query_store_app_by_store_id,
+    upsert_df,
 )
 from adscrawler.mitm_ad_parser import mitm_logs
 from adscrawler.mitm_ad_parser.mitm_logs import parse_log
@@ -164,7 +165,6 @@ def manual_reprocess_mitm(
     database_connection: PostgresCon,
 ) -> None:
     apps_df = query_apps_mitm_in_s3(database_connection=database_connection)
-
     rows = apps_df.shape[0]
     store_id_missing_mitm_logs = []
     # ndf = apps_df[_i:].copy()
@@ -207,12 +207,19 @@ def record_mitm_to_db(
         mdf[["mitm_uuid", "ip_address"]].copy(), database_connection
     )
     gdf["country_id"] = np.where(np.isnan(gdf["country_id"]), None, gdf["country_id"])
-    gdf = insert_df(
-        gdf[["mitm_uuid", "ip_address", "country_id", "state_iso", "city_name", "org"]],
-        "ip_geo_snapshots",
-        database_connection,
+    # WARNING: this shouldn't be used outside of tests, try insert instead
+    cols = ["mitm_uuid", "ip_address", "country_id", "state_iso", "city_name", "org"]
+    gdf = upsert_df(
+        df=gdf[
+            ["mitm_uuid", "ip_address", "country_id", "state_iso", "city_name", "org"]
+        ],
+        table_name="ip_geo_snapshots",
+        key_columns=["mitm_uuid"],
+        insert_columns=cols,
+        database_connection=database_connection,
         return_rows=True,
     ).rename(columns={"id": "ip_geo_snapshot_id"})
+    gdf["mitm_uuid"] = gdf["mitm_uuid"].astype(str)
     mdf = pd.merge(
         mdf,
         gdf[["ip_geo_snapshot_id", "mitm_uuid"]],

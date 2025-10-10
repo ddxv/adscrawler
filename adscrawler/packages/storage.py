@@ -539,16 +539,10 @@ def download_app_to_local(
     return file_path, version_str
 
 
-def creative_exists_in_s3(md5_hash: str, extension: str, store: int) -> bool:
+def creative_exists_in_s3(md5_hash: str, extension: str) -> bool:
     """Check if a creative already exists in S3 (fast)."""
     hash_prefix = md5_hash[0:3]
-    if store == 1:
-        s3_key = f"creatives/raw/{hash_prefix}/{md5_hash}.{extension}"
-    elif store == 2:
-        s3_key = f"creatives/raw/{hash_prefix}/{md5_hash}.{extension}"
-    else:
-        raise ValueError(f"Invalid store: {store}")
-
+    s3_key = f"creatives/raw/{hash_prefix}/{md5_hash}.{extension}"
     s3_client = get_s3_client()
     try:
         s3_client.head_object(Bucket=CONFIG["s3"]["bucket"], Key=s3_key)
