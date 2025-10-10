@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict qqHaiXKhj86ScY0GcHUezY8IEvMg38ZMsZLzdj0L4VwA6nWXnFPmqvhvLMhoxYF
+\restrict ThpPqv36d4W5HK55oQFXtOJ6iYiEcls6tRZpCEX5643Vz0eRzXvrDuF2z0Guhdh
 
 -- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 -- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
@@ -50,8 +50,8 @@ WITH deduped_data AS (
         ON (((sa_1.category)::text = (cm.original_category)::text))
     )
     LEFT JOIN
-        public.ad_domains AS ad_1
-        ON ((saac.tld_url = (ad_1.domain)::text))
+        public.domains AS ad_1
+        ON ((saac.tld_url = (ad_1.domain_name)::text))
     )
     LEFT JOIN
         adtech.company_domain_mapping AS cdm
@@ -178,4 +178,4 @@ CREATE UNIQUE INDEX idx_unique_company_domains_top_apps ON frontend.company_doma
 -- PostgreSQL database dump complete
 --
 
-\unrestrict qqHaiXKhj86ScY0GcHUezY8IEvMg38ZMsZLzdj0L4VwA6nWXnFPmqvhvLMhoxYF
+\unrestrict ThpPqv36d4W5HK55oQFXtOJ6iYiEcls6tRZpCEX5643Vz0eRzXvrDuF2z0Guhdh

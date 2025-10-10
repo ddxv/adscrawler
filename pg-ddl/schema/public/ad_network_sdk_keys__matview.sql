@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict KZf3kJEttBRwSf0MwkuDvoMzzr060v5S8O2RreOum9DjFSucrXBBy805TacaG01
+\restrict SkbbUs7UilZFE5Ir4mJdraADeEn2Ws17RLmQ0XsiUpKlNoiA3Yaq4vjTBGZXKYb
 
 -- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 -- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
@@ -35,7 +35,7 @@ WITH manifest_regex AS (
         (
             regexp_match(
                 vm.manifest_string,
-                'applovin\.sdk\.key\"\ android\:value\=\"([^"]+)"'::text
+                'applovin\.sdk\.key\"\ android:value\=\"([^"]+)"'::text
             )
         )[1] AS applovin_sdk_key
     FROM (
@@ -85,4 +85,4 @@ ALTER MATERIALIZED VIEW public.ad_network_sdk_keys OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict KZf3kJEttBRwSf0MwkuDvoMzzr060v5S8O2RreOum9DjFSucrXBBy805TacaG01
+\unrestrict SkbbUs7UilZFE5Ir4mJdraADeEn2Ws17RLmQ0XsiUpKlNoiA3Yaq4vjTBGZXKYb

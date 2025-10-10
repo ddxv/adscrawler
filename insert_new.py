@@ -46,9 +46,9 @@ def insert_company_with_domain(cur, company_name: str, domain: str) -> int:
     # Insert ad_domain if not exists and get its ID
     cur.execute(
         """
-            INSERT INTO ad_domains (domain) 
+            INSERT INTO domains (domain_name) 
             VALUES (%s) 
-            ON CONFLICT (domain) DO NOTHING
+            ON CONFLICT (domain_name) DO NOTHING
             RETURNING id;
         """,
         (domain,),
@@ -56,7 +56,7 @@ def insert_company_with_domain(cur, company_name: str, domain: str) -> int:
     ad_domain_id = cur.fetchone()
 
     if not ad_domain_id:
-        cur.execute("SELECT id FROM ad_domains WHERE domain = %s;", (domain,))
+        cur.execute("SELECT id FROM domains WHERE domain_name = %s;", (domain,))
         ad_domain_id = cur.fetchone()[0]
     else:
         ad_domain_id = ad_domain_id[0]

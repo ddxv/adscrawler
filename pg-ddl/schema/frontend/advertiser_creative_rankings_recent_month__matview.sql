@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict ieM22FjL9AW1WVyJbXCS1noySKZzABUswBxpWDkDqcnZhcK4CmHmJHUYIpmAHqD
+\restrict m1sqX3Eda9L37e9cZ1v3Zdx9ecB5yWVRWOhWPJ4gAqnb9o1UtbqEdVlpdwHSPzu
 
 -- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 -- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
@@ -32,10 +32,10 @@ WITH adv_mmp AS (
     SELECT DISTINCT
         cr_1.advertiser_store_app_id,
         cr_1.mmp_domain_id,
-        ad.domain AS mmp_domain
+        ad.domain_name AS mmp_domain
     FROM (
         public.creative_records AS cr_1
-        LEFT JOIN public.ad_domains AS ad ON ((cr_1.mmp_domain_id = ad.id))
+        LEFT JOIN public.domains AS ad ON ((cr_1.mmp_domain_id = ad.id))
     )
     WHERE (cr_1.mmp_domain_id IS NOT null)
 ), ad_network_domain_ids AS (
@@ -83,10 +83,10 @@ WITH adv_mmp AS (
 ), ad_network_domains AS (
     SELECT
         adi.advertiser_store_app_id,
-        ad.domain AS ad_network_domain
+        ad.domain_name AS ad_network_domain
     FROM (
         ad_network_domain_ids AS adi
-        LEFT JOIN public.ad_domains AS ad ON ((adi.domain_id = ad.id))
+        LEFT JOIN public.domains AS ad ON ((adi.domain_id = ad.id))
     )
 ), creative_rankings AS (
     SELECT
@@ -191,4 +191,4 @@ ALTER MATERIALIZED VIEW frontend.advertiser_creative_rankings_recent_month OWNER
 -- PostgreSQL database dump complete
 --
 
-\unrestrict ieM22FjL9AW1WVyJbXCS1noySKZzABUswBxpWDkDqcnZhcK4CmHmJHUYIpmAHqD
+\unrestrict m1sqX3Eda9L37e9cZ1v3Zdx9ecB5yWVRWOhWPJ4gAqnb9o1UtbqEdVlpdwHSPzu

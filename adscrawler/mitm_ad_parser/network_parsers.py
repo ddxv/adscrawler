@@ -157,7 +157,6 @@ def check_click_urls(
         if len(redirect_urls) > 0:
             click_urls += redirect_urls
     click_urls = list(set(click_urls))
-    logger.info(f"Found {len(click_urls)} click URLs")
     return click_urls
 
 

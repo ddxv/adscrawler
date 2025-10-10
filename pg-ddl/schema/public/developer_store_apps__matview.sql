@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict fcxoQdDY4wBKE50u2WUlXnJVTPmNDj68sGde8nsfMg9Aews0tosC5gYhNL4WQ6k
+\restrict t5Be02XYqvPHGizZMeObwlmSe9zCht5VY1Tzu5Q1OjyyOIBRJNhP97tAa8vx4ds
 
 -- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 -- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
@@ -32,7 +32,7 @@ WITH developer_domain_ids AS (
     SELECT DISTINCT pd_1.id AS domain_id
     FROM (((
         public.app_urls_map aum_1
-        LEFT JOIN public.pub_domains AS pd_1 ON ((aum_1.pub_domain = pd_1.id))
+        LEFT JOIN public.domains AS pd_1 ON ((aum_1.pub_domain = pd_1.id))
     )
     LEFT JOIN public.store_apps AS sa_1 ON ((aum_1.store_app = sa_1.id))
     )
@@ -49,7 +49,7 @@ SELECT
     sa.rating_count,
     sa.review_count,
     d.name AS developer_name,
-    pd.url AS developer_url,
+    pd.domain_name AS developer_url,
     d.store AS developer_store,
     pd.id AS domain_id,
     d.developer_id
@@ -59,7 +59,7 @@ FROM (((
 )
 LEFT JOIN public.app_urls_map AS aum ON ((sa.id = aum.store_app))
 )
-LEFT JOIN public.pub_domains AS pd ON ((aum.pub_domain = pd.id))
+LEFT JOIN public.domains AS pd ON ((aum.pub_domain = pd.id))
 )
 ORDER BY sa.installs DESC NULLS LAST, sa.rating_count DESC NULLS LAST
 WITH NO DATA;
@@ -107,4 +107,4 @@ CREATE UNIQUE INDEX idx_developer_store_apps_unique ON public.developer_store_ap
 -- PostgreSQL database dump complete
 --
 
-\unrestrict fcxoQdDY4wBKE50u2WUlXnJVTPmNDj68sGde8nsfMg9Aews0tosC5gYhNL4WQ6k
+\unrestrict t5Be02XYqvPHGizZMeObwlmSe9zCht5VY1Tzu5Q1OjyyOIBRJNhP97tAa8vx4ds

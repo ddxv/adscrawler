@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict ItEfe31RGhzGhh4XmHqlNeiyKkqmPOV1MvoyRzdmwNr9arQCn2UExBF4gUgy3wW
+\restrict uHpSpyrqwMBnkOxNyUUVCezR3YYdgXgAkVuD69f6TvfFPrb7eoLcDTlTSJG7T6o
 
 -- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 -- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
@@ -51,14 +51,12 @@ WITH latest_week AS (
     WHERE
         (
             (
-                (
-                    store_apps_history_weekly.week_start
-                    >= (latest_week.max_week - '84 days'::interval)
-                )
-                AND (
-                    store_apps_history_weekly.week_start
-                    <= (latest_week.max_week - '35 days'::interval)
-                )
+                store_apps_history_weekly.week_start
+                >= (latest_week.max_week - '84 days'::interval)
+            )
+            AND (
+                store_apps_history_weekly.week_start
+                <= (latest_week.max_week - '35 days'::interval)
             )
             AND (store_apps_history_weekly.country_id = 840)
         )
@@ -208,4 +206,4 @@ ALTER MATERIALIZED VIEW public.store_app_z_scores OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict ItEfe31RGhzGhh4XmHqlNeiyKkqmPOV1MvoyRzdmwNr9arQCn2UExBF4gUgy3wW
+\unrestrict uHpSpyrqwMBnkOxNyUUVCezR3YYdgXgAkVuD69f6TvfFPrb7eoLcDTlTSJG7T6o

@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict p8wDmDranZmwvXQVcF8aM7HOZfeGFRKQt5pqnG9by6ikomxQr4RQJmfyewcuVr1
+\restrict S2sgOQYRJ83XJedlTqfNgrbWse8eagECqA9bQEPNo36e7YoPIj0cULdZULCt7gb
 
 -- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 -- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
@@ -36,9 +36,9 @@ SELECT
     saa.name AS adv_name,
     sap.store_id AS pub_store_id,
     saa.store_id AS adv_store_id,
-    hd.domain AS host_domain,
+    hd.domain_name AS host_domain,
     hc.name AS host_domain_company_name,
-    ad.domain AS ad_domain,
+    ad.domain_name AS ad_domain,
     ac.name AS ad_domain_company_name,
     ca.md5_hash,
     ca.file_extension,
@@ -47,17 +47,18 @@ SELECT
     sap.icon_url_512 AS pub_icon_url_512,
     saa.icon_url_512 AS adv_icon_url_512,
     mmp.name AS mmp_name,
-    mmpd.domain AS mmp_domain,
+    mmpd.domain_name AS mmp_domain,
     cr.mmp_urls,
-    COALESCE(hcd.domain, hd.domain) AS host_domain_company_domain,
-    COALESCE(acd.domain, ad.domain) AS ad_domain_company_domain,
+    COALESCE(hcd.domain_name, hd.domain_name) AS host_domain_company_domain,
+    COALESCE(acd.domain_name, ad.domain_name) AS ad_domain_company_domain,
     COALESCE(ca.phash, ca.md5_hash) AS vhash,
     (
         SELECT
-            COALESCE(ARRAY_AGG(ad_domains.domain), '{}'::character varying [])
-                AS array_agg
-        FROM public.ad_domains
-        WHERE (ad_domains.id = ANY(cr.additional_ad_domain_ids))
+            COALESCE(
+                ARRAY_AGG(domains.domain_name), '{}'::character varying []
+            ) AS array_agg
+        FROM public.domains
+        WHERE (domains.id = ANY(cr.additional_ad_domain_ids))
     ) AS additional_ad_domain_urls
 FROM ((((((((((((((((
     public.creative_records cr
@@ -75,9 +76,9 @@ LEFT JOIN
     public.version_code_api_scan_results AS vcasr
     ON ((ac1.run_id = vcasr.id))
 )
-LEFT JOIN public.ad_domains AS hd ON ((cr.creative_host_domain_id = hd.id))
+LEFT JOIN public.domains AS hd ON ((cr.creative_host_domain_id = hd.id))
 )
-LEFT JOIN public.ad_domains AS ad ON ((cr.creative_initial_domain_id = ad.id))
+LEFT JOIN public.domains AS ad ON ((cr.creative_initial_domain_id = ad.id))
 )
 LEFT JOIN adtech.company_domain_mapping AS hcdm ON ((hd.id = hcdm.domain_id))
 )
@@ -87,9 +88,9 @@ LEFT JOIN adtech.companies AS hc ON ((hcdm.company_id = hc.id))
 )
 LEFT JOIN adtech.companies AS ac ON ((acdm.company_id = ac.id))
 )
-LEFT JOIN public.ad_domains AS hcd ON ((hc.domain_id = hcd.id))
+LEFT JOIN public.domains AS hcd ON ((hc.domain_id = hcd.id))
 )
-LEFT JOIN public.ad_domains AS acd ON ((ac.domain_id = acd.id))
+LEFT JOIN public.domains AS acd ON ((ac.domain_id = acd.id))
 )
 LEFT JOIN
     adtech.company_domain_mapping AS cdm
@@ -97,7 +98,7 @@ LEFT JOIN
 )
 LEFT JOIN adtech.companies AS mmp ON ((cdm.company_id = mmp.id))
 )
-LEFT JOIN public.ad_domains AS mmpd ON ((cr.mmp_domain_id = mmpd.id))
+LEFT JOIN public.domains AS mmpd ON ((cr.mmp_domain_id = mmpd.id))
 )
 WITH NO DATA;
 
@@ -108,4 +109,4 @@ ALTER MATERIALIZED VIEW frontend.advertiser_creatives OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict p8wDmDranZmwvXQVcF8aM7HOZfeGFRKQt5pqnG9by6ikomxQr4RQJmfyewcuVr1
+\unrestrict S2sgOQYRJ83XJedlTqfNgrbWse8eagECqA9bQEPNo36e7YoPIj0cULdZULCt7gb

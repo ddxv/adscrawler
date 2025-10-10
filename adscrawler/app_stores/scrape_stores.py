@@ -944,12 +944,12 @@ def update_all_app_info(
 
     app_df["url"] = app_df["url"].apply(lambda x: extract_domains(x))
 
-    insert_columns = ["url"]
+    insert_columns = ["domain_name"]
     app_urls_df = upsert_df(
-        table_name="pub_domains",
-        df=app_df,
+        table_name="domains",
+        df=app_df.rename(columns={"url": "domain_name"}),
         insert_columns=insert_columns,
-        key_columns=["url"],
+        key_columns=["domain_name"],
         database_connection=database_connection,
         return_rows=True,
     )

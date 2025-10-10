@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict bJgUtrRjiq9J3BzvrtxK4YNu0vfUYlXyt0wTSAqfYTfbboDbZlzlB3QS024zyCs
+\restrict DtgMcxv3OewOPDDARMqzTUovTADP51VlieoDEVINQR5SvmGFYuU6xFPzrOHdfpK
 
 -- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 -- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
@@ -60,11 +60,11 @@ ADD CONSTRAINT company_domain_mapping_company_id_fkey FOREIGN KEY (
 ALTER TABLE ONLY adtech.company_domain_mapping
 ADD CONSTRAINT company_domain_mapping_domain_id_fkey FOREIGN KEY (
     domain_id
-) REFERENCES public.ad_domains (id);
+) REFERENCES public.domains (id) ON DELETE CASCADE;
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict bJgUtrRjiq9J3BzvrtxK4YNu0vfUYlXyt0wTSAqfYTfbboDbZlzlB3QS024zyCs
+\unrestrict DtgMcxv3OewOPDDARMqzTUovTADP51VlieoDEVINQR5SvmGFYuU6xFPzrOHdfpK

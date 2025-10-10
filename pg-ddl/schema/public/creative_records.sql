@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict lN2OfZ5HpnpC2xmqKY2tQHbGn8bIUxhAG1TVA0FXcVqnhG64jUnHU4OAfwIUAcF
+\restrict w2wYAhbZejuA7cEdP2yI7cnfvuaDcKsTRdBYzac2WIeeAFdq9srqyoXdusxfrt0
 
 -- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 -- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
@@ -123,7 +123,7 @@ ADD CONSTRAINT creative_records_advertiser_app_fk FOREIGN KEY (
 ALTER TABLE ONLY public.creative_records
 ADD CONSTRAINT creative_records_advertiser_domain_fk FOREIGN KEY (
     advertiser_domain_id
-) REFERENCES public.ad_domains (id);
+) REFERENCES public.domains (id) ON DELETE SET NULL;
 
 
 --
@@ -153,7 +153,7 @@ ADD CONSTRAINT creative_records_asset_fk FOREIGN KEY (
 ALTER TABLE ONLY public.creative_records
 ADD CONSTRAINT creative_records_host_domain_fk FOREIGN KEY (
     creative_host_domain_id
-) REFERENCES public.ad_domains (id);
+) REFERENCES public.domains (id) ON DELETE CASCADE;
 
 
 --
@@ -163,7 +163,7 @@ ADD CONSTRAINT creative_records_host_domain_fk FOREIGN KEY (
 ALTER TABLE ONLY public.creative_records
 ADD CONSTRAINT creative_records_initial_domain_fk FOREIGN KEY (
     creative_initial_domain_id
-) REFERENCES public.ad_domains (id);
+) REFERENCES public.domains (id) ON DELETE SET NULL;
 
 
 --
@@ -173,11 +173,11 @@ ADD CONSTRAINT creative_records_initial_domain_fk FOREIGN KEY (
 ALTER TABLE ONLY public.creative_records
 ADD CONSTRAINT creative_records_mmp_domain_fk FOREIGN KEY (
     mmp_domain_id
-) REFERENCES public.ad_domains (id);
+) REFERENCES public.domains (id) ON DELETE SET NULL;
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict lN2OfZ5HpnpC2xmqKY2tQHbGn8bIUxhAG1TVA0FXcVqnhG64jUnHU4OAfwIUAcF
+\unrestrict w2wYAhbZejuA7cEdP2yI7cnfvuaDcKsTRdBYzac2WIeeAFdq9srqyoXdusxfrt0

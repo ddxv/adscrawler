@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 5IhZBSpmRN90g8KCS0BPeul29aOl9gMHqzK9igVWzwve1E0kfxI3iBMw8fwJrtC
+\restrict qcCMeJnTQeS3VhVcpBNh7edsojJnMRmLiCgkqWDhJBJURDC75pBnwy2XyCdKrty
 
 -- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 -- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
@@ -46,13 +46,13 @@ SELECT DISTINCT
     aae.id AS app_ad_entry_id,
     sa.id AS store_app,
     pd.id AS pub_domain_id
-FROM ((((((
+FROM (((((((
     public.app_ads_entrys aae
-    LEFT JOIN public.ad_domains AS ad ON ((aae.ad_domain = ad.id))
+    LEFT JOIN public.domains AS ad ON ((aae.ad_domain = ad.id))
 )
 LEFT JOIN public.app_ads_map AS aam ON ((aae.id = aam.app_ads_entry))
 )
-LEFT JOIN public.pub_domains AS pd ON ((aam.pub_domain = pd.id))
+LEFT JOIN public.domains AS pd ON ((aam.pub_domain = pd.id))
 )
 LEFT JOIN public.app_urls_map AS aum ON ((pd.id = aum.pub_domain))
 )
@@ -60,7 +60,9 @@ INNER JOIN public.store_apps AS sa ON ((aum.store_app = sa.id))
 )
 LEFT JOIN parent_companies AS myc ON ((ad.id = myc.parent_company_domain_id))
 )
-WHERE ((pd.crawled_at - aam.updated_at) < '01:00:00'::interval)
+LEFT JOIN public.adstxt_crawl_results AS pdcr ON ((pd.id = pdcr.domain_id))
+)
+WHERE ((pdcr.crawled_at - aam.updated_at) < '01:00:00'::interval)
 WITH NO DATA;
 
 
@@ -97,4 +99,4 @@ CREATE UNIQUE INDEX adstxt_entries_store_apps_unique_idx ON frontend.adstxt_entr
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 5IhZBSpmRN90g8KCS0BPeul29aOl9gMHqzK9igVWzwve1E0kfxI3iBMw8fwJrtC
+\unrestrict qcCMeJnTQeS3VhVcpBNh7edsojJnMRmLiCgkqWDhJBJURDC75pBnwy2XyCdKrty

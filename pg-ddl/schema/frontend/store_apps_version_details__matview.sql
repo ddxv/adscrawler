@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict OGL58PdOHxBaNhYDGvR0Bf4n7WwXs1ntwRKltrymNv1fOw2FwZh5zGSfBtohQMl
+\restrict 8jo9OzAtmdLP0glLrgScNXZZzB6ygX8gDZRKCatKEHW3cQDhr5yEAHfS2sfxwLn
 
 -- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 -- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
@@ -48,7 +48,7 @@ SELECT DISTINCT
     sa.store_id,
     cvsm.company_id,
     c.name AS company_name,
-    ad.domain AS company_domain,
+    ad.domain_name AS company_domain,
     cats.url_slug AS category_slug
 FROM ((((((((
     latest_version_codes vc
@@ -66,7 +66,7 @@ LEFT JOIN adtech.company_categories AS cc ON ((c.id = cc.company_id))
 )
 LEFT JOIN adtech.categories AS cats ON ((cc.category_id = cats.id))
 )
-LEFT JOIN public.ad_domains AS ad ON ((c.domain_id = ad.id))
+LEFT JOIN public.domains AS ad ON ((c.domain_id = ad.id))
 )
 LEFT JOIN public.store_apps AS sa ON ((vc.store_app = sa.id))
 )
@@ -97,4 +97,4 @@ CREATE UNIQUE INDEX store_apps_version_details_unique_idx ON frontend.store_apps
 -- PostgreSQL database dump complete
 --
 
-\unrestrict OGL58PdOHxBaNhYDGvR0Bf4n7WwXs1ntwRKltrymNv1fOw2FwZh5zGSfBtohQMl
+\unrestrict 8jo9OzAtmdLP0glLrgScNXZZzB6ygX8gDZRKCatKEHW3cQDhr5yEAHfS2sfxwLn

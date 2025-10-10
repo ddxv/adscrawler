@@ -266,10 +266,10 @@ def append_missing_domains(
                 .rename(columns={col: "domain"})
             )
             new_ad_domains = upsert_df(
-                table_name="ad_domains",
-                df=new_ad_domains,
-                insert_columns=["domain"],
-                key_columns=["domain"],
+                table_name="domains",
+                df=new_ad_domains.rename(columns={"domain": "domain_name"}),
+                insert_columns=["domain_name"],
+                key_columns=["domain_name"],
                 database_connection=database_connection,
                 return_rows=True,
             )
@@ -297,9 +297,9 @@ def add_additional_domain_id_column(
 
     # Merge on the exploded domain value
     merged = exploded.merge(
-        ad_domains_df[["domain", "id"]],
+        ad_domains_df[["domain_name", "id"]],
         left_on="found_ad_network_tlds",
-        right_on="domain",
+        right_on="domain_name",
         how="left",
     )
 
@@ -348,25 +348,25 @@ def make_creative_records_df(
         creative_records_df, ad_domains_df
     )
     creative_records_df = creative_records_df.merge(
-        ad_domains_df[["id", "domain"]].rename(
+        ad_domains_df[["id", "domain_name"]].rename(
             columns={"id": "creative_host_domain_id"}
         ),
         left_on="host_ad_network_tld",
-        right_on="domain",
+        right_on="domain_name",
         how="left",
     )
     creative_records_df = creative_records_df.merge(
-        ad_domains_df[["id", "domain"]].rename(
+        ad_domains_df[["id", "domain_name"]].rename(
             columns={"id": "creative_initial_domain_id"}
         ),
         left_on="creative_initial_domain_tld",
-        right_on="domain",
+        right_on="domain_name",
         how="left",
     )
     creative_records_df = creative_records_df.merge(
-        ad_domains_df[["id", "domain"]].rename(columns={"id": "mmp_domain_id"}),
+        ad_domains_df[["id", "domain_name"]].rename(columns={"id": "mmp_domain_id"}),
         left_on="mmp_tld",
-        right_on="domain",
+        right_on="domain_name",
         how="left",
     )
     creative_records_df = creative_records_df[

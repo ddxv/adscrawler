@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict IeIeHguq13r6gdPMmY6nsEkAOrUrocMdS8QFYA67At0udZmjG1rmIiLIge7hqol
+\restrict b5lt5thus4t9DhHb1lmA5BjBTCyApapc68pf42J3rXhHpTRXzRiP4GAuIP2huam
 
 -- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 -- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
@@ -29,7 +29,7 @@ SET default_table_access_method = heap;
 
 CREATE MATERIALIZED VIEW frontend.companies_open_source_percent AS
 SELECT
-    ad.domain AS company_domain,
+    ad.domain_name AS company_domain,
     avg(
         CASE
             WHEN sd.is_open_source THEN 1
@@ -40,9 +40,9 @@ FROM ((
     adtech.sdks sd
     LEFT JOIN adtech.companies AS c ON ((sd.company_id = c.id))
 )
-LEFT JOIN public.ad_domains AS ad ON ((c.domain_id = ad.id))
+LEFT JOIN public.domains AS ad ON ((c.domain_id = ad.id))
 )
-GROUP BY ad.domain
+GROUP BY ad.domain_name
 WITH NO DATA;
 
 
@@ -61,4 +61,4 @@ CREATE UNIQUE INDEX companies_open_source_percent_unique ON frontend.companies_o
 -- PostgreSQL database dump complete
 --
 
-\unrestrict IeIeHguq13r6gdPMmY6nsEkAOrUrocMdS8QFYA67At0udZmjG1rmIiLIge7hqol
+\unrestrict b5lt5thus4t9DhHb1lmA5BjBTCyApapc68pf42J3rXhHpTRXzRiP4GAuIP2huam

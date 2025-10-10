@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict crp73YEIegdODkmrX2vxwwJlMcz3EwD9LbYFsmh7p9nsNQBBbfoAgg2vN1B0gZj
+\restrict blj5xbThbE4AhXMEOo0ZBs4YHnRkaGSRy3pMzqkGwEjbcJpLQQbMYplgs6gX3Qb
 
 -- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 -- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
@@ -30,8 +30,8 @@ SET default_table_access_method = heap;
 CREATE MATERIALIZED VIEW frontend.companies_sdks_overview AS
 SELECT
     c.name AS company_name,
-    ad.domain AS company_domain,
-    parad.domain AS parent_company_domain,
+    ad.domain_name AS company_domain,
+    parad.domain_name AS parent_company_domain,
     sdk.sdk_name,
     sp.package_pattern,
     sp2.path_pattern,
@@ -40,9 +40,9 @@ FROM ((((((
     adtech.companies c
     LEFT JOIN adtech.companies AS cc ON ((c.parent_company_id = cc.id))
 )
-LEFT JOIN public.ad_domains AS ad ON ((c.domain_id = ad.id))
+LEFT JOIN public.domains AS ad ON ((c.domain_id = ad.id))
 )
-LEFT JOIN public.ad_domains AS parad ON ((cc.domain_id = parad.id))
+LEFT JOIN public.domains AS parad ON ((cc.domain_id = parad.id))
 )
 LEFT JOIN adtech.sdks AS sdk ON ((c.id = sdk.company_id))
 )
@@ -73,4 +73,4 @@ CREATE UNIQUE INDEX companies_sdks_overview_unique_idx ON frontend.companies_sdk
 -- PostgreSQL database dump complete
 --
 
-\unrestrict crp73YEIegdODkmrX2vxwwJlMcz3EwD9LbYFsmh7p9nsNQBBbfoAgg2vN1B0gZj
+\unrestrict blj5xbThbE4AhXMEOo0ZBs4YHnRkaGSRy3pMzqkGwEjbcJpLQQbMYplgs6gX3Qb

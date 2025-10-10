@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 5mdhi5z0MNSFKyDNt378KmpSdktIBiRqIzsHeVIW1k7V43ziEBEMo457xoUqVm2
+\restrict VptpEieqD9svLVJsGwIOYw8mBDvw3T6rPrrEvS8F71zHsTA4GuGhV8biM2jSGKj
 
 -- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 -- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
@@ -79,16 +79,6 @@ ADD CONSTRAINT unique_company_name UNIQUE (name);
 
 
 --
--- Name: companies fk_ad_domain_id; Type: FK CONSTRAINT; Schema: adtech; Owner: postgres
---
-
-ALTER TABLE ONLY adtech.companies
-ADD CONSTRAINT fk_ad_domain_id FOREIGN KEY (
-    domain_id
-) REFERENCES public.ad_domains (id);
-
-
---
 -- Name: companies fk_companies_parent; Type: FK CONSTRAINT; Schema: adtech; Owner: postgres
 --
 
@@ -99,7 +89,17 @@ ADD CONSTRAINT fk_companies_parent FOREIGN KEY (
 
 
 --
+-- Name: companies fk_domain_id; Type: FK CONSTRAINT; Schema: adtech; Owner: postgres
+--
+
+ALTER TABLE ONLY adtech.companies
+ADD CONSTRAINT fk_domain_id FOREIGN KEY (domain_id) REFERENCES public.domains (
+    id
+) ON DELETE CASCADE;
+
+
+--
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 5mdhi5z0MNSFKyDNt378KmpSdktIBiRqIzsHeVIW1k7V43ziEBEMo457xoUqVm2
+\unrestrict VptpEieqD9svLVJsGwIOYw8mBDvw3T6rPrrEvS8F71zHsTA4GuGhV8biM2jSGKj

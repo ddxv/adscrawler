@@ -525,10 +525,10 @@ def query_companies(database_connection: PostgresCon) -> pd.DataFrame:
         c.logo_url as company_logo_url,
         c.linkedin_url as company_linkedin_url,
         ad.id as company_domain_id,
-        ad.domain as company_domain
+        ad.domain_name as company_domain
         FROM
         adtech.companies c
-        left join ad_domains ad on c.domain_id = ad.id
+        left join domains ad on c.domain_id = ad.id
         where c.id > 0
         ;
         """
@@ -589,15 +589,18 @@ def query_pub_domains(
         before_date = (
             datetime.datetime.today() - datetime.timedelta(days=exclude_recent_days)
         ).strftime("%Y-%m-%d")
-        exclude_str = f"AND (pd.crawled_at <= '{before_date}' OR pd.crawled_at IS NULL)"
+        exclude_str = (
+            f"AND (pdcr.crawled_at <= '{before_date}' OR pdcr.crawled_at IS NULL)"
+        )
     if limit:
         limit_str = f"LIMIT {limit}"
     sel_query = f"""SELECT
-            DISTINCT pd.id, pd.url, pd.crawled_at
+            DISTINCT pd.id, pd.domain_name as url, pd.crawled_at
         FROM
             app_urls_map aum
-        LEFT JOIN pub_domains pd ON
+        LEFT JOIN domains pd ON
             pd.id = aum.pub_domain
+        LEFT JOIN adstxt_crawl_results pdcr on (pd.id = pdcr.domain_id)
         LEFT JOIN store_apps sa ON
             sa.id = aum.store_app
         WHERE
@@ -605,7 +608,7 @@ def query_pub_domains(
             AND sa.crawl_result = 1
             {exclude_str}
         ORDER BY
-            pd.crawled_at NULLS FIRST
+            pdcr.crawled_at NULLS FIRST
         {limit_str}
         ; 
         """
@@ -959,7 +962,13 @@ def query_all_store_app_descriptions(
 
 @lru_cache(maxsize=1)
 def query_ad_domains(database_connection: PostgresCon) -> pd.DataFrame:
-    sel_query = """SELECT * FROM ad_domains;"""
+    # TODO FIX
+    sel_query = """SELECT * FROM domains
+    LEFT JOIN adtech.company_domain_mapping cdm ON domains.id = cdm.domain_id
+    LEFT JOIN adtech.combined_company_domains ccd ON domains.id = ccd.domain_id
+    WHERE cdm.company_id > 0
+    OR ccd.company_id > 0
+    """
     df = pd.read_sql(sel_query, con=database_connection.engine)
     return df
 
@@ -1077,14 +1086,14 @@ def get_all_mmp_tlds(database_connection: PostgresCon) -> pd.DataFrame:
     sel_query = """SELECT
                 c.id,
                 name,
-                ad."domain" AS mmp_tld
+                ad.domain_name AS mmp_tld
             FROM
                 adtech.companies c
             LEFT JOIN adtech.company_categories cc ON
                 c.id = cc.company_id
             LEFT JOIN adtech.company_domain_mapping cdm ON
                 c.id = cdm.company_id
-            LEFT JOIN ad_domains ad ON
+            LEFT JOIN domains ad ON
                 cdm.domain_id = ad.id
             WHERE
                 cc.category_id = 2

@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 9iaw63mVipxB963PQQAN6uRHfwjI7xkqK6nclLLozwqeKJhPzLJeQrrcHLPUPn6
+\restrict zibMQ5XR5U85tQChEv9K91WNpWIYBEZP2EfnA8ud51Ll8nhh8ZXXZ0cc0J57QN0
 
 -- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 -- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
@@ -98,7 +98,7 @@ SELECT DISTINCT
     vd.company_id,
     vd.md5_hash,
     vd.file_extension,
-    ad.domain AS company_domain,
+    ad.domain_name AS company_domain,
     sa.name AS advertiser_name,
     sa.store,
     sa.store_id AS advertiser_store_id,
@@ -116,7 +116,7 @@ FROM (((
     visually_distinct vd
     LEFT JOIN adtech.companies AS c ON ((vd.company_id = c.id))
 )
-LEFT JOIN public.ad_domains AS ad ON ((c.domain_id = ad.id))
+LEFT JOIN public.domains AS ad ON ((c.domain_id = ad.id))
 )
 LEFT JOIN
     frontend.store_apps_overview AS sa
@@ -133,4 +133,4 @@ ALTER MATERIALIZED VIEW frontend.companies_creative_rankings OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 9iaw63mVipxB963PQQAN6uRHfwjI7xkqK6nclLLozwqeKJhPzLJeQrrcHLPUPn6
+\unrestrict zibMQ5XR5U85tQChEv9K91WNpWIYBEZP2EfnA8ud51Ll8nhh8ZXXZ0cc0J57QN0

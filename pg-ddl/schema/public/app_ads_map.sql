@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict Q3KsI4e9n1BfG6rgR9fz41K1cxS4u1IQo1TdbqFuHHHcyfJC4Xd7ehHcfXAGJDH
+\restrict V8cRYapMAWvNEHHFrvZ1GjHutxP5qcav4VuWmsJJ6mfCWXEsWRZmY4UDyjqoJii
 
 -- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 -- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
@@ -86,17 +86,17 @@ ADD CONSTRAINT app_ads_map_fk FOREIGN KEY (
 
 
 --
--- Name: app_ads_map app_ads_map_fk_1; Type: FK CONSTRAINT; Schema: public; Owner: james
+-- Name: app_ads_map app_ads_map_fk_domain; Type: FK CONSTRAINT; Schema: public; Owner: james
 --
 
 ALTER TABLE ONLY public.app_ads_map
-ADD CONSTRAINT app_ads_map_fk_1 FOREIGN KEY (
+ADD CONSTRAINT app_ads_map_fk_domain FOREIGN KEY (
     pub_domain
-) REFERENCES public.pub_domains (id);
+) REFERENCES public.domains (id);
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict Q3KsI4e9n1BfG6rgR9fz41K1cxS4u1IQo1TdbqFuHHHcyfJC4Xd7ehHcfXAGJDH
+\unrestrict V8cRYapMAWvNEHHFrvZ1GjHutxP5qcav4VuWmsJJ6mfCWXEsWRZmY4UDyjqoJii

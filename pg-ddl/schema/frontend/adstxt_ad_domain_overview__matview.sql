@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict oDKbPmZPAzhQG46GAgja1Gh7dXxP9i7aUrlz7etAJJSDbYdD2fdQA7fplLuHTEs
+\restrict m4b0xxqtdNA8IxmroqfMhfmbEeWI0ggVTouHbbsazoAcobuIPa9S6S5qCbGKATq
 
 -- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 -- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
@@ -29,7 +29,7 @@ SET default_table_access_method = heap;
 
 CREATE MATERIALIZED VIEW frontend.adstxt_ad_domain_overview AS
 SELECT
-    ad.domain AS ad_domain_url,
+    ad.domain_name AS ad_domain_url,
     aae.relationship,
     sa.store,
     count(DISTINCT aae.publisher_id) AS publisher_id_count,
@@ -41,9 +41,9 @@ FROM (((
 )
 LEFT JOIN public.app_ads_entrys AS aae ON ((aesa.app_ad_entry_id = aae.id))
 )
-LEFT JOIN public.ad_domains AS ad ON ((aesa.ad_domain_id = ad.id))
+LEFT JOIN public.domains AS ad ON ((aesa.ad_domain_id = ad.id))
 )
-GROUP BY ad.domain, aae.relationship, sa.store
+GROUP BY ad.domain_name, aae.relationship, sa.store
 WITH NO DATA;
 
 
@@ -71,4 +71,4 @@ CREATE UNIQUE INDEX adstxt_ad_domain_overview_unique_idx ON frontend.adstxt_ad_d
 -- PostgreSQL database dump complete
 --
 
-\unrestrict oDKbPmZPAzhQG46GAgja1Gh7dXxP9i7aUrlz7etAJJSDbYdD2fdQA7fplLuHTEs
+\unrestrict m4b0xxqtdNA8IxmroqfMhfmbEeWI0ggVTouHbbsazoAcobuIPa9S6S5qCbGKATq

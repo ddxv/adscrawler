@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict waI7xCen421Bve8ILSJk9nuZkefTmWodaJPV0nMupGiUy7AQcZ9mB0zbrMJLEdG
+\restrict FWS0QiS6sDHg8TQbBdPCCIGS1whGeMQrbRBD2J5OsXD7SH5VSwfhs8rWHc8Gl3p
 
 -- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 -- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
@@ -207,11 +207,11 @@ WITH app_count AS (
     )
 ), appads_url_count AS (
     SELECT
-        count(DISTINCT pd.url) AS appads_urls,
+        count(DISTINCT pd.domain_name) AS appads_urls,
         count(
             DISTINCT
             CASE
-                WHEN (pd.crawl_result = 1) THEN pd.url
+                WHEN (pdcr.crawl_result = 1) THEN pd.domain_name
                 ELSE null::character varying
             END
         ) AS appads_success_urls,
@@ -220,12 +220,13 @@ WITH app_count AS (
             CASE
                 WHEN
                     (
-                        (pd.crawl_result = 1)
+                        (pdcr.crawl_result = 1)
                         AND (
-                            pd.updated_at >= (current_date - '7 days'::interval)
+                            pdcr.updated_at
+                            >= (current_date - '7 days'::interval)
                         )
                     )
-                    THEN pd.url
+                    THEN pd.domain_name
                 ELSE null::character varying
             END
         ) AS appads_weekly_success_urls,
@@ -233,12 +234,17 @@ WITH app_count AS (
             DISTINCT
             CASE
                 WHEN
-                    (pd.updated_at >= (current_date - '7 days'::interval))
-                    THEN pd.url
+                    (pdcr.updated_at >= (current_date - '7 days'::interval))
+                    THEN pd.domain_name
                 ELSE null::character varying
             END
         ) AS appads_weekly_urls
-    FROM public.pub_domains AS pd
+    FROM (
+        public.domains AS pd
+        LEFT JOIN
+            public.adstxt_crawl_results AS pdcr
+            ON ((pd.id = pdcr.domain_id))
+    )
 )
 SELECT
     app_count.android_apps,
@@ -274,4 +280,4 @@ ALTER MATERIALIZED VIEW public.total_count_overview OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict waI7xCen421Bve8ILSJk9nuZkefTmWodaJPV0nMupGiUy7AQcZ9mB0zbrMJLEdG
+\unrestrict FWS0QiS6sDHg8TQbBdPCCIGS1whGeMQrbRBD2J5OsXD7SH5VSwfhs8rWHc8Gl3p

@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict gvb0qo5BT7afTMd1vkLtVGq39aPWcPcBmcyVkLkEXnVyij6FC8Gu3C2Lx9XHN03
+\restrict O5tIWXYUYr2Upz07bPbVuBQeceyZs2waGmUUxq1g5TsoZzzKptH3erGE7IfDysA
 
 -- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 -- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
@@ -30,7 +30,7 @@ SET default_table_access_method = heap;
 CREATE MATERIALIZED VIEW frontend.adstxt_publishers_overview AS
 WITH ranked_data AS (
     SELECT
-        ad.domain AS ad_domain_url,
+        ad.domain_name AS ad_domain_url,
         aae.relationship,
         sa.store,
         aae.publisher_id,
@@ -38,7 +38,7 @@ WITH ranked_data AS (
         count(DISTINCT aesa.store_app) AS app_count,
         row_number()
             OVER (
-                PARTITION BY ad.domain, aae.relationship, sa.store
+                PARTITION BY ad.domain_name, aae.relationship, sa.store
                 ORDER BY (count(DISTINCT aesa.store_app)) DESC
             )
             AS pubrank
@@ -48,9 +48,9 @@ WITH ranked_data AS (
     )
     LEFT JOIN public.app_ads_entrys AS aae ON ((aesa.app_ad_entry_id = aae.id))
     )
-    LEFT JOIN public.ad_domains AS ad ON ((aesa.ad_domain_id = ad.id))
+    LEFT JOIN public.domains AS ad ON ((aesa.ad_domain_id = ad.id))
     )
-    GROUP BY ad.domain, aae.relationship, sa.store, aae.publisher_id
+    GROUP BY ad.domain_name, aae.relationship, sa.store, aae.publisher_id
 )
 SELECT
     ad_domain_url,
@@ -89,4 +89,4 @@ CREATE UNIQUE INDEX adstxt_publishers_overview_ad_domain_unique_idx ON frontend.
 -- PostgreSQL database dump complete
 --
 
-\unrestrict gvb0qo5BT7afTMd1vkLtVGq39aPWcPcBmcyVkLkEXnVyij6FC8Gu3C2Lx9XHN03
+\unrestrict O5tIWXYUYr2Upz07bPbVuBQeceyZs2waGmUUxq1g5TsoZzzKptH3erGE7IfDysA

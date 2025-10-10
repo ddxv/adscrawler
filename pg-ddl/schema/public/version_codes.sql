@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict hyWFlfpCnfKZFg7axykcvPVy1hF5oZmhxHfjmQQDdal2gbnSzd4nT8xcnnbUG5G
+\restrict Kus4eouYw3w1I6UF0sJL7t8T4WwuZdnSql2of6ojVQi8MfoiSc1ECwA9bVj2fHU
 
 -- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 -- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
@@ -91,4 +91,4 @@ ADD CONSTRAINT vc_fk_store_app FOREIGN KEY (
 -- PostgreSQL database dump complete
 --
 
-\unrestrict hyWFlfpCnfKZFg7axykcvPVy1hF5oZmhxHfjmQQDdal2gbnSzd4nT8xcnnbUG5G
+\unrestrict Kus4eouYw3w1I6UF0sJL7t8T4WwuZdnSql2of6ojVQi8MfoiSc1ECwA9bVj2fHU

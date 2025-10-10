@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict qdh04HHEclgRLpwUFFdZniHH5j0lSH6hXRWbzoEHJ3G6l7WpcGt6OmKSyy1CIhJ
+\restrict aAnJfw1SxWgyGgUPWB2p3YY4DmcgIP0UonmRoYR2o2n1m5gU538ItSzxLB5pdzZ
 
 -- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 -- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
@@ -52,12 +52,12 @@ WITH d30_counts AS (
         c.name AS company_name,
         sa.installs,
         sa.rating_count,
-        coalesce(ad.domain, csac.ad_domain) AS company_domain
+        coalesce(ad.domain_name, csac.ad_domain) AS company_domain
     FROM (((
         adtech.combined_store_apps_companies csac
         LEFT JOIN adtech.companies AS c ON ((csac.parent_id = c.id))
     )
-    LEFT JOIN public.ad_domains AS ad ON ((c.domain_id = ad.id))
+    LEFT JOIN public.domains AS ad ON ((c.domain_id = ad.id))
     )
     LEFT JOIN public.store_apps AS sa ON ((csac.store_app = sa.id))
     )
@@ -114,4 +114,4 @@ CREATE INDEX companies_parent_category_stats_query_idx ON frontend.companies_par
 -- PostgreSQL database dump complete
 --
 
-\unrestrict qdh04HHEclgRLpwUFFdZniHH5j0lSH6hXRWbzoEHJ3G6l7WpcGt6OmKSyy1CIhJ
+\unrestrict aAnJfw1SxWgyGgUPWB2p3YY4DmcgIP0UonmRoYR2o2n1m5gU538ItSzxLB5pdzZ

@@ -310,12 +310,14 @@ def scrape_app_ads_url(url: str, database_connection: PostgresCon) -> None:
     if result_dict["crawl_result"] != 1:
         return
     insert_columns = ["domain"]
-    ad_domains = txt_df[["domain"]].drop_duplicates()
+    found_domains = (
+        txt_df[["domain"]].drop_duplicates().rename(columns={"domain": "domain_name"})
+    )
     domain_df = upsert_df(
-        table_name="ad_domains",
-        df=ad_domains,
+        table_name="domains",
+        df=found_domains,
         insert_columns=insert_columns,
-        key_columns=["domain"],
+        key_columns=["domain_name"],
         database_connection=database_connection,
         return_rows=True,
     )

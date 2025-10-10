@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict zIOEuMEUrXK4LLSxJdyd3dUPAMFN04HI4PYz1G1GUm0rhpmRZc8EWiSxCdKQBmD
+\restrict aIhoQC8EFNgjWnJBvskZI4pcITp2Jpx1jJJl25CiJP79oqPYb0uFizRv5VmFAXK
 
 -- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 -- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
@@ -86,31 +86,34 @@ SELECT
     ca.tld_url,
     co.alpha2 AS country,
     ca.org,
-    coalesce(cad.domain, (ca.tld_url)::character varying) AS company_domain,
+    coalesce(cad.domain_name, (ca.tld_url)::character varying)
+        AS company_domain,
     coalesce(
-        pcad.domain, coalesce(cad.domain, (ca.tld_url)::character varying)
+        pcad.domain_name,
+        coalesce(cad.domain_name, (ca.tld_url)::character varying)
     ) AS parent_company_domain,
     count(DISTINCT ca.store_app) AS store_app_count
 FROM (((((((
     cleaned_calls ca
-    LEFT JOIN public.ad_domains AS ad ON ((ca.tld_url = (ad.domain)::text))
+    LEFT JOIN public.domains AS ad ON ((ca.tld_url = (ad.domain_name)::text))
 )
 LEFT JOIN adtech.company_domain_mapping AS cdm ON ((ad.id = cdm.domain_id))
 )
 LEFT JOIN adtech.companies AS c ON ((cdm.company_id = c.id))
 )
-LEFT JOIN public.ad_domains AS cad ON ((c.domain_id = cad.id))
+LEFT JOIN public.domains AS cad ON ((c.domain_id = cad.id))
 )
 LEFT JOIN adtech.companies AS pc ON ((c.parent_company_id = pc.id))
 )
-LEFT JOIN public.ad_domains AS pcad ON ((pc.domain_id = pcad.id))
+LEFT JOIN public.domains AS pcad ON ((pc.domain_id = pcad.id))
 )
 LEFT JOIN public.countries AS co ON ((ca.country_id = co.id))
 )
 GROUP BY
-    coalesce(cad.domain, (ca.tld_url)::character varying),
+    coalesce(cad.domain_name, (ca.tld_url)::character varying),
     coalesce(
-        pcad.domain, coalesce(cad.domain, (ca.tld_url)::character varying)
+        pcad.domain_name,
+        coalesce(cad.domain_name, (ca.tld_url)::character varying)
     ),
     ca.tld_url,
     co.alpha2,
@@ -134,4 +137,4 @@ CREATE UNIQUE INDEX api_call_countries_unique ON frontend.api_call_countries USI
 -- PostgreSQL database dump complete
 --
 
-\unrestrict zIOEuMEUrXK4LLSxJdyd3dUPAMFN04HI4PYz1G1GUm0rhpmRZc8EWiSxCdKQBmD
+\unrestrict aIhoQC8EFNgjWnJBvskZI4pcITp2Jpx1jJJl25CiJP79oqPYb0uFizRv5VmFAXK

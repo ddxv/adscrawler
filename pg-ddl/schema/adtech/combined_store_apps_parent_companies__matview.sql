@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict vU3kvYRAyPjLfhayB446tjWBC0XcNsdh22xTHx4r6J4gCLiU1fhx2hkbexsZFmC
+\restrict RIdPnfFNJAwkCYLhCLRzMJhBsIVN5OtEDwCitG2YfEwO5YbSfWlWkhcoUz1brFU
 
 -- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 -- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
@@ -32,7 +32,7 @@ SELECT
     csac.store_app,
     csac.app_category,
     csac.parent_id AS company_id,
-    COALESCE(ad.domain, csac.ad_domain) AS ad_domain,
+    COALESCE(ad.domain_name, csac.ad_domain) AS ad_domain,
     BOOL_OR(csac.sdk) AS sdk,
     BOOL_OR(csac.api_call) AS api_call,
     BOOL_OR(csac.app_ads_direct) AS app_ads_direct
@@ -40,7 +40,7 @@ FROM ((
     adtech.combined_store_apps_companies csac
     LEFT JOIN adtech.companies AS c ON ((csac.parent_id = c.id))
 )
-LEFT JOIN public.ad_domains AS ad ON ((c.domain_id = ad.id))
+LEFT JOIN public.domains AS ad ON ((c.domain_id = ad.id))
 )
 WHERE (csac.parent_id IN (
     SELECT DISTINCT pc.id
@@ -51,7 +51,7 @@ WHERE (csac.parent_id IN (
     WHERE (c_1.id IS NOT null)
 ))
 GROUP BY
-    COALESCE(ad.domain, csac.ad_domain),
+    COALESCE(ad.domain_name, csac.ad_domain),
     csac.store_app,
     csac.app_category,
     csac.parent_id
@@ -73,4 +73,4 @@ CREATE UNIQUE INDEX idx_combined_store_apps_parent_companies_idx ON adtech.combi
 -- PostgreSQL database dump complete
 --
 
-\unrestrict vU3kvYRAyPjLfhayB446tjWBC0XcNsdh22xTHx4r6J4gCLiU1fhx2hkbexsZFmC
+\unrestrict RIdPnfFNJAwkCYLhCLRzMJhBsIVN5OtEDwCitG2YfEwO5YbSfWlWkhcoUz1brFU

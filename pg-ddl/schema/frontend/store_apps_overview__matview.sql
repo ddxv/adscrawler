@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict nmbbUbKBdfXTTLVd1qLRt2Bb2FyPhg1OYiRnqhqP6wRjSBkEi0YW0wNtNW2hM2I
+\restrict nQEOfWviezFcmoH2TIjyLqXaFq8y3kOG2AG5WlPvI4If9YkoXTATpMdINAKQdIJ
 
 -- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 -- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
@@ -184,9 +184,9 @@ SELECT
     sa.tablet_image_url_3,
     d.developer_id,
     d.name AS developer_name,
-    pd.url AS developer_url,
-    pd.updated_at AS adstxt_last_crawled,
-    pd.crawl_result AS adstxt_crawl_result,
+    pd.domain_name AS developer_url,
+    pdcr.updated_at AS adstxt_last_crawled,
+    pdcr.crawl_result AS adstxt_crawl_result,
     lss.scanned_at AS sdk_last_crawled,
     lss.scan_result AS sdk_last_crawl_result,
     lsss.scanned_at AS sdk_successful_last_crawled,
@@ -198,7 +198,7 @@ SELECT
     lsac.run_at AS api_successful_last_crawled,
     acr.ad_creative_count,
     amc.ad_mon_creatives
-FROM ((((((((((((((
+FROM (((((((((((((((
     public.store_apps sa
     LEFT JOIN
         public.category_mapping AS cm
@@ -208,7 +208,9 @@ LEFT JOIN public.developers AS d ON ((sa.developer = d.id))
 )
 LEFT JOIN public.app_urls_map AS aum ON ((sa.id = aum.store_app))
 )
-LEFT JOIN public.pub_domains AS pd ON ((aum.pub_domain = pd.id))
+LEFT JOIN public.domains AS pd ON ((aum.pub_domain = pd.id))
+)
+LEFT JOIN public.adstxt_crawl_results AS pdcr ON ((pd.id = pdcr.domain_id))
 )
 LEFT JOIN latest_version_codes AS lvc ON ((sa.id = lvc.store_app))
 )
@@ -248,4 +250,4 @@ CREATE UNIQUE INDEX store_apps_overview_unique_idx ON frontend.store_apps_overvi
 -- PostgreSQL database dump complete
 --
 
-\unrestrict nmbbUbKBdfXTTLVd1qLRt2Bb2FyPhg1OYiRnqhqP6wRjSBkEi0YW0wNtNW2hM2I
+\unrestrict nQEOfWviezFcmoH2TIjyLqXaFq8y3kOG2AG5WlPvI4If9YkoXTATpMdINAKQdIJ

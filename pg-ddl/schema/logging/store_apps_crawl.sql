@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 0iRDEJBHEqPS8r0JVa9AeG2NHvNbNBd3GjRU6oXqFp1aYHOXvdfluvqdXqrt2jp
+\restrict hzuYefbhSTMzCha63lwslAAgRWltlek8v8FglSjJHRncA98Hhqk3fV0RUB2ZluO
 
 -- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 -- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
@@ -52,4 +52,4 @@ CREATE INDEX ix_logging_store_apps_crawl_index ON logging.store_apps_crawl USING
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 0iRDEJBHEqPS8r0JVa9AeG2NHvNbNBd3GjRU6oXqFp1aYHOXvdfluvqdXqrt2jp
+\unrestrict hzuYefbhSTMzCha63lwslAAgRWltlek8v8FglSjJHRncA98Hhqk3fV0RUB2ZluO

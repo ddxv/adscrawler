@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict jQlYSxGctnpNfv4HDtmk6hgpE6szfgnkurO0qR77zLZPq81WviRCO4JPYQsebxn
+\restrict 8WXsXyEhskC83vu5XCAB4RWek1sgBBy5tn6OtnHKzBmnVajpKud8av6DIUsg9CH
 
 -- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 -- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
@@ -131,4 +131,4 @@ ADD CONSTRAINT fk_store_keyword FOREIGN KEY (
 -- PostgreSQL database dump complete
 --
 
-\unrestrict jQlYSxGctnpNfv4HDtmk6hgpE6szfgnkurO0qR77zLZPq81WviRCO4JPYQsebxn
+\unrestrict 8WXsXyEhskC83vu5XCAB4RWek1sgBBy5tn6OtnHKzBmnVajpKud8av6DIUsg9CH

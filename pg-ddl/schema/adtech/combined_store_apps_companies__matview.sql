@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict QjHnTDEHhAUxvrMdJilMt34rOefgjFG7hFyFMCNhzYvLwHZQwaCjygu90pi2CjB
+\restrict XEbw8a7dx2Qu4XbOH3XfBGb8S2wH1sznhHKnwK3pjGSaezRSCUDtiy3ZZha1q5l
 
 -- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 -- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
@@ -35,7 +35,8 @@ WITH api_based_companies AS (
         cdm.company_id,
         c_1.parent_company_id AS parent_id,
         'api_call'::text AS tag_source,
-        COALESCE(cad_1.domain, (saac.tld_url)::character varying) AS ad_domain
+        COALESCE(cad_1.domain_name, (saac.tld_url)::character varying)
+            AS ad_domain
     FROM ((((((
         public.api_calls saac
         LEFT JOIN public.store_apps AS sa_1 ON ((saac.store_app = sa_1.id))
@@ -45,8 +46,8 @@ WITH api_based_companies AS (
         ON (((sa_1.category)::text = (cm.original_category)::text))
     )
     LEFT JOIN
-        public.ad_domains AS ad_1
-        ON ((saac.tld_url = (ad_1.domain)::text))
+        public.domains AS ad_1
+        ON ((saac.tld_url = (ad_1.domain_name)::text))
     )
     LEFT JOIN
         adtech.company_domain_mapping AS cdm
@@ -54,7 +55,7 @@ WITH api_based_companies AS (
     )
     LEFT JOIN adtech.companies AS c_1 ON ((cdm.company_id = c_1.id))
     )
-    LEFT JOIN public.ad_domains AS cad_1 ON ((c_1.domain_id = cad_1.id))
+    LEFT JOIN public.domains AS cad_1 ON ((c_1.domain_id = cad_1.id))
     )
 ), sdk_based_companies AS (
     SELECT
@@ -62,13 +63,13 @@ WITH api_based_companies AS (
         cm.mapped_category AS app_category,
         sac.company_id,
         sac.parent_id,
-        ad_1.domain AS ad_domain,
+        ad_1.domain_name AS ad_domain,
         'sdk'::text AS tag_source
     FROM ((((
         adtech.store_apps_companies_sdk sac
         LEFT JOIN adtech.companies AS c_1 ON ((sac.company_id = c_1.id))
     )
-    LEFT JOIN public.ad_domains AS ad_1 ON ((c_1.domain_id = ad_1.id))
+    LEFT JOIN public.domains AS ad_1 ON ((c_1.domain_id = ad_1.id))
     )
     LEFT JOIN public.store_apps AS sa_1 ON ((sac.store_app = sa_1.id))
     )
@@ -78,18 +79,20 @@ WITH api_based_companies AS (
     )
 ), distinct_ad_and_pub_domains AS (
     SELECT DISTINCT
-        pd.url AS publisher_domain_url,
-        ad_1.domain AS ad_domain_url,
+        pd.domain_name AS publisher_domain_url,
+        ad_1.domain_name AS ad_domain_url,
         aae.relationship
-    FROM (((
+    FROM ((((
         public.app_ads_entrys aae
-        LEFT JOIN public.ad_domains AS ad_1 ON ((aae.ad_domain = ad_1.id))
+        LEFT JOIN public.domains AS ad_1 ON ((aae.ad_domain = ad_1.id))
     )
     LEFT JOIN public.app_ads_map AS aam ON ((aae.id = aam.app_ads_entry))
     )
-    LEFT JOIN public.pub_domains AS pd ON ((aam.pub_domain = pd.id))
+    LEFT JOIN public.domains AS pd ON ((aam.pub_domain = pd.id))
     )
-    WHERE ((pd.crawled_at - aam.updated_at) < '01:00:00'::interval)
+    LEFT JOIN public.adstxt_crawl_results AS pdcr ON ((pd.id = pdcr.domain_id))
+    )
+    WHERE ((pdcr.crawled_at - aam.updated_at) < '01:00:00'::interval)
 ), adstxt_based_companies AS (
     SELECT DISTINCT
         aum.store_app,
@@ -108,15 +111,15 @@ WITH api_based_companies AS (
         END AS tag_source
     FROM ((((((
         public.app_urls_map aum
-        LEFT JOIN public.pub_domains AS pd ON ((aum.pub_domain = pd.id))
+        LEFT JOIN public.domains AS pd ON ((aum.pub_domain = pd.id))
     )
     LEFT JOIN
         distinct_ad_and_pub_domains AS pnv
-        ON (((pd.url)::text = (pnv.publisher_domain_url)::text))
+        ON (((pd.domain_name)::text = (pnv.publisher_domain_url)::text))
     )
     LEFT JOIN
-        public.ad_domains AS ad_1
-        ON (((pnv.ad_domain_url)::text = (ad_1.domain)::text))
+        public.domains AS ad_1
+        ON (((pnv.ad_domain_url)::text = (ad_1.domain_name)::text))
     )
     LEFT JOIN adtech.companies AS c_1 ON ((ad_1.id = c_1.domain_id))
     )
@@ -184,8 +187,8 @@ FROM (((
     LEFT JOIN frontend.store_apps_overview AS sa ON ((cs.store_app = sa.id))
 )
 LEFT JOIN
-    public.ad_domains AS ad
-    ON (((cs.ad_domain)::text = (ad.domain)::text))
+    public.domains AS ad
+    ON (((cs.ad_domain)::text = (ad.domain_name)::text))
 )
 LEFT JOIN adtech.companies AS c ON ((ad.id = c.domain_id))
 )
@@ -215,4 +218,4 @@ CREATE UNIQUE INDEX combined_store_app_companies_idx ON adtech.combined_store_ap
 -- PostgreSQL database dump complete
 --
 
-\unrestrict QjHnTDEHhAUxvrMdJilMt34rOefgjFG7hFyFMCNhzYvLwHZQwaCjygu90pi2CjB
+\unrestrict XEbw8a7dx2Qu4XbOH3XfBGb8S2wH1sznhHKnwK3pjGSaezRSCUDtiy3ZZha1q5l

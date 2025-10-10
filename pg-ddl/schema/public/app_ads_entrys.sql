@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict RxclwKWhgvWamGEe610Noqlw6kuY53ryxBcmTJ5awuzxrrPtD1iorl4YFdQyrPX
+\restrict EfuV0pfhrNTdeuumgp4MI2aCPNdP7TmWX1Z1FiQuZxekkt1JsQ4arLHMUJMzNUp
 
 -- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 -- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
@@ -79,17 +79,17 @@ CREATE TRIGGER app_ads_entrys_updated_at BEFORE UPDATE ON public.app_ads_entrys 
 
 
 --
--- Name: app_ads_entrys app_ads_txt_fk; Type: FK CONSTRAINT; Schema: public; Owner: james
+-- Name: app_ads_entrys app_ads_entrys_domain_fk; Type: FK CONSTRAINT; Schema: public; Owner: james
 --
 
 ALTER TABLE ONLY public.app_ads_entrys
-ADD CONSTRAINT app_ads_txt_fk FOREIGN KEY (
+ADD CONSTRAINT app_ads_entrys_domain_fk FOREIGN KEY (
     ad_domain
-) REFERENCES public.ad_domains (id);
+) REFERENCES public.domains (id);
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict RxclwKWhgvWamGEe610Noqlw6kuY53ryxBcmTJ5awuzxrrPtD1iorl4YFdQyrPX
+\unrestrict EfuV0pfhrNTdeuumgp4MI2aCPNdP7TmWX1Z1FiQuZxekkt1JsQ4arLHMUJMzNUp

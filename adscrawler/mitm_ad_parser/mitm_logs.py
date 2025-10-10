@@ -188,8 +188,6 @@ def process_flow(
                 + flow.request.path
             )
         tld_url = get_tld(url)
-        if tld_url == ".":
-            tld_url = None
         if flow.response:
             try:
                 # Try decoded content first (may fail if encoding is unknown)
