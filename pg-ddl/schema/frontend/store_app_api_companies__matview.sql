@@ -31,7 +31,7 @@ WITH latest_run_per_app AS (
         saac_1.store_app,
         saac_1.run_id
     FROM (
-        public.store_app_api_calls AS saac_1
+        public.api_calls AS saac_1
         INNER JOIN
             public.version_code_api_scan_results AS vcasr
             ON ((saac_1.run_id = vcasr.id))
@@ -40,19 +40,19 @@ WITH latest_run_per_app AS (
 )
 SELECT DISTINCT
     sa.store_id,
-    saac.tld_url AS company_domain,
+    ac.tld_url AS company_domain,
     c.id AS company_id,
     c.name AS company_name,
     co.alpha2 AS country
-FROM (((((((((
+FROM ((((((((((
     latest_run_per_app lrpa
     LEFT JOIN
-        public.store_app_api_calls AS saac
-        ON ((lrpa.run_id = saac.run_id))
+        public.api_calls AS ac
+        ON ((lrpa.run_id = ac.run_id))
 )
-LEFT JOIN public.ad_domains AS ad ON ((saac.tld_url = (ad.domain)::text))
+LEFT JOIN public.ad_domains AS ad ON ((ac.tld_url = (ad.domain)::text))
 )
-LEFT JOIN public.store_apps AS sa ON ((saac.store_app = sa.id))
+LEFT JOIN public.store_apps AS sa ON ((ac.store_app = sa.id))
 )
 LEFT JOIN adtech.company_domain_mapping AS cdm ON ((ad.id = cdm.domain_id))
 )
@@ -64,7 +64,9 @@ LEFT JOIN adtech.companies AS pc ON ((c.parent_company_id = pc.id))
 )
 LEFT JOIN public.ad_domains AS pcad ON ((pc.domain_id = pcad.id))
 )
-LEFT JOIN public.countries AS co ON ((saac.country_id = co.id))
+LEFT JOIN public.ip_geo_snapshots AS igs ON ((ac.ip_geo_snapshot_id = igs.id))
+)
+LEFT JOIN public.countries AS co ON ((igs.country_id = co.id))
 )
 ORDER BY sa.store_id DESC
 WITH NO DATA;

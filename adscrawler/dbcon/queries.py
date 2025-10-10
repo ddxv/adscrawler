@@ -1072,14 +1072,6 @@ def query_api_calls_for_mitm_uuids(
     return df
 
 
-def query_api_calls_for_run(
-    database_connection: PostgresCon, run_id: int
-) -> pd.DataFrame:
-    sel_query = f"""SELECT * FROM store_app_api_calls WHERE run_id = {run_id};"""
-    df = pd.read_sql(sel_query, con=database_connection.engine)
-    return df
-
-
 @lru_cache(maxsize=1)
 def get_all_mmp_tlds(database_connection: PostgresCon) -> pd.DataFrame:
     sel_query = """SELECT

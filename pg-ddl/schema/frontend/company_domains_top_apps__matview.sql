@@ -42,7 +42,7 @@ WITH deduped_data AS (
         true AS api_call,
         false AS app_ads_direct
     FROM ((((((
-        public.store_app_api_calls saac
+        public.api_calls saac
         LEFT JOIN public.store_apps AS sa_1 ON ((saac.store_app = sa_1.id))
     )
     LEFT JOIN

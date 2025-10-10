@@ -30,7 +30,7 @@ SET default_table_access_method = heap;
 CREATE MATERIALIZED VIEW frontend.advertiser_creatives AS
 SELECT
     saa.store_id AS advertiser_store_id,
-    cr.run_id,
+    ac1.run_id,
     vcasr.run_at,
     sap.name AS pub_name,
     saa.name AS adv_name,
@@ -59,19 +59,21 @@ SELECT
         FROM public.ad_domains
         WHERE (ad_domains.id = ANY(cr.additional_ad_domain_ids))
     ) AS additional_ad_domain_urls
-FROM (((((((((((((((
+FROM ((((((((((((((((
     public.creative_records cr
     LEFT JOIN public.creative_assets AS ca ON ((cr.creative_asset_id = ca.id))
 )
+LEFT JOIN public.api_calls AS ac1 ON ((cr.api_call_id = ac1.id))
+)
 LEFT JOIN
     frontend.store_apps_overview AS sap
-    ON ((cr.store_app_pub_id = sap.id))
+    ON ((ac1.store_app = sap.id))
 )
-LEFT JOIN frontend.store_apps_overview AS saa ON ((ca.store_app_id = saa.id))
+LEFT JOIN frontend.store_apps_overview AS saa ON ((cr.advertiser_store_app_id = saa.id))
 )
 LEFT JOIN
     public.version_code_api_scan_results AS vcasr
-    ON ((cr.run_id = vcasr.id))
+    ON ((ac1.run_id = vcasr.id))
 )
 LEFT JOIN public.ad_domains AS hd ON ((cr.creative_host_domain_id = hd.id))
 )

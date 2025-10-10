@@ -31,22 +31,24 @@ CREATE MATERIALIZED VIEW frontend.companies_creative_rankings AS
 WITH creative_rankings AS (
     SELECT
         ca.file_extension,
-        ca.store_app_id AS advertiser_store_app_id,
+        cr.advertiser_store_app_id,
         cr.creative_initial_domain_id,
         cr.creative_host_domain_id,
         cr.additional_ad_domain_ids,
         vcasr.run_at,
         ca.md5_hash,
         COALESCE(ca.phash, ca.md5_hash) AS vhash
-    FROM ((
+    FROM (((
         public.creative_records cr
         LEFT JOIN
             public.creative_assets AS ca
             ON ((cr.creative_asset_id = ca.id))
     )
+    LEFT JOIN public.api_calls AS ac ON ((cr.api_call_id = ac.id))
+    )
     LEFT JOIN
         public.version_code_api_scan_results AS vcasr
-        ON ((cr.run_id = vcasr.id))
+        ON ((ac.run_id = vcasr.id))
     )
 ), combined_domains AS (
     SELECT

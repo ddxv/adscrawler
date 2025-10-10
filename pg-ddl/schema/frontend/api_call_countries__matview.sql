@@ -29,36 +29,40 @@ SET default_table_access_method = heap;
 
 CREATE MATERIALIZED VIEW frontend.api_call_countries AS
 WITH latest_run_per_app AS (
-    SELECT DISTINCT ON (saac.store_app)
-        saac.store_app,
-        saac.run_id
-    FROM (
-        public.store_app_api_calls AS saac
+    SELECT DISTINCT ON (ac.store_app)
+        ac.store_app,
+        ac.run_id
+    FROM ((
+        public.api_calls AS ac
         INNER JOIN
             public.version_code_api_scan_results AS vcasr
-            ON ((saac.run_id = vcasr.id))
+            ON ((ac.run_id = vcasr.id))
     )
-    WHERE (saac.country_id IS NOT null)
-    ORDER BY saac.store_app ASC, vcasr.run_at DESC
+        INNER JOIN public.ip_geo_snapshots AS igs ON ((ac.ip_geo_snapshot_id = igs.id))
+    )
+    WHERE (igs.country_id IS NOT null)
+    ORDER BY ac.store_app ASC, vcasr.run_at DESC
 ), filtered_calls AS (
     SELECT
-        saac.store_app,
-        saac.tld_url,
-        saac.url,
-        saac.country_id,
-        saac.city_name,
-        saac.org
-    FROM (
-        public.store_app_api_calls AS saac
+        ac.store_app,
+        ac.tld_url,
+        ac.url,
+        igs.country_id,
+        igs.city_name,
+        igs.org
+    FROM ((
+        public.api_calls AS ac
         INNER JOIN
             latest_run_per_app AS lra
             ON
                 (
                     (
-                        (saac.store_app = lra.store_app)
-                        AND (saac.run_id = lra.run_id)
+                        (ac.store_app = lra.store_app)
+                        AND (ac.run_id = lra.run_id)
                     )
                 )
+    )
+    INNER JOIN public.ip_geo_snapshots AS igs ON ((ac.ip_geo_snapshot_id = igs.id))
     )
 ), cleaned_calls AS (
     SELECT

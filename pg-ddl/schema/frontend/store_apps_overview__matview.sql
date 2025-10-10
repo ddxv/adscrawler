@@ -26,7 +26,6 @@ SET default_table_access_method = heap;
 --
 -- Name: store_apps_overview; Type: MATERIALIZED VIEW; Schema: frontend; Owner: postgres
 --
-
 CREATE MATERIALIZED VIEW frontend.store_apps_overview AS
 WITH latest_version_codes AS (
     SELECT DISTINCT ON (version_codes.store_app)
@@ -134,21 +133,18 @@ WITH latest_version_codes AS (
             )
         )
 ), my_ad_creatives AS (
-    SELECT
-        ca.store_app_id,
+     SELECT
+        cr.advertiser_store_app_id AS store_app,
         count(*) AS ad_creative_count
-    FROM (
+    FROM 
         public.creative_records AS cr
-        LEFT JOIN
-            public.creative_assets AS ca
-            ON ((cr.creative_asset_id = ca.id))
-    )
-    GROUP BY ca.store_app_id
+    GROUP BY cr.advertiser_store_app_id
 ), my_mon_creatives AS (
     SELECT DISTINCT
         1 AS ad_mon_creatives,
-        creative_records.store_app_pub_id
-    FROM public.creative_records
+        ac.store_app
+    FROM public.creative_records as cr
+    left join public.api_calls ac on cr.api_call_id = ac.id
 )
 SELECT
     sa.id,
@@ -228,11 +224,12 @@ LEFT JOIN latest_api_calls AS lac ON ((sa.id = lac.store_app))
 )
 LEFT JOIN latest_successful_api_calls AS lsac ON ((sa.id = lsac.store_app))
 )
-LEFT JOIN my_ad_creatives AS acr ON ((sa.id = acr.store_app_id))
+LEFT JOIN my_ad_creatives AS acr ON ((sa.id = acr.store_app))
 )
-LEFT JOIN my_mon_creatives AS amc ON ((sa.id = amc.store_app_pub_id))
+LEFT JOIN my_mon_creatives AS amc ON ((sa.id = amc.store_app))
 )
 WITH NO DATA;
+
 
 
 ALTER MATERIALIZED VIEW frontend.store_apps_overview OWNER TO postgres;
