@@ -9,8 +9,8 @@ WITH has_creatives AS (
             OR
             response_mime_type
             ~* '(image|video)/(jpeg|jpg|png|gif|webp|webm|mp4|mpeg|avi|quicktime)'
-        ) AND response_status_code = 200
-        AND actual_response_size > 50000
+        ) AND status_code = 200
+        AND response_size_bytes > 50000
 ),
 run_counts AS (
     SELECT
