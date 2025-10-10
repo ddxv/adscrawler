@@ -201,7 +201,7 @@ def process_flow(
             response_size_bytes = 0
         # Extract useful data from each flow
         host = flow.request.host
-        if host is None or host == "":
+        if host is None or host == "" or host[:3] == "www":
             host = flow.server_conn.address[0]
         flow_data = {
             "mitm_uuid": mitm_uuid,
