@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict uYwJCm2F2YYiMPbWDLIUP5eLdocGJtOqWK8DbU8SvRtLBg9ccqpeGC2ndhh4B1s
+\restrict wDANfIVctssZtAlKJEpbygiyKTAGYKJFqZ1nlaRChrpY9lKcZ6w2PFixpZCymDN
 
 -- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 -- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
@@ -107,4 +107,4 @@ ADD CONSTRAINT store_apps_country_history_app_fk FOREIGN KEY (
 -- PostgreSQL database dump complete
 --
 
-\unrestrict uYwJCm2F2YYiMPbWDLIUP5eLdocGJtOqWK8DbU8SvRtLBg9ccqpeGC2ndhh4B1s
+\unrestrict wDANfIVctssZtAlKJEpbygiyKTAGYKJFqZ1nlaRChrpY9lKcZ6w2PFixpZCymDN

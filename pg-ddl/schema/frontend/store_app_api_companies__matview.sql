@@ -2,8 +2,10 @@
 -- PostgreSQL database dump
 --
 
--- Dumped from database version 17.5 (Ubuntu 17.5-1.pgdg24.04+1)
--- Dumped by pg_dump version 17.5 (Ubuntu 17.5-1.pgdg24.04+1)
+\restrict FL5lm6OGeQ1U6dQXyedsuzeOMnSIy6FEbGvDGnWOC3n9hSvscb0t4Hhd4GcXtuN
+
+-- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
+-- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -46,9 +48,7 @@ SELECT DISTINCT
     co.alpha2 AS country
 FROM ((((((((((
     latest_run_per_app lrpa
-    LEFT JOIN
-        public.api_calls AS ac
-        ON ((lrpa.run_id = ac.run_id))
+    LEFT JOIN public.api_calls AS ac ON ((lrpa.run_id = ac.run_id))
 )
 LEFT JOIN public.ad_domains AS ad ON ((ac.tld_url = (ad.domain)::text))
 )
@@ -77,3 +77,5 @@ ALTER MATERIALIZED VIEW frontend.store_app_api_companies OWNER TO postgres;
 --
 -- PostgreSQL database dump complete
 --
+
+\unrestrict FL5lm6OGeQ1U6dQXyedsuzeOMnSIy6FEbGvDGnWOC3n9hSvscb0t4Hhd4GcXtuN

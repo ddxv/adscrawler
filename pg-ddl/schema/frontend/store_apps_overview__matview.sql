@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 0ej4FDLxLvEjgRkIb0vMg15YHl3XyTLW3323VbAMm6exByFt1kp9MopkR07E3tc
+\restrict nmbbUbKBdfXTTLVd1qLRt2Bb2FyPhg1OYiRnqhqP6wRjSBkEi0YW0wNtNW2hM2I
 
 -- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 -- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
@@ -26,6 +26,7 @@ SET default_table_access_method = heap;
 --
 -- Name: store_apps_overview; Type: MATERIALIZED VIEW; Schema: frontend; Owner: postgres
 --
+
 CREATE MATERIALIZED VIEW frontend.store_apps_overview AS
 WITH latest_version_codes AS (
     SELECT DISTINCT ON (version_codes.store_app)
@@ -133,18 +134,19 @@ WITH latest_version_codes AS (
             )
         )
 ), my_ad_creatives AS (
-     SELECT
+    SELECT
         cr.advertiser_store_app_id AS store_app,
         count(*) AS ad_creative_count
-    FROM 
-        public.creative_records AS cr
+    FROM public.creative_records AS cr
     GROUP BY cr.advertiser_store_app_id
 ), my_mon_creatives AS (
     SELECT DISTINCT
         1 AS ad_mon_creatives,
         ac.store_app
-    FROM public.creative_records as cr
-    left join public.api_calls ac on cr.api_call_id = ac.id
+    FROM (
+        public.creative_records AS cr
+        LEFT JOIN public.api_calls AS ac ON ((cr.api_call_id = ac.id))
+    )
 )
 SELECT
     sa.id,
@@ -231,7 +233,6 @@ LEFT JOIN my_mon_creatives AS amc ON ((sa.id = amc.store_app))
 WITH NO DATA;
 
 
-
 ALTER MATERIALIZED VIEW frontend.store_apps_overview OWNER TO postgres;
 
 --
@@ -247,4 +248,4 @@ CREATE UNIQUE INDEX store_apps_overview_unique_idx ON frontend.store_apps_overvi
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 0ej4FDLxLvEjgRkIb0vMg15YHl3XyTLW3323VbAMm6exByFt1kp9MopkR07E3tc
+\unrestrict nmbbUbKBdfXTTLVd1qLRt2Bb2FyPhg1OYiRnqhqP6wRjSBkEi0YW0wNtNW2hM2I

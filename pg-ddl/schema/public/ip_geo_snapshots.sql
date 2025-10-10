@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict jTVqWovKXrmhlKCbz7lzcAcPuTXOivaHgvExcc2qTLDDDrBYvmQI6fCN6YzpFUb
+\restrict liD19ISzhq4S5tpmr9tIArfNCzDXydVGER2WGhWBJDjZACICUOAITOkunyITQCb
 
 -- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 -- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
@@ -29,13 +29,13 @@ SET default_table_access_method = heap;
 
 CREATE TABLE public.ip_geo_snapshots (
     id integer NOT NULL,
-    mitm_uuid character varying NOT NULL,
+    mitm_uuid uuid NOT NULL,
     ip_address inet NOT NULL,
     country_id integer,
     state_iso character varying(4),
     city_name character varying,
     org character varying,
-    created_at timestamp without time zone DEFAULT timezone(
+    created_at timestamp with time zone DEFAULT timezone(
         'utc'::text, now()
     ) NOT NULL
 );
@@ -91,6 +91,24 @@ ADD CONSTRAINT ip_geo_unique_key UNIQUE (mitm_uuid);
 
 
 --
+-- Name: idx_ip_geo_ip_created; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_ip_geo_ip_created ON public.ip_geo_snapshots USING btree (
+    ip_address, created_at DESC
+);
+
+
+--
+-- Name: idx_ip_geo_mitm_uuid; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_ip_geo_mitm_uuid ON public.ip_geo_snapshots USING btree (
+    mitm_uuid
+);
+
+
+--
 -- Name: ip_geo_snapshots fk_country; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -104,4 +122,4 @@ ADD CONSTRAINT fk_country FOREIGN KEY (
 -- PostgreSQL database dump complete
 --
 
-\unrestrict jTVqWovKXrmhlKCbz7lzcAcPuTXOivaHgvExcc2qTLDDDrBYvmQI6fCN6YzpFUb
+\unrestrict liD19ISzhq4S5tpmr9tIArfNCzDXydVGER2WGhWBJDjZACICUOAITOkunyITQCb

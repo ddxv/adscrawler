@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict feIgEha86jeuHyYiaQf5RYKuMIbZKGIUVp9NTaaIKBTIqN0omY00qiSNDHx6kIF
+\restrict L2oSIkYWJBdnGPs3GdJmRPIkXqGes63YbgIVvJRz9mN5cAoVmamEhNrSZ6PTPgi
 
 -- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 -- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
@@ -33,32 +33,39 @@ WITH adv_mmp AS (
         cr_1.advertiser_store_app_id,
         cr_1.mmp_domain_id,
         ad.domain AS mmp_domain
-    FROM 
-        public.creative_records cr_1
-    LEFT JOIN public.ad_domains AS ad ON ((cr_1.mmp_domain_id = ad.id))
+    FROM (
+        public.creative_records AS cr_1
+        LEFT JOIN public.ad_domains AS ad ON ((cr_1.mmp_domain_id = ad.id))
+    )
     WHERE (cr_1.mmp_domain_id IS NOT null)
 ), ad_network_domain_ids AS (
     SELECT
         cr_1.advertiser_store_app_id,
         COALESCE(icp.domain_id, ic.domain_id) AS domain_id
-    FROM 
+    FROM (((
         public.creative_records cr_1
-    INNER JOIN
-        adtech.company_domain_mapping AS icdm
-        ON ((cr_1.creative_initial_domain_id = icdm.domain_id))
+        INNER JOIN
+            adtech.company_domain_mapping AS icdm
+            ON ((cr_1.creative_initial_domain_id = icdm.domain_id))
+    )
     LEFT JOIN adtech.companies AS ic ON ((icdm.company_id = ic.id))
+    )
     LEFT JOIN adtech.companies AS icp ON ((ic.parent_company_id = icp.id))
+    )
     UNION
     SELECT
         cr_1.advertiser_store_app_id,
         COALESCE(hcp.domain_id, hc.domain_id) AS domain_id
-    FROM 
+    FROM (((
         public.creative_records cr_1
-    INNER JOIN
-        adtech.company_domain_mapping AS hcdm
-        ON ((cr_1.creative_host_domain_id = hcdm.domain_id))
+        INNER JOIN
+            adtech.company_domain_mapping AS hcdm
+            ON ((cr_1.creative_host_domain_id = hcdm.domain_id))
+    )
     LEFT JOIN adtech.companies AS hc ON ((hcdm.company_id = hc.id))
+    )
     LEFT JOIN adtech.companies AS hcp ON ((hc.parent_company_id = hcp.id))
+    )
 ), ad_network_domains AS (
     SELECT
         adi.advertiser_store_app_id,
@@ -74,7 +81,10 @@ WITH adv_mmp AS (
         cr_1.advertiser_store_app_id,
         vcasr_1.run_at,
         ROW_NUMBER()
-            OVER (PARTITION BY cr_1.advertiser_store_app_id ORDER BY vcasr_1.run_at DESC)
+            OVER (
+                PARTITION BY cr_1.advertiser_store_app_id
+                ORDER BY vcasr_1.run_at DESC
+            )
             AS rn
     FROM (((
         public.creative_records cr_1
@@ -82,13 +92,11 @@ WITH adv_mmp AS (
             public.creative_assets AS ca_1
             ON ((cr_1.creative_asset_id = ca_1.id))
     )
-    LEFT JOIN
-        public.api_calls AS ac
-        ON ((cr_1.api_call_id = ac.id))
+    LEFT JOIN public.api_calls AS ac_1 ON ((cr_1.api_call_id = ac_1.id))
     )
     LEFT JOIN
         public.version_code_api_scan_results AS vcasr_1
-        ON ((ac.run_id = vcasr_1.id))
+        ON ((ac_1.run_id = vcasr_1.id))
     )
 )
 SELECT
@@ -127,17 +135,20 @@ FROM (((((((
 )
 LEFT JOIN public.api_calls AS ac ON ((cr.api_call_id = ac.id))
 )
-LEFT JOIN
-    frontend.store_apps_overview AS sap
-    ON ((ac.store_app = sap.id))
+LEFT JOIN frontend.store_apps_overview AS sap ON ((ac.store_app = sap.id))
 )
-LEFT JOIN frontend.store_apps_overview AS saa ON ((cr.advertiser_store_app_id = saa.id))
+LEFT JOIN
+    frontend.store_apps_overview AS saa
+    ON ((cr.advertiser_store_app_id = saa.id))
 )
 LEFT JOIN
     public.version_code_api_scan_results AS vcasr
     ON ((ac.run_id = vcasr.id))
 )
-LEFT JOIN adv_mmp ON ((cr.advertiser_store_app_id = adv_mmp.advertiser_store_app_id)))
+LEFT JOIN
+    adv_mmp
+    ON ((cr.advertiser_store_app_id = adv_mmp.advertiser_store_app_id))
+)
 LEFT JOIN
     ad_network_domains AS adis
     ON ((cr.advertiser_store_app_id = adis.advertiser_store_app_id))
@@ -164,4 +175,4 @@ ALTER MATERIALIZED VIEW frontend.advertiser_creative_rankings OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict feIgEha86jeuHyYiaQf5RYKuMIbZKGIUVp9NTaaIKBTIqN0omY00qiSNDHx6kIF
+\unrestrict L2oSIkYWJBdnGPs3GdJmRPIkXqGes63YbgIVvJRz9mN5cAoVmamEhNrSZ6PTPgi

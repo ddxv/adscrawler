@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict tCWhDAg20SOnjpbEoTVrsfJFQKrK1CDD9tLN816kQY9owRXr5sB7AheraazndCv
+\restrict NOtORiPobclc2kDuqEsLuFnEg444sOgAKWbzIursKwgQBq8aCLqtnBFLi3hQaJI
 
 -- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 -- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
@@ -78,5 +78,5 @@ CREATE UNIQUE INDEX keyword_scores_unique ON frontend.keyword_scores USING btree
 -- PostgreSQL database dump complete
 --
 
-\unrestrict tCWhDAg20SOnjpbEoTVrsfJFQKrK1CDD9tLN816kQY9owRXr5sB7AheraazndCv
+\unrestrict NOtORiPobclc2kDuqEsLuFnEg444sOgAKWbzIursKwgQBq8aCLqtnBFLi3hQaJI
 

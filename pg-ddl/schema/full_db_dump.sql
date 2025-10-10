@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict K9vLqWejxPqTCUaJBzxlIGnnLBebP1lMfDhuZ60nSIJA3c6hw7F7jXYqki1iWWF
+\restrict jhY1BxHIQktGetCyo5IGw4glN5GDOL8CbjbvpVq8EGVmeQ1AZbkJWm7eCa0FNZp
 
 -- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 -- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
@@ -713,6 +713,31 @@ CREATE MATERIALIZED VIEW adtech.store_apps_companies_sdk AS
 ALTER MATERIALIZED VIEW adtech.store_apps_companies_sdk OWNER TO postgres;
 
 --
+-- Name: api_calls; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.api_calls (
+    id integer NOT NULL,
+    run_id integer NOT NULL,
+    store_app integer NOT NULL,
+    mitm_uuid uuid NOT NULL,
+    flow_type text NOT NULL,
+    tld_url text,
+    status_code smallint NOT NULL,
+    request_mime_type text,
+    response_mime_type text,
+    response_size_bytes integer,
+    url text,
+    ip_geo_snapshot_id integer,
+    called_at timestamp without time zone NOT NULL,
+    created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+
+ALTER TABLE public.api_calls OWNER TO postgres;
+
+--
 -- Name: app_urls_map; Type: TABLE; Schema: public; Owner: james
 --
 
@@ -761,35 +786,23 @@ CREATE MATERIALIZED VIEW public.category_mapping AS
 ALTER MATERIALIZED VIEW public.category_mapping OWNER TO postgres;
 
 --
--- Name: creative_assets; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE public.creative_assets (
-    id integer NOT NULL,
-    store_app_id integer NOT NULL,
-    md5_hash character varying NOT NULL,
-    file_extension character varying NOT NULL,
-    phash character varying
-);
-
-
-ALTER TABLE public.creative_assets OWNER TO postgres;
-
---
 -- Name: creative_records; Type: TABLE; Schema: public; Owner: postgres
 --
 
 CREATE TABLE public.creative_records (
     id integer NOT NULL,
-    creative_initial_domain_id integer NOT NULL,
-    creative_host_domain_id integer NOT NULL,
-    run_id integer NOT NULL,
-    store_app_pub_id integer NOT NULL,
+    api_call_id integer NOT NULL,
     creative_asset_id integer NOT NULL,
-    updated_at timestamp with time zone DEFAULT now(),
+    creative_host_domain_id integer NOT NULL,
+    creative_initial_domain_id integer,
+    advertiser_store_app_id integer,
+    advertiser_domain_id integer,
     mmp_domain_id integer,
     mmp_urls text[],
-    additional_ad_domain_ids integer[]
+    additional_ad_domain_ids integer[],
+    created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
+    CONSTRAINT check_advertiser_or_advertiser_domain CHECK (((advertiser_store_app_id IS NOT NULL) OR (advertiser_domain_id IS NOT NULL) OR ((advertiser_store_app_id IS NULL) AND (advertiser_domain_id IS NULL))))
 );
 
 
@@ -1118,24 +1131,24 @@ CREATE MATERIALIZED VIEW frontend.store_apps_overview AS
             vasr.run_result,
             vasr.run_at
            FROM (public.version_codes vc
-             LEFT JOIN public.version_code_api_scan_results vasr ON ((vasr.version_code_id = vc.id)))
+             LEFT JOIN public.version_code_api_scan_results vasr ON ((vc.id = vasr.version_code_id)))
           WHERE (vc.updated_at >= '2025-05-01 00:00:00'::timestamp without time zone)
         ), latest_successful_api_calls AS (
          SELECT DISTINCT ON (vc.store_app) vc.store_app,
             vasr.run_at
            FROM (public.version_codes vc
-             LEFT JOIN public.version_code_api_scan_results vasr ON ((vasr.version_code_id = vc.id)))
+             LEFT JOIN public.version_code_api_scan_results vasr ON ((vc.id = vasr.version_code_id)))
           WHERE ((vasr.run_result = 1) AND (vc.updated_at >= '2025-05-01 00:00:00'::timestamp without time zone))
         ), my_ad_creatives AS (
-         SELECT ca.store_app_id,
+         SELECT cr.advertiser_store_app_id AS store_app,
             count(*) AS ad_creative_count
-           FROM (public.creative_records cr
-             LEFT JOIN public.creative_assets ca ON ((cr.creative_asset_id = ca.id)))
-          GROUP BY ca.store_app_id
+           FROM public.creative_records cr
+          GROUP BY cr.advertiser_store_app_id
         ), my_mon_creatives AS (
          SELECT DISTINCT 1 AS ad_mon_creatives,
-            creative_records.store_app_pub_id
-           FROM public.creative_records
+            ac.store_app
+           FROM (public.creative_records cr
+             LEFT JOIN public.api_calls ac ON ((cr.api_call_id = ac.id)))
         )
  SELECT sa.id,
     sa.name,
@@ -1199,8 +1212,8 @@ CREATE MATERIALIZED VIEW frontend.store_apps_overview AS
      LEFT JOIN public.store_app_z_scores saz ON ((sa.id = saz.store_app)))
      LEFT JOIN latest_api_calls lac ON ((sa.id = lac.store_app)))
      LEFT JOIN latest_successful_api_calls lsac ON ((sa.id = lsac.store_app)))
-     LEFT JOIN my_ad_creatives acr ON ((sa.id = acr.store_app_id)))
-     LEFT JOIN my_mon_creatives amc ON ((sa.id = amc.store_app_pub_id)))
+     LEFT JOIN my_ad_creatives acr ON ((sa.id = acr.store_app)))
+     LEFT JOIN my_mon_creatives amc ON ((sa.id = amc.store_app)))
   WITH NO DATA;
 
 
@@ -1254,28 +1267,6 @@ CREATE TABLE public.app_ads_map (
 ALTER TABLE public.app_ads_map OWNER TO james;
 
 --
--- Name: store_app_api_calls; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE public.store_app_api_calls (
-    id integer NOT NULL,
-    store_app integer NOT NULL,
-    tld_url text NOT NULL,
-    url text NOT NULL,
-    host text NOT NULL,
-    status_code integer NOT NULL,
-    called_at timestamp without time zone NOT NULL,
-    run_id integer NOT NULL,
-    country_id integer,
-    state_iso character varying(4),
-    city_name character varying,
-    org character varying
-);
-
-
-ALTER TABLE public.store_app_api_calls OWNER TO postgres;
-
---
 -- Name: combined_store_apps_companies; Type: MATERIALIZED VIEW; Schema: adtech; Owner: postgres
 --
 
@@ -1287,7 +1278,7 @@ CREATE MATERIALIZED VIEW adtech.combined_store_apps_companies AS
             c_1.parent_company_id AS parent_id,
             'api_call'::text AS tag_source,
             COALESCE(cad_1.domain, (saac.tld_url)::character varying) AS ad_domain
-           FROM ((((((public.store_app_api_calls saac
+           FROM ((((((public.api_calls saac
              LEFT JOIN public.store_apps sa_1 ON ((saac.store_app = sa_1.id)))
              LEFT JOIN public.category_mapping cm ON (((sa_1.category)::text = (cm.original_category)::text)))
              LEFT JOIN public.ad_domains ad_1 ON ((saac.tld_url = (ad_1.domain)::text)))
@@ -1389,10 +1380,10 @@ ALTER MATERIALIZED VIEW adtech.combined_store_apps_companies OWNER TO postgres;
 --
 
 CREATE MATERIALIZED VIEW adtech.combined_store_apps_parent_companies AS
- SELECT COALESCE(ad.domain, csac.ad_domain) AS ad_domain,
-    csac.store_app,
+ SELECT csac.store_app,
     csac.app_category,
     csac.parent_id AS company_id,
+    COALESCE(ad.domain, csac.ad_domain) AS ad_domain,
     bool_or(csac.sdk) AS sdk,
     bool_or(csac.api_call) AS api_call,
     bool_or(csac.app_ads_direct) AS app_ads_direct
@@ -1552,31 +1543,43 @@ CREATE MATERIALIZED VIEW frontend.adstxt_publishers_overview AS
 ALTER MATERIALIZED VIEW frontend.adstxt_publishers_overview OWNER TO postgres;
 
 --
+-- Name: creative_assets; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.creative_assets (
+    id integer NOT NULL,
+    md5_hash character varying NOT NULL,
+    file_extension character varying NOT NULL,
+    phash character varying,
+    created_at timestamp without time zone DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+
+ALTER TABLE public.creative_assets OWNER TO postgres;
+
+--
 -- Name: advertiser_creative_rankings; Type: MATERIALIZED VIEW; Schema: frontend; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW frontend.advertiser_creative_rankings AS
  WITH adv_mmp AS (
-         SELECT DISTINCT ca_1.store_app_id AS advertiser_store_app_id,
+         SELECT DISTINCT cr_1.advertiser_store_app_id,
             cr_1.mmp_domain_id,
             ad.domain AS mmp_domain
-           FROM ((public.creative_records cr_1
-             LEFT JOIN public.creative_assets ca_1 ON ((cr_1.creative_asset_id = ca_1.id)))
+           FROM (public.creative_records cr_1
              LEFT JOIN public.ad_domains ad ON ((cr_1.mmp_domain_id = ad.id)))
           WHERE (cr_1.mmp_domain_id IS NOT NULL)
         ), ad_network_domain_ids AS (
-         SELECT ca_1.store_app_id AS advertiser_store_app_id,
+         SELECT cr_1.advertiser_store_app_id,
             COALESCE(icp.domain_id, ic.domain_id) AS domain_id
-           FROM ((((public.creative_records cr_1
-             LEFT JOIN public.creative_assets ca_1 ON ((cr_1.creative_asset_id = ca_1.id)))
+           FROM (((public.creative_records cr_1
              JOIN adtech.company_domain_mapping icdm ON ((cr_1.creative_initial_domain_id = icdm.domain_id)))
              LEFT JOIN adtech.companies ic ON ((icdm.company_id = ic.id)))
              LEFT JOIN adtech.companies icp ON ((ic.parent_company_id = icp.id)))
         UNION
-         SELECT ca_1.store_app_id AS advertiser_store_app_id,
+         SELECT cr_1.advertiser_store_app_id,
             COALESCE(hcp.domain_id, hc.domain_id) AS domain_id
-           FROM ((((public.creative_records cr_1
-             LEFT JOIN public.creative_assets ca_1 ON ((cr_1.creative_asset_id = ca_1.id)))
+           FROM (((public.creative_records cr_1
              JOIN adtech.company_domain_mapping hcdm ON ((cr_1.creative_host_domain_id = hcdm.domain_id)))
              LEFT JOIN adtech.companies hc ON ((hcdm.company_id = hc.id)))
              LEFT JOIN adtech.companies hcp ON ((hc.parent_company_id = hcp.id)))
@@ -1588,12 +1591,13 @@ CREATE MATERIALIZED VIEW frontend.advertiser_creative_rankings AS
         ), creative_rankings AS (
          SELECT ca_1.md5_hash,
             ca_1.file_extension,
-            ca_1.store_app_id AS advertiser_store_app_id,
+            cr_1.advertiser_store_app_id,
             vcasr_1.run_at,
-            row_number() OVER (PARTITION BY ca_1.store_app_id ORDER BY vcasr_1.run_at DESC) AS rn
-           FROM ((public.creative_records cr_1
+            row_number() OVER (PARTITION BY cr_1.advertiser_store_app_id ORDER BY vcasr_1.run_at DESC) AS rn
+           FROM (((public.creative_records cr_1
              LEFT JOIN public.creative_assets ca_1 ON ((cr_1.creative_asset_id = ca_1.id)))
-             LEFT JOIN public.version_code_api_scan_results vcasr_1 ON ((cr_1.run_id = vcasr_1.id)))
+             LEFT JOIN public.api_calls ac_1 ON ((cr_1.api_call_id = ac_1.id)))
+             LEFT JOIN public.version_code_api_scan_results vcasr_1 ON ((ac_1.run_id = vcasr_1.id)))
         )
  SELECT saa.name AS advertiser_name,
     saa.store_id AS advertiser_store_id,
@@ -1606,7 +1610,7 @@ CREATE MATERIALIZED VIEW frontend.advertiser_creative_rankings AS
     saa.installs_sum_1w,
     saa.installs_sum_4w,
     count(DISTINCT ca.md5_hash) AS unique_creatives,
-    count(DISTINCT cr.store_app_pub_id) AS unique_publishers,
+    count(DISTINCT ac.store_app) AS unique_publishers,
     min(vcasr.run_at) AS first_seen,
     max(vcasr.run_at) AS last_seen,
     array_agg(DISTINCT ca.file_extension) AS file_types,
@@ -1617,13 +1621,14 @@ CREATE MATERIALIZED VIEW frontend.advertiser_creative_rankings AS
            FROM creative_rankings crk
           WHERE ((crk.advertiser_store_app_id = saa.id) AND (crk.rn <= 5))
           ORDER BY crk.rn) AS top_md5_hashes
-   FROM ((((((public.creative_records cr
+   FROM (((((((public.creative_records cr
      LEFT JOIN public.creative_assets ca ON ((cr.creative_asset_id = ca.id)))
-     LEFT JOIN frontend.store_apps_overview sap ON ((cr.store_app_pub_id = sap.id)))
-     LEFT JOIN frontend.store_apps_overview saa ON ((ca.store_app_id = saa.id)))
-     LEFT JOIN public.version_code_api_scan_results vcasr ON ((cr.run_id = vcasr.id)))
-     LEFT JOIN adv_mmp ON ((ca.store_app_id = adv_mmp.advertiser_store_app_id)))
-     LEFT JOIN ad_network_domains adis ON ((ca.store_app_id = adis.advertiser_store_app_id)))
+     LEFT JOIN public.api_calls ac ON ((cr.api_call_id = ac.id)))
+     LEFT JOIN frontend.store_apps_overview sap ON ((ac.store_app = sap.id)))
+     LEFT JOIN frontend.store_apps_overview saa ON ((cr.advertiser_store_app_id = saa.id)))
+     LEFT JOIN public.version_code_api_scan_results vcasr ON ((ac.run_id = vcasr.id)))
+     LEFT JOIN adv_mmp ON ((cr.advertiser_store_app_id = adv_mmp.advertiser_store_app_id)))
+     LEFT JOIN ad_network_domains adis ON ((cr.advertiser_store_app_id = adis.advertiser_store_app_id)))
   GROUP BY saa.name, saa.store_id, saa.icon_url_512, saa.category, saa.installs, saa.id, saa.icon_url_100, saa.rating, saa.rating_count, saa.installs_sum_1w, saa.installs_sum_4w
   ORDER BY (count(DISTINCT ca.md5_hash)) DESC
   WITH NO DATA;
@@ -1637,32 +1642,31 @@ ALTER MATERIALIZED VIEW frontend.advertiser_creative_rankings OWNER TO postgres;
 
 CREATE MATERIALIZED VIEW frontend.advertiser_creative_rankings_recent_month AS
  WITH adv_mmp AS (
-         SELECT DISTINCT ca_1.store_app_id AS advertiser_store_app_id,
+         SELECT DISTINCT cr_1.advertiser_store_app_id,
             cr_1.mmp_domain_id,
             ad.domain AS mmp_domain
-           FROM ((public.creative_records cr_1
-             LEFT JOIN public.creative_assets ca_1 ON ((cr_1.creative_asset_id = ca_1.id)))
+           FROM (public.creative_records cr_1
              LEFT JOIN public.ad_domains ad ON ((cr_1.mmp_domain_id = ad.id)))
           WHERE (cr_1.mmp_domain_id IS NOT NULL)
         ), ad_network_domain_ids AS (
-         SELECT ca_1.store_app_id AS advertiser_store_app_id,
+         SELECT cr_1.advertiser_store_app_id,
             COALESCE(icp.domain_id, ic.domain_id) AS domain_id
            FROM (((((public.creative_records cr_1
-             LEFT JOIN public.creative_assets ca_1 ON ((cr_1.creative_asset_id = ca_1.id)))
              JOIN adtech.company_domain_mapping icdm ON ((cr_1.creative_initial_domain_id = icdm.domain_id)))
              LEFT JOIN adtech.companies ic ON ((icdm.company_id = ic.id)))
              LEFT JOIN adtech.companies icp ON ((ic.parent_company_id = icp.id)))
-             LEFT JOIN public.version_code_api_scan_results vcasr_1 ON ((cr_1.run_id = vcasr_1.id)))
+             LEFT JOIN public.api_calls ac_1 ON ((cr_1.api_call_id = ac_1.id)))
+             LEFT JOIN public.version_code_api_scan_results vcasr_1 ON ((ac_1.run_id = vcasr_1.id)))
           WHERE (vcasr_1.run_at >= (now() - '1 mon'::interval))
         UNION
-         SELECT ca_1.store_app_id AS advertiser_store_app_id,
+         SELECT cr_1.advertiser_store_app_id,
             COALESCE(hcp.domain_id, hc.domain_id) AS domain_id
            FROM (((((public.creative_records cr_1
-             LEFT JOIN public.creative_assets ca_1 ON ((cr_1.creative_asset_id = ca_1.id)))
              JOIN adtech.company_domain_mapping hcdm ON ((cr_1.creative_host_domain_id = hcdm.domain_id)))
              LEFT JOIN adtech.companies hc ON ((hcdm.company_id = hc.id)))
              LEFT JOIN adtech.companies hcp ON ((hc.parent_company_id = hcp.id)))
-             LEFT JOIN public.version_code_api_scan_results vcasr_1 ON ((cr_1.run_id = vcasr_1.id)))
+             LEFT JOIN public.api_calls ac_1 ON ((cr_1.api_call_id = ac_1.id)))
+             LEFT JOIN public.version_code_api_scan_results vcasr_1 ON ((ac_1.run_id = vcasr_1.id)))
           WHERE (vcasr_1.run_at >= (now() - '1 mon'::interval))
         ), ad_network_domains AS (
          SELECT adi.advertiser_store_app_id,
@@ -1672,12 +1676,13 @@ CREATE MATERIALIZED VIEW frontend.advertiser_creative_rankings_recent_month AS
         ), creative_rankings AS (
          SELECT ca_1.md5_hash,
             ca_1.file_extension,
-            ca_1.store_app_id AS advertiser_store_app_id,
+            cr_1.advertiser_store_app_id,
             vcasr_1.run_at,
-            row_number() OVER (PARTITION BY ca_1.store_app_id ORDER BY vcasr_1.run_at DESC) AS rn
-           FROM ((public.creative_records cr_1
+            row_number() OVER (PARTITION BY cr_1.advertiser_store_app_id ORDER BY vcasr_1.run_at DESC) AS rn
+           FROM (((public.creative_records cr_1
              LEFT JOIN public.creative_assets ca_1 ON ((cr_1.creative_asset_id = ca_1.id)))
-             LEFT JOIN public.version_code_api_scan_results vcasr_1 ON ((cr_1.run_id = vcasr_1.id)))
+             LEFT JOIN public.api_calls ac_1 ON ((cr_1.api_call_id = ac_1.id)))
+             LEFT JOIN public.version_code_api_scan_results vcasr_1 ON ((ac_1.run_id = vcasr_1.id)))
           WHERE (vcasr_1.run_at >= (now() - '1 mon'::interval))
         )
  SELECT saa.name AS advertiser_name,
@@ -1691,7 +1696,7 @@ CREATE MATERIALIZED VIEW frontend.advertiser_creative_rankings_recent_month AS
     saa.installs_sum_1w,
     saa.installs_sum_4w,
     count(DISTINCT ca.md5_hash) AS unique_creatives,
-    count(DISTINCT cr.store_app_pub_id) AS unique_publishers,
+    count(DISTINCT ac.store_app) AS unique_publishers,
     min(vcasr.run_at) AS first_seen,
     max(vcasr.run_at) AS last_seen,
     array_agg(DISTINCT ca.file_extension) AS file_types,
@@ -1702,13 +1707,14 @@ CREATE MATERIALIZED VIEW frontend.advertiser_creative_rankings_recent_month AS
            FROM creative_rankings crk
           WHERE ((crk.advertiser_store_app_id = saa.id) AND (crk.rn <= 5))
           ORDER BY crk.rn) AS top_md5_hashes
-   FROM ((((((public.creative_records cr
+   FROM (((((((public.creative_records cr
+     LEFT JOIN public.api_calls ac ON ((cr.api_call_id = ac.id)))
      LEFT JOIN public.creative_assets ca ON ((cr.creative_asset_id = ca.id)))
-     LEFT JOIN frontend.store_apps_overview sap ON ((cr.store_app_pub_id = sap.id)))
-     LEFT JOIN frontend.store_apps_overview saa ON ((ca.store_app_id = saa.id)))
-     LEFT JOIN public.version_code_api_scan_results vcasr ON ((cr.run_id = vcasr.id)))
-     LEFT JOIN adv_mmp ON ((ca.store_app_id = adv_mmp.advertiser_store_app_id)))
-     LEFT JOIN ad_network_domains adis ON ((ca.store_app_id = adis.advertiser_store_app_id)))
+     LEFT JOIN frontend.store_apps_overview sap ON ((ac.store_app = sap.id)))
+     LEFT JOIN frontend.store_apps_overview saa ON ((cr.advertiser_store_app_id = saa.id)))
+     LEFT JOIN public.version_code_api_scan_results vcasr ON ((ac.run_id = vcasr.id)))
+     LEFT JOIN adv_mmp ON ((cr.advertiser_store_app_id = adv_mmp.advertiser_store_app_id)))
+     LEFT JOIN ad_network_domains adis ON ((cr.advertiser_store_app_id = adis.advertiser_store_app_id)))
   WHERE (vcasr.run_at >= (now() - '1 mon'::interval))
   GROUP BY saa.name, saa.store_id, saa.icon_url_512, saa.category, saa.installs, saa.id, saa.icon_url_100, saa.rating, saa.rating_count, saa.installs_sum_1w, saa.installs_sum_4w
   ORDER BY (count(DISTINCT ca.md5_hash)) DESC
@@ -1723,19 +1729,16 @@ ALTER MATERIALIZED VIEW frontend.advertiser_creative_rankings_recent_month OWNER
 
 CREATE MATERIALIZED VIEW frontend.advertiser_creatives AS
  SELECT saa.store_id AS advertiser_store_id,
-    cr.run_id,
+    ac1.run_id,
     vcasr.run_at,
     sap.name AS pub_name,
     saa.name AS adv_name,
     sap.store_id AS pub_store_id,
     saa.store_id AS adv_store_id,
     hd.domain AS host_domain,
-    COALESCE(hcd.domain, hd.domain) AS host_domain_company_domain,
     hc.name AS host_domain_company_name,
     ad.domain AS ad_domain,
-    COALESCE(acd.domain, ad.domain) AS ad_domain_company_domain,
     ac.name AS ad_domain_company_name,
-    COALESCE(ca.phash, ca.md5_hash) AS vhash,
     ca.md5_hash,
     ca.file_extension,
     sap.icon_url_100 AS pub_icon_url_100,
@@ -1745,14 +1748,18 @@ CREATE MATERIALIZED VIEW frontend.advertiser_creatives AS
     mmp.name AS mmp_name,
     mmpd.domain AS mmp_domain,
     cr.mmp_urls,
+    COALESCE(hcd.domain, hd.domain) AS host_domain_company_domain,
+    COALESCE(acd.domain, ad.domain) AS ad_domain_company_domain,
+    COALESCE(ca.phash, ca.md5_hash) AS vhash,
     ( SELECT COALESCE(array_agg(ad_domains.domain), '{}'::character varying[]) AS array_agg
            FROM public.ad_domains
           WHERE (ad_domains.id = ANY (cr.additional_ad_domain_ids))) AS additional_ad_domain_urls
-   FROM (((((((((((((((public.creative_records cr
+   FROM ((((((((((((((((public.creative_records cr
      LEFT JOIN public.creative_assets ca ON ((cr.creative_asset_id = ca.id)))
-     LEFT JOIN frontend.store_apps_overview sap ON ((cr.store_app_pub_id = sap.id)))
-     LEFT JOIN frontend.store_apps_overview saa ON ((ca.store_app_id = saa.id)))
-     LEFT JOIN public.version_code_api_scan_results vcasr ON ((cr.run_id = vcasr.id)))
+     LEFT JOIN public.api_calls ac1 ON ((cr.api_call_id = ac1.id)))
+     LEFT JOIN frontend.store_apps_overview sap ON ((ac1.store_app = sap.id)))
+     LEFT JOIN frontend.store_apps_overview saa ON ((cr.advertiser_store_app_id = saa.id)))
+     LEFT JOIN public.version_code_api_scan_results vcasr ON ((ac1.run_id = vcasr.id)))
      LEFT JOIN public.ad_domains hd ON ((cr.creative_host_domain_id = hd.id)))
      LEFT JOIN public.ad_domains ad ON ((cr.creative_initial_domain_id = ad.id)))
      LEFT JOIN adtech.company_domain_mapping hcdm ON ((hd.id = hcdm.domain_id)))
@@ -1790,26 +1797,46 @@ CREATE TABLE public.countries (
 ALTER TABLE public.countries OWNER TO postgres;
 
 --
+-- Name: ip_geo_snapshots; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.ip_geo_snapshots (
+    id integer NOT NULL,
+    mitm_uuid uuid NOT NULL,
+    ip_address inet NOT NULL,
+    country_id integer,
+    state_iso character varying(4),
+    city_name character varying,
+    org character varying,
+    created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+
+ALTER TABLE public.ip_geo_snapshots OWNER TO postgres;
+
+--
 -- Name: api_call_countries; Type: MATERIALIZED VIEW; Schema: frontend; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW frontend.api_call_countries AS
  WITH latest_run_per_app AS (
-         SELECT DISTINCT ON (saac.store_app) saac.store_app,
-            saac.run_id
-           FROM (public.store_app_api_calls saac
-             JOIN public.version_code_api_scan_results vcasr ON ((saac.run_id = vcasr.id)))
-          WHERE (saac.country_id IS NOT NULL)
-          ORDER BY saac.store_app, vcasr.run_at DESC
+         SELECT DISTINCT ON (ac.store_app) ac.store_app,
+            ac.run_id
+           FROM ((public.api_calls ac
+             JOIN public.version_code_api_scan_results vcasr ON ((ac.run_id = vcasr.id)))
+             JOIN public.ip_geo_snapshots igs ON ((ac.ip_geo_snapshot_id = igs.id)))
+          WHERE (igs.country_id IS NOT NULL)
+          ORDER BY ac.store_app, vcasr.run_at DESC
         ), filtered_calls AS (
-         SELECT saac.store_app,
-            saac.tld_url,
-            saac.url,
-            saac.country_id,
-            saac.city_name,
-            saac.org
-           FROM (public.store_app_api_calls saac
-             JOIN latest_run_per_app lra ON (((saac.store_app = lra.store_app) AND (saac.run_id = lra.run_id))))
+         SELECT ac.store_app,
+            ac.tld_url,
+            ac.url,
+            igs.country_id,
+            igs.city_name,
+            igs.org
+           FROM ((public.api_calls ac
+             JOIN latest_run_per_app lra ON (((ac.store_app = lra.store_app) AND (ac.run_id = lra.run_id))))
+             JOIN public.ip_geo_snapshots igs ON ((ac.ip_geo_snapshot_id = igs.id)))
         ), cleaned_calls AS (
          SELECT filtered_calls.store_app,
             filtered_calls.tld_url,
@@ -1819,11 +1846,11 @@ CREATE MATERIALIZED VIEW frontend.api_call_countries AS
             regexp_replace(regexp_replace(regexp_replace(filtered_calls.url, '^https?://'::text, ''::text), '\?.*$'::text, ''::text), '^(([^/]+/){0,2}[^/]+).*$'::text, '\1'::text) AS short_url
            FROM filtered_calls
         )
- SELECT COALESCE(cad.domain, (ca.tld_url)::character varying) AS company_domain,
-    COALESCE(pcad.domain, COALESCE(cad.domain, (ca.tld_url)::character varying)) AS parent_company_domain,
-    ca.tld_url,
+ SELECT ca.tld_url,
     co.alpha2 AS country,
     ca.org,
+    COALESCE(cad.domain, (ca.tld_url)::character varying) AS company_domain,
+    COALESCE(pcad.domain, COALESCE(cad.domain, (ca.tld_url)::character varying)) AS parent_company_domain,
     count(DISTINCT ca.store_app) AS store_app_count
    FROM (((((((cleaned_calls ca
      LEFT JOIN public.ad_domains ad ON ((ca.tld_url = (ad.domain)::text)))
@@ -1910,7 +1937,7 @@ CREATE MATERIALIZED VIEW frontend.apps_new_monthly AS
     ra.category AS app_category,
     ra.rn
    FROM (rankedapps ra
-     LEFT JOIN public.store_apps sa ON ((sa.id = ra.id)))
+     LEFT JOIN public.store_apps sa ON ((ra.id = sa.id)))
   WHERE (ra.rn <= 100)
   WITH NO DATA;
 
@@ -1987,7 +2014,7 @@ CREATE MATERIALIZED VIEW frontend.apps_new_weekly AS
     ra.category AS app_category,
     ra.rn
    FROM (rankedapps ra
-     LEFT JOIN public.store_apps sa ON ((sa.id = ra.id)))
+     LEFT JOIN public.store_apps sa ON ((ra.id = sa.id)))
   WHERE (ra.rn <= 100)
   WITH NO DATA;
 
@@ -2064,7 +2091,7 @@ CREATE MATERIALIZED VIEW frontend.apps_new_yearly AS
     ra.category AS app_category,
     ra.rn
    FROM (rankedapps ra
-     LEFT JOIN public.store_apps sa ON ((sa.id = ra.id)))
+     LEFT JOIN public.store_apps sa ON ((ra.id = sa.id)))
   WHERE (ra.rn <= 100)
   WITH NO DATA;
 
@@ -2300,17 +2327,18 @@ ALTER MATERIALIZED VIEW frontend.companies_category_tag_type_stats OWNER TO post
 
 CREATE MATERIALIZED VIEW frontend.companies_creative_rankings AS
  WITH creative_rankings AS (
-         SELECT COALESCE(ca.phash, ca.md5_hash) AS vhash,
-            ca.file_extension,
-            ca.store_app_id AS advertiser_store_app_id,
+         SELECT ca.file_extension,
+            cr.advertiser_store_app_id,
             cr.creative_initial_domain_id,
             cr.creative_host_domain_id,
             cr.additional_ad_domain_ids,
             vcasr.run_at,
-            ca.md5_hash
-           FROM ((public.creative_records cr
+            ca.md5_hash,
+            COALESCE(ca.phash, ca.md5_hash) AS vhash
+           FROM (((public.creative_records cr
              LEFT JOIN public.creative_assets ca ON ((cr.creative_asset_id = ca.id)))
-             LEFT JOIN public.version_code_api_scan_results vcasr ON ((cr.run_id = vcasr.id)))
+             LEFT JOIN public.api_calls ac ON ((cr.api_call_id = ac.id)))
+             LEFT JOIN public.version_code_api_scan_results vcasr ON ((ac.run_id = vcasr.id)))
         ), combined_domains AS (
          SELECT cr.vhash,
             cr.md5_hash,
@@ -2410,10 +2438,10 @@ CREATE MATERIALIZED VIEW frontend.companies_parent_category_stats AS
          SELECT sa.store,
             csac.store_app,
             csac.app_category,
-            COALESCE(ad.domain, csac.ad_domain) AS company_domain,
             c.name AS company_name,
             sa.installs,
-            sa.rating_count
+            sa.rating_count,
+            COALESCE(ad.domain, csac.ad_domain) AS company_domain
            FROM (((adtech.combined_store_apps_companies csac
              LEFT JOIN adtech.companies c ON ((csac.parent_id = c.id)))
              LEFT JOIN public.ad_domains ad ON ((c.domain_id = ad.id)))
@@ -2457,10 +2485,10 @@ CREATE MATERIALIZED VIEW frontend.companies_parent_category_tag_stats AS
             csac.store_app,
             csac.app_category,
             tag.tag_source,
-            COALESCE(ad.domain, csac.ad_domain) AS company_domain,
             c.name AS company_name,
             sa.installs,
-            sa.rating_count
+            sa.rating_count,
+            COALESCE(ad.domain, csac.ad_domain) AS company_domain
            FROM ((((adtech.combined_store_apps_companies csac
              LEFT JOIN adtech.companies c ON ((csac.parent_id = c.id)))
              LEFT JOIN public.ad_domains ad ON ((c.domain_id = ad.id)))
@@ -2598,7 +2626,7 @@ CREATE MATERIALIZED VIEW frontend.company_domains_top_apps AS
             false AS sdk,
             true AS api_call,
             false AS app_ads_direct
-           FROM ((((((public.store_app_api_calls saac
+           FROM ((((((public.api_calls saac
              LEFT JOIN public.store_apps sa_1 ON ((saac.store_app = sa_1.id)))
              LEFT JOIN public.category_mapping cm ON (((sa_1.category)::text = (cm.original_category)::text)))
              LEFT JOIN public.ad_domains ad_1 ON ((saac.tld_url = (ad_1.domain)::text)))
@@ -2867,6 +2895,40 @@ CREATE MATERIALIZED VIEW frontend.latest_sdk_scanned_apps AS
 
 
 ALTER MATERIALIZED VIEW frontend.latest_sdk_scanned_apps OWNER TO postgres;
+
+--
+-- Name: store_app_api_companies; Type: MATERIALIZED VIEW; Schema: frontend; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW frontend.store_app_api_companies AS
+ WITH latest_run_per_app AS (
+         SELECT DISTINCT ON (saac_1.store_app) saac_1.store_app,
+            saac_1.run_id
+           FROM (public.api_calls saac_1
+             JOIN public.version_code_api_scan_results vcasr ON ((saac_1.run_id = vcasr.id)))
+          ORDER BY saac_1.store_app, vcasr.run_at DESC
+        )
+ SELECT DISTINCT sa.store_id,
+    ac.tld_url AS company_domain,
+    c.id AS company_id,
+    c.name AS company_name,
+    co.alpha2 AS country
+   FROM ((((((((((latest_run_per_app lrpa
+     LEFT JOIN public.api_calls ac ON ((lrpa.run_id = ac.run_id)))
+     LEFT JOIN public.ad_domains ad ON ((ac.tld_url = (ad.domain)::text)))
+     LEFT JOIN public.store_apps sa ON ((ac.store_app = sa.id)))
+     LEFT JOIN adtech.company_domain_mapping cdm ON ((ad.id = cdm.domain_id)))
+     LEFT JOIN adtech.companies c ON ((cdm.company_id = c.id)))
+     LEFT JOIN public.ad_domains cad ON ((c.domain_id = cad.id)))
+     LEFT JOIN adtech.companies pc ON ((c.parent_company_id = pc.id)))
+     LEFT JOIN public.ad_domains pcad ON ((pc.domain_id = pcad.id)))
+     LEFT JOIN public.ip_geo_snapshots igs ON ((ac.ip_geo_snapshot_id = igs.id)))
+     LEFT JOIN public.countries co ON ((igs.country_id = co.id)))
+  ORDER BY sa.store_id DESC
+  WITH NO DATA;
+
+
+ALTER MATERIALIZED VIEW frontend.store_app_api_companies OWNER TO postgres;
 
 --
 -- Name: store_app_ranks_weekly; Type: TABLE; Schema: frontend; Owner: postgres
@@ -3353,6 +3415,28 @@ UNION
 ALTER MATERIALIZED VIEW public.ad_network_sdk_keys OWNER TO postgres;
 
 --
+-- Name: api_calls_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.api_calls_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.api_calls_id_seq OWNER TO postgres;
+
+--
+-- Name: api_calls_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.api_calls_id_seq OWNED BY public.api_calls.id;
+
+
+--
 -- Name: app_ads_entrys_id_seq; Type: SEQUENCE; Schema: public; Owner: james
 --
 
@@ -3481,43 +3565,6 @@ ALTER TABLE public.crawl_results ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDE
 
 
 --
--- Name: creative_assets_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
---
-
-CREATE SEQUENCE public.creative_assets_id_seq
-    AS integer
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
-ALTER SEQUENCE public.creative_assets_id_seq OWNER TO postgres;
-
---
--- Name: creative_assets_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
---
-
-ALTER SEQUENCE public.creative_assets_id_seq OWNED BY public.creative_assets.id;
-
-
---
--- Name: creative_assets_new; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE public.creative_assets_new (
-    id integer NOT NULL,
-    md5_hash character varying NOT NULL,
-    file_extension character varying NOT NULL,
-    phash character varying,
-    created_at timestamp without time zone DEFAULT timezone('utc'::text, now()) NOT NULL
-);
-
-
-ALTER TABLE public.creative_assets_new OWNER TO postgres;
-
---
 -- Name: creative_assets_new_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
 --
 
@@ -3536,8 +3583,73 @@ ALTER SEQUENCE public.creative_assets_new_id_seq OWNER TO postgres;
 -- Name: creative_assets_new_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
 --
 
-ALTER SEQUENCE public.creative_assets_new_id_seq OWNED BY public.creative_assets_new.id;
+ALTER SEQUENCE public.creative_assets_new_id_seq OWNED BY public.creative_assets.id;
 
+
+--
+-- Name: creative_attributions; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.creative_attributions (
+    id integer NOT NULL,
+    api_call_id integer NOT NULL,
+    creative_asset_id integer NOT NULL,
+    creative_initial_domain_id integer NOT NULL,
+    creative_host_domain_id integer NOT NULL,
+    mmp_domain_id integer,
+    mmp_urls text[],
+    additional_ad_domain_ids integer[],
+    advertiser_store_app_id integer,
+    click_domain_id integer,
+    created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
+    CONSTRAINT check_advertiser_or_ecommerce CHECK (((advertiser_store_app_id IS NOT NULL) OR (click_domain_id IS NOT NULL) OR ((advertiser_store_app_id IS NULL) AND (click_domain_id IS NULL))))
+);
+
+
+ALTER TABLE public.creative_attributions OWNER TO postgres;
+
+--
+-- Name: creative_attributions_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.creative_attributions_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.creative_attributions_id_seq OWNER TO postgres;
+
+--
+-- Name: creative_attributions_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.creative_attributions_id_seq OWNED BY public.creative_attributions.id;
+
+
+--
+-- Name: creative_records_old; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.creative_records_old (
+    id integer NOT NULL,
+    creative_initial_domain_id integer NOT NULL,
+    creative_host_domain_id integer NOT NULL,
+    run_id integer NOT NULL,
+    store_app_pub_id integer NOT NULL,
+    creative_asset_id integer NOT NULL,
+    updated_at timestamp with time zone DEFAULT now(),
+    mmp_domain_id integer,
+    mmp_urls text[],
+    additional_ad_domain_ids integer[]
+);
+
+
+ALTER TABLE public.creative_records_old OWNER TO postgres;
 
 --
 -- Name: creative_records_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
@@ -3558,7 +3670,29 @@ ALTER SEQUENCE public.creative_records_id_seq OWNER TO postgres;
 -- Name: creative_records_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
 --
 
-ALTER SEQUENCE public.creative_records_id_seq OWNED BY public.creative_records.id;
+ALTER SEQUENCE public.creative_records_id_seq OWNED BY public.creative_records_old.id;
+
+
+--
+-- Name: creative_records_id_seq1; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.creative_records_id_seq1
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.creative_records_id_seq1 OWNER TO postgres;
+
+--
+-- Name: creative_records_id_seq1; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.creative_records_id_seq1 OWNED BY public.creative_records.id;
 
 
 --
@@ -3630,6 +3764,28 @@ ALTER TABLE public.developers ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTI
     NO MAXVALUE
     CACHE 1
 );
+
+
+--
+-- Name: ip_geo_snapshots_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.ip_geo_snapshots_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.ip_geo_snapshots_id_seq OWNER TO postgres;
+
+--
+-- Name: ip_geo_snapshots_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.ip_geo_snapshots_id_seq OWNED BY public.ip_geo_snapshots.id;
 
 
 --
@@ -3766,6 +3922,28 @@ ALTER TABLE public.pub_domains ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENT
 
 
 --
+-- Name: store_app_api_calls_old; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.store_app_api_calls_old (
+    id integer NOT NULL,
+    store_app integer NOT NULL,
+    tld_url text NOT NULL,
+    url text NOT NULL,
+    host text NOT NULL,
+    status_code integer NOT NULL,
+    called_at timestamp without time zone NOT NULL,
+    run_id integer NOT NULL,
+    country_id integer,
+    state_iso character varying(4),
+    city_name character varying,
+    org character varying
+);
+
+
+ALTER TABLE public.store_app_api_calls_old OWNER TO postgres;
+
+--
 -- Name: store_app_api_calls_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
 --
 
@@ -3784,7 +3962,7 @@ ALTER SEQUENCE public.store_app_api_calls_id_seq OWNER TO postgres;
 -- Name: store_app_api_calls_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
 --
 
-ALTER SEQUENCE public.store_app_api_calls_id_seq OWNED BY public.store_app_api_calls.id;
+ALTER SEQUENCE public.store_app_api_calls_id_seq OWNED BY public.store_app_api_calls_old.id;
 
 
 --
@@ -4411,6 +4589,13 @@ ALTER TABLE ONLY adtech.click_url_redirect_chains ALTER COLUMN id SET DEFAULT ne
 
 
 --
+-- Name: api_calls id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.api_calls ALTER COLUMN id SET DEFAULT nextval('public.api_calls_id_seq'::regclass);
+
+
+--
 -- Name: app_keyword_rankings id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
@@ -4421,21 +4606,28 @@ ALTER TABLE ONLY public.app_keyword_rankings ALTER COLUMN id SET DEFAULT nextval
 -- Name: creative_assets id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.creative_assets ALTER COLUMN id SET DEFAULT nextval('public.creative_assets_id_seq'::regclass);
+ALTER TABLE ONLY public.creative_assets ALTER COLUMN id SET DEFAULT nextval('public.creative_assets_new_id_seq'::regclass);
 
 
 --
--- Name: creative_assets_new id; Type: DEFAULT; Schema: public; Owner: postgres
+-- Name: creative_attributions id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.creative_assets_new ALTER COLUMN id SET DEFAULT nextval('public.creative_assets_new_id_seq'::regclass);
+ALTER TABLE ONLY public.creative_attributions ALTER COLUMN id SET DEFAULT nextval('public.creative_attributions_id_seq'::regclass);
 
 
 --
 -- Name: creative_records id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.creative_records ALTER COLUMN id SET DEFAULT nextval('public.creative_records_id_seq'::regclass);
+ALTER TABLE ONLY public.creative_records ALTER COLUMN id SET DEFAULT nextval('public.creative_records_id_seq1'::regclass);
+
+
+--
+-- Name: creative_records_old id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.creative_records_old ALTER COLUMN id SET DEFAULT nextval('public.creative_records_id_seq'::regclass);
 
 
 --
@@ -4443,6 +4635,13 @@ ALTER TABLE ONLY public.creative_records ALTER COLUMN id SET DEFAULT nextval('pu
 --
 
 ALTER TABLE ONLY public.description_keywords ALTER COLUMN id SET DEFAULT nextval('public.description_keywords_id_seq'::regclass);
+
+
+--
+-- Name: ip_geo_snapshots id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.ip_geo_snapshots ALTER COLUMN id SET DEFAULT nextval('public.ip_geo_snapshots_id_seq'::regclass);
 
 
 --
@@ -4467,10 +4666,10 @@ ALTER TABLE ONLY public.platforms ALTER COLUMN id SET DEFAULT nextval('public.ne
 
 
 --
--- Name: store_app_api_calls id; Type: DEFAULT; Schema: public; Owner: postgres
+-- Name: store_app_api_calls_old id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.store_app_api_calls ALTER COLUMN id SET DEFAULT nextval('public.store_app_api_calls_id_seq'::regclass);
+ALTER TABLE ONLY public.store_app_api_calls_old ALTER COLUMN id SET DEFAULT nextval('public.store_app_api_calls_id_seq'::regclass);
 
 
 --
@@ -4685,6 +4884,22 @@ ALTER TABLE ONLY public.ad_domains
 
 
 --
+-- Name: api_calls api_calls_mitm_uuid_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.api_calls
+    ADD CONSTRAINT api_calls_mitm_uuid_key UNIQUE (mitm_uuid);
+
+
+--
+-- Name: api_calls api_calls_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.api_calls
+    ADD CONSTRAINT api_calls_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: app_ads_entrys app_ads_entrys_pkey; Type: CONSTRAINT; Schema: public; Owner: james
 --
 
@@ -4773,50 +4988,66 @@ ALTER TABLE ONLY public.crawl_results
 
 
 --
--- Name: creative_assets_new creative_assets_new_md5_hash_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+-- Name: creative_assets creative_assets_new_md5_hash_key; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.creative_assets_new
+ALTER TABLE ONLY public.creative_assets
     ADD CONSTRAINT creative_assets_new_md5_hash_key UNIQUE (md5_hash);
 
 
 --
--- Name: creative_assets_new creative_assets_new_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+-- Name: creative_assets creative_assets_new_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.creative_assets_new
+ALTER TABLE ONLY public.creative_assets
     ADD CONSTRAINT creative_assets_new_pkey PRIMARY KEY (id);
 
 
 --
--- Name: creative_assets creative_assets_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+-- Name: creative_attributions creative_attributions_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.creative_assets
-    ADD CONSTRAINT creative_assets_pkey PRIMARY KEY (id);
-
-
---
--- Name: creative_assets creative_assets_store_app_id_md5_hash_key; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.creative_assets
-    ADD CONSTRAINT creative_assets_store_app_id_md5_hash_key UNIQUE (store_app_id, md5_hash);
+ALTER TABLE ONLY public.creative_attributions
+    ADD CONSTRAINT creative_attributions_pkey PRIMARY KEY (id);
 
 
 --
--- Name: creative_records creative_records_creative_initial_domain_id_creative_host_d_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+-- Name: creative_attributions creative_attributions_unique; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.creative_attributions
+    ADD CONSTRAINT creative_attributions_unique UNIQUE (api_call_id, creative_asset_id, creative_initial_domain_id, creative_host_domain_id);
+
+
+--
+-- Name: creative_records creative_records__pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.creative_records
+    ADD CONSTRAINT creative_records__pkey PRIMARY KEY (id);
+
+
+--
+-- Name: creative_records creative_records_api_call_id_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.creative_records
+    ADD CONSTRAINT creative_records_api_call_id_key UNIQUE (api_call_id);
+
+
+--
+-- Name: creative_records_old creative_records_creative_initial_domain_id_creative_host_d_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.creative_records_old
     ADD CONSTRAINT creative_records_creative_initial_domain_id_creative_host_d_key UNIQUE (creative_initial_domain_id, creative_host_domain_id, run_id, store_app_pub_id, creative_asset_id);
 
 
 --
--- Name: creative_records creative_records_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+-- Name: creative_records_old creative_records_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.creative_records
+ALTER TABLE ONLY public.creative_records_old
     ADD CONSTRAINT creative_records_pkey PRIMARY KEY (id);
 
 
@@ -4850,6 +5081,22 @@ ALTER TABLE ONLY public.developers
 
 ALTER TABLE ONLY public.developers
     ADD CONSTRAINT developers_un UNIQUE (store, developer_id);
+
+
+--
+-- Name: ip_geo_snapshots ip_geo_snapshots_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.ip_geo_snapshots
+    ADD CONSTRAINT ip_geo_snapshots_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: ip_geo_snapshots ip_geo_unique_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.ip_geo_snapshots
+    ADD CONSTRAINT ip_geo_unique_key UNIQUE (mitm_uuid);
 
 
 --
@@ -4909,10 +5156,10 @@ ALTER TABLE ONLY public.pub_domains
 
 
 --
--- Name: store_app_api_calls store_app_api_calls_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+-- Name: store_app_api_calls_old store_app_api_calls_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.store_app_api_calls
+ALTER TABLE ONLY public.store_app_api_calls_old
     ADD CONSTRAINT store_app_api_calls_pkey PRIMARY KEY (id);
 
 
@@ -5029,10 +5276,10 @@ ALTER TABLE ONLY public.app_keyword_rankings
 
 
 --
--- Name: store_app_api_calls unique_store_app_api_calls; Type: CONSTRAINT; Schema: public; Owner: postgres
+-- Name: store_app_api_calls_old unique_store_app_api_calls; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.store_app_api_calls
+ALTER TABLE ONLY public.store_app_api_calls_old
     ADD CONSTRAINT unique_store_app_api_calls UNIQUE (store_app, tld_url, url, host, status_code, called_at);
 
 
@@ -5615,10 +5862,24 @@ CREATE INDEX developers_name_idx ON public.developers USING gin (to_tsvector('si
 
 
 --
+-- Name: idx_api_calls_mitm_uuid; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_api_calls_mitm_uuid ON public.api_calls USING btree (mitm_uuid);
+
+
+--
+-- Name: idx_api_calls_store_app; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_api_calls_store_app ON public.api_calls USING btree (store_app);
+
+
+--
 -- Name: idx_creative_assets_phash; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE INDEX idx_creative_assets_phash ON public.creative_assets_new USING btree (phash) WHERE (phash IS NOT NULL);
+CREATE INDEX idx_creative_assets_phash ON public.creative_assets USING btree (phash) WHERE (phash IS NOT NULL);
 
 
 --
@@ -5647,6 +5908,20 @@ CREATE INDEX idx_developer_store_apps_domain_id ON public.developer_store_apps U
 --
 
 CREATE UNIQUE INDEX idx_developer_store_apps_unique ON public.developer_store_apps USING btree (developer_id, store_id);
+
+
+--
+-- Name: idx_ip_geo_ip_created; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_ip_geo_ip_created ON public.ip_geo_snapshots USING btree (ip_address, created_at DESC);
+
+
+--
+-- Name: idx_ip_geo_mitm_uuid; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_ip_geo_mitm_uuid ON public.ip_geo_snapshots USING btree (mitm_uuid);
 
 
 --
@@ -6012,6 +6287,30 @@ ALTER TABLE ONLY logging.store_app_waydroid_crawled_at
 
 
 --
+-- Name: api_calls api_calls_ip_geo_snapshot_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.api_calls
+    ADD CONSTRAINT api_calls_ip_geo_snapshot_fk FOREIGN KEY (ip_geo_snapshot_id) REFERENCES public.ip_geo_snapshots(id);
+
+
+--
+-- Name: api_calls api_calls_run_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.api_calls
+    ADD CONSTRAINT api_calls_run_fk FOREIGN KEY (run_id) REFERENCES public.version_code_api_scan_results(id);
+
+
+--
+-- Name: api_calls api_calls_store_app_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.api_calls
+    ADD CONSTRAINT api_calls_store_app_fk FOREIGN KEY (store_app) REFERENCES public.store_apps(id) ON DELETE CASCADE;
+
+
+--
 -- Name: app_ads_map app_ads_map_fk; Type: FK CONSTRAINT; Schema: public; Owner: james
 --
 
@@ -6052,50 +6351,146 @@ ALTER TABLE ONLY public.app_urls_map
 
 
 --
--- Name: creative_assets creative_assets_store_app_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+-- Name: creative_attributions creative_attributions_advertiser_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.creative_assets
-    ADD CONSTRAINT creative_assets_store_app_id_fkey FOREIGN KEY (store_app_id) REFERENCES public.store_apps(id);
+ALTER TABLE ONLY public.creative_attributions
+    ADD CONSTRAINT creative_attributions_advertiser_fk FOREIGN KEY (advertiser_store_app_id) REFERENCES public.store_apps(id);
 
 
 --
--- Name: creative_records creative_records_creative_host_domain_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+-- Name: creative_attributions creative_attributions_asset_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.creative_attributions
+    ADD CONSTRAINT creative_attributions_asset_fk FOREIGN KEY (creative_asset_id) REFERENCES public.creative_assets(id);
+
+
+--
+-- Name: creative_attributions creative_attributions_ecommerce_domain_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.creative_attributions
+    ADD CONSTRAINT creative_attributions_ecommerce_domain_fk FOREIGN KEY (click_domain_id) REFERENCES public.ad_domains(id);
+
+
+--
+-- Name: creative_attributions creative_attributions_host_domain_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.creative_attributions
+    ADD CONSTRAINT creative_attributions_host_domain_fk FOREIGN KEY (creative_host_domain_id) REFERENCES public.ad_domains(id);
+
+
+--
+-- Name: creative_attributions creative_attributions_initial_domain_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.creative_attributions
+    ADD CONSTRAINT creative_attributions_initial_domain_fk FOREIGN KEY (creative_initial_domain_id) REFERENCES public.ad_domains(id);
+
+
+--
+-- Name: creative_attributions creative_attributions_mmp_domain_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.creative_attributions
+    ADD CONSTRAINT creative_attributions_mmp_domain_fk FOREIGN KEY (mmp_domain_id) REFERENCES public.ad_domains(id);
+
+
+--
+-- Name: creative_records creative_records_advertiser_app_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.creative_records
+    ADD CONSTRAINT creative_records_advertiser_app_fk FOREIGN KEY (advertiser_store_app_id) REFERENCES public.store_apps(id);
+
+
+--
+-- Name: creative_records creative_records_advertiser_domain_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.creative_records
+    ADD CONSTRAINT creative_records_advertiser_domain_fk FOREIGN KEY (advertiser_domain_id) REFERENCES public.ad_domains(id);
+
+
+--
+-- Name: creative_records creative_records_api_call_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.creative_records
+    ADD CONSTRAINT creative_records_api_call_fk FOREIGN KEY (api_call_id) REFERENCES public.api_calls(id) ON DELETE CASCADE;
+
+
+--
+-- Name: creative_records creative_records_asset_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.creative_records
+    ADD CONSTRAINT creative_records_asset_fk FOREIGN KEY (creative_asset_id) REFERENCES public.creative_assets(id);
+
+
+--
+-- Name: creative_records_old creative_records_creative_host_domain_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.creative_records_old
     ADD CONSTRAINT creative_records_creative_host_domain_id_fkey FOREIGN KEY (creative_host_domain_id) REFERENCES public.ad_domains(id);
 
 
 --
--- Name: creative_records creative_records_creative_initial_domain_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+-- Name: creative_records_old creative_records_creative_initial_domain_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.creative_records
+ALTER TABLE ONLY public.creative_records_old
     ADD CONSTRAINT creative_records_creative_initial_domain_id_fkey FOREIGN KEY (creative_initial_domain_id) REFERENCES public.ad_domains(id);
 
 
 --
--- Name: creative_records creative_records_mmp_domain_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+-- Name: creative_records creative_records_host_domain_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.creative_records
+    ADD CONSTRAINT creative_records_host_domain_fk FOREIGN KEY (creative_host_domain_id) REFERENCES public.ad_domains(id);
+
+
+--
+-- Name: creative_records creative_records_initial_domain_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.creative_records
+    ADD CONSTRAINT creative_records_initial_domain_fk FOREIGN KEY (creative_initial_domain_id) REFERENCES public.ad_domains(id);
+
+
+--
+-- Name: creative_records creative_records_mmp_domain_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.creative_records
+    ADD CONSTRAINT creative_records_mmp_domain_fk FOREIGN KEY (mmp_domain_id) REFERENCES public.ad_domains(id);
+
+
+--
+-- Name: creative_records_old creative_records_mmp_domain_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.creative_records_old
     ADD CONSTRAINT creative_records_mmp_domain_id_fkey FOREIGN KEY (mmp_domain_id) REFERENCES public.ad_domains(id);
 
 
 --
--- Name: creative_records creative_records_run_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+-- Name: creative_records_old creative_records_run_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.creative_records
+ALTER TABLE ONLY public.creative_records_old
     ADD CONSTRAINT creative_records_run_id_fkey FOREIGN KEY (run_id) REFERENCES public.version_code_api_scan_results(id);
 
 
 --
--- Name: creative_records creative_records_store_app_pub_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+-- Name: creative_records_old creative_records_store_app_pub_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.creative_records
+ALTER TABLE ONLY public.creative_records_old
     ADD CONSTRAINT creative_records_store_app_pub_id_fkey FOREIGN KEY (store_app_pub_id) REFERENCES public.store_apps(id);
 
 
@@ -6140,10 +6535,18 @@ ALTER TABLE ONLY public.app_keyword_rankings
 
 
 --
--- Name: store_app_api_calls fk_country; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+-- Name: store_app_api_calls_old fk_country; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.store_app_api_calls
+ALTER TABLE ONLY public.store_app_api_calls_old
+    ADD CONSTRAINT fk_country FOREIGN KEY (country_id) REFERENCES public.countries(id);
+
+
+--
+-- Name: ip_geo_snapshots fk_country; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.ip_geo_snapshots
     ADD CONSTRAINT fk_country FOREIGN KEY (country_id) REFERENCES public.countries(id);
 
 
@@ -6188,18 +6591,18 @@ ALTER TABLE ONLY public.pub_domains
 
 
 --
--- Name: store_app_api_calls store_app_api_call_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+-- Name: store_app_api_calls_old store_app_api_call_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.store_app_api_calls
+ALTER TABLE ONLY public.store_app_api_calls_old
     ADD CONSTRAINT store_app_api_call_fk FOREIGN KEY (store_app) REFERENCES public.store_apps(id) ON DELETE CASCADE;
 
 
 --
--- Name: store_app_api_calls store_app_api_calls_api_scan_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+-- Name: store_app_api_calls_old store_app_api_calls_api_scan_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.store_app_api_calls
+ALTER TABLE ONLY public.store_app_api_calls_old
     ADD CONSTRAINT store_app_api_calls_api_scan_id_fkey FOREIGN KEY (run_id) REFERENCES public.version_code_api_scan_results(id);
 
 
@@ -6319,5 +6722,5 @@ GRANT ALL ON SCHEMA public TO PUBLIC;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict K9vLqWejxPqTCUaJBzxlIGnnLBebP1lMfDhuZ60nSIJA3c6hw7F7jXYqki1iWWF
+\unrestrict jhY1BxHIQktGetCyo5IGw4glN5GDOL8CbjbvpVq8EGVmeQ1AZbkJWm7eCa0FNZp
 

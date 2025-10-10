@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict S5gKKZ4O67oP9Tb6nui0zzqsWDKP6n4lQ9hyTZFNDN1kOebfzqZEPT5F04ND1SH
+\restrict lN2OfZ5HpnpC2xmqKY2tQHbGn8bIUxhAG1TVA0FXcVqnhG64jUnHU4OAfwIUAcF
 
 -- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 -- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
@@ -29,25 +29,41 @@ SET default_table_access_method = heap;
 
 CREATE TABLE public.creative_records (
     id integer NOT NULL,
-    creative_initial_domain_id integer NOT NULL,
-    creative_host_domain_id integer NOT NULL,
-    run_id integer NOT NULL,
-    store_app_pub_id integer NOT NULL,
+    api_call_id integer NOT NULL,
     creative_asset_id integer NOT NULL,
-    updated_at timestamp with time zone DEFAULT now(),
+    creative_host_domain_id integer NOT NULL,
+    creative_initial_domain_id integer,
+    advertiser_store_app_id integer,
+    advertiser_domain_id integer,
     mmp_domain_id integer,
     mmp_urls text [],
-    additional_ad_domain_ids integer []
+    additional_ad_domain_ids integer [],
+    created_at timestamp with time zone DEFAULT timezone(
+        'utc'::text, now()
+    ) NOT NULL,
+    updated_at timestamp with time zone DEFAULT timezone(
+        'utc'::text, now()
+    ) NOT NULL,
+    CONSTRAINT check_advertiser_or_advertiser_domain CHECK (
+        (
+            (advertiser_store_app_id IS NOT null)
+            OR (advertiser_domain_id IS NOT null)
+            OR (
+                (advertiser_store_app_id IS null)
+                AND (advertiser_domain_id IS null)
+            )
+        )
+    )
 );
 
 
 ALTER TABLE public.creative_records OWNER TO postgres;
 
 --
--- Name: creative_records_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+-- Name: creative_records_id_seq1; Type: SEQUENCE; Schema: public; Owner: postgres
 --
 
-CREATE SEQUENCE public.creative_records_id_seq
+CREATE SEQUENCE public.creative_records_id_seq1
 AS integer
 START WITH 1
 INCREMENT BY 1
@@ -56,13 +72,13 @@ NO MAXVALUE
 CACHE 1;
 
 
-ALTER SEQUENCE public.creative_records_id_seq OWNER TO postgres;
+ALTER SEQUENCE public.creative_records_id_seq1 OWNER TO postgres;
 
 --
--- Name: creative_records_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+-- Name: creative_records_id_seq1; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
 --
 
-ALTER SEQUENCE public.creative_records_id_seq OWNED BY public.creative_records.id;
+ALTER SEQUENCE public.creative_records_id_seq1 OWNED BY public.creative_records.id;
 
 
 --
@@ -70,84 +86,98 @@ ALTER SEQUENCE public.creative_records_id_seq OWNED BY public.creative_records.i
 --
 
 ALTER TABLE ONLY public.creative_records ALTER COLUMN id SET DEFAULT nextval(
-    'public.creative_records_id_seq'::regclass
+    'public.creative_records_id_seq1'::regclass
 );
 
 
 --
--- Name: creative_records creative_records_creative_initial_domain_id_creative_host_d_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+-- Name: creative_records creative_records__pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.creative_records
-ADD CONSTRAINT creative_records_creative_initial_domain_id_creative_host_d_key UNIQUE (
-    creative_initial_domain_id,
-    creative_host_domain_id,
-    run_id,
-    store_app_pub_id,
+ADD CONSTRAINT creative_records__pkey PRIMARY KEY (id);
+
+
+--
+-- Name: creative_records creative_records_api_call_id_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.creative_records
+ADD CONSTRAINT creative_records_api_call_id_key UNIQUE (api_call_id);
+
+
+--
+-- Name: creative_records creative_records_advertiser_app_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.creative_records
+ADD CONSTRAINT creative_records_advertiser_app_fk FOREIGN KEY (
+    advertiser_store_app_id
+) REFERENCES public.store_apps (id);
+
+
+--
+-- Name: creative_records creative_records_advertiser_domain_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.creative_records
+ADD CONSTRAINT creative_records_advertiser_domain_fk FOREIGN KEY (
+    advertiser_domain_id
+) REFERENCES public.ad_domains (id);
+
+
+--
+-- Name: creative_records creative_records_api_call_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.creative_records
+ADD CONSTRAINT creative_records_api_call_fk FOREIGN KEY (
+    api_call_id
+) REFERENCES public.api_calls (id) ON DELETE CASCADE;
+
+
+--
+-- Name: creative_records creative_records_asset_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.creative_records
+ADD CONSTRAINT creative_records_asset_fk FOREIGN KEY (
     creative_asset_id
-);
+) REFERENCES public.creative_assets (id);
 
 
 --
--- Name: creative_records creative_records_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.creative_records
-ADD CONSTRAINT creative_records_pkey PRIMARY KEY (id);
-
-
---
--- Name: creative_records creative_records_creative_host_domain_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+-- Name: creative_records creative_records_host_domain_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.creative_records
-ADD CONSTRAINT creative_records_creative_host_domain_id_fkey FOREIGN KEY (
+ADD CONSTRAINT creative_records_host_domain_fk FOREIGN KEY (
     creative_host_domain_id
 ) REFERENCES public.ad_domains (id);
 
 
 --
--- Name: creative_records creative_records_creative_initial_domain_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+-- Name: creative_records creative_records_initial_domain_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.creative_records
-ADD CONSTRAINT creative_records_creative_initial_domain_id_fkey FOREIGN KEY (
+ADD CONSTRAINT creative_records_initial_domain_fk FOREIGN KEY (
     creative_initial_domain_id
 ) REFERENCES public.ad_domains (id);
 
 
 --
--- Name: creative_records creative_records_mmp_domain_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+-- Name: creative_records creative_records_mmp_domain_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.creative_records
-ADD CONSTRAINT creative_records_mmp_domain_id_fkey FOREIGN KEY (
+ADD CONSTRAINT creative_records_mmp_domain_fk FOREIGN KEY (
     mmp_domain_id
 ) REFERENCES public.ad_domains (id);
-
-
---
--- Name: creative_records creative_records_run_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.creative_records
-ADD CONSTRAINT creative_records_run_id_fkey FOREIGN KEY (
-    run_id
-) REFERENCES public.version_code_api_scan_results (id);
-
-
---
--- Name: creative_records creative_records_store_app_pub_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.creative_records
-ADD CONSTRAINT creative_records_store_app_pub_id_fkey FOREIGN KEY (
-    store_app_pub_id
-) REFERENCES public.store_apps (id);
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict S5gKKZ4O67oP9Tb6nui0zzqsWDKP6n4lQ9hyTZFNDN1kOebfzqZEPT5F04ND1SH
+\unrestrict lN2OfZ5HpnpC2xmqKY2tQHbGn8bIUxhAG1TVA0FXcVqnhG64jUnHU4OAfwIUAcF

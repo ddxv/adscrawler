@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict Cv2eH2FCHWMMKTp7UMezlyE8DNfqdsVsreyXzlSSgy1lmlCj6d9QGa9TNYLxe94
+\restrict Wuio2zQPYX94Cfpv5S3KcGBkFMhbVxyAS7wRnu6SCYVzS7QM9BzcRJCG0fqdvYi
 
 -- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 -- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
@@ -112,4 +112,4 @@ ALTER MATERIALIZED VIEW public.store_apps_history_weekly OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict Cv2eH2FCHWMMKTp7UMezlyE8DNfqdsVsreyXzlSSgy1lmlCj6d9QGa9TNYLxe94
+\unrestrict Wuio2zQPYX94Cfpv5S3KcGBkFMhbVxyAS7wRnu6SCYVzS7QM9BzcRJCG0fqdvYi

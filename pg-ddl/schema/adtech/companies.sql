@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict XPWv9rRCE3ksDddOW0NFOkFGim8elDsczkh71EsVFqjhQ21PBd28IV70KtuNidj
+\restrict 5mdhi5z0MNSFKyDNt378KmpSdktIBiRqIzsHeVIW1k7V43ziEBEMo457xoUqVm2
 
 -- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 -- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
@@ -102,4 +102,4 @@ ADD CONSTRAINT fk_companies_parent FOREIGN KEY (
 -- PostgreSQL database dump complete
 --
 
-\unrestrict XPWv9rRCE3ksDddOW0NFOkFGim8elDsczkh71EsVFqjhQ21PBd28IV70KtuNidj
+\unrestrict 5mdhi5z0MNSFKyDNt378KmpSdktIBiRqIzsHeVIW1k7V43ziEBEMo457xoUqVm2

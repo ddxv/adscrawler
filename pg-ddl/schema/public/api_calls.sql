@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict LD9SU1XNQEvT7SbWgdSDB9vyM5KxwhbQUayVWopQkHmsLXbo3w1kkb3kLYLmfPZ
+\restrict djWcReop2yLPDQHoR0xL5mbonsP8RWANu7c1TOsTdfvUnJcFCtNIOO1NJ26nhiD
 
 -- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 -- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
@@ -84,11 +84,11 @@ ALTER TABLE ONLY public.api_calls ALTER COLUMN id SET DEFAULT nextval(
 
 
 --
--- Name: api_calls api_calls_call_uuid_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+-- Name: api_calls api_calls_mitm_uuid_key; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.api_calls
-ADD CONSTRAINT api_calls_call_uuid_key UNIQUE (mitm_uuid);
+ADD CONSTRAINT api_calls_mitm_uuid_key UNIQUE (mitm_uuid);
 
 
 --
@@ -100,11 +100,29 @@ ADD CONSTRAINT api_calls_pkey PRIMARY KEY (id);
 
 
 --
--- Name: api_calls api_calls_ip_geo_snapshot_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+-- Name: idx_api_calls_mitm_uuid; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_api_calls_mitm_uuid ON public.api_calls USING btree (
+    mitm_uuid
+);
+
+
+--
+-- Name: idx_api_calls_store_app; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_api_calls_store_app ON public.api_calls USING btree (
+    store_app
+);
+
+
+--
+-- Name: api_calls api_calls_ip_geo_snapshot_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.api_calls
-ADD CONSTRAINT api_calls_ip_geo_snapshot_id_fk FOREIGN KEY (
+ADD CONSTRAINT api_calls_ip_geo_snapshot_fk FOREIGN KEY (
     ip_geo_snapshot_id
 ) REFERENCES public.ip_geo_snapshots (id);
 
@@ -133,4 +151,4 @@ ADD CONSTRAINT api_calls_store_app_fk FOREIGN KEY (
 -- PostgreSQL database dump complete
 --
 
-\unrestrict LD9SU1XNQEvT7SbWgdSDB9vyM5KxwhbQUayVWopQkHmsLXbo3w1kkb3kLYLmfPZ
+\unrestrict djWcReop2yLPDQHoR0xL5mbonsP8RWANu7c1TOsTdfvUnJcFCtNIOO1NJ26nhiD

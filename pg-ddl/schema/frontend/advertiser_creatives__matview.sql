@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict uVImMLgjP5ZQ9k9IQIebMD9PJm2DQZHNvV8hWTxLHVXhqsAa7RZRXpqljeXW9Dc
+\restrict p8wDmDranZmwvXQVcF8aM7HOZfeGFRKQt5pqnG9by6ikomxQr4RQJmfyewcuVr1
 
 -- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 -- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
@@ -65,11 +65,11 @@ FROM ((((((((((((((((
 )
 LEFT JOIN public.api_calls AS ac1 ON ((cr.api_call_id = ac1.id))
 )
-LEFT JOIN
-    frontend.store_apps_overview AS sap
-    ON ((ac1.store_app = sap.id))
+LEFT JOIN frontend.store_apps_overview AS sap ON ((ac1.store_app = sap.id))
 )
-LEFT JOIN frontend.store_apps_overview AS saa ON ((cr.advertiser_store_app_id = saa.id))
+LEFT JOIN
+    frontend.store_apps_overview AS saa
+    ON ((cr.advertiser_store_app_id = saa.id))
 )
 LEFT JOIN
     public.version_code_api_scan_results AS vcasr
@@ -108,4 +108,4 @@ ALTER MATERIALIZED VIEW frontend.advertiser_creatives OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict uVImMLgjP5ZQ9k9IQIebMD9PJm2DQZHNvV8hWTxLHVXhqsAa7RZRXpqljeXW9Dc
+\unrestrict p8wDmDranZmwvXQVcF8aM7HOZfeGFRKQt5pqnG9by6ikomxQr4RQJmfyewcuVr1

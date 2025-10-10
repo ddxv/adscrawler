@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict uYKHh2tSVDUJ0GAsXNcfDYiIUg8Be7ddAaYcq4igLL2YX0dtJSrhTMGJWlyYSvd
+\restrict zIOEuMEUrXK4LLSxJdyd3dUPAMFN04HI4PYz1G1GUm0rhpmRZc8EWiSxCdKQBmD
 
 -- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 -- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
@@ -33,12 +33,14 @@ WITH latest_run_per_app AS (
         ac.store_app,
         ac.run_id
     FROM ((
-        public.api_calls AS ac
+        public.api_calls ac
         INNER JOIN
             public.version_code_api_scan_results AS vcasr
             ON ((ac.run_id = vcasr.id))
     )
-        INNER JOIN public.ip_geo_snapshots AS igs ON ((ac.ip_geo_snapshot_id = igs.id))
+    INNER JOIN
+        public.ip_geo_snapshots AS igs
+        ON ((ac.ip_geo_snapshot_id = igs.id))
     )
     WHERE (igs.country_id IS NOT null)
     ORDER BY ac.store_app ASC, vcasr.run_at DESC
@@ -51,18 +53,14 @@ WITH latest_run_per_app AS (
         igs.city_name,
         igs.org
     FROM ((
-        public.api_calls AS ac
+        public.api_calls ac
         INNER JOIN
             latest_run_per_app AS lra
-            ON
-                (
-                    (
-                        (ac.store_app = lra.store_app)
-                        AND (ac.run_id = lra.run_id)
-                    )
-                )
+            ON (((ac.store_app = lra.store_app) AND (ac.run_id = lra.run_id)))
     )
-    INNER JOIN public.ip_geo_snapshots AS igs ON ((ac.ip_geo_snapshot_id = igs.id))
+    INNER JOIN
+        public.ip_geo_snapshots AS igs
+        ON ((ac.ip_geo_snapshot_id = igs.id))
     )
 ), cleaned_calls AS (
     SELECT
@@ -136,4 +134,4 @@ CREATE UNIQUE INDEX api_call_countries_unique ON frontend.api_call_countries USI
 -- PostgreSQL database dump complete
 --
 
-\unrestrict uYKHh2tSVDUJ0GAsXNcfDYiIUg8Be7ddAaYcq4igLL2YX0dtJSrhTMGJWlyYSvd
+\unrestrict zIOEuMEUrXK4LLSxJdyd3dUPAMFN04HI4PYz1G1GUm0rhpmRZc8EWiSxCdKQBmD

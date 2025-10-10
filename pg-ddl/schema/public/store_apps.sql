@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict kbgKApMuGLxSqRljgXNysrXXnQLs7YWlhtwrZWamkfl56rWIYzX8X8DVomRI8po
+\restrict 0xjAHJ4VGhiIcVSX80u14DmpqSdUagLwWTWZtoZNyfEwCSXUEnutDgb1EM42kPB
 
 -- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
 -- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
@@ -193,4 +193,4 @@ ADD CONSTRAINT store_apps_fk_1 FOREIGN KEY (
 -- PostgreSQL database dump complete
 --
 
-\unrestrict kbgKApMuGLxSqRljgXNysrXXnQLs7YWlhtwrZWamkfl56rWIYzX8X8DVomRI8po
+\unrestrict 0xjAHJ4VGhiIcVSX80u14DmpqSdUagLwWTWZtoZNyfEwCSXUEnutDgb1EM42kPB
