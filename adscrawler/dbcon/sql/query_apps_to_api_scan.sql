@@ -107,7 +107,7 @@ monthly_ads_scheduled_to_run AS (
         AND sa.ad_supported
         AND sa.free
         AND (fr.failed_attempts < 1 OR fr.failed_attempts IS NULL)
-        AND sa.id IN (SELECT store_app_pub_id FROM creative_records)
+        AND sa.id IN (SELECT ac.store_app FROM creative_records LEFT JOIN api_calls ac ON creative_records.api_call_id = ac.id)
     ORDER BY sa.installs DESC
 ),
 user_requested_apps_crawl AS (

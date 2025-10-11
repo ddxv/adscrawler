@@ -333,7 +333,7 @@ def scrape_app_ads_url(
         on=["domain_name"],
         validate="many_to_one",
     ).rename(columns={"id": "ad_domain"})
-    app_df["pub_domain"] = pub_domain_df["id"].astype(object)[0]
+    app_df["pub_domain"] = domain_id
     insert_columns = [
         "ad_domain",
         "publisher_id",
