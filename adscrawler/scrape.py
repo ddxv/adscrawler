@@ -1,4 +1,5 @@
 import csv
+import datetime
 import io
 from typing import TypedDict
 
@@ -302,10 +303,11 @@ def scrape_app_ads_url(
     except Exception as error:
         logger.exception(f"{info} unknown ERROR: {error}")
         result_dict["crawl_result"] = 4
-    insert_columns = ["domain_id", "crawl_result"]
+    insert_columns = ["domain_id", "crawl_result", "crawled_at"]
     pub_domain_df = pd.DataFrame([result_dict])
     pub_domain_df["domain_id"] = domain_id
     pub_domain_df["crawl_result"] = pub_domain_df["crawl_result"].astype(int)
+    pub_domain_df["crawled_at"] = datetime.datetime.now(tz=datetime.UTC)
     pub_domain_df = upsert_df(
         table_name="adstxt_crawl_results",
         df=pub_domain_df,
