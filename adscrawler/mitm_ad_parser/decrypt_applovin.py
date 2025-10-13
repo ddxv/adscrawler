@@ -94,7 +94,6 @@ def decode_from(blob: bytes, database_connection: PostgresCon) -> str | None:
     if found_text:
         return found_text
     else:
-        logger.error(f"Decode {version=} failed")
         return None
 
 
@@ -173,7 +172,7 @@ def decode_v1_from(payload: bytes, sdk_prefix32: str) -> str | None:
     try:
         plain = plain.decode("utf-8")
     except Exception:
-        logger.error("Decode V1 failed final decode to utf-8")
+        logger.debug("Decode V1 failed final decode to utf-8")
         return None
     return plain
 
@@ -218,7 +217,7 @@ def decode_v2_from(blob: bytes, sdk_prefix32: str) -> str | None:
                 return text
         except Exception:
             continue
-    logger.error("Decode V2 failed")
+    logger.debug("Decode V2 failed")
     return None
 
 

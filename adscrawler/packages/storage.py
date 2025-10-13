@@ -5,6 +5,7 @@ import shutil
 import boto3
 import numpy as np
 import pandas as pd
+from botocore.exceptions import ClientError
 
 from adscrawler.config import (
     APKS_DIR,
@@ -541,14 +542,19 @@ def download_app_to_local(
 
 def creative_exists_in_s3(md5_hash: str, extension: str) -> bool:
     """Check if a creative already exists in S3 (fast)."""
+
     hash_prefix = md5_hash[0:3]
     s3_key = f"creatives/raw/{hash_prefix}/{md5_hash}.{extension}"
     s3_client = get_s3_client()
     try:
         s3_client.head_object(Bucket=CONFIG["s3"]["bucket"], Key=s3_key)
         return True
-    except s3_client.exceptions.NoSuchKey:
-        return False
+    except ClientError as e:
+        # Check if it's a 404 (not found) error
+        if e.response["Error"]["Code"] == "404":
+            return False
+        # Re-raise other errors (permissions, etc.)
+        raise
 
 
 S3_CLIENT = None

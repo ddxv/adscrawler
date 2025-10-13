@@ -48,16 +48,12 @@ def decode_network_request(
                 blob=flowpart.content, database_connection=database_connection
             )
             if text is None:
-                logger.error(f"Decode {url[:40]=} failed")
-                try:
-                    text = flowpart.get_text()
-                except Exception:
-                    text = "Unknown decode error"
+                logger.warning(f"Decode {url[:40]=} failed")
         except Exception:
-            text = flowpart.get_text()
+            text = None
     else:
         logger.error(f"Unknown Decode Network Request URL: {url}")
-        text = flowpart.get_text()
+        text = None
     return text
 
 
@@ -71,10 +67,6 @@ def get_mitm_df(
         error_msg = "No data in mitm df"
         logger.error(error_msg)
         return pd.DataFrame(), pd.DataFrame(), error_msg
-    # if "status_code" not in df.columns:
-    #     error_msg = "No status code found in df, skipping"
-    #     logger.error(error_msg)
-    #     return pd.DataFrame(), pd.DataFrame(), error_msg
     df = add_file_extension(df)
     df = add_is_creative_column(df)
     if df["is_creative"].sum() == 0:
@@ -255,12 +247,19 @@ def append_additional_mitm_data(
     database_connection: PostgresCon,
 ) -> dict:
     """Appends additional data from the mitm flow to the flow_data dictionary."""
-    if "applovin.com" in tld_url:
-        flow_data["request_text"] = decode_network_request(
+    if tld_url and "applovin.com" in tld_url:
+        decoded_text = decode_network_request(
             url,
             flowpart=flow.request,
             database_connection=database_connection,
         )
+        if decoded_text is not None:
+            flow_data["request_text"] = decoded_text
+        else:
+            try:
+                flow_data["request_text"] = flow.request.get_text()
+            except Exception:
+                flow_data["request_text"] = ""
     else:
         try:
             flow_data["request_text"] = flow.request.get_text()
@@ -278,12 +277,23 @@ def append_additional_mitm_data(
             flow_data["status_code"] = flow.response.status_code
         except Exception:
             flow_data["status_code"] = -1
-        if "applovin.com" in tld_url:
-            flow_data["response_text"] = decode_network_request(
+        try:
+            flow_data["response_headers"] = dict(flow.response.headers)
+        except Exception:
+            flow_data["response_headers"] = {}
+        if tld_url and "applovin.com" in tld_url:
+            decoded_text = decode_network_request(
                 url,
                 flowpart=flow.response,
                 database_connection=database_connection,
             )
+            if decoded_text is not None:
+                flow_data["response_text"] = decoded_text
+            else:
+                try:
+                    flow_data["response_text"] = flow.response.get_text()
+                except Exception:
+                    flow_data["response_text"] = ""
         else:
             try:
                 flow_data["response_text"] = flow.response.get_text()
@@ -299,19 +309,23 @@ def append_additional_mitm_data(
 
 def add_file_extension(df: pd.DataFrame) -> pd.DataFrame:
     """Adds file extension column to DataFrame based on URL or content type."""
-    df["file_extension"] = df["url"].apply(lambda x: x.split(".")[-1])
-    ext_too_long = (df["file_extension"].str.len() > 4) & (
-        df["response_mime_type"].fillna("").str.contains("/")
+
+    ext_too_long = (
+        df["url"]
+        .apply(lambda x: x.split(".")[-1] if x else "NoExtensionFound")
+        .str.len()
+        > 4
     )
+    has_mimetype = df["response_mime_type"].fillna("").str.contains("/")
 
     def get_subtype(x):
         parts = x.split("/")
         return parts[1] if len(parts) > 1 else None
 
     df["file_extension"] = np.where(
-        ext_too_long,
+        ext_too_long | ~has_mimetype,
         df["response_mime_type"].fillna("").apply(get_subtype),
-        df["file_extension"],
+        "",
     )
     return df
 

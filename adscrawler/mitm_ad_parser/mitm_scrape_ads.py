@@ -146,13 +146,13 @@ def attribute_creatives(
             logger.error(f"{error_msg} for {row['tld_url']} {video_id}")
             row["error_msg"] = error_msg
             error_messages.append(row)
-            continue
+            adv_store_id = None
         elif len(found_advs) == 0:
             error_msg = f"No adv_store_id found for {row['tld_url']} {video_id=}"
             logger.error(error_msg)
             row["error_msg"] = error_msg
             error_messages.append(row)
-            continue
+            adv_store_id = None
         else:
             adv_store_id = found_advs[0]
         found_mmp_urls = [
@@ -174,7 +174,6 @@ def attribute_creatives(
         try:
             md5_hash = store_creatives(
                 row,
-                adv_store_id=adv_store_id,
                 file_extension=file_extension,
             )
         except Exception:
@@ -186,7 +185,6 @@ def attribute_creatives(
         try:
             phash = get_phash(
                 md5_hash=md5_hash,
-                adv_store_id=adv_store_id,
                 file_extension=file_extension,
             )
         except Exception:
@@ -202,6 +200,13 @@ def attribute_creatives(
             error_messages.append(row)
             continue
         init_tlds = [x["init_tld"] for x in found_ad_infos]
+        if len(init_tlds) == 0:
+            init_tld = None
+            error_msg = "No initial domain found"
+            logger.error(f"{error_msg} for {row['tld_url']} {video_id}")
+            row["error_msg"] = error_msg
+            error_messages.append(row)
+            continue
         init_tld = init_tlds[0]
         adv_store_app_ids = [x["adv_store_app_id"] for x in found_ad_infos]
         adv_store_app_id = adv_store_app_ids[0]
@@ -263,11 +268,11 @@ def append_missing_domains(
             new_ad_domains = (
                 missing_ad_domains[[col]]
                 .drop_duplicates()
-                .rename(columns={col: "domain"})
+                .rename(columns={col: "domain_name"})
             )
             new_ad_domains = upsert_df(
                 table_name="domains",
-                df=new_ad_domains.rename(columns={"domain": "domain_name"}),
+                df=new_ad_domains,
                 insert_columns=["domain_name"],
                 key_columns=["domain_name"],
                 database_connection=database_connection,
@@ -297,14 +302,14 @@ def add_additional_domain_id_column(
 
     # Merge on the exploded domain value
     merged = exploded.merge(
-        ad_domains_df[["domain_name", "company_id"]],
+        ad_domains_df[["domain_name", "domain_id"]],
         left_on="found_ad_network_tlds",
         right_on="domain_name",
         how="left",
     )
 
     # Group back the matching ids by the original row index
-    grouped = merged.groupby("orig_idx")["company_id"].apply(
+    grouped = merged.groupby("orig_idx")["domain_id"].apply(
         lambda ids: [int(i) for i in ids.dropna().unique()]
     )
 
@@ -344,23 +349,26 @@ def make_creative_records_df(
     ad_domains_df = append_missing_domains(
         ad_domains_df, creative_records_df, database_connection
     )
+    # For mapping we only want the mapped domains
+    ad_domains_df = ad_domains_df[~ad_domains_df["domain_id"].isna()]
+    ad_domains_df["domain_id"] = ad_domains_df["domain_id"].astype(int)
     creative_records_df = add_additional_domain_id_column(
         creative_records_df, ad_domains_df
     )
     creative_records_df = creative_records_df.merge(
-        ad_domains_df.rename(columns={"company_id": "creative_host_domain_id"}),
+        ad_domains_df.rename(columns={"domain_id": "creative_host_domain_id"}),
         left_on="host_ad_network_tld",
         right_on="domain_name",
         how="left",
     )
     creative_records_df = creative_records_df.merge(
-        ad_domains_df.rename(columns={"company_id": "creative_initial_domain_id"}),
+        ad_domains_df.rename(columns={"domain_id": "creative_initial_domain_id"}),
         left_on="creative_initial_domain_tld",
         right_on="domain_name",
         how="left",
     )
     creative_records_df = creative_records_df.merge(
-        ad_domains_df.rename(columns={"company_id": "mmp_domain_id"}),
+        ad_domains_df.rename(columns={"domain_id": "mmp_domain_id"}),
         left_on="mmp_tld",
         right_on="domain_name",
         how="left",
@@ -399,6 +407,7 @@ def parse_store_id_mitm_log(
     database_connection: PostgresCon,
 ) -> list[dict[str, Any]]:
     """Parses MITM log for a specific store ID and processes creative content."""
+
     df, error_message = get_mitm_df(pub_store_id, run_id, database_connection)
     if error_message:
         logger.error(error_message)
@@ -539,7 +548,7 @@ def scan_all_apps(
         i += 1
         pub_store_id = runlog["store_id"]
         run_id = runlog["run_id"]
-        logger.info(f"{i}/{mitms_count}: {pub_store_id} start")
+        logger.info(f"{i}/{mitms_count}: {pub_store_id} {run_id=} start")
         try:
             error_messages = parse_store_id_mitm_log(
                 pub_store_id, run_id, database_connection

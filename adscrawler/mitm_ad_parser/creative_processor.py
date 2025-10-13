@@ -18,6 +18,8 @@ def extract_frame_at(local_path: pathlib.Path, second: int) -> Image.Image:
     subprocess.run(
         [
             "ffmpeg",
+            "-loglevel",
+            "error",
             "-y",
             "-ss",
             str(second),
@@ -57,12 +59,10 @@ def compute_phash_multiple_frames(local_path: pathlib.Path, seconds: list[int]) 
     return str(phash)
 
 
-def get_phash(md5_hash: str, adv_store_id: str, file_extension: str) -> str:
+def get_phash(md5_hash: str, file_extension: str) -> str:
     """Generates a perceptual hash for a creative file, using multiple frames for videos."""
     phash = None
-    local_path = (
-        pathlib.Path(CREATIVES_DIR, adv_store_id) / f"{md5_hash}.{file_extension}"
-    )
+    local_path = pathlib.Path(CREATIVES_DIR, "raw") / f"{md5_hash}.{file_extension}"
     seekable_formats = {"mp4", "webm", "gif"}
     if file_extension in seekable_formats:
         try:
@@ -75,10 +75,10 @@ def get_phash(md5_hash: str, adv_store_id: str, file_extension: str) -> str:
     return phash
 
 
-def store_creatives(row: pd.Series, adv_store_id: str, file_extension: str) -> str:
+def store_creatives(row: pd.Series, file_extension: str) -> str:
     """Stores creative files locally and generates thumbnails, returning the MD5 hash."""
     thumbnail_width = 320
-    local_dir = pathlib.Path(CREATIVES_DIR, adv_store_id)
+    local_dir = pathlib.Path(CREATIVES_DIR, "raw")
     local_dir.mkdir(parents=True, exist_ok=True)
     thumbs_dir = CREATIVES_DIR / "thumbs"
     thumbs_dir.mkdir(parents=True, exist_ok=True)
@@ -99,6 +99,8 @@ def store_creatives(row: pd.Series, adv_store_id: str, file_extension: str) -> s
                     subprocess.run(
                         [
                             "ffmpeg",
+                            "-loglevel",
+                            "error",
                             "-y",
                             "-ss",
                             "5",
@@ -115,13 +117,14 @@ def store_creatives(row: pd.Series, adv_store_id: str, file_extension: str) -> s
                             str(thumb_path),
                         ],
                         check=True,
-                        stdout=subprocess.DEVNULL,
                     )
                 except subprocess.CalledProcessError:
                     # Fallback: use first frame (or static image frame)
                     subprocess.run(
                         [
                             "ffmpeg",
+                            "-loglevel",
+                            "error",
                             "-y",
                             "-i",
                             str(local_path),
@@ -136,14 +139,14 @@ def store_creatives(row: pd.Series, adv_store_id: str, file_extension: str) -> s
                             str(thumb_path),
                         ],
                         check=True,
-                        stdout=subprocess.DEVNULL,
-                        stderr=subprocess.DEVNULL,
                     )
             elif ext in static_formats:
                 # Static images: no need to seek, just resize
                 subprocess.run(
                     [
                         "ffmpeg",
+                        "-loglevel",
+                        "error",
                         "-y",
                         "-i",
                         str(local_path),
@@ -156,7 +159,6 @@ def store_creatives(row: pd.Series, adv_store_id: str, file_extension: str) -> s
                         str(thumb_path),
                     ],
                     check=True,
-                    stdout=subprocess.DEVNULL,
                 )
             else:
                 logger.error(f"Unknown file extension: {file_extension} for thumbnail!")
