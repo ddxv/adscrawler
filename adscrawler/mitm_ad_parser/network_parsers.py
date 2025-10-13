@@ -299,7 +299,7 @@ def parse_urls_for_known_parts(
     found_mmp_urls = []
     found_adv_store_ids = []
     found_ad_network_urls = []
-    ad_network_urls = query_ad_domains(database_connection=database_connection)
+    ad_domains_df = query_ad_domains(database_connection=database_connection)
     for url in all_urls:
         adv_store_id = None
         tld_url = tldextract.extract(url).domain + "." + tldextract.extract(url).suffix
@@ -341,7 +341,7 @@ def parse_urls_for_known_parts(
             url = url.replace("fybernativebrowser://navigate?url=", "")
             found_ad_network_urls.append(url)
         if (
-            tld_url in ad_network_urls["domain"].to_list()
+            tld_url in ad_domains_df["domain_name"].to_list()
             and tld_url
             not in get_all_mmp_tlds(database_connection)["mmp_tld"].to_list()
             and not any(ignore_url in url.lower() for ignore_url in IGNORE_PRIVACY_URLS)

@@ -962,12 +962,17 @@ def query_all_store_app_descriptions(
 
 @lru_cache(maxsize=1)
 def query_ad_domains(database_connection: PostgresCon) -> pd.DataFrame:
-    # TODO FIX
-    sel_query = """SELECT * FROM domains
-    LEFT JOIN adtech.company_domain_mapping cdm ON domains.id = cdm.domain_id
-    LEFT JOIN adtech.combined_company_domains ccd ON domains.id = ccd.domain_id
-    WHERE cdm.company_id > 0
-    OR ccd.company_id > 0
+    sel_query = """WITH all_ad_domains AS (
+             SELECT DISTINCT csac.company_id , domain_name FROM adtech.combined_store_apps_companies csac
+             WHERE ad_domain IS NOT null
+             UNION
+             SELECT DISTINCT cdm.company_id, domain_name FROM domains
+                 LEFT JOIN adtech.company_domain_mapping cdm ON domains.id = cdm.domain_id
+             --avoid including pub domains
+             WHERE cdm.company_id > 0
+             )
+             SELECT company_id, domain_name FROM all_ad_domains
+             ; 
     """
     df = pd.read_sql(sel_query, con=database_connection.engine)
     return df

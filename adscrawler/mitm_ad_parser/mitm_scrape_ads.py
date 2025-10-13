@@ -348,23 +348,19 @@ def make_creative_records_df(
         creative_records_df, ad_domains_df
     )
     creative_records_df = creative_records_df.merge(
-        ad_domains_df[["id", "domain_name"]].rename(
-            columns={"id": "creative_host_domain_id"}
-        ),
+        ad_domains_df.rename(columns={"company_id": "creative_host_domain_id"}),
         left_on="host_ad_network_tld",
         right_on="domain_name",
         how="left",
     )
     creative_records_df = creative_records_df.merge(
-        ad_domains_df[["id", "domain_name"]].rename(
-            columns={"id": "creative_initial_domain_id"}
-        ),
+        ad_domains_df.rename(columns={"company_id": "creative_initial_domain_id"}),
         left_on="creative_initial_domain_tld",
         right_on="domain_name",
         how="left",
     )
     creative_records_df = creative_records_df.merge(
-        ad_domains_df[["id", "domain_name"]].rename(columns={"id": "mmp_domain_id"}),
+        ad_domains_df.rename(columns={"company_id": "mmp_domain_id"}),
         left_on="mmp_tld",
         right_on="domain_name",
         how="left",
