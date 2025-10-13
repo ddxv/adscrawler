@@ -963,7 +963,7 @@ def query_all_store_app_descriptions(
 @lru_cache(maxsize=1)
 def query_ad_domains(database_connection: PostgresCon) -> pd.DataFrame:
     sel_query = """WITH all_ad_domains AS (
-             SELECT DISTINCT csac.company_id , domain_name FROM adtech.combined_store_apps_companies csac
+             SELECT DISTINCT csac.company_id, ad_domain AS domain_name FROM adtech.combined_store_apps_companies csac
              WHERE ad_domain IS NOT null
              UNION
              SELECT DISTINCT cdm.company_id, domain_name FROM domains
