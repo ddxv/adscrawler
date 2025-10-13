@@ -147,14 +147,18 @@ def attribute_creatives(
             row["error_msg"] = error_msg
             error_messages.append(row)
             adv_store_id = None
+            adv_store_app_id = None
         elif len(found_advs) == 0:
             error_msg = f"No adv_store_id found for {row['tld_url']} {video_id=}"
             logger.error(error_msg)
             row["error_msg"] = error_msg
             error_messages.append(row)
             adv_store_id = None
+            adv_store_app_id = None
         else:
             adv_store_id = found_advs[0]
+            adv_store_app_ids = [x["adv_store_app_id"] for x in found_ad_infos]
+            adv_store_app_id = adv_store_app_ids[0]
         found_mmp_urls = [
             x["found_mmp_urls"]
             for x in found_ad_infos
@@ -206,10 +210,8 @@ def attribute_creatives(
             logger.error(f"{error_msg} for {row['tld_url']} {video_id}")
             row["error_msg"] = error_msg
             error_messages.append(row)
-            continue
-        init_tld = init_tlds[0]
-        adv_store_app_ids = [x["adv_store_app_id"] for x in found_ad_infos]
-        adv_store_app_id = adv_store_app_ids[0]
+        else:
+            init_tld = init_tlds[0]
         adv_creatives.append(
             {
                 "mitm_uuid": row["mitm_uuid"],
@@ -262,7 +264,8 @@ def append_missing_domains(
     check_cols = ["creative_initial_domain_tld", "host_ad_network_tld"]
     for col in check_cols:
         missing_ad_domains = creative_records_df[
-            ~creative_records_df[col].isin(ad_domains_df["domain_name"])
+            (~creative_records_df[col].isin(ad_domains_df["domain_name"]))
+            & (creative_records_df[col].notna())
         ]
         if not missing_ad_domains.empty:
             new_ad_domains = (
@@ -334,16 +337,17 @@ def make_creative_records_df(
         mitm_uuids=adv_creatives_df["mitm_uuid"].astype(str).tolist(),
     ).rename(columns={"id": "api_call_id"})
     api_calls_df["mitm_uuid"] = api_calls_df["mitm_uuid"].astype(str)
-    adv_creatives_df = adv_creatives_df.merge(
-        api_calls_df[["api_call_id", "mitm_uuid"]],
-        on=["mitm_uuid"],
-        how="left",
-        validate="1:1",
-    )
     creative_records_df = adv_creatives_df.merge(
         assets_df[["md5_hash", "creative_asset_id"]],
         on="md5_hash",
         how="left",
+        validate="m:1",
+    )
+    creative_records_df = creative_records_df.merge(
+        api_calls_df[["api_call_id", "mitm_uuid"]],
+        on=["mitm_uuid"],
+        how="left",
+        validate="1:1",
     )
     ad_domains_df = query_ad_domains(database_connection=database_connection)
     ad_domains_df = append_missing_domains(
@@ -407,7 +411,6 @@ def parse_store_id_mitm_log(
     database_connection: PostgresCon,
 ) -> list[dict[str, Any]]:
     """Parses MITM log for a specific store ID and processes creative content."""
-
     df, error_message = get_mitm_df(pub_store_id, run_id, database_connection)
     if error_message:
         logger.error(error_message)
