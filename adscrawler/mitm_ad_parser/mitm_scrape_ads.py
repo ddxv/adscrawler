@@ -257,7 +257,7 @@ def append_missing_domains(
     check_cols = ["creative_initial_domain_tld", "host_ad_network_tld"]
     for col in check_cols:
         missing_ad_domains = creative_records_df[
-            ~creative_records_df[col].isin(ad_domains_df["domain"])
+            ~creative_records_df[col].isin(ad_domains_df["domain_name"])
         ]
         if not missing_ad_domains.empty:
             new_ad_domains = (
