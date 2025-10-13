@@ -297,14 +297,14 @@ def add_additional_domain_id_column(
 
     # Merge on the exploded domain value
     merged = exploded.merge(
-        ad_domains_df[["domain_name", "id"]],
+        ad_domains_df[["domain_name", "company_id"]],
         left_on="found_ad_network_tlds",
         right_on="domain_name",
         how="left",
     )
 
     # Group back the matching ids by the original row index
-    grouped = merged.groupby("orig_idx")["id"].apply(
+    grouped = merged.groupby("orig_idx")["company_id"].apply(
         lambda ids: [int(i) for i in ids.dropna().unique()]
     )
 
