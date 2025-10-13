@@ -309,23 +309,19 @@ def append_additional_mitm_data(
 
 def add_file_extension(df: pd.DataFrame) -> pd.DataFrame:
     """Adds file extension column to DataFrame based on URL or content type."""
-
-    ext_too_long = (
-        df["url"]
-        .apply(lambda x: x.split(".")[-1] if x else "NoExtensionFound")
-        .str.len()
-        > 4
+    df["file_extension"] = df["url"].fillna("").apply(lambda x: x.split(".")[-1])
+    ext_too_long = (df["file_extension"].str.len() > 4) & (
+        df["response_mime_type"].fillna("").str.contains("/")
     )
-    has_mimetype = df["response_mime_type"].fillna("").str.contains("/")
 
     def get_subtype(x):
         parts = x.split("/")
         return parts[1] if len(parts) > 1 else None
 
     df["file_extension"] = np.where(
-        ext_too_long | ~has_mimetype,
+        ext_too_long,
         df["response_mime_type"].fillna("").apply(get_subtype),
-        "",
+        df["file_extension"],
     )
     return df
 

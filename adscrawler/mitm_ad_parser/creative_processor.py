@@ -161,7 +161,9 @@ def store_creatives(row: pd.Series, file_extension: str) -> str:
                     check=True,
                 )
             else:
-                logger.error(f"Unknown file extension: {file_extension} for thumbnail!")
+                logger.error(
+                    f"Unknown file extension: {file_extension=} for thumbnail!"
+                )
         except Exception:
             logger.error(f"Failed to create thumbnail for {local_path}")
             pass
