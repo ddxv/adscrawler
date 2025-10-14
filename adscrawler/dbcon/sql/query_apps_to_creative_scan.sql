@@ -21,7 +21,9 @@ run_counts AS (
     FROM
         has_creatives AS ac
     LEFT JOIN store_apps AS sa ON ac.store_app = sa.id
-    WHERE ac.called_at <= current_date - INTERVAL '1 hour'
+    WHERE
+        ac.called_at >= :earliest_date
+        AND ac.called_at <= current_date - INTERVAL '1 hour'
     GROUP BY
         ac.store_app, ac.run_id, sa.store_id
 )

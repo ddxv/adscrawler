@@ -925,10 +925,20 @@ def query_apps_mitm_in_s3(database_connection: PostgresCon) -> pd.DataFrame:
     return df
 
 
-def query_apps_to_creative_scan(database_connection: PostgresCon) -> pd.DataFrame:
+def query_apps_to_creative_scan(
+    database_connection: PostgresCon, recent_months: bool = False
+) -> pd.DataFrame:
+    earliest_date = (datetime.datetime.now() - datetime.timedelta(days=365)).strftime(
+        "%Y-%m-%d"
+    )
+    if recent_months:
+        earliest_date = (
+            datetime.datetime.now() - datetime.timedelta(days=60)
+        ).strftime("%Y-%m-%d")
     df = pd.read_sql(
         QUERY_APPS_TO_CREATIVE_SCAN,
         con=database_connection.engine,
+        params={"earliest_date": earliest_date},
     )
     return df
 

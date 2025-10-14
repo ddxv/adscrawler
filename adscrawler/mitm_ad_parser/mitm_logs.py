@@ -42,7 +42,7 @@ def decode_network_request(
     url: str, flowpart: http.HTTPFlow, database_connection: PostgresCon
 ) -> str:
     """Decodes network request content, handling AppLovin-specific decoding when needed."""
-    if "applovin.com" == url and decode_from:
+    if "applovin.com" in url and decode_from:
         try:
             text = decode_from(
                 blob=flowpart.content, database_connection=database_connection

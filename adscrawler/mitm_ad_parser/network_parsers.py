@@ -960,8 +960,8 @@ def parse_sent_video_df(
             error_messages.append(row)
             continue
         if ad_info["adv_store_id"] is None:
-            error_msg = f"Unknown adv_store_id for {init_tld=} {video_id=}"
-            logger.error(error_msg)
+            error_msg = f"No adv_store_id found for {init_tld=} {video_id=}"
+            logger.warning(error_msg)
             row["error_msg"] = error_msg
             error_messages.append(row)
         try:

@@ -260,7 +260,7 @@ def upload_creatives_to_s3(adv_creatives_df: pd.DataFrame) -> None:
         md5_hash = row["md5_hash"]
         extension = row["file_extension"]
         if creative_exists_in_s3(md5_hash, extension):
-            logger.info(f"Creative {row['md5_hash']} already in S3")
+            logger.debug(f"Creative {row['md5_hash']} already in S3")
             continue
         upload_ad_creative_to_s3(
             md5_hash=row["md5_hash"],
@@ -545,10 +545,11 @@ def parse_all_runs_for_store_id(
 def scan_all_apps(
     database_connection: PostgresCon,
     only_new_apps: bool = False,
+    recent_months: bool = False,
 ) -> None:
     """Scans all apps for creative content and uploads thumbnails to S3."""
     mitm_runs_to_scan = query_apps_to_creative_scan(
-        database_connection=database_connection
+        database_connection=database_connection, recent_months=recent_months
     )
     logger.info(f"MITM logs to scan: {mitm_runs_to_scan.shape[0]}")
     if only_new_apps:

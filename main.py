@@ -132,6 +132,11 @@ class ProcessManager:
             action="store_true",
         )
         parser.add_argument(
+            "--creative-scan-recent-months",
+            help="Scan all apps for creatives from last two months",
+            action="store_true",
+        )
+        parser.add_argument(
             "--creative-scan-single-app",
             help="Scan a single app for creatives, requires --store-id and --run-id",
             action="store_true",
@@ -298,6 +303,9 @@ class ProcessManager:
         if self.args.creative_scan_new_apps:
             self.creative_scan_new_apps()
 
+        if self.args.creative_scan_recent_months:
+            self.creative_scan_recent_months()
+
         if self.args.creative_scan_single_app:
             self.creative_scan_single_app()
 
@@ -397,6 +405,9 @@ class ProcessManager:
 
     def creative_scan_new_apps(self) -> None:
         scan_all_apps(database_connection=self.pgcon, only_new_apps=True)
+
+    def creative_scan_recent_months(self) -> None:
+        scan_all_apps(database_connection=self.pgcon, recent_months=True)
 
     def creative_scan_single_app(self) -> None:
         error_messages = parse_store_id_mitm_log(
