@@ -47,17 +47,9 @@ def try_decompress(data: bytes):
 
 
 def decode_from(blob: bytes, database_connection: PostgresCon) -> str | None:
-    const_a = base64.b64decode(CONFIG["applovin"]["CONST_A"])
-    const_b = base64.b64decode(CONFIG["applovin"]["CONST_B"])
-    m = blob.split(b":")
-    version = m[0]
-    sha1_seen = m[1]
-    sdk_postfix = m[2]
-    payload = m[3]
-
-    assert version in [b"1", b"2"], f"Invalid version: {version}"
-
     sdk_keys_df = query_sdk_keys(database_connection)
+    m = blob.split(b":")
+    sdk_postfix = m[2]
 
     keys = (
         sdk_keys_df[
@@ -74,6 +66,14 @@ def decode_from(blob: bytes, database_connection: PostgresCon) -> str | None:
             f"Multiple applovin sdk keys found for {sdk_postfix.decode('utf-8')}"
         )
         return None
+
+    version = m[0]
+    assert version in [b"1", b"2"], f"Invalid version: {version}"
+    sha1_seen = m[1]
+    payload = m[3]
+    const_a = base64.b64decode(CONFIG["applovin"]["CONST_A"])
+    const_b = base64.b64decode(CONFIG["applovin"]["CONST_B"])
+
     sdk_prefix32 = keys[0][:32]
 
     sha1_seen = sha1_seen.decode()
@@ -105,10 +105,11 @@ def decode_v1_from(payload: bytes, sdk_prefix32: str) -> str | None:
         # Step 1: Decode custom base64
         raw_data = base64_custom_decode(payload.decode("utf-8"))
     except Exception as e:
-        return f"Error: Invalid Base64 string. {e}"
+        logger.debug(f"Base64 decode V1 failed: {e}")
+        return None
     if len(raw_data) <= 16:
         logger.debug("Error: Data is too short to contain an 8-byte seed.")
-        return ""
+        return None
     # Generate key from SDK prefix and CONST_A
     ckey = hashlib.sha256(
         CONFIG["applovin"]["CONST_A"].encode("utf-8") + sdk_prefix32.encode("utf-8")
