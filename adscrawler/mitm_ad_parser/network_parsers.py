@@ -10,7 +10,6 @@ from typing import Any
 import pandas as pd
 import protod
 import requests
-import tldextract
 from bs4 import BeautifulSoup
 from protod import Renderer
 
@@ -303,7 +302,9 @@ def parse_urls_for_known_parts(
     ad_domains_df = query_ad_domains(database_connection=database_connection)
     for url in all_urls:
         adv_store_id = None
-        tld_url = tldextract.extract(url).domain + "." + tldextract.extract(url).suffix
+        tld_url = get_tld(url)
+        if not tld_url:
+            continue
         if tld_url in get_all_mmp_tlds(database_connection)["mmp_tld"].to_list():
             if any(
                 x in url.lower()
@@ -351,10 +352,8 @@ def parse_urls_for_known_parts(
     found_mmp_urls = list(set(found_mmp_urls))
     found_adv_store_ids = list(set(found_adv_store_ids))
     found_adv_store_ids = [x for x in found_adv_store_ids if x != pub_store_id]
-    found_ad_network_tlds = [
-        tldextract.extract(url).domain + "." + tldextract.extract(url).suffix
-        for url in found_ad_network_urls
-    ]
+    found_ad_network_tlds = [get_tld(url) for url in found_ad_network_urls]
+    found_ad_network_urls = [x for x in found_ad_network_urls if x is not None]
     found_ad_network_tlds = list(set(found_ad_network_tlds))
     if len(found_adv_store_ids) == 0:
         adv_store_id = None
@@ -880,11 +879,7 @@ def parse_sent_video_df(
     found_ad_infos = []
     for sent_video_dict in sent_video_dicts:
         init_url = sent_video_dict["url"]
-        init_tld = (
-            tldextract.extract(init_url).domain
-            + "."
-            + tldextract.extract(init_url).suffix
-        )
+        init_tld = sent_video_dict["tld_url"]
         if "vungle.com" in init_url:
             ad_info = parse_vungle_ad(sent_video_dict, database_connection)
         elif "bidmachine.io" in init_url:
@@ -962,10 +957,8 @@ def parse_sent_video_df(
             error_messages.append(row)
             continue
         if ad_info["adv_store_id"] is None:
-            error_msg = f"No adv_store_id found for {init_tld=} {video_id=}"
-            logger.warning(error_msg)
-            row["error_msg"] = error_msg
-            error_messages.append(row)
+            error_msg = "No adv_store_id found"
+            logger.debug(error_msg)
         try:
             if ad_info["adv_store_id"] is None:
                 adv_db_id = None
