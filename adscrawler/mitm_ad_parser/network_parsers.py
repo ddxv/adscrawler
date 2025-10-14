@@ -660,7 +660,10 @@ def parse_generic_adnetwork(
 ) -> tuple[AdInfo, str | None]:
     """Parses generic ad network responses to extract advertiser information."""
     error_msg = None
-    init_tld = get_tld(sent_video_dict["tld_url"])
+    if sent_video_dict['tld_url']:
+        init_tld = get_tld(sent_video_dict["tld_url"])
+    else:
+        init_tld = None
     text = sent_video_dict["response_text"]
     all_urls = extract_and_decode_urls(
         text, run_id=sent_video_dict["run_id"], database_connection=database_connection

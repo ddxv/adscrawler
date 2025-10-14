@@ -559,7 +559,7 @@ def scan_all_apps(
             database_connection=database_connection
         )
         mitm_runs_to_scan = mitm_runs_to_scan[
-            ~mitm_runs_to_scan["run_id"].isin(creative_records["run_id"])
+            ~mitm_runs_to_scan["run_id"].astype(str).isin(creative_records["run_id"].astype(str))
         ]
         logger.info(f"Apps to scan (limited to new apps): {mitm_runs_to_scan.shape[0]}")
     mitms_count = mitm_runs_to_scan.shape[0]
