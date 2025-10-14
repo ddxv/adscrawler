@@ -1,13 +1,14 @@
 import asyncio
 import socket
 import threading
+from collections.abc import Generator
 from contextlib import contextmanager
 from socket import gethostbyname
+from typing import Any
 
 import asyncssh
 import sqlalchemy
 from sqlalchemy.engine import Engine
-from typing import Generator, Any
 
 from adscrawler.config import CONFIG, SSH_KNOWN_HOSTS, get_logger
 
@@ -57,7 +58,7 @@ class PostgresCon:
             raise
 
     @contextmanager
-    def get_cursor(self) -> Generator[Any, None, None]:
+    def get_cursor(self) -> Generator[Any]:
         """Context manager for database connection and cursor."""
         conn = self.engine.raw_connection()
         try:
@@ -154,9 +155,7 @@ def get_db_connection(
 def get_host_ip(hostname: str) -> str:
     """Convert hostname to IPv4 address if needed."""
     # Check if hostname is already an IPv4 address
-    if all(
-        part.isdigit() and 0 <= int(part) <= 255 for part in hostname.split(".")
-    ):  # noqa: PLR2004
+    if all(part.isdigit() and 0 <= int(part) <= 255 for part in hostname.split(".")):  # noqa: PLR2004
         return hostname
     ip_address = gethostbyname(hostname)
     logger.info(f"Resolved {hostname} to {ip_address}")
