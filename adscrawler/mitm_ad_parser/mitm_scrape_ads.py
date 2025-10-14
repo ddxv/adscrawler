@@ -440,13 +440,15 @@ def parse_store_id_mitm_log(
     if adv_creatives_df.empty:
         if len(error_messages) == 0:
             error_msg = "No creatives or errors"
-            logger.error(f"{error_msg}")
-            row = {
-                "run_id": run_id,
-                "pub_store_id": pub_store_id,
-                "error_msg": error_msg,
-            }
-            error_messages.append(row)
+        else:
+            error_msg = "No creatives found"
+        logger.info(f"{error_msg}")
+        row = {
+            "run_id": run_id,
+            "pub_store_id": pub_store_id,
+            "error_msg": error_msg,
+        }
+        error_messages.append(row)
         return error_messages
     else:
         msg = "Success found creatives!"
