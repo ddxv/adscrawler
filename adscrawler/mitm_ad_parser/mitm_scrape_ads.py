@@ -51,7 +51,6 @@ def find_sent_video_df(
         return None
     if sent_video_df.shape[0] > 1:
         logger.info(f"Multiple responses for {video_id=}")
-    sent_video_df["tld_url"] = sent_video_df["url"].apply(lambda x: get_tld(x))
     return sent_video_df
 
 
