@@ -122,18 +122,18 @@ class ProcessManager:
         )
         ### OPTIONS FOR CREATIVE SCAN
         parser.add_argument(
-            "--creative-scan-new-apps",
-            help="Scan new apps for creatives",
+            "--creative-scan-all-apps",
+            help="Scan apps for creatives from MITM logs",
             action="store_true",
         )
         parser.add_argument(
-            "--creative-scan-all-apps",
-            help="Scan all apps for creatives",
+            "--creative-scan-new-apps",
+            help="Only scan new apps (requires --creative-scan-all-apps)",
             action="store_true",
         )
         parser.add_argument(
             "--creative-scan-recent-months",
-            help="Scan all apps for creatives from last two months",
+            help="Only scan apps from last two months (requires --creative-scan-all-apps)",
             action="store_true",
         )
         parser.add_argument(
@@ -300,12 +300,6 @@ class ProcessManager:
         if self.args.creative_scan_all_apps:
             self.creative_scan_all_apps()
 
-        if self.args.creative_scan_new_apps:
-            self.creative_scan_new_apps()
-
-        if self.args.creative_scan_recent_months:
-            self.creative_scan_recent_months()
-
         if self.args.creative_scan_single_app:
             self.creative_scan_single_app()
 
@@ -401,13 +395,11 @@ class ProcessManager:
             )
 
     def creative_scan_all_apps(self) -> None:
-        scan_all_apps(database_connection=self.pgcon)
-
-    def creative_scan_new_apps(self) -> None:
-        scan_all_apps(database_connection=self.pgcon, only_new_apps=True)
-
-    def creative_scan_recent_months(self) -> None:
-        scan_all_apps(database_connection=self.pgcon, recent_months=True)
+        scan_all_apps(
+            database_connection=self.pgcon,
+            only_new_apps=self.args.creative_scan_new_apps,
+            recent_months=self.args.creative_scan_recent_months,
+        )
 
     def creative_scan_single_app(self) -> None:
         error_messages = parse_store_id_mitm_log(
