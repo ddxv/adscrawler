@@ -368,7 +368,7 @@ def make_creative_records_df(
         ad_domains_df, creative_records_df, database_connection
     )
     # For mapping we only want the mapped domains
-    ad_domains_df = ad_domains_df[~ad_domains_df["domain_id"].isna()]
+    ad_domains_df = ad_domains_df[~ad_domains_df["domain_id"].isna()].copy()
     ad_domains_df["domain_id"] = ad_domains_df["domain_id"].astype(int)
     creative_records_df = add_additional_domain_id_column(
         creative_records_df, ad_domains_df
@@ -559,7 +559,9 @@ def scan_all_apps(
             database_connection=database_connection
         )
         mitm_runs_to_scan = mitm_runs_to_scan[
-            ~mitm_runs_to_scan["run_id"].astype(str).isin(creative_records["run_id"].astype(str))
+            ~mitm_runs_to_scan["run_id"]
+            .astype(str)
+            .isin(creative_records["run_id"].astype(str))
         ]
         logger.info(f"Apps to scan (limited to new apps): {mitm_runs_to_scan.shape[0]}")
     mitms_count = mitm_runs_to_scan.shape[0]
