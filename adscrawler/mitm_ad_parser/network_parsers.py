@@ -660,7 +660,7 @@ def parse_generic_adnetwork(
 ) -> tuple[AdInfo, str | None]:
     """Parses generic ad network responses to extract advertiser information."""
     error_msg = None
-    if sent_video_dict['tld_url']:
+    if sent_video_dict["tld_url"]:
         init_tld = get_tld(sent_video_dict["tld_url"])
     else:
         init_tld = None
@@ -920,7 +920,6 @@ def parse_sent_video_df(
         else:
             real_tld = get_tld(init_url)
             error_msg = f"Not a recognized ad network: {real_tld}"
-            logger.warning(f"{error_msg} for video {video_id[0:10]}")
             row["error_msg"] = error_msg
             error_messages.append(row)
             ad_info, error_msg = parse_generic_adnetwork(

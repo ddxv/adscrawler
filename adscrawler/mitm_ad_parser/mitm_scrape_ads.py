@@ -119,7 +119,6 @@ def attribute_creatives(
         sent_video_df = find_sent_video_df(df, row, video_id)
         if sent_video_df is None or sent_video_df.empty:
             error_msg = f"No source bidrequest found for {row['tld_url']}"
-            logger.error(f"{error_msg} {video_id}")
             row["error_msg"] = error_msg
             error_messages.append(row)
             sent_video_df = pd.DataFrame(row).T
@@ -164,7 +163,6 @@ def attribute_creatives(
             adv_store_app_id = None
         elif len(found_advs) == 0:
             error_msg = f"No adv_store_id found for {row['tld_url']} {video_id=}"
-            logger.error(error_msg)
             row["error_msg"] = error_msg
             error_messages.append(row)
             adv_store_id = None
@@ -221,7 +219,7 @@ def attribute_creatives(
         if len(init_tlds) == 0:
             init_tld = None
             error_msg = "No initial domain found"
-            logger.error(f"{error_msg} for {row['tld_url']} {video_id}")
+            logger.warning(f"{error_msg} for {row['tld_url']} {video_id}")
             row["error_msg"] = error_msg
             error_messages.append(row)
         else:

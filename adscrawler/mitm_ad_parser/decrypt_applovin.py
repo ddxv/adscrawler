@@ -59,12 +59,10 @@ def decode_from(blob: bytes, database_connection: PostgresCon) -> str | None:
         .tolist()
     )
     if len(keys) == 0:
-        logger.error(f"No applovin sdk keys found for {sdk_postfix.decode('utf-8')}")
+        logger.error("No applovin sdk keys found")
         return None
     if len(keys) > 1:
-        logger.error(
-            f"Multiple applovin sdk keys found for {sdk_postfix.decode('utf-8')}"
-        )
+        logger.error("Multiple applovin sdk keys found")
         return None
 
     version = m[0]
