@@ -8,6 +8,8 @@ import pandas as pd
 from PIL import Image
 
 from adscrawler.config import CREATIVES_DIR, get_logger
+from adscrawler.dbcon.connection import PostgresCon
+from adscrawler.dbcon.queries import query_creative_assets
 
 logger = get_logger(__name__, "mitm_scrape_ads")
 
@@ -59,9 +61,16 @@ def compute_phash_multiple_frames(local_path: pathlib.Path, seconds: list[int]) 
     return str(phash)
 
 
-def get_phash(md5_hash: str, file_extension: str) -> str:
+def get_phash(
+    md5_hash: str, file_extension: str, database_connection: PostgresCon
+) -> str:
     """Generates a perceptual hash for a creative file, using multiple frames for videos."""
     phash = None
+    cached_assets = query_creative_assets(database_connection)
+    cached_row = cached_assets[cached_assets["md5_hash"] == md5_hash]
+    if not cached_row.empty and pd.notna(cached_row.iloc[0]["phash"]):
+        return cached_row.iloc[0]["phash"]
+
     local_path = pathlib.Path(CREATIVES_DIR, "raw") / f"{md5_hash}.{file_extension}"
     seekable_formats = {"mp4", "webm", "gif"}
     if file_extension in seekable_formats:
@@ -75,7 +84,7 @@ def get_phash(md5_hash: str, file_extension: str) -> str:
     return phash
 
 
-def store_creatives(row: pd.Series, file_extension: str) -> str:
+def store_creative_and_thumb_to_local(row: pd.Series, file_extension: str) -> str:
     """Stores creative files locally and generates thumbnails, returning the MD5 hash."""
     thumbnail_width = 320
     local_dir = pathlib.Path(CREATIVES_DIR, "raw")
@@ -84,8 +93,9 @@ def store_creatives(row: pd.Series, file_extension: str) -> str:
     thumbs_dir.mkdir(parents=True, exist_ok=True)
     md5_hash = hashlib.md5(row["response_content"]).hexdigest()
     local_path = local_dir / f"{md5_hash}.{file_extension}"
-    with open(local_path, "wb") as creative_file:
-        creative_file.write(row["response_content"])
+    if not local_path.exists():
+        with open(local_path, "wb") as creative_file:
+            creative_file.write(row["response_content"])
     thumb_path = thumbs_dir / f"{md5_hash}.jpg"
     # Only generate thumbnail if not already present
     seekable_formats = {"mp4", "webm", "gif"}

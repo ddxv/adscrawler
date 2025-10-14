@@ -16,7 +16,10 @@ from adscrawler.dbcon.queries import (
     query_creative_records,
     upsert_df,
 )
-from adscrawler.mitm_ad_parser.creative_processor import get_phash, store_creatives
+from adscrawler.mitm_ad_parser.creative_processor import (
+    get_phash,
+    store_creative_and_thumb_to_local,
+)
 from adscrawler.mitm_ad_parser.mitm_logs import get_mitm_df
 from adscrawler.mitm_ad_parser.network_parsers import parse_sent_video_df
 from adscrawler.mitm_ad_parser.utils import get_tld
@@ -112,7 +115,6 @@ def attribute_creatives(
             error_messages.append(row)
             continue
         file_extension = row["file_extension"]
-        # store_creatives(row, 'cheeck', file_extension)
         if video_id in IGNORE_CREATIVE_IDS:
             logger.info(f"Ignoring video {video_id}.{file_extension}")
             continue
@@ -188,7 +190,7 @@ def attribute_creatives(
             set([item for sublist in found_ad_network_tlds for item in sublist])
         )
         try:
-            md5_hash = store_creatives(
+            md5_hash = store_creative_and_thumb_to_local(
                 row,
                 file_extension=file_extension,
             )
@@ -202,6 +204,7 @@ def attribute_creatives(
             phash = get_phash(
                 md5_hash=md5_hash,
                 file_extension=file_extension,
+                database_connection=database_connection,
             )
         except Exception:
             error_msg = "Found potential creative but failed to compute phash"

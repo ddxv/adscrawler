@@ -943,6 +943,18 @@ def query_apps_to_creative_scan(
     return df
 
 
+@lru_cache(maxsize=1)
+def query_creative_assets(database_connection: PostgresCon) -> pd.DataFrame:
+    sel_query = """SELECT
+        *
+        FROM
+        creative_assets
+        ;
+        """
+    df = pd.read_sql(sel_query, con=database_connection.engine)
+    return df
+
+
 def query_creative_records(database_connection: PostgresCon) -> pd.DataFrame:
     df = pd.read_sql(
         """SELECT 
