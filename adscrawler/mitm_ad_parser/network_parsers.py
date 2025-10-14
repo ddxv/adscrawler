@@ -950,7 +950,7 @@ def parse_sent_video_df(
                 error_messages.append(row)
                 continue
             else:
-                ad_info["adv_store_id"] = "unknown"
+                ad_info["adv_store_id"] = None
         if ad_info["adv_store_id"] == pub_store_id:
             error_msg = "Incorrect adv_store_id, identified pub ID as adv ID"
             logger.error(
@@ -959,18 +959,20 @@ def parse_sent_video_df(
             row["error_msg"] = error_msg
             error_messages.append(row)
             continue
-        if ad_info["adv_store_id"] == "unknown":
+        if ad_info["adv_store_id"] is None:
             error_msg = f"Unknown adv_store_id for {init_tld=} {video_id=}"
             logger.error(error_msg)
             row["error_msg"] = error_msg
             error_messages.append(row)
-            continue
         try:
-            adv_db_id = query_store_app_by_store_id(
-                store_id=ad_info["adv_store_id"],
-                database_connection=database_connection,
-                case_insensitive=True,
-            )
+            if ad_info["adv_store_id"] is None:
+                adv_db_id = None
+            else:
+                adv_db_id = query_store_app_by_store_id(
+                    store_id=ad_info["adv_store_id"],
+                    database_connection=database_connection,
+                    case_insensitive=True,
+                )
             ad_info["adv_store_app_id"] = adv_db_id
         except Exception:
             error_msg = f"found potential app! but failed to get db id {ad_info['adv_store_id']}"

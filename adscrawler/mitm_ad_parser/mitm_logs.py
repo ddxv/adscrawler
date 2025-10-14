@@ -40,9 +40,9 @@ IGNORE_URLS = [
 
 def decode_network_request(
     url: str, flowpart: http.HTTPFlow, database_connection: PostgresCon
-) -> str | None:
+) -> str:
     """Decodes network request content, handling AppLovin-specific decoding when needed."""
-    if decode_from and "applovin.com" in url:
+    if "applovin.com" == url and decode_from:
         try:
             text = decode_from(
                 blob=flowpart.content, database_connection=database_connection
@@ -54,6 +54,11 @@ def decode_network_request(
     else:
         logger.error(f"Unknown Decode Network Request URL: {url}")
         text = None
+    if text is None:
+        try:
+            text = flowpart.get_text()
+        except Exception:
+            text = ""
     return text
 
 
@@ -247,19 +252,12 @@ def append_additional_mitm_data(
     database_connection: PostgresCon,
 ) -> dict:
     """Appends additional data from the mitm flow to the flow_data dictionary."""
-    if tld_url and "applovin.com" in tld_url:
-        decoded_text = decode_network_request(
+    if tld_url and "applovin.com" == tld_url:
+        flow_data["request_text"] = decode_network_request(
             url,
             flowpart=flow.request,
             database_connection=database_connection,
         )
-        if decoded_text is not None:
-            flow_data["request_text"] = decoded_text
-        else:
-            try:
-                flow_data["request_text"] = flow.request.get_text()
-            except Exception:
-                flow_data["request_text"] = ""
     else:
         try:
             flow_data["request_text"] = flow.request.get_text()
@@ -281,19 +279,12 @@ def append_additional_mitm_data(
             flow_data["response_headers"] = dict(flow.response.headers)
         except Exception:
             flow_data["response_headers"] = {}
-        if tld_url and "applovin.com" in tld_url:
-            decoded_text = decode_network_request(
+        if tld_url and "applovin.com" == tld_url:
+            flow_data["response_text"] = decode_network_request(
                 url,
                 flowpart=flow.response,
                 database_connection=database_connection,
             )
-            if decoded_text is not None:
-                flow_data["response_text"] = decoded_text
-            else:
-                try:
-                    flow_data["response_text"] = flow.response.get_text()
-                except Exception:
-                    flow_data["response_text"] = ""
         else:
             try:
                 flow_data["response_text"] = flow.response.get_text()

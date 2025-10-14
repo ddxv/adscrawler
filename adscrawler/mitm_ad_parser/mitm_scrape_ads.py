@@ -99,6 +99,11 @@ def attribute_creatives(
     row_count = df[df["is_creative"]].shape[0]
     for _i, row in df[df["is_creative"]].iterrows():
         i += 1
+        if not row["tld_url"]:
+            error_msg = "Host tld_url is empty"
+            row["error_msg"] = error_msg
+            error_messages.append(row)
+            continue
         host_ad_network_tld = get_tld(row["tld_url"])
         video_id = get_video_id(row)
         if video_id == "":
@@ -117,16 +122,25 @@ def attribute_creatives(
             logger.error(f"{error_msg} {video_id}")
             row["error_msg"] = error_msg
             error_messages.append(row)
-            continue
-        sent_video_df["pub_store_id"] = pub_store_id
-        found_ad_infos, found_error_messages = parse_sent_video_df(
-            row, pub_store_id, sent_video_df, database_connection, video_id
-        )
-        for found_error_message in found_error_messages:
-            row_copy = row.copy()
-            row_copy["error_msg"] = found_error_message["error_msg"]
-            error_messages.append(row_copy)
-        found_ad_infos = [x for x in found_ad_infos if x["adv_store_id"] != "unknown"]
+            sent_video_df = pd.DataFrame(row).T
+            found_ad_infos, found_error_messages = parse_sent_video_df(
+                row, pub_store_id, sent_video_df, database_connection, video_id
+            )
+        else:
+            sent_video_df["pub_store_id"] = pub_store_id
+            found_ad_infos, found_error_messages = parse_sent_video_df(
+                row, pub_store_id, sent_video_df, database_connection, video_id
+            )
+            for found_error_message in found_error_messages:
+                row_copy = row.copy()
+                row_copy["error_msg"] = found_error_message["error_msg"]
+                error_messages.append(row_copy)
+        found_ad_infos = [
+            x
+            for x in found_ad_infos
+            if x["adv_store_id"] is not None
+            or (x["init_tld"] is not None and x["init_tld"] != host_ad_network_tld)
+        ]
         found_advs = list(set([x["adv_store_id"] for x in found_ad_infos]))
         mmp_tlds = [
             x["mmp_tld"] for x in found_ad_infos if x["found_mmp_urls"] is not None
