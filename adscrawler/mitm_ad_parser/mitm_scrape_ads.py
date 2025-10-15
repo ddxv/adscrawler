@@ -7,7 +7,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from adscrawler.config import CREATIVES_DIR, get_logger
+from adscrawler.config import CREATIVE_THUMBS_DIR, get_logger
 from adscrawler.dbcon.connection import PostgresCon, get_db_connection
 from adscrawler.dbcon.queries import (
     log_creative_scan_results,
@@ -684,7 +684,7 @@ def scan_all_apps(
         [
             "s3cmd",
             "sync",
-            str(CREATIVES_DIR / "thumbs") + "/",
+            str(CREATIVE_THUMBS_DIR) + "/",
             "s3://appgoblin-data/creatives/thumbs/",
             "--acl-public",
         ],

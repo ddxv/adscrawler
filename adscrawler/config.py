@@ -21,7 +21,8 @@ SSH_KNOWN_HOSTS = pathlib.Path(HOME, pathlib.Path(".ssh/known_hosts"))
 GEO_DATA_DIR = pathlib.Path(CONFIG_DIR, pathlib.Path("geo-data"))
 
 MITM_DIR = pathlib.Path(PACKAGE_DIR, pathlib.Path("mitmlogs"))
-CREATIVES_DIR = pathlib.Path(PACKAGE_DIR, pathlib.Path("creatives"))
+CREATIVE_THUMBS_DIR = pathlib.Path(PACKAGE_DIR, pathlib.Path("creatives", "thumbs"))
+CREATIVE_RAW_DIR = pathlib.Path(PACKAGE_DIR, pathlib.Path("creatives", "raw"))
 
 # APK File dirs
 APP_FILES_DIR = pathlib.Path(HOME, "apk-files")
@@ -100,7 +101,8 @@ def check_dirs() -> None:
         XAPKS_TMP_UNZIP_DIR,
         IPAS_DIR,
         IPAS_TMP_UNZIPPED_DIR,
-        CREATIVES_DIR,
+        CREATIVE_THUMBS_DIR,
+        CREATIVE_RAW_DIR,
         XAPKS_DIR,
         XAPKS_ISSUES_DIR,
         APKS_ISSUES_DIR,

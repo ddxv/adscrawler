@@ -11,7 +11,7 @@ from adscrawler.config import (
     APKS_DIR,
     APKS_INCOMING_DIR,
     CONFIG,
-    CREATIVES_DIR,
+    CREATIVE_RAW_DIR,
     IPAS_DIR,
     IPAS_INCOMING_DIR,
     MITM_DIR,
@@ -133,7 +133,7 @@ def upload_ad_creative_to_s3(
     """Upload apk to s3."""
     # app_prefix = f"{adv_store_id}/{md5_hash}.{extension}"
     creative_hash_prefix = md5_hash[0:3]
-    file_path = pathlib.Path(CREATIVES_DIR, "raw", f"{md5_hash}.{extension}")
+    file_path = pathlib.Path(CREATIVE_RAW_DIR, f"{md5_hash}.{extension}")
     prefix = f"creatives/raw/{creative_hash_prefix}/{md5_hash}.{extension}"
     metadata = {
         "md5": md5_hash,
