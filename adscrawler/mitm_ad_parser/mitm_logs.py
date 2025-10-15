@@ -48,7 +48,7 @@ def decode_network_request(
                 blob=flowpart.content, database_connection=database_connection
             )
             if text is None:
-                logger.warning(f"Decode {url[:40]=} failed")
+                logger.debug(f"Decode {url[:40]=} failed")
         except Exception:
             text = None
     else:
