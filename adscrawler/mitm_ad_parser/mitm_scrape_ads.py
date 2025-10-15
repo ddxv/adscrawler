@@ -52,7 +52,7 @@ def find_sent_video_df(
     if sent_video_df.empty:
         return None
     if sent_video_df.shape[0] > 1:
-        logger.info(f"Multiple responses for {video_id=}")
+        logger.debug(f"Multiple responses for {video_id=}")
     return sent_video_df
 
 
@@ -118,9 +118,9 @@ def attribute_creatives(
         video_id = row["video_id"]
         if len(video_id) < 4:
             error_msg = "Bad creative parsing video ID is too short"
+            logger.info(f"{error_msg} for {row['tld_url']} {video_id=}")
             row["error_msg"] = error_msg
             error_messages.append(row)
-            continue
         file_extension = row["file_extension"]
         if video_id in IGNORE_CREATIVE_IDS:
             logger.info(f"Ignoring video {video_id}.{file_extension}")
@@ -130,7 +130,14 @@ def attribute_creatives(
             found_ad_infos, found_error_messages = parse_results_cache[video_id]
             logger.debug(f"Cache hit for {video_id}")
         else:
-            sent_video_df = find_sent_video_df(df, row, video_id)
+            if len(video_id) < 5:
+                # Too short video ids cause false positives and slow downs
+                sent_video_df = None
+            else:
+                logger.info(
+                    f"Processing {i}/{row_count} {host_ad_network_tld} {video_id=}"
+                )
+                sent_video_df = find_sent_video_df(df, row, video_id)
             if sent_video_df is None or sent_video_df.empty:
                 error_msg = (
                     f"No requests found as source for {row['tld_url']} {video_id=}"
@@ -512,7 +519,10 @@ def parse_store_id_mitm_log(
             "updated_at",
         ],
     )
-    upload_creatives_to_s3(adv_creatives_df)
+    logger.info(
+        f"Upserted {creative_records_df.shape[0]} creative records for {pub_store_id} {assets_df.shape[0]} creatives"
+    )
+    upload_creatives_to_s3(assets_df)
     return error_messages
 
 

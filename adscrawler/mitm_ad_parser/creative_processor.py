@@ -7,7 +7,13 @@ import imagehash
 import pandas as pd
 from PIL import Image
 
-from adscrawler.config import CREATIVE_RAW_DIR, CREATIVE_THUMBS_DIR, get_logger
+from adscrawler.config import (
+    ANY_CREATIVE_VIDEO_EXTENSIONS,
+    CREATIVE_RAW_DIR,
+    CREATIVE_STATIC_MIME_EXTENSIONS,
+    CREATIVE_THUMBS_DIR,
+    get_logger,
+)
 from adscrawler.dbcon.connection import PostgresCon
 from adscrawler.dbcon.queries import query_creative_assets
 
@@ -94,34 +100,34 @@ def store_creative_and_thumb_to_local(row: pd.Series, file_extension: str) -> st
             creative_file.write(row["response_content"])
     thumb_path = CREATIVE_THUMBS_DIR / f"{md5_hash}.jpg"
     # Only generate thumbnail if not already present
-    seekable_formats = {"mp4", "webm", "gif"}
-    static_formats = {"jpg", "jpeg", "png", "webp"}
     if not thumb_path.exists():
         try:
             ext = file_extension.lower()
-            if ext in seekable_formats:
+            if ext in ANY_CREATIVE_VIDEO_EXTENSIONS:
                 try:
                     # Attempt to extract a thumbnail at 5s (works for video or animated gif/webp)
+                    ffmpg_thumb_at_5s = [
+                        "ffmpeg",
+                        "-loglevel",
+                        "error",
+                        "-y",
+                        "-ss",
+                        "5",
+                        "-i",
+                        str(local_path),
+                        "-vframes",
+                        "1",
+                        "-vf",
+                        f"scale={thumbnail_width}:-1",
+                        "-q:v",
+                        "2",
+                        "-update",
+                        "1",
+                        str(thumb_path),
+                    ]
+                    print(" ".join(ffmpg_thumb_at_5s))
                     subprocess.run(
-                        [
-                            "ffmpeg",
-                            "-loglevel",
-                            "error",
-                            "-y",
-                            "-ss",
-                            "5",
-                            "-i",
-                            str(local_path),
-                            "-vframes",
-                            "1",
-                            "-vf",
-                            f"scale={thumbnail_width}:-1",
-                            "-q:v",
-                            "2",
-                            "-update",
-                            "1",
-                            str(thumb_path),
-                        ],
+                        ffmpg_thumb_at_5s,
                         check=True,
                     )
                 except subprocess.CalledProcessError:
@@ -146,7 +152,7 @@ def store_creative_and_thumb_to_local(row: pd.Series, file_extension: str) -> st
                         ],
                         check=True,
                     )
-            elif ext in static_formats:
+            elif ext in CREATIVE_STATIC_MIME_EXTENSIONS:
                 # Static images: no need to seek, just resize
                 subprocess.run(
                     [

@@ -1017,6 +1017,19 @@ def query_keywords_base(database_connection: PostgresCon) -> pd.DataFrame:
     return df
 
 
+@lru_cache(maxsize=1000)
+def query_store_app_by_store_id_cached(
+    database_connection: PostgresCon,
+    store_id: str,
+    case_insensitive: bool = False,
+) -> int:
+    return query_store_app_by_store_id(
+        database_connection=database_connection,
+        store_id=store_id,
+        case_insensitive=case_insensitive,
+    )
+
+
 def query_store_app_by_store_id(
     database_connection: PostgresCon,
     store_id: str,
@@ -1099,6 +1112,12 @@ def get_version_code_by_md5_hash(
     except Exception:
         logger.exception(f"Error getting version code id for {md5_hash} and {store_id}")
         raise
+
+
+def query_api_calls_all(database_connection: PostgresCon) -> pd.DataFrame:
+    sel_query = """SELECT * FROM api_calls LIMIT 200000;"""
+    df = pd.read_sql(sel_query, con=database_connection.engine)
+    return df
 
 
 def query_api_calls_for_mitm_uuids(

@@ -1,5 +1,6 @@
 import datetime
 import pathlib
+import re
 import struct
 
 import numpy as np
@@ -8,7 +9,11 @@ from mitmproxy import http, tcp
 from mitmproxy.exceptions import FlowReadException
 from mitmproxy.io import FlowReader
 
-from adscrawler.config import MITM_DIR, get_logger
+from adscrawler.config import (
+    ALL_CREATIVE_EXTENSIONS,
+    MITM_DIR,
+    get_logger,
+)
 from adscrawler.dbcon.connection import PostgresCon
 from adscrawler.dbcon.queries import query_countries
 from adscrawler.mitm_ad_parser.utils import get_tld
@@ -283,48 +288,35 @@ def append_additional_mitm_data(
 
 def add_file_extension(df: pd.DataFrame) -> pd.DataFrame:
     """Adds file extension column to DataFrame based on URL or content type."""
-    df["file_extension"] = df["url"].fillna("").apply(lambda x: x.split(".")[-1])
-    ext_too_long = (df["file_extension"].str.len() > 4) & (
-        df["response_mime_type"].fillna("").str.contains("/")
+    df["url_file_extension"] = (
+        df["url"]
+        .fillna("")
+        .str.extract(r"\.([a-z0-9]{2,4})(?:\?|#|$)", flags=re.IGNORECASE)[0]
+        .str.lower()
     )
 
-    def get_subtype(x):
-        parts = x.split("/")
-        return parts[1].split(";")[0] if len(parts) > 1 else None
+    df["mime_file_extension"] = (
+        df["response_mime_type"]
+        .fillna("")
+        .str.extract(r"^(?:image|video|text)/([^;]+)", flags=re.IGNORECASE)[0]
+        .str.lower()
+    )
 
     df["file_extension"] = np.where(
-        ext_too_long,
-        df["response_mime_type"].fillna("").apply(get_subtype),
-        df["file_extension"],
+        df["mime_file_extension"].isin(ALL_CREATIVE_EXTENSIONS),
+        df["mime_file_extension"],
+        np.where(
+            df["url_file_extension"].isin(ALL_CREATIVE_EXTENSIONS),
+            df["url_file_extension"],
+            None,
+        ),
     )
     return df
 
 
 def add_is_creative_column(df: pd.DataFrame) -> pd.DataFrame:
     """Adds a column indicating whether the response contains creative content (images/videos)."""
-    creative_types = (
-        r"\b(?:image|video)/(?:jpeg|jpg|png|gif|webp|webm|mp4|mpeg|avi|quicktime)\b"
-    )
-    is_creative_content_response = (
-        df["response_mime_type"]
-        .fillna("")
-        .str.contains(
-            creative_types,
-            case=False,
-            regex=True,
-        )
-    )
-    is_creative_content_request = (
-        df["response_mime_type"]
-        .fillna("")
-        .str.contains(
-            creative_types,
-            case=False,
-            regex=True,
-        )
-    )
-    is_creative_content = is_creative_content_response | is_creative_content_request
-    df["is_creative_content"] = is_creative_content
+    df["is_creative_content"] = df["file_extension"].isin(ALL_CREATIVE_EXTENSIONS)
     status_code_200 = df["status_code"] == 200
     is_large_enough = df["response_size_bytes"] > 50000
     response_content_ok = df["response_content"].notna()

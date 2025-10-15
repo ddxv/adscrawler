@@ -19,7 +19,7 @@ from adscrawler.dbcon.queries import (
     get_all_mmp_tlds,
     get_click_url_redirect_chains,
     query_ad_domains,
-    query_store_app_by_store_id,
+    query_store_app_by_store_id_cached,
     upsert_df,
 )
 from adscrawler.mitm_ad_parser.models import AdInfo, MultipleAdvertiserIdError
@@ -393,7 +393,12 @@ def parse_yandex_ad(
     """Parses Yandex ad response to extract advertiser information and URLs."""
     init_ad_network_tld = "yandex.ru"
     json_text = json.loads(sent_video_dict["response_text"])
+
     if "native" in json_text:
+        # ads = [x for x in json_text["native"]["ads"]]
+        # ads[0]
+        # video_id in str(ads[1])
+        # "com.nomad" in str(ads[1])
         matched_ads = [x for x in json_text["native"]["ads"] if video_id in str(x)]
         if len(matched_ads) == 0:
             return AdInfo(
@@ -403,6 +408,7 @@ def parse_yandex_ad(
         text = str(matched_ads)
     else:
         text = sent_video_dict["response_text"]
+
     all_urls = extract_and_decode_urls(
         text, run_id=sent_video_dict["run_id"], database_connection=database_connection
     )
@@ -880,19 +886,20 @@ def parse_sent_video_df(
     for sent_video_dict in sent_video_dicts:
         init_url = sent_video_dict["url"]
         init_tld = sent_video_dict["tld_url"]
-        if "vungle.com" in init_url:
+        logger.debug(f"Parsing ad network {init_url=} for adv")
+        if "vungle.com" == init_tld:
             ad_info = parse_vungle_ad(sent_video_dict, database_connection)
-        elif "bidmachine.io" in init_url:
+        elif "bidmachine.io" == init_tld:
             ad_info = parse_bidmachine_ad(sent_video_dict, database_connection)
         elif (
-            "fyber.com" in init_url
-            or "tpbid.com" in init_url
-            or "inner-active.mobi" in init_url
+            "fyber.com" == init_tld
+            or "tpbid.com" == init_tld
+            or "inner-active.mobi" == init_tld
         ):
             ad_info = parse_fyber_ad(sent_video_dict, database_connection)
-        elif "everestop.io" in init_url:
+        elif "everestop.io" == init_tld:
             ad_info = parse_everestop_ad(sent_video_dict)
-        elif "doubleclick.net" in init_url:
+        elif "doubleclick.net" == init_tld:
             ad_info, error_msg = parse_google_ad(
                 sent_video_dict, video_id, database_connection
             )
@@ -906,15 +913,14 @@ def parse_sent_video_df(
                 row["error_msg"] = error_msg
                 error_messages.append(row)
                 continue
-        elif "mtgglobals.com" in init_url:
+        elif "mtgglobals.com" == init_tld:
             ad_info = parse_mtg_ad(sent_video_dict, database_connection)
-        elif "yandex.ru" in init_url:
+        elif "yandex.ru" == init_tld:
             ad_info = parse_yandex_ad(sent_video_dict, database_connection, video_id)
-        elif "youappi.com" in init_url:
+        elif "youappi.com" == init_tld:
             ad_info = parse_youappi_ad(sent_video_dict, database_connection)
         else:
-            real_tld = get_tld(init_url)
-            error_msg = f"Not a recognized ad network: {real_tld}"
+            error_msg = f"Not a recognized ad network: {init_tld}"
             row["error_msg"] = error_msg
             error_messages.append(row)
             ad_info, error_msg = parse_generic_adnetwork(
@@ -925,19 +931,10 @@ def parse_sent_video_df(
                 error_messages.append(row)
                 continue
         if ad_info["adv_store_id"] is None:
+            # This is doubling the time for the run as it is parsing the text again
+            # but this does seem to could catch misses often enough to keep it
             text = sent_video_dict["response_text"]
             all_urls = extract_and_decode_urls(text, run_id, database_connection)
-            if any(
-                [
-                    x in all_urls
-                    for x in get_all_mmp_tlds(database_connection)["mmp_tld"].to_list()
-                    + PLAYSTORE_URL_PARTS
-                ]
-            ):
-                error_msg = "found potential app! mmp or playstore"
-                row["error_msg"] = error_msg
-                error_messages.append(row)
-                continue
             ad_parts = parse_urls_for_known_parts(
                 all_urls, database_connection, sent_video_dict["pub_store_id"]
             )
@@ -963,14 +960,16 @@ def parse_sent_video_df(
             if ad_info["adv_store_id"] is None:
                 adv_db_id = None
             else:
-                adv_db_id = query_store_app_by_store_id(
+                adv_db_id = query_store_app_by_store_id_cached(
                     store_id=ad_info["adv_store_id"],
                     database_connection=database_connection,
                     case_insensitive=True,
                 )
             ad_info["adv_store_app_id"] = adv_db_id
         except Exception:
-            error_msg = f"found potential app! but failed to get db id {ad_info['adv_store_id']}"
+            error_msg = (
+                f"found potential app but failed to get db id {ad_info['adv_store_id']}"
+            )
             logger.error(error_msg)
             row["error_msg"] = error_msg
             error_messages.append(row)

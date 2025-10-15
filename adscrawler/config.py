@@ -226,4 +226,45 @@ DEVLEOPER_IGNORE_TLDS = [
     "youtube.com",
 ]
 
+
+CREATIVE_STATIC_MIME_EXTENSIONS = [
+    # Images
+    "jpeg",
+    "jpg",
+    "png",
+    "webp",
+    "avif",
+]
+
+CREATIVE_VIDEO_MIME_EXTENSIONS = [
+    # Videos
+    "gif",
+    "webm",
+    "mp4",
+    "quicktime",
+]
+
+
+CREATIVE_MIME_EXTENSIONS = [
+    *CREATIVE_STATIC_MIME_EXTENSIONS,
+    *CREATIVE_VIDEO_MIME_EXTENSIONS,
+]
+
+# Include extensions that can be foudn in URLs
+# but are not mime types
+ANY_CREATIVE_VIDEO_EXTENSIONS = [
+    *CREATIVE_VIDEO_MIME_EXTENSIONS,
+    "mov",
+    "m4v",
+]
+
+ALL_CREATIVE_EXTENSIONS = list(
+    set(
+        [
+            *CREATIVE_MIME_EXTENSIONS,
+            *ANY_CREATIVE_VIDEO_EXTENSIONS,
+        ]
+    )
+)
+
 logger.info("Logger and Config loaded")

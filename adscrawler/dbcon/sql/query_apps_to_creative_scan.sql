@@ -5,10 +5,10 @@ WITH has_creatives AS (
     WHERE
         (
             request_mime_type
-            ~* '(image|video)/(jpeg|jpg|png|gif|webp|webm|mp4|mpeg|avi|quicktime)'
+            ~* '(image|video)/(jpeg|jpg|png|gif|webp|webm|mp4|avi|quicktime)'
             OR
             response_mime_type
-            ~* '(image|video)/(jpeg|jpg|png|gif|webp|webm|mp4|mpeg|avi|quicktime)'
+            ~* '(image|video)/(jpeg|jpg|png|gif|webp|webm|mp4|avi|quicktime)'
         ) AND status_code = 200
         AND response_size_bytes > 50000
 ),
