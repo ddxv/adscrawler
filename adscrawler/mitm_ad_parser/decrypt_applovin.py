@@ -58,7 +58,7 @@ def has_keys(sdk_postfix: bytes, database_connection: PostgresCon):
         .tolist()
     )
     if len(keys) == 0:
-        logger.error("No applovin sdk keys found")
+        logger.debug("No applovin sdk keys found")
         return None
     if len(keys) > 1:
         logger.error("Multiple applovin sdk keys found")

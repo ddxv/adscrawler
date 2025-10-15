@@ -72,7 +72,7 @@ def get_mitm_df(
     if df.empty:
         error_msg = "No data in mitm df"
         logger.error(error_msg)
-        return pd.DataFrame(), pd.DataFrame(), error_msg
+        return pd.DataFrame(), error_msg
     df = add_file_extension(df)
     df = add_is_creative_column(df)
     if df["is_creative"].sum() == 0:
@@ -290,7 +290,7 @@ def add_file_extension(df: pd.DataFrame) -> pd.DataFrame:
 
     def get_subtype(x):
         parts = x.split("/")
-        return parts[1] if len(parts) > 1 else None
+        return parts[1].split(";")[0] if len(parts) > 1 else None
 
     df["file_extension"] = np.where(
         ext_too_long,
