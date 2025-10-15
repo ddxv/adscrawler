@@ -2,6 +2,7 @@ import base64
 import gzip
 import hashlib
 import zlib
+from functools import lru_cache
 
 from adscrawler.config import CONFIG, get_logger
 from adscrawler.dbcon.connection import PostgresCon
@@ -46,11 +47,9 @@ def try_decompress(data: bytes):
     return data, "none"
 
 
-def decode_from(blob: bytes, database_connection: PostgresCon) -> str | None:
+@lru_cache(maxsize=10000)
+def has_keys(sdk_postfix: bytes, database_connection: PostgresCon):
     sdk_keys_df = query_sdk_keys(database_connection)
-    m = blob.split(b":")
-    sdk_postfix = m[2]
-
     keys = (
         sdk_keys_df[
             sdk_keys_df["applovin_sdk_key"].str.contains(sdk_postfix.decode("utf-8"))
@@ -64,6 +63,17 @@ def decode_from(blob: bytes, database_connection: PostgresCon) -> str | None:
     if len(keys) > 1:
         logger.error("Multiple applovin sdk keys found")
         return None
+    sdk_prefix32 = keys[0][:32]
+    return sdk_prefix32
+
+
+def decode_from(blob: bytes, database_connection: PostgresCon) -> str | None:
+    m = blob.split(b":")
+    sdk_postfix = m[2]
+    sdk_prefix32 = has_keys(sdk_postfix, database_connection=database_connection)
+
+    if sdk_prefix32 is None:
+        return None
 
     version = m[0]
     assert version in [b"1", b"2"], f"Invalid version: {version}"
@@ -71,8 +81,6 @@ def decode_from(blob: bytes, database_connection: PostgresCon) -> str | None:
     payload = m[3]
     const_a = base64.b64decode(CONFIG["applovin"]["CONST_A"])
     const_b = base64.b64decode(CONFIG["applovin"]["CONST_B"])
-
-    sdk_prefix32 = keys[0][:32]
 
     sha1_seen = sha1_seen.decode()
 

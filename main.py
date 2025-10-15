@@ -399,6 +399,8 @@ class ProcessManager:
             database_connection=self.pgcon,
             only_new_apps=self.args.creative_scan_new_apps,
             recent_months=self.args.creative_scan_recent_months,
+            use_ssh_tunnel=self.args.use_ssh_tunnel,
+            max_workers=int(self.args.workers),
         )
 
     def creative_scan_single_app(self) -> None:

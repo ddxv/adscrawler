@@ -38,23 +38,24 @@ IGNORE_URLS = [
 ]
 
 
-def decode_network_request(
-    url: str, flowpart: http.HTTPFlow, database_connection: PostgresCon
+def get_content_text(
+    tld_url: str, flowpart: http.HTTPFlow, database_connection: PostgresCon
 ) -> str:
-    """Decodes network request content, handling AppLovin-specific decoding when needed."""
-    if "applovin.com" in url and decode_from:
+    """Decodes request or response content, handling AppLovin-specific decoding when needed."""
+
+    if tld_url and "applovin.com" == tld_url and decode_from:
         try:
             text = decode_from(
                 blob=flowpart.content, database_connection=database_connection
             )
-            if text is None:
-                logger.debug(f"Decode {url[:40]=} failed")
         except Exception:
             text = None
+        if text is None:
+            try:
+                text = flowpart.get_text()
+            except Exception:
+                text = ""
     else:
-        logger.error(f"Unknown Decode Network Request URL: {url}")
-        text = None
-    if text is None:
         try:
             text = flowpart.get_text()
         except Exception:
@@ -220,7 +221,6 @@ def process_flow(
                 flow=flow,
                 flow_data=flow_data,
                 tld_url=tld_url,
-                url=url,
                 database_connection=database_connection,
             )
     elif isinstance(flow, tcp.TCPFlow):
@@ -248,21 +248,12 @@ def append_additional_mitm_data(
     flow: http.HTTPFlow,
     flow_data: dict,
     tld_url: str,
-    url: str,
     database_connection: PostgresCon,
 ) -> dict:
     """Appends additional data from the mitm flow to the flow_data dictionary."""
-    if tld_url and "applovin.com" == tld_url:
-        flow_data["request_text"] = decode_network_request(
-            url,
-            flowpart=flow.request,
-            database_connection=database_connection,
-        )
-    else:
-        try:
-            flow_data["request_text"] = flow.request.get_text()
-        except Exception:
-            flow_data["request_text"] = ""
+    flow_data["request_text"] = get_content_text(
+        tld_url, flow.request, database_connection
+    )
     try:
         flow_data["content"] = flow.request.content
     except Exception:
@@ -279,17 +270,9 @@ def append_additional_mitm_data(
             flow_data["response_headers"] = dict(flow.response.headers)
         except Exception:
             flow_data["response_headers"] = {}
-        if tld_url and "applovin.com" == tld_url:
-            flow_data["response_text"] = decode_network_request(
-                url,
-                flowpart=flow.response,
-                database_connection=database_connection,
-            )
-        else:
-            try:
-                flow_data["response_text"] = flow.response.get_text()
-            except Exception:
-                flow_data["response_text"] = ""
+        flow_data["response_text"] = get_content_text(
+            tld_url, flow.response, database_connection
+        )
         try:
             flow_data["response_content"] = flow.response.content
         except Exception:
