@@ -31,6 +31,8 @@ from adscrawler.packages.storage import (
 
 logger = get_logger(__name__, "mitm_scrape_ads")
 
+# Global variable to store the worker's database connection
+_worker_db_connection = None
 
 IGNORE_CREATIVE_IDS = ["privacy", "google_play_icon_grey_2022", "favicon"]
 
@@ -237,7 +239,6 @@ def attribute_creatives(
         if len(init_tlds) == 0:
             init_tld = None
             error_msg = "No initial domain found"
-            logger.warning(f"{error_msg} for {row['tld_url']} {video_id}")
             row["error_msg"] = error_msg
             error_messages.append(row)
         else:
@@ -560,17 +561,28 @@ def parse_all_runs_for_store_id(
         log_creative_scan_results(error_msg_df, database_connection)
 
 
-def _process_single_mitm_log(row: pd.Series, use_ssh_tunnel: bool) -> dict:
+_worker_db_connection = None
+
+
+def _init_worker(use_ssh_tunnel: bool):
+    """Initialize worker process with a database connection that will be reused."""
+    global _worker_db_connection
+    _worker_db_connection = get_db_connection(use_ssh_tunnel=use_ssh_tunnel)
+    logger.info(
+        f"Worker initialized with database connection (tunnel={use_ssh_tunnel})"
+    )
+
+
+def _process_single_mitm_log(row: pd.Series) -> dict:
     """Worker function to process a single MITM log in parallel."""
+    global _worker_db_connection
+
     pub_store_id = row["store_id"]
     run_id = row["run_id"]
 
-    # Create new database connection for this worker
-    database_connection = get_db_connection(use_ssh_tunnel=use_ssh_tunnel)
-
     try:
         error_messages = parse_store_id_mitm_log(
-            pub_store_id, run_id, database_connection
+            pub_store_id, run_id, _worker_db_connection
         )
         return {
             "run_id": run_id,
@@ -593,9 +605,6 @@ def _process_single_mitm_log(row: pd.Series, use_ssh_tunnel: bool) -> dict:
             ],
             "success": False,
         }
-    finally:
-        if database_connection and hasattr(database_connection, "engine"):
-            database_connection.engine.dispose()
 
 
 def scan_all_apps(
@@ -627,16 +636,11 @@ def scan_all_apps(
 
     completed = 0
 
-    # Process in parallel - aligned with update_app_details pattern
-    with ProcessPoolExecutor(max_workers=max_workers) as executor:
-        # Create partial function to pass use_ssh_tunnel
-        from functools import partial
-
-        worker_func = partial(_process_single_mitm_log, use_ssh_tunnel=use_ssh_tunnel)
-
-        # Process rows and handle results as they complete
+    with ProcessPoolExecutor(
+        max_workers=max_workers, initializer=_init_worker, initargs=(use_ssh_tunnel,)
+    ) as executor:
         for result in executor.map(
-            worker_func, [row for _, row in mitm_runs_to_scan.iterrows()]
+            _process_single_mitm_log, [row for _, row in mitm_runs_to_scan.iterrows()]
         ):
             completed += 1
             run_id = result["run_id"]
@@ -686,129 +690,3 @@ def scan_all_apps(
         ],
         check=False,
     )
-
-
-# def _process_single_mitm_log(
-#     args: tuple, use_ssh_tunnel: bool
-# ) -> tuple[int, str, list]:
-#     """Worker function to process a single MITM log in parallel."""
-#     pub_store_id, run_id, db_config = args
-#     # Create new database connection for this worker
-
-#     database_connection = get_db_connection(use_ssh_tunnel=use_ssh_tunnel)
-
-#     try:
-#         error_messages = parse_store_id_mitm_log(
-#             pub_store_id, run_id, database_connection
-#         )
-#         return (run_id, pub_store_id, error_messages)
-#     except Exception:
-#         error_msg = "CRITICAL uncaught error"
-#         logger.exception(f"{error_msg}")
-#         row = {
-#             "run_id": run_id,
-#             "pub_store_id": pub_store_id,
-#             "error_msg": error_msg,
-#         }
-#         return (run_id, pub_store_id, [row])
-#     finally:
-#         if database_connection and hasattr(database_connection, "engine"):
-#             database_connection.engine.dispose()
-
-
-# def scan_all_apps(
-#     database_connection: PostgresCon,
-#     only_new_apps: bool = False,
-#     recent_months: bool = False,
-#     use_ssh_tunnel: bool = False,
-#     max_workers: int = 1,
-# ) -> None:
-#     """Scans all apps for creative content and uploads thumbnails to S3."""
-#     mitm_runs_to_scan = query_apps_to_creative_scan(
-#         database_connection=database_connection, recent_months=recent_months
-#     )
-#     logger.info(f"MITM logs to scan: {mitm_runs_to_scan.shape[0]}")
-#     if only_new_apps:
-#         creative_records = query_creative_records(
-#             database_connection=database_connection
-#         )
-#         mitm_runs_to_scan = mitm_runs_to_scan[
-#             ~mitm_runs_to_scan["run_id"]
-#             .astype(str)
-#             .isin(creative_records["run_id"].astype(str))
-#         ]
-#         logger.info(f"Apps to scan (limited to new apps): {mitm_runs_to_scan.shape[0]}")
-
-#     mitms_count = mitm_runs_to_scan.shape[0]
-
-#     # Prepare arguments for parallel processing
-#     db_config = None  # Pass config if needed
-#     tasks = [
-#         (row["store_id"], row["run_id"], db_config)
-#         for _, row in mitm_runs_to_scan.iterrows()
-#     ]
-
-#     logger.info(f"Starting parallel processing with {max_workers} workers")
-#     completed = 0
-
-#     # Process in parallel
-#     with ProcessPoolExecutor(max_workers=max_workers) as executor:
-#         # Submit all tasks
-#         future_to_task = {
-#             executor.submit(_process_single_mitm_log, task, use_ssh_tunnel): task
-#             for task in tasks
-#         }
-
-#         # Process results as they complete
-#         for future in as_completed(future_to_task):
-#             completed += 1
-#             task = future_to_task[future]
-#             pub_store_id, run_id, _ = task
-
-#             try:
-#                 run_id, pub_store_id, error_messages = future.result()
-#                 logger.info(
-#                     f"{completed}/{mitms_count}: {pub_store_id} {run_id=} completed"
-#                 )
-
-#                 if len(error_messages) == 0:
-#                     continue
-
-#                 # Log results to database
-#                 d = [x for x in error_messages if type(x) is dict]
-#                 s = [x for x in error_messages if type(x) is pd.Series]
-#                 error_msg_df = pd.concat(
-#                     [pd.DataFrame(d), pd.DataFrame(s)], ignore_index=True
-#                 )
-#                 mycols = [
-#                     x
-#                     for x in error_msg_df.columns
-#                     if x
-#                     in [
-#                         "url",
-#                         "tld_url",
-#                         "path",
-#                         "content_type",
-#                         "run_id",
-#                         "pub_store_id",
-#                         "file_extension",
-#                         "creative_size",
-#                         "error_msg",
-#                     ]
-#                 ]
-#                 error_msg_df = error_msg_df[mycols]
-#                 log_creative_scan_results(error_msg_df, database_connection)
-#             except Exception as e:
-#                 logger.exception(f"Error processing {pub_store_id} {run_id}: {e}")
-
-#     logger.info("All MITM logs processed, syncing to S3...")
-#     subprocess.run(
-#         [
-#             "s3cmd",
-#             "sync",
-#             str(CREATIVES_DIR / "thumbs") + "/",
-#             "s3://appgoblin-data/creatives/thumbs/",
-#             "--acl-public",
-#         ],
-#         check=False,
-#     )
