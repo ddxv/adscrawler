@@ -1,31 +1,38 @@
 WITH
 my_advs AS (
-    SELECT DISTINCT store_app_id
+    SELECT DISTINCT cr.advertiser_store_app_id
     FROM
-        creative_assets AS ca
-    LEFT JOIN creative_records AS cr
+        creative_records AS cr
+    LEFT JOIN api_calls AS ac
         ON
-            ca.id = cr.creative_asset_id
+            cr.api_call_id = ac.id
     LEFT JOIN version_code_api_scan_results AS vcasr
         ON
-            cr.run_id = vcasr.id
-    WHERE
-        vcasr.run_at >= :target_week::date - interval '7 days'
-        AND vcasr.run_at < :target_week::date
-),
-latest_week_per_app AS (
-    SELECT
-        sahw.store_app,
-        MAX(sahw.week_start) AS app_max_week
-    FROM
-        store_apps_history_weekly AS sahw
-    INNER JOIN my_advs AS m
+            ac.run_id = vcasr.id
+    LEFT JOIN adtech.company_domain_mapping AS hcdm
         ON
-            m.store_app_id = store_app
+            cr.creative_host_domain_id = hcdm.domain_id
+    LEFT JOIN adtech.companies AS hc
+        ON
+            hcdm.company_id = hc.id
+    LEFT JOIN adtech.company_categories AS hcc
+        ON
+            hc.id = hcc.company_id
+    LEFT JOIN adtech.company_domain_mapping AS icdm
+        ON
+            cr.creative_initial_domain_id = icdm.domain_id
+    LEFT JOIN adtech.companies AS ic
+        ON
+            icdm.company_id = ic.id
+    LEFT JOIN adtech.company_categories AS icc
+        ON
+            ic.id = icc.company_id
     WHERE
-        sahw.country_id = 840
-    GROUP BY
-        sahw.store_app
+        vcasr.run_at > :target_week::date - interval '7 days'
+        AND vcasr.run_at <= :target_week::date
+        AND (
+            hcc.category_id = 1
+        )
 ),
 baseline_period AS (
     SELECT
@@ -40,13 +47,13 @@ baseline_period AS (
         store_apps_history_weekly AS s
     INNER JOIN my_advs AS m
         ON
-            s.store_app = m.store_app_id
+            s.store_app = m.advertiser_store_app_id
     WHERE
         s.week_start >= (
-            :target_week::date - interval '15 days'
+            :target_week::date - interval '22 days'
         )
         AND s.week_start <= (
-            :target_week::date - interval '1 days'
+            :target_week::date - interval '7 days'
         )
         AND s.country_id = 840
     GROUP BY
@@ -56,72 +63,56 @@ target_weeks_data AS (
     SELECT
         s.store_app,
         :target_week::date AS target_week,
-        s.week_start,
-        s.installs_diff,
-        s.rating_count_diff,
-        CASE
-            WHEN s.week_start = :target_week::date THEN 1
-            ELSE 0
-        END AS is_latest_week
+        SUM(s.installs_diff) AS target_week_installs,
+        SUM(s.rating_count_diff) AS target_week_rating_count
     FROM
         store_apps_history_weekly AS s
-    INNER JOIN latest_week_per_app AS lwpa
-        ON
-            s.store_app = lwpa.store_app
     WHERE
         s.week_start >= :target_week::date
         AND
-        s.week_start <= (
+        s.week_start < (
             :target_week::date + interval '7 days'
         )
         AND s.country_id = 840
-),
-aggregated_metrics AS (
-    SELECT
-        rd.store_app,
-        rd.target_week,
-        SUM(CASE WHEN rd.is_latest_week = 1 THEN rd.installs_diff ELSE 0 END)
-            AS installs_sum_1w,
-        SUM(
-            CASE WHEN rd.is_latest_week = 1 THEN rd.rating_count_diff ELSE 0 END
-        ) AS ratings_sum_1w
-    FROM
-        target_weeks_data AS rd
     GROUP BY
-        rd.store_app,
-        rd.target_week
+        s.store_app,
+        target_week
 ),
 my_app_z_scores AS (
     SELECT
-        am.store_app,
-        am.target_week,
-        am.installs_sum_1w,
-        am.ratings_sum_1w,
+        tw.store_app,
+        tw.target_week,
+        tw.target_week_installs,
+        tw.target_week_rating_count,
         bp.baseline_installs_2w,
         bp.baseline_ratings_2w,
-        (am.installs_sum_1w - bp.avg_installs_diff)
+        (
+            tw.target_week_installs - bp.avg_installs_diff
+        )
         / NULLIF(bp.avg_installs_diff, 0)
         * 100 AS installs_pct_increase,
-        (am.ratings_sum_1w - bp.avg_ratings_diff)
+        (
+            tw.target_week_rating_count - bp.avg_ratings_diff
+        )
         / NULLIF(bp.avg_ratings_diff, 0)
         * 100 AS ratings_pct_increase,
         (
-            am.installs_sum_1w - bp.avg_installs_diff
+            tw.target_week_installs - bp.avg_installs_diff
         ) / NULLIF(bp.stddev_installs_diff, 0) AS installs_z_score_1w,
         (
-            am.ratings_sum_1w - bp.avg_ratings_diff
+            tw.target_week_rating_count - bp.avg_ratings_diff
         ) / NULLIF(bp.stddev_ratings_diff, 0) AS ratings_z_score_1w
     FROM
-        aggregated_metrics AS am
+        target_weeks_data AS tw
     INNER JOIN baseline_period AS bp ON
-        am.store_app = bp.store_app
+        tw.store_app = bp.store_app
 ),
 ranked_z_scores AS (
     SELECT
         saz.target_week,
         saz.store_app,
-        saz.installs_sum_1w,
-        saz.ratings_sum_1w,
+        saz.target_week_installs,
+        saz.target_week_rating_count,
         saz.baseline_installs_2w,
         saz.baseline_ratings_2w,
         saz.installs_pct_increase,
@@ -163,11 +154,9 @@ ranked_z_scores AS (
         sa.tablet_image_url_3,
         sa.textsearchable_index_col,
         cm.original_category,
-        cm.mapped_category,
         ROW_NUMBER() OVER (
             PARTITION BY
                 sa.store,
-                cm.mapped_category,
                 (
                     CASE
                         WHEN sa.store = 2 THEN 'rating'::text
@@ -197,15 +186,13 @@ SELECT
     id AS store_app,
     store_id,
     name AS app_name,
-    mapped_category AS app_category,
     in_app_purchases,
     ad_supported,
     icon_url_100,
-    icon_url_512,
     installs,
     rating_count,
-    installs_sum_1w,
-    ratings_sum_1w,
+    target_week_installs,
+    target_week_rating_count,
     baseline_installs_2w,
     baseline_ratings_2w,
     installs_pct_increase,
@@ -215,4 +202,4 @@ SELECT
 FROM
     ranked_z_scores
 WHERE
-    rn <= 20;
+    rn <= 50;
