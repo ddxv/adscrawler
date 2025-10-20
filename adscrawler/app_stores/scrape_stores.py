@@ -1,4 +1,5 @@
 import datetime
+import uuid
 import os
 import pathlib
 import time
@@ -210,29 +211,92 @@ RANKS_COUNTRY_LIST = [
 ]
 
 
+def app_details_to_s3(
+    df: pd.DataFrame,
+    store: int,
+) -> None:
+    logger.info(f"S3 upload app details {store=} start")
+    if store is None:
+        raise ValueError("store is required")
+    s3_client = get_s3_client()
+    bucket = CONFIG["s3"]["bucket"]
+    for crawled_date, ddf in df.groupby("crawled_date"):
+        if isinstance(crawled_date, datetime.date):
+            crawled_date = crawled_date.strftime("%Y-%m-%d")
+        epoch_ms = int(time.time() * 1000)
+        suffix = uuid.uuid4().hex[:8]
+        file_name = f"app_details_{epoch_ms}_{suffix}.parquet"
+        s3_key = f"raw-data/app_details/store={store}/crawled_date={crawled_date}/{file_name}"
+        buffer = BytesIO()
+        ddf.to_parquet(buffer, index=False)
+        buffer.seek(0)
+        s3_client.upload_fileobj(buffer, bucket, s3_key)
+    logger.info(f"S3 upload app details {store=} finished")
+
+
 def process_chunk(df_chunk, use_ssh_tunnel, process_icon):
     database_connection = get_db_connection(use_ssh_tunnel=use_ssh_tunnel)
     logger.info(
         f"Processing chunk {df_chunk.index[0]}-{df_chunk.index[-1]} ({len(df_chunk)} apps)"
     )
     try:
+        chunk_results = []
         for _, row in df_chunk.iterrows():
-            try:
-                if process_icon:
-                    app_existing_icon_url = row.icon_url_100
-                else:
-                    app_existing_icon_url = None
-                update_all_app_info(
-                    row.store,
-                    row.store_id,
-                    database_connection,
-                    process_icon,
-                    app_existing_icon_url,
-                )
-            except Exception as e:
-                logger.exception(
-                    f"store={row.store}, store_id={row.store_id} update_all_app_info failed with {e}"
-                )
+            if process_icon:
+                app_existing_icon_url = row.icon_url_100
+            else:
+                app_existing_icon_url = None
+            for country in APP_DETAILS_COUNTRY_LIST:
+                for language in APP_DETAILS_LANGUAGE_LIST:
+                    try:
+                        result_dict = scrape_app(
+                            store=row.store,
+                            store_id=row.store_id,
+                            country=country,
+                            language=language,
+                        )
+                        chunk_results.append(result_dict)
+                    except Exception as e:
+                        logger.exception(
+                            f"store={row.store}, store_id={row.store_id} update_all_app_info failed with {e}"
+                        )
+        apps_df = pd.DataFrame(chunk_results)
+        apps_df["crawled_date"] = apps_df["crawled_at"].dt.date
+        app_details_to_s3(apps_df, row.store)
+
+        for crawl_result, adf in apps_df.groupby("crawl_result"):
+            if crawl_result != 1:
+                adf = adf[["store_id", "store", "crawled_at", "crawl_result"]]
+            else:
+                adf = clean_scraped_df(df=adf, store=row.store)
+                if "description_short" not in adf.columns:
+                    adf["description_short"] = ""
+                adf.loc[adf["description_short"].isna(), "description_short"] = ""
+            apps_df = save_apps_df(
+                apps_df=adf,
+                database_connection=database_connection,
+            )
+            logger.info(f"Processed {len(adf)} apps for crawl_result={crawl_result}")
+
+        # if process_icon and crawl_result == 1 and not app_existing_icon_url:
+        #     try:
+        #         icon_url_100 = process_app_icon(
+        #             row.store_id, df["icon_url_512"].to_numpy()[0]
+        #         )
+        #         if icon_url_100 is not None:
+        #             df["icon_url_100"] = icon_url_100
+        #     except Exception:
+        #         logger.exception(f"{row.store_id} failed to process app icon")
+
+        # This will become the 'extra' udpate info
+        update_all_app_info(
+            row.store,
+            row.store_id,
+            database_connection,
+            process_icon,
+            app_existing_icon_url,
+        )
+
     except Exception as e:
         logger.exception(
             f"Error processing chunk {df_chunk.index[0]}-{df_chunk.index[-1]} with {e}"
@@ -252,7 +316,6 @@ def update_app_details(
     """Process apps with dynamic work queue - simple and efficient."""
     log_info = f"Update app details: {stores=}"
 
-    # Query apps to process
     df = query_store_apps(
         stores,
         database_connection,
@@ -277,8 +340,10 @@ def update_app_details(
     with ProcessPoolExecutor(max_workers=workers) as executor:
         # Submit all chunks, but stagger the first wave to avoid API thundering herd
         future_to_idx = {}
-        for idx, chunk in enumerate(chunks):
-            future = executor.submit(process_chunk, chunk, use_ssh_tunnel, process_icon)
+        for idx, df_chunk in enumerate(chunks):
+            future = executor.submit(
+                process_chunk, df_chunk, use_ssh_tunnel, process_icon
+            )
             future_to_idx[future] = idx
 
             # Only stagger the initial batch to avoid simultaneous API burst
@@ -995,15 +1060,12 @@ def scrape_app(
     store_id: str,
     country: str,
     language: str,
-    process_icon: bool = False,
-    app_existing_icon_url: str | None = None,
-) -> pd.DataFrame:
+) -> dict:
     scrape_info = f"{store=}, {country=}, {language=}, {store_id=}, "
     max_retries = 2
     base_delay = 1
     retries = 0
-
-    logger.info(f"{scrape_info} scrape start")
+    logger.debug(f"{scrape_info} scrape start")
     while retries <= max_retries:
         retries += 1
         try:
@@ -1042,47 +1104,28 @@ def scrape_app(
             logger.error(f"{scrape_info} unexpected error: {error=}")
             crawl_result = 4
             break
-
     if crawl_result != 1:
         result_dict = {}
-
     if "kind" in result_dict.keys() and "mac" in result_dict["kind"].lower():
         logger.error(f"{scrape_info} Crawled app is Mac Software, not iOS!")
         crawl_result = 5
-
     result_dict["crawl_result"] = crawl_result
+    result_dict["crawled_at"] = datetime.datetime.now(tz=datetime.UTC)
     result_dict["store"] = store
     result_dict["store_id"] = store_id
     result_dict["queried_language"] = language.lower()
     result_dict["country"] = country.upper()
-
-    df = pd.DataFrame([result_dict])
-
-    if crawl_result == 1:
-        df = clean_scraped_df(df=df, store=store)
-
-    if "description_short" not in df.columns:
-        df["description_short"] = ""
-    df.loc[df["description_short"].isna(), "description_short"] = ""
-
-    if process_icon and crawl_result == 1 and not app_existing_icon_url:
-        try:
-            icon_url_100 = process_app_icon(store_id, df["icon_url_512"].to_numpy()[0])
-            if icon_url_100 is not None:
-                df["icon_url_100"] = icon_url_100
-        except Exception:
-            logger.exception(f"{scrape_info} failed to process app icon")
-
-    return df
+    logger.info(f"{scrape_info} {crawl_result} scrape finished")
+    return result_dict
 
 
 def save_developer_info(
     app_df: pd.DataFrame,
     database_connection: PostgresCon,
 ) -> pd.DataFrame:
-    assert app_df["developer_id"].to_numpy()[0], (
-        f"{app_df['store_id']} Missing Developer ID"
-    )
+    assert app_df["developer_id"].to_numpy()[
+        0
+    ], f"{app_df['store_id']} Missing Developer ID"
     df = (
         app_df[["store", "developer_id", "developer_name"]]
         .rename(columns={"developer_name": "name"})

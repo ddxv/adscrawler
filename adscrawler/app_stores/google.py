@@ -36,12 +36,31 @@ def scrape_app_gp(store_id: str, country: str, language: str = "en") -> dict:
         country=country,
         timeout=10,
     )
-    logger.info(f"{store_id=}, {country=}, {language=} play store scraped")
+    logger.debug(f"{store_id=}, {country=}, {language=} play store scraped")
     return result_dict
 
 
-def clean_google_play_app_df(df: pd.DataFrame) -> pd.DataFrame:
-    df = df.rename(
+def detect_language_safe(text: str) -> str:
+    """Detect language safely; return 'zz' if detection fails or text is null/empty."""
+    if not isinstance(text, str) or not text.strip():
+        return "zz"
+    try:
+        return langdetect.detect(text)
+    except langdetect.lang_detect_exception.LangDetectException:
+        return "zz"
+
+
+def add_language_column(apps_df: pd.DataFrame) -> pd.DataFrame:
+    """Add a store_language_code column to apps_df safely."""
+    apps_df = apps_df.copy()
+    apps_df.loc[:, "store_language_code"] = apps_df["description"].apply(
+        detect_language_safe
+    )
+    return apps_df
+
+
+def clean_google_play_app_df(apps_df: pd.DataFrame) -> pd.DataFrame:
+    apps_df = apps_df.rename(
         columns={
             "title": "name",
             "installs": "min_installs",
@@ -66,57 +85,55 @@ def clean_google_play_app_df(df: pd.DataFrame) -> pd.DataFrame:
             "screenshots": "phone_image_urls",
         },
     )
-    can_replace_min_installs = (df["min_installs"].isna()) & (df["installs"].notna())
-    df.loc[can_replace_min_installs, "min_installs"] = df.loc[
+    can_replace_min_installs = (apps_df["min_installs"].isna()) & (
+        apps_df["installs"].notna()
+    )
+    apps_df.loc[can_replace_min_installs, "min_installs"] = apps_df.loc[
         can_replace_min_installs,
         "installs",
     ].astype(str)
-    df["min_installs"].str.replace(r"[,+]", "", regex=True).fillna("0").astype(int)
-    df = df.assign(
-        min_installs=df["min_installs"]
+    # apps_df["min_installs"].str.replace(r"[,+]", "", regex=True).fillna("0").astype(int)
+    apps_df = apps_df.assign(
+        min_installs=apps_df["min_installs"]
         .str.replace(r"[,+]", "", regex=True)
         .fillna("0")
         .astype(int),
-        category=df["category"].str.lower(),
+        category=apps_df["category"].str.lower(),
         store_last_updated=pd.to_datetime(
-            df["store_last_updated"],
+            apps_df["store_last_updated"],
             unit="s",
-        ).fillna(df["release_date"]),
-        release_date=pd.to_datetime(df["release_date"], format="%b %d, %Y").dt.date,
+        ).fillna(apps_df["release_date"]),
+        release_date=pd.to_datetime(
+            apps_df["release_date"], format="%b %d, %Y"
+        ).dt.date,
     )
-    if "developer_name" in df.columns:
-        df["developer_name"] = df["developer_name"].str.replace("\t", " ")
+    if "developer_name" in apps_df.columns:
+        apps_df.loc[apps_df["developer_name"].notna(), "developer_name"] = apps_df.loc[
+            apps_df["developer_name"].notna(), "developer_name"
+        ].str.replace("\t", " ")
     list_cols = ["phone_image_url"]
     for list_col in list_cols:
-        urls_empty = ((df[f"{list_col}s"].isna()) | (df[f"{list_col}s"] == "")).all()
+        urls_empty = (
+            (apps_df[f"{list_col}s"].isna()) | (apps_df[f"{list_col}s"] == "")
+        ).all()
         if not urls_empty:
             columns = {x: f"{list_col}_{x + 1}" for x in range(3)}
-            df = pd.concat(
+            apps_df = pd.concat(
                 [
-                    df,
-                    df[f"{list_col}s"].apply(pd.Series).rename(columns=columns),
+                    apps_df,
+                    apps_df[f"{list_col}s"].apply(pd.Series).rename(columns=columns),
                 ],
                 axis=1,
             )
         else:
             for x in range(3):
-                df[f"{list_col}_{x}"] = None
-    if "description" in df.columns:
-        df["description"] = df["description"].apply(truncate_utf8_bytes)
-        try:
-            df["store_language_code"] = df["description"].apply(
-                lambda x: langdetect.detect(x)
-            )
-        except langdetect.lang_detect_exception.LangDetectException:
-            logger.debug(
-                f"Unable to detect language for {df['store_id'].to_numpy()[0]}"
-            )
-            # This is not a language code, so later join will fail and description keywords ignored
-            df["store_language_code"] = "zz"
-        df.loc[
-            df["store_language_code"].str.startswith("zh-"), "store_language_code"
+                apps_df[f"{list_col}_{x}"] = None
+    if "description" in apps_df.columns:
+        apps_df = add_language_column(apps_df)
+        apps_df.loc[
+            apps_df["store_language_code"].str.startswith("zh-"), "store_language_code"
         ] = "zh"
-    return df
+    return apps_df
 
 
 def call_js_to_update_file(
