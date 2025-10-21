@@ -145,6 +145,14 @@ def upsert_df(
     key_columns : list of str, optional
         A list of the column name(s) on which to match. If omitted, the
         primary key columns of the target table will be used.
+    insert_columns : list of str, all columns to insert/update
+    return_rows : bool, optional
+        Whether to return the rows that were inserted/updated, usually to get db ids
+    md5_key_columns: list of str columns (usually >1000 chars needs this)
+        that have Postgresql md5() used in the UNIQUE INDEX
+        allows upsert without hitting index size limits
+    log : bool, optional
+        Print generated SQL statement for debugging.
     """
 
     raw_conn = database_connection.engine.raw_connection()
@@ -191,7 +199,12 @@ def upsert_df(
     )
 
     sel_where_conditions = SQL(" AND ").join(
-        SQL("{} = ANY(%s)").format(Identifier(col)) for col in key_columns
+        (
+            SQL("md5({}) = ANY(%s::text[])").format(Identifier(col))
+            if md5_key_columns and col in md5_key_columns
+            else SQL("{} = ANY(%s)").format(Identifier(col))
+        )
+        for col in key_columns
     )
 
     select_query = SQL(

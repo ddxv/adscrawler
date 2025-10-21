@@ -260,31 +260,27 @@ def process_chunk(df_chunk, use_ssh_tunnel, process_icon):
                         logger.exception(
                             f"store={row.store}, store_id={row.store_id} update_all_app_info failed with {e}"
                         )
-        apps_df = pd.DataFrame(chunk_results)
-        apps_df["crawled_date"] = apps_df["crawled_at"].dt.date
-        app_details_to_s3(apps_df, row.store)
+        results_df = pd.DataFrame(chunk_results)
+        results_df["crawled_date"] = results_df["crawled_at"].dt.date
+        app_details_to_s3(results_df, row.store)
 
-        for crawl_result, adf in apps_df.groupby("crawl_result"):
+        for crawl_result, apps_df in results_df.groupby("crawl_result"):
             if crawl_result != 1:
-                adf = adf[["store_id", "store", "crawled_at", "crawl_result"]]
+                apps_df = apps_df[["store_id", "store", "crawled_at", "crawl_result"]]
             else:
-                adf = clean_scraped_df(df=adf, store=row.store)
-                if "description_short" not in adf.columns:
-                    adf["description_short"] = ""
-                adf.loc[adf["description_short"].isna(), "description_short"] = ""
-
-            adf[adf["rating_count"].isna()]["rating_count"].fillna(None)
-
-            adf = adf.convert_dtypes(dtype_backend="pyarrow")
-            adf = adf.replace({pd.NA: None})
-
-            adf["crawled_at", "store_id"].tail(10)
-
-            apps_df = save_apps_df(
-                apps_df=adf,
+                apps_df = clean_scraped_df(df=apps_df, store=row.store)
+                if "description_short" not in apps_df.columns:
+                    apps_df["description_short"] = ""
+                apps_df.loc[
+                    apps_df["description_short"].isna(), "description_short"
+                ] = ""
+            apps_df = apps_df.convert_dtypes(dtype_backend="pyarrow")
+            apps_df = apps_df.replace({pd.NA: None})
+            results_df = save_apps_df(
+                apps_df=apps_df,
                 database_connection=database_connection,
             )
-            logger.info(f"Processed {len(adf)} apps for crawl_result={crawl_result}")
+            logger.info(f"Chunk upserted apps={len(apps_df)} {crawl_result=}")
 
         # if process_icon and crawl_result == 1 and not app_existing_icon_url:
         #     try:
@@ -1262,47 +1258,48 @@ def upsert_store_apps_descriptions(
         validate="m:1",
     ).rename(columns={"id": "language_id"})
     if store_apps_descriptions["language_id"].isna().any():
-        logger.error(
-            f"Store apps descriptions language id is NA {store_apps_descriptions[['store_id', 'store_language_code']]}"
-        )
-        store_apps_descriptions = store_apps_descriptions[
-            ~store_apps_descriptions["language_id"].isna()
-        ]
+        null_ids = store_apps_descriptions["language_id"].isna()
+        null_langs = store_apps_descriptions[
+            ["store_id", "store_language_code"]
+        ].drop_duplicates()
+        logger.error(f"App descriptions dropping unknown language codes: {null_langs}")
+        store_apps_descriptions = store_apps_descriptions[~null_ids]
         if store_apps_descriptions.empty:
-            logger.error("Dropped all descriptions, no language id found")
+            logger.debug("Dropped all descriptions, no language id found")
             return
-
     if "description_short" not in store_apps_descriptions.columns:
         store_apps_descriptions["description_short"] = ""
     key_columns = ["store_app", "language_id", "description", "description_short"]
-    description_df = upsert_df(
+    upsert_df(
         table_name=table_name,
         df=store_apps_descriptions,
         insert_columns=key_columns,
         key_columns=key_columns,
+        md5_key_columns=["description", "description_short"],
         database_connection=database_connection,
-        return_rows=True,
-    ).rename(columns={"id": "description_id"})
-    description_df = pd.merge(
-        description_df,
-        store_apps_descriptions[["store_app", "name"]],
-        how="left",
-        on="store_app",
-        validate="1:1",
+        # return_rows=True,
     )
-    if description_df is not None and not description_df.empty:
-        for _i, row in description_df.iterrows():
-            description = row["description"]
-            description_short = row["description_short"]
-            language_id = row["language_id"]
-            description_id = row["description_id"]
-            app_name = row["name"]
-            text = ". ".join([app_name, description_short, description])
-            # keywords = extract_keywords(text, database_connection=database_connection)
-            # keywords_df = pd.DataFrame(keywords, columns=["keyword_text"])
-            # keywords_df["language_id"] = language_id
-            # keywords_df["description_id"] = description_id
-            # upsert_keywords(keywords_df, database_connection)
+    # .rename(columns={"id": "description_id"})
+    # description_df = pd.merge(
+    #     description_df,
+    #     store_apps_descriptions[["store_app", "name"]],
+    #     how="inner",
+    #     on="store_app",
+    #     validate="1:1",
+    # )
+    # if description_df is not None and not description_df.empty:
+    #     for _i, row in description_df.iterrows():
+    #         description = row["description"]
+    #         description_short = row["description_short"]
+    #         language_id = row["language_id"]
+    #         description_id = row["description_id"]
+    #         app_name = row["name"]
+    #         text = ". ".join([app_name, description_short, description])
+    #         keywords = extract_keywords(text, database_connection=database_connection)
+    #         keywords_df = pd.DataFrame(keywords, columns=["keyword_text"])
+    #         keywords_df["language_id"] = language_id
+    #         keywords_df["description_id"] = description_id
+    #         upsert_keywords(keywords_df, database_connection)
 
 
 def upsert_keywords(keywords_df: pd.DataFrame, database_connection: PostgresCon):
