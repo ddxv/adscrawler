@@ -729,10 +729,9 @@ def query_store_apps(
     limit_str = ""
     if limit:
         limit_str = f"LIMIT {limit}"
+    icon_str = ""
     if process_icon:
         icon_str = "icon_url_100,"
-    else:
-        icon_str = ""
     sel_query = f"""SELECT 
             store, 
             sa.id as store_app, 

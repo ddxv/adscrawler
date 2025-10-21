@@ -43,7 +43,7 @@ class ProcessManager:
         parser.add_argument(
             "-p",
             "--platform",
-            action="append",
+            type=str,
             help="String of google or apple",
             default=None,
         )

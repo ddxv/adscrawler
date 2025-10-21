@@ -234,18 +234,13 @@ def app_details_to_s3(
     logger.info(f"S3 upload app details {store=} finished")
 
 
-def process_chunk(df_chunk, use_ssh_tunnel, process_icon):
+def process_chunk(df_chunk, use_ssh_tunnel, process_icon, total_rows):
+    chunk_info = f"Chunk {df_chunk.index[0]}-{df_chunk.index[-1]}/{total_rows}"
     database_connection = get_db_connection(use_ssh_tunnel=use_ssh_tunnel)
-    logger.info(
-        f"Processing chunk {df_chunk.index[0]}-{df_chunk.index[-1]} ({len(df_chunk)} apps)"
-    )
+    logger.info(f"{chunk_info} start")
     try:
         chunk_results = []
         for _, row in df_chunk.iterrows():
-            if process_icon:
-                app_existing_icon_url = row.icon_url_100
-            else:
-                app_existing_icon_url = None
             for country in APP_DETAILS_COUNTRY_LIST:
                 for language in APP_DETAILS_LANGUAGE_LIST:
                     try:
@@ -263,7 +258,6 @@ def process_chunk(df_chunk, use_ssh_tunnel, process_icon):
         results_df = pd.DataFrame(chunk_results)
         results_df["crawled_date"] = results_df["crawled_at"].dt.date
         app_details_to_s3(results_df, row.store)
-
         for crawl_result, apps_df in results_df.groupby("crawl_result"):
             if crawl_result != 1:
                 apps_df = apps_df[["store_id", "store", "crawled_at", "crawl_result"]]
@@ -274,44 +268,43 @@ def process_chunk(df_chunk, use_ssh_tunnel, process_icon):
                 apps_df.loc[
                     apps_df["description_short"].isna(), "description_short"
                 ] = ""
+                if process_icon:
+                    try:
+                        apps_df = pd.merge(
+                            apps_df,
+                            df_chunk[["store_id", "icon_url_100"]],
+                            on="store_id",
+                            how="inner",
+                            validate="1:1",
+                        )
+                        no_icon = apps_df["icon_url_100"].isna()
+                        if apps_df[no_icon].empty:
+                            pass
+                        else:
+                            apps_df.loc[no_icon, "icon_url_100"] = apps_df.loc[
+                                no_icon
+                            ].apply(
+                                lambda row: process_app_icon(
+                                    row.store_id, row["icon_url_512"]
+                                ),
+                                axis=1,
+                            )
+                    except Exception:
+                        logger.exception(f"{row.store_id} failed to process app icon")
             apps_df = apps_df.convert_dtypes(dtype_backend="pyarrow")
             apps_df = apps_df.replace({pd.NA: None})
-            results_df = save_apps_df(
+            apps_details_to_db(
                 apps_df=apps_df,
                 database_connection=database_connection,
             )
-            logger.info(f"Chunk upserted apps={len(apps_df)} {crawl_result=}")
-
-        # if process_icon and crawl_result == 1 and not app_existing_icon_url:
-        #     try:
-        #         icon_url_100 = process_app_icon(
-        #             row.store_id, df["icon_url_512"].to_numpy()[0]
-        #         )
-        #         if icon_url_100 is not None:
-        #             df["icon_url_100"] = icon_url_100
-        #     except Exception:
-        #         logger.exception(f"{row.store_id} failed to process app icon")
-
-        # This will become the 'extra' udpate info
-        update_all_app_info(
-            row.store,
-            row.store_id,
-            database_connection,
-            process_icon,
-            app_existing_icon_url,
-        )
-
+            logger.info(f"{chunk_info} upserted {crawl_result=} apps={len(apps_df)} ")
     except Exception as e:
-        logger.exception(
-            f"Error processing chunk {df_chunk.index[0]}-{df_chunk.index[-1]} with {e}"
-        )
+        logger.exception(f"{chunk_info} error processing with {e}")
     finally:
-        logger.info(f"Finished chunk {df_chunk.index[0]}-{df_chunk.index[-1]}")
+        logger.info(f"{chunk_info} finished")
         if database_connection and hasattr(database_connection, "engine"):
             database_connection.engine.dispose()
-            logger.debug(
-                f"Disposed database engine for chunk {df_chunk.index[0]}-{df_chunk.index[-1]}"
-            )
+            logger.debug(f"{chunk_info} database connection disposed")
 
 
 def update_app_details(
@@ -324,7 +317,6 @@ def update_app_details(
         store,
         database_connection,
         limit=limit,
-        log_query=False,
         process_icon=process_icon,
     )
     logger.info(f"{log_info} start {len(df)} apps")
@@ -334,8 +326,9 @@ def update_app_details(
     chunks = [df.iloc[i : i + chunk_size] for i in range(0, len(df), chunk_size)]
 
     total_chunks = len(chunks)
+    total_rows = len(df)
     logger.info(
-        f"Processing {len(df)} apps in {total_chunks} chunks of ~{chunk_size} apps each"
+        f"Processing {total_rows} apps in {total_chunks} chunks of ~{chunk_size} apps each"
     )
 
     completed_count = 0
@@ -346,7 +339,7 @@ def update_app_details(
         future_to_idx = {}
         for idx, df_chunk in enumerate(chunks):
             future = executor.submit(
-                process_chunk, df_chunk, use_ssh_tunnel, process_icon
+                process_chunk, df_chunk, use_ssh_tunnel, process_icon, total_rows
             )
             future_to_idx[future] = idx
 
@@ -990,50 +983,44 @@ def crawl_developers_for_new_store_ids(
                 logger.exception(f"{row_info=} failed!")
 
 
-def update_all_app_info(
-    store: int,
-    store_id: str,
+def save_app_domains(
+    apps_df: pd.DataFrame,
     database_connection: PostgresCon,
-    process_icon: bool,
-    app_existing_icon_url: str | None = None,
 ) -> None:
-    info = f"{store=} {store_id=}"
-    app_df = scrape_and_save_app(
-        store, store_id, database_connection, process_icon, app_existing_icon_url
-    )
-    if "store_app" not in app_df.columns:
-        logger.error(f"{info} store_app db id not in app_df columns")
+    if "url" not in apps_df.columns or apps_df["url"].isna().all():
+        logger.warning("No app urls found, finished")
         return
-    if app_df["crawl_result"].to_numpy()[0] != 1:
-        logger.info(f"{info} crawl not successful, don't update further")
-        return
-    if "url" not in app_df.columns or not app_df["url"].to_numpy():
-        logger.info(f"{info} no app url, finished")
-        return
-
-    app_df["url"] = app_df["url"].apply(lambda x: extract_domains(x))
-
+    urls_na = apps_df["url"].isna()
+    app_urls = apps_df[~urls_na][["store_app", "url"]].drop_duplicates()
+    app_urls["url"] = app_urls["url"].apply(lambda x: extract_domains(x))
     insert_columns = ["domain_name"]
-    app_urls_df = upsert_df(
+    domain_ids_df = upsert_df(
         table_name="domains",
-        df=app_df.rename(columns={"url": "domain_name"}),
+        df=app_urls.rename(columns={"url": "domain_name"}),
         insert_columns=insert_columns,
         key_columns=["domain_name"],
         database_connection=database_connection,
         return_rows=True,
-    )
-    if app_urls_df is not None and not app_urls_df.empty:
-        app_df["pub_domain"] = app_urls_df["id"].astype(object)[0]
+    ).rename(columns={"id": "pub_domain"})
+    if domain_ids_df is not None and not domain_ids_df.empty:
+        app_urls = pd.merge(
+            app_urls,
+            domain_ids_df,
+            how="left",
+            left_on="url",
+            right_on="domain_name",
+            validate="m:1",
+        )
         insert_columns = ["store_app", "pub_domain"]
         key_columns = ["store_app"]
         upsert_df(
             table_name="app_urls_map",
             insert_columns=insert_columns,
-            df=app_df,
+            df=app_urls,
             key_columns=key_columns,
             database_connection=database_connection,
         )
-    logger.info(f"{info} finished inserting pub_domains")
+    logger.info(f"Finished inserting app domains")
 
 
 def scrape_from_store(
@@ -1119,7 +1106,7 @@ def scrape_app(
     result_dict["store_id"] = store_id
     result_dict["queried_language"] = language.lower()
     result_dict["country"] = country.upper()
-    logger.info(f"{scrape_info} {crawl_result} scrape finished")
+    logger.info(f"{scrape_info} result={crawl_result} scrape finished")
     return result_dict
 
 
@@ -1127,9 +1114,9 @@ def save_developer_info(
     app_df: pd.DataFrame,
     database_connection: PostgresCon,
 ) -> pd.DataFrame:
-    assert app_df["developer_id"].to_numpy()[0], (
-        f"{app_df['store_id']} Missing Developer ID"
-    )
+    assert app_df["developer_id"].to_numpy()[
+        0
+    ], f"{app_df['store_id']} Missing Developer ID"
     df = (
         app_df[["store", "developer_id", "developer_name"]]
         .rename(columns={"developer_name": "name"})
@@ -1155,38 +1142,10 @@ def save_developer_info(
     return app_df
 
 
-def scrape_and_save_app(
-    store: int,
-    store_id: str,
-    database_connection: PostgresCon,
-    process_icon: bool = False,
-    app_existing_icon_url: str | None = None,
-) -> pd.DataFrame:
-    for country in APP_DETAILS_COUNTRY_LIST:
-        for language in APP_DETAILS_LANGUAGE_LIST:
-            app_df = scrape_app(
-                store=store,
-                store_id=store_id,
-                country=country,
-                language=language,
-                process_icon=process_icon,
-                app_existing_icon_url=app_existing_icon_url,
-            )
-            crawl_result = int(app_df["crawl_result"].to_numpy()[0])
-            info = f"{store=}, {country=}, {language=}, {store_id=}, {crawl_result=}"
-            logger.info(f"{info} save to db start")
-            app_df = save_apps_df(
-                apps_df=app_df,
-                database_connection=database_connection,
-            )
-            logger.info(f"{info} {crawl_result=} saved to db")
-    return app_df
-
-
-def save_apps_df(
+def apps_details_to_db(
     apps_df: pd.DataFrame,
     database_connection: PostgresCon,
-) -> pd.DataFrame:
+) -> None:
     table_name = "store_apps"
     key_columns = ["store", "store_id"]
     if (apps_df["crawl_result"] == 1).all() and apps_df["developer_id"].notna().all():
@@ -1239,8 +1198,12 @@ def save_apps_df(
             how="left",
             validate="1:1",
         )
+        save_app_domains(
+            apps_df=apps_df,
+            database_connection=database_connection,
+        )
     log_crawl_results(apps_df, database_connection=database_connection)
-    return apps_df
+    return
 
 
 def upsert_store_apps_descriptions(
@@ -1442,7 +1405,7 @@ def process_app_icon(store_id: str, url: str) -> str | None:
         ContentType=image_format,
     )
     if response["ResponseMetadata"]["HTTPStatusCode"] == 200:
-        logger.info(f"Uploaded {store_id} app icon to S3")
+        logger.info(f"S3 uploaded {store_id} app icon")
     else:
-        logger.error(f"Failed to upload {store_id} app icon to S3")
+        logger.error(f"S3 failed to upload {store_id} app icon")
     return f_name
