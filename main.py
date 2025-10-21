@@ -387,7 +387,9 @@ class ProcessManager:
         logger.info(f"Error messages: {error_messages}")
 
     def waydroid_mitm(self) -> None:
-        update_geo_dbs(redownload=self.args.redownload_geo_dbs)
+        if self.args.redownload_geo_dbs:
+            update_geo_dbs(redownload=self.args.redownload_geo_dbs)
+            return
         if self.args.store_id:
             # Manual waydroid process, launches app for 5 minutes for user to interact
             store_id = self.args.store_id
