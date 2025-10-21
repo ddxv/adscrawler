@@ -1,3 +1,4 @@
+
 WITH latest_version_codes AS (
     SELECT DISTINCT ON
     (store_app)
@@ -30,7 +31,7 @@ latest_success_version_codes AS (
         updated_at DESC,
         string_to_array(version_code, '.')::bigint [] DESC
 ),
-failing_downloads AS (
+faily_downloads_monthly AS (
     SELECT
         store_app,
         count(*) AS attempt_count
@@ -39,6 +40,18 @@ failing_downloads AS (
     WHERE
         crawl_result != 1
         AND updated_at >= current_date - interval '30 days'
+    GROUP BY
+        store_app
+),
+faily_downloads_quarter AS (
+    SELECT
+        store_app,
+        count(*) AS attempt_count
+    FROM
+        logging.store_app_downloads
+    WHERE
+        crawl_result != 1
+        AND updated_at >= current_date - interval '90 days'
     GROUP BY
         store_app
 ),
@@ -59,7 +72,8 @@ scheduled_apps_crawl AS (
         vc.crawl_result AS last_crawl_result,
         vc.updated_at AS last_download_attempt,
         lsvc.created_at AS last_downloaded_at,
-        coalesce(fd.attempt_count, 0) AS attempt_count
+        coalesce(fd.attempt_count, 0) AS failed_attempts_month,
+        coalesce(fdq.attempt_count, 0) AS failed_attempts_quarter
     FROM
         store_apps_in_latest_rankings AS dc
     LEFT JOIN latest_version_codes AS vc
@@ -68,9 +82,12 @@ scheduled_apps_crawl AS (
     LEFT JOIN latest_success_version_codes AS lsvc
         ON
             dc.store_app = lsvc.store_app
-    LEFT JOIN failing_downloads AS fd
+    LEFT JOIN faily_downloads_monthly AS fd
         ON
             vc.store_app = fd.store_app
+    LEFT JOIN faily_downloads_quarter AS fdq
+        ON
+            vc.store_app = fdq.store_app
     WHERE
         dc.store = :store
         AND
@@ -108,7 +125,8 @@ user_requested_apps_crawl AS (
         lvc.crawl_result AS last_crawl_result,
         lvc.updated_at AS last_download_attempt,
         lsvc.created_at AS last_downloaded_at,
-        coalesce(fd.attempt_count, 0) AS attempt_count
+        coalesce(fd.attempt_count, 0) AS failed_attempts_month,
+        coalesce(fdq.attempt_count, 0) AS failed_attempts_quarter
     FROM
         user_requested_scan AS urs
     LEFT JOIN store_apps AS sa
@@ -120,9 +138,12 @@ user_requested_apps_crawl AS (
     LEFT JOIN latest_version_codes AS lvc
         ON
             sa.id = lvc.store_app
-    LEFT JOIN failing_downloads AS fd
+    LEFT JOIN faily_downloads_monthly AS fd
         ON
             sa.id = fd.store_app
+        LEFT JOIN faily_downloads_quarter AS fdq
+        ON
+            sa.id = fdq.store_app
     WHERE
         (
             (
@@ -156,7 +177,8 @@ combined AS (
         name,
         installs,
         rating_count,
-        attempt_count,
+        failed_attempts_month,
+        failed_attempts_quarter,
         last_crawl_result,
         'user' AS mysource,
         last_download_attempt,
@@ -164,7 +186,7 @@ combined AS (
     FROM
         user_requested_apps_crawl
     WHERE
-        attempt_count < 3
+        failed_attempts_month < 3
     UNION ALL
     SELECT
         store_app,
@@ -172,7 +194,8 @@ combined AS (
         name,
         installs,
         rating_count,
-        attempt_count,
+        failed_attempts_month,
+        failed_attempts_quarter,
         last_crawl_result,
         CASE
             WHEN
@@ -185,7 +208,7 @@ combined AS (
     FROM
         scheduled_apps_crawl
     WHERE
-        attempt_count < 2
+        failed_attempts_month < 2 AND failed_attempts_quarter < 4
         AND (
             last_downloaded_at IS NULL
             OR last_downloaded_at < current_date - interval '180 days'
@@ -226,4 +249,5 @@ final_selection AS (
 )
 SELECT *
 FROM
-    final_selection;
+    final_selection
+;
