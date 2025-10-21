@@ -1,8 +1,8 @@
 import datetime
-import uuid
 import os
 import pathlib
 import time
+import uuid
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from io import BytesIO
 from urllib.error import URLError
@@ -272,6 +272,14 @@ def process_chunk(df_chunk, use_ssh_tunnel, process_icon):
                 if "description_short" not in adf.columns:
                     adf["description_short"] = ""
                 adf.loc[adf["description_short"].isna(), "description_short"] = ""
+
+            adf[adf["rating_count"].isna()]["rating_count"].fillna(None)
+
+            adf = adf.convert_dtypes(dtype_backend="pyarrow")
+            adf = adf.replace({pd.NA: None})
+
+            adf["crawled_at", "store_id"].tail(10)
+
             apps_df = save_apps_df(
                 apps_df=adf,
                 database_connection=database_connection,
@@ -311,13 +319,13 @@ def process_chunk(df_chunk, use_ssh_tunnel, process_icon):
 
 
 def update_app_details(
-    database_connection, stores, use_ssh_tunnel, workers, process_icon, limit
+    database_connection, store, use_ssh_tunnel, workers, process_icon, limit
 ):
     """Process apps with dynamic work queue - simple and efficient."""
-    log_info = f"Update app details: {stores=}"
+    log_info = f"Update app details: {store=}"
 
     df = query_store_apps(
-        stores,
+        store,
         database_connection,
         limit=limit,
         log_query=False,
@@ -424,13 +432,13 @@ def crawl_keyword_cranks(database_connection: PostgresCon) -> None:
         )
 
 
-def scrape_store_ranks(database_connection: PostgresCon, stores: list[int]) -> None:
+def scrape_store_ranks(database_connection: PostgresCon, store: int) -> None:
     collections_map = query_collections(database_connection)
     categories_map = query_categories(database_connection)
     countries_map = query_countries(database_connection)
     collections_map = collections_map.rename(columns={"id": "store_collection"})
     categories_map = categories_map.rename(columns={"id": "store_category"})
-    if 2 in stores:
+    if store == 2:
         collection_keyword = "TOP"
         for country in RANKS_COUNTRY_LIST:
             try:
@@ -451,7 +459,7 @@ def scrape_store_ranks(database_connection: PostgresCon, stores: list[int]) -> N
                     f"Srape iOS collection={collection_keyword} hit error={e}, skipping",
                 )
 
-    if 1 in stores:
+    if store == 1:
         for country in RANKS_COUNTRY_LIST:
             try:
                 ranked_dicts = scrape_google_ranks(country=country)
@@ -1123,9 +1131,9 @@ def save_developer_info(
     app_df: pd.DataFrame,
     database_connection: PostgresCon,
 ) -> pd.DataFrame:
-    assert app_df["developer_id"].to_numpy()[
-        0
-    ], f"{app_df['store_id']} Missing Developer ID"
+    assert app_df["developer_id"].to_numpy()[0], (
+        f"{app_df['store_id']} Missing Developer ID"
+    )
     df = (
         app_df[["store", "developer_id", "developer_name"]]
         .rename(columns={"developer_name": "name"})

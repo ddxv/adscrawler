@@ -1,4 +1,3 @@
-
 WITH latest_version_codes AS (
     SELECT DISTINCT ON
     (store_app)
@@ -141,7 +140,7 @@ user_requested_apps_crawl AS (
     LEFT JOIN faily_downloads_monthly AS fd
         ON
             sa.id = fd.store_app
-        LEFT JOIN faily_downloads_quarter AS fdq
+    LEFT JOIN faily_downloads_quarter AS fdq
         ON
             sa.id = fdq.store_app
     WHERE
@@ -249,5 +248,4 @@ final_selection AS (
 )
 SELECT *
 FROM
-    final_selection
-;
+    final_selection;

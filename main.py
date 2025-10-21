@@ -30,6 +30,8 @@ from adscrawler.tools.geo import update_geo_dbs
 
 logger = get_logger(__name__)
 
+STORES_MAP = {"google": 1, "apple": 2}
+
 
 class ProcessManager:
     def __init__(self) -> None:
@@ -40,10 +42,10 @@ class ProcessManager:
         parser = argparse.ArgumentParser()
         parser.add_argument(
             "-p",
-            "--platforms",
+            "--platform",
             action="append",
-            help="String of google and/or apple",
-            default=[],
+            help="String of google or apple",
+            default=None,
         )
         parser.add_argument(
             "-t",
@@ -187,10 +189,8 @@ class ProcessManager:
             if any([" -u " in x, " --update-app-store-details" in x])
         ]
 
-        if self.args.platforms:
-            found_processes = [
-                x for x in found_processes if any(p in x for p in self.args.platforms)
-            ]
+        if self.args.platform:
+            found_processes = [x for x in found_processes if self.args.platform in x]
 
         return len(found_processes) > 1
 
@@ -198,10 +198,8 @@ class ProcessManager:
         processes = self.get_running_processes()
         my_processes = self.filter_processes(processes, "/adscrawler/main.py")
         found_processes = [x for x in my_processes if any([" --download-apks" in x])]
-        if self.args.platforms:
-            found_processes = [
-                x for x in found_processes if any(p in x for p in self.args.platforms)
-            ]
+        if self.args.platform:
+            found_processes = [x for x in found_processes if self.args.platform in x]
 
         return len(found_processes) > 1
 
@@ -209,10 +207,8 @@ class ProcessManager:
         processes = self.get_running_processes()
         my_processes = self.filter_processes(processes, "/adscrawler/main.py")
         found_processes = [x for x in my_processes if any([" --process-sdks" in x])]
-        if self.args.platforms:
-            found_processes = [
-                x for x in found_processes if any(p in x for p in self.args.platforms)
-            ]
+        if self.args.platform:
+            found_processes = [x for x in found_processes if self.args.platform in x]
 
         return len(found_processes) > 1
 
@@ -222,10 +218,8 @@ class ProcessManager:
         found_processes = [
             x for x in my_processes if any([" -w" in x, " --waydroid" in x])
         ]
-        if self.args.platforms:
-            found_processes = [
-                x for x in found_processes if any(p in x for p in self.args.platforms)
-            ]
+        if self.args.platform:
+            found_processes = [x for x in found_processes if self.args.platform in x]
 
         return len(found_processes) > 1
 
@@ -265,34 +259,30 @@ class ProcessManager:
 
     def main(self) -> None:
         logger.info(f"Main starting with args: {self.args}")
-        platforms: list[str] = self.args.platforms or ["google", "apple"]
-        _stores: list[int | None] = [
-            1 if "google" in platforms else None,
-            2 if "apple" in platforms else None,
-        ]
-        stores: list[int] = [x for x in _stores if x]
-        stores = [s for s in stores if s is not None]
+        platform: str = self.args.platform or None
+
+        store = STORES_MAP.get(platform) if platform else None
 
         if self.args.new_apps_check:
-            self.scrape_new_apps(stores)
+            self.scrape_new_apps(store)
 
         if self.args.import_ranks_from_s3:
-            self.import_ranks_from_s3(stores)
+            self.import_ranks_from_s3(store)
 
         if self.args.new_apps_check_devs:
-            self.scrape_new_apps_devs(stores)
+            self.scrape_new_apps_devs(store)
 
         if self.args.update_app_store_details:
-            self.update_app_details(stores)
+            self.update_app_details(store)
 
         if self.args.app_ads_txt_scrape:
             self.crawl_app_ads()
 
         if self.args.download_apks:
-            self.download_apks(stores)
+            self.download_apks(store)
 
         if self.args.process_sdks:
-            self.process_sdks(stores)
+            self.process_sdks(store)
 
         if self.args.waydroid:
             self.waydroid_mitm()
@@ -308,7 +298,7 @@ class ProcessManager:
 
         logger.info("Adscrawler exiting main")
 
-    def import_ranks_from_s3(self, stores: list[int]) -> None:
+    def import_ranks_from_s3(self, store: int) -> None:
         period = self.args.period
         if period == "week":
             start_date = datetime.date.today() - datetime.timedelta(days=8)
@@ -318,38 +308,36 @@ class ProcessManager:
             end_date = datetime.date.today()
         else:
             raise ValueError(f"Invalid period {period}")
-        for store in stores:
-            try:
-                import_ranks_from_s3(
-                    database_connection=self.pgcon,
-                    store=store,
-                    start_date=start_date,
-                    end_date=end_date,
-                    period=period,
-                )
-            except Exception:
-                logger.exception(
-                    f"Importing {self.args.period} ranks from s3 for {store=} failed"
-                )
-
-    def scrape_new_apps(self, stores: list[int]) -> None:
         try:
-            scrape_store_ranks(database_connection=self.pgcon, stores=stores)
+            import_ranks_from_s3(
+                database_connection=self.pgcon,
+                store=store,
+                start_date=start_date,
+                end_date=end_date,
+                period=period,
+            )
+        except Exception:
+            logger.exception(
+                f"Importing {self.args.period} ranks from s3 for {store=} failed"
+            )
+
+    def scrape_new_apps(self, store: int) -> None:
+        try:
+            scrape_store_ranks(database_connection=self.pgcon, store=store)
         except Exception:
             logger.exception("Crawling front pages failed")
 
-    def scrape_new_apps_devs(self, stores: list[int]) -> None:
-        for store in stores:
-            try:
-                crawl_developers_for_new_store_ids(
-                    database_connection=self.pgcon, store=store
-                )
-            except Exception:
-                logger.exception(f"Crawling developers for {store=} failed")
+    def scrape_new_apps_devs(self, store: int) -> None:
+        try:
+            crawl_developers_for_new_store_ids(
+                database_connection=self.pgcon, store=store
+            )
+        except Exception:
+            logger.exception(f"Crawling developers for {store=} failed")
 
-    def update_app_details(self, stores: list[int]) -> None:
+    def update_app_details(self, store: int) -> None:
         update_app_details(
-            stores=stores,
+            store=store,
             database_connection=self.pgcon,
             use_ssh_tunnel=self.args.use_ssh_tunnel,
             workers=int(self.args.workers),
@@ -360,7 +348,7 @@ class ProcessManager:
     def crawl_app_ads(self) -> None:
         crawl_app_ads(self.pgcon, limit=self.args.limit_query_rows)
 
-    def download_apks(self, stores: list[int]) -> None:
+    def download_apks(self, store: int) -> None:
         if self.args.store_id:
             # For manually processing a single app
             manual_download_app(
@@ -369,30 +357,17 @@ class ProcessManager:
                 store=1,
             )
             return
-        if 2 in stores:
-            try:
-                download_apps(
-                    store=2, database_connection=self.pgcon, number_of_apps_to_pull=50
-                )
-            except Exception:
-                logger.exception("iTunes scrape plist failing")
-        if 1 in stores:
-            try:
-                download_apps(
-                    store=1, database_connection=self.pgcon, number_of_apps_to_pull=20
-                )
-            except Exception:
-                logger.exception("Android download apks failing")
+        try:
+            download_apps(
+                store=store, database_connection=self.pgcon, number_of_apps_to_pull=30
+            )
+        except Exception:
+            logger.exception(f"Download app/decompile failing {store=}")
 
-    def process_sdks(self, stores: list[int]) -> None:
-        if 1 in stores:
-            process_sdks(
-                store=1, database_connection=self.pgcon, number_of_apps_to_pull=20
-            )
-        if 2 in stores:
-            process_sdks(
-                store=2, database_connection=self.pgcon, number_of_apps_to_pull=20
-            )
+    def process_sdks(self, store: int) -> None:
+        process_sdks(
+            store=store, database_connection=self.pgcon, number_of_apps_to_pull=20
+        )
 
     def creative_scan_all_apps(self) -> None:
         scan_all_apps(

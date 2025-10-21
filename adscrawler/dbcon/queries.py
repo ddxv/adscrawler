@@ -654,7 +654,7 @@ def get_store_app_columns(database_connection: PostgresCon) -> list[str]:
 
 
 def query_store_apps(
-    stores: list[int],
+    store: int,
     database_connection: PostgresCon,
     limit: int | None = 1000,
     log_query: bool = False,
@@ -711,7 +711,7 @@ def query_store_apps(
                         OR {max_group}
                         )
                         """
-    where_str = "store IN (" + (", ").join([str(x) for x in stores]) + ")"
+    where_str = f"store = {store}"
     where_str += f""" AND {installs_and_dates_str}"""
     limit_str = ""
     if limit:
