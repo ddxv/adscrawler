@@ -304,7 +304,8 @@ def parse_urls_for_known_parts(
         adv_store_id = None
         tld_url = get_tld(url)
         if not tld_url:
-            continue
+            # only for use here, likely url like "market://"
+            tld_url = ""
         if tld_url in get_all_mmp_tlds(database_connection)["mmp_tld"].to_list():
             if any(
                 x in url.lower()
