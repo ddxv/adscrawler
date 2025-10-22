@@ -62,20 +62,22 @@ def get_s3_client(key_name: str = "s3") -> boto3.client:
     This supports both self hosted and regular cloud S3. For the self hosted it also supports SSH port forwarding if the S3 is not public.
 
     """
-    global S3_CLIENT
-    if S3_CLIENT is not None:
-        return S3_CLIENT
+    global S3_CLIENTS
+
+    if key_name in S3_CLIENTS:
+        return S3_CLIENTS[key_name]
 
     endpoint_url = get_s3_endpoint(key_name)
     session = boto3.session.Session()
-    S3_CLIENT = session.client(
+    client = session.client(
         "s3",
         region_name=CONFIG[key_name]["region_name"],
         endpoint_url=endpoint_url,
         aws_access_key_id=CONFIG[key_name]["access_key_id"],
         aws_secret_access_key=CONFIG[key_name]["secret_key"],
     )
-    return S3_CLIENT
+    S3_CLIENTS[key_name] = client
+    return client
 
 
 def upload_mitm_log_to_s3(
@@ -557,4 +559,4 @@ def creative_exists_in_s3(md5_hash: str, extension: str) -> bool:
         raise
 
 
-S3_CLIENT = None
+S3_CLIENTS = {}

@@ -284,8 +284,8 @@ def process_chunk(df_chunk, use_ssh_tunnel, process_icon, total_rows):
                             apps_df.loc[no_icon, "icon_url_100"] = apps_df.loc[
                                 no_icon
                             ].apply(
-                                lambda row: process_app_icon(
-                                    row.store_id, row["icon_url_512"]
+                                lambda x: process_app_icon(
+                                    x["store_id"], x["icon_url_512"]
                                 ),
                                 axis=1,
                             )
@@ -1020,7 +1020,7 @@ def save_app_domains(
             key_columns=key_columns,
             database_connection=database_connection,
         )
-    logger.info(f"Finished inserting app domains")
+    logger.info("Finished inserting app domains")
 
 
 def scrape_from_store(
@@ -1114,9 +1114,9 @@ def save_developer_info(
     app_df: pd.DataFrame,
     database_connection: PostgresCon,
 ) -> pd.DataFrame:
-    assert app_df["developer_id"].to_numpy()[
-        0
-    ], f"{app_df['store_id']} Missing Developer ID"
+    assert app_df["developer_id"].to_numpy()[0], (
+        f"{app_df['store_id']} Missing Developer ID"
+    )
     df = (
         app_df[["store", "developer_id", "developer_name"]]
         .rename(columns={"developer_name": "name"})
@@ -1380,7 +1380,7 @@ def process_app_icon(store_id: str, url: str) -> str | None:
     # Fetch image
     f_name = None
     try:
-        response = requests.get(url)
+        response = requests.get(url, timeout=10)
     except Exception:
         logger.error(f"Failed to fetch image from {url}")
         return None
