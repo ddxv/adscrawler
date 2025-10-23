@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict lDaHvxnFHqhGdeT3OFKn4ZHHYcKSOEGXibW1ZnF1ENYU4Ehq3x8g5RjEs1kd79I
+\restrict moQU2vF8ApOtjLA8Numq66M9WchhZNLp8AM5lDTwHEEN7IFg4BmBBhwvaCiflWx
 
--- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
--- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
+-- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
+-- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -76,6 +76,24 @@ CREATE INDEX sdk_packages_package_pattern_idx ON adtech.sdk_packages USING btree
 
 
 --
+-- Name: sdk_packages_pattern_lower_idx; Type: INDEX; Schema: adtech; Owner: postgres
+--
+
+CREATE INDEX sdk_packages_pattern_lower_idx ON adtech.sdk_packages USING btree (
+    lower((package_pattern)::text) text_pattern_ops
+);
+
+
+--
+-- Name: sdk_packages_pattern_trgm_idx; Type: INDEX; Schema: adtech; Owner: postgres
+--
+
+CREATE INDEX sdk_packages_pattern_trgm_idx ON adtech.sdk_packages USING gin (
+    lower((package_pattern)::text) public.gin_trgm_ops
+);
+
+
+--
 -- Name: sdk_packages sdk_packages_sdk_id_fkey; Type: FK CONSTRAINT; Schema: adtech; Owner: postgres
 --
 
@@ -89,4 +107,4 @@ ADD CONSTRAINT sdk_packages_sdk_id_fkey FOREIGN KEY (
 -- PostgreSQL database dump complete
 --
 
-\unrestrict lDaHvxnFHqhGdeT3OFKn4ZHHYcKSOEGXibW1ZnF1ENYU4Ehq3x8g5RjEs1kd79I
+\unrestrict moQU2vF8ApOtjLA8Numq66M9WchhZNLp8AM5lDTwHEEN7IFg4BmBBhwvaCiflWx

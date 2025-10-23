@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict RIdPnfFNJAwkCYLhCLRzMJhBsIVN5OtEDwCitG2YfEwO5YbSfWlWkhcoUz1brFU
+\restrict dQLVBVeYOEGD2BZhFSiuhvBPn68ijv3YA4IdbIIBfsfrNzwGtPoklprLvC2ovmn
 
--- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
--- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
+-- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
+-- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -73,4 +73,4 @@ CREATE UNIQUE INDEX idx_combined_store_apps_parent_companies_idx ON adtech.combi
 -- PostgreSQL database dump complete
 --
 
-\unrestrict RIdPnfFNJAwkCYLhCLRzMJhBsIVN5OtEDwCitG2YfEwO5YbSfWlWkhcoUz1brFU
+\unrestrict dQLVBVeYOEGD2BZhFSiuhvBPn68ijv3YA4IdbIIBfsfrNzwGtPoklprLvC2ovmn

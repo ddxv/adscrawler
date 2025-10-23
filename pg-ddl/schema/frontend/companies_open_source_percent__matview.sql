@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict b5lt5thus4t9DhHb1lmA5BjBTCyApapc68pf42J3rXhHpTRXzRiP4GAuIP2huam
+\restrict KpbgQ5fI5l9k0S5o126OgDiBlVnQFveDbv4ADMXeCdGWM4Le3pAcVy5tkKIt3Ix
 
--- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
--- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
+-- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
+-- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -61,4 +61,4 @@ CREATE UNIQUE INDEX companies_open_source_percent_unique ON frontend.companies_o
 -- PostgreSQL database dump complete
 --
 
-\unrestrict b5lt5thus4t9DhHb1lmA5BjBTCyApapc68pf42J3rXhHpTRXzRiP4GAuIP2huam
+\unrestrict KpbgQ5fI5l9k0S5o126OgDiBlVnQFveDbv4ADMXeCdGWM4Le3pAcVy5tkKIt3Ix

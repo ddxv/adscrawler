@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict m1sqX3Eda9L37e9cZ1v3Zdx9ecB5yWVRWOhWPJ4gAqnb9o1UtbqEdVlpdwHSPzu
+\restrict E6w0LemUfGS74aa6q8qp6gBWtaq3NWfIPD89YYQQKA4MzZZ7AJfDBXCIGkch3iV
 
--- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
--- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
+-- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
+-- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -35,7 +35,15 @@ WITH adv_mmp AS (
         ad.domain_name AS mmp_domain
     FROM (
         public.creative_records AS cr_1
-        LEFT JOIN public.domains AS ad ON ((cr_1.mmp_domain_id = ad.id))
+        LEFT JOIN
+            public.domains AS ad
+            ON
+                (
+                    (
+                        (cr_1.mmp_domain_id = ad.id)
+                        AND (cr_1.advertiser_store_app_id IS NOT null)
+                    )
+                )
     )
     WHERE (cr_1.mmp_domain_id IS NOT null)
 ), ad_network_domain_ids AS (
@@ -168,7 +176,11 @@ LEFT JOIN
     ad_network_domains AS adis
     ON ((cr.advertiser_store_app_id = adis.advertiser_store_app_id))
 )
-WHERE (vcasr.run_at >= (NOW() - '1 mon'::interval))
+WHERE
+    (
+        (vcasr.run_at >= (NOW() - '1 mon'::interval))
+        AND (cr.advertiser_store_app_id IS NOT null)
+    )
 GROUP BY
     saa.name,
     saa.store_id,
@@ -191,4 +203,4 @@ ALTER MATERIALIZED VIEW frontend.advertiser_creative_rankings_recent_month OWNER
 -- PostgreSQL database dump complete
 --
 
-\unrestrict m1sqX3Eda9L37e9cZ1v3Zdx9ecB5yWVRWOhWPJ4gAqnb9o1UtbqEdVlpdwHSPzu
+\unrestrict E6w0LemUfGS74aa6q8qp6gBWtaq3NWfIPD89YYQQKA4MzZZ7AJfDBXCIGkch3iV

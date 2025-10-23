@@ -14,7 +14,7 @@ from adscrawler.dbcon.connection import get_db_connection
 
 logger = get_logger(__name__)
 
-use_tunnel = False
+use_tunnel = True
 database_connection = get_db_connection(use_ssh_tunnel=use_tunnel)
 
 
@@ -42,7 +42,6 @@ def get_mv_files() -> list[Path]:
             continue
 
         mv_files = list(matview_dir.glob("*__matview.sql"))
-        logger.info(f"Found {len(mv_files)} matview files in {schema}")
         all_mv_files.extend(mv_files)
 
     logger.info(f"Total: {len(all_mv_files)} matview files across all schemas")
@@ -122,7 +121,7 @@ def create_all_mvs(mv_files: list[Path]) -> None:
         logger.error("No matview files found!")
         return
 
-    missing_mvs = []
+    mvs_missing_in_db = []
     for mv_file in mv_files:
         with open(mv_file) as f:
             file_content = f.read()
@@ -138,12 +137,12 @@ def create_all_mvs(mv_files: list[Path]) -> None:
             continue
 
         if mv_name not in existing_mvs:
-            missing_mvs.append((mv_name, file_content.strip(), mv_file.name))
+            mvs_missing_in_db.append((mv_name, file_content.strip(), mv_file.name))
 
-    logger.info(f"Found {len(missing_mvs)} missing MVs to create")
+    logger.info(f"Found {len(mvs_missing_in_db)} missing MVs to create in db")
 
     with database_connection.engine.connect() as conn:
-        for mv_name, create_statement, file_name in missing_mvs:
+        for mv_name, create_statement, file_name in mvs_missing_in_db:
             trans = conn.begin()
             try:
                 conn.execute(text(create_statement))

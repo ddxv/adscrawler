@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict OyxD6xrfWkiUXTCc6wRxyfUQ7ClSdCW372nmykS2oCJt7FYpqErGjk6fFqnVw0b
+\restrict qW1e6nMlfh62q6cJlmomVbK9ihAwr6AtcmdDHxQuJdIuprPydY2hSCftdbjxvTr
 
--- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
--- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
+-- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
+-- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -65,4 +65,4 @@ CREATE UNIQUE INDEX idx_total_categories_app_counts ON frontend.total_categories
 -- PostgreSQL database dump complete
 --
 
-\unrestrict OyxD6xrfWkiUXTCc6wRxyfUQ7ClSdCW372nmykS2oCJt7FYpqErGjk6fFqnVw0b
+\unrestrict qW1e6nMlfh62q6cJlmomVbK9ihAwr6AtcmdDHxQuJdIuprPydY2hSCftdbjxvTr

@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict K1BxpYbyx2EJLL836z6WNdegL3wuQBfU1Mks0njplly6hMOep67dilMhUzaEwna
+\restrict OtgEdpefptcNWGgdVwUfAwkHb9q6daGw9i2ZpiG1gL22CQcWRdJZyQQ6v0ABfa6
 
--- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
--- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
+-- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
+-- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -419,52 +419,6 @@ CREATE TABLE adtech.companies (
 ALTER TABLE adtech.companies OWNER TO postgres;
 
 --
--- Name: sdk_categories; Type: TABLE; Schema: adtech; Owner: postgres
---
-
-CREATE TABLE adtech.sdk_categories (
-    sdk_id integer NOT NULL,
-    category_id integer NOT NULL
-);
-
-
-ALTER TABLE adtech.sdk_categories OWNER TO postgres;
-
---
--- Name: sdks; Type: TABLE; Schema: adtech; Owner: postgres
---
-
-CREATE TABLE adtech.sdks (
-    id integer NOT NULL,
-    company_id integer NOT NULL,
-    sdk_name character varying(255) NOT NULL,
-    sdk_url character varying(255),
-    is_open_source boolean DEFAULT false,
-    has_third_party_tracking boolean DEFAULT true,
-    license_type character varying(50) DEFAULT 'Commercial'::character varying,
-    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
-    sdk_slug text
-);
-
-
-ALTER TABLE adtech.sdks OWNER TO postgres;
-
---
--- Name: company_categories; Type: MATERIALIZED VIEW; Schema: adtech; Owner: postgres
---
-
-CREATE MATERIALIZED VIEW adtech.company_categories AS
- SELECT DISTINCT c.id AS company_id,
-    sc.category_id
-   FROM ((adtech.sdk_categories sc
-     LEFT JOIN adtech.sdks sd ON ((sc.sdk_id = sd.id)))
-     JOIN adtech.companies c ON ((sd.company_id = c.id)))
-  WITH NO DATA;
-
-
-ALTER MATERIALIZED VIEW adtech.company_categories OWNER TO postgres;
-
---
 -- Name: company_developers; Type: TABLE; Schema: adtech; Owner: postgres
 --
 
@@ -502,6 +456,38 @@ CREATE TABLE adtech.sdk_packages (
 ALTER TABLE adtech.sdk_packages OWNER TO postgres;
 
 --
+-- Name: sdk_paths; Type: TABLE; Schema: adtech; Owner: postgres
+--
+
+CREATE TABLE adtech.sdk_paths (
+    id integer NOT NULL,
+    path_pattern character varying NOT NULL,
+    sdk_id integer
+);
+
+
+ALTER TABLE adtech.sdk_paths OWNER TO postgres;
+
+--
+-- Name: sdks; Type: TABLE; Schema: adtech; Owner: postgres
+--
+
+CREATE TABLE adtech.sdks (
+    id integer NOT NULL,
+    company_id integer NOT NULL,
+    sdk_name character varying(255) NOT NULL,
+    sdk_url character varying(255),
+    is_open_source boolean DEFAULT false,
+    has_third_party_tracking boolean DEFAULT true,
+    license_type character varying(50) DEFAULT 'Commercial'::character varying,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    sdk_slug text
+);
+
+
+ALTER TABLE adtech.sdks OWNER TO postgres;
+
+--
 -- Name: version_strings; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -516,78 +502,50 @@ CREATE TABLE public.version_strings (
 ALTER TABLE public.version_strings OWNER TO postgres;
 
 --
--- Name: company_value_string_mapping; Type: MATERIALIZED VIEW; Schema: adtech; Owner: postgres
+-- Name: company_sdk_strings; Type: MATERIALIZED VIEW; Schema: adtech; Owner: postgres
 --
 
-CREATE MATERIALIZED VIEW adtech.company_value_string_mapping AS
- SELECT vd.id AS version_string_id,
-    sd.company_id,
-    sp.sdk_id AS id
-   FROM ((public.version_strings vd
-     JOIN adtech.sdk_packages sp ON ((vd.value_name ~~* ((sp.package_pattern)::text || '%'::text))))
-     LEFT JOIN adtech.sdks sd ON ((sp.sdk_id = sd.id)))
+CREATE MATERIALIZED VIEW adtech.company_sdk_strings AS
+ WITH matched_value_patterns AS (
+         SELECT DISTINCT lower(vd.value_name) AS value_name_lower,
+            sd.company_id
+           FROM ((public.version_strings vd
+             JOIN adtech.sdk_packages sp ON ((lower(vd.value_name) ~~ (lower((sp.package_pattern)::text) || '%'::text))))
+             JOIN adtech.sdks sd ON ((sp.sdk_id = sd.id)))
+        ), matched_path_patterns AS (
+         SELECT DISTINCT lower(vd.xml_path) AS xml_path_lower,
+            sd.company_id
+           FROM ((public.version_strings vd
+             JOIN adtech.sdk_paths ptm ON ((lower(vd.xml_path) = lower((ptm.path_pattern)::text))))
+             JOIN adtech.sdks sd ON ((ptm.sdk_id = sd.id)))
+        )
+ SELECT vs.id AS version_string_id,
+    mp.company_id
+   FROM (matched_value_patterns mp
+     JOIN public.version_strings vs ON ((lower(vs.value_name) = mp.value_name_lower)))
+UNION
+ SELECT vs.id AS version_string_id,
+    mp.company_id
+   FROM (matched_path_patterns mp
+     JOIN public.version_strings vs ON ((lower(vs.xml_path) = mp.xml_path_lower)))
   WITH NO DATA;
 
 
-ALTER MATERIALIZED VIEW adtech.company_value_string_mapping OWNER TO postgres;
+ALTER MATERIALIZED VIEW adtech.company_sdk_strings OWNER TO postgres;
 
 --
--- Name: sdk_paths; Type: TABLE; Schema: adtech; Owner: postgres
+-- Name: version_code_sdk_scan_results; Type: TABLE; Schema: public; Owner: postgres
 --
 
-CREATE TABLE adtech.sdk_paths (
+CREATE TABLE public.version_code_sdk_scan_results (
     id integer NOT NULL,
-    path_pattern character varying NOT NULL,
-    sdk_id integer
+    version_code_id integer,
+    scan_result smallint NOT NULL,
+    scanned_at timestamp without time zone DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
 
-ALTER TABLE adtech.sdk_paths OWNER TO postgres;
-
---
--- Name: store_apps; Type: TABLE; Schema: public; Owner: james
---
-
-CREATE TABLE public.store_apps (
-    id integer NOT NULL,
-    developer integer,
-    name character varying,
-    store_id character varying NOT NULL,
-    store integer NOT NULL,
-    category character varying,
-    rating double precision,
-    review_count double precision,
-    installs double precision,
-    free boolean,
-    price double precision,
-    size text,
-    minimum_android text,
-    developer_email text,
-    store_last_updated timestamp without time zone,
-    content_rating text,
-    ad_supported boolean,
-    in_app_purchases boolean,
-    editors_choice boolean,
-    created_at timestamp without time zone DEFAULT timezone('utc'::text, now()),
-    updated_at timestamp without time zone DEFAULT timezone('utc'::text, now()),
-    crawl_result integer,
-    icon_url_512 character varying,
-    release_date date,
-    rating_count integer,
-    featured_image_url character varying,
-    phone_image_url_1 character varying,
-    phone_image_url_2 character varying,
-    phone_image_url_3 character varying,
-    tablet_image_url_1 character varying,
-    tablet_image_url_2 character varying,
-    tablet_image_url_3 character varying,
-    textsearchable_index_col tsvector GENERATED ALWAYS AS (to_tsvector('simple'::regconfig, (COALESCE(name, ''::character varying))::text)) STORED,
-    additional_html_scraped_at timestamp without time zone,
-    icon_url_100 text
-);
-
-
-ALTER TABLE public.store_apps OWNER TO james;
+ALTER TABLE public.version_code_sdk_scan_results OWNER TO postgres;
 
 --
 -- Name: version_codes; Type: TABLE; Schema: public; Owner: postgres
@@ -620,97 +578,31 @@ CREATE TABLE public.version_details_map (
 ALTER TABLE public.version_details_map OWNER TO postgres;
 
 --
--- Name: store_apps_companies_sdk; Type: MATERIALIZED VIEW; Schema: adtech; Owner: postgres
+-- Name: store_app_sdk_strings; Type: MATERIALIZED VIEW; Schema: adtech; Owner: postgres
 --
 
-CREATE MATERIALIZED VIEW adtech.store_apps_companies_sdk AS
+CREATE MATERIALIZED VIEW adtech.store_app_sdk_strings AS
  WITH latest_version_codes AS (
-         SELECT DISTINCT ON (version_codes.store_app) version_codes.id,
-            version_codes.store_app,
-            version_codes.version_code
-           FROM public.version_codes
-          WHERE (version_codes.crawl_result = 1)
-          ORDER BY version_codes.store_app, (string_to_array((version_codes.version_code)::text, '.'::text))::bigint[] DESC
-        ), sdk_apps_with_companies AS (
-         SELECT DISTINCT vc.store_app,
-            cvsm.company_id,
-            COALESCE(pc.parent_company_id, cvsm.company_id) AS parent_id
-           FROM (((latest_version_codes vc
-             LEFT JOIN public.version_details_map vdm ON ((vc.id = vdm.version_code)))
-             JOIN adtech.company_value_string_mapping cvsm ON ((vdm.string_id = cvsm.version_string_id)))
-             LEFT JOIN adtech.companies pc ON ((cvsm.company_id = pc.id)))
-        ), sdk_paths_with_companies AS (
-         SELECT DISTINCT vc.store_app,
-            sd.company_id,
-            COALESCE(pc.parent_company_id, sd.company_id) AS parent_id
-           FROM (((((latest_version_codes vc
-             LEFT JOIN public.version_details_map vdm ON ((vc.id = vdm.version_code)))
-             LEFT JOIN public.version_strings vs ON ((vdm.string_id = vs.id)))
-             JOIN adtech.sdk_paths ptm ON ((vs.value_name ~~* ((ptm.path_pattern)::text || '%'::text))))
-             LEFT JOIN adtech.sdks sd ON ((ptm.sdk_id = sd.id)))
-             LEFT JOIN adtech.companies pc ON ((sd.company_id = pc.id)))
-        ), dev_apps_with_companies AS (
-         SELECT DISTINCT sa.id AS store_app,
-            cd.company_id,
-            COALESCE(pc.parent_company_id, cd.company_id) AS parent_id
-           FROM ((adtech.company_developers cd
-             LEFT JOIN public.store_apps sa ON ((cd.developer_id = sa.developer)))
-             LEFT JOIN adtech.companies pc ON ((cd.company_id = pc.id)))
-        ), all_apps_with_companies AS (
-         SELECT sawc.store_app,
-            sawc.company_id,
-            sawc.parent_id
-           FROM sdk_apps_with_companies sawc
-        UNION
-         SELECT spwc.store_app,
-            spwc.company_id,
-            spwc.parent_id
-           FROM sdk_paths_with_companies spwc
-        UNION
-         SELECT dawc.store_app,
-            dawc.company_id,
-            dawc.parent_id
-           FROM dev_apps_with_companies dawc
-        ), distinct_apps_with_cats AS (
-         SELECT DISTINCT aawc.store_app,
-            c.id AS category_id
-           FROM ((all_apps_with_companies aawc
-             LEFT JOIN adtech.company_categories cc ON ((aawc.company_id = cc.company_id)))
-             LEFT JOIN adtech.categories c ON ((cc.category_id = c.id)))
-        ), distinct_store_apps AS (
-         SELECT DISTINCT lvc.store_app
-           FROM latest_version_codes lvc
-        ), all_combinations AS (
-         SELECT sa.store_app,
-            c.id AS category_id
-           FROM (distinct_store_apps sa
-             CROSS JOIN adtech.categories c)
-        ), unmatched_apps AS (
-         SELECT DISTINCT ac.store_app,
-            (- ac.category_id) AS company_id,
-            (- ac.category_id) AS parent_id
-           FROM (all_combinations ac
-             LEFT JOIN distinct_apps_with_cats dawc ON (((ac.store_app = dawc.store_app) AND (ac.category_id = dawc.category_id))))
-          WHERE (dawc.store_app IS NULL)
-        ), final_union AS (
-         SELECT aawc.store_app,
-            aawc.company_id,
-            aawc.parent_id
-           FROM all_apps_with_companies aawc
-        UNION
-         SELECT ua.store_app,
-            ua.company_id,
-            ua.parent_id
-           FROM unmatched_apps ua
+         SELECT DISTINCT ON (vc_1.store_app) vc_1.id,
+            vc_1.store_app,
+            vc_1.version_code,
+            vc_1.updated_at,
+            vc_1.crawl_result
+           FROM (public.version_codes vc_1
+             JOIN public.version_code_sdk_scan_results vcssr ON ((vc_1.id = vcssr.version_code_id)))
+          WHERE (vcssr.scan_result = 1)
+          ORDER BY vc_1.store_app, (string_to_array((vc_1.version_code)::text, '.'::text))::bigint[] DESC
         )
- SELECT store_app,
-    company_id,
-    parent_id
-   FROM final_union
+ SELECT vc.store_app,
+    vdm.string_id AS version_string_id,
+    css.company_id
+   FROM ((latest_version_codes vc
+     JOIN public.version_details_map vdm ON ((vc.id = vdm.version_code)))
+     LEFT JOIN adtech.company_sdk_strings css ON ((vdm.string_id = css.version_string_id)))
   WITH NO DATA;
 
 
-ALTER MATERIALIZED VIEW adtech.store_apps_companies_sdk OWNER TO postgres;
+ALTER MATERIALIZED VIEW adtech.store_app_sdk_strings OWNER TO postgres;
 
 --
 -- Name: adstxt_crawl_results; Type: TABLE; Schema: public; Owner: postgres
@@ -767,6 +659,51 @@ CREATE TABLE public.app_urls_map (
 
 
 ALTER TABLE public.app_urls_map OWNER TO james;
+
+--
+-- Name: store_apps; Type: TABLE; Schema: public; Owner: james
+--
+
+CREATE TABLE public.store_apps (
+    id integer NOT NULL,
+    developer integer,
+    name character varying,
+    store_id character varying NOT NULL,
+    store integer NOT NULL,
+    category character varying,
+    rating double precision,
+    review_count double precision,
+    installs double precision,
+    free boolean,
+    price double precision,
+    size text,
+    minimum_android text,
+    developer_email text,
+    store_last_updated timestamp without time zone,
+    content_rating text,
+    ad_supported boolean,
+    in_app_purchases boolean,
+    editors_choice boolean,
+    created_at timestamp without time zone DEFAULT timezone('utc'::text, now()),
+    updated_at timestamp without time zone DEFAULT timezone('utc'::text, now()),
+    crawl_result integer,
+    icon_url_512 character varying,
+    release_date date,
+    rating_count integer,
+    featured_image_url character varying,
+    phone_image_url_1 character varying,
+    phone_image_url_2 character varying,
+    phone_image_url_3 character varying,
+    tablet_image_url_1 character varying,
+    tablet_image_url_2 character varying,
+    tablet_image_url_3 character varying,
+    textsearchable_index_col tsvector GENERATED ALWAYS AS (to_tsvector('simple'::regconfig, (COALESCE(name, ''::character varying))::text)) STORED,
+    additional_html_scraped_at timestamp without time zone,
+    icon_url_100 text
+);
+
+
+ALTER TABLE public.store_apps OWNER TO james;
 
 --
 -- Name: category_mapping; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
@@ -1078,20 +1015,6 @@ CREATE TABLE public.version_code_api_scan_results (
 ALTER TABLE public.version_code_api_scan_results OWNER TO postgres;
 
 --
--- Name: version_code_sdk_scan_results; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE public.version_code_sdk_scan_results (
-    id integer NOT NULL,
-    version_code_id integer,
-    scan_result smallint NOT NULL,
-    scanned_at timestamp without time zone DEFAULT timezone('utc'::text, now()) NOT NULL
-);
-
-
-ALTER TABLE public.version_code_sdk_scan_results OWNER TO postgres;
-
---
 -- Name: store_apps_overview; Type: MATERIALIZED VIEW; Schema: frontend; Owner: postgres
 --
 
@@ -1285,14 +1208,26 @@ CREATE MATERIALIZED VIEW adtech.combined_store_apps_companies AS
              LEFT JOIN adtech.company_domain_mapping cdm ON ((ad_1.id = cdm.domain_id)))
              LEFT JOIN adtech.companies c_1 ON ((cdm.company_id = c_1.id)))
              LEFT JOIN public.domains cad_1 ON ((c_1.domain_id = cad_1.id)))
+        ), developer_based_companies AS (
+         SELECT DISTINCT sa_1.id AS store_app,
+            cm.mapped_category AS app_category,
+            cd.company_id,
+            COALESCE(c_1.parent_company_id, cd.company_id) AS parent_id,
+            d.domain_name AS ad_domain,
+            'developer'::text AS tag_source
+           FROM ((((adtech.company_developers cd
+             LEFT JOIN public.store_apps sa_1 ON ((cd.developer_id = sa_1.developer)))
+             LEFT JOIN adtech.companies c_1 ON ((cd.company_id = c_1.id)))
+             LEFT JOIN public.domains d ON ((c_1.domain_id = d.id)))
+             LEFT JOIN public.category_mapping cm ON (((sa_1.category)::text = (cm.original_category)::text)))
         ), sdk_based_companies AS (
-         SELECT sac.store_app,
+         SELECT DISTINCT sac.store_app,
             cm.mapped_category AS app_category,
             sac.company_id,
-            sac.parent_id,
+            COALESCE(c_1.parent_company_id, sac.company_id) AS parent_id,
             ad_1.domain_name AS ad_domain,
             'sdk'::text AS tag_source
-           FROM ((((adtech.store_apps_companies_sdk sac
+           FROM ((((adtech.store_app_sdk_strings sac
              LEFT JOIN adtech.companies c_1 ON ((sac.company_id = c_1.id)))
              LEFT JOIN public.domains ad_1 ON ((c_1.domain_id = ad_1.id)))
              LEFT JOIN public.store_apps sa_1 ON ((sac.store_app = sa_1.id)))
@@ -1350,6 +1285,14 @@ CREATE MATERIALIZED VIEW adtech.combined_store_apps_companies AS
             adstxt_based_companies.ad_domain,
             adstxt_based_companies.tag_source
            FROM adstxt_based_companies
+        UNION ALL
+         SELECT developer_based_companies.store_app,
+            developer_based_companies.app_category,
+            developer_based_companies.company_id,
+            developer_based_companies.parent_id,
+            developer_based_companies.ad_domain,
+            developer_based_companies.tag_source
+           FROM developer_based_companies
         )
  SELECT cs.ad_domain,
     cs.store_app,
@@ -1414,6 +1357,33 @@ ALTER TABLE adtech.companies ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTIT
     CACHE 1
 );
 
+
+--
+-- Name: sdk_categories; Type: TABLE; Schema: adtech; Owner: postgres
+--
+
+CREATE TABLE adtech.sdk_categories (
+    sdk_id integer NOT NULL,
+    category_id integer NOT NULL
+);
+
+
+ALTER TABLE adtech.sdk_categories OWNER TO postgres;
+
+--
+-- Name: company_categories; Type: MATERIALIZED VIEW; Schema: adtech; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW adtech.company_categories AS
+ SELECT DISTINCT c.id AS company_id,
+    sc.category_id
+   FROM ((adtech.sdk_categories sc
+     LEFT JOIN adtech.sdks sd ON ((sc.sdk_id = sd.id)))
+     JOIN adtech.companies c ON ((sd.company_id = c.id)))
+  WITH NO DATA;
+
+
+ALTER MATERIALIZED VIEW adtech.company_categories OWNER TO postgres;
 
 --
 -- Name: sdk_packages_id_seq; Type: SEQUENCE; Schema: adtech; Owner: postgres
@@ -1570,7 +1540,7 @@ CREATE MATERIALIZED VIEW frontend.advertiser_creative_rankings AS
             ad.domain_name AS mmp_domain
            FROM (public.creative_records cr_1
              LEFT JOIN public.domains ad ON ((cr_1.mmp_domain_id = ad.id)))
-          WHERE (cr_1.mmp_domain_id IS NOT NULL)
+          WHERE ((cr_1.mmp_domain_id IS NOT NULL) AND (cr_1.advertiser_store_app_id IS NOT NULL))
         ), ad_network_domain_ids AS (
          SELECT cr_1.advertiser_store_app_id,
             COALESCE(icp.domain_id, ic.domain_id) AS domain_id
@@ -1631,6 +1601,7 @@ CREATE MATERIALIZED VIEW frontend.advertiser_creative_rankings AS
      LEFT JOIN public.version_code_api_scan_results vcasr ON ((ac.run_id = vcasr.id)))
      LEFT JOIN adv_mmp ON ((cr.advertiser_store_app_id = adv_mmp.advertiser_store_app_id)))
      LEFT JOIN ad_network_domains adis ON ((cr.advertiser_store_app_id = adis.advertiser_store_app_id)))
+  WHERE (cr.advertiser_store_app_id IS NOT NULL)
   GROUP BY saa.name, saa.store_id, saa.icon_url_512, saa.category, saa.installs, saa.id, saa.icon_url_100, saa.rating, saa.rating_count, saa.installs_sum_1w, saa.installs_sum_4w
   ORDER BY (count(DISTINCT ca.md5_hash)) DESC
   WITH NO DATA;
@@ -1648,7 +1619,7 @@ CREATE MATERIALIZED VIEW frontend.advertiser_creative_rankings_recent_month AS
             cr_1.mmp_domain_id,
             ad.domain_name AS mmp_domain
            FROM (public.creative_records cr_1
-             LEFT JOIN public.domains ad ON ((cr_1.mmp_domain_id = ad.id)))
+             LEFT JOIN public.domains ad ON (((cr_1.mmp_domain_id = ad.id) AND (cr_1.advertiser_store_app_id IS NOT NULL))))
           WHERE (cr_1.mmp_domain_id IS NOT NULL)
         ), ad_network_domain_ids AS (
          SELECT cr_1.advertiser_store_app_id,
@@ -1717,7 +1688,7 @@ CREATE MATERIALIZED VIEW frontend.advertiser_creative_rankings_recent_month AS
      LEFT JOIN public.version_code_api_scan_results vcasr ON ((ac.run_id = vcasr.id)))
      LEFT JOIN adv_mmp ON ((cr.advertiser_store_app_id = adv_mmp.advertiser_store_app_id)))
      LEFT JOIN ad_network_domains adis ON ((cr.advertiser_store_app_id = adis.advertiser_store_app_id)))
-  WHERE (vcasr.run_at >= (now() - '1 mon'::interval))
+  WHERE ((vcasr.run_at >= (now() - '1 mon'::interval)) AND (cr.advertiser_store_app_id IS NOT NULL))
   GROUP BY saa.name, saa.store_id, saa.icon_url_512, saa.category, saa.installs, saa.id, saa.icon_url_100, saa.rating, saa.rating_count, saa.installs_sum_1w, saa.installs_sum_4w
   ORDER BY (count(DISTINCT ca.md5_hash)) DESC
   WITH NO DATA;
@@ -2141,52 +2112,27 @@ CREATE MATERIALIZED VIEW frontend.category_tag_stats AS
 ALTER MATERIALIZED VIEW frontend.category_tag_stats OWNER TO postgres;
 
 --
--- Name: store_apps_version_details; Type: MATERIALIZED VIEW; Schema: frontend; Owner: postgres
---
-
-CREATE MATERIALIZED VIEW frontend.store_apps_version_details AS
- WITH latest_version_codes AS (
-         SELECT DISTINCT ON (version_codes.store_app) version_codes.id,
-            version_codes.store_app,
-            version_codes.version_code,
-            version_codes.updated_at,
-            version_codes.crawl_result
-           FROM public.version_codes
-          ORDER BY version_codes.store_app, (string_to_array((version_codes.version_code)::text, '.'::text))::bigint[] DESC
-        )
- SELECT DISTINCT vs.id AS version_string_id,
-    sa.store,
-    sa.store_id,
-    cvsm.company_id,
-    c.name AS company_name,
-    ad.domain_name AS company_domain,
-    cats.url_slug AS category_slug
-   FROM ((((((((latest_version_codes vc
-     LEFT JOIN public.version_details_map vdm ON ((vc.id = vdm.version_code)))
-     LEFT JOIN public.version_strings vs ON ((vdm.string_id = vs.id)))
-     LEFT JOIN adtech.company_value_string_mapping cvsm ON ((vs.id = cvsm.version_string_id)))
-     LEFT JOIN adtech.companies c ON ((cvsm.company_id = c.id)))
-     LEFT JOIN adtech.company_categories cc ON ((c.id = cc.company_id)))
-     LEFT JOIN adtech.categories cats ON ((cc.category_id = cats.id)))
-     LEFT JOIN public.domains ad ON ((c.domain_id = ad.id)))
-     LEFT JOIN public.store_apps sa ON ((vc.store_app = sa.id)))
-  WITH NO DATA;
-
-
-ALTER MATERIALIZED VIEW frontend.store_apps_version_details OWNER TO postgres;
-
---
 -- Name: companies_apps_overview; Type: MATERIALIZED VIEW; Schema: frontend; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW frontend.companies_apps_overview AS
- SELECT DISTINCT store_id,
-    company_id,
-    company_name,
-    company_domain,
-    category_slug
-   FROM frontend.store_apps_version_details
-  WHERE (company_id IS NOT NULL)
+ WITH store_app_sdk_companies AS (
+         SELECT DISTINCT savs.store_app,
+            savs.company_id
+           FROM adtech.store_app_sdk_strings savs
+        )
+ SELECT sa.store_id,
+    sacs.company_id,
+    c.name AS company_name,
+    d.domain_name AS company_domain,
+    cc2.url_slug AS category_slug
+   FROM (((((store_app_sdk_companies sacs
+     LEFT JOIN public.store_apps sa ON ((sacs.store_app = sa.id)))
+     LEFT JOIN adtech.companies c ON ((sacs.company_id = c.id)))
+     LEFT JOIN public.domains d ON ((c.domain_id = d.id)))
+     LEFT JOIN adtech.company_categories cc ON ((c.id = cc.company_id)))
+     LEFT JOIN adtech.categories cc2 ON ((cc.category_id = cc2.id)))
+  WHERE (sacs.company_id IS NOT NULL)
   WITH NO DATA;
 
 
@@ -2330,6 +2276,7 @@ ALTER MATERIALIZED VIEW frontend.companies_category_tag_type_stats OWNER TO post
 CREATE MATERIALIZED VIEW frontend.companies_creative_rankings AS
  WITH creative_rankings AS (
          SELECT ca.file_extension,
+            ac_1.id AS api_call_id,
             cr.advertiser_store_app_id,
             cr.creative_initial_domain_id,
             cr.creative_host_domain_id,
@@ -2339,10 +2286,11 @@ CREATE MATERIALIZED VIEW frontend.companies_creative_rankings AS
             COALESCE(ca.phash, ca.md5_hash) AS vhash
            FROM (((public.creative_records cr
              LEFT JOIN public.creative_assets ca ON ((cr.creative_asset_id = ca.id)))
-             LEFT JOIN public.api_calls ac ON ((cr.api_call_id = ac.id)))
-             LEFT JOIN public.version_code_api_scan_results vcasr ON ((ac.run_id = vcasr.id)))
+             LEFT JOIN public.api_calls ac_1 ON ((cr.api_call_id = ac_1.id)))
+             LEFT JOIN public.version_code_api_scan_results vcasr ON ((ac_1.run_id = vcasr.id)))
         ), combined_domains AS (
-         SELECT cr.vhash,
+         SELECT cr.api_call_id,
+            cr.vhash,
             cr.md5_hash,
             cr.file_extension,
             cr.creative_initial_domain_id AS domain_id,
@@ -2350,7 +2298,8 @@ CREATE MATERIALIZED VIEW frontend.companies_creative_rankings AS
             cr.run_at
            FROM creative_rankings cr
         UNION
-         SELECT cr.vhash,
+         SELECT cr.api_call_id,
+            cr.vhash,
             cr.md5_hash,
             cr.file_extension,
             cr.creative_host_domain_id,
@@ -2358,7 +2307,8 @@ CREATE MATERIALIZED VIEW frontend.companies_creative_rankings AS
             cr.run_at
            FROM creative_rankings cr
         UNION
-         SELECT cr.vhash,
+         SELECT cr.api_call_id,
+            cr.vhash,
             cr.md5_hash,
             cr.file_extension,
             unnest(cr.additional_ad_domain_ids) AS unnest,
@@ -2371,38 +2321,145 @@ CREATE MATERIALIZED VIEW frontend.companies_creative_rankings AS
             cd.advertiser_store_app_id,
             cd.vhash,
             min((cd.md5_hash)::text) AS md5_hash,
+            max(cd.api_call_id) AS last_api_call_id,
             max(cd.run_at) AS last_seen
            FROM (combined_domains cd
              LEFT JOIN adtech.company_domain_mapping cdm ON ((cd.domain_id = cdm.domain_id)))
           GROUP BY cdm.company_id, cd.file_extension, cd.advertiser_store_app_id, cd.vhash
         )
- SELECT DISTINCT vd.company_id,
+ SELECT vd.company_id,
     vd.md5_hash,
     vd.file_extension,
     ad.domain_name AS company_domain,
-    sa.name AS advertiser_name,
-    sa.store,
-    sa.store_id AS advertiser_store_id,
-    sa.icon_url_100,
-    sa.icon_url_512,
-    sa.installs,
-    sa.rating_count,
-    sa.rating,
-    sa.installs_sum_1w,
-    sa.ratings_sum_1w,
-    sa.installs_sum_4w,
-    sa.ratings_sum_4w,
+    saa.name AS advertiser_name,
+    saa.store,
+    saa.store_id AS advertiser_store_id,
+        CASE
+            WHEN (saa.icon_url_100 IS NOT NULL) THEN (concat('https://media.appgoblin.info/app-icons/', saa.store_id, '/', saa.icon_url_100))::character varying
+            ELSE saa.icon_url_512
+        END AS advertiser_icon_url,
+    sap.store_id AS publisher_store_id,
+    sap.name AS publisher_name,
+        CASE
+            WHEN (sap.icon_url_100 IS NOT NULL) THEN (concat('https://media.appgoblin.info/app-icons/', sap.store_id, '/', sap.icon_url_100))::character varying
+            ELSE sap.icon_url_512
+        END AS publisher_icon_url,
+    saa.installs,
+    saa.rating_count,
+    saa.rating,
+    saa.installs_sum_1w,
+    saa.ratings_sum_1w,
+    saa.installs_sum_4w,
+    saa.ratings_sum_4w,
     vd.last_seen
-   FROM (((visually_distinct vd
+   FROM (((((visually_distinct vd
+     LEFT JOIN public.api_calls ac ON ((vd.last_api_call_id = ac.id)))
      LEFT JOIN adtech.companies c ON ((vd.company_id = c.id)))
      LEFT JOIN public.domains ad ON ((c.domain_id = ad.id)))
-     LEFT JOIN frontend.store_apps_overview sa ON ((vd.advertiser_store_app_id = sa.id)))
+     LEFT JOIN frontend.store_apps_overview saa ON ((vd.advertiser_store_app_id = saa.id)))
+     LEFT JOIN frontend.store_apps_overview sap ON ((ac.store_app = sap.id)))
   WHERE (c.id IS NOT NULL)
   ORDER BY vd.last_seen DESC
   WITH NO DATA;
 
 
 ALTER MATERIALIZED VIEW frontend.companies_creative_rankings OWNER TO postgres;
+
+--
+-- Name: companies_creative_rankings_new; Type: MATERIALIZED VIEW; Schema: frontend; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW frontend.companies_creative_rankings_new AS
+ WITH creative_rankings AS (
+         SELECT ca.file_extension,
+            ac_1.id AS api_call_id,
+            cr.advertiser_store_app_id,
+            cr.creative_initial_domain_id,
+            cr.creative_host_domain_id,
+            cr.additional_ad_domain_ids,
+            vcasr.run_at,
+            ca.md5_hash,
+            COALESCE(ca.phash, ca.md5_hash) AS vhash
+           FROM (((public.creative_records cr
+             LEFT JOIN public.creative_assets ca ON ((cr.creative_asset_id = ca.id)))
+             LEFT JOIN public.api_calls ac_1 ON ((cr.api_call_id = ac_1.id)))
+             LEFT JOIN public.version_code_api_scan_results vcasr ON ((ac_1.run_id = vcasr.id)))
+        ), combined_domains AS (
+         SELECT cr.api_call_id,
+            cr.vhash,
+            cr.md5_hash,
+            cr.file_extension,
+            cr.creative_initial_domain_id AS domain_id,
+            cr.advertiser_store_app_id,
+            cr.run_at
+           FROM creative_rankings cr
+        UNION
+         SELECT cr.api_call_id,
+            cr.vhash,
+            cr.md5_hash,
+            cr.file_extension,
+            cr.creative_host_domain_id,
+            cr.advertiser_store_app_id,
+            cr.run_at
+           FROM creative_rankings cr
+        UNION
+         SELECT cr.api_call_id,
+            cr.vhash,
+            cr.md5_hash,
+            cr.file_extension,
+            unnest(cr.additional_ad_domain_ids) AS unnest,
+            cr.advertiser_store_app_id,
+            cr.run_at
+           FROM creative_rankings cr
+        ), visually_distinct AS (
+         SELECT cdm.company_id,
+            cd.file_extension,
+            cd.advertiser_store_app_id,
+            cd.vhash,
+            min((cd.md5_hash)::text) AS md5_hash,
+            max(cd.api_call_id) AS last_api_call_id,
+            max(cd.run_at) AS last_seen
+           FROM (combined_domains cd
+             LEFT JOIN adtech.company_domain_mapping cdm ON ((cd.domain_id = cdm.domain_id)))
+          GROUP BY cdm.company_id, cd.file_extension, cd.advertiser_store_app_id, cd.vhash
+        )
+ SELECT vd.company_id,
+    vd.md5_hash,
+    vd.file_extension,
+    ad.domain_name AS company_domain,
+    saa.name AS advertiser_name,
+    saa.store,
+    saa.store_id AS advertiser_store_id,
+        CASE
+            WHEN (saa.icon_url_100 IS NOT NULL) THEN (concat('https://media.appgoblin.info/app-icons/', saa.store_id, '/', saa.icon_url_100))::character varying
+            ELSE saa.icon_url_512
+        END AS advertiser_icon_url,
+    sap.store_id AS publisher_store_id,
+    sap.name AS publisher_name,
+        CASE
+            WHEN (sap.icon_url_100 IS NOT NULL) THEN (concat('https://media.appgoblin.info/app-icons/', sap.store_id, '/', sap.icon_url_100))::character varying
+            ELSE sap.icon_url_512
+        END AS publisher_icon_url,
+    saa.installs,
+    saa.rating_count,
+    saa.rating,
+    saa.installs_sum_1w,
+    saa.ratings_sum_1w,
+    saa.installs_sum_4w,
+    saa.ratings_sum_4w,
+    vd.last_seen
+   FROM (((((visually_distinct vd
+     LEFT JOIN public.api_calls ac ON ((vd.last_api_call_id = ac.id)))
+     LEFT JOIN adtech.companies c ON ((vd.company_id = c.id)))
+     LEFT JOIN public.domains ad ON ((c.domain_id = ad.id)))
+     LEFT JOIN frontend.store_apps_overview saa ON ((vd.advertiser_store_app_id = saa.id)))
+     LEFT JOIN frontend.store_apps_overview sap ON ((ac.store_app = sap.id)))
+  WHERE (c.id IS NOT NULL)
+  ORDER BY vd.last_seen DESC
+  WITH NO DATA;
+
+
+ALTER MATERIALIZED VIEW frontend.companies_creative_rankings_new OWNER TO postgres;
 
 --
 -- Name: companies_open_source_percent; Type: MATERIALIZED VIEW; Schema: frontend; Owner: postgres
@@ -2542,27 +2599,6 @@ CREATE MATERIALIZED VIEW frontend.companies_sdks_overview AS
 
 
 ALTER MATERIALIZED VIEW frontend.companies_sdks_overview OWNER TO postgres;
-
---
--- Name: companies_version_details_count; Type: MATERIALIZED VIEW; Schema: frontend; Owner: postgres
---
-
-CREATE MATERIALIZED VIEW frontend.companies_version_details_count AS
- SELECT savd.store,
-    savd.company_name,
-    savd.company_domain,
-    vs.xml_path,
-    vs.value_name,
-    count(DISTINCT savd.store_id) AS app_count
-   FROM (frontend.store_apps_version_details savd
-     LEFT JOIN public.version_strings vs ON ((savd.version_string_id = vs.id)))
-  GROUP BY savd.store, savd.company_name, savd.company_domain, vs.xml_path, vs.value_name
-  ORDER BY (count(DISTINCT savd.store_id)) DESC
- LIMIT 1000
-  WITH NO DATA;
-
-
-ALTER MATERIALIZED VIEW frontend.companies_version_details_count OWNER TO postgres;
 
 --
 -- Name: company_domain_country; Type: MATERIALIZED VIEW; Schema: frontend; Owner: postgres
@@ -3047,7 +3083,6 @@ CREATE MATERIALIZED VIEW frontend.store_app_ranks_latest AS
     sa.ratings_sum_1w,
     sa.ratings_sum_4w,
     sa.icon_url_100,
-    sa.icon_url_512,
     ar.store_collection,
     ar.store_category,
     c.alpha2 AS country,
@@ -3355,34 +3390,6 @@ CREATE TABLE logging.version_code_api_scan_results (
 
 
 ALTER TABLE logging.version_code_api_scan_results OWNER TO postgres;
-
---
--- Name: ad_domains_old; Type: TABLE; Schema: public; Owner: james
---
-
-CREATE TABLE public.ad_domains_old (
-    id integer NOT NULL,
-    domain character varying NOT NULL,
-    created_at timestamp without time zone DEFAULT timezone('utc'::text, now()),
-    updated_at timestamp without time zone DEFAULT timezone('utc'::text, now())
-);
-
-
-ALTER TABLE public.ad_domains_old OWNER TO james;
-
---
--- Name: ad_domains_id_seq; Type: SEQUENCE; Schema: public; Owner: james
---
-
-ALTER TABLE public.ad_domains_old ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
-    SEQUENCE NAME public.ad_domains_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1
-);
-
 
 --
 -- Name: version_manifests; Type: TABLE; Schema: public; Owner: postgres
@@ -3881,36 +3888,6 @@ ALTER SEQUENCE public.newtable_id_seq OWNED BY public.platforms.id;
 
 
 --
--- Name: pub_domains_old; Type: TABLE; Schema: public; Owner: james
---
-
-CREATE TABLE public.pub_domains_old (
-    id integer NOT NULL,
-    url character varying NOT NULL,
-    created_at timestamp without time zone DEFAULT timezone('utc'::text, now()),
-    updated_at timestamp without time zone DEFAULT timezone('utc'::text, now()),
-    crawl_result integer,
-    crawled_at timestamp without time zone
-);
-
-
-ALTER TABLE public.pub_domains_old OWNER TO james;
-
---
--- Name: pub_domains_id_seq; Type: SEQUENCE; Schema: public; Owner: james
---
-
-ALTER TABLE public.pub_domains_old ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
-    SEQUENCE NAME public.pub_domains_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1
-);
-
-
---
 -- Name: store_app_z_scores_history; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -3920,15 +3897,14 @@ CREATE TABLE public.store_app_z_scores_history (
     store_app numeric NOT NULL,
     store_id character varying NOT NULL,
     app_name character varying NOT NULL,
-    app_category character varying,
     in_app_purchases boolean,
     ad_supported boolean,
     icon_url_100 text,
     icon_url_512 text,
     installs bigint,
     rating_count bigint,
-    installs_sum_1w numeric,
-    ratings_sum_1w numeric,
+    target_week_installs numeric,
+    target_week_rating_count numeric,
     baseline_installs_2w numeric,
     baseline_ratings_2w numeric,
     installs_pct_increase numeric,
@@ -4807,22 +4783,6 @@ ALTER TABLE ONLY logging.store_app_sources
 
 
 --
--- Name: ad_domains_old ad_domains_pkey; Type: CONSTRAINT; Schema: public; Owner: james
---
-
-ALTER TABLE ONLY public.ad_domains_old
-    ADD CONSTRAINT ad_domains_pkey PRIMARY KEY (id);
-
-
---
--- Name: ad_domains_old ad_domains_un; Type: CONSTRAINT; Schema: public; Owner: james
---
-
-ALTER TABLE ONLY public.ad_domains_old
-    ADD CONSTRAINT ad_domains_un UNIQUE (domain);
-
-
---
 -- Name: adstxt_crawl_results adstxt_crawl_results_domain_un; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -5079,22 +5039,6 @@ ALTER TABLE ONLY public.platforms
 
 
 --
--- Name: pub_domains_old pub_domains_pkey; Type: CONSTRAINT; Schema: public; Owner: james
---
-
-ALTER TABLE ONLY public.pub_domains_old
-    ADD CONSTRAINT pub_domains_pkey PRIMARY KEY (id);
-
-
---
--- Name: pub_domains_old pub_domains_un; Type: CONSTRAINT; Schema: public; Owner: james
---
-
-ALTER TABLE ONLY public.pub_domains_old
-    ADD CONSTRAINT pub_domains_un UNIQUE (url);
-
-
---
 -- Name: store_app_z_scores_history store_app_z_scores_history_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -5116,14 +5060,6 @@ ALTER TABLE ONLY public.store_apps_country_history
 
 ALTER TABLE ONLY public.store_apps_descriptions
     ADD CONSTRAINT store_apps_descriptions_pkey PRIMARY KEY (id);
-
-
---
--- Name: store_apps_descriptions store_apps_descriptions_store_app_language_id_description_d_key; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.store_apps_descriptions
-    ADD CONSTRAINT store_apps_descriptions_store_app_language_id_description_d_key UNIQUE (store_app, language_id, description, description_short);
 
 
 --
@@ -5309,17 +5245,17 @@ CREATE UNIQUE INDEX combined_store_app_companies_idx ON adtech.combined_store_ap
 
 
 --
+-- Name: company_sdk_strings_version_string_id_company_id_idx; Type: INDEX; Schema: adtech; Owner: postgres
+--
+
+CREATE UNIQUE INDEX company_sdk_strings_version_string_id_company_id_idx ON adtech.company_sdk_strings USING btree (version_string_id, company_id);
+
+
+--
 -- Name: idx_combined_store_apps_parent_companies_idx; Type: INDEX; Schema: adtech; Owner: postgres
 --
 
 CREATE UNIQUE INDEX idx_combined_store_apps_parent_companies_idx ON adtech.combined_store_apps_parent_companies USING btree (ad_domain, store_app, app_category, company_id);
-
-
---
--- Name: idx_store_apps_companies_sdk_new; Type: INDEX; Schema: adtech; Owner: postgres
---
-
-CREATE UNIQUE INDEX idx_store_apps_companies_sdk_new ON adtech.store_apps_companies_sdk USING btree (store_app, company_id, parent_id);
 
 
 --
@@ -5330,10 +5266,38 @@ CREATE INDEX sdk_packages_package_pattern_idx ON adtech.sdk_packages USING btree
 
 
 --
+-- Name: sdk_packages_pattern_lower_idx; Type: INDEX; Schema: adtech; Owner: postgres
+--
+
+CREATE INDEX sdk_packages_pattern_lower_idx ON adtech.sdk_packages USING btree (lower((package_pattern)::text) text_pattern_ops);
+
+
+--
+-- Name: sdk_packages_pattern_trgm_idx; Type: INDEX; Schema: adtech; Owner: postgres
+--
+
+CREATE INDEX sdk_packages_pattern_trgm_idx ON adtech.sdk_packages USING gin (lower((package_pattern)::text) public.gin_trgm_ops);
+
+
+--
 -- Name: sdk_path_pattern_idx; Type: INDEX; Schema: adtech; Owner: postgres
 --
 
 CREATE INDEX sdk_path_pattern_idx ON adtech.sdk_paths USING btree (path_pattern);
+
+
+--
+-- Name: sdk_paths_path_pattern_trgm_idx; Type: INDEX; Schema: adtech; Owner: postgres
+--
+
+CREATE INDEX sdk_paths_path_pattern_trgm_idx ON adtech.sdk_paths USING gin (lower((path_pattern)::text) public.gin_trgm_ops);
+
+
+--
+-- Name: store_app_sdk_strings_idx; Type: INDEX; Schema: adtech; Owner: postgres
+--
+
+CREATE UNIQUE INDEX store_app_sdk_strings_idx ON adtech.store_app_sdk_strings USING btree (store_app, version_string_id, company_id);
 
 
 --
@@ -5404,13 +5368,6 @@ CREATE INDEX companies_apps_overview_idx ON frontend.companies_apps_overview USI
 --
 
 CREATE UNIQUE INDEX companies_apps_overview_unique_idx ON frontend.companies_apps_overview USING btree (store_id, company_id, category_slug);
-
-
---
--- Name: companies_apps_version_details_count_unique_idx; Type: INDEX; Schema: frontend; Owner: postgres
---
-
-CREATE UNIQUE INDEX companies_apps_version_details_count_unique_idx ON frontend.companies_version_details_count USING btree (store, company_name, company_domain, xml_path, value_name);
 
 
 --
@@ -5708,20 +5665,6 @@ CREATE UNIQUE INDEX store_apps_overview_unique_idx ON frontend.store_apps_overvi
 
 
 --
--- Name: store_apps_version_details_store_id_idx; Type: INDEX; Schema: frontend; Owner: postgres
---
-
-CREATE INDEX store_apps_version_details_store_id_idx ON frontend.store_apps_version_details USING btree (store_id);
-
-
---
--- Name: store_apps_version_details_unique_idx; Type: INDEX; Schema: frontend; Owner: postgres
---
-
-CREATE UNIQUE INDEX store_apps_version_details_unique_idx ON frontend.store_apps_version_details USING btree (version_string_id, store_id, company_id, company_domain, category_slug);
-
-
---
 -- Name: ix_logging_store_apps_crawl_index; Type: INDEX; Schema: logging; Owner: postgres
 --
 
@@ -5897,6 +5840,13 @@ CREATE UNIQUE INDEX store_apps_country_history_unique_idx ON public.store_apps_c
 
 
 --
+-- Name: store_apps_descriptions_unique_hash_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX store_apps_descriptions_unique_hash_idx ON public.store_apps_descriptions USING btree (store_app, language_id, md5(description), md5(description_short));
+
+
+--
 -- Name: store_apps_developer_idx; Type: INDEX; Schema: public; Owner: james
 --
 
@@ -5932,10 +5882,38 @@ CREATE INDEX textsearch_generated_idx ON public.store_apps USING gin (textsearch
 
 
 --
--- Name: ad_domains_old ad_domains_updated_at; Type: TRIGGER; Schema: public; Owner: james
+-- Name: version_strings_value_name_lower_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE TRIGGER ad_domains_updated_at BEFORE UPDATE ON public.ad_domains_old FOR EACH ROW EXECUTE FUNCTION public.update_modified_column();
+CREATE INDEX version_strings_value_name_lower_idx ON public.version_strings USING btree (lower(value_name) text_pattern_ops);
+
+
+--
+-- Name: version_strings_value_name_lower_prefix_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX version_strings_value_name_lower_prefix_idx ON public.version_strings USING btree (lower(value_name) text_pattern_ops);
+
+
+--
+-- Name: version_strings_value_name_trgm_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX version_strings_value_name_trgm_idx ON public.version_strings USING gin (lower(value_name) public.gin_trgm_ops);
+
+
+--
+-- Name: version_strings_xml_path_lower_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX version_strings_xml_path_lower_idx ON public.version_strings USING btree (lower(xml_path));
+
+
+--
+-- Name: version_strings_xml_path_trgm_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX version_strings_xml_path_trgm_idx ON public.version_strings USING gin (lower(xml_path) public.gin_trgm_ops);
 
 
 --
@@ -5964,20 +5942,6 @@ CREATE TRIGGER app_urls_map_updated_at BEFORE UPDATE ON public.app_urls_map FOR 
 --
 
 CREATE TRIGGER developers_updated_at BEFORE UPDATE ON public.developers FOR EACH ROW EXECUTE FUNCTION public.update_modified_column();
-
-
---
--- Name: pub_domains_old pub_domains_crawled_at; Type: TRIGGER; Schema: public; Owner: james
---
-
-CREATE TRIGGER pub_domains_crawled_at BEFORE UPDATE OF crawl_result ON public.pub_domains_old FOR EACH ROW EXECUTE FUNCTION public.update_crawled_at();
-
-
---
--- Name: pub_domains_old pub_domains_updated_at; Type: TRIGGER; Schema: public; Owner: james
---
-
-CREATE TRIGGER pub_domains_updated_at BEFORE UPDATE ON public.pub_domains_old FOR EACH ROW EXECUTE FUNCTION public.update_modified_column();
 
 
 --
@@ -6418,14 +6382,6 @@ ALTER TABLE ONLY public.version_manifests
 
 
 --
--- Name: pub_domains_old pub_domains_fk; Type: FK CONSTRAINT; Schema: public; Owner: james
---
-
-ALTER TABLE ONLY public.pub_domains_old
-    ADD CONSTRAINT pub_domains_fk FOREIGN KEY (crawl_result) REFERENCES public.crawl_results(id);
-
-
---
 -- Name: store_apps_country_history store_apps_country_history_app_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -6541,5 +6497,5 @@ GRANT ALL ON SCHEMA public TO PUBLIC;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict K1BxpYbyx2EJLL836z6WNdegL3wuQBfU1Mks0njplly6hMOep67dilMhUzaEwna
+\unrestrict OtgEdpefptcNWGgdVwUfAwkHb9q6daGw9i2ZpiG1gL22CQcWRdJZyQQ6v0ABfa6
 

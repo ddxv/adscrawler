@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict hzuYefbhSTMzCha63lwslAAgRWltlek8v8FglSjJHRncA98Hhqk3fV0RUB2ZluO
+\restrict QU8ePU9lODelbaExx1SzWmU4Z4xCyjnjGROQGgM0WgbWczu23iLN7rP3T86aLom
 
--- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
--- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
+-- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
+-- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -52,4 +52,4 @@ CREATE INDEX ix_logging_store_apps_crawl_index ON logging.store_apps_crawl USING
 -- PostgreSQL database dump complete
 --
 
-\unrestrict hzuYefbhSTMzCha63lwslAAgRWltlek8v8FglSjJHRncA98Hhqk3fV0RUB2ZluO
+\unrestrict QU8ePU9lODelbaExx1SzWmU4Z4xCyjnjGROQGgM0WgbWczu23iLN7rP3T86aLom

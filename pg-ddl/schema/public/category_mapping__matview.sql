@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict MNEAANtrxGYpsNCQhTaG7nLB1d26ERLf1BxFP5fgBKbPpo7svzZcDJnoc9iqS0R
+\restrict IAHOKhIOtazXhepExtB0ckFg52E28XeAunklL0ef9qdjPmoQaFV6kKm73oR3YSL
 
--- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
--- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
+-- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
+-- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -106,4 +106,4 @@ CREATE UNIQUE INDEX category_mapping_idx ON public.category_mapping USING btree 
 -- PostgreSQL database dump complete
 --
 
-\unrestrict MNEAANtrxGYpsNCQhTaG7nLB1d26ERLf1BxFP5fgBKbPpo7svzZcDJnoc9iqS0R
+\unrestrict IAHOKhIOtazXhepExtB0ckFg52E28XeAunklL0ef9qdjPmoQaFV6kKm73oR3YSL

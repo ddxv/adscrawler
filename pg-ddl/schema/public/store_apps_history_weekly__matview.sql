@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict wh5b4pr7bnTgG6cOclwaVCAhhDnZ6YxUQCB6p3Le9WIwGLYHJ9uKauZYx0r0tgC
+\restrict aisg5IXqzeYfaW7SrG7MGjld4BuL2clBTvI95fdT1oSJWqpkSaBDalQ77Aa6qlc
 
--- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
--- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
+-- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
+-- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -112,4 +112,4 @@ ALTER MATERIALIZED VIEW public.store_apps_history_weekly OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict wh5b4pr7bnTgG6cOclwaVCAhhDnZ6YxUQCB6p3Le9WIwGLYHJ9uKauZYx0r0tgC
+\unrestrict aisg5IXqzeYfaW7SrG7MGjld4BuL2clBTvI95fdT1oSJWqpkSaBDalQ77Aa6qlc

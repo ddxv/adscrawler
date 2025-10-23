@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict qcCMeJnTQeS3VhVcpBNh7edsojJnMRmLiCgkqWDhJBJURDC75pBnwy2XyCdKrty
+\restrict 5ExPLtLHRSCbZAPtK0sV19qcZakEPLSozwHjdbcBhNnhHo48EQRYdAHtg7UysFg
 
--- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
--- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
+-- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
+-- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -99,4 +99,4 @@ CREATE UNIQUE INDEX adstxt_entries_store_apps_unique_idx ON frontend.adstxt_entr
 -- PostgreSQL database dump complete
 --
 
-\unrestrict qcCMeJnTQeS3VhVcpBNh7edsojJnMRmLiCgkqWDhJBJURDC75pBnwy2XyCdKrty
+\unrestrict 5ExPLtLHRSCbZAPtK0sV19qcZakEPLSozwHjdbcBhNnhHo48EQRYdAHtg7UysFg

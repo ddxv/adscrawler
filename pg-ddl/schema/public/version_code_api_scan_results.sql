@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict HwCG8vxMUweFb47a0OhHBpC4AP3rGpppoOdjaptlNWFUhhyCpjf35fcx4IKpNcq
+\restrict wwDQvHqwi1yKTJvNvI0ohxsmdp0V0Sml1pbv83GTQj54TpWubEmFLqpOEDwtpGE
 
--- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
--- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
+-- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
+-- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -93,4 +93,4 @@ ADD CONSTRAINT version_code_api_scan_results_version_code_id_fkey FOREIGN KEY (
 -- PostgreSQL database dump complete
 --
 
-\unrestrict HwCG8vxMUweFb47a0OhHBpC4AP3rGpppoOdjaptlNWFUhhyCpjf35fcx4IKpNcq
+\unrestrict wwDQvHqwi1yKTJvNvI0ohxsmdp0V0Sml1pbv83GTQj54TpWubEmFLqpOEDwtpGE

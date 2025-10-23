@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 9le4YH8c3Nhit5foTYTuwqFHMjbtcdizphQr6UZILNSMiC7UjTdiFdd0bts4bNF
+\restrict LEcGxA4oZsk3LaMMyn1OibiROWtXuzE5AWUmNuJTm5msmrsWrNaC9tSEb7idkw3
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -24,10 +24,10 @@ SET default_tablespace = '';
 SET default_table_access_method = heap;
 
 --
--- Name: companies_creative_rankings; Type: MATERIALIZED VIEW; Schema: frontend; Owner: postgres
+-- Name: companies_creative_rankings_new; Type: MATERIALIZED VIEW; Schema: frontend; Owner: postgres
 --
 
-CREATE MATERIALIZED VIEW frontend.companies_creative_rankings AS
+CREATE MATERIALIZED VIEW frontend.companies_creative_rankings_new AS
 WITH creative_rankings AS (
     SELECT
         ca.file_extension,
@@ -164,10 +164,10 @@ ORDER BY vd.last_seen DESC
 WITH NO DATA;
 
 
-ALTER MATERIALIZED VIEW frontend.companies_creative_rankings OWNER TO postgres;
+ALTER MATERIALIZED VIEW frontend.companies_creative_rankings_new OWNER TO postgres;
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 9le4YH8c3Nhit5foTYTuwqFHMjbtcdizphQr6UZILNSMiC7UjTdiFdd0bts4bNF
+\unrestrict LEcGxA4oZsk3LaMMyn1OibiROWtXuzE5AWUmNuJTm5msmrsWrNaC9tSEb7idkw3

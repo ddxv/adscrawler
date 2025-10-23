@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict XEbw8a7dx2Qu4XbOH3XfBGb8S2wH1sznhHKnwK3pjGSaezRSCUDtiy3ZZha1q5l
+\restrict F28G3Kqe8plOcw3L1DgUflkuJRVmQwtVR0l4DVTCMh7wFkPKZh52KIMnxjqdT79
 
--- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
--- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
+-- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
+-- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -57,16 +57,38 @@ WITH api_based_companies AS (
     )
     LEFT JOIN public.domains AS cad_1 ON ((c_1.domain_id = cad_1.id))
     )
+), developer_based_companies AS (
+    SELECT DISTINCT
+        sa_1.id AS store_app,
+        cm.mapped_category AS app_category,
+        cd.company_id,
+        d.domain_name AS ad_domain,
+        'developer'::text AS tag_source,
+        COALESCE(c_1.parent_company_id, cd.company_id) AS parent_id
+    FROM ((((
+        adtech.company_developers cd
+        LEFT JOIN
+            public.store_apps AS sa_1
+            ON ((cd.developer_id = sa_1.developer))
+    )
+    LEFT JOIN adtech.companies AS c_1 ON ((cd.company_id = c_1.id))
+    )
+    LEFT JOIN public.domains AS d ON ((c_1.domain_id = d.id))
+    )
+    LEFT JOIN
+        public.category_mapping AS cm
+        ON (((sa_1.category)::text = (cm.original_category)::text))
+    )
 ), sdk_based_companies AS (
-    SELECT
+    SELECT DISTINCT
         sac.store_app,
         cm.mapped_category AS app_category,
         sac.company_id,
-        sac.parent_id,
         ad_1.domain_name AS ad_domain,
-        'sdk'::text AS tag_source
+        'sdk'::text AS tag_source,
+        COALESCE(c_1.parent_company_id, sac.company_id) AS parent_id
     FROM ((((
-        adtech.store_apps_companies_sdk sac
+        adtech.store_app_sdk_strings sac
         LEFT JOIN adtech.companies AS c_1 ON ((sac.company_id = c_1.id))
     )
     LEFT JOIN public.domains AS ad_1 ON ((c_1.domain_id = ad_1.id))
@@ -161,6 +183,15 @@ WITH api_based_companies AS (
         adstxt_based_companies.ad_domain,
         adstxt_based_companies.tag_source
     FROM adstxt_based_companies
+    UNION ALL
+    SELECT
+        developer_based_companies.store_app,
+        developer_based_companies.app_category,
+        developer_based_companies.company_id,
+        developer_based_companies.parent_id,
+        developer_based_companies.ad_domain,
+        developer_based_companies.tag_source
+    FROM developer_based_companies
 )
 SELECT
     cs.ad_domain,
@@ -218,4 +249,4 @@ CREATE UNIQUE INDEX combined_store_app_companies_idx ON adtech.combined_store_ap
 -- PostgreSQL database dump complete
 --
 
-\unrestrict XEbw8a7dx2Qu4XbOH3XfBGb8S2wH1sznhHKnwK3pjGSaezRSCUDtiy3ZZha1q5l
+\unrestrict F28G3Kqe8plOcw3L1DgUflkuJRVmQwtVR0l4DVTCMh7wFkPKZh52KIMnxjqdT79

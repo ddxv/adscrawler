@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict UX11qu7hUSY42nlsBm1hpZZd6mfQ3BmRAsBu1voAGm9tx8qhdgDFjhjPT14jzih
+\restrict SPnbIzqtuumwJRqMFoxkSVaHitaR3T29fW8hMRj6kcUf2TuLHWCbgNuMF7oQGT4
 
--- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
--- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
+-- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
+-- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -80,4 +80,4 @@ ADD CONSTRAINT store_categories_fk FOREIGN KEY (
 -- PostgreSQL database dump complete
 --
 
-\unrestrict UX11qu7hUSY42nlsBm1hpZZd6mfQ3BmRAsBu1voAGm9tx8qhdgDFjhjPT14jzih
+\unrestrict SPnbIzqtuumwJRqMFoxkSVaHitaR3T29fW8hMRj6kcUf2TuLHWCbgNuMF7oQGT4

@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict r4jyrJZlnZF05Jx3wteqA0caycfJ7JC1qNoBX9nzLD6tJydjORXk1I8Lc5Pg7gz
+\restrict h6VugEVr3zptCVx4XxbNcY8v2deMC4MEQlaT5TSGGfN5MMhyYFev1kdML2vbPLR
 
--- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
--- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
+-- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
+-- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -76,6 +76,15 @@ CREATE INDEX sdk_path_pattern_idx ON adtech.sdk_paths USING btree (
 
 
 --
+-- Name: sdk_paths_path_pattern_trgm_idx; Type: INDEX; Schema: adtech; Owner: postgres
+--
+
+CREATE INDEX sdk_paths_path_pattern_trgm_idx ON adtech.sdk_paths USING gin (
+    lower((path_pattern)::text) public.gin_trgm_ops
+);
+
+
+--
 -- Name: sdk_paths sdk_paths_sdk_id_fkey; Type: FK CONSTRAINT; Schema: adtech; Owner: postgres
 --
 
@@ -89,4 +98,4 @@ ADD CONSTRAINT sdk_paths_sdk_id_fkey FOREIGN KEY (
 -- PostgreSQL database dump complete
 --
 
-\unrestrict r4jyrJZlnZF05Jx3wteqA0caycfJ7JC1qNoBX9nzLD6tJydjORXk1I8Lc5Pg7gz
+\unrestrict h6VugEVr3zptCVx4XxbNcY8v2deMC4MEQlaT5TSGGfN5MMhyYFev1kdML2vbPLR

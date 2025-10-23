@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict AWRZWldJnSphvbNf6yuea74e1qzEEStXn2ysdybVRFogAybNBgJZRJ3vECLynD9
+\restrict lrdAQvU5bg8RylzPG77QJCD0NKtjs90pEg9ShlGFXLqdShVp8eABlEU6ZjIy4CV
 
--- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
--- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
+-- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
+-- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -61,4 +61,4 @@ ADD CONSTRAINT crawl_results_pkey PRIMARY KEY (id);
 -- PostgreSQL database dump complete
 --
 
-\unrestrict AWRZWldJnSphvbNf6yuea74e1qzEEStXn2ysdybVRFogAybNBgJZRJ3vECLynD9
+\unrestrict lrdAQvU5bg8RylzPG77QJCD0NKtjs90pEg9ShlGFXLqdShVp8eABlEU6ZjIy4CV

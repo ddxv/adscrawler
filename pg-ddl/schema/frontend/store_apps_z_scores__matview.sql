@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict 3bbw0YGq2JPAb7w7OBnIHhM3z2YZ7VmjLgWLP97vbhemURac5diTmXZfGFgTIy0
+\restrict wnIeNu3RdcjfxznxClbgxxpjMOflQlNqfDVYFjmZAhXPrF2cm1o7SvsvPZw5hvS
 
--- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
--- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
+-- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
+-- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -143,4 +143,4 @@ CREATE UNIQUE INDEX frontend_store_apps_z_scores_unique ON frontend.store_apps_z
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 3bbw0YGq2JPAb7w7OBnIHhM3z2YZ7VmjLgWLP97vbhemURac5diTmXZfGFgTIy0
+\unrestrict wnIeNu3RdcjfxznxClbgxxpjMOflQlNqfDVYFjmZAhXPrF2cm1o7SvsvPZw5hvS

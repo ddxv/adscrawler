@@ -6,7 +6,6 @@ import google_play_scraper
 import langdetect
 import pandas as pd
 
-from adscrawler.app_stores.utils import truncate_utf8_bytes
 from adscrawler.config import CONFIG, MODULE_DIR, PACKAGE_DIR, get_logger
 
 logger = get_logger(__name__, "scrape_google")

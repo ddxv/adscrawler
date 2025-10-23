@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict U4eJbqNRYfTpNn3XgVcIHhPf66hgZvFtbhfVWF3uvMkychSKM4rwM2kBcKzMAI5
+\restrict qlaoMFzinI795Xz1lsRFtLHzTLlrf5yAtRZfqgoPKzlMXqo0jf8gwgWrKzI58o3
 
--- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
--- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
+-- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
+-- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -37,7 +37,11 @@ WITH adv_mmp AS (
         public.creative_records AS cr_1
         LEFT JOIN public.domains AS ad ON ((cr_1.mmp_domain_id = ad.id))
     )
-    WHERE (cr_1.mmp_domain_id IS NOT null)
+    WHERE
+        (
+            (cr_1.mmp_domain_id IS NOT null)
+            AND (cr_1.advertiser_store_app_id IS NOT null)
+        )
 ), ad_network_domain_ids AS (
     SELECT
         cr_1.advertiser_store_app_id,
@@ -153,6 +157,7 @@ LEFT JOIN
     ad_network_domains AS adis
     ON ((cr.advertiser_store_app_id = adis.advertiser_store_app_id))
 )
+WHERE (cr.advertiser_store_app_id IS NOT null)
 GROUP BY
     saa.name,
     saa.store_id,
@@ -175,4 +180,4 @@ ALTER MATERIALIZED VIEW frontend.advertiser_creative_rankings OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict U4eJbqNRYfTpNn3XgVcIHhPf66hgZvFtbhfVWF3uvMkychSKM4rwM2kBcKzMAI5
+\unrestrict qlaoMFzinI795Xz1lsRFtLHzTLlrf5yAtRZfqgoPKzlMXqo0jf8gwgWrKzI58o3

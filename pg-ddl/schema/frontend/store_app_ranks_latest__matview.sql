@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict ETjJ36CLLNXVnZCx5gGQRnzud6zDc4MA72yiSgMfJYgEThOu0nDj4jfEBisNxep
+\restrict tkNeUomjmax5KE3B5BBOz31MaeLPoiO0hFwdKlKOHpLYrFMdpV0IIBzr8KnFZs2
 
--- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
--- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
+-- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
+-- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -50,7 +50,6 @@ SELECT
     sa.ratings_sum_1w,
     sa.ratings_sum_4w,
     sa.icon_url_100,
-    sa.icon_url_512,
     ar.store_collection,
     ar.store_category,
     c.alpha2 AS country,
@@ -91,4 +90,4 @@ CREATE UNIQUE INDEX idx_store_app_ranks_latest_filter_sort ON frontend.store_app
 -- PostgreSQL database dump complete
 --
 
-\unrestrict ETjJ36CLLNXVnZCx5gGQRnzud6zDc4MA72yiSgMfJYgEThOu0nDj4jfEBisNxep
+\unrestrict tkNeUomjmax5KE3B5BBOz31MaeLPoiO0hFwdKlKOHpLYrFMdpV0IIBzr8KnFZs2

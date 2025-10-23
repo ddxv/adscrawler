@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict lYqzoNLxmsZ5A3vKjFytrwse7yeJkpUEphkxr7bwcAMjZl2U6admHakF3vCgiR0
+\restrict uFFtC4RauO9WyFlFaKTmNdWNVTXnrjjeisKgjWmtBat5SNBqpHyQ3fCvr1v1T5n
 
--- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
--- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
+-- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
+-- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -81,21 +81,20 @@ ADD CONSTRAINT store_apps_descriptions_pkey PRIMARY KEY (id);
 
 
 --
--- Name: store_apps_descriptions store_apps_descriptions_store_app_language_id_description_d_key; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.store_apps_descriptions
-ADD CONSTRAINT store_apps_descriptions_store_app_language_id_description_d_key UNIQUE (
-    store_app, language_id, description, description_short
-);
-
-
---
 -- Name: idx_description_tsv; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_description_tsv ON public.store_apps_descriptions USING gin (
     description_tsv
+);
+
+
+--
+-- Name: store_apps_descriptions_unique_hash_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX store_apps_descriptions_unique_hash_idx ON public.store_apps_descriptions USING btree (
+    store_app, language_id, md5(description), md5(description_short)
 );
 
 
@@ -123,4 +122,4 @@ ADD CONSTRAINT store_apps_descriptions_store_app_fkey FOREIGN KEY (
 -- PostgreSQL database dump complete
 --
 
-\unrestrict lYqzoNLxmsZ5A3vKjFytrwse7yeJkpUEphkxr7bwcAMjZl2U6admHakF3vCgiR0
+\unrestrict uFFtC4RauO9WyFlFaKTmNdWNVTXnrjjeisKgjWmtBat5SNBqpHyQ3fCvr1v1T5n

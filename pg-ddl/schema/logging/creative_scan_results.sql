@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict fK02eVleTQ4XwmDfcekYo0sOeOnGlMngjenQZZJSLac7wKacqhMH15VIxlMfwiz
+\restrict Zs2tXgYEbhNhXa9fWOHH8I4M364z6VOYuqd5C6I9xK5CqyUVLxiuJa6y3ukLA8R
 
--- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
--- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
+-- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
+-- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -47,4 +47,4 @@ ALTER TABLE logging.creative_scan_results OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict fK02eVleTQ4XwmDfcekYo0sOeOnGlMngjenQZZJSLac7wKacqhMH15VIxlMfwiz
+\unrestrict Zs2tXgYEbhNhXa9fWOHH8I4M364z6VOYuqd5C6I9xK5CqyUVLxiuJa6y3ukLA8R

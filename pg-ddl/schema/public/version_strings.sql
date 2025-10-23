@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict tfwrjYv1ZxzO0xO3u5LQIom8TSk6sMEolXfkxImthKllh92dIySGHobvQnWyL9r
+\restrict anktcwakIsz0bUs2R5HKdGyBLziBXSrhbg7HdBS63OA6h4JZoAPeJkD6cWZjzfo
 
--- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
--- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
+-- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
+-- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -68,7 +68,52 @@ ADD CONSTRAINT version_strings_unique UNIQUE (xml_path, tag, value_name);
 
 
 --
+-- Name: version_strings_value_name_lower_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX version_strings_value_name_lower_idx ON public.version_strings USING btree (
+    lower(value_name) text_pattern_ops
+);
+
+
+--
+-- Name: version_strings_value_name_lower_prefix_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX version_strings_value_name_lower_prefix_idx ON public.version_strings USING btree (
+    lower(value_name) text_pattern_ops
+);
+
+
+--
+-- Name: version_strings_value_name_trgm_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX version_strings_value_name_trgm_idx ON public.version_strings USING gin (
+    lower(value_name) public.gin_trgm_ops
+);
+
+
+--
+-- Name: version_strings_xml_path_lower_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX version_strings_xml_path_lower_idx ON public.version_strings USING btree (
+    lower(xml_path)
+);
+
+
+--
+-- Name: version_strings_xml_path_trgm_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX version_strings_xml_path_trgm_idx ON public.version_strings USING gin (
+    lower(xml_path) public.gin_trgm_ops
+);
+
+
+--
 -- PostgreSQL database dump complete
 --
 
-\unrestrict tfwrjYv1ZxzO0xO3u5LQIom8TSk6sMEolXfkxImthKllh92dIySGHobvQnWyL9r
+\unrestrict anktcwakIsz0bUs2R5HKdGyBLziBXSrhbg7HdBS63OA6h4JZoAPeJkD6cWZjzfo

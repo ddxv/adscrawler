@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict 3gcqnwoR6h8kxKwXSuhrar3y44v4RQomYzMqqOD66bSJLbgnIt88bIVBdC3KM4R
+\restrict 9Ovbm1QW0mojgnMk4m8L7EdI7qtEMXjbYZ0HHPhvJpwswc5x3hF4ilb12nbq0uC
 
--- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
--- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
+-- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
+-- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -62,4 +62,4 @@ ADD CONSTRAINT categories_pkey PRIMARY KEY (id);
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 3gcqnwoR6h8kxKwXSuhrar3y44v4RQomYzMqqOD66bSJLbgnIt88bIVBdC3KM4R
+\unrestrict 9Ovbm1QW0mojgnMk4m8L7EdI7qtEMXjbYZ0HHPhvJpwswc5x3hF4ilb12nbq0uC

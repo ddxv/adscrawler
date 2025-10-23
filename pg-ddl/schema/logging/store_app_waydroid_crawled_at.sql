@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict 5V0j11t51Po5wOjbzLBPacOx7G5a2UZ2TOuDqc5m8RPiznhjM0WtGrI9lR4ScD0
+\restrict USjfH7ldgsXiuZwONdrafmNbQdJPPtTwZclIR1IuQyt24RPwKyUcr6EwuCchUfK
 
--- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
--- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
+-- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
+-- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -69,4 +69,4 @@ ADD CONSTRAINT waydroid_store_apps_crawl_fk FOREIGN KEY (
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 5V0j11t51Po5wOjbzLBPacOx7G5a2UZ2TOuDqc5m8RPiznhjM0WtGrI9lR4ScD0
+\unrestrict USjfH7ldgsXiuZwONdrafmNbQdJPPtTwZclIR1IuQyt24RPwKyUcr6EwuCchUfK

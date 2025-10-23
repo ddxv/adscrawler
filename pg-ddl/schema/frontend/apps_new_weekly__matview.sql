@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict On6GNKSJYhHHsZToFeLazYn2rbQMfPhmQL8mkHUjm8iqbLJrET3Y6lXdrYvpiEx
+\restrict eh6yxgcIjESC2VuQHwPREljfQaqIIBCYf4KQJ3F143On6gCD6dVYQccGSBgmFbk
 
--- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
--- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
+-- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
+-- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -147,4 +147,4 @@ CREATE UNIQUE INDEX idx_apps_new_weekly_f ON frontend.apps_new_weekly USING btre
 -- PostgreSQL database dump complete
 --
 
-\unrestrict On6GNKSJYhHHsZToFeLazYn2rbQMfPhmQL8mkHUjm8iqbLJrET3Y6lXdrYvpiEx
+\unrestrict eh6yxgcIjESC2VuQHwPREljfQaqIIBCYf4KQJ3F143On6gCD6dVYQccGSBgmFbk

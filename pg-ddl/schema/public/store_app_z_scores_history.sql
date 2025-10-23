@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict Z6XnKE6Vulgr6ahMouYFkA0iyoIMFnp5hNYim6LGyZMdD8gRvxFQ2K0PaT7EyCc
+\restrict pWEyxKRP77MRL2QS2e9TzdR8PJ9ICRfI2peBAi7xeLojxmrWKTx838gjwAgg0uw
 
--- Dumped from database version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
--- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg24.04+1)
+-- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
+-- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -33,15 +33,14 @@ CREATE TABLE public.store_app_z_scores_history (
     store_app numeric NOT NULL,
     store_id character varying NOT NULL,
     app_name character varying NOT NULL,
-    app_category character varying,
     in_app_purchases boolean,
     ad_supported boolean,
     icon_url_100 text,
     icon_url_512 text,
     installs bigint,
     rating_count bigint,
-    installs_sum_1w numeric,
-    ratings_sum_1w numeric,
+    target_week_installs numeric,
+    target_week_rating_count numeric,
     baseline_installs_2w numeric,
     baseline_ratings_2w numeric,
     installs_pct_increase numeric,
@@ -67,4 +66,4 @@ ADD CONSTRAINT store_app_z_scores_history_pkey PRIMARY KEY (
 -- PostgreSQL database dump complete
 --
 
-\unrestrict Z6XnKE6Vulgr6ahMouYFkA0iyoIMFnp5hNYim6LGyZMdD8gRvxFQ2K0PaT7EyCc
+\unrestrict pWEyxKRP77MRL2QS2e9TzdR8PJ9ICRfI2peBAi7xeLojxmrWKTx838gjwAgg0uw
