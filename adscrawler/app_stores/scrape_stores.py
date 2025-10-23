@@ -1111,14 +1111,14 @@ def scrape_app(
 
 
 def save_developer_info(
-    app_df: pd.DataFrame,
+    apps_df: pd.DataFrame,
     database_connection: PostgresCon,
 ) -> pd.DataFrame:
-    assert app_df["developer_id"].to_numpy()[0], (
-        f"{app_df['store_id']} Missing Developer ID"
+    assert apps_df["developer_id"].to_numpy()[0], (
+        f"{apps_df['store_id']} Missing Developer ID"
     )
     df = (
-        app_df[["store", "developer_id", "developer_name"]]
+        apps_df[["store", "developer_id", "developer_name"]]
         .rename(columns={"developer_name": "name"})
         .drop_duplicates()
     )
@@ -1135,11 +1135,19 @@ def save_developer_info(
             database_connection=database_connection,
             return_rows=True,
         )
-        assert dev_df is not None, "Dev_df is none!"
-        app_df["developer"] = dev_df["id"].astype(object)[0]
+        apps_df = pd.merge(
+            apps_df,
+            dev_df.rename(columns={"id": "developer"})[
+                ["store", "developer_id", "developer"]
+            ],
+            how="left",
+            left_on=["store", "developer_id"],
+            right_on=["store", "developer_id"],
+            validate="m:1",
+        )
     except Exception as error:
         logger.error(f"Developer insert failed with error {error}")
-    return app_df
+    return apps_df
 
 
 def apps_details_to_db(
