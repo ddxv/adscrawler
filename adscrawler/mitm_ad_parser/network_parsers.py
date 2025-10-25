@@ -393,7 +393,6 @@ def parse_youappi_ad(
     sent_video_dict: dict[str, Any], database_connection: PostgresCon
 ) -> AdInfo:
     """Parses YouAppi ad response to extract advertiser information and URLs."""
-    init_ad_network_tld = "youappi.com"
     ad_info, error_msg = parse_text_for_adinfo(
         text=sent_video_dict["response_text"],
         run_id=sent_video_dict["run_id"],
@@ -401,7 +400,6 @@ def parse_youappi_ad(
         mitm_uuid=sent_video_dict["mitm_uuid"],
         database_connection=database_connection,
     )
-    ad_info.init_tld = init_ad_network_tld
     return ad_info
 
 
@@ -409,7 +407,6 @@ def parse_yandex_ad(
     sent_video_dict: dict[str, Any], database_connection: PostgresCon, video_id: str
 ) -> AdInfo:
     """Parses Yandex ad response to extract advertiser information and URLs."""
-    init_ad_network_tld = "yandex.ru"
     json_text = json.loads(sent_video_dict["response_text"])
 
     if "native" in json_text:
@@ -421,7 +418,6 @@ def parse_yandex_ad(
         if len(matched_ads) == 0:
             return AdInfo(
                 adv_store_id=None,
-                init_tld=init_ad_network_tld,
             )
         text = str(matched_ads)
     else:
@@ -433,7 +429,6 @@ def parse_yandex_ad(
         mitm_uuid=sent_video_dict["mitm_uuid"],
         database_connection=database_connection,
     )
-    ad_info.init_tld = init_ad_network_tld
     return ad_info
 
 
@@ -441,7 +436,6 @@ def parse_mtg_ad(
     sent_video_dict: dict[str, Any], database_connection: PostgresCon
 ) -> AdInfo:
     """Parses MTG ad response to extract advertiser package name and URLs."""
-    init_ad_network_tld = "mtgglobals.com"
     text = sent_video_dict["response_text"]
     try:
         ad_response = json.loads(text)
@@ -449,7 +443,6 @@ def parse_mtg_ad(
         if adv_store_id:
             ad_info = AdInfo(
                 adv_store_id=adv_store_id,
-                init_tld=init_ad_network_tld,
             )
             return ad_info
     except Exception:
@@ -543,12 +536,10 @@ def parse_bidmachine_ad(
     sent_video_dict: dict[str, Any], database_connection: PostgresCon
 ) -> AdInfo:
     """Parses BidMachine ad response using protobuf decoding to extract advertiser information."""
-    init_ad_network_tld = "bidmachine.com"
     adv_store_id = None
     additional_ad_network_tld = None
     ad_info = AdInfo(
         adv_store_id=adv_store_id,
-        init_tld=init_ad_network_tld,
     )
     if isinstance(sent_video_dict["response_content"], str):
         sent_video_dict["response_content"] = ast.literal_eval(
@@ -596,14 +587,11 @@ def parse_bidmachine_ad(
             pass
     if additional_ad_network_tld is not None and not ad_info.found_ad_network_tlds:
         ad_info.found_ad_network_tlds.append(additional_ad_network_tld)
-    ad_info.init_tld = init_ad_network_tld
     return ad_info
 
 
 def parse_everestop_ad(sent_video_dict: dict[str, Any]) -> AdInfo:
     """Parses Everestop ad response using protobuf decoding to extract advertiser information."""
-    init_ad_network_tld = "everestop.io"
-
     if isinstance(sent_video_dict["response_content"], str):
         sent_video_dict["response_content"] = ast.literal_eval(
             sent_video_dict["response_content"]
@@ -621,7 +609,6 @@ def parse_everestop_ad(sent_video_dict: dict[str, Any]) -> AdInfo:
 
     ad_info = AdInfo(
         adv_store_id=adv_store_id,
-        init_tld=init_ad_network_tld,
         found_ad_network_tlds=[additional_ad_network_tld],
     )
     return ad_info
@@ -631,7 +618,6 @@ def parse_unity_ad(
     sent_video_dict: dict[str, Any], database_connection: PostgresCon
 ) -> tuple[AdInfo, str | None]:
     """Parses Unity ad response to extract advertiser information and bundle ID."""
-    init_ad_network_tld = "unity3d.com"
     error_msg = None
     found_mmp_urls = []
     adv_store_id = None
@@ -668,7 +654,6 @@ def parse_unity_ad(
         ad_info.adv_store_id = adv_store_id
     if ad_info.found_mmp_urls is None and found_mmp_urls:
         ad_info.found_mmp_urls = found_mmp_urls
-    ad_info.init_tld = init_ad_network_tld
     return ad_info, error_msg
 
 
@@ -704,10 +689,6 @@ def parse_generic_adnetwork(
     sent_video_dict: dict[str, Any], database_connection: PostgresCon
 ) -> tuple[AdInfo, str | None]:
     """Parses generic ad network responses to extract advertiser information."""
-    if sent_video_dict["tld_url"]:
-        init_tld = sent_video_dict["tld_url"]
-    else:
-        init_tld = None
     ad_info, error_msg = parse_text_for_adinfo(
         text=sent_video_dict["response_text"],
         pub_store_id=sent_video_dict["pub_store_id"],
@@ -715,7 +696,6 @@ def parse_generic_adnetwork(
         mitm_uuid=sent_video_dict["mitm_uuid"],
         database_connection=database_connection,
     )
-    ad_info.init_tld = init_tld
     return ad_info, error_msg
 
 
@@ -723,7 +703,6 @@ def parse_vungle_ad(
     sent_video_dict: dict[str, Any], database_connection: PostgresCon
 ) -> AdInfo:
     """Parses Vungle ad response to extract advertiser market ID and tracking URLs."""
-    init_ad_network_tld = "vungle.com"
     found_mmp_urls = None
     adv_store_id = None
     error_msg = None
@@ -757,7 +736,6 @@ def parse_vungle_ad(
     else:
         ad_info = AdInfo(
             adv_store_id=adv_store_id,
-            init_tld=init_ad_network_tld,
             found_mmp_urls=found_mmp_urls,
         )
     return ad_info, error_msg
@@ -767,7 +745,6 @@ def parse_fyber_ad(
     sent_video_dict: dict[str, Any], database_connection: PostgresCon
 ) -> AdInfo:
     """Parses Fyber ad response to extract advertiser information and URLs."""
-    init_ad_network_tld = "fyber.com"
     parsed_urls = []
     text = sent_video_dict["response_text"]
     try:
@@ -791,13 +768,11 @@ def parse_fyber_ad(
             adv_store_id = sent_video_dict["response_headers"]["x-ia-app-bundle"]
             ad_info = AdInfo(
                 adv_store_id=adv_store_id,
-                init_tld=init_ad_network_tld,
             )
             return ad_info
     ad_info = parse_urls_for_known_parts(
         all_urls, database_connection, sent_video_dict["pub_store_id"]
     )
-    ad_info.init_tld = init_ad_network_tld
     return ad_info
 
 
@@ -917,6 +892,7 @@ def parse_sent_video_df(
             or "tpbid.com" == init_tld
             or "inner-active.mobi" == init_tld
         ):
+            init_tld = "fyber.com"
             ad_info = parse_fyber_ad(sent_video_dict, database_connection)
         elif "everestop.io" == init_tld:
             ad_info = parse_everestop_ad(sent_video_dict)
