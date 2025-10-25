@@ -289,14 +289,16 @@ def follow_url_redirects(
 
 def get_redirect_chain(url: str) -> list[str]:
     """Follows HTTP redirects for a given URL and returns the complete redirect chain."""
+    max_redirects = 5
     chain = []
     cur_url = url
-    while cur_url:
+    while cur_url and len(chain) < max_redirects:
+        print(f"loop {len(chain)}: ")
         try:
             headers = {"User-Agent": ANDROID_USER_AGENT}
             # Do NOT allow requests to auto-follow
             response = requests.get(
-                cur_url, headers=headers, allow_redirects=False, timeout=10
+                cur_url, headers=headers, allow_redirects=False, timeout=(5, 5)
             )
             next_url = response.headers.get("Location")
         except Exception:
