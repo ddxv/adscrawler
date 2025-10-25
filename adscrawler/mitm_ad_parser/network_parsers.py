@@ -679,8 +679,8 @@ def parse_text_for_adinfo(
     except MultipleAdvertiserIdError as e:
         error_msg = f"multiple adv_store_id found for: {e.found_adv_store_ids}"
         logger.error(error_msg)
-        ad_info = (
-            AdInfo(adv_store_id=None, found_ad_network_tlds=None, found_mmp_urls=None),
+        ad_info = AdInfo(
+            adv_store_id=None, found_ad_network_tlds=None, found_mmp_urls=None
         )
     return ad_info, error_msg
 
