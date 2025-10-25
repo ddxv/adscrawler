@@ -375,7 +375,7 @@ def get_store_id_mitm_s3_keys(store_id: str) -> pd.DataFrame:
         prefix = f"mitm/ios/{store_id}/"
     else:
         raise ValueError(f"Invalid store: {store}")
-    logger.info(f"S3 getting {store_id=} mitm logs start")
+    logger.info(f"S3 download mitm logs {store_id=}")
     s3_client = get_s3_client()
     response = s3_client.list_objects_v2(Bucket=CONFIG["s3"]["bucket"], Prefix=prefix)
     objects_data = []

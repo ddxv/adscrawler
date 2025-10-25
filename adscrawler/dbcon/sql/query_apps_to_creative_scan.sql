@@ -10,22 +10,20 @@ WITH has_creatives AS (
             response_mime_type
             ~* '(image|video)/(jpeg|jpg|png|gif|webp|webm|mp4|avi|quicktime)'
         ) AND status_code = 200
-        AND response_size_bytes > 50000
-),
-run_counts AS (
-    SELECT
-        ac.store_app,
-        ac.run_id,
-        sa.store_id,
-        count(*) AS api_calls
-    FROM
-        has_creatives AS ac
-    LEFT JOIN store_apps AS sa ON ac.store_app = sa.id
-    WHERE
-        ac.called_at >= :earliest_date
-        AND ac.called_at <= current_date - INTERVAL '1 hour'
-    GROUP BY
-        ac.store_app, ac.run_id, sa.store_id
+        AND response_size_bytes > 80000
 )
-SELECT * FROM run_counts
-WHERE api_calls > 1;
+SELECT
+    ac.store_app,
+    ac.run_id,
+    sa.store_id,
+    ac.id AS api_call_id,
+    ac.mitm_uuid
+FROM
+    api_calls AS ac
+LEFT JOIN store_apps AS sa ON ac.store_app = sa.id
+WHERE
+    ac.id IN (
+        SELECT id FROM has_creatives
+    )
+    AND ac.called_at >= :earliest_date
+    AND ac.called_at <= current_date - INTERVAL '1 hour';

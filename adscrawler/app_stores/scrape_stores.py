@@ -245,8 +245,8 @@ def process_chunk(df_chunk, use_ssh_tunnel, process_icon, total_rows):
                 for language in APP_DETAILS_LANGUAGE_LIST:
                     try:
                         result_dict = scrape_app(
-                            store=row.store,
-                            store_id=row.store_id,
+                            store=row["store"],
+                            store_id=row["store_id"],
                             country=country,
                             language=language,
                         )
@@ -257,12 +257,12 @@ def process_chunk(df_chunk, use_ssh_tunnel, process_icon, total_rows):
                         )
         results_df = pd.DataFrame(chunk_results)
         results_df["crawled_date"] = results_df["crawled_at"].dt.date
-        app_details_to_s3(results_df, row.store)
+        app_details_to_s3(results_df, row["store"])
         for crawl_result, apps_df in results_df.groupby("crawl_result"):
             if crawl_result != 1:
                 apps_df = apps_df[["store_id", "store", "crawled_at", "crawl_result"]]
             else:
-                apps_df = clean_scraped_df(df=apps_df, store=row.store)
+                apps_df = clean_scraped_df(df=apps_df, store=row["store"])
                 if "description_short" not in apps_df.columns:
                     apps_df["description_short"] = ""
                 apps_df.loc[
@@ -290,7 +290,9 @@ def process_chunk(df_chunk, use_ssh_tunnel, process_icon, total_rows):
                                 axis=1,
                             )
                     except Exception:
-                        logger.exception(f"{row.store_id} failed to process app icon")
+                        logger.exception(
+                            f"{row['store_id']} failed to process app icon"
+                        )
             apps_df = apps_df.convert_dtypes(dtype_backend="pyarrow")
             apps_df = apps_df.replace({pd.NA: None})
             apps_details_to_db(

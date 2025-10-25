@@ -13,7 +13,7 @@ from adscrawler.dbcon.queries import (
     log_creative_scan_results,
     query_ad_domains,
     query_api_calls_for_mitm_uuids,
-    query_apps_to_creative_scan,
+    query_api_calls_to_creative_scan,
     query_creative_records,
     upsert_df,
 )
@@ -369,17 +369,15 @@ def make_creative_records_df(
     database_connection: PostgresCon,
 ) -> pd.DataFrame:
     """Creates creative records DataFrame with domain IDs and asset relationships."""
-    # This could just query for mitm_uuids
-    api_calls_df = query_api_calls_for_mitm_uuids(
-        database_connection=database_connection,
-        mitm_uuids=adv_creatives_df["mitm_uuid"].astype(str).tolist(),
-    ).rename(columns={"id": "api_call_id"})
-    api_calls_df["mitm_uuid"] = api_calls_df["mitm_uuid"].astype(str)
     creative_records_df = adv_creatives_df.merge(
         assets_df[["md5_hash", "creative_asset_id"]],
         on="md5_hash",
         how="left",
         validate="m:1",
+    )
+    api_calls_df = query_api_calls_for_mitm_uuids(
+        database_connection=database_connection,
+        mitm_uuids=adv_creatives_df["mitm_uuid"].astype(str).tolist(),
     )
     creative_records_df = creative_records_df.merge(
         api_calls_df[["api_call_id", "mitm_uuid"]],
@@ -625,9 +623,10 @@ def scan_all_apps(
     max_workers: int = 1,
 ) -> None:
     """Scans all apps for creative content and uploads thumbnails to S3."""
-    mitm_runs_to_scan = query_apps_to_creative_scan(
+    all_api_calls = query_api_calls_to_creative_scan(
         database_connection=database_connection, recent_months=recent_months
     )
+    mitm_runs_to_scan = all_api_calls[["store_id", "run_id"]].drop_duplicates()
     logger.info(f"MITM logs to scan: {mitm_runs_to_scan.shape[0]}")
 
     if only_new_apps:

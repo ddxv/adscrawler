@@ -25,7 +25,7 @@ def load_sql_file(file_name: str) -> TextClause:
 QUERY_APPS_TO_DOWNLOAD = load_sql_file("query_apps_to_download.sql")
 QUERY_APPS_TO_SDK_SCAN = load_sql_file("query_apps_to_sdk_scan.sql")
 QUERY_APPS_TO_API_SCAN = load_sql_file("query_apps_to_api_scan.sql")
-QUERY_APPS_TO_CREATIVE_SCAN = load_sql_file("query_apps_to_creative_scan.sql")
+QUERY_API_CALLS_TO_CREATIVE_SCAN = load_sql_file("query_apps_to_creative_scan.sql")
 QUERY_APPS_MITM_IN_S3 = load_sql_file("query_apps_mitm_in_s3.sql")
 QUERY_ZSCORES = load_sql_file("query_simplified_store_app_z_scores.sql")
 
@@ -937,7 +937,8 @@ def query_apps_mitm_in_s3(database_connection: PostgresCon) -> pd.DataFrame:
     return df
 
 
-def query_apps_to_creative_scan(
+@lru_cache(maxsize=2)
+def query_api_calls_to_creative_scan(
     database_connection: PostgresCon, recent_months: bool = False
 ) -> pd.DataFrame:
     earliest_date = (datetime.datetime.now() - datetime.timedelta(days=365)).strftime(
@@ -948,7 +949,7 @@ def query_apps_to_creative_scan(
             datetime.datetime.now() - datetime.timedelta(days=60)
         ).strftime("%Y-%m-%d")
     df = pd.read_sql(
-        QUERY_APPS_TO_CREATIVE_SCAN,
+        QUERY_API_CALLS_TO_CREATIVE_SCAN,
         con=database_connection.engine,
         params={"earliest_date": earliest_date},
     )
@@ -1126,19 +1127,30 @@ def get_version_code_by_md5_hash(
         raise
 
 
-def query_api_calls_all(database_connection: PostgresCon) -> pd.DataFrame:
-    sel_query = """SELECT * FROM api_calls LIMIT 200000;"""
+@lru_cache(maxsize=1000)
+def query_api_call_id_for_uuid(mitm_uuid: str, database_connection: PostgresCon) -> int:
+    api_calls = query_api_calls_id_uuid_map(database_connection)
+    filtered_df = api_calls[api_calls["mitm_uuid"] == mitm_uuid]
+    assert filtered_df.shape[0] == 1, "Failed to find api_call_id for mitm_uuid"
+    api_call_id = filtered_df.values["api_call_id"][0]
+    return api_call_id
+
+
+@lru_cache(maxsize=1)
+def query_api_calls_id_uuid_map(database_connection: PostgresCon) -> pd.DataFrame:
+    sel_query = """SELECT id, mitm_uuid FROM api_calls"""
     df = pd.read_sql(sel_query, con=database_connection.engine)
+    df["mitm_uuid"] = df["mitm_uuid"].astype(str)
+    df = df.rename(columns={"id": "api_call_id"})
     return df
 
 
 def query_api_calls_for_mitm_uuids(
     database_connection: PostgresCon, mitm_uuids: list[str]
 ) -> pd.DataFrame:
-    uuids = "'" + "','".join(mitm_uuids) + "'"
-    sel_query = f"""SELECT * FROM api_calls WHERE mitm_uuid IN ({uuids});"""
-    df = pd.read_sql(sel_query, con=database_connection.engine)
-    return df
+    api_calls = query_api_calls_id_uuid_map(database_connection)
+    filtered_df = api_calls[api_calls["mitm_uuid"].isin(mitm_uuids)]
+    return filtered_df
 
 
 @lru_cache(maxsize=1)

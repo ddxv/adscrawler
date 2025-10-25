@@ -8,7 +8,7 @@ from adscrawler.config import MITM_DIR, get_logger
 from adscrawler.dbcon.connection import PostgresCon
 from adscrawler.dbcon.queries import (
     get_store_id_mitm_s3_keys,
-    query_apps_to_creative_scan,
+    query_api_calls_to_creative_scan,
 )
 from adscrawler.mitm_ad_parser.mitm_scrape_ads import (
     add_is_creative_content_column,
@@ -24,7 +24,7 @@ logger = get_logger(__name__, "mitm_scrape_ads")
 
 def download_all_mitms(database_connection: PostgresCon) -> None:
     """Downloads all MITM log files from S3 for apps that need creative scanning."""
-    apps_to_download = query_apps_to_creative_scan(
+    apps_to_download = query_api_calls_to_creative_scan(
         database_connection=database_connection
     )
     for i, app in apps_to_download.iterrows():
