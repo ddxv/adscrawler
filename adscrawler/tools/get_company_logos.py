@@ -136,10 +136,30 @@ def parse_github(html: str) -> list[str]:
     return list(set(github_urls))
 
 
+def crawl_linked_in_urls(linkedin_urls: list[str]) -> list[str]:
+    candidates = []
+    if linkedin_urls and len(linkedin_urls) > 0:
+        logger.info(f"Found {len(linkedin_urls)} linkedin urls")
+        for linkedin_url in linkedin_urls:
+            linkedin_url = normalize_url(linkedin_url)
+            l_r = requests.get(linkedin_url, headers=HEADERS, timeout=10)
+            linkedin_candidates = parse_linkedin(html=l_r.text)
+            if linkedin_candidates:
+                candidates += linkedin_candidates
+    return candidates
+
+
 def process_site(
     domain: str, check_domain: str, official_linkedin_url: str | None = None
 ) -> str | None:
     candidates = []
+    if official_linkedin_url:
+        linkedin_urls = [official_linkedin_url]
+        candidates += crawl_linked_in_urls(linkedin_urls=linkedin_urls)
+        if candidates:
+            file_name = process_candidates(candidates, domain)
+            if file_name:
+                return file_name
     if "github.com-" in check_domain:
         check_domain = check_domain.replace("github.com-", "github.com/")
     try:
@@ -155,21 +175,13 @@ def process_site(
     if "github.com" in check_domain:
         logger.info("Found github.com in domain")
         candidates = parse_github(html=html)
-    if official_linkedin_url:
-        linkedin_urls = [official_linkedin_url]
-    else:
-        linkedin_urls = find_other_domains(other_tld="linkedin.com", html=html)
+
+    linkedin_urls = find_other_domains(other_tld="linkedin.com", html=html)
     github_urls = []
     if "github.com" not in check_domain:
         github_urls = find_other_domains(other_tld="github.com", html=html)
-    if linkedin_urls and len(linkedin_urls) > 0:
-        logger.info(f"Found {len(linkedin_urls)} linkedin urls")
-        for linkedin_url in linkedin_urls:
-            linkedin_url = normalize_url(linkedin_url)
-            l_r = requests.get(linkedin_url, headers=HEADERS, timeout=10)
-            linkedin_candidates = parse_linkedin(html=l_r.text)
-            if linkedin_candidates:
-                candidates += linkedin_candidates
+    candidates += crawl_linked_in_urls(linkedin_urls=linkedin_urls)
+
     if github_urls and len(github_urls) > 0:
         logger.info(f"Found {len(github_urls)} github urls")
         for github_url in github_urls:
@@ -290,9 +302,27 @@ def upload_company_logo_to_s3(
         logger.error(f"Failed to upload {domain} logo to S3")
 
 
+def upload_and_update(
+    company_id: int, domain: str, filename: str, database_connection
+) -> None:
+    upload_company_logo_to_s3(
+        domain=domain,
+        file_path=pathlib.Path(OUTPUT_DIR, domain, filename),
+    )
+    logger.info(f"Uploaded {domain}  to S3")
+    logo_url = f"company-logos/{domain}/{filename}"
+    logger.info(f"Updating {domain} logo url to {filename}")
+    logo_url = f"company-logos/{domain}/{filename}"
+    update_company_logo_url(
+        company_id=company_id,
+        logo_url=logo_url,
+        database_connection=database_connection,
+    )
+
+
 def update_company_logos() -> None:
     os.makedirs(OUTPUT_DIR, exist_ok=True)
-    use_ssh_tunnel = True
+    use_ssh_tunnel = False
     database_connection = get_db_connection(use_ssh_tunnel=use_ssh_tunnel)
     companies = query_companies(database_connection=database_connection)
     companies = companies[
@@ -310,40 +340,33 @@ def update_company_logos() -> None:
         if filename and row["company_logo_url"]:
             logger.info(f"{domain} ok")
             continue
-        if filename and not row["company_logo_url"]:
-            logger.info(f"Updating {domain} logo url to {filename}")
-            logo_url = f"company-logos/{domain}/{filename}"
-            update_company_logo_url(
-                company_id=company_id,
-                logo_url=logo_url,
-                database_connection=database_connection,
-            )
-        else:
-            try_these = ["", "/about", "/company", "/about-us", "/about-company"]
-            if "github.com" in domain:
-                try_these = [""]
-            for try_this in try_these:
-                check_domain = domain + try_this
-                filename = process_site(
-                    domain=domain,
-                    check_domain=check_domain,
-                    official_linkedin_url=official_linkedin_url,
-                )
-                if filename:
-                    break
-            if not filename:
-                filename = try_guessing(domain=domain)
-                if not filename:
-                    logger.info(f"No logo found for {domain}")
-                    continue
-            upload_company_logo_to_s3(
+        # if filename and not row["company_logo_url"]:
+        #     upload_and_update(
+        #         company_id=company_id,
+        #         domain=domain,
+        #         filename=filename,
+        #         database_connection=database_connection,
+        #     )
+        try_these = ["", "/about", "/company", "/about-us", "/about-company"]
+        if "github.com" in domain:
+            try_these = [""]
+        for try_this in try_these:
+            check_domain = domain + try_this
+            filename = process_site(
                 domain=domain,
-                file_path=pathlib.Path(OUTPUT_DIR, domain, filename),
+                check_domain=check_domain,
+                official_linkedin_url=official_linkedin_url,
             )
-            logger.info(f"Uploaded {domain}  to S3")
-            logo_url = f"company-logos/{domain}/{filename}"
-            update_company_logo_url(
-                company_id=company_id,
-                logo_url=logo_url,
-                database_connection=database_connection,
-            )
+            if filename:
+                break
+        if not filename:
+            filename = try_guessing(domain=domain)
+            if not filename:
+                logger.info(f"No logo found for {domain}")
+                continue
+        upload_and_update(
+            company_id=company_id,
+            domain=domain,
+            filename=filename,
+            database_connection=database_connection,
+        )
