@@ -339,6 +339,8 @@ def scrape_app_ios(store_id: str, country: str, language: str) -> dict:
     # SAME FOR ALL COUNTRIES
     yt_de['sellerName'] == yt_us['sellerName']
 
+    yt_us.keys()
+
 
     ## UNIQUE PER COUNTRY
     yt_us['userRatingCountForCurrentVersion'] != yt_de['userRatingCountForCurrentVersion']
