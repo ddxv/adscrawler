@@ -21,8 +21,6 @@ dependencies = [
     "beautifulsoup4",
     "nltk",
     "rake_nltk",
-    "spacy",
-    "scikit-learn",
     "langdetect",
     "mitmproxy",
     "cloudscraper",
@@ -36,7 +34,7 @@ dependencies = [
 
 
 [project.optional-dependencies]
-dev = ["pre-commit", "pytest"]
+dev = ["pre-commit", "pytest","scikit-learn", "spacy" ]
 
 
 [build-system]

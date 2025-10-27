@@ -1116,9 +1116,9 @@ def save_developer_info(
     apps_df: pd.DataFrame,
     database_connection: PostgresCon,
 ) -> pd.DataFrame:
-    assert apps_df["developer_id"].to_numpy()[0], (
-        f"{apps_df['store_id']} Missing Developer ID"
-    )
+    assert apps_df["developer_id"].to_numpy()[
+        0
+    ], f"{apps_df['store_id']} Missing Developer ID"
     df = (
         apps_df[["store", "developer_id", "developer_name"]]
         .rename(columns={"developer_name": "name"})
@@ -1304,39 +1304,6 @@ def upsert_keywords(keywords_df: pd.DataFrame, database_connection: PostgresCon)
         insert_columns=insert_columns,
         key_columns=key_columns,
         database_connection=database_connection,
-    )
-
-
-def insert_global_keywords(database_connection: PostgresCon) -> None:
-    """Insert global keywords into the database.
-    NOTE: This takes about ~5-8GB of RAM for 50k keywords and 200k descriptions. For now run manually.
-    """
-    from adscrawler.tools.extract_keywords import get_global_keywords  # noqa: PLC0415
-
-    global_keywords = get_global_keywords(database_connection)
-    global_keywords_df = pd.DataFrame(global_keywords, columns=["keyword_text"])
-    table_name = "keywords"
-    insert_columns = ["keyword_text"]
-    key_columns = ["keyword_text"]
-    keywords_df = upsert_df(
-        table_name=table_name,
-        df=global_keywords_df,
-        insert_columns=insert_columns,
-        key_columns=key_columns,
-        database_connection=database_connection,
-        return_rows=True,
-    )
-    keywords_df = keywords_df.rename(columns={"id": "keyword_id"})
-    keywords_df = keywords_df[["keyword_id"]]
-    table_name = "keywords_base"
-    insert_columns = ["keyword_id"]
-    key_columns = ["keyword_id"]
-    keywords_df.to_sql(
-        name=table_name,
-        con=database_connection.engine,
-        if_exists="replace",
-        index=False,
-        schema="public",
     )
 
 
