@@ -754,8 +754,6 @@ def query_store_apps(
                 THEN 0
                 ELSE 1
             END),
-            COALESCE(review_count, 0
-                ) + 
             GREATEST(
                     COALESCE(installs, 0),
                     COALESCE(CAST(rating_count AS bigint), 0)*50

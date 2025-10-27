@@ -15,7 +15,7 @@ from adscrawler.dbcon.connection import get_db_connection
 logger = get_logger(__name__)
 
 use_tunnel = True
-database_connection = get_db_connection(use_ssh_tunnel=use_tunnel)
+database_connection = get_db_connection(use_ssh_tunnel=use_tunnel, config_key="devdb")
 
 
 def get_existing_mvs() -> set:
@@ -112,7 +112,7 @@ def has_data(conn, mv_name):
         return False
 
 
-def create_all_mvs(mv_files: list[Path]) -> None:
+def create_all_mvs(mv_files: list[Path], stop_on_error: bool = False) -> None:
     """Create all missing materialized views."""
     existing_mvs = get_existing_mvs()
     logger.info(f"Found {len(existing_mvs)} existing MVs")
@@ -121,8 +121,10 @@ def create_all_mvs(mv_files: list[Path]) -> None:
         logger.error("No matview files found!")
         return
 
+    ordered_mvs = get_correct_order_from_dump(mv_files)
+
     mvs_missing_in_db = []
-    for mv_file in mv_files:
+    for mv_file in ordered_mvs:
         with open(mv_file) as f:
             file_content = f.read()
 
@@ -151,7 +153,9 @@ def create_all_mvs(mv_files: list[Path]) -> None:
             except Exception as e:
                 trans.rollback()
                 logger.exception(f"✗ Failed to create {mv_name} with {e}")
-                break
+                if stop_on_error:
+                    logger.error("Stopping further MV creation due to error.")
+                    break
 
 
 def get_correct_order_from_dump(mv_files: list[Path]) -> list[str]:
@@ -184,7 +188,7 @@ def get_correct_order_from_dump(mv_files: list[Path]) -> list[str]:
     return ordered_existing_mvs
 
 
-def run_all_mvs(mv_files: list[Path]) -> None:
+def run_all_mvs(mv_files: list[Path], stop_on_error: bool = False) -> None:
     """Refresh all materialized views in correct dependency order."""
     ordered_mvs = get_correct_order_from_dump(mv_files)
 
@@ -231,14 +235,17 @@ def run_all_mvs(mv_files: list[Path]) -> None:
             except Exception as e:
                 trans.rollback()
                 logger.exception(f"Failed to refresh {mv_name} with {e}")
+                if stop_on_error:
+                    logger.error("Stopping further MV refresh due to error.")
+                    break
 
 
 def main() -> None:
     mv_files = get_mv_files()
 
     # drop_all_mvs(mv_files)
-    # create_all_mvs(mv_files)
-    run_all_mvs(mv_files)
+    create_all_mvs(mv_files, stop_on_error=True)
+    # run_all_mvs(mv_files)
 
 
 if __name__ == "__main__":
