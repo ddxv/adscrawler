@@ -15,11 +15,11 @@ def scrape_app_gp(store_id: str, country: str, language: str = "en") -> dict:
     """
     yt_us = scrape_app_gp("com.google.android.youtube", "us", language="en")
     yt_de = scrape_app_gp("com.google.android.youtube", "de", language="de")
+    yt_de_en = scrape_app_gp("com.google.android.youtube", "de", language="en")
 
     # SAME FOR ALL COUNTRIES
     yt_us["ratings"] == yt_de["ratings"]
     yt_us["realInstalls"] == yt_de["realInstalls"]
-
 
     ## UNIQUE PER COUNTRY
     yt_us["reviews"] == yt_de["reviews"]
@@ -28,6 +28,7 @@ def scrape_app_gp(store_id: str, country: str, language: str = "en") -> dict:
 
     ## UNIQUE PER LANGUAGE
     yt_us["description"] == yt_de["description"]
+    yt_us["description"] == yt_de_en["description"]
     """
     result_dict: dict = google_play_scraper.app(
         store_id,

@@ -175,13 +175,11 @@ def process_site(
     if "github.com" in check_domain:
         logger.info("Found github.com in domain")
         candidates = parse_github(html=html)
-
     linkedin_urls = find_other_domains(other_tld="linkedin.com", html=html)
     github_urls = []
     if "github.com" not in check_domain:
         github_urls = find_other_domains(other_tld="github.com", html=html)
     candidates += crawl_linked_in_urls(linkedin_urls=linkedin_urls)
-
     if github_urls and len(github_urls) > 0:
         logger.info(f"Found {len(github_urls)} github urls")
         for github_url in github_urls:
