@@ -156,9 +156,7 @@ def get_db_connection(
 def get_host_ip(hostname: str) -> str:
     """Convert hostname to IPv4 address if needed."""
     # Check if hostname is already an IPv4 address
-    if all(
-        part.isdigit() and 0 <= int(part) <= 255 for part in hostname.split(".")
-    ):  # noqa: PLR2004
+    if all(part.isdigit() and 0 <= int(part) <= 255 for part in hostname.split(".")):  # noqa: PLR2004
         return hostname
     ip_address = gethostbyname(hostname)
     logger.info(f"Resolved {hostname} to {ip_address}")

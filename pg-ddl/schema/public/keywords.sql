@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict VUZIgKgjg2vgWAuLakhsGmN5X6DCycB4gyY5JkR8J9en24FaRI5yQNq579pDZDo
+\restrict SD7nG15BGC40hv1stqnbx9CUg5g8rLZuwUdqWEiuMbvOncsqMDuy2wwqqZLN7Yp
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -86,4 +86,4 @@ ADD CONSTRAINT unique_keyword UNIQUE (keyword_text);
 -- PostgreSQL database dump complete
 --
 
-\unrestrict VUZIgKgjg2vgWAuLakhsGmN5X6DCycB4gyY5JkR8J9en24FaRI5yQNq579pDZDo
+\unrestrict SD7nG15BGC40hv1stqnbx9CUg5g8rLZuwUdqWEiuMbvOncsqMDuy2wwqqZLN7Yp

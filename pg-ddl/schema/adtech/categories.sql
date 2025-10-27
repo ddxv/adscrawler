@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 9Ovbm1QW0mojgnMk4m8L7EdI7qtEMXjbYZ0HHPhvJpwswc5x3hF4ilb12nbq0uC
+\restrict pEvld29kEGorD9OA10LDk4x1t0wHKhPmERhcyv3cfv0DDeYjEAnihH1X2jNHU2G
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -62,4 +62,4 @@ ADD CONSTRAINT categories_pkey PRIMARY KEY (id);
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 9Ovbm1QW0mojgnMk4m8L7EdI7qtEMXjbYZ0HHPhvJpwswc5x3hF4ilb12nbq0uC
+\unrestrict pEvld29kEGorD9OA10LDk4x1t0wHKhPmERhcyv3cfv0DDeYjEAnihH1X2jNHU2G

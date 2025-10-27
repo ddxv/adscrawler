@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict Ail7UHvB1W1laoozBUtol4UgZsF0QVUHlVZKavSFmyCJJ81fEMqDS3PwZqH7dp1
+\restrict JUYQHiSHTicNIzF0J0zgEtBlqc99RbTeCGa79FR1mbWp3M7yfrNwwFfXQjn5MUu
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -31,7 +31,8 @@ CREATE TABLE adtech.click_url_redirect_chains (
     id integer NOT NULL,
     run_id integer NOT NULL,
     url text NOT NULL,
-    redirect_url text NOT NULL
+    redirect_url text NOT NULL,
+    api_call_id integer
 );
 
 
@@ -86,6 +87,16 @@ CREATE UNIQUE INDEX click_url_redirect_chains_unique ON adtech.click_url_redirec
 
 
 --
+-- Name: click_url_redirect_chains fk_api_call_id; Type: FK CONSTRAINT; Schema: adtech; Owner: postgres
+--
+
+ALTER TABLE ONLY adtech.click_url_redirect_chains
+ADD CONSTRAINT fk_api_call_id FOREIGN KEY (
+    api_call_id
+) REFERENCES public.api_calls (id);
+
+
+--
 -- Name: click_url_redirect_chains fk_run_id; Type: FK CONSTRAINT; Schema: adtech; Owner: postgres
 --
 
@@ -99,4 +110,4 @@ ADD CONSTRAINT fk_run_id FOREIGN KEY (
 -- PostgreSQL database dump complete
 --
 
-\unrestrict Ail7UHvB1W1laoozBUtol4UgZsF0QVUHlVZKavSFmyCJJ81fEMqDS3PwZqH7dp1
+\unrestrict JUYQHiSHTicNIzF0J0zgEtBlqc99RbTeCGa79FR1mbWp3M7yfrNwwFfXQjn5MUu

@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict uFFtC4RauO9WyFlFaKTmNdWNVTXnrjjeisKgjWmtBat5SNBqpHyQ3fCvr1v1T5n
+\restrict Xc6gjJchoOF6ZW98n6dGZXhqxNhd1LcDHi2Bm9TiAHlFfeFdG5yeH1QCSvW7oCC
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -122,4 +122,4 @@ ADD CONSTRAINT store_apps_descriptions_store_app_fkey FOREIGN KEY (
 -- PostgreSQL database dump complete
 --
 
-\unrestrict uFFtC4RauO9WyFlFaKTmNdWNVTXnrjjeisKgjWmtBat5SNBqpHyQ3fCvr1v1T5n
+\unrestrict Xc6gjJchoOF6ZW98n6dGZXhqxNhd1LcDHi2Bm9TiAHlFfeFdG5yeH1QCSvW7oCC

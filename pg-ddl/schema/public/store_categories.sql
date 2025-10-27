@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict SPnbIzqtuumwJRqMFoxkSVaHitaR3T29fW8hMRj6kcUf2TuLHWCbgNuMF7oQGT4
+\restrict zYllT1w5f8pPdEWuI3Q33MQwSykaivDJJwGVIn1HdbJomcoY7YaJyujjjFCEBLK
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -80,4 +80,4 @@ ADD CONSTRAINT store_categories_fk FOREIGN KEY (
 -- PostgreSQL database dump complete
 --
 
-\unrestrict SPnbIzqtuumwJRqMFoxkSVaHitaR3T29fW8hMRj6kcUf2TuLHWCbgNuMF7oQGT4
+\unrestrict zYllT1w5f8pPdEWuI3Q33MQwSykaivDJJwGVIn1HdbJomcoY7YaJyujjjFCEBLK

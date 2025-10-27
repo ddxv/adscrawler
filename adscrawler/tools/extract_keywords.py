@@ -1,9 +1,8 @@
 import re
 from collections import Counter
-import pandas as pd
-from adscrawler.dbcon.queries import upsert_df
 
 import nltk
+import pandas as pd
 from nltk.corpus import stopwords, wordnet
 from nltk.stem import WordNetLemmatizer
 from nltk.tokenize import word_tokenize
@@ -13,8 +12,8 @@ from adscrawler.dbcon.connection import PostgresCon
 from adscrawler.dbcon.queries import (
     query_all_store_app_descriptions,
     query_keywords_base,
+    upsert_df,
 )
-
 
 # Custom stopwords to remove personal pronouns & other irrelevant words
 CUSTOM_STOPWORDS = {

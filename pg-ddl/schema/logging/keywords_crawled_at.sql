@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict fE5WPg1zTNCUlImzqkO3XnkyqaYIvihVfpflcgeA3BAj74HMBU7VsqotiqKWKXi
+\restrict VvFQbhiazWHVWIzNpaa81YdDeaMEoUHqmCfjKgIC8LHF2mWgyXdwzJOImpCZVEC
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -57,4 +57,4 @@ ADD CONSTRAINT keywords_crawled_at_fk FOREIGN KEY (
 -- PostgreSQL database dump complete
 --
 
-\unrestrict fE5WPg1zTNCUlImzqkO3XnkyqaYIvihVfpflcgeA3BAj74HMBU7VsqotiqKWKXi
+\unrestrict VvFQbhiazWHVWIzNpaa81YdDeaMEoUHqmCfjKgIC8LHF2mWgyXdwzJOImpCZVEC

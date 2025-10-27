@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 7GpKLxec5N1NZ0H789xxsd4OD4gbe9O3nU65c4LeJQO5fBqC5CZRHMtqCFa2Ru1
+\restrict ZLK8cE9sg9IgwLtvh7b1sk0gGV5kgfRJsugBeBZ46RQNM8fCIKwcCvPWf6m2syE
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -45,4 +45,4 @@ ALTER TABLE logging.snapshot_pub_domains OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 7GpKLxec5N1NZ0H789xxsd4OD4gbe9O3nU65c4LeJQO5fBqC5CZRHMtqCFa2Ru1
+\unrestrict ZLK8cE9sg9IgwLtvh7b1sk0gGV5kgfRJsugBeBZ46RQNM8fCIKwcCvPWf6m2syE

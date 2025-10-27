@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict shl4Rke6sqndYOvGZxpz8HcJzuxGYYyq7QYN9bIq6TRgIGWkU1A0cJ2ye5lgArl
+\restrict n7tWDWLjdDHk7Ibe2RSeMkM8az1RpW9Qhjw3Gl6kCNuihmfQwzpEKVHe1sY7eOV
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -120,4 +120,4 @@ ADD CONSTRAINT developers_fk FOREIGN KEY (store) REFERENCES public.stores (id);
 -- PostgreSQL database dump complete
 --
 
-\unrestrict shl4Rke6sqndYOvGZxpz8HcJzuxGYYyq7QYN9bIq6TRgIGWkU1A0cJ2ye5lgArl
+\unrestrict n7tWDWLjdDHk7Ibe2RSeMkM8az1RpW9Qhjw3Gl6kCNuihmfQwzpEKVHe1sY7eOV

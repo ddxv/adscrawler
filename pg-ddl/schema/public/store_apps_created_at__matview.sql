@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict nsRfYYwdXcaiavuITzmMK4lTAb5ZqovzygEyb48vmnTDcbXoc23D3Ow3gG3n2D3
+\restrict uffQl5zPHMtKoDQ6Tme6qvfHSkd2UcpDR5OCEUp5q7rTdbvIiWBBCqt75MewCjy
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -98,4 +98,4 @@ CREATE UNIQUE INDEX idx_store_apps_created_atx ON public.store_apps_created_at U
 -- PostgreSQL database dump complete
 --
 
-\unrestrict nsRfYYwdXcaiavuITzmMK4lTAb5ZqovzygEyb48vmnTDcbXoc23D3Ow3gG3n2D3
+\unrestrict uffQl5zPHMtKoDQ6Tme6qvfHSkd2UcpDR5OCEUp5q7rTdbvIiWBBCqt75MewCjy

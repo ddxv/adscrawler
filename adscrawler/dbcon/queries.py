@@ -1129,7 +1129,7 @@ def get_version_code_by_md5_hash(
 def query_api_call_id_for_uuid(mitm_uuid: str, database_connection: PostgresCon) -> int:
     api_calls = query_api_calls_id_uuid_map(database_connection)
     filtered_df = api_calls[api_calls["mitm_uuid"] == mitm_uuid]
-    assert filtered_df.shape[0] == 1, f"Failed to find api_call_id for mitm_uuid"
+    assert filtered_df.shape[0] == 1, "Failed to find api_call_id for mitm_uuid"
     api_call_id = filtered_df["api_call_id"].to_numpy()[0]
     return api_call_id
 
