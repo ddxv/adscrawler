@@ -44,7 +44,6 @@ SELECT
     sa.installs,
     sa.rating_count,
     sa.rating,
-    sa.review_count,
     sa.installs_sum_1w,
     sa.installs_sum_4w,
     sa.ratings_sum_1w,

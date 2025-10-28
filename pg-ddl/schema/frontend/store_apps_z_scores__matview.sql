@@ -50,8 +50,6 @@ WITH ranked_z_scores AS (
         sa.store_id,
         sa.store,
         sa.category,
-        sa.rating,
-        sa.review_count,
         sa.installs,
         sa.free,
         sa.price,

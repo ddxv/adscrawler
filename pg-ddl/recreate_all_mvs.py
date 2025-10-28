@@ -124,7 +124,12 @@ def create_all_mvs(mv_files: list[Path], stop_on_error: bool = False) -> None:
     ordered_mvs = get_correct_order_from_dump(mv_files)
 
     mvs_missing_in_db = []
-    for mv_file in ordered_mvs:
+    for mv_name in ordered_mvs:
+        mv_file = next(
+            (f for f in mv_files if mv_name.split(".")[1] + "__matview.sql" in f.name),
+            None,
+        )
+
         with open(mv_file) as f:
             file_content = f.read()
 
@@ -245,7 +250,7 @@ def main() -> None:
 
     # drop_all_mvs(mv_files)
     create_all_mvs(mv_files, stop_on_error=True)
-    # run_all_mvs(mv_files)
+    # run_all_mvs(mv_files, stop_on_error=False)
 
 
 if __name__ == "__main__":

@@ -47,7 +47,6 @@ SELECT
     sa.installs,
     sa.rating,
     sa.rating_count,
-    sa.review_count,
     d.name AS developer_name,
     pd.domain_name AS developer_url,
     d.store AS developer_store,
