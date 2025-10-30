@@ -9,7 +9,6 @@ from io import BytesIO
 from urllib.error import URLError
 from urllib.parse import unquote_plus
 
-import duckdb
 import google_play_scraper
 import imagehash
 import numpy as np
@@ -36,7 +35,10 @@ from adscrawler.app_stores.google import (
     search_play_store,
 )
 from adscrawler.config import APP_ICONS_TMP_DIR, CONFIG, get_logger
-from adscrawler.dbcon.connection import PostgresCon, get_db_connection
+from adscrawler.dbcon.connection import (
+    PostgresCon,
+    get_db_connection,
+)
 from adscrawler.dbcon.queries import (
     get_crawl_scenario_countries,
     get_store_app_columns,
@@ -52,7 +54,7 @@ from adscrawler.dbcon.queries import (
     query_store_ids,
     upsert_df,
 )
-from adscrawler.packages.storage import get_s3_client, get_s3_endpoint
+from adscrawler.packages.storage import get_duckdb_connection, get_s3_client
 
 logger = get_logger(__name__, "scrape_stores")
 
@@ -879,32 +881,6 @@ def get_app_details_duck_query(
     OVERWRITE_OR_IGNORE true);
     """
     return query
-
-
-def get_duckdb_connection(s3_config_key: str) -> duckdb.DuckDBPyConnection:
-    s3_region = CONFIG[s3_config_key]["region_name"]
-    # DuckDB uses S3 endpoint url
-    endpoint = get_s3_endpoint(s3_config_key)
-    duckdb_con = duckdb.connect()
-    if "http://" in endpoint:
-        duckdb_con.execute("SET s3_use_ssl=false;")
-        endpoint = endpoint.replace("http://", "")
-    elif "https://" in endpoint:
-        endpoint = endpoint.replace("https://", "")
-    duckdb_con.execute("INSTALL httpfs; LOAD httpfs;")
-    duckdb_con.execute(f"SET s3_region='{s3_region}';")
-    duckdb_con.execute(f"SET s3_endpoint='{endpoint}';")
-    duckdb_con.execute("SET s3_url_style='path';")
-    duckdb_con.execute("SET s3_url_compatibility_mode=true;")
-    duckdb_con.execute(
-        f"SET s3_access_key_id='{CONFIG[s3_config_key]['access_key_id']}';"
-    )
-    duckdb_con.execute(
-        f"SET s3_secret_access_key='{CONFIG[s3_config_key]['secret_key']}';"
-    )
-    duckdb_con.execute("SET temp_directory = '/tmp/duckdb.tmp/';")
-    duckdb_con.execute("SET preserve_insertion_order = false;")
-    return duckdb_con
 
 
 def import_ranks_from_s3(

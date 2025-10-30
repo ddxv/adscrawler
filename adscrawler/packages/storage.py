@@ -3,6 +3,7 @@ import pathlib
 import shutil
 
 import boto3
+import duckdb
 import numpy as np
 import pandas as pd
 from botocore.exceptions import ClientError
@@ -557,6 +558,32 @@ def creative_exists_in_s3(md5_hash: str, extension: str) -> bool:
             return False
         # Re-raise other errors (permissions, etc.)
         raise
+
+
+def get_duckdb_connection(s3_config_key: str) -> duckdb.DuckDBPyConnection:
+    s3_region = CONFIG[s3_config_key]["region_name"]
+    # DuckDB uses S3 endpoint url
+    endpoint = get_s3_endpoint(s3_config_key)
+    duckdb_con = duckdb.connect()
+    if "http://" in endpoint:
+        duckdb_con.execute("SET s3_use_ssl=false;")
+        endpoint = endpoint.replace("http://", "")
+    elif "https://" in endpoint:
+        endpoint = endpoint.replace("https://", "")
+    duckdb_con.execute("INSTALL httpfs; LOAD httpfs;")
+    duckdb_con.execute(f"SET s3_region='{s3_region}';")
+    duckdb_con.execute(f"SET s3_endpoint='{endpoint}';")
+    duckdb_con.execute("SET s3_url_style='path';")
+    duckdb_con.execute("SET s3_url_compatibility_mode=true;")
+    duckdb_con.execute(
+        f"SET s3_access_key_id='{CONFIG[s3_config_key]['access_key_id']}';"
+    )
+    duckdb_con.execute(
+        f"SET s3_secret_access_key='{CONFIG[s3_config_key]['secret_key']}';"
+    )
+    duckdb_con.execute("SET temp_directory = '/tmp/duckdb.tmp/';")
+    duckdb_con.execute("SET preserve_insertion_order = false;")
+    return duckdb_con
 
 
 S3_CLIENTS = {}
