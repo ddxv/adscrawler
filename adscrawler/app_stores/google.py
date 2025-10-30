@@ -14,17 +14,24 @@ logger = get_logger(__name__, "scrape_google")
 def scrape_app_gp(store_id: str, country: str, language: str = "en") -> dict:
     """
     yt_us = scrape_app_gp("com.google.android.youtube", "us", language="en")
-    yt_de = scrape_app_gp("com.google.android.youtube", "de", language="de")
-    yt_de_en = scrape_app_gp("com.google.android.youtube", "de", language="en")
+    yt_de = scrape_app_gp("com.google.android.youtube", "mx", language="en")
 
     # SAME FOR ALL COUNTRIES
     yt_us["ratings"] == yt_de["ratings"]
     yt_us["realInstalls"] == yt_de["realInstalls"]
+    yt_us["updated"] == yt_de["updated"]
+
+    # MOSTLY SAME FOR ALL COUNTRIES
+    # Almost always lower for smaller countries
+    # looks more like delays and incomplete (0s)
+    yt_us["histogram"] == yt_de["histogram"]
+
 
     ## UNIQUE PER COUNTRY
-    yt_us["reviews"] == yt_de["reviews"]
-    yt_us["score"] == yt_de["score"]
-    yt_us["histogram"] == yt_de["histogram"]
+    yt_us["reviews"] != yt_de["reviews"]
+    yt_us["score"] != yt_de["score"]
+
+
 
     ## UNIQUE PER LANGUAGE
     yt_us["description"] == yt_de["description"]

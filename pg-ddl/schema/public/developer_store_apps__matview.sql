@@ -41,12 +41,7 @@ WITH developer_domain_ids AS (
 )
 SELECT
     sa.store,
-    sa.store_id,
-    sa.name,
-    sa.icon_url_512,
-    sa.installs,
-    sa.rating,
-    sa.rating_count,
+    sa.id AS store_app,
     d.name AS developer_name,
     pd.domain_name AS developer_url,
     d.store AS developer_store,

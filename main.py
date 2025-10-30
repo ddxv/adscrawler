@@ -3,10 +3,10 @@ import datetime
 import os
 import sys
 
+from adscrawler.app_stores.process_from_s3 import import_ranks_from_s3
 from adscrawler.app_stores.scrape_stores import (
     crawl_developers_for_new_store_ids,
     crawl_keyword_cranks,
-    import_ranks_from_s3,
     scrape_store_ranks,
     update_app_details,
 )

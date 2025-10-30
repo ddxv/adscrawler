@@ -334,13 +334,9 @@ def scrape_app_ios(store_id: str, country: str, language: str) -> dict:
     yt_us = scrape_app_ios("544007664", "us", language="en")
     yt_de = scrape_app_ios("544007664", "de", language="en")
 
-
-
     # SAME FOR ALL COUNTRIES
     yt_de['sellerName'] == yt_us['sellerName']
-
-    yt_us.keys()
-
+    yt_us['currentVersionReleaseDate'] == yt_de['currentVersionReleaseDate']
 
     ## UNIQUE PER COUNTRY
     yt_us['userRatingCountForCurrentVersion'] != yt_de['userRatingCountForCurrentVersion']
@@ -351,6 +347,7 @@ def scrape_app_ios(store_id: str, country: str, language: str) -> dict:
 
     # These very by country but are also the same as each other?
     yt_de['userRatingCount'] == yt_de['userRatingCountForCurrentVersion']
+
 
     """
     # NOTE: averageUserRating, Rating_count, Histogram are country specific
