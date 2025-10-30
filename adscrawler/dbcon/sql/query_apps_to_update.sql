@@ -93,7 +93,6 @@ ORDER BY
             THEN 0
         ELSE 1
     END),
-    ctc.priority,
     GREATEST(
         COALESCE(installs, 0),
         COALESCE(CAST(rating_count AS bigint), 0) * 50

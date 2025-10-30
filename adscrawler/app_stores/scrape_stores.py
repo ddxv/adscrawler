@@ -93,8 +93,8 @@ def process_chunk(
     total_rows: int,
 ):
     chunk_info = f"Chunk {df_chunk.index[0]}-{df_chunk.index[-1]}/{total_rows}"
-    database_connection = get_db_connection(use_ssh_tunnel=use_ssh_tunnel)
     logger.info(f"{chunk_info} start")
+    database_connection = get_db_connection(use_ssh_tunnel=use_ssh_tunnel)
     try:
         chunk_results = []
         for _, row in df_chunk.iterrows():
@@ -114,6 +114,7 @@ def process_chunk(
         results_df["crawled_date"] = results_df["crawled_at"].dt.date
         app_details_to_s3(results_df, store=store)
         log_crawl_results(results_df, store, database_connection=database_connection)
+        results_df = results_df[(results_df["country"] == "US")]
         for crawl_result, apps_df in results_df.groupby("crawl_result"):
             if crawl_result != 1:
                 apps_df = apps_df[["store_id", "store", "crawled_at", "crawl_result"]]
@@ -181,20 +182,28 @@ def update_app_details(
         store=store,
         database_connection=database_connection,
         limit=limit,
-        log_query=True,
         country_crawl_priority=country_crawl_priority,
     )
+    df = df.sort_values("country_code").reset_index(drop=True)
     logger.info(f"{log_info} start {len(df)} apps")
 
-    # Calculate optimal chunk size: aim for 3-10x more chunks than workers
-    chunk_size = max(50, min(1000, len(df) // (workers * 5)))
-    chunks = [df.iloc[i : i + chunk_size] for i in range(0, len(df), chunk_size)]
-
+    max_chunk_size = 10000
+    chunks = []
+    # Try keeping countries together for larger end S3 files
+    for _country, country_df in df.groupby("country_code"):
+        country_size = len(country_df)
+        if country_size <= max_chunk_size:
+            # Country fits in one chunk
+            chunks.append(country_df)
+        else:
+            # Split large country into multiple chunks
+            num_chunks = (country_size + max_chunk_size - 1) // max_chunk_size
+            chunk_size = country_size // num_chunks
+            for i in range(0, country_size, chunk_size):
+                chunks.append(country_df.iloc[i : i + chunk_size])
     total_chunks = len(chunks)
     total_rows = len(df)
-    logger.info(
-        f"Processing {total_rows} apps in {total_chunks} chunks of ~{chunk_size} apps each"
-    )
+    logger.info(f"Processing {total_rows} apps in {total_chunks} chunks")
 
     completed_count = 0
     failed_count = 0
