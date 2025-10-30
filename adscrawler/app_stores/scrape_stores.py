@@ -358,6 +358,11 @@ def insert_new_apps(
     dicts: list[dict], database_connection: PostgresCon, crawl_source: str, store: int
 ) -> None:
     df = pd.DataFrame(dicts)
+    df["store_id"].str.match(r"^[0-9].*\.")
+    found_bad_ids = df[df["store"] == store, "store_id"].str.match(r"^[0-9].*\.").any()
+    if found_bad_ids:
+        logger.error(f"Scrape {store=} {crawl_source=} found bad store_ids")
+        raise ValueError("Found bad store_ids")
     all_scraped_ids = df["store_id"].unique().tolist()
     existing_ids_map = query_store_id_map(
         database_connection,
@@ -593,14 +598,8 @@ def map_database_ids(
         )
     new_ids = df[~df["store_id"].isin(store_id_map["store_id"])]["store_id"].unique()
     if len(new_ids) > 0:
-        logger.info(f"Found new store ids: {len(new_ids)}")
-        new_ids = [{"store": store, "store_id": store_id} for store_id in new_ids]
-        process_scraped(
-            database_connection=database_connection,
-            ranked_dicts=new_ids,
-            crawl_source="process_ranks_parquet",
-        )
-        store_id_map = query_store_id_map(database_connection, store)
+        logger.warning(f"Found new store ids: {len(new_ids)}")
+        raise ValueError("New store ids found in map_database_ids")
     df["store_app"] = df["store_id"].map(
         store_id_map.set_index("store_id")["id"].to_dict()
     )
@@ -975,7 +974,32 @@ def process_parquets_and_insert(
               ORDER BY par.country, par.collection, par.category, par.crawled_date, par.rank
             """
     wdf = duckdb_con.execute(period_query).df()
-    wdf = map_database_ids(wdf, database_connection, store)
+    store_id_map = query_store_id_map_cached(
+        store=store, database_connection=database_connection
+    )
+    country_map = query_countries(database_connection)
+    collection_map = query_collections(database_connection)
+    category_map = query_categories(database_connection)
+    wdf["country"] = wdf["country"].map(country_map.set_index("alpha2")["id"].to_dict())
+    wdf["store_collection"] = wdf["collection"].map(
+        collection_map.set_index("collection")["id"].to_dict()
+    )
+    wdf["store_category"] = wdf["category"].map(
+        category_map.set_index("category")["id"].to_dict()
+    )
+    new_ids = wdf[~wdf["store_id"].isin(store_id_map["store_id"])]["store_id"].unique()
+    if len(new_ids) > 0:
+        logger.info(f"Found new store ids: {len(new_ids)}")
+        new_ids = [{"store": store, "store_id": store_id} for store_id in new_ids]
+        process_scraped(
+            database_connection=database_connection,
+            ranked_dicts=new_ids,
+            crawl_source="process_ranks_parquet",
+        )
+        store_id_map = query_store_id_map(database_connection, store)
+    wdf["store_app"] = wdf["store_id"].map(
+        store_id_map.set_index("store_id")["id"].to_dict()
+    )
     wdf = wdf.drop(columns=["store_id", "collection", "category"])
     upsert_df(
         df=wdf,
@@ -1225,9 +1249,9 @@ def save_developer_info(
     apps_df: pd.DataFrame,
     database_connection: PostgresCon,
 ) -> pd.DataFrame:
-    assert apps_df["developer_id"].to_numpy()[0], (
-        f"{apps_df['store_id']} Missing Developer ID"
-    )
+    assert apps_df["developer_id"].to_numpy()[
+        0
+    ], f"{apps_df['store_id']} Missing Developer ID"
     df = (
         apps_df[["store", "developer_id", "developer_name"]]
         .rename(columns={"developer_name": "name"})
