@@ -496,6 +496,11 @@ def insert_new_apps(
     dicts: list[dict], database_connection: PostgresCon, crawl_source: str, store: int
 ) -> None:
     df = pd.DataFrame(dicts)
+    df["store_id"].str.match(r"^[0-9].*\.")
+    found_bad_ids = df[df["store"] == store, "store_id"].str.match(r"^[0-9].*\.").any()
+    if found_bad_ids:
+        logger.error(f"Scrape {store=} {crawl_source=} found bad store_ids")
+        raise ValueError("Found bad store_ids")
     all_scraped_ids = df["store_id"].unique().tolist()
     existing_ids_map = query_store_id_map(
         database_connection,
@@ -706,38 +711,6 @@ def process_store_rankings(
             local_path.unlink()
 
 
-def map_database_ids(
-    df: pd.DataFrame,
-    database_connection: PostgresCon,
-    store_id_map: pd.DataFrame,
-    store: int,
-) -> pd.DataFrame:
-    country_map = query_countries(database_connection)
-    collection_map = query_collections(database_connection)
-    category_map = query_categories(database_connection)
-    df["country"] = df["country"].map(country_map.set_index("alpha2")["id"].to_dict())
-    df["store_collection"] = df["collection"].map(
-        collection_map.set_index("collection")["id"].to_dict()
-    )
-    df["store_category"] = df["category"].map(
-        category_map.set_index("category")["id"].to_dict()
-    )
-    new_ids = df[~df["store_id"].isin(store_id_map["store_id"])]["store_id"].unique()
-    if len(new_ids) > 0:
-        logger.info(f"Found new store ids: {len(new_ids)}")
-        new_ids = [{"store": store, "store_id": store_id} for store_id in new_ids]
-        process_scraped(
-            database_connection=database_connection,
-            ranked_dicts=new_ids,
-            crawl_source="process_ranks_parquet",
-        )
-        store_id_map = query_store_id_map(database_connection, store)
-    df["store_app"] = df["store_id"].map(
-        store_id_map.set_index("store_id")["id"].to_dict()
-    )
-    return df
-
-
 def get_s3_rank_parquet_paths(
     s3, bucket: str, dt: pd.DatetimeIndex, days: int, store: int
 ) -> list[str]:
@@ -871,7 +844,30 @@ def process_parquets_and_insert(
               ORDER BY par.country, par.collection, par.category, par.crawled_date, par.rank
             """
     wdf = duckdb_con.execute(period_query).df()
-    wdf = map_database_ids(wdf, database_connection, store_id_map, store)
+    country_map = query_countries(database_connection)
+    collection_map = query_collections(database_connection)
+    category_map = query_categories(database_connection)
+    wdf["country"] = wdf["country"].map(country_map.set_index("alpha2")["id"].to_dict())
+    wdf["store_collection"] = wdf["collection"].map(
+        collection_map.set_index("collection")["id"].to_dict()
+    )
+    wdf["store_category"] = wdf["category"].map(
+        category_map.set_index("category")["id"].to_dict()
+    )
+    new_ids = wdf[~wdf["store_id"].isin(store_id_map["store_id"])]["store_id"].unique()
+    if len(new_ids) > 0:
+        logger.info(f"Found new store ids: {len(new_ids)}")
+        new_ids = [{"store": store, "store_id": store_id} for store_id in new_ids]
+        process_scraped(
+            database_connection=database_connection,
+            ranked_dicts=new_ids,
+            crawl_source="process_ranks_parquet",
+        )
+        store_id_map = query_store_id_map(database_connection, store)
+    wdf["store_app"] = wdf["store_id"].map(
+        store_id_map.set_index("store_id")["id"].to_dict()
+    )
+
     wdf = wdf.drop(columns=["store_id", "collection", "category"])
     upsert_df(
         df=wdf,
