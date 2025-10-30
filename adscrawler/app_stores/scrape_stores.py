@@ -1,18 +1,18 @@
 import datetime
-import re
 import os
 import pathlib
+import re
 import time
 import uuid
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from io import BytesIO
 from urllib.error import URLError
 from urllib.parse import unquote_plus
-import numpy as np
 
 import duckdb
 import google_play_scraper
 import imagehash
+import numpy as np
 import pandas as pd
 import requests
 import tldextract
@@ -38,6 +38,7 @@ from adscrawler.app_stores.google import (
 from adscrawler.config import APP_ICONS_TMP_DIR, CONFIG, get_logger
 from adscrawler.dbcon.connection import PostgresCon, get_db_connection
 from adscrawler.dbcon.queries import (
+    get_crawl_scenario_countries,
     get_store_app_columns,
     query_categories,
     query_collections,
@@ -45,11 +46,10 @@ from adscrawler.dbcon.queries import (
     query_developers,
     query_keywords_to_crawl,
     query_languages,
-    query_store_apps_to_update_new,
+    query_store_apps_to_update,
     query_store_id_map,
     query_store_id_map_cached,
     query_store_ids,
-    get_crawl_scenario_countries,
     upsert_df,
 )
 from adscrawler.packages.storage import get_s3_client, get_s3_endpoint
@@ -84,7 +84,11 @@ def app_details_to_s3(
 
 
 def process_chunk(
-    df_chunk: pd.DataFrame, use_ssh_tunnel: bool, process_icon: bool, total_rows: int
+    df_chunk: pd.DataFrame,
+    store: int,
+    use_ssh_tunnel: bool,
+    process_icon: bool,
+    total_rows: int,
 ):
     chunk_info = f"Chunk {df_chunk.index[0]}-{df_chunk.index[-1]}/{total_rows}"
     database_connection = get_db_connection(use_ssh_tunnel=use_ssh_tunnel)
@@ -94,9 +98,9 @@ def process_chunk(
         for _, row in df_chunk.iterrows():
             try:
                 result_dict = scrape_app(
-                    store=row["store"],
+                    store=store,
                     store_id=row["store_id"],
-                    country=row["country"],
+                    country=row["country_code"],
                     language=row["language"],
                 )
                 chunk_results.append(result_dict)
@@ -106,7 +110,8 @@ def process_chunk(
                 )
         results_df = pd.DataFrame(chunk_results)
         results_df["crawled_date"] = results_df["crawled_at"].dt.date
-        app_details_to_s3(results_df, store=row["store"])
+        app_details_to_s3(results_df, store=store)
+        log_crawl_results(results_df, store, database_connection=database_connection)
         for crawl_result, apps_df in results_df.groupby("crawl_result"):
             if crawl_result != 1:
                 apps_df = apps_df[["store_id", "store", "crawled_at", "crawl_result"]]
@@ -170,11 +175,10 @@ def update_app_details(
     """Process apps with dynamic work queue - simple and efficient."""
     log_info = f"Update app details: {store=}"
 
-    df = query_store_apps_to_update_new(
-        store,
-        database_connection,
+    df = query_store_apps_to_update(
+        store=store,
+        database_connection=database_connection,
         limit=limit,
-        process_icon=process_icon,
         log_query=True,
         country_crawl_priority=country_crawl_priority,
     )
@@ -198,7 +202,7 @@ def update_app_details(
         future_to_idx = {}
         for idx, df_chunk in enumerate(chunks):
             future = executor.submit(
-                process_chunk, df_chunk, use_ssh_tunnel, process_icon, total_rows
+                process_chunk, df_chunk, store, use_ssh_tunnel, process_icon, total_rows
             )
             future_to_idx[future] = idx
 
@@ -1245,9 +1249,9 @@ def save_developer_info(
     apps_df: pd.DataFrame,
     database_connection: PostgresCon,
 ) -> pd.DataFrame:
-    assert apps_df["developer_id"].to_numpy()[
-        0
-    ], f"{apps_df['store_id']} Missing Developer ID"
+    assert apps_df["developer_id"].to_numpy()[0], (
+        f"{apps_df['store_id']} Missing Developer ID"
+    )
     df = (
         apps_df[["store", "developer_id", "developer_name"]]
         .rename(columns={"developer_name": "name"})
@@ -1333,7 +1337,6 @@ def apps_details_to_db(
             apps_df=apps_df,
             database_connection=database_connection,
         )
-    log_crawl_results(apps_df, database_connection=database_connection)
     return
 
 
@@ -1428,7 +1431,19 @@ def upsert_keywords(keywords_df: pd.DataFrame, database_connection: PostgresCon)
     )
 
 
-def log_crawl_results(app_df: pd.DataFrame, database_connection: PostgresCon) -> None:
+def log_crawl_results(
+    app_df: pd.DataFrame, store: int, database_connection: PostgresCon
+) -> None:
+    store_id_map = query_store_id_map_cached(
+        store=store, database_connection=database_connection
+    )
+    country_map = query_countries(database_connection)
+    app_df["country_id"] = app_df["country"].map(
+        country_map.set_index("alpha2")["id"].to_dict()
+    )
+    app_df["store_app"] = app_df["store_id"].map(
+        store_id_map.set_index("store_id")["id"].to_dict()
+    )
     insert_columns = [
         "crawl_result",
         "store_app",
@@ -1437,10 +1452,11 @@ def log_crawl_results(app_df: pd.DataFrame, database_connection: PostgresCon) ->
     ]
     app_df = app_df[insert_columns]
     app_df.to_sql(
-        name="store_app_country_crawl",
         schema="logging",
+        name="store_app_country_crawl",
         con=database_connection.engine,
         if_exists="append",
+        index=False,
     )
 
 

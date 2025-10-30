@@ -106,6 +106,12 @@ class ProcessManager:
             help="Number of workers to use for updating app store details",
         )
         parser.add_argument(
+            "--country-crawl-priority-group",
+            help="Country crawl priority group to use when updating app store details",
+            type=int,
+            default=1,
+        )
+        parser.add_argument(
             "-a",
             "--app-ads-txt-scrape",
             help="Scrape app stores for app details, ie downloads",
@@ -255,7 +261,9 @@ class ProcessManager:
         return False
 
     def setup_database_connection(self) -> None:
-        self.pgcon = get_db_connection(use_ssh_tunnel=self.args.use_ssh_tunnel)
+        self.pgcon = get_db_connection(
+            use_ssh_tunnel=self.args.use_ssh_tunnel, config_key="devdb"
+        )
 
     def main(self) -> None:
         logger.info(f"Main starting with args: {self.args}")
@@ -342,6 +350,7 @@ class ProcessManager:
             use_ssh_tunnel=self.args.use_ssh_tunnel,
             workers=int(self.args.workers),
             process_icon=self.args.process_icons,
+            country_crawl_priority=self.args.country_crawl_priority_group,
             limit=self.args.limit_query_rows,
         )
 

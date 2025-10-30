@@ -711,7 +711,7 @@ def get_crawl_scenario_countries(
     return df
 
 
-def query_store_apps_to_update_new(
+def query_store_apps_to_update(
     database_connection: PostgresCon,
     store: int,
     country_crawl_priority: int,
@@ -763,112 +763,6 @@ def query_store_apps_to_update_new(
         dtype={"store_app": int, "store": int, "store_id": str},
     )
     df["language"] = "en"
-    return df
-
-
-def query_store_apps_to_update(
-    store: int,
-    database_connection: PostgresCon,
-    limit: int | None = 1000,
-    log_query: bool = False,
-    process_icon: bool = False,
-) -> pd.DataFrame:
-    if "crawl-settings" in CONFIG:
-        short_update_days = CONFIG["crawl-settings"].get("short_update_days", 1)
-        short_update_installs = CONFIG["crawl-settings"].get(
-            "short_update_installs", 1000
-        )
-        short_update_ratings = CONFIG["crawl-settings"].get("short_update_ratings", 100)
-        long_update_days = CONFIG["crawl-settings"].get("long_update_days", 2)
-        max_recrawl_days = CONFIG["crawl-settings"].get("max_recrawl_days", 15)
-    else:
-        short_update_days = 1
-        short_update_days = 1
-        short_update_installs = 1000
-        short_update_ratings = 100
-        long_update_days = 2
-        max_recrawl_days = 15
-    short_update_ts = datetime.datetime.now(tz=datetime.UTC) - datetime.timedelta(
-        days=short_update_days
-    )
-    long_update_ts = datetime.datetime.now(tz=datetime.UTC) - datetime.timedelta(
-        days=long_update_days
-    )
-    max_recrawl_ts = datetime.datetime.now(tz=datetime.UTC) - datetime.timedelta(
-        days=max_recrawl_days
-    )
-    year_ago_ts = datetime.datetime.now(tz=datetime.UTC) - datetime.timedelta(days=365)
-    rankings_mv_apps = ""
-    if check_mv_exists(database_connection, "store_apps_in_latest_rankings"):
-        rankings_mv_apps = (
-            " OR (sa.id in (select store_app from store_apps_in_latest_rankings))"
-        )
-    short_group = f"""(
-                        (
-                          installs >= {short_update_installs}
-                          OR rating_count >= {short_update_ratings}
-                            {rankings_mv_apps}
-                            )
-                          AND sa.updated_at <= '{short_update_ts}'
-                          AND (crawl_result = 1 OR crawl_result IS NULL OR sa.created_at >= '{long_update_ts}' OR sa.store_last_updated >= '{year_ago_ts}')
-                        )
-                    """
-    long_group = f"""(
-                       sa.updated_at <= '{long_update_ts}'
-                       AND (crawl_result = 1 OR crawl_result IS NULL OR sa.store_last_updated >= '{year_ago_ts}')
-                    )
-                    """
-    max_group = f"""(
-                      sa.updated_at <= '{max_recrawl_ts}'
-                      OR crawl_result IS NULL
-                    )
-                """
-    installs_and_dates_str = f"""(
-                        {short_group}
-                        OR {long_group}
-                        OR {max_group}
-                        )
-                        """
-    where_str = f"store = {store}"
-    where_str += f""" AND {installs_and_dates_str}"""
-    limit_str = ""
-    if limit:
-        limit_str = f"LIMIT {limit}"
-    icon_str = ""
-    if process_icon:
-        icon_str = "icon_url_100,"
-    sel_query = f"""SELECT 
-            store, 
-            sa.id as store_app, 
-            store_id, 
-            sa.updated_at, 
-            {icon_str}
-            sa.additional_html_scraped_at
-        FROM 
-            store_apps sa
-        WHERE {where_str}
-        ORDER BY
-            (CASE
-                WHEN crawl_result IS NULL 
-                    {rankings_mv_apps}
-                THEN 0
-                ELSE 1
-            END),
-            (CASE
-                WHEN sa.updated_at < '{max_recrawl_ts}'
-                THEN 0
-                ELSE 1
-            END),
-            GREATEST(
-                    COALESCE(installs, 0),
-                    COALESCE(CAST(rating_count AS bigint), 0)*50
-                )
-            DESC NULLS LAST
-        {limit_str}
-        """
-    if log_query:
-        logger.info(sel_query)
-    df = pd.read_sql(sel_query, database_connection.engine)
     return df
 
 
