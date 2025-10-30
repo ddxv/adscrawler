@@ -1,4 +1,5 @@
 import datetime
+import re
 import os
 import pathlib
 import time
@@ -7,6 +8,7 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from io import BytesIO
 from urllib.error import URLError
 from urllib.parse import unquote_plus
+import numpy as np
 
 import duckdb
 import google_play_scraper
@@ -43,172 +45,16 @@ from adscrawler.dbcon.queries import (
     query_developers,
     query_keywords_to_crawl,
     query_languages,
-    query_store_apps,
+    query_store_apps_to_update_new,
     query_store_id_map,
+    query_store_id_map_cached,
     query_store_ids,
+    get_crawl_scenario_countries,
     upsert_df,
 )
 from adscrawler.packages.storage import get_s3_client, get_s3_endpoint
 
 logger = get_logger(__name__, "scrape_stores")
-
-# Pulling for more countries will want to track rating, review count, and histogram
-APP_DETAILS_COUNTRY_LIST = ["us"]
-
-# Pulling for more languages to track descriptions, reviews, titles, etc.
-APP_DETAILS_LANGUAGE_LIST = ["en"]
-
-# Daily ranks on the app stores
-RANKS_COUNTRY_LIST = [
-    "us",
-    "cn",
-    "de",
-    "in",
-    "ca",
-    "gb",
-    "au",
-    "fr",
-    "es",
-    "it",
-    "kr",
-    "jp",
-    "ru",
-    "mx",
-    "nl",
-    "pl",
-    "pt",
-    "sa",
-    "tr",
-    "ua",
-    "za",
-    "br",
-    "be",
-    "ch",
-    "cz",
-    "dk",
-    "gr",
-    "hu",
-    "id",
-    "ie",
-    "il",
-    "my",
-    "no",
-    "nz",
-    "ph",
-    "ro",
-    "se",
-    "sg",
-    "vn",
-    "pk",
-    "ng",
-    "bd",
-    "et",
-    "eg",
-    "cd",
-    "ir",
-    "th",
-    "tz",
-    "mm",
-    "ke",
-    "co",
-    "ar",
-    "ug",
-    "dz",
-    "sd",
-    "iq",
-    "af",
-    "ma",
-    "uz",
-    "pe",
-    "ao",
-    "gh",
-    "mz",
-    "ve",
-    "ye",
-    "np",
-    "mg",
-    "kp",
-    "cm",
-    "ci",
-    "tw",
-    "ne",
-    "lk",
-    "bf",
-    "ml",
-    "cl",
-    "kz",
-    "mw",
-    "zm",
-    "gt",
-    "ec",
-    "sy",
-    "kh",
-    "sn",
-    "td",
-    "so",
-    "zw",
-    "gn",
-    "rw",
-    "tn",
-    "bj",
-    "bo",
-    "cu",
-    "bi",
-    "ht",
-    "do",
-    "jo",
-    "az",
-    "ae",
-    "hn",
-    "by",
-    "tj",
-    "at",
-    "pg",
-    "ss",
-    "tg",
-    "sl",
-    "hk",
-    "la",
-    "bg",
-    "rs",
-    "lb",
-    "ly",
-    "ni",
-    "sv",
-    "kg",
-    "er",
-    "tm",
-    "fi",
-    "sk",
-    "cg",
-    "cr",
-    "om",
-    "lr",
-    "cf",
-    "ps",
-    "mr",
-    "pa",
-    "kw",
-    "hr",
-    "ge",
-    "md",
-    "uy",
-    "ba",
-    "pr",
-    "mn",
-    "am",
-    "jm",
-    "al",
-    "lt",
-    "qa",
-    "na",
-    "gm",
-    "bw",
-    "ga",
-    "ls",
-    "mk",
-    "si",
-]
 
 
 def app_details_to_s3(
@@ -241,20 +87,18 @@ def process_chunk(df_chunk, use_ssh_tunnel, process_icon, total_rows):
     try:
         chunk_results = []
         for _, row in df_chunk.iterrows():
-            for country in APP_DETAILS_COUNTRY_LIST:
-                for language in APP_DETAILS_LANGUAGE_LIST:
-                    try:
-                        result_dict = scrape_app(
-                            store=row["store"],
-                            store_id=row["store_id"],
-                            country=country,
-                            language=language,
-                        )
-                        chunk_results.append(result_dict)
-                    except Exception as e:
-                        logger.exception(
-                            f"store={row.store}, store_id={row.store_id} update_all_app_info failed with {e}"
-                        )
+            try:
+                result_dict = scrape_app(
+                    store=row["store"],
+                    store_id=row["store_id"],
+                    country=row["country"],
+                    language=row["language"],
+                )
+                chunk_results.append(result_dict)
+            except Exception as e:
+                logger.exception(
+                    f"store={row.store}, store_id={row.store_id} update_all_app_info failed with {e}"
+                )
         results_df = pd.DataFrame(chunk_results)
         results_df["crawled_date"] = results_df["crawled_at"].dt.date
         app_details_to_s3(results_df, row["store"])
@@ -310,16 +154,24 @@ def process_chunk(df_chunk, use_ssh_tunnel, process_icon, total_rows):
 
 
 def update_app_details(
-    database_connection, store, use_ssh_tunnel, workers, process_icon, limit
+    database_connection,
+    store,
+    use_ssh_tunnel,
+    workers,
+    process_icon,
+    limit,
+    country_crawl_priority,
 ):
     """Process apps with dynamic work queue - simple and efficient."""
     log_info = f"Update app details: {store=}"
 
-    df = query_store_apps(
+    df = query_store_apps_to_update_new(
         store,
         database_connection,
         limit=limit,
         process_icon=process_icon,
+        log_query=True,
+        country_crawl_priority=country_crawl_priority,
     )
     logger.info(f"{log_info} start {len(df)} apps")
 
@@ -429,9 +281,13 @@ def scrape_store_ranks(database_connection: PostgresCon, store: int) -> None:
     countries_map = query_countries(database_connection)
     collections_map = collections_map.rename(columns={"id": "store_collection"})
     categories_map = categories_map.rename(columns={"id": "store_category"})
+    ranks_country_list = get_crawl_scenario_countries(
+        database_connection=database_connection, scenario_name="app_ranks"
+    )
+    country_codes = ranks_country_list["country_code"].str.lower().unique().tolist()
     if store == 2:
         collection_keyword = "TOP"
-        for country in RANKS_COUNTRY_LIST:
+        for country in country_codes:
             try:
                 ranked_dicts = scrape_ios_ranks(
                     collection_keyword=collection_keyword, country=country
@@ -451,7 +307,7 @@ def scrape_store_ranks(database_connection: PostgresCon, store: int) -> None:
                 )
 
     if store == 1:
-        for country in RANKS_COUNTRY_LIST:
+        for country in country_codes:
             try:
                 ranked_dicts = scrape_google_ranks(country=country)
                 process_scraped(
@@ -704,19 +560,26 @@ def process_store_rankings(
 def map_database_ids(
     df: pd.DataFrame,
     database_connection: PostgresCon,
-    store_id_map: pd.DataFrame,
     store: int,
 ) -> pd.DataFrame:
+    store_id_map = query_store_id_map_cached(
+        store=store, database_connection=database_connection
+    )
     country_map = query_countries(database_connection)
     collection_map = query_collections(database_connection)
     category_map = query_categories(database_connection)
-    df["country"] = df["country"].map(country_map.set_index("alpha2")["id"].to_dict())
-    df["store_collection"] = df["collection"].map(
-        collection_map.set_index("collection")["id"].to_dict()
-    )
-    df["store_category"] = df["category"].map(
-        category_map.set_index("category")["id"].to_dict()
-    )
+    if "country" in df.columns:
+        df["country"] = df["country"].map(
+            country_map.set_index("alpha2")["id"].to_dict()
+        )
+    if "collection" in df.columns:
+        df["store_collection"] = df["collection"].map(
+            collection_map.set_index("collection")["id"].to_dict()
+        )
+    if "category" in df.columns:
+        df["store_category"] = df["category"].map(
+            category_map.set_index("category")["id"].to_dict()
+        )
     new_ids = df[~df["store_id"].isin(store_id_map["store_id"])]["store_id"].unique()
     if len(new_ids) > 0:
         logger.info(f"Found new store ids: {len(new_ids)}")
@@ -750,28 +613,269 @@ def get_s3_rank_parquet_paths(
     return all_parquet_paths
 
 
-def import_ranks_from_s3(
+def get_s3_app_details_parquet_paths(
+    bucket: str,
+    snapshot_date: pd.DatetimeIndex,
+    # end_date: pd.DatetimeIndex,
+    store: int,
+) -> list[str]:
+    all_parquet_paths = []
+    ddt_str = snapshot_date.strftime("%Y-%m-%d")
+    prefix = f"raw-data/app_details/store={store}/crawled_date={ddt_str}/country="
+    all_parquet_paths += get_parquet_paths_by_prefix(bucket, prefix)
+    return all_parquet_paths
+
+
+def get_s3_agg_app_snapshots_parquet_paths(
+    bucket: str,
+    start_date: pd.DatetimeIndex,
+    end_date: pd.DatetimeIndex,
+    store: int,
+    freq: str,
+) -> list[str]:
+    all_parquet_paths = []
+    for ddt in pd.date_range(start_date, end_date, freq=freq):
+        ddt_str = ddt.strftime("%Y-%m-%d")
+        prefix = f"agg-data/store_app_country_history/store={store}/snapshot_date={ddt_str}/country="
+        all_parquet_paths += get_parquet_paths_by_prefix(bucket, prefix)
+    return all_parquet_paths
+
+
+def s3_store_app_history_to_db(
     store: int,
     start_date: datetime.date,
     end_date: datetime.date,
     database_connection: PostgresCon,
-    period: str = "week",
 ) -> None:
-    if period == "week":
-        days = 6
-        freq = "W-MON"
-        table_suffix = "weekly"
-    elif period == "day":
-        days = 1
-        freq = "D"
-        table_suffix = "daily"
-    else:
-        raise ValueError(f"Invalid period {period}")
     s3_config_key = "s3"
+    bucket = CONFIG[s3_config_key]["bucket"]
+    parquet_paths = get_s3_agg_app_snapshots_parquet_paths(
+        bucket=bucket,
+        start_date=start_date,
+        end_date=end_date,
+        store=store,
+        freq="D",
+    )
+    duckdb_con = get_duckdb_connection(s3_config_key)
+    query = f"""
+      SELECT *
+      FROM read_parquet({parquet_paths})
+    """
+    df = duckdb_con.execute(query).df()
+    duckdb_con.close()
+    df = df[df["store_id"].notna()]
+    star_cols = ["one_star", "two_star", "three_stars", "four_stars", "five_stars"]
+    if store == 1:
+        df[star_cols] = df["histogram"].apply(pd.Series)
+        df["store_last_updated"] = np.where(
+            (df["store_last_updated"] < 0) | (df["store_last_updated"].isna()),
+            None,
+            df["store_last_updated"],
+        )
+        df.loc[df["store_last_updated"].notna(), "store_last_updated"] = pd.to_datetime(
+            df.loc[df["store_last_updated"].notna(), "store_last_updated"], unit="s"
+        )
+    if store == 2:
+        df[star_cols] = (
+            df["user_ratings"]
+            .apply(lambda x: [int(num) for num in re.findall(r"\d+", x)[1::2]])
+            .apply(pd.Series)
+        )
+        df["store_last_updated"] = pd.to_datetime(
+            df["store_last_updated"], format="ISO8601", utc=True
+        )
+    df = map_database_ids(df, database_connection, store).rename(
+        columns={"country": "country_id"}
+    )
+    df = df.convert_dtypes(dtype_backend="pyarrow")
+    df = df.replace({pd.NA: None})
+    # snapshot date?
+    all_columns = [
+        "snapshot_date",
+        "country_id",
+        "store_app",
+        "review_count",
+        "rating",
+        "rating_count",
+        "one_star",
+        "two_star",
+        "three_stars",
+        "four_stars",
+        "five_stars",
+        "installs",
+        "store_last_updated",
+    ]
+    key_columns = ["snapshot_date", "country_id", "store_app"]
+    insert_columns = [x for x in all_columns if x in df.columns]
+    any_duplicates = df[insert_columns].duplicated(subset=key_columns).any()
+    if any_duplicates:
+        df[df[insert_columns].duplicated(subset=key_columns)][
+            ["store_id", "country_id", "snapshot_date", "crawled_at"]
+        ]
+        logger.error("Duplicates found in app history data, dropping duplicates")
+        raise ValueError("Duplicates found in app history data")
+    # TESTING ONLY
+    df = df[df["store_app"].notna()]
+    upsert_df(
+        df=df,
+        table_name="store_app_country_history",
+        database_connection=database_connection,
+        key_columns=key_columns,
+        insert_columns=insert_columns,
+    )
+
+
+def make_s3_store_app_country_history(store, snapshot_date) -> None:
+    bucket = CONFIG["s3"]["bucket"]
+    # lookback_date = snapshot_date - datetime.timedelta(days=lookback_days)
+    # lookback_date_str = lookback_date.strftime("%Y-%m-%d")
+    snapshot_date_str = snapshot_date.strftime("%Y-%m-%d")
+    app_detail_parquets = get_s3_app_details_parquet_paths(
+        bucket=bucket,
+        # start_date=lookback_date,
+        snapshot_date=snapshot_date,
+        store=store,
+    )
+    if len(app_detail_parquets) == 0:
+        logger.error(
+            f"No app detail parquet files found for store={store} snapshot_date={snapshot_date_str}"
+        )
+        return
+    s3_config_key = "s3"
+    query = get_app_details_duck_query(
+        store=store,
+        app_detail_parquets=app_detail_parquets,
+        # lookback_date_str=lookback_date_str,
+        snapshot_date_str=snapshot_date_str,
+    )
+    duckdb_con = get_duckdb_connection(s3_config_key)
+    duckdb_con.execute(query)
+    duckdb_con.close()
+
+
+def snapshot_rerun_store_app_country_history(database_connection: PostgresCon) -> None:
+    start_date = datetime.date(2025, 10, 10)
+    snapshot_date = datetime.date(2025, 10, 28)
+    # lookback_days = 60
+    for single_date in pd.date_range(start_date, snapshot_date, freq="D"):
+        for store in [1, 2]:
+            snapshot_date = single_date.date()
+            logger.info(f"date={snapshot_date}, store={store} Make S3 agg")
+            make_s3_store_app_country_history(store, snapshot_date=snapshot_date)
+            logger.info(f"date={snapshot_date}, store={store} Load to db")
+            s3_store_app_history_to_db(
+                store,
+                start_date=snapshot_date,
+                end_date=snapshot_date,
+                database_connection=database_connection,
+            )
+
+
+def get_parquet_paths_by_prefix(bucket, prefix: str) -> list[str]:
+    s3 = get_s3_client()
+    continuation_token = None
+    all_parquet_paths = []
+    while True:
+        params = {
+            "Bucket": bucket,
+            "Prefix": prefix,
+            "MaxKeys": 1000,
+        }
+        if continuation_token:
+            params["ContinuationToken"] = continuation_token
+        response = s3.list_objects_v2(**params)
+        # Extract parquet paths from this page
+        if "Contents" in response:
+            parquet_paths = [
+                f"s3://{bucket}/{obj['Key']}"
+                for obj in response["Contents"]
+                if obj["Key"].endswith(".parquet")
+            ]
+            all_parquet_paths += parquet_paths
+        if "NextContinuationToken" in response:
+            continuation_token = response["NextContinuationToken"]
+        else:
+            break
+    return all_parquet_paths
+
+
+def get_app_details_duck_query(
+    store: int,
+    app_detail_parquets: list[str],
+    # lookback_date_str: str,
+    snapshot_date_str: str,
+) -> str:
+    if store == 2:
+        data_cols = """
+             trackId AS store_id,
+             country,
+             crawled_date,
+             averageUserRating AS rating,
+             userRatingCount AS rating_count,
+             user_ratings,
+             currentVersionReleaseDate AS store_last_updated,
+             crawled_at
+        """
+        export_cols = """
+             store_id,
+             country,
+             crawled_date,
+             rating,
+             rating_count,
+             user_ratings,
+             store_last_updated,
+             crawled_at
+             """
+        extra_sort_column = "rating_count DESC"
+    elif store == 1:
+        data_cols = """
+             appId AS store_id,
+             country,
+             crawled_date,
+             score AS rating,
+             reviews AS review_count,
+             histogram,
+             updated AS store_last_updated,
+             crawled_at
+             """
+        export_cols = """
+                store_id,
+                country,
+                crawled_date,
+                rating,
+                review_count,
+                histogram,
+                store_last_updated,
+                crawled_at
+        """
+        extra_sort_column = "review_count DESC"
+    # WHERE crawled_date BETWEEN DATE '{lookback_date_str}' AND DATE '{snapshot_date_str}'
+    query = f"""COPY (
+    with data  AS (
+    SELECT {data_cols}
+     FROM read_parquet({app_detail_parquets}, union_by_name=true)
+     )
+      SELECT
+            {export_cols}
+      FROM data
+      QUALIFY ROW_NUMBER() OVER (
+        PARTITION BY store_id, country
+        ORDER BY crawled_at DESC, {extra_sort_column}
+      ) = 1
+    ) TO 's3://adscrawler/agg-data/store_app_country_history/store={store}/snapshot_date={snapshot_date_str}/'
+    (FORMAT PARQUET, 
+    PARTITION_BY (country), 
+    ROW_GROUP_SIZE 100000, 
+    COMPRESSION 'zstd',
+    OVERWRITE_OR_IGNORE true);
+    """
+    return query
+
+
+def get_duckdb_connection(s3_config_key: str) -> duckdb.DuckDBPyConnection:
     s3_region = CONFIG[s3_config_key]["region_name"]
     # DuckDB uses S3 endpoint url
     endpoint = get_s3_endpoint(s3_config_key)
-    store_id_map = query_store_id_map(database_connection, store)
     duckdb_con = duckdb.connect()
     if "http://" in endpoint:
         duckdb_con.execute("SET s3_use_ssl=false;")
@@ -791,14 +895,36 @@ def import_ranks_from_s3(
     )
     duckdb_con.execute("SET temp_directory = '/tmp/duckdb.tmp/';")
     duckdb_con.execute("SET preserve_insertion_order = false;")
+    return duckdb_con
+
+
+def import_ranks_from_s3(
+    store: int,
+    start_date: datetime.date,
+    end_date: datetime.date,
+    database_connection: PostgresCon,
+    period: str = "week",
+) -> None:
+    if period == "week":
+        days = 6
+        freq = "W-MON"
+        table_suffix = "weekly"
+    elif period == "day":
+        days = 1
+        freq = "D"
+        table_suffix = "daily"
+    else:
+        raise ValueError(f"Invalid period {period}")
+    s3_config_key = "s3"
+    duckdb_con = get_duckdb_connection(s3_config_key)
     s3 = get_s3_client()
     bucket = CONFIG[s3_config_key]["bucket"]
+    s3_region = CONFIG[s3_config_key]["region_name"]
     logger.info(f"Importing ranks from S3 {bucket=} in {s3_region=}")
     for dt in pd.date_range(start_date, end_date, freq=freq):
         period_date_str = dt.strftime("%Y-%m-%d")
         logger.info(f"Processing store={store} period_start={period_date_str}")
         all_parquet_paths = get_s3_rank_parquet_paths(s3, bucket, dt, days, store)
-
         if len(all_parquet_paths) == 0:
             logger.info(f"No parquet files found for period_start={period_date_str}")
             continue
@@ -822,7 +948,6 @@ def import_ranks_from_s3(
                 table_suffix=table_suffix,
                 duckdb_con=duckdb_con,
                 database_connection=database_connection,
-                store_id_map=store_id_map,
             )
 
 
@@ -833,7 +958,6 @@ def process_parquets_and_insert(
     table_suffix: str,
     duckdb_con,
     database_connection: PostgresCon,
-    store_id_map: pd.DataFrame,
 ):
     """Process parquet files for a specific country and insert into the database."""
     period_query = f"""WITH all_data AS (
@@ -866,7 +990,7 @@ def process_parquets_and_insert(
               ORDER BY par.country, par.collection, par.category, par.crawled_date, par.rank
             """
     wdf = duckdb_con.execute(period_query).df()
-    wdf = map_database_ids(wdf, database_connection, store_id_map, store)
+    wdf = map_database_ids(wdf, database_connection, store)
     wdf = wdf.drop(columns=["store_id", "collection", "category"])
     upsert_df(
         df=wdf,
@@ -1116,9 +1240,9 @@ def save_developer_info(
     apps_df: pd.DataFrame,
     database_connection: PostgresCon,
 ) -> pd.DataFrame:
-    assert apps_df["developer_id"].to_numpy()[0], (
-        f"{apps_df['store_id']} Missing Developer ID"
-    )
+    assert apps_df["developer_id"].to_numpy()[
+        0
+    ], f"{apps_df['store_id']} Missing Developer ID"
     df = (
         apps_df[["store", "developer_id", "developer_name"]]
         .rename(columns={"developer_name": "name"})
@@ -1175,14 +1299,6 @@ def apps_details_to_db(
         store_apps_df is not None
         and not store_apps_df[store_apps_df["crawl_result"] == 1].empty
     ):
-        store_apps_df = store_apps_df.rename(columns={"id": "store_app"})
-        store_apps_history = store_apps_df[store_apps_df["crawl_result"] == 1].copy()
-        store_apps_history = pd.merge(
-            store_apps_history,
-            apps_df[["store_id", "histogram", "country"]],
-            on="store_id",
-        )
-        upsert_store_apps_history(store_apps_history, database_connection)
         store_apps_descriptions = store_apps_df[
             store_apps_df["crawl_result"] == 1
         ].copy()
@@ -1307,46 +1423,16 @@ def upsert_keywords(keywords_df: pd.DataFrame, database_connection: PostgresCon)
     )
 
 
-def upsert_store_apps_history(
-    store_apps_history: pd.DataFrame, database_connection: PostgresCon
-) -> None:
-    store_apps_history["crawled_date"] = (
-        datetime.datetime.now(datetime.UTC).date().strftime("%Y-%m-%d")
-    )
-    table_name = "store_apps_country_history"
-    countries_map = query_countries(database_connection)
-    store_apps_history = pd.merge(
-        store_apps_history,
-        countries_map[["id", "alpha2"]],
-        how="left",
-        left_on="country",
-        right_on="alpha2",
-        validate="m:1",
-    ).rename(columns={"id": "country_id"})
-    insert_columns = [
-        "installs",
-        "review_count",
-        "rating",
-        "rating_count",
-        "histogram",
-        "store_last_updated",
-    ]
-    key_columns = ["store_app", "country_id", "crawled_date"]
-    upsert_df(
-        table_name=table_name,
-        df=store_apps_history,
-        insert_columns=insert_columns,
-        key_columns=key_columns,
-        database_connection=database_connection,
-    )
-
-
 def log_crawl_results(app_df: pd.DataFrame, database_connection: PostgresCon) -> None:
-    app_df["crawled_at"] = datetime.datetime.now(datetime.UTC)
-    insert_columns = ["crawl_result", "store", "store_id", "store_app", "crawled_at"]
+    insert_columns = [
+        "crawl_result",
+        "store_app",
+        "country_id",
+        "crawled_at",
+    ]
     app_df = app_df[insert_columns]
     app_df.to_sql(
-        name="store_apps_crawl",
+        name="store_app_country_crawl",
         schema="logging",
         con=database_connection.engine,
         if_exists="append",
