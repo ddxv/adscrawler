@@ -96,11 +96,10 @@ def get_s3_rank_parquet_paths(
 
 
 def get_s3_app_details_parquet_paths(
-    bucket: str,
     snapshot_date: pd.DatetimeIndex,
-    # end_date: pd.DatetimeIndex,
     store: int,
 ) -> list[str]:
+    bucket = CONFIG["s3"]["bucket"]
     all_parquet_paths = []
     ddt_str = snapshot_date.strftime("%Y-%m-%d")
     prefix = f"raw-data/app_details/store={store}/crawled_date={ddt_str}/country="
@@ -119,16 +118,14 @@ def get_s3_agg_app_snapshots_parquet_paths(
     for ddt in pd.date_range(start_date, end_date, freq=freq):
         ddt_str = ddt.strftime("%Y-%m-%d")
         prefix = f"agg-data/store_app_country_history/store={store}/snapshot_date={ddt_str}/country="
+        print(prefix)
         all_parquet_paths += get_parquet_paths_by_prefix(bucket, prefix)
     return all_parquet_paths
 
 
-def s3_store_app_history_to_db(
-    store: int,
-    start_date: datetime.date,
-    end_date: datetime.date,
-    database_connection: PostgresCon,
-) -> None:
+def get_s3_agg_daily_snapshots(
+    start_date: datetime.date, end_date: datetime.date, store: int
+) -> pd.DataFrame:
     s3_config_key = "s3"
     bucket = CONFIG[s3_config_key]["bucket"]
     parquet_paths = get_s3_agg_app_snapshots_parquet_paths(
@@ -145,10 +142,99 @@ def s3_store_app_history_to_db(
     """
     df = duckdb_con.execute(query).df()
     duckdb_con.close()
+    return df
+
+
+def s3_store_app_global_history_to_db(
+    df: pd.DataFrame,
+    store: int,
+    database_connection: PostgresCon,
+) -> None:
     df = df[df["store_id"].notna()]
     star_cols = ["one_star", "two_star", "three_stars", "four_stars", "five_stars"]
     if store == 1:
-        df[star_cols] = None
+        df[star_cols] = df["histogram"].apply(pd.Series)
+        df["store_last_updated"] = np.where(
+            (df["store_last_updated"] < 0) | (df["store_last_updated"].isna()),
+            None,
+            df["store_last_updated"],
+        )
+        df.loc[df["store_last_updated"].notna(), "store_last_updated"] = pd.to_datetime(
+            df.loc[df["store_last_updated"].notna(), "store_last_updated"], unit="s"
+        )
+    if store == 2:
+        df["user_ratings"].tail()
+        df[star_cols] = df["user_ratings"].str.findall(r":\s*(\d+)").apply(pd.Series)
+        df[star_cols] = (
+            df["user_ratings"]
+            .apply(lambda x: [int(num) for num in re.findall(r"\d+", x)[1::2]])
+            .apply(pd.Series)
+        )
+        ratings_str = df["user_ratings"].str.extractall(r"(\d+)").unstack()
+        ratings_str = ratings_str.reindex(df.index, fill_value=0)
+        df[star_cols] = ratings_str.iloc[:, 1::2].astype(int).values
+        df["store_last_updated"] = pd.to_datetime(
+            df["store_last_updated"], format="ISO8601", utc=True
+        )
+        df.groupby(["store_id", "country"])[
+            ["rating_count"] + star_cols
+        ].sum().reset_index()
+    store_id_map = query_store_id_map_cached(
+        store=store, database_connection=database_connection
+    )
+    country_map = query_countries(database_connection)
+    df["country_id"] = df["country"].map(
+        country_map.set_index("alpha2")["id"].to_dict()
+    )
+    new_ids = df[~df["store_id"].isin(store_id_map["store_id"])]["store_id"].unique()
+    if len(new_ids) > 0:
+        logger.warning(f"Found new store ids: {len(new_ids)}")
+        raise ValueError("New store ids found in S3 app history data")
+    df["store_app"] = df["store_id"].map(
+        store_id_map.set_index("store_id")["id"].to_dict()
+    )
+    df = df.convert_dtypes(dtype_backend="pyarrow")
+    df = df.replace({pd.NA: None})
+    all_columns = [
+        "snapshot_date",
+        "store_app",
+        "review_count",
+        "rating",
+        "rating_count",
+        "one_star",
+        "two_star",
+        "three_stars",
+        "four_stars",
+        "five_stars",
+    ]
+    key_columns = ["snapshot_date", "store_app"]
+    insert_columns = [x for x in all_columns if x in df.columns]
+    any_duplicates = df[insert_columns].duplicated(subset=key_columns).any()
+    if any_duplicates:
+        df[df[insert_columns].duplicated(subset=key_columns)][
+            ["store_id", "snapshot_date", "crawled_at"]
+        ]
+        logger.error("Duplicates found in app history data, dropping duplicates")
+        raise ValueError("Duplicates found in app history data")
+    # TESTING ONLY
+    df = df[df["store_app"].notna()]
+    upsert_df(
+        df=df,
+        table_name="store_app_global_history",
+        database_connection=database_connection,
+        key_columns=key_columns,
+        insert_columns=insert_columns,
+    )
+
+
+def s3_store_app_country_history_to_db(
+    df: pd.DataFrame,
+    store: int,
+    database_connection: PostgresCon,
+) -> None:
+    df = df[df["store_id"].notna()]
+    star_cols = ["one_star", "two_star", "three_stars", "four_stars", "five_stars"]
+    if store == 1:
         df["store_last_updated"] = np.where(
             (df["store_last_updated"] < 0) | (df["store_last_updated"].isna()),
             None,
@@ -217,26 +303,20 @@ def s3_store_app_history_to_db(
 
 
 def make_s3_store_app_country_history(store, snapshot_date) -> None:
-    bucket = CONFIG["s3"]["bucket"]
-    # lookback_date = snapshot_date - datetime.timedelta(days=lookback_days)
-    # lookback_date_str = lookback_date.strftime("%Y-%m-%d")
-    snapshot_date_str = snapshot_date.strftime("%Y-%m-%d")
     app_detail_parquets = get_s3_app_details_parquet_paths(
-        bucket=bucket,
-        # start_date=lookback_date,
         snapshot_date=snapshot_date,
         store=store,
     )
+    snapshot_date_str = snapshot_date.strftime("%Y-%m-%d")
     if len(app_detail_parquets) == 0:
         logger.error(
             f"No app detail parquet files found for store={store} snapshot_date={snapshot_date_str}"
         )
         return
     s3_config_key = "s3"
-    query = get_app_details_duck_query(
+    query = app_details_country_history_query(
         store=store,
         app_detail_parquets=app_detail_parquets,
-        # lookback_date_str=lookback_date_str,
         snapshot_date_str=snapshot_date_str,
     )
     duckdb_con = get_duckdb_connection(s3_config_key)
@@ -246,18 +326,25 @@ def make_s3_store_app_country_history(store, snapshot_date) -> None:
 
 def snapshot_rerun_store_app_country_history(database_connection: PostgresCon) -> None:
     start_date = datetime.date(2025, 10, 10)
-    snapshot_date = datetime.date(2025, 10, 28)
+    end_date = datetime.date(2025, 10, 28)
     # lookback_days = 60
-    for single_date in pd.date_range(start_date, snapshot_date, freq="D"):
+    for snapshot_date in pd.date_range(start_date, end_date, freq="D"):
+        snapshot_date = snapshot_date.date()
         for store in [1, 2]:
-            snapshot_date = single_date.date()
             logger.info(f"date={snapshot_date}, store={store} Make S3 agg")
             make_s3_store_app_country_history(store, snapshot_date=snapshot_date)
             logger.info(f"date={snapshot_date}, store={store} Load to db")
-            s3_store_app_history_to_db(
+            df = get_s3_agg_daily_snapshots(snapshot_date, snapshot_date, store)
+            s3_store_app_country_history_to_db(
+                store=store,
+                df=df,
+                database_connection=database_connection,
+            )
+            if store == 1:
+                df = df[df["country"] == "US"]
+            s3_store_app_global_history_to_db(
                 store,
-                start_date=snapshot_date,
-                end_date=snapshot_date,
+                df=df,
                 database_connection=database_connection,
             )
 
@@ -290,7 +377,7 @@ def get_parquet_paths_by_prefix(bucket, prefix: str) -> list[str]:
     return all_parquet_paths
 
 
-def get_app_details_duck_query(
+def app_details_country_history_query(
     store: int,
     app_detail_parquets: list[str],
     # lookback_date_str: str,
@@ -323,6 +410,7 @@ def get_app_details_duck_query(
              appId AS store_id,
              country,
              crawled_date,
+             realInstalls as installs,
              score AS rating,
              reviews AS review_count,
              histogram,
@@ -333,6 +421,7 @@ def get_app_details_duck_query(
                 store_id,
                 country,
                 crawled_date,
+                installs,
                 rating,
                 review_count,
                 histogram,
