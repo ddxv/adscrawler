@@ -573,39 +573,6 @@ def process_store_rankings(
             local_path.unlink()
 
 
-def map_database_ids(
-    df: pd.DataFrame,
-    database_connection: PostgresCon,
-    store: int,
-) -> pd.DataFrame:
-    store_id_map = query_store_id_map_cached(
-        store=store, database_connection=database_connection
-    )
-    country_map = query_countries(database_connection)
-    collection_map = query_collections(database_connection)
-    category_map = query_categories(database_connection)
-    if "country" in df.columns:
-        df["country"] = df["country"].map(
-            country_map.set_index("alpha2")["id"].to_dict()
-        )
-    if "collection" in df.columns:
-        df["store_collection"] = df["collection"].map(
-            collection_map.set_index("collection")["id"].to_dict()
-        )
-    if "category" in df.columns:
-        df["store_category"] = df["category"].map(
-            category_map.set_index("category")["id"].to_dict()
-        )
-    new_ids = df[~df["store_id"].isin(store_id_map["store_id"])]["store_id"].unique()
-    if len(new_ids) > 0:
-        logger.warning(f"Found new store ids: {len(new_ids)}")
-        raise ValueError("New store ids found in map_database_ids")
-    df["store_app"] = df["store_id"].map(
-        store_id_map.set_index("store_id")["id"].to_dict()
-    )
-    return df
-
-
 def get_s3_rank_parquet_paths(
     s3, bucket: str, dt: pd.DatetimeIndex, days: int, store: int
 ) -> list[str]:
@@ -694,8 +661,19 @@ def s3_store_app_history_to_db(
         df["store_last_updated"] = pd.to_datetime(
             df["store_last_updated"], format="ISO8601", utc=True
         )
-    df = map_database_ids(df, database_connection, store).rename(
-        columns={"country": "country_id"}
+    store_id_map = query_store_id_map_cached(
+        store=store, database_connection=database_connection
+    )
+    country_map = query_countries(database_connection)
+    df["country_id"] = df["country"].map(
+        country_map.set_index("alpha2")["id"].to_dict()
+    )
+    new_ids = df[~df["store_id"].isin(store_id_map["store_id"])]["store_id"].unique()
+    if len(new_ids) > 0:
+        logger.warning(f"Found new store ids: {len(new_ids)}")
+        raise ValueError("New store ids found in S3 app history data")
+    df["store_app"] = df["store_id"].map(
+        store_id_map.set_index("store_id")["id"].to_dict()
     )
     df = df.convert_dtypes(dtype_backend="pyarrow")
     df = df.replace({pd.NA: None})
