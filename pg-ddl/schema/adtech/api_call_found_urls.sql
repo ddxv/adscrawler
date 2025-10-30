@@ -42,12 +42,12 @@ ALTER TABLE adtech.api_call_found_urls OWNER TO postgres;
 --
 
 CREATE SEQUENCE adtech.api_call_found_urls_id_seq
-    AS integer
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
+AS integer
+START WITH 1
+INCREMENT BY 1
+NO MINVALUE
+NO MAXVALUE
+CACHE 1;
 
 
 ALTER SEQUENCE adtech.api_call_found_urls_id_seq OWNER TO postgres;
@@ -63,7 +63,9 @@ ALTER SEQUENCE adtech.api_call_found_urls_id_seq OWNED BY adtech.api_call_found_
 -- Name: api_call_found_urls id; Type: DEFAULT; Schema: adtech; Owner: postgres
 --
 
-ALTER TABLE ONLY adtech.api_call_found_urls ALTER COLUMN id SET DEFAULT nextval('adtech.api_call_found_urls_id_seq'::regclass);
+ALTER TABLE ONLY adtech.api_call_found_urls ALTER COLUMN id SET DEFAULT nextval(
+    'adtech.api_call_found_urls_id_seq'::regclass
+);
 
 
 --
@@ -71,14 +73,16 @@ ALTER TABLE ONLY adtech.api_call_found_urls ALTER COLUMN id SET DEFAULT nextval(
 --
 
 ALTER TABLE ONLY adtech.api_call_found_urls
-    ADD CONSTRAINT found_urls_pkey PRIMARY KEY (id);
+ADD CONSTRAINT found_urls_pkey PRIMARY KEY (id);
 
 
 --
 -- Name: found_urls_idx; Type: INDEX; Schema: adtech; Owner: postgres
 --
 
-CREATE UNIQUE INDEX found_urls_idx ON adtech.api_call_found_urls USING btree (run_id, api_call_id, md5(url));
+CREATE UNIQUE INDEX found_urls_idx ON adtech.api_call_found_urls USING btree (
+    run_id, api_call_id, md5(url)
+);
 
 
 --
@@ -86,7 +90,9 @@ CREATE UNIQUE INDEX found_urls_idx ON adtech.api_call_found_urls USING btree (ru
 --
 
 ALTER TABLE ONLY adtech.api_call_found_urls
-    ADD CONSTRAINT fk_api_call_id FOREIGN KEY (api_call_id) REFERENCES public.api_calls(id);
+ADD CONSTRAINT fk_api_call_id FOREIGN KEY (
+    api_call_id
+) REFERENCES public.api_calls (id);
 
 
 --
@@ -94,7 +100,9 @@ ALTER TABLE ONLY adtech.api_call_found_urls
 --
 
 ALTER TABLE ONLY adtech.api_call_found_urls
-    ADD CONSTRAINT fk_run_id FOREIGN KEY (run_id) REFERENCES public.version_code_api_scan_results(id);
+ADD CONSTRAINT fk_run_id FOREIGN KEY (
+    run_id
+) REFERENCES public.version_code_api_scan_results (id);
 
 
 --
@@ -102,4 +110,3 @@ ALTER TABLE ONLY adtech.api_call_found_urls
 --
 
 \unrestrict 4lxco5pb3b48FzH6zwmQ9LhFLqiwqAjTLWGEwrIJKX9B7penRxqSDdCEJOTEa1i
-
