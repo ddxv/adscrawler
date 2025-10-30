@@ -66,21 +66,26 @@ def app_details_to_s3(
         raise ValueError("store is required")
     s3_client = get_s3_client()
     bucket = CONFIG["s3"]["bucket"]
-    for crawled_date, ddf in df.groupby("crawled_date"):
+    # handles edge case of a crawl spanning a date change
+    for crawled_date, date_df in df.groupby("crawled_date"):
         if isinstance(crawled_date, datetime.date):
             crawled_date = crawled_date.strftime("%Y-%m-%d")
-        epoch_ms = int(time.time() * 1000)
-        suffix = uuid.uuid4().hex[:8]
-        file_name = f"app_details_{epoch_ms}_{suffix}.parquet"
-        s3_key = f"raw-data/app_details/store={store}/crawled_date={crawled_date}/{file_name}"
-        buffer = BytesIO()
-        ddf.to_parquet(buffer, index=False)
-        buffer.seek(0)
-        s3_client.upload_fileobj(buffer, bucket, s3_key)
+        for country, country_df in date_df.groupby("country"):
+            epoch_ms = int(time.time() * 1000)
+            suffix = uuid.uuid4().hex[:8]
+            file_name = f"app_details_{epoch_ms}_{suffix}.parquet"
+            s3_loc = "raw-data/app_details"
+            s3_key = f"{s3_loc}/store={store}/crawled_date={crawled_date}/country={country}/{file_name}"
+            buffer = BytesIO()
+            country_df.to_parquet(buffer, index=False)
+            buffer.seek(0)
+            s3_client.upload_fileobj(buffer, bucket, s3_key)
     logger.info(f"S3 upload app details {store=} finished")
 
 
-def process_chunk(df_chunk, use_ssh_tunnel, process_icon, total_rows):
+def process_chunk(
+    df_chunk: pd.DataFrame, use_ssh_tunnel: bool, process_icon: bool, total_rows: int
+):
     chunk_info = f"Chunk {df_chunk.index[0]}-{df_chunk.index[-1]}/{total_rows}"
     database_connection = get_db_connection(use_ssh_tunnel=use_ssh_tunnel)
     logger.info(f"{chunk_info} start")
@@ -101,7 +106,7 @@ def process_chunk(df_chunk, use_ssh_tunnel, process_icon, total_rows):
                 )
         results_df = pd.DataFrame(chunk_results)
         results_df["crawled_date"] = results_df["crawled_at"].dt.date
-        app_details_to_s3(results_df, row["store"])
+        app_details_to_s3(results_df, store=row["store"])
         for crawl_result, apps_df in results_df.groupby("crawl_result"):
             if crawl_result != 1:
                 apps_df = apps_df[["store_id", "store", "crawled_at", "crawl_result"]]
@@ -457,11 +462,11 @@ def process_scraped(
 def save_app_ranks(
     df: pd.DataFrame,
     database_connection: PostgresCon,
-    store: int,
+    store: int | None,
     collections_map: pd.DataFrame | None = None,
     categories_map: pd.DataFrame | None = None,
     countries_map: pd.DataFrame | None = None,
-):
+) -> None:
     all_scraped_ids = df["store_id"].unique().tolist()
     new_existing_ids_map = query_store_id_map(
         database_connection,
@@ -475,7 +480,7 @@ def save_app_ranks(
         validate="m:1",
     )
     df["country"] = df["country"].str.upper()
-    if collections_map is not None and categories_map is not None:
+    if collections_map is not None and categories_map is not None and store is not None:
         process_store_rankings(
             store=store,
             df=df,
