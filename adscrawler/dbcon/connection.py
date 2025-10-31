@@ -111,7 +111,8 @@ def manage_tunnel_thread(
     t.start()
     while "port" not in result:
         pass  # wait for listener to be ready
-    return result["port"]
+    port: int = result["port"]
+    return port
 
 
 def start_ssh_tunnel(config_key: str) -> int:
