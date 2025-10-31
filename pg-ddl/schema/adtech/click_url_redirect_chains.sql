@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict Ail7UHvB1W1laoozBUtol4UgZsF0QVUHlVZKavSFmyCJJ81fEMqDS3PwZqH7dp1
+\restrict qVLRq8zbdWR4bttdJiXMDj3Uan0dpZcnI8lI6HLiGzemRYm07XFeZnrZ8xLIQyG
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -31,7 +31,8 @@ CREATE TABLE adtech.click_url_redirect_chains (
     id integer NOT NULL,
     run_id integer NOT NULL,
     url text NOT NULL,
-    redirect_url text NOT NULL
+    redirect_url text NOT NULL,
+    api_call_id integer
 );
 
 
@@ -42,12 +43,12 @@ ALTER TABLE adtech.click_url_redirect_chains OWNER TO postgres;
 --
 
 CREATE SEQUENCE adtech.click_url_redirect_chains_id_seq
-AS integer
-START WITH 1
-INCREMENT BY 1
-NO MINVALUE
-NO MAXVALUE
-CACHE 1;
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
 
 
 ALTER SEQUENCE adtech.click_url_redirect_chains_id_seq OWNER TO postgres;
@@ -63,9 +64,7 @@ ALTER SEQUENCE adtech.click_url_redirect_chains_id_seq OWNED BY adtech.click_url
 -- Name: click_url_redirect_chains id; Type: DEFAULT; Schema: adtech; Owner: postgres
 --
 
-ALTER TABLE ONLY adtech.click_url_redirect_chains ALTER COLUMN id SET DEFAULT nextval(
-    'adtech.click_url_redirect_chains_id_seq'::regclass
-);
+ALTER TABLE ONLY adtech.click_url_redirect_chains ALTER COLUMN id SET DEFAULT nextval('adtech.click_url_redirect_chains_id_seq'::regclass);
 
 
 --
@@ -73,16 +72,22 @@ ALTER TABLE ONLY adtech.click_url_redirect_chains ALTER COLUMN id SET DEFAULT ne
 --
 
 ALTER TABLE ONLY adtech.click_url_redirect_chains
-ADD CONSTRAINT click_url_redirect_chains_pkey PRIMARY KEY (id);
+    ADD CONSTRAINT click_url_redirect_chains_pkey PRIMARY KEY (id);
 
 
 --
 -- Name: click_url_redirect_chains_unique; Type: INDEX; Schema: adtech; Owner: postgres
 --
 
-CREATE UNIQUE INDEX click_url_redirect_chains_unique ON adtech.click_url_redirect_chains USING btree (
-    run_id, md5(url), md5(redirect_url)
-);
+CREATE UNIQUE INDEX click_url_redirect_chains_unique ON adtech.click_url_redirect_chains USING btree (run_id, md5(url), md5(redirect_url));
+
+
+--
+-- Name: click_url_redirect_chains fk_api_call_id; Type: FK CONSTRAINT; Schema: adtech; Owner: postgres
+--
+
+ALTER TABLE ONLY adtech.click_url_redirect_chains
+    ADD CONSTRAINT fk_api_call_id FOREIGN KEY (api_call_id) REFERENCES public.api_calls(id);
 
 
 --
@@ -90,13 +95,12 @@ CREATE UNIQUE INDEX click_url_redirect_chains_unique ON adtech.click_url_redirec
 --
 
 ALTER TABLE ONLY adtech.click_url_redirect_chains
-ADD CONSTRAINT fk_run_id FOREIGN KEY (
-    run_id
-) REFERENCES public.version_code_api_scan_results (id) ON DELETE CASCADE;
+    ADD CONSTRAINT fk_run_id FOREIGN KEY (run_id) REFERENCES public.version_code_api_scan_results(id) ON DELETE CASCADE;
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict Ail7UHvB1W1laoozBUtol4UgZsF0QVUHlVZKavSFmyCJJ81fEMqDS3PwZqH7dp1
+\unrestrict qVLRq8zbdWR4bttdJiXMDj3Uan0dpZcnI8lI6HLiGzemRYm07XFeZnrZ8xLIQyG
+

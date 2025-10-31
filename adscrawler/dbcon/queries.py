@@ -22,6 +22,7 @@ def load_sql_file(file_name: str) -> TextClause:
         return text(file.read())
 
 
+QUERY_APPS_TO_UPDATE = load_sql_file("query_apps_to_update.sql")
 QUERY_APPS_TO_DOWNLOAD = load_sql_file("query_apps_to_download.sql")
 QUERY_APPS_TO_SDK_SCAN = load_sql_file("query_apps_to_sdk_scan.sql")
 QUERY_APPS_TO_API_SCAN = load_sql_file("query_apps_to_api_scan.sql")
@@ -252,7 +253,6 @@ def query_developers(
     sel_query = f"""SELECT 
             d.*,
             SUM(sa.installs) AS total_installs,
-            SUM(sa.review_count) AS total_reviews,
             dc.apps_crawled_at
         FROM
             developers d
@@ -266,8 +266,7 @@ def query_developers(
         GROUP BY
             d.id, dc.apps_crawled_at
         ORDER BY apps_crawled_at::date NULLS FIRST,
-        total_installs DESC NULLS LAST,
-        total_reviews DESC NULLS LAST
+        total_installs DESC NULLS LAST
         limit {limit}
         ;
         """
@@ -469,6 +468,25 @@ def upsert_details_df(
     logger.info(f"{store_id=} finished")
 
 
+@lru_cache(maxsize=2)
+def query_store_id_map_cached(
+    database_connection: PostgresCon,
+    store: int | None,
+) -> pd.DataFrame:
+    where_statement = ""
+    if store:
+        where_statement += f"WHERE store = {store} "
+    sel_query = f"""SELECT
+        id, store, store_id
+        FROM
+        store_apps
+        {where_statement}
+        ;
+        """
+    df = pd.read_sql(sel_query, database_connection.engine)
+    return df
+
+
 def query_store_id_map(
     database_connection: PostgresCon,
     store: int | None = None,
@@ -666,28 +684,45 @@ def get_store_app_columns(database_connection: PostgresCon) -> list[str]:
     return columns
 
 
-def query_store_apps(
-    store: int,
-    database_connection: PostgresCon,
-    limit: int | None = 1000,
-    log_query: bool = False,
-    process_icon: bool = False,
+def check_mv_exists(database_connection: PostgresCon, mv_name: str) -> bool:
+    query = f"""
+        SELECT relispopulated
+        FROM pg_class
+        WHERE relname = '{mv_name}';
+    """
+    with database_connection.get_cursor() as cur:
+        cur.execute(query)
+        row = cur.fetchone()
+    return row[0] if row is not None else False
+
+
+def get_crawl_scenario_countries(
+    database_connection: PostgresCon, scenario_name: str
 ) -> pd.DataFrame:
-    if "crawl-settings" in CONFIG:
-        short_update_days = CONFIG["crawl-settings"].get("short_update_days", 1)
-        short_update_installs = CONFIG["crawl-settings"].get(
-            "short_update_installs", 1000
-        )
-        short_update_ratings = CONFIG["crawl-settings"].get("short_update_ratings", 100)
-        long_update_days = CONFIG["crawl-settings"].get("long_update_days", 2)
-        max_recrawl_days = CONFIG["crawl-settings"].get("max_recrawl_days", 15)
-    else:
-        short_update_days = 1
-        short_update_days = 1
-        short_update_installs = 1000
-        short_update_ratings = 100
-        long_update_days = 2
-        max_recrawl_days = 15
+    query = f"""SELECT c.alpha2 as country_code, cc.priority
+        FROM public.crawl_scenario_country_config cc
+        JOIN public.countries c ON cc.country_id = c.id
+        JOIN public.crawl_scenarios s ON cc.scenario_id = s.id
+        WHERE s.name = '{scenario_name}'
+          AND cc.enabled = true
+        ORDER BY cc.priority;
+    """
+    df = pd.read_sql(query, database_connection.engine)
+    return df
+
+
+def query_store_apps_to_update(
+    database_connection: PostgresCon,
+    store: int,
+    country_crawl_priority: int,
+    log_query=False,
+    limit: int = 1000,
+) -> pd.DataFrame:
+    short_update_days = CONFIG["crawl-settings"].get("short_update_days", 1)
+    short_update_installs = CONFIG["crawl-settings"].get("short_update_installs", 1000)
+    short_update_ratings = CONFIG["crawl-settings"].get("short_update_ratings", 100)
+    long_update_days = CONFIG["crawl-settings"].get("long_update_days", 2)
+    max_recrawl_days = CONFIG["crawl-settings"].get("max_recrawl_days", 15)
     short_update_ts = datetime.datetime.now(tz=datetime.UTC) - datetime.timedelta(
         days=short_update_days
     )
@@ -698,74 +733,36 @@ def query_store_apps(
         days=max_recrawl_days
     )
     year_ago_ts = datetime.datetime.now(tz=datetime.UTC) - datetime.timedelta(days=365)
-    short_group = f"""(
-                        (
-                          installs >= {short_update_installs}
-                          OR rating_count >= {short_update_ratings}
-                          OR (sa.id in (select store_app from store_apps_in_latest_rankings))
-                            )
-                          AND sa.updated_at <= '{short_update_ts}'
-                          AND (crawl_result = 1 OR crawl_result IS NULL OR sa.created_at >= '{long_update_ts}' OR sa.store_last_updated >= '{year_ago_ts}')
-                        )
-                    """
-    long_group = f"""(
-                       sa.updated_at <= '{long_update_ts}'
-                       AND (crawl_result = 1 OR crawl_result IS NULL OR sa.store_last_updated >= '{year_ago_ts}')
-                    )
-                    """
-    max_group = f"""(
-                      sa.updated_at <= '{max_recrawl_ts}'
-                      OR crawl_result IS NULL
-                    )
-                """
-    installs_and_dates_str = f"""(
-                        {short_group}
-                        OR {long_group}
-                        OR {max_group}
-                        )
-                        """
-    where_str = f"store = {store}"
-    where_str += f""" AND {installs_and_dates_str}"""
-    limit_str = ""
-    if limit:
-        limit_str = f"LIMIT {limit}"
-    icon_str = ""
-    if process_icon:
-        icon_str = "icon_url_100,"
-    sel_query = f"""SELECT 
-            store, 
-            sa.id as store_app, 
-            store_id, 
-            sa.updated_at, 
-            {icon_str}
-            sa.additional_html_scraped_at
-        FROM 
-            store_apps sa
-        WHERE {where_str}
-        ORDER BY
-            (CASE
-                WHEN crawl_result IS NULL 
-                    OR (sa.id in (select store_app from store_apps_in_latest_rankings))
-                THEN 0
-                ELSE 1
-            END),
-            (CASE
-                WHEN sa.updated_at < '{max_recrawl_ts}'
-                THEN 0
-                ELSE 1
-            END),
-            COALESCE(review_count, 0
-                ) + 
-            GREATEST(
-                    COALESCE(installs, 0),
-                    COALESCE(CAST(rating_count AS bigint), 0)*50
-                )
-            DESC NULLS LAST
-        {limit_str}
-        """
+    rankings_mv_apps = ""
+    if check_mv_exists(database_connection, "store_apps_in_latest_rankings"):
+        # TODO: this is not included yet
+        rankings_mv_apps = (
+            " OR (sa.id in (select store_app from store_apps_in_latest_rankings))"
+        )
+    params = {
+        "store": store,
+        "country_crawl_priority": country_crawl_priority,
+        "short_update_ts": short_update_ts,
+        "short_update_installs": short_update_installs,
+        "short_update_ratings": short_update_ratings,
+        "long_update_ts": long_update_ts,
+        "max_recrawl_ts": max_recrawl_ts,
+        "year_ago_ts": year_ago_ts,
+        "mylimit": limit,
+    }
     if log_query:
-        logger.info(sel_query)
-    df = pd.read_sql(sel_query, database_connection.engine)
+        # Compile and print the query with parameters
+        compiled_query = QUERY_APPS_TO_UPDATE.bindparams(**params).compile(
+            database_connection.engine, compile_kwargs={"literal_binds": True}
+        )
+        logger.info(f"Executing query:\n{compiled_query}")
+    df = pd.read_sql(
+        QUERY_APPS_TO_UPDATE,
+        con=database_connection.engine,
+        params=params,
+        dtype={"store_app": int, "store": int, "store_id": str},
+    )
+    df["language"] = "en"
     return df
 
 
@@ -1131,7 +1128,7 @@ def get_version_code_by_md5_hash(
 def query_api_call_id_for_uuid(mitm_uuid: str, database_connection: PostgresCon) -> int:
     api_calls = query_api_calls_id_uuid_map(database_connection)
     filtered_df = api_calls[api_calls["mitm_uuid"] == mitm_uuid]
-    assert filtered_df.shape[0] == 1, f"Failed to find api_call_id for mitm_uuid"
+    assert filtered_df.shape[0] == 1, "Failed to find api_call_id for mitm_uuid"
     api_call_id = filtered_df["api_call_id"].to_numpy()[0]
     return api_call_id
 

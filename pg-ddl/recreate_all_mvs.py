@@ -4,18 +4,17 @@ This script checks which MVs exist in pg-ddl/schema/adtech/*__matview.sql but no
 then attempts to create them. It stops on the first failure.
 """
 
+import argparse
 import re
 from pathlib import Path
 
 from sqlalchemy import text
+from sqlalchemy.engine import Connection
 
 from adscrawler.config import get_logger
 from adscrawler.dbcon.connection import get_db_connection
 
 logger = get_logger(__name__)
-
-use_tunnel = True
-database_connection = get_db_connection(use_ssh_tunnel=use_tunnel)
 
 
 def get_existing_mvs() -> set:
@@ -93,17 +92,17 @@ def drop_all_mvs(mv_files: list[Path]) -> None:
             file_content = f.read()
         # Remove \restrict line that causes errors
         file_content = re.sub(r"\\restrict.*\n?", "", file_content, flags=re.IGNORECASE)
-        file_content = re.sub(
+        file_content_str = re.sub(
             r"\\unrestrict.*\n?", "", file_content, flags=re.IGNORECASE
         )
-        mv_name = extract_mv_name_from_file(file_content, mv_file)
+        mv_name = extract_mv_name_from_file(file_content_str, mv_file)
         if not mv_name:
             logger.warning(f"Could not extract MV name from {mv_file.name}")
             continue
         drop_mv(mv_name)
 
 
-def has_data(conn, mv_name):
+def has_data(conn: Connection, mv_name: str) -> bool:
     """Check if a materialized view has data. Reuses existing connection."""
     try:
         result = conn.execute(text(f"SELECT 1 FROM {mv_name} LIMIT 1;"))
@@ -112,7 +111,7 @@ def has_data(conn, mv_name):
         return False
 
 
-def create_all_mvs(mv_files: list[Path]) -> None:
+def create_all_mvs(mv_files: list[Path], stop_on_error: bool = False) -> None:
     """Create all missing materialized views."""
     existing_mvs = get_existing_mvs()
     logger.info(f"Found {len(existing_mvs)} existing MVs")
@@ -121,17 +120,24 @@ def create_all_mvs(mv_files: list[Path]) -> None:
         logger.error("No matview files found!")
         return
 
+    ordered_mvs = get_correct_order_from_dump(mv_files)
+
     mvs_missing_in_db = []
-    for mv_file in mv_files:
+    for mv_name in ordered_mvs:
+        mv_file = next(
+            (f for f in mv_files if mv_name.split(".")[1] + "__matview.sql" in f.name),
+            None,
+        )
+
         with open(mv_file) as f:
             file_content = f.read()
 
         # Remove \restrict line that causes errors
         file_content = re.sub(r"\\restrict.*\n?", "", file_content, flags=re.IGNORECASE)
-        file_content = re.sub(
+        file_content_str = re.sub(
             r"\\unrestrict.*\n?", "", file_content, flags=re.IGNORECASE
         )
-        mv_name = extract_mv_name_from_file(file_content, mv_file)
+        mv_name = extract_mv_name_from_file(file_content_str, mv_file)
         if not mv_name:
             logger.warning(f"Could not extract MV name from {mv_file.name}")
             continue
@@ -142,7 +148,7 @@ def create_all_mvs(mv_files: list[Path]) -> None:
     logger.info(f"Found {len(mvs_missing_in_db)} missing MVs to create in db")
 
     with database_connection.engine.connect() as conn:
-        for mv_name, create_statement, file_name in mvs_missing_in_db:
+        for mv_name, create_statement, _file_name in mvs_missing_in_db:
             trans = conn.begin()
             try:
                 conn.execute(text(create_statement))
@@ -151,7 +157,9 @@ def create_all_mvs(mv_files: list[Path]) -> None:
             except Exception as e:
                 trans.rollback()
                 logger.exception(f"✗ Failed to create {mv_name} with {e}")
-                break
+                if stop_on_error:
+                    logger.error("Stopping further MV creation due to error.")
+                    break
 
 
 def get_correct_order_from_dump(mv_files: list[Path]) -> list[str]:
@@ -184,7 +192,7 @@ def get_correct_order_from_dump(mv_files: list[Path]) -> list[str]:
     return ordered_existing_mvs
 
 
-def run_all_mvs(mv_files: list[Path]) -> None:
+def run_all_mvs(mv_files: list[Path], stop_on_error: bool = False) -> None:
     """Refresh all materialized views in correct dependency order."""
     ordered_mvs = get_correct_order_from_dump(mv_files)
 
@@ -200,10 +208,10 @@ def run_all_mvs(mv_files: list[Path]) -> None:
             file_content = f.read()
         # Remove \restrict line that causes errors
         file_content = re.sub(r"\\restrict.*\n?", "", file_content, flags=re.IGNORECASE)
-        file_content = re.sub(
+        file_content_str = re.sub(
             r"\\unrestrict.*\n?", "", file_content, flags=re.IGNORECASE
         )
-        mv_name = extract_mv_name_from_file(file_content, mv_file)
+        mv_name = extract_mv_name_from_file(file_content_str, mv_file)
         if not mv_name:
             logger.warning(f"Could not extract MV name from {mv_file.name}")
             continue
@@ -231,15 +239,71 @@ def run_all_mvs(mv_files: list[Path]) -> None:
             except Exception as e:
                 trans.rollback()
                 logger.exception(f"Failed to refresh {mv_name} with {e}")
+                if stop_on_error:
+                    logger.error("Stopping further MV refresh due to error.")
+                    break
 
 
-def main() -> None:
+def main(
+    drop_all: bool,
+    create_all: bool,
+    run_all: bool,
+    stop_on_error: bool,
+) -> None:
     mv_files = get_mv_files()
 
-    # drop_all_mvs(mv_files)
-    # create_all_mvs(mv_files)
-    run_all_mvs(mv_files)
+    if drop_all:
+        drop_all_mvs(mv_files)
+
+    if create_all:
+        create_all_mvs(mv_files, stop_on_error=stop_on_error)
+
+    if run_all:
+        run_all_mvs(mv_files, stop_on_error=stop_on_error)
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(
+        description="Manage materialized views: drop, create, and refresh"
+    )
+
+    parser.add_argument(
+        "--drop-all-mvs",
+        action="store_true",
+        help="Drop all materialized views before creating",
+    )
+    parser.add_argument(
+        "--create-all-mvs",
+        action="store_true",
+        help="Create missing materialized views",
+    )
+    parser.add_argument(
+        "--run-all-mvs", action="store_true", help="Refresh all materialized views"
+    )
+    parser.add_argument(
+        "--use-tunnel",
+        action="store_true",
+        help="Use SSH tunnel for database connection",
+    )
+    parser.add_argument(
+        "--config-key",
+        type=str,
+        required=True,
+        help="Database config key (e.g., 'devdb', 'proddb')",
+    )
+    parser.add_argument(
+        "--stop-on-error", action="store_true", help="Stop execution on first error"
+    )
+
+    args = parser.parse_args()
+
+    database_connection = get_db_connection(
+        use_ssh_tunnel=args.use_tunnel, config_key=args.config_key
+    )
+
+    main(
+        drop_all=args.drop_all_mvs,
+        create_all=args.create_all_mvs,
+        run_all=args.run_all_mvs,
+        stop_on_error=args.stop_on_error,
+    )

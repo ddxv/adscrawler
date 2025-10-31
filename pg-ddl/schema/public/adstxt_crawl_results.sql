@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict cQtBFDR6ZZTj8Su5kzxIo7gU6c8ahP4UYxMgjrNh8gPAtElGX1YEmLGKjQ4T542
+\restrict H1CSeIJgD92dq2NSXmD3rQR1rN87ZEmD8YKMn0fkD4pcAEbdgdryrR0t96Gx45v
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -44,12 +44,12 @@ ALTER TABLE public.adstxt_crawl_results OWNER TO postgres;
 --
 
 CREATE SEQUENCE public.adstxt_crawl_results_id_seq
-AS integer
-START WITH 1
-INCREMENT BY 1
-NO MINVALUE
-NO MAXVALUE
-CACHE 1;
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
 
 
 ALTER SEQUENCE public.adstxt_crawl_results_id_seq OWNER TO postgres;
@@ -65,9 +65,7 @@ ALTER SEQUENCE public.adstxt_crawl_results_id_seq OWNED BY public.adstxt_crawl_r
 -- Name: adstxt_crawl_results id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.adstxt_crawl_results ALTER COLUMN id SET DEFAULT nextval(
-    'public.adstxt_crawl_results_id_seq'::regclass
-);
+ALTER TABLE ONLY public.adstxt_crawl_results ALTER COLUMN id SET DEFAULT nextval('public.adstxt_crawl_results_id_seq'::regclass);
 
 
 --
@@ -75,7 +73,7 @@ ALTER TABLE ONLY public.adstxt_crawl_results ALTER COLUMN id SET DEFAULT nextval
 --
 
 ALTER TABLE ONLY public.adstxt_crawl_results
-ADD CONSTRAINT adstxt_crawl_results_domain_un UNIQUE (domain_id);
+    ADD CONSTRAINT adstxt_crawl_results_domain_un UNIQUE (domain_id);
 
 
 --
@@ -83,7 +81,7 @@ ADD CONSTRAINT adstxt_crawl_results_domain_un UNIQUE (domain_id);
 --
 
 ALTER TABLE ONLY public.adstxt_crawl_results
-ADD CONSTRAINT adstxt_crawl_results_pkey PRIMARY KEY (id);
+    ADD CONSTRAINT adstxt_crawl_results_pkey PRIMARY KEY (id);
 
 
 --
@@ -91,13 +89,12 @@ ADD CONSTRAINT adstxt_crawl_results_pkey PRIMARY KEY (id);
 --
 
 ALTER TABLE ONLY public.adstxt_crawl_results
-ADD CONSTRAINT adstxt_crawl_results_d_fkey FOREIGN KEY (
-    domain_id
-) REFERENCES public.domains (id);
+    ADD CONSTRAINT adstxt_crawl_results_d_fkey FOREIGN KEY (domain_id) REFERENCES public.domains(id);
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict cQtBFDR6ZZTj8Su5kzxIo7gU6c8ahP4UYxMgjrNh8gPAtElGX1YEmLGKjQ4T542
+\unrestrict H1CSeIJgD92dq2NSXmD3rQR1rN87ZEmD8YKMn0fkD4pcAEbdgdryrR0t96Gx45v
+

@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict lVI4phFaVgNR7cYsd48cNXMcQOkJs1ySbzyuRVeI57soihG1hWpSpxMQ9YfQSgY
+\restrict Kd01DvGzUGsIuIfah5aFeHPkvEcizGz8zvnvwFht3NHmFW4v1rmmTRDCAdNQdyx
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -40,7 +40,7 @@ ALTER TABLE adtech.sdk_categories OWNER TO postgres;
 --
 
 ALTER TABLE ONLY adtech.sdk_categories
-ADD CONSTRAINT sdk_categories_pkey PRIMARY KEY (sdk_id, category_id);
+    ADD CONSTRAINT sdk_categories_pkey PRIMARY KEY (sdk_id, category_id);
 
 
 --
@@ -48,9 +48,7 @@ ADD CONSTRAINT sdk_categories_pkey PRIMARY KEY (sdk_id, category_id);
 --
 
 ALTER TABLE ONLY adtech.sdk_categories
-ADD CONSTRAINT fk_category FOREIGN KEY (
-    category_id
-) REFERENCES adtech.categories (id) ON DELETE CASCADE;
+    ADD CONSTRAINT fk_category FOREIGN KEY (category_id) REFERENCES adtech.categories(id) ON DELETE CASCADE;
 
 
 --
@@ -58,13 +56,12 @@ ADD CONSTRAINT fk_category FOREIGN KEY (
 --
 
 ALTER TABLE ONLY adtech.sdk_categories
-ADD CONSTRAINT fk_sdk FOREIGN KEY (sdk_id) REFERENCES adtech.sdks (
-    id
-) ON DELETE CASCADE;
+    ADD CONSTRAINT fk_sdk FOREIGN KEY (sdk_id) REFERENCES adtech.sdks(id) ON DELETE CASCADE;
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict lVI4phFaVgNR7cYsd48cNXMcQOkJs1ySbzyuRVeI57soihG1hWpSpxMQ9YfQSgY
+\unrestrict Kd01DvGzUGsIuIfah5aFeHPkvEcizGz8zvnvwFht3NHmFW4v1rmmTRDCAdNQdyx
+

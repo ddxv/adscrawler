@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict G6cFdDZHMMowxJBw5ldXefkYgFiVghLaNgLTOCrhVI5asbMraUtKCjaR7F6fVvo
+\restrict t34cWDOLbP2iOq680iY3fNiIu364ZbJyP0nE7IrbzTcPABDJKhwqxbcAjZ6N82p
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -32,9 +32,7 @@ CREATE TABLE logging.version_code_api_scan_results (
     version_code text,
     apk_hash text,
     crawl_result smallint,
-    updated_at timestamp without time zone DEFAULT timezone(
-        'utc'::text, now()
-    ) NOT NULL
+    updated_at timestamp without time zone DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
 
@@ -44,4 +42,5 @@ ALTER TABLE logging.version_code_api_scan_results OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict G6cFdDZHMMowxJBw5ldXefkYgFiVghLaNgLTOCrhVI5asbMraUtKCjaR7F6fVvo
+\unrestrict t34cWDOLbP2iOq680iY3fNiIu364ZbJyP0nE7IrbzTcPABDJKhwqxbcAjZ6N82p
+

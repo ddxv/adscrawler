@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict Bwtzd7Kl68WOQ7fTTGwK6ILJ6i1ERz22jChJ46IHUiHeTH4IbNeXLIsgFxaEHdb
+\restrict uzXS4Ym1uFoi6Ee9XrmRLrJDrDEzHUlHjBKXkoH2LXj0YZy3vJnBNNqv0TfsoKi
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -41,12 +41,12 @@ ALTER TABLE public.domains OWNER TO postgres;
 --
 
 CREATE SEQUENCE public.domains_id_seq
-AS integer
-START WITH 1
-INCREMENT BY 1
-NO MINVALUE
-NO MAXVALUE
-CACHE 1;
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
 
 
 ALTER SEQUENCE public.domains_id_seq OWNER TO postgres;
@@ -62,9 +62,7 @@ ALTER SEQUENCE public.domains_id_seq OWNED BY public.domains.id;
 -- Name: domains id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.domains ALTER COLUMN id SET DEFAULT nextval(
-    'public.domains_id_seq'::regclass
-);
+ALTER TABLE ONLY public.domains ALTER COLUMN id SET DEFAULT nextval('public.domains_id_seq'::regclass);
 
 
 --
@@ -72,7 +70,7 @@ ALTER TABLE ONLY public.domains ALTER COLUMN id SET DEFAULT nextval(
 --
 
 ALTER TABLE ONLY public.domains
-ADD CONSTRAINT domains_domain_type_un UNIQUE (domain_name);
+    ADD CONSTRAINT domains_domain_type_un UNIQUE (domain_name);
 
 
 --
@@ -80,11 +78,12 @@ ADD CONSTRAINT domains_domain_type_un UNIQUE (domain_name);
 --
 
 ALTER TABLE ONLY public.domains
-ADD CONSTRAINT domains_pkey PRIMARY KEY (id);
+    ADD CONSTRAINT domains_pkey PRIMARY KEY (id);
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict Bwtzd7Kl68WOQ7fTTGwK6ILJ6i1ERz22jChJ46IHUiHeTH4IbNeXLIsgFxaEHdb
+\unrestrict uzXS4Ym1uFoi6Ee9XrmRLrJDrDEzHUlHjBKXkoH2LXj0YZy3vJnBNNqv0TfsoKi
+

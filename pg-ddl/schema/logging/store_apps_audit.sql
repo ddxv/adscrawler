@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict PNkiHCYIBLyiUTpsgQALG6VFocfoCpcyfGTf0iI6RFie7adwjEmHvfq4HmWoLT7
+\restrict WvU7uUThjb5Run3bPNIAFi9Z8HlPm8KOp1NhX9AwunKUpy5bmV3a8rgis7Y5qNb
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -44,13 +44,12 @@ ALTER TABLE logging.store_apps_audit OWNER TO postgres;
 -- Name: store_apps_audit_stamp_idx; Type: INDEX; Schema: logging; Owner: postgres
 --
 
-CREATE INDEX store_apps_audit_stamp_idx ON logging.store_apps_audit USING btree (
-    stamp
-);
+CREATE INDEX store_apps_audit_stamp_idx ON logging.store_apps_audit USING btree (stamp);
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict PNkiHCYIBLyiUTpsgQALG6VFocfoCpcyfGTf0iI6RFie7adwjEmHvfq4HmWoLT7
+\unrestrict WvU7uUThjb5Run3bPNIAFi9Z8HlPm8KOp1NhX9AwunKUpy5bmV3a8rgis7Y5qNb
+

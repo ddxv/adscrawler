@@ -1,0 +1,3 @@
+# Files in these directories are auto generated from dumps
+# SQLFluff struggles and throws errors for them
+*.sql

@@ -20,7 +20,10 @@ WITH latest_version_codes AS (
 ),
 last_scanned AS (
     SELECT DISTINCT ON
-    (vc.store_app) *
+    (vc.store_app)
+        vasr.version_code_id,
+        vasr.run_at,
+        vasr.run_result
     FROM
         version_code_api_scan_results AS vasr
     LEFT JOIN version_codes AS vc
@@ -31,7 +34,9 @@ last_scanned AS (
 ),
 last_successful_scanned AS (
     SELECT DISTINCT ON
-    (vc.store_app) *
+    (vc.store_app)
+        vasr.version_code_id,
+        vasr.run_at
     FROM
         version_code_api_scan_results AS vasr
     LEFT JOIN version_codes AS vc

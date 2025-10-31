@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict ip8AKMNr6hBvIRqeEbRwqDQCkoXsfWaGe4wtYT56C8LuB4dEGRa1B6E2Au51iBJ
+\restrict VNr4U40QhpRtLwUdrOKeVKDjfeqVo5JTtNicVMVkGxpQlmyHA3P9oi2yPasBJyP
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -28,41 +28,25 @@ SET default_table_access_method = heap;
 --
 
 CREATE MATERIALIZED VIEW public.developer_store_apps AS
-WITH developer_domain_ids AS (
-    SELECT DISTINCT pd_1.id AS domain_id
-    FROM (((
-        public.app_urls_map aum_1
-        LEFT JOIN public.domains AS pd_1 ON ((aum_1.pub_domain = pd_1.id))
-    )
-    LEFT JOIN public.store_apps AS sa_1 ON ((aum_1.store_app = sa_1.id))
-    )
-    LEFT JOIN public.developers AS d_1 ON ((sa_1.developer = d_1.id))
-    )
-)
-SELECT
-    sa.store,
-    sa.store_id,
-    sa.name,
-    sa.icon_url_512,
-    sa.installs,
-    sa.rating,
-    sa.rating_count,
-    sa.review_count,
+ WITH developer_domain_ids AS (
+         SELECT DISTINCT pd_1.id AS domain_id
+           FROM (((public.app_urls_map aum_1
+             LEFT JOIN public.domains pd_1 ON ((aum_1.pub_domain = pd_1.id)))
+             LEFT JOIN public.store_apps sa_1 ON ((aum_1.store_app = sa_1.id)))
+             LEFT JOIN public.developers d_1 ON ((sa_1.developer = d_1.id)))
+        )
+ SELECT sa.store,
+    sa.id AS store_app,
     d.name AS developer_name,
     pd.domain_name AS developer_url,
     d.store AS developer_store,
     pd.id AS domain_id,
     d.developer_id
-FROM (((
-    public.store_apps sa
-    LEFT JOIN public.developers AS d ON ((sa.developer = d.id))
-)
-LEFT JOIN public.app_urls_map AS aum ON ((sa.id = aum.store_app))
-)
-LEFT JOIN public.domains AS pd ON ((aum.pub_domain = pd.id))
-)
-ORDER BY sa.installs DESC NULLS LAST, sa.rating_count DESC NULLS LAST
-WITH NO DATA;
+   FROM (((public.store_apps sa
+     LEFT JOIN public.developers d ON ((sa.developer = d.id)))
+     LEFT JOIN public.app_urls_map aum ON ((sa.id = aum.store_app)))
+     LEFT JOIN public.domains pd ON ((aum.pub_domain = pd.id)))
+  WITH NO DATA;
 
 
 ALTER MATERIALIZED VIEW public.developer_store_apps OWNER TO postgres;
@@ -71,40 +55,33 @@ ALTER MATERIALIZED VIEW public.developer_store_apps OWNER TO postgres;
 -- Name: developer_store_apps_query; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE INDEX developer_store_apps_query ON public.developer_store_apps USING btree (
-    developer_id
-);
+CREATE INDEX developer_store_apps_query ON public.developer_store_apps USING btree (developer_id);
 
 
 --
 -- Name: idx_developer_store_apps_developer_domain; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE INDEX idx_developer_store_apps_developer_domain ON public.developer_store_apps USING btree (
-    developer_id, domain_id
-);
+CREATE INDEX idx_developer_store_apps_developer_domain ON public.developer_store_apps USING btree (developer_id, domain_id);
 
 
 --
 -- Name: idx_developer_store_apps_domain_id; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE INDEX idx_developer_store_apps_domain_id ON public.developer_store_apps USING btree (
-    domain_id
-);
+CREATE INDEX idx_developer_store_apps_domain_id ON public.developer_store_apps USING btree (domain_id);
 
 
 --
 -- Name: idx_developer_store_apps_unique; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE UNIQUE INDEX idx_developer_store_apps_unique ON public.developer_store_apps USING btree (
-    developer_id, store_id
-);
+CREATE UNIQUE INDEX idx_developer_store_apps_unique ON public.developer_store_apps USING btree (developer_id, store_app);
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict ip8AKMNr6hBvIRqeEbRwqDQCkoXsfWaGe4wtYT56C8LuB4dEGRa1B6E2Au51iBJ
+\unrestrict VNr4U40QhpRtLwUdrOKeVKDjfeqVo5JTtNicVMVkGxpQlmyHA3P9oi2yPasBJyP
+

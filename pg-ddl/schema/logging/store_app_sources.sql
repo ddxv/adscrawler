@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict LERMLUOLBD0Rc6LStCtZylUuWsY3hlV6A6cKS2CDaDFRi9U1mMdnQzCzMyGpd4y
+\restrict hDefcPGVAShcAMVsaonXEiO6nhaOBpVWnHHSwAcnbfWbgcops4KxIQTOTjDPlD4
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -41,7 +41,7 @@ ALTER TABLE logging.store_app_sources OWNER TO postgres;
 --
 
 ALTER TABLE ONLY logging.store_app_sources
-ADD CONSTRAINT store_app_sources_pk PRIMARY KEY (store, store_app);
+    ADD CONSTRAINT store_app_sources_pk PRIMARY KEY (store, store_app);
 
 
 --
@@ -49,9 +49,7 @@ ADD CONSTRAINT store_app_sources_pk PRIMARY KEY (store, store_app);
 --
 
 ALTER TABLE ONLY logging.store_app_sources
-ADD CONSTRAINT store_app_sources_app_fk FOREIGN KEY (
-    store_app
-) REFERENCES public.store_apps (id) ON DELETE CASCADE;
+    ADD CONSTRAINT store_app_sources_app_fk FOREIGN KEY (store_app) REFERENCES public.store_apps(id) ON DELETE CASCADE;
 
 
 --
@@ -59,13 +57,12 @@ ADD CONSTRAINT store_app_sources_app_fk FOREIGN KEY (
 --
 
 ALTER TABLE ONLY logging.store_app_sources
-ADD CONSTRAINT store_app_sources_store_fk FOREIGN KEY (
-    store
-) REFERENCES public.stores (id);
+    ADD CONSTRAINT store_app_sources_store_fk FOREIGN KEY (store) REFERENCES public.stores(id);
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict LERMLUOLBD0Rc6LStCtZylUuWsY3hlV6A6cKS2CDaDFRi9U1mMdnQzCzMyGpd4y
+\unrestrict hDefcPGVAShcAMVsaonXEiO6nhaOBpVWnHHSwAcnbfWbgcops4KxIQTOTjDPlD4
+

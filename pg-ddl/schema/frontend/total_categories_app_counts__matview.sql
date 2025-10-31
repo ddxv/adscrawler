@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict qW1e6nMlfh62q6cJlmomVbK9ihAwr6AtcmdDHxQuJdIuprPydY2hSCftdbjxvTr
+\restrict PXHb9LIcQtQiEiF2tbwK13ddoAhanHYwhfjkPRSBSragKg7Gs2SwK1TTJvl4f5A
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -28,26 +28,16 @@ SET default_table_access_method = heap;
 --
 
 CREATE MATERIALIZED VIEW frontend.total_categories_app_counts AS
-SELECT
-    sa.store,
+ SELECT sa.store,
     tag.tag_source,
     csac.app_category,
     count(DISTINCT csac.store_app) AS app_count
-FROM ((
-    adtech.combined_store_apps_companies csac
-    LEFT JOIN public.store_apps AS sa ON ((csac.store_app = sa.id))
-)
-CROSS JOIN
-    LATERAL (
-        VALUES ('sdk'::text, csac.sdk),
-        ('api_call'::text, csac.api_call),
-        ('app_ads_direct'::text, csac.app_ads_direct),
-        ('app_ads_reseller'::text, csac.app_ads_reseller)
-    ) AS tag (tag_source, present)
-)
-WHERE (tag.present IS true)
-GROUP BY sa.store, tag.tag_source, csac.app_category
-WITH NO DATA;
+   FROM ((adtech.combined_store_apps_companies csac
+     LEFT JOIN public.store_apps sa ON ((csac.store_app = sa.id)))
+     CROSS JOIN LATERAL ( VALUES ('sdk'::text,csac.sdk), ('api_call'::text,csac.api_call), ('app_ads_direct'::text,csac.app_ads_direct), ('app_ads_reseller'::text,csac.app_ads_reseller)) tag(tag_source, present))
+  WHERE (tag.present IS TRUE)
+  GROUP BY sa.store, tag.tag_source, csac.app_category
+  WITH NO DATA;
 
 
 ALTER MATERIALIZED VIEW frontend.total_categories_app_counts OWNER TO postgres;
@@ -56,13 +46,12 @@ ALTER MATERIALIZED VIEW frontend.total_categories_app_counts OWNER TO postgres;
 -- Name: idx_total_categories_app_counts; Type: INDEX; Schema: frontend; Owner: postgres
 --
 
-CREATE UNIQUE INDEX idx_total_categories_app_counts ON frontend.total_categories_app_counts USING btree (
-    store, tag_source, app_category
-);
+CREATE UNIQUE INDEX idx_total_categories_app_counts ON frontend.total_categories_app_counts USING btree (store, tag_source, app_category);
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict qW1e6nMlfh62q6cJlmomVbK9ihAwr6AtcmdDHxQuJdIuprPydY2hSCftdbjxvTr
+\unrestrict PXHb9LIcQtQiEiF2tbwK13ddoAhanHYwhfjkPRSBSragKg7Gs2SwK1TTJvl4f5A
+

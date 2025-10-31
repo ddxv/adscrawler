@@ -1,14 +1,11 @@
 import datetime
-import os
 import pathlib
 import time
-import uuid
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from io import BytesIO
 from urllib.error import URLError
 from urllib.parse import unquote_plus
 
-import duckdb
 import google_play_scraper
 import imagehash
 import pandas as pd
@@ -33,9 +30,18 @@ from adscrawler.app_stores.google import (
     scrape_google_ranks,
     search_play_store,
 )
+from adscrawler.app_stores.process_from_s3 import (
+    app_details_to_s3,
+    process_store_rankings,
+)
+from adscrawler.app_stores.utils import insert_new_apps
 from adscrawler.config import APP_ICONS_TMP_DIR, CONFIG, get_logger
-from adscrawler.dbcon.connection import PostgresCon, get_db_connection
+from adscrawler.dbcon.connection import (
+    PostgresCon,
+    get_db_connection,
+)
 from adscrawler.dbcon.queries import (
+    get_crawl_scenario_countries,
     get_store_app_columns,
     query_categories,
     query_collections,
@@ -43,268 +49,54 @@ from adscrawler.dbcon.queries import (
     query_developers,
     query_keywords_to_crawl,
     query_languages,
-    query_store_apps,
+    query_store_apps_to_update,
     query_store_id_map,
+    query_store_id_map_cached,
     query_store_ids,
     upsert_df,
 )
-from adscrawler.packages.storage import get_s3_client, get_s3_endpoint
+from adscrawler.packages.storage import get_s3_client
 
 logger = get_logger(__name__, "scrape_stores")
 
-# Pulling for more countries will want to track rating, review count, and histogram
-APP_DETAILS_COUNTRY_LIST = ["us"]
-
-# Pulling for more languages to track descriptions, reviews, titles, etc.
-APP_DETAILS_LANGUAGE_LIST = ["en"]
-
-# Daily ranks on the app stores
-RANKS_COUNTRY_LIST = [
-    "us",
-    "cn",
-    "de",
-    "in",
-    "ca",
-    "gb",
-    "au",
-    "fr",
-    "es",
-    "it",
-    "kr",
-    "jp",
-    "ru",
-    "mx",
-    "nl",
-    "pl",
-    "pt",
-    "sa",
-    "tr",
-    "ua",
-    "za",
-    "br",
-    "be",
-    "ch",
-    "cz",
-    "dk",
-    "gr",
-    "hu",
-    "id",
-    "ie",
-    "il",
-    "my",
-    "no",
-    "nz",
-    "ph",
-    "ro",
-    "se",
-    "sg",
-    "vn",
-    "pk",
-    "ng",
-    "bd",
-    "et",
-    "eg",
-    "cd",
-    "ir",
-    "th",
-    "tz",
-    "mm",
-    "ke",
-    "co",
-    "ar",
-    "ug",
-    "dz",
-    "sd",
-    "iq",
-    "af",
-    "ma",
-    "uz",
-    "pe",
-    "ao",
-    "gh",
-    "mz",
-    "ve",
-    "ye",
-    "np",
-    "mg",
-    "kp",
-    "cm",
-    "ci",
-    "tw",
-    "ne",
-    "lk",
-    "bf",
-    "ml",
-    "cl",
-    "kz",
-    "mw",
-    "zm",
-    "gt",
-    "ec",
-    "sy",
-    "kh",
-    "sn",
-    "td",
-    "so",
-    "zw",
-    "gn",
-    "rw",
-    "tn",
-    "bj",
-    "bo",
-    "cu",
-    "bi",
-    "ht",
-    "do",
-    "jo",
-    "az",
-    "ae",
-    "hn",
-    "by",
-    "tj",
-    "at",
-    "pg",
-    "ss",
-    "tg",
-    "sl",
-    "hk",
-    "la",
-    "bg",
-    "rs",
-    "lb",
-    "ly",
-    "ni",
-    "sv",
-    "kg",
-    "er",
-    "tm",
-    "fi",
-    "sk",
-    "cg",
-    "cr",
-    "om",
-    "lr",
-    "cf",
-    "ps",
-    "mr",
-    "pa",
-    "kw",
-    "hr",
-    "ge",
-    "md",
-    "uy",
-    "ba",
-    "pr",
-    "mn",
-    "am",
-    "jm",
-    "al",
-    "lt",
-    "qa",
-    "na",
-    "gm",
-    "bw",
-    "ga",
-    "ls",
-    "mk",
-    "si",
-]
-
-
-def app_details_to_s3(
-    df: pd.DataFrame,
-    store: int,
-) -> None:
-    logger.info(f"S3 upload app details {store=} start")
-    if store is None:
-        raise ValueError("store is required")
-    s3_client = get_s3_client()
-    bucket = CONFIG["s3"]["bucket"]
-    # handles edge case of a crawl spanning a date change
-    for crawled_date, date_df in df.groupby("crawled_date"):
-        if isinstance(crawled_date, datetime.date):
-            crawled_date = crawled_date.strftime("%Y-%m-%d")
-        for country, country_df in date_df.groupby("country"):
-            epoch_ms = int(time.time() * 1000)
-            suffix = uuid.uuid4().hex[:8]
-            file_name = f"app_details_{epoch_ms}_{suffix}.parquet"
-            s3_loc = "raw-data/app_details"
-            s3_key = f"{s3_loc}/store={store}/crawled_date={crawled_date}/country={country}/{file_name}"
-            buffer = BytesIO()
-            country_df.to_parquet(buffer, index=False)
-            buffer.seek(0)
-            s3_client.upload_fileobj(buffer, bucket, s3_key)
-    logger.info(f"S3 upload app details {store=} finished")
-
 
 def process_chunk(
-    df_chunk: pd.DataFrame, use_ssh_tunnel: bool, process_icon: bool, total_rows: int
+    df_chunk: pd.DataFrame,
+    store: int,
+    use_ssh_tunnel: bool,
+    process_icon: bool,
+    total_rows: int,
 ):
     chunk_info = f"Chunk {df_chunk.index[0]}-{df_chunk.index[-1]}/{total_rows}"
-    database_connection = get_db_connection(use_ssh_tunnel=use_ssh_tunnel)
     logger.info(f"{chunk_info} start")
+    database_connection = get_db_connection(use_ssh_tunnel=use_ssh_tunnel)
     try:
         chunk_results = []
         for _, row in df_chunk.iterrows():
-            for country in APP_DETAILS_COUNTRY_LIST:
-                for language in APP_DETAILS_LANGUAGE_LIST:
-                    try:
-                        result_dict = scrape_app(
-                            store=row["store"],
-                            store_id=row["store_id"],
-                            country=country,
-                            language=language,
-                        )
-                        chunk_results.append(result_dict)
-                    except Exception as e:
-                        logger.exception(
-                            f"store={row.store}, store_id={row.store_id} update_all_app_info failed with {e}"
-                        )
+            try:
+                result_dict = scrape_app(
+                    store=store,
+                    store_id=row["store_id"],
+                    country=row["country_code"],
+                    language=row["language"],
+                )
+                chunk_results.append(result_dict)
+            except Exception as e:
+                logger.exception(
+                    f"store={row.store}, store_id={row.store_id} update_all_app_info failed with {e}"
+                )
         results_df = pd.DataFrame(chunk_results)
         results_df["crawled_date"] = results_df["crawled_at"].dt.date
-        app_details_to_s3(results_df, store=row["store"])
-        for crawl_result, apps_df in results_df.groupby("crawl_result"):
-            if crawl_result != 1:
-                apps_df = apps_df[["store_id", "store", "crawled_at", "crawl_result"]]
-            else:
-                apps_df = clean_scraped_df(df=apps_df, store=row["store"])
-                if "description_short" not in apps_df.columns:
-                    apps_df["description_short"] = ""
-                apps_df.loc[
-                    apps_df["description_short"].isna(), "description_short"
-                ] = ""
-                if process_icon:
-                    try:
-                        apps_df = pd.merge(
-                            apps_df,
-                            df_chunk[["store_id", "icon_url_100"]],
-                            on="store_id",
-                            how="inner",
-                            validate="1:1",
-                        )
-                        no_icon = apps_df["icon_url_100"].isna()
-                        if apps_df[no_icon].empty:
-                            pass
-                        else:
-                            apps_df.loc[no_icon, "icon_url_100"] = apps_df.loc[
-                                no_icon
-                            ].apply(
-                                lambda x: process_app_icon(
-                                    x["store_id"], x["icon_url_512"]
-                                ),
-                                axis=1,
-                            )
-                    except Exception:
-                        logger.exception(
-                            f"{row['store_id']} failed to process app icon"
-                        )
-            apps_df = apps_df.convert_dtypes(dtype_backend="pyarrow")
-            apps_df = apps_df.replace({pd.NA: None})
-            apps_details_to_db(
-                apps_df=apps_df,
-                database_connection=database_connection,
-            )
-            logger.info(f"{chunk_info} upserted {crawl_result=} apps={len(apps_df)} ")
+        app_details_to_s3(results_df, store=store)
+        log_crawl_results(results_df, store, database_connection=database_connection)
+        results_df = results_df[(results_df["country"] == "US")]
+        process_live_app_details(
+            store=store,
+            results_df=results_df,
+            database_connection=database_connection,
+            process_icon=process_app_icon,
+            df_chunk=df_chunk,
+        )
     except Exception as e:
         logger.exception(f"{chunk_info} error processing with {e}")
     finally:
@@ -315,28 +107,43 @@ def process_chunk(
 
 
 def update_app_details(
-    database_connection, store, use_ssh_tunnel, workers, process_icon, limit
+    database_connection,
+    store,
+    use_ssh_tunnel,
+    workers,
+    process_icon,
+    limit,
+    country_crawl_priority,
 ):
     """Process apps with dynamic work queue - simple and efficient."""
     log_info = f"Update app details: {store=}"
 
-    df = query_store_apps(
-        store,
-        database_connection,
+    df = query_store_apps_to_update(
+        store=store,
+        database_connection=database_connection,
         limit=limit,
-        process_icon=process_icon,
+        country_crawl_priority=country_crawl_priority,
     )
+    df = df.sort_values("country_code").reset_index(drop=True)
     logger.info(f"{log_info} start {len(df)} apps")
 
-    # Calculate optimal chunk size: aim for 3-10x more chunks than workers
-    chunk_size = max(50, min(1000, len(df) // (workers * 5)))
-    chunks = [df.iloc[i : i + chunk_size] for i in range(0, len(df), chunk_size)]
-
+    max_chunk_size = 10000
+    chunks = []
+    # Try keeping countries together for larger end S3 files
+    for _country, country_df in df.groupby("country_code"):
+        country_size = len(country_df)
+        if country_size <= max_chunk_size:
+            # Country fits in one chunk
+            chunks.append(country_df)
+        else:
+            # Split large country into multiple chunks
+            num_chunks = (country_size + max_chunk_size - 1) // max_chunk_size
+            chunk_size = country_size // num_chunks
+            for i in range(0, country_size, chunk_size):
+                chunks.append(country_df.iloc[i : i + chunk_size])
     total_chunks = len(chunks)
     total_rows = len(df)
-    logger.info(
-        f"Processing {total_rows} apps in {total_chunks} chunks of ~{chunk_size} apps each"
-    )
+    logger.info(f"Processing {total_rows} apps in {total_chunks} chunks")
 
     completed_count = 0
     failed_count = 0
@@ -346,7 +153,7 @@ def update_app_details(
         future_to_idx = {}
         for idx, df_chunk in enumerate(chunks):
             future = executor.submit(
-                process_chunk, df_chunk, use_ssh_tunnel, process_icon, total_rows
+                process_chunk, df_chunk, store, use_ssh_tunnel, process_icon, total_rows
             )
             future_to_idx[future] = idx
 
@@ -383,7 +190,6 @@ def update_app_details(
 
 
 def crawl_keyword_cranks(database_connection: PostgresCon) -> None:
-    countries_map = query_countries(database_connection)
     languages_map = query_languages(database_connection)
     country = "us"
     language = "en"
@@ -404,12 +210,13 @@ def crawl_keyword_cranks(database_connection: PostgresCon) -> None:
             )
             df["keyword"] = keyword_id
             df["lang"] = language_key
-            process_scraped(
-                database_connection=database_connection,
-                ranked_dicts=df.to_dict(orient="records"),
-                crawl_source="scrape_keywords",
-                countries_map=countries_map,
-            )
+            #  _countries_map = query_countries(database_connection)
+            # process_scraped(
+            #     database_connection=database_connection,
+            #     ranked_dicts=df.to_dict(orient="records"),
+            #     crawl_source="scrape_keywords",
+            #     countries_map=countries_map,
+            # )
         except Exception:
             logger.exception(f"Scrape keyword={keyword} hit error, skipping")
         key_columns = ["keyword"]
@@ -434,9 +241,13 @@ def scrape_store_ranks(database_connection: PostgresCon, store: int) -> None:
     countries_map = query_countries(database_connection)
     collections_map = collections_map.rename(columns={"id": "store_collection"})
     categories_map = categories_map.rename(columns={"id": "store_category"})
+    ranks_country_list = get_crawl_scenario_countries(
+        database_connection=database_connection, scenario_name="app_ranks"
+    )
+    country_codes = ranks_country_list["country_code"].str.lower().unique().tolist()
     if store == 2:
         collection_keyword = "TOP"
-        for country in RANKS_COUNTRY_LIST:
+        for country in country_codes:
             try:
                 ranked_dicts = scrape_ios_ranks(
                     collection_keyword=collection_keyword, country=country
@@ -456,7 +267,7 @@ def scrape_store_ranks(database_connection: PostgresCon, store: int) -> None:
                 )
 
     if store == 1:
-        for country in RANKS_COUNTRY_LIST:
+        for country in country_codes:
             try:
                 ranked_dicts = scrape_google_ranks(country=country)
                 process_scraped(
@@ -490,57 +301,6 @@ def scrape_store_ranks(database_connection: PostgresCon, store: int) -> None:
             )
         except Exception:
             logger.exception("ApkCombo RSS feed failed")
-
-
-def insert_new_apps(
-    dicts: list[dict], database_connection: PostgresCon, crawl_source: str, store: int
-) -> None:
-    df = pd.DataFrame(dicts)
-    df["store_id"].str.match(r"^[0-9].*\.")
-    found_bad_ids = df[df["store"] == store, "store_id"].str.match(r"^[0-9].*\.").any()
-    if found_bad_ids:
-        logger.error(f"Scrape {store=} {crawl_source=} found bad store_ids")
-        raise ValueError("Found bad store_ids")
-    all_scraped_ids = df["store_id"].unique().tolist()
-    existing_ids_map = query_store_id_map(
-        database_connection,
-        store_ids=all_scraped_ids,
-    )
-    existing_store_ids = existing_ids_map["store_id"].tolist()
-    new_apps_df = df[~(df["store_id"].isin(existing_store_ids))][
-        ["store", "store_id"]
-    ].drop_duplicates()
-    if new_apps_df.empty:
-        logger.info(f"Scrape {store=} {crawl_source=} no new apps")
-        return
-    else:
-        logger.info(
-            f"Scrape {store=} {crawl_source=} insert new apps to db {new_apps_df.shape=}",
-        )
-        insert_columns = ["store", "store_id"]
-        inserted_apps: pd.DataFrame = upsert_df(
-            table_name="store_apps",
-            insert_columns=insert_columns,
-            df=new_apps_df,
-            key_columns=insert_columns,
-            database_connection=database_connection,
-            return_rows=True,
-        )
-        if inserted_apps is not None and not inserted_apps.empty:
-            logger.warning(
-                f"No IDs returned for {store=} {crawl_source=} inserted apps {inserted_apps.shape=}"
-            )
-            inserted_apps["crawl_source"] = crawl_source
-            inserted_apps = inserted_apps.rename(columns={"id": "store_app"})
-            insert_columns = ["store", "store_app"]
-            upsert_df(
-                table_name="store_app_sources",
-                insert_columns=insert_columns + ["crawl_source"],
-                df=inserted_apps,
-                key_columns=insert_columns,
-                database_connection=database_connection,
-                schema="logging",
-            )
 
 
 def scrape_keyword(
@@ -668,231 +428,6 @@ def process_keyword_rankings(
     logger.info("keyword rankings inserted")
 
 
-def manual_download_rankings(
-    store: int, crawled_date: datetime.date, country: str
-) -> pd.DataFrame:
-    s3_client = get_s3_client()
-    bucket = CONFIG["s3"]["bucket"]
-    store = 1
-    country = "US"
-    crawled_date = datetime.date(2025, 8, 15)
-    s3_key = f"raw-data/app_rankings/store={store}/crawled_date={crawled_date}/country={country}/rankings.parquet"
-    local_path = pathlib.Path(
-        f"/tmp/exports/app_rankings/store={store}/crawled_date={crawled_date}/country={country}/rankings.parquet"
-    )
-    os.makedirs(os.path.dirname(local_path), exist_ok=True)
-    s3_client.download_file(bucket, s3_key, str(local_path))
-    df = pd.read_parquet(local_path)
-    return df
-
-
-def process_store_rankings(
-    df: pd.DataFrame,
-    store: int,
-) -> None:
-    logger.info(f"Process and save rankings start {store=}")
-    if store is None:
-        raise ValueError("store is required")
-    output_dir = f"/tmp/exports/app_rankings/store={store}"
-    s3_client = get_s3_client()
-    bucket = CONFIG["s3"]["bucket"]
-    for crawled_date, df_crawled_date in df.groupby("crawled_date"):
-        if isinstance(crawled_date, datetime.date):
-            crawled_date = crawled_date.strftime("%Y-%m-%d")
-        for country, df_country in df_crawled_date.groupby("country"):
-            local_path = pathlib.Path(
-                f"{output_dir}/crawled_date={crawled_date}/country={country}/rankings.parquet"
-            )
-            os.makedirs(os.path.dirname(local_path), exist_ok=True)
-            df_country.to_parquet(local_path, index=False)
-            s3_key = f"raw-data/app_rankings/store={store}/crawled_date={crawled_date}/country={country}/rankings.parquet"
-            logger.info(f"Uploading to S3: {s3_key}")
-            s3_client.upload_file(str(local_path), bucket, s3_key)
-            local_path.unlink()
-
-
-def get_s3_rank_parquet_paths(
-    s3, bucket: str, dt: pd.DatetimeIndex, days: int, store: int
-) -> list[str]:
-    all_parquet_paths = []
-    for ddt in pd.date_range(dt, dt + datetime.timedelta(days=days), freq="D"):
-        ddt_str = ddt.strftime("%Y-%m-%d")
-        prefix = f"raw-data/app_rankings/store={store}/crawled_date={ddt_str}/country="
-        objects = s3.list_objects_v2(Bucket=bucket, Prefix=prefix)
-        parquet_paths = [
-            f"s3://{bucket}/{obj['Key']}"
-            for obj in objects.get("Contents", [])
-            if obj["Key"].endswith("rankings.parquet")
-        ]
-        all_parquet_paths += parquet_paths
-    return all_parquet_paths
-
-
-def import_ranks_from_s3(
-    store: int,
-    start_date: datetime.date,
-    end_date: datetime.date,
-    database_connection: PostgresCon,
-    period: str = "week",
-) -> None:
-    if period == "week":
-        days = 6
-        freq = "W-MON"
-        table_suffix = "weekly"
-    elif period == "day":
-        days = 1
-        freq = "D"
-        table_suffix = "daily"
-    else:
-        raise ValueError(f"Invalid period {period}")
-    s3_config_key = "s3"
-    s3_region = CONFIG[s3_config_key]["region_name"]
-    # DuckDB uses S3 endpoint url
-    endpoint = get_s3_endpoint(s3_config_key)
-    store_id_map = query_store_id_map(database_connection, store)
-    duckdb_con = duckdb.connect()
-    if "http://" in endpoint:
-        duckdb_con.execute("SET s3_use_ssl=false;")
-        endpoint = endpoint.replace("http://", "")
-    elif "https://" in endpoint:
-        endpoint = endpoint.replace("https://", "")
-    duckdb_con.execute("INSTALL httpfs; LOAD httpfs;")
-    duckdb_con.execute(f"SET s3_region='{s3_region}';")
-    duckdb_con.execute(f"SET s3_endpoint='{endpoint}';")
-    duckdb_con.execute("SET s3_url_style='path';")
-    duckdb_con.execute("SET s3_url_compatibility_mode=true;")
-    duckdb_con.execute(
-        f"SET s3_access_key_id='{CONFIG[s3_config_key]['access_key_id']}';"
-    )
-    duckdb_con.execute(
-        f"SET s3_secret_access_key='{CONFIG[s3_config_key]['secret_key']}';"
-    )
-    duckdb_con.execute("SET temp_directory = '/tmp/duckdb.tmp/';")
-    duckdb_con.execute("SET preserve_insertion_order = false;")
-    s3 = get_s3_client()
-    bucket = CONFIG[s3_config_key]["bucket"]
-    logger.info(f"Importing ranks from S3 {bucket=} in {s3_region=}")
-    for dt in pd.date_range(start_date, end_date, freq=freq):
-        period_date_str = dt.strftime("%Y-%m-%d")
-        logger.info(f"Processing store={store} period_start={period_date_str}")
-        all_parquet_paths = get_s3_rank_parquet_paths(s3, bucket, dt, days, store)
-
-        if len(all_parquet_paths) == 0:
-            logger.info(f"No parquet files found for period_start={period_date_str}")
-            continue
-        countries_in_period = [
-            x.split("country=")[1].split("/")[0]
-            for x in all_parquet_paths
-            if "country=" in x
-        ]
-        countries_in_period = list(set(countries_in_period))
-        for country in countries_in_period:
-            country_parquet_paths = [
-                x for x in all_parquet_paths if f"country={country}" in x
-            ]
-            logger.info(
-                f"DuckDB {store=} period_start={period_date_str} {country=} files={len(country_parquet_paths)}"
-            )
-            process_parquets_and_insert(
-                country_parquet_paths=country_parquet_paths,
-                period=period,
-                store=store,
-                table_suffix=table_suffix,
-                duckdb_con=duckdb_con,
-                database_connection=database_connection,
-                store_id_map=store_id_map,
-            )
-
-
-def process_parquets_and_insert(
-    country_parquet_paths: list[str],
-    period: str,
-    store: int,
-    table_suffix: str,
-    duckdb_con,
-    database_connection: PostgresCon,
-    store_id_map: pd.DataFrame,
-):
-    """Process parquet files for a specific country and insert into the database."""
-    period_query = f"""WITH all_data AS (
-                SELECT * FROM read_parquet({country_parquet_paths})
-                 ),
-             period_max_dates AS (
-                          SELECT ar_1.country,
-                             ar_1.collection,
-                             ar_1.category,
-                             date_trunc('{period}'::text, ar_1.crawled_date::VARCHAR::DATE) AS period_start,
-                             max(ar_1.crawled_date) AS max_crawled_date
-                            FROM all_data ar_1
-                           GROUP BY ar_1.country, ar_1.collection, ar_1.category, (date_trunc('{period}'::text, ar_1.crawled_date::VARCHAR::DATE))
-                         ),
-             period_app_ranks as (SELECT ar.rank,
-                min(ar.rank) AS best_rank,
-                ar.country,
-                ar.collection,
-                ar.category,
-                ar.crawled_date,
-                ar.store_id
-               FROM all_data ar
-                 JOIN period_max_dates pmd ON ar.country = pmd.country 
-                 AND ar.collection = pmd.collection 
-                 AND ar.category = pmd.category 
-                 AND ar.crawled_date = pmd.max_crawled_date
-                 GROUP BY ar.rank, ar.country, ar.collection, ar.category, ar.crawled_date, ar.store_id
-                 )
-            SELECT par.rank, par.best_rank, par.country, par.collection, par.category, par.crawled_date, par.store_id FROM period_app_ranks par
-              ORDER BY par.country, par.collection, par.category, par.crawled_date, par.rank
-            """
-    wdf = duckdb_con.execute(period_query).df()
-    country_map = query_countries(database_connection)
-    collection_map = query_collections(database_connection)
-    category_map = query_categories(database_connection)
-    wdf["country"] = wdf["country"].map(country_map.set_index("alpha2")["id"].to_dict())
-    wdf["store_collection"] = wdf["collection"].map(
-        collection_map.set_index("collection")["id"].to_dict()
-    )
-    wdf["store_category"] = wdf["category"].map(
-        category_map.set_index("category")["id"].to_dict()
-    )
-    new_ids = wdf[~wdf["store_id"].isin(store_id_map["store_id"])]["store_id"].unique()
-    if len(new_ids) > 0:
-        logger.info(f"Found new store ids: {len(new_ids)}")
-        new_ids = [{"store": store, "store_id": store_id} for store_id in new_ids]
-        process_scraped(
-            database_connection=database_connection,
-            ranked_dicts=new_ids,
-            crawl_source="process_ranks_parquet",
-        )
-        store_id_map = query_store_id_map(database_connection, store)
-    wdf["store_app"] = wdf["store_id"].map(
-        store_id_map.set_index("store_id")["id"].to_dict()
-    )
-
-    wdf = wdf.drop(columns=["store_id", "collection", "category"])
-    upsert_df(
-        df=wdf,
-        table_name=f"store_app_ranks_{table_suffix}",
-        schema="frontend",
-        database_connection=database_connection,
-        key_columns=[
-            "country",
-            "store_collection",
-            "store_category",
-            "crawled_date",
-            "rank",
-        ],
-        insert_columns=[
-            "country",
-            "store_collection",
-            "store_category",
-            "crawled_date",
-            "rank",
-            "store_app",
-            "best_rank",
-        ],
-    )
-
-
 def extract_domains(x: str) -> str:
     ext = tldextract.extract(x)
     use_top_domain = any(
@@ -919,10 +454,11 @@ def crawl_developers_for_new_store_ids(
         developer_ids = [unquote_plus(x) for x in developer_ids]
         apps_df = crawl_google_developers(developer_ids, store_ids)
         if not apps_df.empty:
-            process_scraped(
+            insert_new_apps(
                 database_connection=database_connection,
-                ranked_dicts=apps_df.to_dict(orient="records"),
+                dicts=apps_df.to_dict(orient="records"),
                 crawl_source="crawl_developers",
+                store=store,
             )
         dev_df = pd.DataFrame(
             [
@@ -954,12 +490,11 @@ def crawl_developers_for_new_store_ids(
                 apps_df = crawl_ios_developers(developer_db_id, developer_id, store_ids)
 
                 if not apps_df.empty:
-                    process_scraped(
+                    insert_new_apps(
                         database_connection=database_connection,
-                        ranked_dicts=apps_df[["store", "store_id"]].to_dict(
-                            orient="records",
-                        ),
+                        dicts=apps_df[["store", "store_id"]].to_dict(orient="records"),
                         crawl_source="crawl_developers",
+                        store=store,
                     )
                 dev_df = pd.DataFrame(
                     [
@@ -1117,9 +652,9 @@ def save_developer_info(
     apps_df: pd.DataFrame,
     database_connection: PostgresCon,
 ) -> pd.DataFrame:
-    assert apps_df["developer_id"].to_numpy()[
-        0
-    ], f"{apps_df['store_id']} Missing Developer ID"
+    assert apps_df["developer_id"].to_numpy()[0], (
+        f"{apps_df['store_id']} Missing Developer ID"
+    )
     df = (
         apps_df[["store", "developer_id", "developer_name"]]
         .rename(columns={"developer_name": "name"})
@@ -1153,19 +688,65 @@ def save_developer_info(
     return apps_df
 
 
+def process_live_app_details(
+    store: int,
+    results_df: pd.DataFrame,
+    database_connection: PostgresCon,
+    process_icon: bool,
+    df_chunk: pd.DataFrame,
+) -> None:
+    for crawl_result, apps_df in results_df.groupby("crawl_result"):
+        if crawl_result != 1:
+            apps_df = apps_df[["store_id", "store", "crawled_at", "crawl_result"]]
+        else:
+            apps_df = clean_scraped_df(df=apps_df, store=store)
+            if "description_short" not in apps_df.columns:
+                apps_df["description_short"] = ""
+            apps_df.loc[apps_df["description_short"].isna(), "description_short"] = ""
+            if process_icon:
+                try:
+                    apps_df = pd.merge(
+                        apps_df,
+                        df_chunk[["store_id", "icon_url_100"]],
+                        on="store_id",
+                        how="inner",
+                    )
+                    no_icon = apps_df["icon_url_100"].isna()
+                    if apps_df[no_icon].empty:
+                        pass
+                    else:
+                        apps_df.loc[no_icon, "icon_url_100"] = apps_df.loc[
+                            no_icon
+                        ].apply(
+                            lambda x: process_app_icon(
+                                x["store_id"], x["icon_url_512"]
+                            ),
+                            axis=1,
+                        )
+                except Exception:
+                    logger.exception("failed to process app icon")
+        apps_df = apps_df.convert_dtypes(dtype_backend="pyarrow")
+        apps_df = apps_df.replace({pd.NA: None})
+        apps_details_to_db(
+            apps_df=apps_df,
+            database_connection=database_connection,
+        )
+
+
 def apps_details_to_db(
     apps_df: pd.DataFrame,
     database_connection: PostgresCon,
 ) -> None:
-    table_name = "store_apps"
     key_columns = ["store", "store_id"]
     if (apps_df["crawl_result"] == 1).all() and apps_df["developer_id"].notna().all():
         apps_df = save_developer_info(apps_df, database_connection)
     insert_columns = [
         x for x in get_store_app_columns(database_connection) if x in apps_df.columns
     ]
+    # Update columns we always want the latest of
+    # Eg name, developer_id
     store_apps_df = upsert_df(
-        table_name=table_name,
+        table_name="store_apps",
         df=apps_df,
         insert_columns=insert_columns,
         key_columns=key_columns,
@@ -1176,14 +757,6 @@ def apps_details_to_db(
         store_apps_df is not None
         and not store_apps_df[store_apps_df["crawl_result"] == 1].empty
     ):
-        store_apps_df = store_apps_df.rename(columns={"id": "store_app"})
-        store_apps_history = store_apps_df[store_apps_df["crawl_result"] == 1].copy()
-        store_apps_history = pd.merge(
-            store_apps_history,
-            apps_df[["store_id", "histogram", "country"]],
-            on="store_id",
-        )
-        upsert_store_apps_history(store_apps_history, database_connection)
         store_apps_descriptions = store_apps_df[
             store_apps_df["crawl_result"] == 1
         ].copy()
@@ -1213,7 +786,6 @@ def apps_details_to_db(
             apps_df=apps_df,
             database_connection=database_connection,
         )
-    log_crawl_results(apps_df, database_connection=database_connection)
     return
 
 
@@ -1308,82 +880,32 @@ def upsert_keywords(keywords_df: pd.DataFrame, database_connection: PostgresCon)
     )
 
 
-def insert_global_keywords(database_connection: PostgresCon) -> None:
-    """Insert global keywords into the database.
-    NOTE: This takes about ~5-8GB of RAM for 50k keywords and 200k descriptions. For now run manually.
-    """
-    from adscrawler.tools.extract_keywords import get_global_keywords  # noqa: PLC0415
-
-    global_keywords = get_global_keywords(database_connection)
-    global_keywords_df = pd.DataFrame(global_keywords, columns=["keyword_text"])
-    table_name = "keywords"
-    insert_columns = ["keyword_text"]
-    key_columns = ["keyword_text"]
-    keywords_df = upsert_df(
-        table_name=table_name,
-        df=global_keywords_df,
-        insert_columns=insert_columns,
-        key_columns=key_columns,
-        database_connection=database_connection,
-        return_rows=True,
-    )
-    keywords_df = keywords_df.rename(columns={"id": "keyword_id"})
-    keywords_df = keywords_df[["keyword_id"]]
-    table_name = "keywords_base"
-    insert_columns = ["keyword_id"]
-    key_columns = ["keyword_id"]
-    keywords_df.to_sql(
-        name=table_name,
-        con=database_connection.engine,
-        if_exists="replace",
-        index=False,
-        schema="public",
-    )
-
-
-def upsert_store_apps_history(
-    store_apps_history: pd.DataFrame, database_connection: PostgresCon
+def log_crawl_results(
+    app_df: pd.DataFrame, store: int, database_connection: PostgresCon
 ) -> None:
-    store_apps_history["crawled_date"] = (
-        datetime.datetime.now(datetime.UTC).date().strftime("%Y-%m-%d")
+    store_id_map = query_store_id_map_cached(
+        store=store, database_connection=database_connection
     )
-    table_name = "store_apps_country_history"
-    countries_map = query_countries(database_connection)
-    store_apps_history = pd.merge(
-        store_apps_history,
-        countries_map[["id", "alpha2"]],
-        how="left",
-        left_on="country",
-        right_on="alpha2",
-        validate="m:1",
-    ).rename(columns={"id": "country_id"})
+    country_map = query_countries(database_connection)
+    app_df["country_id"] = app_df["country"].map(
+        country_map.set_index("alpha2")["id"].to_dict()
+    )
+    app_df["store_app"] = app_df["store_id"].map(
+        store_id_map.set_index("store_id")["id"].to_dict()
+    )
     insert_columns = [
-        "installs",
-        "review_count",
-        "rating",
-        "rating_count",
-        "histogram",
-        "store_last_updated",
+        "crawl_result",
+        "store_app",
+        "country_id",
+        "crawled_at",
     ]
-    key_columns = ["store_app", "country_id", "crawled_date"]
-    upsert_df(
-        table_name=table_name,
-        df=store_apps_history,
-        insert_columns=insert_columns,
-        key_columns=key_columns,
-        database_connection=database_connection,
-    )
-
-
-def log_crawl_results(app_df: pd.DataFrame, database_connection: PostgresCon) -> None:
-    app_df["crawled_at"] = datetime.datetime.now(datetime.UTC)
-    insert_columns = ["crawl_result", "store", "store_id", "store_app", "crawled_at"]
     app_df = app_df[insert_columns]
     app_df.to_sql(
-        name="store_apps_crawl",
         schema="logging",
+        name="app_country_crawls",
         con=database_connection.engine,
         if_exists="append",
+        index=False,
     )
 
 

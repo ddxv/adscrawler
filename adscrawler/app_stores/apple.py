@@ -330,6 +330,26 @@ def get_developer_url(result: dict, urls: dict) -> str:
 
 
 def scrape_app_ios(store_id: str, country: str, language: str) -> dict:
+    """Scrape iOS app details from the App Store.
+    yt_us = scrape_app_ios("544007664", "us", language="en")
+    yt_de = scrape_app_ios("544007664", "de", language="en")
+
+    # SAME FOR ALL COUNTRIES
+    yt_de['sellerName'] == yt_us['sellerName']
+    yt_us['currentVersionReleaseDate'] == yt_de['currentVersionReleaseDate']
+
+    ## UNIQUE PER COUNTRY
+    yt_us['userRatingCountForCurrentVersion'] != yt_de['userRatingCountForCurrentVersion']
+    yt_de['averageUserRating'] != yt_us['averageUserRating']
+    yt_us['userRatingCount'] != yt_de['userRatingCount']
+    yt_de['user_ratings'] != yt_us['user_ratings']
+    yt_de['description'] != yt_us['description']
+
+    # These very by country but are also the same as each other?
+    yt_de['userRatingCount'] == yt_de['userRatingCountForCurrentVersion']
+
+
+    """
     # NOTE: averageUserRating, Rating_count, Histogram are country specific
     scraper = AppStoreScraper()
     # Note add_ratings is pulling reviews, then not storing them!

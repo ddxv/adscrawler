@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict Kv9jp78aX3N5dZJiD0FVQIoXqdfZiTozTc4oTtBVMGOSXW8u90svxwheaw1vGFO
+\restrict d2RiLRb8oWggQ6ZE1DPUxwcRLg11Vwe71TgYBhvl1nDWh6pegCf8wc1BxCueFDT
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -28,94 +28,39 @@ SET default_table_access_method = heap;
 --
 
 CREATE MATERIALIZED VIEW frontend.company_top_apps AS
-WITH deduped_data AS (
-    SELECT
-        cac.ad_domain AS company_domain,
-        c.name AS company_name,
-        sa.store,
-        sa.name,
-        sa.store_id,
-        cac.app_category,
-        sa.installs_sum_4w AS installs_d30,
-        sa.ratings_sum_4w AS rating_count_d30,
-        cac.sdk,
-        cac.api_call,
-        cac.app_ads_direct
-    FROM ((
-        adtech.combined_store_apps_companies cac
-        LEFT JOIN
-            frontend.store_apps_overview AS sa
-            ON ((cac.store_app = sa.id))
-    )
-    LEFT JOIN adtech.companies AS c ON ((cac.company_id = c.id))
-    )
-    WHERE (cac.app_ads_direct OR cac.sdk OR cac.api_call)
-), ranked_apps AS (
-    SELECT
-        deduped_data.company_domain,
-        deduped_data.company_name,
-        deduped_data.store,
-        deduped_data.name,
-        deduped_data.store_id,
-        deduped_data.app_category,
-        deduped_data.installs_d30,
-        deduped_data.rating_count_d30,
-        deduped_data.sdk,
-        deduped_data.api_call,
-        deduped_data.app_ads_direct,
-        row_number()
-            OVER (
-                PARTITION BY
-                    deduped_data.store,
-                    deduped_data.company_domain,
-                    deduped_data.company_name
-                ORDER BY
-                    (
-                        coalesce((deduped_data.sdk)::integer, 0)
-                        + coalesce((deduped_data.api_call)::integer, 0)
-                    ) DESC,
-                    greatest(
-                        (
-                            coalesce(
-                                deduped_data.rating_count_d30, (0)::numeric
-                            )
-                        )::double precision,
-                        coalesce(
-                            (deduped_data.installs_d30)::double precision,
-                            (0)::double precision
-                        )
-                    ) DESC
-            )
-            AS app_company_rank,
-        row_number()
-            OVER (
-                PARTITION BY
-                    deduped_data.store,
-                    deduped_data.app_category,
-                    deduped_data.company_domain,
-                    deduped_data.company_name
-                ORDER BY
-                    (
-                        coalesce((deduped_data.sdk)::integer, 0)
-                        + coalesce((deduped_data.api_call)::integer, 0)
-                    ) DESC,
-                    greatest(
-                        (
-                            coalesce(
-                                deduped_data.rating_count_d30, (0)::numeric
-                            )
-                        )::double precision,
-                        coalesce(
-                            (deduped_data.installs_d30)::double precision,
-                            (0)::double precision
-                        )
-                    ) DESC
-            )
-            AS app_company_category_rank
-    FROM deduped_data
-)
-SELECT
-    company_domain,
+ WITH deduped_data AS (
+         SELECT cac.ad_domain AS company_domain,
+            c.name AS company_name,
+            sa.store,
+            sa.name,
+            sa.store_id,
+            cac.app_category,
+            sa.installs_sum_4w AS installs_d30,
+            sa.ratings_sum_4w AS rating_count_d30,
+            cac.sdk,
+            cac.api_call,
+            cac.app_ads_direct
+           FROM ((adtech.combined_store_apps_companies cac
+             LEFT JOIN frontend.store_apps_overview sa ON ((cac.store_app = sa.id)))
+             LEFT JOIN adtech.companies c ON ((cac.company_id = c.id)))
+          WHERE (cac.app_ads_direct OR cac.sdk OR cac.api_call)
+        ), ranked_apps AS (
+         SELECT deduped_data.company_domain,
+            deduped_data.company_name,
+            deduped_data.store,
+            deduped_data.name,
+            deduped_data.store_id,
+            deduped_data.app_category,
+            deduped_data.installs_d30,
+            deduped_data.rating_count_d30,
+            deduped_data.sdk,
+            deduped_data.api_call,
+            deduped_data.app_ads_direct,
+            row_number() OVER (PARTITION BY deduped_data.store, deduped_data.company_domain, deduped_data.company_name ORDER BY (COALESCE((deduped_data.sdk)::integer, 0) + COALESCE((deduped_data.api_call)::integer, 0)) DESC, GREATEST((COALESCE(deduped_data.rating_count_d30, (0)::numeric))::double precision, COALESCE((deduped_data.installs_d30)::double precision, (0)::double precision)) DESC) AS app_company_rank,
+            row_number() OVER (PARTITION BY deduped_data.store, deduped_data.app_category, deduped_data.company_domain, deduped_data.company_name ORDER BY (COALESCE((deduped_data.sdk)::integer, 0) + COALESCE((deduped_data.api_call)::integer, 0)) DESC, GREATEST((COALESCE(deduped_data.rating_count_d30, (0)::numeric))::double precision, COALESCE((deduped_data.installs_d30)::double precision, (0)::double precision)) DESC) AS app_company_category_rank
+           FROM deduped_data
+        )
+ SELECT company_domain,
     company_name,
     store,
     name,
@@ -128,9 +73,9 @@ SELECT
     app_ads_direct,
     app_company_rank,
     app_company_category_rank
-FROM ranked_apps
-WHERE (app_company_category_rank <= 20)
-WITH NO DATA;
+   FROM ranked_apps
+  WHERE (app_company_category_rank <= 20)
+  WITH NO DATA;
 
 
 ALTER MATERIALIZED VIEW frontend.company_top_apps OWNER TO postgres;
@@ -139,40 +84,33 @@ ALTER MATERIALIZED VIEW frontend.company_top_apps OWNER TO postgres;
 -- Name: idx_company_top_apps; Type: INDEX; Schema: frontend; Owner: postgres
 --
 
-CREATE INDEX idx_company_top_apps ON frontend.company_top_apps USING btree (
-    company_domain
-);
+CREATE INDEX idx_company_top_apps ON frontend.company_top_apps USING btree (company_domain);
 
 
 --
 -- Name: idx_company_top_apps_domain_rank; Type: INDEX; Schema: frontend; Owner: postgres
 --
 
-CREATE INDEX idx_company_top_apps_domain_rank ON frontend.company_top_apps USING btree (
-    company_domain, app_company_rank
-);
+CREATE INDEX idx_company_top_apps_domain_rank ON frontend.company_top_apps USING btree (company_domain, app_company_rank);
 
 
 --
 -- Name: idx_query_company_top_apps; Type: INDEX; Schema: frontend; Owner: postgres
 --
 
-CREATE INDEX idx_query_company_top_apps ON frontend.company_top_apps USING btree (
-    company_domain, app_category, app_company_category_rank, store
-);
+CREATE INDEX idx_query_company_top_apps ON frontend.company_top_apps USING btree (company_domain, app_category, app_company_category_rank, store);
 
 
 --
 -- Name: idx_unique_company_top_apps; Type: INDEX; Schema: frontend; Owner: postgres
 --
 
-CREATE UNIQUE INDEX idx_unique_company_top_apps ON frontend.company_top_apps USING btree (
-    company_domain, company_name, store, name, store_id, app_category
-);
+CREATE UNIQUE INDEX idx_unique_company_top_apps ON frontend.company_top_apps USING btree (company_domain, company_name, store, name, store_id, app_category);
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict Kv9jp78aX3N5dZJiD0FVQIoXqdfZiTozTc4oTtBVMGOSXW8u90svxwheaw1vGFO
+\unrestrict d2RiLRb8oWggQ6ZE1DPUxwcRLg11Vwe71TgYBhvl1nDWh6pegCf8wc1BxCueFDT
+

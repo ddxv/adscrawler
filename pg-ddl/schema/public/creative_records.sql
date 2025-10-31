@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict SHgtO0lzdq3drVItuad8hR8srWM0OY9NQ3boIljHJBJ9UHBwH76ihVdLh6TGWuK
+\restrict XhF5y4yOhabVLSjyoeKZsELsWaVbvH4qQV5ojpDV4AMQk2mDEH83WIWwa12fuUE
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -36,24 +36,11 @@ CREATE TABLE public.creative_records (
     advertiser_store_app_id integer,
     advertiser_domain_id integer,
     mmp_domain_id integer,
-    mmp_urls text [],
-    additional_ad_domain_ids integer [],
-    created_at timestamp with time zone DEFAULT timezone(
-        'utc'::text, now()
-    ) NOT NULL,
-    updated_at timestamp with time zone DEFAULT timezone(
-        'utc'::text, now()
-    ) NOT NULL,
-    CONSTRAINT check_advertiser_or_advertiser_domain CHECK (
-        (
-            (advertiser_store_app_id IS NOT null)
-            OR (advertiser_domain_id IS NOT null)
-            OR (
-                (advertiser_store_app_id IS null)
-                AND (advertiser_domain_id IS null)
-            )
-        )
-    )
+    mmp_urls text[],
+    additional_ad_domain_ids integer[],
+    created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
+    CONSTRAINT check_advertiser_or_advertiser_domain CHECK (((advertiser_store_app_id IS NOT NULL) OR (advertiser_domain_id IS NOT NULL) OR ((advertiser_store_app_id IS NULL) AND (advertiser_domain_id IS NULL))))
 );
 
 
@@ -64,12 +51,12 @@ ALTER TABLE public.creative_records OWNER TO postgres;
 --
 
 CREATE SEQUENCE public.creative_records_id_seq1
-AS integer
-START WITH 1
-INCREMENT BY 1
-NO MINVALUE
-NO MAXVALUE
-CACHE 1;
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
 
 
 ALTER SEQUENCE public.creative_records_id_seq1 OWNER TO postgres;
@@ -85,9 +72,7 @@ ALTER SEQUENCE public.creative_records_id_seq1 OWNED BY public.creative_records.
 -- Name: creative_records id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.creative_records ALTER COLUMN id SET DEFAULT nextval(
-    'public.creative_records_id_seq1'::regclass
-);
+ALTER TABLE ONLY public.creative_records ALTER COLUMN id SET DEFAULT nextval('public.creative_records_id_seq1'::regclass);
 
 
 --
@@ -95,7 +80,7 @@ ALTER TABLE ONLY public.creative_records ALTER COLUMN id SET DEFAULT nextval(
 --
 
 ALTER TABLE ONLY public.creative_records
-ADD CONSTRAINT creative_records__pkey PRIMARY KEY (id);
+    ADD CONSTRAINT creative_records__pkey PRIMARY KEY (id);
 
 
 --
@@ -103,7 +88,7 @@ ADD CONSTRAINT creative_records__pkey PRIMARY KEY (id);
 --
 
 ALTER TABLE ONLY public.creative_records
-ADD CONSTRAINT creative_records_api_call_id_key UNIQUE (api_call_id);
+    ADD CONSTRAINT creative_records_api_call_id_key UNIQUE (api_call_id);
 
 
 --
@@ -111,9 +96,7 @@ ADD CONSTRAINT creative_records_api_call_id_key UNIQUE (api_call_id);
 --
 
 ALTER TABLE ONLY public.creative_records
-ADD CONSTRAINT creative_records_advertiser_app_fk FOREIGN KEY (
-    advertiser_store_app_id
-) REFERENCES public.store_apps (id);
+    ADD CONSTRAINT creative_records_advertiser_app_fk FOREIGN KEY (advertiser_store_app_id) REFERENCES public.store_apps(id);
 
 
 --
@@ -121,9 +104,7 @@ ADD CONSTRAINT creative_records_advertiser_app_fk FOREIGN KEY (
 --
 
 ALTER TABLE ONLY public.creative_records
-ADD CONSTRAINT creative_records_advertiser_domain_fk FOREIGN KEY (
-    advertiser_domain_id
-) REFERENCES public.domains (id) ON DELETE SET NULL;
+    ADD CONSTRAINT creative_records_advertiser_domain_fk FOREIGN KEY (advertiser_domain_id) REFERENCES public.domains(id) ON DELETE SET NULL;
 
 
 --
@@ -131,9 +112,7 @@ ADD CONSTRAINT creative_records_advertiser_domain_fk FOREIGN KEY (
 --
 
 ALTER TABLE ONLY public.creative_records
-ADD CONSTRAINT creative_records_api_call_fk FOREIGN KEY (
-    api_call_id
-) REFERENCES public.api_calls (id) ON DELETE CASCADE;
+    ADD CONSTRAINT creative_records_api_call_fk FOREIGN KEY (api_call_id) REFERENCES public.api_calls(id) ON DELETE CASCADE;
 
 
 --
@@ -141,9 +120,7 @@ ADD CONSTRAINT creative_records_api_call_fk FOREIGN KEY (
 --
 
 ALTER TABLE ONLY public.creative_records
-ADD CONSTRAINT creative_records_asset_fk FOREIGN KEY (
-    creative_asset_id
-) REFERENCES public.creative_assets (id);
+    ADD CONSTRAINT creative_records_asset_fk FOREIGN KEY (creative_asset_id) REFERENCES public.creative_assets(id);
 
 
 --
@@ -151,9 +128,7 @@ ADD CONSTRAINT creative_records_asset_fk FOREIGN KEY (
 --
 
 ALTER TABLE ONLY public.creative_records
-ADD CONSTRAINT creative_records_host_domain_fk FOREIGN KEY (
-    creative_host_domain_id
-) REFERENCES public.domains (id) ON DELETE CASCADE;
+    ADD CONSTRAINT creative_records_host_domain_fk FOREIGN KEY (creative_host_domain_id) REFERENCES public.domains(id) ON DELETE CASCADE;
 
 
 --
@@ -161,9 +136,7 @@ ADD CONSTRAINT creative_records_host_domain_fk FOREIGN KEY (
 --
 
 ALTER TABLE ONLY public.creative_records
-ADD CONSTRAINT creative_records_initial_domain_fk FOREIGN KEY (
-    creative_initial_domain_id
-) REFERENCES public.domains (id) ON DELETE SET NULL;
+    ADD CONSTRAINT creative_records_initial_domain_fk FOREIGN KEY (creative_initial_domain_id) REFERENCES public.domains(id) ON DELETE SET NULL;
 
 
 --
@@ -171,13 +144,12 @@ ADD CONSTRAINT creative_records_initial_domain_fk FOREIGN KEY (
 --
 
 ALTER TABLE ONLY public.creative_records
-ADD CONSTRAINT creative_records_mmp_domain_fk FOREIGN KEY (
-    mmp_domain_id
-) REFERENCES public.domains (id) ON DELETE SET NULL;
+    ADD CONSTRAINT creative_records_mmp_domain_fk FOREIGN KEY (mmp_domain_id) REFERENCES public.domains(id) ON DELETE SET NULL;
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict SHgtO0lzdq3drVItuad8hR8srWM0OY9NQ3boIljHJBJ9UHBwH76ihVdLh6TGWuK
+\unrestrict XhF5y4yOhabVLSjyoeKZsELsWaVbvH4qQV5ojpDV4AMQk2mDEH83WIWwa12fuUE
+

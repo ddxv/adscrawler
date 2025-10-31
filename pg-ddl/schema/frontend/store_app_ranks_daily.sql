@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict tjHVCObyy73SRaXfiWPPowhcPMUae0PIUP5GJrJvzVK0aoxVEDkdGK2UkxdI8JW
+\restrict fTCQliHHpePu9Tb5FNuJA0SzDHEbysDjECbeMYPsV5HHBWK3RBEXQ1wfYj9ysPx
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -45,18 +45,14 @@ ALTER TABLE frontend.store_app_ranks_daily OWNER TO postgres;
 --
 
 ALTER TABLE ONLY frontend.store_app_ranks_daily
-ADD CONSTRAINT app_rankings_unique_daily UNIQUE (
-    crawled_date, country, store_collection, store_category, rank
-);
+    ADD CONSTRAINT app_rankings_unique_daily UNIQUE (crawled_date, country, store_collection, store_category, rank);
 
 
 --
 -- Name: idx_ranks_daily_filter; Type: INDEX; Schema: frontend; Owner: postgres
 --
 
-CREATE INDEX idx_ranks_daily_filter ON frontend.store_app_ranks_daily USING btree (
-    country, store_collection, store_category, crawled_date
-);
+CREATE INDEX idx_ranks_daily_filter ON frontend.store_app_ranks_daily USING btree (country, store_collection, store_category, crawled_date);
 
 
 --
@@ -64,9 +60,7 @@ CREATE INDEX idx_ranks_daily_filter ON frontend.store_app_ranks_daily USING btre
 --
 
 ALTER TABLE ONLY frontend.store_app_ranks_daily
-ADD CONSTRAINT fk_country FOREIGN KEY (country) REFERENCES public.countries (
-    id
-);
+    ADD CONSTRAINT fk_country FOREIGN KEY (country) REFERENCES public.countries(id);
 
 
 --
@@ -74,9 +68,7 @@ ADD CONSTRAINT fk_country FOREIGN KEY (country) REFERENCES public.countries (
 --
 
 ALTER TABLE ONLY frontend.store_app_ranks_daily
-ADD CONSTRAINT fk_store_app FOREIGN KEY (
-    store_app
-) REFERENCES public.store_apps (id);
+    ADD CONSTRAINT fk_store_app FOREIGN KEY (store_app) REFERENCES public.store_apps(id);
 
 
 --
@@ -84,9 +76,7 @@ ADD CONSTRAINT fk_store_app FOREIGN KEY (
 --
 
 ALTER TABLE ONLY frontend.store_app_ranks_daily
-ADD CONSTRAINT fk_store_category FOREIGN KEY (
-    store_category
-) REFERENCES public.store_categories (id);
+    ADD CONSTRAINT fk_store_category FOREIGN KEY (store_category) REFERENCES public.store_categories(id);
 
 
 --
@@ -94,13 +84,12 @@ ADD CONSTRAINT fk_store_category FOREIGN KEY (
 --
 
 ALTER TABLE ONLY frontend.store_app_ranks_daily
-ADD CONSTRAINT fk_store_collection FOREIGN KEY (
-    store_collection
-) REFERENCES public.store_collections (id);
+    ADD CONSTRAINT fk_store_collection FOREIGN KEY (store_collection) REFERENCES public.store_collections(id);
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict tjHVCObyy73SRaXfiWPPowhcPMUae0PIUP5GJrJvzVK0aoxVEDkdGK2UkxdI8JW
+\unrestrict fTCQliHHpePu9Tb5FNuJA0SzDHEbysDjECbeMYPsV5HHBWK3RBEXQ1wfYj9ysPx
+

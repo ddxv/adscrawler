@@ -173,7 +173,7 @@ def process_flow(
 ) -> dict:
     if not isinstance(flow, (http.HTTPFlow, tcp.TCPFlow)):
         # These should be inspected and added
-        msg = f"Non HTTPFlow found in mitm log {mitm_log_path}"
+        msg = "Non HTTPFlow found in mitm log"
         logger.exception(msg)
         raise ValueError(msg)
     mitm_uuid = flow.id
@@ -243,7 +243,7 @@ def process_flow(
         }
     else:
         # These should be inspected and added
-        msg = f"Non HTTPFlow found in mitm log {mitm_log_path}"
+        msg = "Non HTTPFlow found in mitm log"
         logger.exception(msg)
         raise ValueError(msg)
     return flow_data

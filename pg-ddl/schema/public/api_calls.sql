@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict ya53HgozaJ3HdUL6GypDBJZssdhmN9epSaz1rKpGe5u94JyYizRWRjUu3u3XgH0
+\restrict dNHpTCLZHd60wdENzn3rz5rONggb7C3v94theiSWax6W4zTmqLoYnByjY90UPKZ
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -41,12 +41,8 @@ CREATE TABLE public.api_calls (
     url text,
     ip_geo_snapshot_id integer,
     called_at timestamp without time zone NOT NULL,
-    created_at timestamp with time zone DEFAULT timezone(
-        'utc'::text, now()
-    ) NOT NULL,
-    updated_at timestamp with time zone DEFAULT timezone(
-        'utc'::text, now()
-    ) NOT NULL
+    created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
 
@@ -57,12 +53,12 @@ ALTER TABLE public.api_calls OWNER TO postgres;
 --
 
 CREATE SEQUENCE public.api_calls_id_seq
-AS integer
-START WITH 1
-INCREMENT BY 1
-NO MINVALUE
-NO MAXVALUE
-CACHE 1;
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
 
 
 ALTER SEQUENCE public.api_calls_id_seq OWNER TO postgres;
@@ -78,9 +74,7 @@ ALTER SEQUENCE public.api_calls_id_seq OWNED BY public.api_calls.id;
 -- Name: api_calls id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.api_calls ALTER COLUMN id SET DEFAULT nextval(
-    'public.api_calls_id_seq'::regclass
-);
+ALTER TABLE ONLY public.api_calls ALTER COLUMN id SET DEFAULT nextval('public.api_calls_id_seq'::regclass);
 
 
 --
@@ -88,7 +82,7 @@ ALTER TABLE ONLY public.api_calls ALTER COLUMN id SET DEFAULT nextval(
 --
 
 ALTER TABLE ONLY public.api_calls
-ADD CONSTRAINT api_calls_mitm_uuid_key UNIQUE (mitm_uuid);
+    ADD CONSTRAINT api_calls_mitm_uuid_key UNIQUE (mitm_uuid);
 
 
 --
@@ -96,25 +90,21 @@ ADD CONSTRAINT api_calls_mitm_uuid_key UNIQUE (mitm_uuid);
 --
 
 ALTER TABLE ONLY public.api_calls
-ADD CONSTRAINT api_calls_pkey PRIMARY KEY (id);
+    ADD CONSTRAINT api_calls_pkey PRIMARY KEY (id);
 
 
 --
 -- Name: idx_api_calls_mitm_uuid; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE INDEX idx_api_calls_mitm_uuid ON public.api_calls USING btree (
-    mitm_uuid
-);
+CREATE INDEX idx_api_calls_mitm_uuid ON public.api_calls USING btree (mitm_uuid);
 
 
 --
 -- Name: idx_api_calls_store_app; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE INDEX idx_api_calls_store_app ON public.api_calls USING btree (
-    store_app
-);
+CREATE INDEX idx_api_calls_store_app ON public.api_calls USING btree (store_app);
 
 
 --
@@ -122,9 +112,7 @@ CREATE INDEX idx_api_calls_store_app ON public.api_calls USING btree (
 --
 
 ALTER TABLE ONLY public.api_calls
-ADD CONSTRAINT api_calls_ip_geo_snapshot_fk FOREIGN KEY (
-    ip_geo_snapshot_id
-) REFERENCES public.ip_geo_snapshots (id);
+    ADD CONSTRAINT api_calls_ip_geo_snapshot_fk FOREIGN KEY (ip_geo_snapshot_id) REFERENCES public.ip_geo_snapshots(id);
 
 
 --
@@ -132,9 +120,7 @@ ADD CONSTRAINT api_calls_ip_geo_snapshot_fk FOREIGN KEY (
 --
 
 ALTER TABLE ONLY public.api_calls
-ADD CONSTRAINT api_calls_run_fk FOREIGN KEY (
-    run_id
-) REFERENCES public.version_code_api_scan_results (id);
+    ADD CONSTRAINT api_calls_run_fk FOREIGN KEY (run_id) REFERENCES public.version_code_api_scan_results(id);
 
 
 --
@@ -142,13 +128,12 @@ ADD CONSTRAINT api_calls_run_fk FOREIGN KEY (
 --
 
 ALTER TABLE ONLY public.api_calls
-ADD CONSTRAINT api_calls_store_app_fk FOREIGN KEY (
-    store_app
-) REFERENCES public.store_apps (id) ON DELETE CASCADE;
+    ADD CONSTRAINT api_calls_store_app_fk FOREIGN KEY (store_app) REFERENCES public.store_apps(id) ON DELETE CASCADE;
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict ya53HgozaJ3HdUL6GypDBJZssdhmN9epSaz1rKpGe5u94JyYizRWRjUu3u3XgH0
+\unrestrict dNHpTCLZHd60wdENzn3rz5rONggb7C3v94theiSWax6W4zTmqLoYnByjY90UPKZ
+

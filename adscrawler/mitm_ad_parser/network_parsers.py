@@ -136,13 +136,26 @@ def extract_and_decode_urls(
         urls.append(decoded_url)
         # print("DECODED:", decoded_url)
     all_urls = list(set(vast_urls + urls))
-    click_urls = check_click_urls(all_urls, run_id, mitm_uuid, database_connection)
+    api_call_id = query_api_call_id_for_uuid(mitm_uuid, database_connection)
+    click_urls = check_click_urls(all_urls, run_id, api_call_id, database_connection)
     all_urls = list(set(all_urls + click_urls))
+    all_urls_df = pd.DataFrame(
+        {"run_id": run_id, "url": all_urls, "api_call_id": api_call_id}
+    )
+    upsert_df(
+        df=all_urls_df,
+        database_connection=database_connection,
+        schema="adtech",
+        table_name="api_call_found_urls",
+        key_columns=["run_id", "api_call_id", "url"],
+        insert_columns=["run_id", "api_call_id", "url"],
+        md5_key_columns=["url"],
+    )
     return all_urls
 
 
 def check_click_urls(
-    all_urls: list[str], run_id: int, mitm_uuid: str, database_connection: PostgresCon
+    all_urls: list[str], run_id: int, api_call_id: int, database_connection: PostgresCon
 ) -> list[str]:
     """Checks URLs for click tracking and follows redirects to find final destination URLs."""
     click_urls = []
@@ -152,7 +165,7 @@ def check_click_urls(
             if "tpbid.com" in url:
                 url = url.replace("fybernativebrowser://navigate?url=", "")
             redirect_urls = follow_url_redirects(
-                url, run_id, mitm_uuid, database_connection
+                url, run_id, api_call_id, database_connection
             )
         if len(redirect_urls) > 0:
             click_urls += redirect_urls
@@ -254,7 +267,7 @@ def upsert_click_url_redirect_chains(
 
 
 def follow_url_redirects(
-    url: str, run_id: int, mitm_uuid: str, database_connection: PostgresCon
+    url: str, run_id: int, api_call_id: int, database_connection: PostgresCon
 ) -> list[str]:
     """Follows URL redirects and returns the final destination URL chain."""
     """
@@ -266,14 +279,12 @@ def follow_url_redirects(
     if not existing_chain_df.empty and url in existing_chain_df["url"].to_list():
         existing_chain_df = existing_chain_df[existing_chain_df["url"] == url]
         if existing_chain_df["api_call_id"].isna().any():
-            api_call_id = query_api_call_id_for_uuid(mitm_uuid, database_connection)
             existing_chain_df["api_call_id"] = api_call_id
             upsert_click_url_redirect_chains(existing_chain_df, database_connection)
         redirect_urls = existing_chain_df["redirect_url"].to_list()
     else:
         redirect_urls = get_redirect_chain(url)
         if len(redirect_urls) > 0:
-            api_call_id = query_api_call_id_for_uuid(mitm_uuid, database_connection)
             chain_df = pd.DataFrame(
                 {
                     "run_id": run_id,
@@ -293,7 +304,6 @@ def get_redirect_chain(url: str) -> list[str]:
     chain = []
     cur_url = url
     while cur_url and len(chain) < max_redirects:
-        print(f"loop {len(chain)}: ")
         try:
             headers = {"User-Agent": ANDROID_USER_AGENT}
             # Do NOT allow requests to auto-follow

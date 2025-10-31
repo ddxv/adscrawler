@@ -21,8 +21,6 @@ dependencies = [
     "beautifulsoup4",
     "nltk",
     "rake_nltk",
-    "spacy",
-    "scikit-learn",
     "langdetect",
     "mitmproxy",
     "cloudscraper",
@@ -36,7 +34,7 @@ dependencies = [
 
 
 [project.optional-dependencies]
-dev = ["pre-commit", "pytest"]
+dev = ["pre-commit", "pytest","scikit-learn", "spacy" ]
 
 
 [build-system]
@@ -101,6 +99,9 @@ exclude_rules = [
     'AM04', # using *, agreed this should be TODO, 
     'LT08', # Avoid new lines after CTEs to help copy pasting between editors
 ]
+[tool.sqlfluff.rules.layout.long_lines]
+ignore_comment_lines = true
+
 
 [tool.sqlfluff.templater.placeholder]
 param_style = 'colon'

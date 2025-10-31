@@ -1,35 +1,21 @@
+# noqa: PLC0415
+import os
 import re
 from collections import Counter
 
 import nltk
-import spacy
+import pandas as pd
 from nltk.corpus import stopwords, wordnet
 from nltk.stem import WordNetLemmatizer
 from nltk.tokenize import word_tokenize
 from rake_nltk import Rake
-from sklearn.feature_extraction.text import TfidfVectorizer
 
 from adscrawler.dbcon.connection import PostgresCon
 from adscrawler.dbcon.queries import (
     query_all_store_app_descriptions,
     query_keywords_base,
+    upsert_df,
 )
-
-# Load spaCy model
-try:
-    nlp = spacy.load("en_core_web_sm")
-except OSError:
-    print("Downloading spaCy model...")
-    import os
-
-    os.system("python -m spacy download en_core_web_sm")
-    nlp = spacy.load("en_core_web_sm")
-
-# Ensure necessary NLTK resources are downloaded
-nltk.download("punkt", quiet=True)
-nltk.download("stopwords", quiet=True)
-nltk.download("wordnet", quiet=True)
-nltk.download("averaged_perceptron_tagger_eng", quiet=True)
 
 # Custom stopwords to remove personal pronouns & other irrelevant words
 CUSTOM_STOPWORDS = {
@@ -99,6 +85,17 @@ def extract_keywords_spacy(
     text: str, top_n: int = 10, max_tokens: int = 3
 ) -> list[str]:
     """Extracts noun phrase keywords using spaCy with token limit."""
+    # Load spaCy model
+    import spacy  # noqa: PLC0415
+
+    try:
+        nlp = spacy.load("en_core_web_sm")
+    except OSError:
+        print("Downloading spaCy model...")
+
+        os.system("python -m spacy download en_core_web_sm")
+        nlp = spacy.load("en_core_web_sm")
+
     doc = nlp(text)
     keywords = []
 
@@ -116,6 +113,12 @@ def extract_keywords_spacy(
 def extract_keywords_nltk(text: str, top_n: int = 10) -> list[str]:
     """Extracts lemmatized keywords using NLTK with frequency ranking."""
     words = word_tokenize(text)
+    # Ensure necessary NLTK resources are downloaded
+    nltk.download("punkt", quiet=True)
+    nltk.download("stopwords", quiet=True)
+    nltk.download("wordnet", quiet=True)
+    nltk.download("averaged_perceptron_tagger_eng", quiet=True)
+
     pos_tags = nltk.pos_tag(words)
     lemmatizer = WordNetLemmatizer()
     processed_words = []
@@ -196,6 +199,8 @@ def get_global_keywords(database_connection: PostgresCon) -> list[str]:
         clean_text(description) for description in df["description"].tolist()
     ]
 
+    from sklearn.feature_extraction.text import TfidfVectorizer  # noqa: PLC0415
+
     vectorizer = TfidfVectorizer(
         ngram_range=(1, 2),  # Include 1-grams, 2-grams, and 3-grams
         stop_words=list(STOPWORDS),
@@ -215,3 +220,35 @@ def get_global_keywords(database_connection: PostgresCon) -> list[str]:
     global_keywords = [kw for kw, score in keyword_scores if kw not in STOPWORDS]
 
     return global_keywords
+
+
+def insert_global_keywords(database_connection: PostgresCon) -> None:
+    """Insert global keywords into the database.
+    NOTE: This takes about ~5-8GB of RAM for 50k keywords and 200k descriptions. For now run manually.
+    """
+
+    global_keywords = get_global_keywords(database_connection)
+    global_keywords_df = pd.DataFrame(global_keywords, columns=["keyword_text"])
+    table_name = "keywords"
+    insert_columns = ["keyword_text"]
+    key_columns = ["keyword_text"]
+    keywords_df = upsert_df(
+        table_name=table_name,
+        df=global_keywords_df,
+        insert_columns=insert_columns,
+        key_columns=key_columns,
+        database_connection=database_connection,
+        return_rows=True,
+    )
+    keywords_df = keywords_df.rename(columns={"id": "keyword_id"})
+    keywords_df = keywords_df[["keyword_id"]]
+    table_name = "keywords_base"
+    insert_columns = ["keyword_id"]
+    key_columns = ["keyword_id"]
+    keywords_df.to_sql(
+        name=table_name,
+        con=database_connection.engine,
+        if_exists="replace",
+        index=False,
+        schema="public",
+    )

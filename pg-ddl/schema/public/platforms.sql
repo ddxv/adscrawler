@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict k3A8edOlwmvHZVsscSxjnpVbNx7tiXk6ooacO0qaVhIuZZAKzjdD1WLljGAEO00
+\restrict 7PWZCE1jtgIji47b2scfw2156qUKMdDeFfdnu66izyXarS7FMEKt8BP6ZKlsQqW
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -40,12 +40,12 @@ ALTER TABLE public.platforms OWNER TO james;
 --
 
 CREATE SEQUENCE public.newtable_id_seq
-AS integer
-START WITH 1
-INCREMENT BY 1
-NO MINVALUE
-NO MAXVALUE
-CACHE 1;
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
 
 
 ALTER SEQUENCE public.newtable_id_seq OWNER TO james;
@@ -61,9 +61,7 @@ ALTER SEQUENCE public.newtable_id_seq OWNED BY public.platforms.id;
 -- Name: platforms id; Type: DEFAULT; Schema: public; Owner: james
 --
 
-ALTER TABLE ONLY public.platforms ALTER COLUMN id SET DEFAULT nextval(
-    'public.newtable_id_seq'::regclass
-);
+ALTER TABLE ONLY public.platforms ALTER COLUMN id SET DEFAULT nextval('public.newtable_id_seq'::regclass);
 
 
 --
@@ -71,7 +69,7 @@ ALTER TABLE ONLY public.platforms ALTER COLUMN id SET DEFAULT nextval(
 --
 
 ALTER TABLE ONLY public.platforms
-ADD CONSTRAINT platforms_pk PRIMARY KEY (id);
+    ADD CONSTRAINT platforms_pk PRIMARY KEY (id);
 
 
 --
@@ -79,11 +77,12 @@ ADD CONSTRAINT platforms_pk PRIMARY KEY (id);
 --
 
 ALTER TABLE ONLY public.platforms
-ADD CONSTRAINT platforms_un UNIQUE (name);
+    ADD CONSTRAINT platforms_un UNIQUE (name);
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict k3A8edOlwmvHZVsscSxjnpVbNx7tiXk6ooacO0qaVhIuZZAKzjdD1WLljGAEO00
+\unrestrict 7PWZCE1jtgIji47b2scfw2156qUKMdDeFfdnu66izyXarS7FMEKt8BP6ZKlsQqW
+

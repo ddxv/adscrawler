@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict e9bVR8W2SfCP1DCKyeeDmSkPuQzspuaQuP6ig32QVQwi1xDtdiOvQpBLnVbiOMl
+\restrict 0UZ9WQWworeqezRxVaZGacCa91WkEeukIBBw44XKOLhmSPAyL2MMbbVUxd72qEn
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -41,12 +41,12 @@ ALTER TABLE public.stores OWNER TO james;
 --
 
 CREATE SEQUENCE public.stores_column1_seq
-AS integer
-START WITH 1
-INCREMENT BY 1
-NO MINVALUE
-NO MAXVALUE
-CACHE 1;
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
 
 
 ALTER SEQUENCE public.stores_column1_seq OWNER TO james;
@@ -62,9 +62,7 @@ ALTER SEQUENCE public.stores_column1_seq OWNED BY public.stores.id;
 -- Name: stores id; Type: DEFAULT; Schema: public; Owner: james
 --
 
-ALTER TABLE ONLY public.stores ALTER COLUMN id SET DEFAULT nextval(
-    'public.stores_column1_seq'::regclass
-);
+ALTER TABLE ONLY public.stores ALTER COLUMN id SET DEFAULT nextval('public.stores_column1_seq'::regclass);
 
 
 --
@@ -72,7 +70,7 @@ ALTER TABLE ONLY public.stores ALTER COLUMN id SET DEFAULT nextval(
 --
 
 ALTER TABLE ONLY public.stores
-ADD CONSTRAINT stores_pk PRIMARY KEY (id);
+    ADD CONSTRAINT stores_pk PRIMARY KEY (id);
 
 
 --
@@ -80,7 +78,7 @@ ADD CONSTRAINT stores_pk PRIMARY KEY (id);
 --
 
 ALTER TABLE ONLY public.stores
-ADD CONSTRAINT stores_un UNIQUE (name);
+    ADD CONSTRAINT stores_un UNIQUE (name);
 
 
 --
@@ -88,13 +86,12 @@ ADD CONSTRAINT stores_un UNIQUE (name);
 --
 
 ALTER TABLE ONLY public.stores
-ADD CONSTRAINT stores_fk FOREIGN KEY (platform) REFERENCES public.platforms (
-    id
-);
+    ADD CONSTRAINT stores_fk FOREIGN KEY (platform) REFERENCES public.platforms(id);
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict e9bVR8W2SfCP1DCKyeeDmSkPuQzspuaQuP6ig32QVQwi1xDtdiOvQpBLnVbiOMl
+\unrestrict 0UZ9WQWworeqezRxVaZGacCa91WkEeukIBBw44XKOLhmSPAyL2MMbbVUxd72qEn
+
