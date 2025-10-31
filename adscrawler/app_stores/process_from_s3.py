@@ -168,6 +168,11 @@ def get_s3_agg_daily_snapshots(
         store=store,
         freq="D",
     )
+    if len(parquet_paths) == 0:
+        logger.warning(
+            f"No parquet paths found for agg app snapshots {store=} {start_date=} {end_date=}"
+        )
+        return pd.DataFrame()
     duckdb_con = get_duckdb_connection(s3_config_key)
     query = f"""
       SELECT *
@@ -253,7 +258,7 @@ def prep_app_metrics_history(
 
 
 def manual_import_app_metrics_from_s3() -> None:
-    use_tunnel = True
+    use_tunnel = False
     database_connection = get_db_connection(
         use_ssh_tunnel=use_tunnel, config_key="devdb"
     )
@@ -286,6 +291,11 @@ def process_app_metrics_to_db(
     make_s3_app_country_metrics_history(store, snapshot_date=snapshot_date)
     logger.info(f"date={snapshot_date}, store={store} agg df load")
     df = get_s3_agg_daily_snapshots(snapshot_date, snapshot_date, store)
+    if df.empty:
+        logger.warning(
+            f"No data found for S3 agg app metrics {store=} {snapshot_date=}"
+        )
+        return
     logger.info(f"date={snapshot_date}, store={store} agg df prep")
     df = prep_app_metrics_history(
         df=df, store=store, database_connection=database_connection
