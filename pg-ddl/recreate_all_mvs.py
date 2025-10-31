@@ -91,7 +91,9 @@ def drop_all_mvs(mv_files: list[Path]) -> None:
         with open(mv_file) as f:
             file_content = f.read()
         # Remove \restrict line that causes errors
-        file_content_str = re.sub(r"\\restrict.*\n?", "", file_content flags=re.IGNORECASE)
+        file_content_str = re.sub(
+            r"\\restrict.*\n?", "", file_content, flags=re.IGNORECASE
+        )
         file_content_str = re.sub(
             r"\\unrestrict.*\n?", "", file_content_str, flags=re.IGNORECASE
         )
@@ -209,7 +211,9 @@ def run_all_mvs(mv_files: list[Path], stop_on_error: bool = False) -> None:
         with open(mv_file) as f:
             file_content = f.read()
         # Remove \restrict line that causes errors
-        file_content_str = re.sub(r"\\restrict.*\n?", "", file_content flags=re.IGNORECASE)
+        file_content_str = re.sub(
+            r"\\restrict.*\n?", "", file_content, flags=re.IGNORECASE
+        )
         file_content_str = re.sub(
             r"\\unrestrict.*\n?", "", file_content_str, flags=re.IGNORECASE
         )
