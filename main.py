@@ -3,7 +3,10 @@ import datetime
 import os
 import sys
 
-from adscrawler.app_stores.process_from_s3 import import_ranks_from_s3
+from adscrawler.app_stores.process_from_s3 import (
+    import_app_metrics_from_s3,
+    import_ranks_from_s3,
+)
 from adscrawler.app_stores.scrape_stores import (
     crawl_developers_for_new_store_ids,
     crawl_keyword_cranks,
@@ -155,12 +158,12 @@ class ProcessManager:
         )
         ### OPTIONS FOR IMPORT RANKS FROM S3
         parser.add_argument(
-            "--import-ranks-from-s3",
-            help="Import ranks from s3",
+            "--daily-s3-imports",
+            help="Import app ranks and metrics from s3",
             action="store_true",
         )
         parser.add_argument(
-            "--period",
+            "--ranks-period",
             help="Period to group imported ranks from s3, default week, options are week or day",
             type=str,
             default="week",
@@ -274,8 +277,8 @@ class ProcessManager:
         if self.args.new_apps_check:
             self.scrape_new_apps(store)
 
-        if self.args.import_ranks_from_s3:
-            self.import_ranks_from_s3(store)
+        if self.args.daily_s3_imports:
+            self.daily_s3_imports()
 
         if self.args.new_apps_check_devs:
             self.scrape_new_apps_devs(store)
@@ -306,8 +309,8 @@ class ProcessManager:
 
         logger.info("Adscrawler exiting main")
 
-    def import_ranks_from_s3(self, store: int) -> None:
-        period = self.args.period
+    def daily_s3_imports(self) -> None:
+        period = self.args.ranks_period
         if period == "week":
             start_date = datetime.date.today() - datetime.timedelta(days=8)
             end_date = datetime.date.today()
@@ -319,15 +322,24 @@ class ProcessManager:
         try:
             import_ranks_from_s3(
                 database_connection=self.pgcon,
-                store=store,
                 start_date=start_date,
                 end_date=end_date,
                 period=period,
             )
         except Exception:
             logger.exception(
-                f"Importing {self.args.period} ranks from s3 for {store=} failed"
+                f"Importing {self.args.ranks_period} ranks from s3 for failed"
             )
+        try:
+            start_date = datetime.date.today() - datetime.timedelta(days=3)
+            end_date = datetime.date.today() - datetime.timedelta(days=1)
+            import_app_metrics_from_s3(
+                database_connection=self.pgcon,
+                start_date=start_date,
+                end_date=end_date,
+            )
+        except Exception:
+            logger.exception("Importing app metrics from s3 for failed")
 
     def scrape_new_apps(self, store: int) -> None:
         try:

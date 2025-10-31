@@ -12,11 +12,11 @@ Scrapers:
 
 ## Setup and Installation
 
-- PostgreSQL: 17
+- PostgreSQL: 17/18
 - Setup your database. The files here use the database name 'madrone'
 - Add a password to your default db user if you dont have one yet `ALTER USER postgres WITH PASSWORD 'xxx';`
 
-- Python environment: Python 3.12/3.13
+- Python environment: Python 3.13
 - Setup python environment `python3.12 -m venv .virtualenv` & `source .virtualenv/bin/activate`
 - `uv pip install -r pyproject.toml`
 - `cp example_config.toml ~/config/adscrawler/config.toml` and edit any needed values. For using all locally, the main thing that needs to be modified is the `xxx` for postgres pass and S3 host.
@@ -45,9 +45,9 @@ Scrapers:
 
 - `-n, --new-apps-check` This crawls app rank data and stores to S3. It is also the source of new apps. Crawl the iTunes and Play Store front pages to discover new apps. Checks top apps for each category and collection.
 
-- `--import-ranks-from-s3` This imports the stored S3 data into a weekly table for frontend to use.
+- `--daily-s3-imports` This processes and imports data stored in S3. App Ranks and app metrics.
 
-- `-d, --new-apps-check-devs` Crawl developers' pages to find new apps.
+- `-d, --new-apps-check-devs` Crawl developers' pages to find new apps from those developers.
 
 - `--limit-query-rows` Number of rows per run, default 200,000.
 

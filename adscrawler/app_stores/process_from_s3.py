@@ -56,7 +56,7 @@ COUNTRY_HISTORY_KEYS = [
 
 COUNTRY_HISTORY_COLS = COUNTRY_HISTORY_KEYS + METRIC_COLS
 
-GLOBAL_HISTORY_COLS = GLOBAL_HISTORY_KEYS + METRIC_COLS
+GLOBAL_HISTORY_COLS = GLOBAL_HISTORY_KEYS + METRIC_COLS + ["store_last_updated"]
 
 
 def app_details_to_s3(
@@ -111,9 +111,11 @@ def process_store_rankings(
 
 
 def get_s3_rank_parquet_paths(
-    s3, bucket: str, dt: pd.DatetimeIndex, days: int, store: int
+    s3_config_key: str, dt: pd.DatetimeIndex, days: int, store: int
 ) -> list[str]:
+    s3 = get_s3_client()
     all_parquet_paths = []
+    bucket = CONFIG[s3_config_key]["bucket"]
     for ddt in pd.date_range(dt, dt + datetime.timedelta(days=days), freq="D"):
         ddt_str = ddt.strftime("%Y-%m-%d")
         prefix = f"raw-data/app_rankings/store={store}/crawled_date={ddt_str}/country="
@@ -248,7 +250,7 @@ def prep_app_metrics_history(
     return df
 
 
-def manual_snapshot_rerun_app_country_metrics_history() -> None:
+def manual_import_app_metrics_from_s3() -> None:
     use_tunnel = True
     database_connection = get_db_connection(
         use_ssh_tunnel=use_tunnel, config_key="devdb"
@@ -258,12 +260,24 @@ def manual_snapshot_rerun_app_country_metrics_history() -> None:
     for snapshot_date in pd.date_range(start_date, end_date, freq="D"):
         snapshot_date = snapshot_date.date()
         for store in [1, 2]:
-            snapshot_rerun_store_app_country_history(
-                database_connection, store, snapshot_date
-            )
+            process_app_metrics_to_db(database_connection, store, snapshot_date)
 
 
-def snapshot_rerun_store_app_country_history(
+def import_app_metrics_from_s3(
+    start_date: datetime.date, end_date: datetime.date, database_connection: PostgresCon
+) -> None:
+    for snapshot_date in pd.date_range(start_date, end_date, freq="D"):
+        snapshot_date = snapshot_date.date()
+        for store in [1, 2]:
+            try:
+                process_app_metrics_to_db(database_connection, store, snapshot_date)
+            except Exception as e:
+                logger.error(
+                    f"Error processing S3 app metrics for {snapshot_date} {store}: {e}"
+                )
+
+
+def process_app_metrics_to_db(
     database_connection: PostgresCon, store: int, snapshot_date: datetime.date
 ) -> None:
     logger.info(f"date={snapshot_date}, store={store} Make S3 agg")
@@ -312,6 +326,7 @@ def snapshot_rerun_store_app_country_history(
         )
         df = df.groupby(GLOBAL_HISTORY_KEYS).agg(
             rating_count=("rating_count", "sum"),
+            store_last_updated=("store_last_updated", "max"),
             **{col: (col, "sum") for col in STAR_COLS},
         )
         df["rating"] = weighted_sum / weight_total
@@ -437,115 +452,130 @@ def app_details_country_history_query(
 
 
 def import_ranks_from_s3(
-    store: int,
     start_date: datetime.date,
     end_date: datetime.date,
     database_connection: PostgresCon,
     period: str = "week",
 ) -> None:
     if period == "week":
-        days = 6
         freq = "W-MON"
-        table_suffix = "weekly"
     elif period == "day":
-        days = 1
         freq = "D"
-        table_suffix = "daily"
     else:
         raise ValueError(f"Invalid period {period}")
     s3_config_key = "s3"
-    duckdb_con = get_duckdb_connection(s3_config_key)
-    s3 = get_s3_client()
     bucket = CONFIG[s3_config_key]["bucket"]
     s3_region = CONFIG[s3_config_key]["region_name"]
     logger.info(f"Importing ranks from S3 {bucket=} in {s3_region=}")
     for dt in pd.date_range(start_date, end_date, freq=freq):
-        period_date_str = dt.strftime("%Y-%m-%d")
-        logger.info(f"Processing store={store} period_start={period_date_str}")
-        all_parquet_paths = get_s3_rank_parquet_paths(s3, bucket, dt, days, store)
-        if len(all_parquet_paths) == 0:
-            logger.info(f"No parquet files found for period_start={period_date_str}")
-            continue
-        countries_in_period = [
-            x.split("country=")[1].split("/")[0]
-            for x in all_parquet_paths
-            if "country=" in x
-        ]
-        countries_in_period = list(set(countries_in_period))
-        for country in countries_in_period:
-            country_parquet_paths = [
-                x for x in all_parquet_paths if f"country={country}" in x
-            ]
-            logger.info(
-                f"DuckDB {store=} period_start={period_date_str} {country=} files={len(country_parquet_paths)}"
-            )
-            wdf = process_parquets_and_insert(
-                country_parquet_paths=country_parquet_paths,
-                period=period,
-                duckdb_con=duckdb_con,
-            )
-            store_id_map = query_store_id_map_cached(
-                store=store, database_connection=database_connection
-            )
-            country_map = query_countries(database_connection)
-            collection_map = query_collections(database_connection)
-            category_map = query_categories(database_connection)
-            wdf["country"] = wdf["country"].map(
-                country_map.set_index("alpha2")["id"].to_dict()
-            )
-            wdf["store_collection"] = wdf["collection"].map(
-                collection_map.set_index("collection")["id"].to_dict()
-            )
-            wdf["store_category"] = wdf["category"].map(
-                category_map.set_index("category")["id"].to_dict()
-            )
-            new_ids = wdf[~wdf["store_id"].isin(store_id_map["store_id"])][
-                "store_id"
-            ].unique()
-            if len(new_ids) > 0:
-                logger.info(f"Found new store ids: {len(new_ids)}")
-                new_ids = [
-                    {"store": store, "store_id": store_id} for store_id in new_ids
-                ]
-                insert_new_apps(
-                    database_connection=database_connection,
-                    dicts=new_ids,
-                    crawl_source="process_ranks_parquet",
-                    store=store,
-                )
-                store_id_map = query_store_id_map(database_connection, store)
-            wdf["store_app"] = wdf["store_id"].map(
-                store_id_map.set_index("store_id")["id"].to_dict()
-            )
-            wdf = wdf.drop(columns=["store_id", "collection", "category"])
-            upsert_df(
-                df=wdf,
-                table_name=f"store_app_ranks_{table_suffix}",
-                schema="frontend",
+        for store in [1, 2]:
+            process_ranks_from_s3(
+                store=store,
+                dt=dt,
                 database_connection=database_connection,
-                key_columns=[
-                    "country",
-                    "store_collection",
-                    "store_category",
-                    "crawled_date",
-                    "rank",
-                ],
-                insert_columns=[
-                    "country",
-                    "store_collection",
-                    "store_category",
-                    "crawled_date",
-                    "rank",
-                    "store_app",
-                    "best_rank",
-                ],
+                period=period,
             )
+
+
+def process_ranks_from_s3(
+    store: int,
+    dt: datetime.date,
+    database_connection: PostgresCon,
+    period: str,
+    s3_config_key: str,
+) -> None:
+    if period == "week":
+        days = 6
+        table_suffix = "weekly"
+    elif period == "day":
+        days = 1
+        table_suffix = "daily"
+    else:
+        raise ValueError(f"Invalid period {period}")
+    period_date_str = dt.strftime("%Y-%m-%d")
+    logger.info(f"Processing store={store} period_start={period_date_str}")
+    all_parquet_paths = get_s3_rank_parquet_paths(s3_config_key, dt, days, store)
+    if len(all_parquet_paths) == 0:
+        logger.info(f"No parquet files found for period_start={period_date_str}")
+        return
+    countries_in_period = [
+        x.split("country=")[1].split("/")[0]
+        for x in all_parquet_paths
+        if "country=" in x
+    ]
+    countries_in_period = list(set(countries_in_period))
+    for country in countries_in_period:
+        country_parquet_paths = [
+            x for x in all_parquet_paths if f"country={country}" in x
+        ]
+        logger.info(
+            f"DuckDB {store=} period_start={period_date_str} {country=} files={len(country_parquet_paths)}"
+        )
+        wdf = process_parquets_and_insert(
+            country_parquet_paths=country_parquet_paths,
+            period=period,
+            s3_config_key=s3_config_key,
+        )
+        store_id_map = query_store_id_map_cached(
+            store=store, database_connection=database_connection
+        )
+        country_map = query_countries(database_connection)
+        collection_map = query_collections(database_connection)
+        category_map = query_categories(database_connection)
+        wdf["country"] = wdf["country"].map(
+            country_map.set_index("alpha2")["id"].to_dict()
+        )
+        wdf["store_collection"] = wdf["collection"].map(
+            collection_map.set_index("collection")["id"].to_dict()
+        )
+        wdf["store_category"] = wdf["category"].map(
+            category_map.set_index("category")["id"].to_dict()
+        )
+        new_ids = wdf[~wdf["store_id"].isin(store_id_map["store_id"])][
+            "store_id"
+        ].unique()
+        if len(new_ids) > 0:
+            logger.info(f"Found new store ids: {len(new_ids)}")
+            new_ids = [{"store": store, "store_id": store_id} for store_id in new_ids]
+            insert_new_apps(
+                database_connection=database_connection,
+                dicts=new_ids,
+                crawl_source="process_ranks_parquet",
+                store=store,
+            )
+            store_id_map = query_store_id_map(database_connection, store)
+        wdf["store_app"] = wdf["store_id"].map(
+            store_id_map.set_index("store_id")["id"].to_dict()
+        )
+        wdf = wdf.drop(columns=["store_id", "collection", "category"])
+        upsert_df(
+            df=wdf,
+            table_name=f"store_app_ranks_{table_suffix}",
+            schema="frontend",
+            database_connection=database_connection,
+            key_columns=[
+                "country",
+                "store_collection",
+                "store_category",
+                "crawled_date",
+                "rank",
+            ],
+            insert_columns=[
+                "country",
+                "store_collection",
+                "store_category",
+                "crawled_date",
+                "rank",
+                "store_app",
+                "best_rank",
+            ],
+        )
 
 
 def process_parquets_and_insert(
     country_parquet_paths: list[str],
     period: str,
-    duckdb_con,
+    s3_config_key: str,
 ):
     """Process parquet files for a specific country and insert into the database."""
     period_query = f"""WITH all_data AS (
@@ -577,6 +607,7 @@ def process_parquets_and_insert(
             SELECT par.rank, par.best_rank, par.country, par.collection, par.category, par.crawled_date, par.store_id FROM period_app_ranks par
               ORDER BY par.country, par.collection, par.category, par.crawled_date, par.rank
             """
+    duckdb_con = get_duckdb_connection(s3_config_key)
     return duckdb_con.execute(period_query).df()
 
 
