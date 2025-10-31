@@ -1,7 +1,6 @@
 import datetime
 import os
 import pathlib
-import re
 import time
 import uuid
 from io import BytesIO
@@ -13,6 +12,7 @@ from adscrawler.app_stores.utils import insert_new_apps
 from adscrawler.config import CONFIG, get_logger
 from adscrawler.dbcon.connection import (
     PostgresCon,
+    get_db_connection,
 )
 from adscrawler.dbcon.queries import (
     query_categories,
@@ -25,6 +25,38 @@ from adscrawler.dbcon.queries import (
 from adscrawler.packages.storage import get_duckdb_connection, get_s3_client
 
 logger = get_logger(__name__, "scrape_stores")
+
+STAR_COLS = [
+    "one_star",
+    "two_star",
+    "three_stars",
+    "four_stars",
+    "five_stars",
+]
+
+
+METRIC_COLS = [
+    "snapshot_date",
+    "store_app",
+    "review_count",
+    "rating",
+    "rating_count",
+    "installs",
+] + STAR_COLS
+
+GLOBAL_HISTORY_KEYS = [
+    "snapshot_date",
+    "store_app",
+]
+COUNTRY_HISTORY_KEYS = [
+    "snapshot_date",
+    "country_id",
+    "store_app",
+]
+
+COUNTRY_HISTORY_COLS = COUNTRY_HISTORY_KEYS + METRIC_COLS
+
+GLOBAL_HISTORY_COLS = GLOBAL_HISTORY_KEYS + METRIC_COLS
 
 
 def app_details_to_s3(
@@ -118,7 +150,6 @@ def get_s3_agg_app_snapshots_parquet_paths(
     for ddt in pd.date_range(start_date, end_date, freq=freq):
         ddt_str = ddt.strftime("%Y-%m-%d")
         prefix = f"agg-data/store_app_country_history/store={store}/snapshot_date={ddt_str}/country="
-        print(prefix)
         all_parquet_paths += get_parquet_paths_by_prefix(bucket, prefix)
     return all_parquet_paths
 
@@ -145,161 +176,15 @@ def get_s3_agg_daily_snapshots(
     return df
 
 
-def s3_store_app_global_history_to_db(
-    df: pd.DataFrame,
-    store: int,
-    database_connection: PostgresCon,
-) -> None:
-    df = df[df["store_id"].notna()]
-    star_cols = ["one_star", "two_star", "three_stars", "four_stars", "five_stars"]
-    if store == 1:
-        df[star_cols] = df["histogram"].apply(pd.Series)
-        df["store_last_updated"] = np.where(
-            (df["store_last_updated"] < 0) | (df["store_last_updated"].isna()),
-            None,
-            df["store_last_updated"],
-        )
-        df.loc[df["store_last_updated"].notna(), "store_last_updated"] = pd.to_datetime(
-            df.loc[df["store_last_updated"].notna(), "store_last_updated"], unit="s"
-        )
-    if store == 2:
-        df["user_ratings"].tail()
-        df[star_cols] = df["user_ratings"].str.findall(r":\s*(\d+)").apply(pd.Series)
-        df[star_cols] = (
-            df["user_ratings"]
-            .apply(lambda x: [int(num) for num in re.findall(r"\d+", x)[1::2]])
-            .apply(pd.Series)
-        )
-        ratings_str = df["user_ratings"].str.extractall(r"(\d+)").unstack()
-        ratings_str = ratings_str.reindex(df.index, fill_value=0)
-        df[star_cols] = ratings_str.iloc[:, 1::2].astype(int).values
-        df["store_last_updated"] = pd.to_datetime(
-            df["store_last_updated"], format="ISO8601", utc=True
-        )
-        df.groupby(["store_id", "country"])[
-            ["rating_count"] + star_cols
-        ].sum().reset_index()
-    store_id_map = query_store_id_map_cached(
-        store=store, database_connection=database_connection
-    )
-    country_map = query_countries(database_connection)
-    df["country_id"] = df["country"].map(
-        country_map.set_index("alpha2")["id"].to_dict()
-    )
-    new_ids = df[~df["store_id"].isin(store_id_map["store_id"])]["store_id"].unique()
-    if len(new_ids) > 0:
-        logger.warning(f"Found new store ids: {len(new_ids)}")
-        raise ValueError("New store ids found in S3 app history data")
-    df["store_app"] = df["store_id"].map(
-        store_id_map.set_index("store_id")["id"].to_dict()
-    )
-    df = df.convert_dtypes(dtype_backend="pyarrow")
-    df = df.replace({pd.NA: None})
-    all_columns = [
-        "snapshot_date",
-        "store_app",
-        "review_count",
-        "rating",
-        "rating_count",
-        "one_star",
-        "two_star",
-        "three_stars",
-        "four_stars",
-        "five_stars",
-    ]
-    key_columns = ["snapshot_date", "store_app"]
-    insert_columns = [x for x in all_columns if x in df.columns]
-    any_duplicates = df[insert_columns].duplicated(subset=key_columns).any()
+def check_for_duplicates(df: pd.DataFrame, key_columns: list[str]):
+    any_duplicates = df.duplicated(subset=key_columns).any()
     if any_duplicates:
-        df[df[insert_columns].duplicated(subset=key_columns)][
-            ["store_id", "snapshot_date", "crawled_at"]
+        dups = df[df.duplicated(subset=key_columns)][
+            key_columns + ["store_id", "crawled_at"]
         ]
-        logger.error("Duplicates found in app history data, dropping duplicates")
+        logger.error(f"Duplicates found in app history data! {dups}")
         raise ValueError("Duplicates found in app history data")
-    # TESTING ONLY
-    df = df[df["store_app"].notna()]
-    upsert_df(
-        df=df,
-        table_name="store_app_global_history",
-        database_connection=database_connection,
-        key_columns=key_columns,
-        insert_columns=insert_columns,
-    )
-
-
-def s3_store_app_country_history_to_db(
-    df: pd.DataFrame,
-    store: int,
-    database_connection: PostgresCon,
-) -> None:
-    df = df[df["store_id"].notna()]
-    star_cols = ["one_star", "two_star", "three_stars", "four_stars", "five_stars"]
-    if store == 1:
-        df["store_last_updated"] = np.where(
-            (df["store_last_updated"] < 0) | (df["store_last_updated"].isna()),
-            None,
-            df["store_last_updated"],
-        )
-        df.loc[df["store_last_updated"].notna(), "store_last_updated"] = pd.to_datetime(
-            df.loc[df["store_last_updated"].notna(), "store_last_updated"], unit="s"
-        )
-    if store == 2:
-        df[star_cols] = (
-            df["user_ratings"]
-            .apply(lambda x: [int(num) for num in re.findall(r"\d+", x)[1::2]])
-            .apply(pd.Series)
-        )
-        df["store_last_updated"] = pd.to_datetime(
-            df["store_last_updated"], format="ISO8601", utc=True
-        )
-    store_id_map = query_store_id_map_cached(
-        store=store, database_connection=database_connection
-    )
-    country_map = query_countries(database_connection)
-    df["country_id"] = df["country"].map(
-        country_map.set_index("alpha2")["id"].to_dict()
-    )
-    new_ids = df[~df["store_id"].isin(store_id_map["store_id"])]["store_id"].unique()
-    if len(new_ids) > 0:
-        logger.warning(f"Found new store ids: {len(new_ids)}")
-        raise ValueError("New store ids found in S3 app history data")
-    df["store_app"] = df["store_id"].map(
-        store_id_map.set_index("store_id")["id"].to_dict()
-    )
-    df = df.convert_dtypes(dtype_backend="pyarrow")
-    df = df.replace({pd.NA: None})
-    # snapshot date?
-    all_columns = [
-        "snapshot_date",
-        "country_id",
-        "store_app",
-        "review_count",
-        "rating",
-        "rating_count",
-        "one_star",
-        "two_star",
-        "three_stars",
-        "four_stars",
-        "five_stars",
-    ]
-    key_columns = ["snapshot_date", "country_id", "store_app"]
-    insert_columns = [x for x in all_columns if x in df.columns]
-    any_duplicates = df[insert_columns].duplicated(subset=key_columns).any()
-    if any_duplicates:
-        df[df[insert_columns].duplicated(subset=key_columns)][
-            ["store_id", "country_id", "snapshot_date", "crawled_at"]
-        ]
-        logger.error("Duplicates found in app history data, dropping duplicates")
-        raise ValueError("Duplicates found in app history data")
-    # TESTING ONLY
-    df = df[df["store_app"].notna()]
-    upsert_df(
-        df=df,
-        table_name="store_app_country_history",
-        database_connection=database_connection,
-        key_columns=key_columns,
-        insert_columns=insert_columns,
-    )
+    return
 
 
 def make_s3_store_app_country_history(store, snapshot_date) -> None:
@@ -324,7 +209,50 @@ def make_s3_store_app_country_history(store, snapshot_date) -> None:
     duckdb_con.close()
 
 
+def prep_store_app_history(
+    df: pd.DataFrame, store: int, database_connection: PostgresCon
+) -> pd.DataFrame:
+    if store == 1:
+        df["store_last_updated"] = np.where(
+            (df["store_last_updated"] < 0) | (df["store_last_updated"].isna()),
+            None,
+            df["store_last_updated"],
+        )
+        df.loc[df["store_last_updated"].notna(), "store_last_updated"] = pd.to_datetime(
+            df.loc[df["store_last_updated"].notna(), "store_last_updated"],
+            unit="s",
+        )
+    if store == 2:
+        ratings_str = df["user_ratings"].str.extractall(r"(\d+)").unstack()
+        ratings_str = ratings_str.reindex(df.index, fill_value=0)
+        df[STAR_COLS] = ratings_str.iloc[:, 1::2].astype(int).values
+        df["store_last_updated"] = pd.to_datetime(
+            df["store_last_updated"], format="ISO8601", utc=True
+        )
+    store_id_map = query_store_id_map_cached(
+        store=store, database_connection=database_connection
+    )
+    country_map = query_countries(database_connection)
+    df["country_id"] = df["country"].map(
+        country_map.set_index("alpha2")["id"].to_dict()
+    )
+    new_ids = df[~df["store_id"].isin(store_id_map["store_id"])]["store_id"].unique()
+    if len(new_ids) > 0:
+        logger.warning(f"Found new store ids: {len(new_ids)}")
+        raise ValueError("New store ids found in S3 app history data")
+    df["store_app"] = df["store_id"].map(
+        store_id_map.set_index("store_id")["id"].to_dict()
+    )
+    df = df.convert_dtypes(dtype_backend="pyarrow")
+    df = df.replace({pd.NA: None})
+    return df
+
+
 def snapshot_rerun_store_app_country_history(database_connection: PostgresCon) -> None:
+    use_tunnel = True
+    database_connection = get_db_connection(
+        use_ssh_tunnel=use_tunnel, config_key="devdb"
+    )
     start_date = datetime.date(2025, 10, 10)
     end_date = datetime.date(2025, 10, 28)
     # lookback_days = 60
@@ -333,19 +261,68 @@ def snapshot_rerun_store_app_country_history(database_connection: PostgresCon) -
         for store in [1, 2]:
             logger.info(f"date={snapshot_date}, store={store} Make S3 agg")
             make_s3_store_app_country_history(store, snapshot_date=snapshot_date)
-            logger.info(f"date={snapshot_date}, store={store} Load to db")
+            logger.info(f"date={snapshot_date}, store={store} agg df load")
             df = get_s3_agg_daily_snapshots(snapshot_date, snapshot_date, store)
-            s3_store_app_country_history_to_db(
-                store=store,
+            logger.info(f"date={snapshot_date}, store={store} agg df prep")
+            df = prep_store_app_history(
+                df=df, store=store, database_connection=database_connection
+            )
+            if not df[df["store_id"].isna()].empty:
+                # Why are there many records with missing store_id?
+                logger.warning("Found records with missing store_id")
+                raise
+            check_for_duplicates(
                 df=df,
+                key_columns=COUNTRY_HISTORY_KEYS,
+            )
+            # TESTING ONLY, ignore new apps since devdb is not updated
+            df = df[df["store_app"].notna()]
+            insert_columns = [x for x in COUNTRY_HISTORY_COLS if x in df.columns]
+            if store == 1:
+                # TODO: Can get installs per Country by getting review_count sum for all countries
+                # Cannot do with this data set since it is snapshot_date only
+                # and not every app for every country crawled on this date
+                insert_columns = [x for x in insert_columns if x != "installs"]
+            logger.info(f"date={snapshot_date}, store={store} agg df country upsert")
+            upsert_df(
+                df=df,
+                table_name="store_app_country_history",
                 database_connection=database_connection,
+                key_columns=COUNTRY_HISTORY_KEYS,
+                insert_columns=insert_columns,
             )
             if store == 1:
                 df = df[df["country"] == "US"]
-            s3_store_app_global_history_to_db(
-                store,
+                df[STAR_COLS] = df["histogram"].apply(pd.Series)
+            if store == 2:
+                weighted_sum = (
+                    (df["rating"] * df["rating_count"])
+                    .groupby([df[k] for k in GLOBAL_HISTORY_KEYS])
+                    .sum()
+                )
+                weight_total = (
+                    df["rating_count"]
+                    .groupby([df[k] for k in GLOBAL_HISTORY_KEYS])
+                    .sum()
+                )
+                df = df.groupby(GLOBAL_HISTORY_KEYS).agg(
+                    rating_count=("rating_count", "sum"),
+                    **{col: (col, "sum") for col in STAR_COLS},
+                )
+                df["rating"] = weighted_sum / weight_total
+                df = df.reset_index()
+            check_for_duplicates(
                 df=df,
+                key_columns=GLOBAL_HISTORY_KEYS,
+            )
+            insert_columns = [x for x in GLOBAL_HISTORY_COLS if x in df.columns]
+            logger.info(f"date={snapshot_date}, store={store} agg df global upsert")
+            upsert_df(
+                df=df,
+                table_name="store_app_global_history",
                 database_connection=database_connection,
+                key_columns=GLOBAL_HISTORY_KEYS,
+                insert_columns=insert_columns,
             )
 
 
@@ -411,6 +388,7 @@ def app_details_country_history_query(
              country,
              crawled_date,
              realInstalls as installs,
+             ratings as rating_count,
              score AS rating,
              reviews AS review_count,
              histogram,
@@ -423,6 +401,7 @@ def app_details_country_history_query(
                 crawled_date,
                 installs,
                 rating,
+                rating_count,
                 review_count,
                 histogram,
                 store_last_updated,
