@@ -90,48 +90,13 @@ def process_chunk(
         app_details_to_s3(results_df, store=store)
         log_crawl_results(results_df, store, database_connection=database_connection)
         results_df = results_df[(results_df["country"] == "US")]
-        for crawl_result, apps_df in results_df.groupby("crawl_result"):
-            if crawl_result != 1:
-                apps_df = apps_df[["store_id", "store", "crawled_at", "crawl_result"]]
-            else:
-                apps_df = clean_scraped_df(df=apps_df, store=row["store"])
-                if "description_short" not in apps_df.columns:
-                    apps_df["description_short"] = ""
-                apps_df.loc[
-                    apps_df["description_short"].isna(), "description_short"
-                ] = ""
-                if process_icon:
-                    try:
-                        apps_df = pd.merge(
-                            apps_df,
-                            df_chunk[["store_id", "icon_url_100"]],
-                            on="store_id",
-                            how="inner",
-                            validate="1:1",
-                        )
-                        no_icon = apps_df["icon_url_100"].isna()
-                        if apps_df[no_icon].empty:
-                            pass
-                        else:
-                            apps_df.loc[no_icon, "icon_url_100"] = apps_df.loc[
-                                no_icon
-                            ].apply(
-                                lambda x: process_app_icon(
-                                    x["store_id"], x["icon_url_512"]
-                                ),
-                                axis=1,
-                            )
-                    except Exception:
-                        logger.exception(
-                            f"{row['store_id']} failed to process app icon"
-                        )
-            apps_df = apps_df.convert_dtypes(dtype_backend="pyarrow")
-            apps_df = apps_df.replace({pd.NA: None})
-            apps_details_to_db(
-                apps_df=apps_df,
-                database_connection=database_connection,
-            )
-            logger.info(f"{chunk_info} upserted {crawl_result=} apps={len(apps_df)} ")
+        process_live_app_details(
+            store=store,
+            results_df=results_df,
+            database_connection=database_connection,
+            process_icon=process_app_icon,
+            df_chunk=df_chunk,
+        )
     except Exception as e:
         logger.exception(f"{chunk_info} error processing with {e}")
     finally:
@@ -723,19 +688,65 @@ def save_developer_info(
     return apps_df
 
 
+def process_live_app_details(
+    store: int,
+    results_df: pd.DataFrame,
+    database_connection: PostgresCon,
+    process_icon: bool,
+    df_chunk: pd.DataFrame,
+) -> None:
+    for crawl_result, apps_df in results_df.groupby("crawl_result"):
+        if crawl_result != 1:
+            apps_df = apps_df[["store_id", "store", "crawled_at", "crawl_result"]]
+        else:
+            apps_df = clean_scraped_df(df=apps_df, store=store)
+            if "description_short" not in apps_df.columns:
+                apps_df["description_short"] = ""
+            apps_df.loc[apps_df["description_short"].isna(), "description_short"] = ""
+            if process_icon:
+                try:
+                    apps_df = pd.merge(
+                        apps_df,
+                        df_chunk[["store_id", "icon_url_100"]],
+                        on="store_id",
+                        how="inner",
+                    )
+                    no_icon = apps_df["icon_url_100"].isna()
+                    if apps_df[no_icon].empty:
+                        pass
+                    else:
+                        apps_df.loc[no_icon, "icon_url_100"] = apps_df.loc[
+                            no_icon
+                        ].apply(
+                            lambda x: process_app_icon(
+                                x["store_id"], x["icon_url_512"]
+                            ),
+                            axis=1,
+                        )
+                except Exception:
+                    logger.exception("failed to process app icon")
+        apps_df = apps_df.convert_dtypes(dtype_backend="pyarrow")
+        apps_df = apps_df.replace({pd.NA: None})
+        apps_details_to_db(
+            apps_df=apps_df,
+            database_connection=database_connection,
+        )
+
+
 def apps_details_to_db(
     apps_df: pd.DataFrame,
     database_connection: PostgresCon,
 ) -> None:
-    table_name = "store_apps"
     key_columns = ["store", "store_id"]
     if (apps_df["crawl_result"] == 1).all() and apps_df["developer_id"].notna().all():
         apps_df = save_developer_info(apps_df, database_connection)
     insert_columns = [
         x for x in get_store_app_columns(database_connection) if x in apps_df.columns
     ]
+    # Update columns we always want the latest of
+    # Eg name, developer_id
     store_apps_df = upsert_df(
-        table_name=table_name,
+        table_name="store_apps",
         df=apps_df,
         insert_columns=insert_columns,
         key_columns=key_columns,
@@ -891,7 +902,7 @@ def log_crawl_results(
     app_df = app_df[insert_columns]
     app_df.to_sql(
         schema="logging",
-        name="store_app_country_crawl",
+        name="app_country_crawls",
         con=database_connection.engine,
         if_exists="append",
         index=False,

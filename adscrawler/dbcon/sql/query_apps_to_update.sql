@@ -27,7 +27,7 @@ latest_crawls AS (
         crawled_at,
         crawl_result
     FROM
-        logging.store_app_country_crawl
+        logging.app_country_crawls
     ORDER BY
         store_app ASC,
         country_id ASC,

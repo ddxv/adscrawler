@@ -29,9 +29,9 @@ logger = get_logger(__name__, "scrape_stores")
 STAR_COLS = [
     "one_star",
     "two_star",
-    "three_stars",
-    "four_stars",
-    "five_stars",
+    "three_star",
+    "four_star",
+    "five_star",
 ]
 
 
@@ -149,7 +149,7 @@ def get_s3_agg_app_snapshots_parquet_paths(
     all_parquet_paths = []
     for ddt in pd.date_range(start_date, end_date, freq=freq):
         ddt_str = ddt.strftime("%Y-%m-%d")
-        prefix = f"agg-data/store_app_country_history/store={store}/snapshot_date={ddt_str}/country="
+        prefix = f"agg-data/app_country_metrics/store={store}/snapshot_date={ddt_str}/country="
         all_parquet_paths += get_parquet_paths_by_prefix(bucket, prefix)
     return all_parquet_paths
 
@@ -187,7 +187,7 @@ def check_for_duplicates(df: pd.DataFrame, key_columns: list[str]):
     return
 
 
-def make_s3_store_app_country_history(store, snapshot_date) -> None:
+def make_s3_app_country_metrics_history(store, snapshot_date) -> None:
     app_detail_parquets = get_s3_app_details_parquet_paths(
         snapshot_date=snapshot_date,
         store=store,
@@ -209,7 +209,7 @@ def make_s3_store_app_country_history(store, snapshot_date) -> None:
     duckdb_con.close()
 
 
-def prep_store_app_history(
+def prep_app_metrics_history(
     df: pd.DataFrame, store: int, database_connection: PostgresCon
 ) -> pd.DataFrame:
     if store == 1:
@@ -248,82 +248,87 @@ def prep_store_app_history(
     return df
 
 
-def snapshot_rerun_store_app_country_history(database_connection: PostgresCon) -> None:
+def manual_snapshot_rerun_app_country_metrics_history() -> None:
     use_tunnel = True
     database_connection = get_db_connection(
         use_ssh_tunnel=use_tunnel, config_key="devdb"
     )
     start_date = datetime.date(2025, 10, 10)
     end_date = datetime.date(2025, 10, 28)
-    # lookback_days = 60
     for snapshot_date in pd.date_range(start_date, end_date, freq="D"):
         snapshot_date = snapshot_date.date()
         for store in [1, 2]:
-            logger.info(f"date={snapshot_date}, store={store} Make S3 agg")
-            make_s3_store_app_country_history(store, snapshot_date=snapshot_date)
-            logger.info(f"date={snapshot_date}, store={store} agg df load")
-            df = get_s3_agg_daily_snapshots(snapshot_date, snapshot_date, store)
-            logger.info(f"date={snapshot_date}, store={store} agg df prep")
-            df = prep_store_app_history(
-                df=df, store=store, database_connection=database_connection
+            snapshot_rerun_store_app_country_history(
+                database_connection, store, snapshot_date
             )
-            if not df[df["store_id"].isna()].empty:
-                # Why are there many records with missing store_id?
-                logger.warning("Found records with missing store_id")
-                raise
-            check_for_duplicates(
-                df=df,
-                key_columns=COUNTRY_HISTORY_KEYS,
-            )
-            # TESTING ONLY, ignore new apps since devdb is not updated
-            df = df[df["store_app"].notna()]
-            insert_columns = [x for x in COUNTRY_HISTORY_COLS if x in df.columns]
-            if store == 1:
-                # TODO: Can get installs per Country by getting review_count sum for all countries
-                # Cannot do with this data set since it is snapshot_date only
-                # and not every app for every country crawled on this date
-                insert_columns = [x for x in insert_columns if x != "installs"]
-            logger.info(f"date={snapshot_date}, store={store} agg df country upsert")
-            upsert_df(
-                df=df,
-                table_name="store_app_country_history",
-                database_connection=database_connection,
-                key_columns=COUNTRY_HISTORY_KEYS,
-                insert_columns=insert_columns,
-            )
-            if store == 1:
-                df = df[df["country"] == "US"]
-                df[STAR_COLS] = df["histogram"].apply(pd.Series)
-            if store == 2:
-                weighted_sum = (
-                    (df["rating"] * df["rating_count"])
-                    .groupby([df[k] for k in GLOBAL_HISTORY_KEYS])
-                    .sum()
-                )
-                weight_total = (
-                    df["rating_count"]
-                    .groupby([df[k] for k in GLOBAL_HISTORY_KEYS])
-                    .sum()
-                )
-                df = df.groupby(GLOBAL_HISTORY_KEYS).agg(
-                    rating_count=("rating_count", "sum"),
-                    **{col: (col, "sum") for col in STAR_COLS},
-                )
-                df["rating"] = weighted_sum / weight_total
-                df = df.reset_index()
-            check_for_duplicates(
-                df=df,
-                key_columns=GLOBAL_HISTORY_KEYS,
-            )
-            insert_columns = [x for x in GLOBAL_HISTORY_COLS if x in df.columns]
-            logger.info(f"date={snapshot_date}, store={store} agg df global upsert")
-            upsert_df(
-                df=df,
-                table_name="store_app_global_history",
-                database_connection=database_connection,
-                key_columns=GLOBAL_HISTORY_KEYS,
-                insert_columns=insert_columns,
-            )
+
+
+def snapshot_rerun_store_app_country_history(
+    database_connection: PostgresCon, store: int, snapshot_date: datetime.date
+) -> None:
+    logger.info(f"date={snapshot_date}, store={store} Make S3 agg")
+    make_s3_app_country_metrics_history(store, snapshot_date=snapshot_date)
+    logger.info(f"date={snapshot_date}, store={store} agg df load")
+    df = get_s3_agg_daily_snapshots(snapshot_date, snapshot_date, store)
+    logger.info(f"date={snapshot_date}, store={store} agg df prep")
+    df = prep_app_metrics_history(
+        df=df, store=store, database_connection=database_connection
+    )
+    if not df[df["store_id"].isna()].empty:
+        # Why are there many records with missing store_id?
+        logger.warning("Found records with missing store_id")
+        raise
+    check_for_duplicates(
+        df=df,
+        key_columns=COUNTRY_HISTORY_KEYS,
+    )
+    # TESTING ONLY, ignore new apps since devdb is not updated
+    df = df[df["store_app"].notna()]
+    insert_columns = [x for x in COUNTRY_HISTORY_COLS if x in df.columns]
+    if store == 1:
+        # TODO: Can get installs per Country by getting review_count sum for all countries
+        # Cannot do with this data set since it is snapshot_date only
+        # and not every app for every country crawled on this date
+        insert_columns = [x for x in insert_columns if x != "installs"]
+    logger.info(f"date={snapshot_date}, store={store} agg df country upsert")
+    upsert_df(
+        df=df,
+        table_name="app_country_metrics_history",
+        database_connection=database_connection,
+        key_columns=COUNTRY_HISTORY_KEYS,
+        insert_columns=insert_columns,
+    )
+    if store == 1:
+        df = df[df["country"] == "US"]
+        df[STAR_COLS] = df["histogram"].apply(pd.Series)
+    if store == 2:
+        weighted_sum = (
+            (df["rating"] * df["rating_count"])
+            .groupby([df[k] for k in GLOBAL_HISTORY_KEYS])
+            .sum()
+        )
+        weight_total = (
+            df["rating_count"].groupby([df[k] for k in GLOBAL_HISTORY_KEYS]).sum()
+        )
+        df = df.groupby(GLOBAL_HISTORY_KEYS).agg(
+            rating_count=("rating_count", "sum"),
+            **{col: (col, "sum") for col in STAR_COLS},
+        )
+        df["rating"] = weighted_sum / weight_total
+        df = df.reset_index()
+    check_for_duplicates(
+        df=df,
+        key_columns=GLOBAL_HISTORY_KEYS,
+    )
+    insert_columns = [x for x in GLOBAL_HISTORY_COLS if x in df.columns]
+    logger.info(f"date={snapshot_date}, store={store} agg df global upsert")
+    upsert_df(
+        df=df,
+        table_name="app_global_metrics_history",
+        database_connection=database_connection,
+        key_columns=GLOBAL_HISTORY_KEYS,
+        insert_columns=insert_columns,
+    )
 
 
 def get_parquet_paths_by_prefix(bucket, prefix: str) -> list[str]:
@@ -421,7 +426,7 @@ def app_details_country_history_query(
         PARTITION BY store_id, country
         ORDER BY crawled_at DESC, {extra_sort_column}
       ) = 1
-    ) TO 's3://adscrawler/agg-data/store_app_country_history/store={store}/snapshot_date={snapshot_date_str}/'
+    ) TO 's3://adscrawler/agg-data/app_country_metrics/store={store}/snapshot_date={snapshot_date_str}/'
     (FORMAT PARQUET, 
     PARTITION_BY (country), 
     ROW_GROUP_SIZE 100000, 
