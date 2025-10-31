@@ -77,8 +77,8 @@ def process_chunk(
                 result_dict = scrape_app(
                     store=store,
                     store_id=row["store_id"],
-                    country=row["country_code"],
-                    language=row["language"],
+                    country=row["country_code"].lower(),
+                    language=row["language"].lower(),
                 )
                 chunk_results.append(result_dict)
             except Exception as e:
