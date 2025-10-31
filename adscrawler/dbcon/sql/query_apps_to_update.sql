@@ -47,6 +47,7 @@ SELECT
 FROM
     public.store_apps AS sa
 CROSS JOIN countries_to_crawl AS ctc
+LEFT JOIN app_global_metrics_latest agm ON sa.id = agm.store_app
 LEFT JOIN latest_crawls AS lc
     ON
         sa.id = lc.store_app
@@ -57,8 +58,8 @@ WHERE
         lc.crawled_at IS NULL OR (
             (
                 (
-                    installs >= :short_update_installs
-                    OR rating_count >= :short_update_ratings
+                    agm.installs >= :short_update_installs
+                    OR agm.rating_count >= :short_update_ratings
                 )
                 AND sa.updated_at <= :short_update_ts
                 AND (
@@ -94,8 +95,8 @@ ORDER BY
         ELSE 1
     END),
     GREATEST(
-        COALESCE(installs, 0),
-        COALESCE(CAST(rating_count AS bigint), 0) * 50
+        COALESCE(agm.installs, 0),
+        COALESCE(CAST(agm.rating_count AS bigint), 0) * 50
     )
     DESC NULLS LAST
 LIMIT :mylimit;
