@@ -198,6 +198,21 @@ class ProcessManager:
             if any([" -u " in x, " --update-app-store-details" in x])
         ]
 
+        if self.args.country_crawl_priority_group:
+            found_processes = [
+                x
+                for x in found_processes
+                if any(
+                    [
+                        f"--country-crawl-priority-group={self.args.country_crawl_priority_group}"
+                        in x,
+                        f"--country-crawl-priority-group {self.args.country_crawl_priority_group}"
+                        in x,
+                    ]
+                )
+                in x
+            ]
+
         if self.args.platform:
             found_processes = [x for x in found_processes if self.args.platform in x]
 
