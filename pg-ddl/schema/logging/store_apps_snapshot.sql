@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict e0AXGUZ7weA4WPE1KHIiJapNmKkmCtz31ooUgXpbLWDxVVIndSfTw9qos2orhBf
+\restrict 1ihJCW5E0OmcgrhioR9qJbUReKCGycFMzHYnoKEEf3aa2FTunx32zlLhJdIHNSO
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -28,9 +28,7 @@ SET default_table_access_method = heap;
 --
 
 CREATE TABLE logging.store_apps_snapshot (
-    updated_at timestamp without time zone DEFAULT timezone(
-        'utc'::text, now()
-    ) NOT NULL,
+    updated_at timestamp without time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
     store integer,
     crawl_result integer,
     total_rows integer,
@@ -46,4 +44,5 @@ ALTER TABLE logging.store_apps_snapshot OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict e0AXGUZ7weA4WPE1KHIiJapNmKkmCtz31ooUgXpbLWDxVVIndSfTw9qos2orhBf
+\unrestrict 1ihJCW5E0OmcgrhioR9qJbUReKCGycFMzHYnoKEEf3aa2FTunx32zlLhJdIHNSO
+

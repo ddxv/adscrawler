@@ -2,7 +2,7 @@
 set -euo pipefail
 
 DB=madrone
-OUTDIR=/home/ads-db/tmp-pg-ddl
+OUTDIR=/home/devdb/tmp-pg-ddl
 
 rm -rf "$OUTDIR/"
 

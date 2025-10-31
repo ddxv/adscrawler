@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 8KGiHAptE3GtuSvNbbRLcrHapHIuZN8YvpiIKfUs8WvFIDehZdsmuB4LSsjdW9w
+\restrict 4qyv5rgoVNRsd0oVXGyDV53q4dHQYvCt5csIEuFCZ6IWcQjRBB2q1otYBTsNVYZ
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -57,13 +57,12 @@ ALTER TABLE public.store_app_z_scores_history OWNER TO postgres;
 --
 
 ALTER TABLE ONLY public.store_app_z_scores_history
-ADD CONSTRAINT store_app_z_scores_history_pkey PRIMARY KEY (
-    target_week, store_id
-);
+    ADD CONSTRAINT store_app_z_scores_history_pkey PRIMARY KEY (target_week, store_id);
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 8KGiHAptE3GtuSvNbbRLcrHapHIuZN8YvpiIKfUs8WvFIDehZdsmuB4LSsjdW9w
+\unrestrict 4qyv5rgoVNRsd0oVXGyDV53q4dHQYvCt5csIEuFCZ6IWcQjRBB2q1otYBTsNVYZ
+

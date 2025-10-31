@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict jOtRx4BfBXd5lBgPYzszFissbS65wgqyprAi3gRPl5bpW48pURUBY7pg558Tonx
+\restrict MRCZeslUZqfXiSeiJGyiIXr83m5UeEYGRkFCLpwFiPBGN8c83Pjd2nf7hVUjjjH
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -31,9 +31,7 @@ CREATE TABLE logging.store_app_downloads (
     store_app integer NOT NULL,
     version_code text NOT NULL,
     crawl_result smallint NOT NULL,
-    updated_at timestamp without time zone DEFAULT timezone(
-        'utc'::text, now()
-    ) NOT NULL
+    updated_at timestamp without time zone DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
 
@@ -44,13 +42,12 @@ ALTER TABLE logging.store_app_downloads OWNER TO postgres;
 --
 
 ALTER TABLE ONLY logging.store_app_downloads
-ADD CONSTRAINT store_app_download_fk FOREIGN KEY (
-    store_app
-) REFERENCES public.store_apps (id);
+    ADD CONSTRAINT store_app_download_fk FOREIGN KEY (store_app) REFERENCES public.store_apps(id);
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict jOtRx4BfBXd5lBgPYzszFissbS65wgqyprAi3gRPl5bpW48pURUBY7pg558Tonx
+\unrestrict MRCZeslUZqfXiSeiJGyiIXr83m5UeEYGRkFCLpwFiPBGN8c83Pjd2nf7hVUjjjH
+

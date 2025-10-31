@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict SD7nG15BGC40hv1stqnbx9CUg5g8rLZuwUdqWEiuMbvOncsqMDuy2wwqqZLN7Yp
+\restrict 1LGNiZiO3etatcFbMVrJvotVtBiPsrmGTAESzA9h8kufJ9hUJJ4TFCI7DBhsRCF
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -40,12 +40,12 @@ ALTER TABLE public.keywords OWNER TO postgres;
 --
 
 CREATE SEQUENCE public.keywords_id_seq
-AS integer
-START WITH 1
-INCREMENT BY 1
-NO MINVALUE
-NO MAXVALUE
-CACHE 1;
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
 
 
 ALTER SEQUENCE public.keywords_id_seq OWNER TO postgres;
@@ -61,9 +61,7 @@ ALTER SEQUENCE public.keywords_id_seq OWNED BY public.keywords.id;
 -- Name: keywords id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.keywords ALTER COLUMN id SET DEFAULT nextval(
-    'public.keywords_id_seq'::regclass
-);
+ALTER TABLE ONLY public.keywords ALTER COLUMN id SET DEFAULT nextval('public.keywords_id_seq'::regclass);
 
 
 --
@@ -71,7 +69,7 @@ ALTER TABLE ONLY public.keywords ALTER COLUMN id SET DEFAULT nextval(
 --
 
 ALTER TABLE ONLY public.keywords
-ADD CONSTRAINT keywords_pkey PRIMARY KEY (id);
+    ADD CONSTRAINT keywords_pkey PRIMARY KEY (id);
 
 
 --
@@ -79,11 +77,12 @@ ADD CONSTRAINT keywords_pkey PRIMARY KEY (id);
 --
 
 ALTER TABLE ONLY public.keywords
-ADD CONSTRAINT unique_keyword UNIQUE (keyword_text);
+    ADD CONSTRAINT unique_keyword UNIQUE (keyword_text);
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict SD7nG15BGC40hv1stqnbx9CUg5g8rLZuwUdqWEiuMbvOncsqMDuy2wwqqZLN7Yp
+\unrestrict 1LGNiZiO3etatcFbMVrJvotVtBiPsrmGTAESzA9h8kufJ9hUJJ4TFCI7DBhsRCF
+

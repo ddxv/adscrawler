@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict VGAWetLYTaPgdikNFwBNtBkyKIe2i0r45dmj9gKvNpudHktXzm5P78oLxsSJzvd
+\restrict hJAUHI8AzNTNgNsxmDrVvoB65clhCi4XJdbhOBd7IN0tzewGVxzHfG0df8LTXHC
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -40,7 +40,7 @@ ALTER TABLE adtech.company_developers OWNER TO postgres;
 --
 
 ALTER TABLE ONLY adtech.company_developers
-ADD CONSTRAINT company_developers_pkey PRIMARY KEY (company_id, developer_id);
+    ADD CONSTRAINT company_developers_pkey PRIMARY KEY (company_id, developer_id);
 
 
 --
@@ -48,13 +48,12 @@ ADD CONSTRAINT company_developers_pkey PRIMARY KEY (company_id, developer_id);
 --
 
 ALTER TABLE ONLY adtech.company_developers
-ADD CONSTRAINT fk_company_developers_category FOREIGN KEY (
-    developer_id
-) REFERENCES public.developers (id);
+    ADD CONSTRAINT fk_company_developers_category FOREIGN KEY (developer_id) REFERENCES public.developers(id);
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict VGAWetLYTaPgdikNFwBNtBkyKIe2i0r45dmj9gKvNpudHktXzm5P78oLxsSJzvd
+\unrestrict hJAUHI8AzNTNgNsxmDrVvoB65clhCi4XJdbhOBd7IN0tzewGVxzHfG0df8LTXHC
+

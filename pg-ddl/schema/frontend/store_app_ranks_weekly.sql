@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 8fHfVF2FDIXZrgdDgtCUpnmoR8J9EwR9va89LInY0e4Q2sVMnzVyRnaaka7RaO6
+\restrict BP7j4siyL56hA99Lg5s1QAPyUGrsSNkFkcdSmU1Zcpz1ip5ZnoWPd3cYF1oLWSe
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -45,27 +45,21 @@ ALTER TABLE frontend.store_app_ranks_weekly OWNER TO postgres;
 --
 
 ALTER TABLE ONLY frontend.store_app_ranks_weekly
-ADD CONSTRAINT app_rankings_unique_test UNIQUE (
-    crawled_date, country, store_collection, store_category, rank
-);
+    ADD CONSTRAINT app_rankings_unique_test UNIQUE (crawled_date, country, store_collection, store_category, rank);
 
 
 --
 -- Name: idx_ranks_filter; Type: INDEX; Schema: frontend; Owner: postgres
 --
 
-CREATE INDEX idx_ranks_filter ON frontend.store_app_ranks_weekly USING btree (
-    country, store_collection, store_category, crawled_date
-);
+CREATE INDEX idx_ranks_filter ON frontend.store_app_ranks_weekly USING btree (country, store_collection, store_category, crawled_date);
 
 
 --
 -- Name: sarw_crawled_store_collection_category_country_idx; Type: INDEX; Schema: frontend; Owner: postgres
 --
 
-CREATE INDEX sarw_crawled_store_collection_category_country_idx ON frontend.store_app_ranks_weekly USING btree (
-    crawled_date, store_app, store_collection, store_category, country
-);
+CREATE INDEX sarw_crawled_store_collection_category_country_idx ON frontend.store_app_ranks_weekly USING btree (crawled_date, store_app, store_collection, store_category, country);
 
 
 --
@@ -73,9 +67,7 @@ CREATE INDEX sarw_crawled_store_collection_category_country_idx ON frontend.stor
 --
 
 ALTER TABLE ONLY frontend.store_app_ranks_weekly
-ADD CONSTRAINT fk_country FOREIGN KEY (country) REFERENCES public.countries (
-    id
-);
+    ADD CONSTRAINT fk_country FOREIGN KEY (country) REFERENCES public.countries(id);
 
 
 --
@@ -83,9 +75,7 @@ ADD CONSTRAINT fk_country FOREIGN KEY (country) REFERENCES public.countries (
 --
 
 ALTER TABLE ONLY frontend.store_app_ranks_weekly
-ADD CONSTRAINT fk_store_app FOREIGN KEY (
-    store_app
-) REFERENCES public.store_apps (id);
+    ADD CONSTRAINT fk_store_app FOREIGN KEY (store_app) REFERENCES public.store_apps(id);
 
 
 --
@@ -93,9 +83,7 @@ ADD CONSTRAINT fk_store_app FOREIGN KEY (
 --
 
 ALTER TABLE ONLY frontend.store_app_ranks_weekly
-ADD CONSTRAINT fk_store_category FOREIGN KEY (
-    store_category
-) REFERENCES public.store_categories (id);
+    ADD CONSTRAINT fk_store_category FOREIGN KEY (store_category) REFERENCES public.store_categories(id);
 
 
 --
@@ -103,13 +91,12 @@ ADD CONSTRAINT fk_store_category FOREIGN KEY (
 --
 
 ALTER TABLE ONLY frontend.store_app_ranks_weekly
-ADD CONSTRAINT fk_store_collection FOREIGN KEY (
-    store_collection
-) REFERENCES public.store_collections (id);
+    ADD CONSTRAINT fk_store_collection FOREIGN KEY (store_collection) REFERENCES public.store_collections(id);
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 8fHfVF2FDIXZrgdDgtCUpnmoR8J9EwR9va89LInY0e4Q2sVMnzVyRnaaka7RaO6
+\unrestrict BP7j4siyL56hA99Lg5s1QAPyUGrsSNkFkcdSmU1Zcpz1ip5ZnoWPd3cYF1oLWSe
+

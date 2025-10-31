@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 9b0GnZhpvduxBERfjBkrV3pJWvHgr6y3WPXj9knD3J3YCgfHDOe9yVvaXWfjw2g
+\restrict 4PvrDtDFQNarIFw4vHexAcdg0Dks9IKW3aDN13hCgZMp4cVys2JdVUF3GnURLE0
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -45,12 +45,12 @@ ALTER TABLE public.app_keyword_rankings OWNER TO postgres;
 --
 
 CREATE SEQUENCE public.app_keyword_rankings_id_seq
-AS integer
-START WITH 1
-INCREMENT BY 1
-NO MINVALUE
-NO MAXVALUE
-CACHE 1;
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
 
 
 ALTER SEQUENCE public.app_keyword_rankings_id_seq OWNER TO postgres;
@@ -66,9 +66,7 @@ ALTER SEQUENCE public.app_keyword_rankings_id_seq OWNED BY public.app_keyword_ra
 -- Name: app_keyword_rankings id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.app_keyword_rankings ALTER COLUMN id SET DEFAULT nextval(
-    'public.app_keyword_rankings_id_seq'::regclass
-);
+ALTER TABLE ONLY public.app_keyword_rankings ALTER COLUMN id SET DEFAULT nextval('public.app_keyword_rankings_id_seq'::regclass);
 
 
 --
@@ -76,7 +74,7 @@ ALTER TABLE ONLY public.app_keyword_rankings ALTER COLUMN id SET DEFAULT nextval
 --
 
 ALTER TABLE ONLY public.app_keyword_rankings
-ADD CONSTRAINT app_keyword_rankings_pkey PRIMARY KEY (id);
+    ADD CONSTRAINT app_keyword_rankings_pkey PRIMARY KEY (id);
 
 
 --
@@ -84,9 +82,7 @@ ADD CONSTRAINT app_keyword_rankings_pkey PRIMARY KEY (id);
 --
 
 ALTER TABLE ONLY public.app_keyword_rankings
-ADD CONSTRAINT unique_keyword_ranking UNIQUE (
-    crawled_date, country, lang, rank, store_app, keyword
-);
+    ADD CONSTRAINT unique_keyword_ranking UNIQUE (crawled_date, country, lang, rank, store_app, keyword);
 
 
 --
@@ -94,9 +90,7 @@ ADD CONSTRAINT unique_keyword_ranking UNIQUE (
 --
 
 ALTER TABLE ONLY public.app_keyword_rankings
-ADD CONSTRAINT fk_country FOREIGN KEY (country) REFERENCES public.countries (
-    id
-);
+    ADD CONSTRAINT fk_country FOREIGN KEY (country) REFERENCES public.countries(id);
 
 
 --
@@ -104,7 +98,7 @@ ADD CONSTRAINT fk_country FOREIGN KEY (country) REFERENCES public.countries (
 --
 
 ALTER TABLE ONLY public.app_keyword_rankings
-ADD CONSTRAINT fk_language FOREIGN KEY (lang) REFERENCES public.languages (id);
+    ADD CONSTRAINT fk_language FOREIGN KEY (lang) REFERENCES public.languages(id);
 
 
 --
@@ -112,9 +106,7 @@ ADD CONSTRAINT fk_language FOREIGN KEY (lang) REFERENCES public.languages (id);
 --
 
 ALTER TABLE ONLY public.app_keyword_rankings
-ADD CONSTRAINT fk_store_app FOREIGN KEY (
-    store_app
-) REFERENCES public.store_apps (id);
+    ADD CONSTRAINT fk_store_app FOREIGN KEY (store_app) REFERENCES public.store_apps(id);
 
 
 --
@@ -122,13 +114,12 @@ ADD CONSTRAINT fk_store_app FOREIGN KEY (
 --
 
 ALTER TABLE ONLY public.app_keyword_rankings
-ADD CONSTRAINT fk_store_keyword FOREIGN KEY (
-    keyword
-) REFERENCES public.keywords (id);
+    ADD CONSTRAINT fk_store_keyword FOREIGN KEY (keyword) REFERENCES public.keywords(id);
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 9b0GnZhpvduxBERfjBkrV3pJWvHgr6y3WPXj9knD3J3YCgfHDOe9yVvaXWfjw2g
+\unrestrict 4PvrDtDFQNarIFw4vHexAcdg0Dks9IKW3aDN13hCgZMp4cVys2JdVUF3GnURLE0
+

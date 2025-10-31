@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict nurd3vrdpkTO3Uo4V4Lje77RSDTPdwioui43r6NOqpxsEPDs2nbrH7zPvS2Is5f
+\restrict BU7QWc8PJQqr3zOkWOh5nD7O6MSiLtcxMUunRksnnNYB1ewTTWRismJJd6zsPPv
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -32,9 +32,7 @@ CREATE TABLE public.creative_assets (
     md5_hash character varying NOT NULL,
     file_extension character varying NOT NULL,
     phash character varying,
-    created_at timestamp without time zone DEFAULT timezone(
-        'utc'::text, now()
-    ) NOT NULL
+    created_at timestamp without time zone DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
 
@@ -45,12 +43,12 @@ ALTER TABLE public.creative_assets OWNER TO postgres;
 --
 
 CREATE SEQUENCE public.creative_assets_new_id_seq
-AS integer
-START WITH 1
-INCREMENT BY 1
-NO MINVALUE
-NO MAXVALUE
-CACHE 1;
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
 
 
 ALTER SEQUENCE public.creative_assets_new_id_seq OWNER TO postgres;
@@ -66,9 +64,7 @@ ALTER SEQUENCE public.creative_assets_new_id_seq OWNED BY public.creative_assets
 -- Name: creative_assets id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.creative_assets ALTER COLUMN id SET DEFAULT nextval(
-    'public.creative_assets_new_id_seq'::regclass
-);
+ALTER TABLE ONLY public.creative_assets ALTER COLUMN id SET DEFAULT nextval('public.creative_assets_new_id_seq'::regclass);
 
 
 --
@@ -76,7 +72,7 @@ ALTER TABLE ONLY public.creative_assets ALTER COLUMN id SET DEFAULT nextval(
 --
 
 ALTER TABLE ONLY public.creative_assets
-ADD CONSTRAINT creative_assets_new_md5_hash_key UNIQUE (md5_hash);
+    ADD CONSTRAINT creative_assets_new_md5_hash_key UNIQUE (md5_hash);
 
 
 --
@@ -84,20 +80,19 @@ ADD CONSTRAINT creative_assets_new_md5_hash_key UNIQUE (md5_hash);
 --
 
 ALTER TABLE ONLY public.creative_assets
-ADD CONSTRAINT creative_assets_new_pkey PRIMARY KEY (id);
+    ADD CONSTRAINT creative_assets_new_pkey PRIMARY KEY (id);
 
 
 --
 -- Name: idx_creative_assets_phash; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE INDEX idx_creative_assets_phash ON public.creative_assets USING btree (
-    phash
-) WHERE (phash IS NOT null);
+CREATE INDEX idx_creative_assets_phash ON public.creative_assets USING btree (phash) WHERE (phash IS NOT NULL);
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict nurd3vrdpkTO3Uo4V4Lje77RSDTPdwioui43r6NOqpxsEPDs2nbrH7zPvS2Is5f
+\unrestrict BU7QWc8PJQqr3zOkWOh5nD7O6MSiLtcxMUunRksnnNYB1ewTTWRismJJd6zsPPv
+

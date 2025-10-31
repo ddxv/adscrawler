@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict Z70biCqpACmfnoQmDe61Ay7kNbnhILYVQXUFNSG4sejk9KDguewiQeEMvKdbxil
+\restrict UDLJs0e6Ot8ZsShmxX039p5J7ETAGLm6txbhsXFRlZQv2zbReShevymQIxkN6XL
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -31,9 +31,7 @@ CREATE TABLE public.version_code_sdk_scan_results (
     id integer NOT NULL,
     version_code_id integer,
     scan_result smallint NOT NULL,
-    scanned_at timestamp without time zone DEFAULT timezone(
-        'utc'::text, now()
-    ) NOT NULL
+    scanned_at timestamp without time zone DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
 
@@ -44,12 +42,12 @@ ALTER TABLE public.version_code_sdk_scan_results OWNER TO postgres;
 --
 
 CREATE SEQUENCE public.version_code_sdk_scan_results_id_seq
-AS integer
-START WITH 1
-INCREMENT BY 1
-NO MINVALUE
-NO MAXVALUE
-CACHE 1;
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
 
 
 ALTER SEQUENCE public.version_code_sdk_scan_results_id_seq OWNER TO postgres;
@@ -65,9 +63,7 @@ ALTER SEQUENCE public.version_code_sdk_scan_results_id_seq OWNED BY public.versi
 -- Name: version_code_sdk_scan_results id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.version_code_sdk_scan_results ALTER COLUMN id SET DEFAULT nextval(
-    'public.version_code_sdk_scan_results_id_seq'::regclass
-);
+ALTER TABLE ONLY public.version_code_sdk_scan_results ALTER COLUMN id SET DEFAULT nextval('public.version_code_sdk_scan_results_id_seq'::regclass);
 
 
 --
@@ -75,7 +71,7 @@ ALTER TABLE ONLY public.version_code_sdk_scan_results ALTER COLUMN id SET DEFAUL
 --
 
 ALTER TABLE ONLY public.version_code_sdk_scan_results
-ADD CONSTRAINT version_code_sdk_scan_results_pkey PRIMARY KEY (id);
+    ADD CONSTRAINT version_code_sdk_scan_results_pkey PRIMARY KEY (id);
 
 
 --
@@ -83,13 +79,12 @@ ADD CONSTRAINT version_code_sdk_scan_results_pkey PRIMARY KEY (id);
 --
 
 ALTER TABLE ONLY public.version_code_sdk_scan_results
-ADD CONSTRAINT version_code_sdk_scan_results_version_code_id_fkey FOREIGN KEY (
-    version_code_id
-) REFERENCES public.version_codes (id);
+    ADD CONSTRAINT version_code_sdk_scan_results_version_code_id_fkey FOREIGN KEY (version_code_id) REFERENCES public.version_codes(id);
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict Z70biCqpACmfnoQmDe61Ay7kNbnhILYVQXUFNSG4sejk9KDguewiQeEMvKdbxil
+\unrestrict UDLJs0e6Ot8ZsShmxX039p5J7ETAGLm6txbhsXFRlZQv2zbReShevymQIxkN6XL
+

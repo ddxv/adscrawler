@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict BqFyFaD8zu9TXgAqQfZtPfpfmTUv5lIeji6xZf1sr94Uuw9WIgQeM5M87ztwBA5
+\restrict m0ulV088vkFePYcAX0An7L8MB5vVYceeN3BytRkxjwyOg56sDWkPFZ8SdkYpRMZ
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -544,14 +544,14 @@ ALTER TABLE public.version_strings OWNER TO postgres;
 
 CREATE MATERIALIZED VIEW adtech.company_sdk_strings AS
  WITH matched_value_patterns AS (
-         SELECT DISTINCT lower(vd.value_name) AS value_name_lower,
-            sd.company_id
+         SELECT DISTINCT sd.company_id,
+            lower(vd.value_name) AS value_name_lower
            FROM ((public.version_strings vd
              JOIN adtech.sdk_packages sp ON ((lower(vd.value_name) ~~ (lower((sp.package_pattern)::text) || '%'::text))))
              JOIN adtech.sdks sd ON ((sp.sdk_id = sd.id)))
         ), matched_path_patterns AS (
-         SELECT DISTINCT lower(vd.xml_path) AS xml_path_lower,
-            sd.company_id
+         SELECT DISTINCT sd.company_id,
+            lower(vd.xml_path) AS xml_path_lower
            FROM ((public.version_strings vd
              JOIN adtech.sdk_paths ptm ON ((lower(vd.xml_path) = lower((ptm.path_pattern)::text))))
              JOIN adtech.sdks sd ON ((ptm.sdk_id = sd.id)))
@@ -683,6 +683,52 @@ CREATE TABLE public.api_calls (
 ALTER TABLE public.api_calls OWNER TO postgres;
 
 --
+-- Name: app_global_metrics_history; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.app_global_metrics_history (
+    snapshot_date date NOT NULL,
+    store_app integer NOT NULL,
+    installs bigint,
+    rating_count bigint,
+    review_count bigint,
+    rating real,
+    one_star bigint,
+    two_star bigint,
+    three_star bigint,
+    four_star bigint,
+    five_star bigint,
+    store_last_updated date
+);
+
+
+ALTER TABLE public.app_global_metrics_history OWNER TO postgres;
+
+--
+-- Name: app_global_metrics_latest; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.app_global_metrics_latest AS
+ SELECT DISTINCT ON (store_app) snapshot_date,
+    store_app,
+    installs,
+    rating_count,
+    review_count,
+    rating,
+    one_star,
+    two_star,
+    three_star,
+    four_star,
+    five_star,
+    store_last_updated
+   FROM public.app_global_metrics_history sacs
+  ORDER BY store_app, snapshot_date DESC
+  WITH NO DATA;
+
+
+ALTER MATERIALIZED VIEW public.app_global_metrics_latest OWNER TO postgres;
+
+--
 -- Name: app_urls_map; Type: TABLE; Schema: public; Owner: james
 --
 
@@ -708,9 +754,6 @@ CREATE TABLE public.store_apps (
     store_id character varying NOT NULL,
     store integer NOT NULL,
     category character varying,
-    rating double precision,
-    review_count double precision,
-    installs double precision,
     free boolean,
     price double precision,
     size text,
@@ -720,13 +763,11 @@ CREATE TABLE public.store_apps (
     content_rating text,
     ad_supported boolean,
     in_app_purchases boolean,
-    editors_choice boolean,
     created_at timestamp without time zone DEFAULT timezone('utc'::text, now()),
     updated_at timestamp without time zone DEFAULT timezone('utc'::text, now()),
     crawl_result integer,
     icon_url_512 character varying,
     release_date date,
-    rating_count integer,
     featured_image_url character varying,
     phone_image_url_1 character varying,
     phone_image_url_2 character varying,
@@ -829,24 +870,24 @@ CREATE TABLE public.domains (
 ALTER TABLE public.domains OWNER TO postgres;
 
 --
--- Name: store_apps_country_history; Type: TABLE; Schema: public; Owner: postgres
+-- Name: store_apps_country_history_old; Type: TABLE; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.store_apps_country_history (
-    store_app integer NOT NULL,
+CREATE TABLE public.store_apps_country_history_old (
+    store_app integer CONSTRAINT store_apps_country_history_store_app_not_null NOT NULL,
     review_count double precision,
     rating double precision,
     crawled_date date,
     rating_count integer,
     histogram bigint[] DEFAULT ARRAY[]::integer[],
     installs bigint,
-    id integer NOT NULL,
+    id integer CONSTRAINT store_apps_country_history_id_not_null NOT NULL,
     country_id smallint,
     store_last_updated date
 );
 
 
-ALTER TABLE public.store_apps_country_history OWNER TO postgres;
+ALTER TABLE public.store_apps_country_history_old OWNER TO postgres;
 
 --
 -- Name: store_apps_history_weekly; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
@@ -863,7 +904,7 @@ CREATE MATERIALIZED VIEW public.store_apps_history_weekly AS
             (sach.installs - lead(sach.installs) OVER (PARTITION BY sach.store_app, sach.country_id ORDER BY sach.crawled_date DESC)) AS installs_diff,
             (sach.rating_count - lead(sach.rating_count) OVER (PARTITION BY sach.store_app, sach.country_id ORDER BY sach.crawled_date DESC)) AS rating_count_diff,
             (sach.crawled_date - lead(sach.crawled_date) OVER (PARTITION BY sach.store_app, sach.country_id ORDER BY sach.crawled_date DESC)) AS days_diff
-           FROM public.store_apps_country_history sach
+           FROM public.store_apps_country_history_old sach
           WHERE ((sach.store_app IN ( SELECT sa.id
                    FROM public.store_apps sa
                   WHERE (sa.crawl_result = 1))) AND (sach.crawled_date > (CURRENT_DATE - '375 days'::interval)))
@@ -1122,16 +1163,21 @@ CREATE MATERIALIZED VIEW frontend.store_apps_overview AS
             ac.store_app
            FROM (public.creative_records cr
              LEFT JOIN public.api_calls ac ON ((cr.api_call_id = ac.id)))
+        ), app_metrics AS (
+         SELECT app_global_metrics_latest.store_app,
+            app_global_metrics_latest.rating,
+            app_global_metrics_latest.rating_count,
+            app_global_metrics_latest.installs
+           FROM public.app_global_metrics_latest
         )
  SELECT sa.id,
     sa.name,
     sa.store_id,
     sa.store,
     cm.mapped_category AS category,
-    sa.rating,
-    sa.rating_count,
-    sa.review_count,
-    sa.installs,
+    am.rating,
+    am.rating_count,
+    am.installs,
     saz.installs_sum_1w,
     saz.ratings_sum_1w,
     saz.installs_sum_4w,
@@ -1141,6 +1187,7 @@ CREATE MATERIALIZED VIEW frontend.store_apps_overview AS
     saz.installs_z_score_4w,
     saz.ratings_z_score_4w,
     sa.ad_supported,
+    sa.free,
     sa.in_app_purchases,
     sa.store_last_updated,
     sa.created_at,
@@ -1172,7 +1219,7 @@ CREATE MATERIALIZED VIEW frontend.store_apps_overview AS
     lsac.run_at AS api_successful_last_crawled,
     acr.ad_creative_count,
     amc.ad_mon_creatives
-   FROM (((((((((((((((public.store_apps sa
+   FROM ((((((((((((((((public.store_apps sa
      LEFT JOIN public.category_mapping cm ON (((sa.category)::text = (cm.original_category)::text)))
      LEFT JOIN public.developers d ON ((sa.developer = d.id)))
      LEFT JOIN public.app_urls_map aum ON ((sa.id = aum.store_app)))
@@ -1188,6 +1235,7 @@ CREATE MATERIALIZED VIEW frontend.store_apps_overview AS
      LEFT JOIN latest_successful_api_calls lsac ON ((sa.id = lsac.store_app)))
      LEFT JOIN my_ad_creatives acr ON ((sa.id = acr.store_app)))
      LEFT JOIN my_mon_creatives amc ON ((sa.id = amc.store_app)))
+     LEFT JOIN app_metrics am ON ((sa.id = am.store_app)))
   WITH NO DATA;
 
 
@@ -1249,9 +1297,9 @@ CREATE MATERIALIZED VIEW adtech.combined_store_apps_companies AS
          SELECT DISTINCT sa_1.id AS store_app,
             cm.mapped_category AS app_category,
             cd.company_id,
-            COALESCE(c_1.parent_company_id, cd.company_id) AS parent_id,
             d.domain_name AS ad_domain,
-            'developer'::text AS tag_source
+            'developer'::text AS tag_source,
+            COALESCE(c_1.parent_company_id, cd.company_id) AS parent_id
            FROM ((((adtech.company_developers cd
              LEFT JOIN public.store_apps sa_1 ON ((cd.developer_id = sa_1.developer)))
              LEFT JOIN adtech.companies c_1 ON ((cd.company_id = c_1.id)))
@@ -1261,9 +1309,9 @@ CREATE MATERIALIZED VIEW adtech.combined_store_apps_companies AS
          SELECT DISTINCT sac.store_app,
             cm.mapped_category AS app_category,
             sac.company_id,
-            COALESCE(c_1.parent_company_id, sac.company_id) AS parent_id,
             ad_1.domain_name AS ad_domain,
-            'sdk'::text AS tag_source
+            'sdk'::text AS tag_source,
+            COALESCE(c_1.parent_company_id, sac.company_id) AS parent_id
            FROM ((((adtech.store_app_sdk_strings sac
              LEFT JOIN adtech.companies c_1 ON ((sac.company_id = c_1.id)))
              LEFT JOIN public.domains ad_1 ON ((c_1.domain_id = ad_1.id)))
@@ -1889,7 +1937,6 @@ CREATE MATERIALIZED VIEW frontend.apps_new_monthly AS
             sa_1.store,
             sa_1.category,
             sa_1.rating,
-            sa_1.review_count,
             sa_1.installs,
             sa_1.installs_sum_1w,
             sa_1.installs_sum_4w,
@@ -1921,7 +1968,6 @@ CREATE MATERIALIZED VIEW frontend.apps_new_monthly AS
     ra.store,
     ra.category,
     ra.rating,
-    ra.review_count,
     ra.installs,
     ra.installs_sum_1w,
     ra.installs_sum_4w,
@@ -1966,7 +2012,6 @@ CREATE MATERIALIZED VIEW frontend.apps_new_weekly AS
             sa_1.store,
             sa_1.category,
             sa_1.rating,
-            sa_1.review_count,
             sa_1.installs,
             sa_1.installs_sum_1w,
             sa_1.installs_sum_4w,
@@ -1998,7 +2043,6 @@ CREATE MATERIALIZED VIEW frontend.apps_new_weekly AS
     ra.store,
     ra.category,
     ra.rating,
-    ra.review_count,
     ra.installs,
     ra.installs_sum_1w,
     ra.installs_sum_4w,
@@ -2043,7 +2087,6 @@ CREATE MATERIALIZED VIEW frontend.apps_new_yearly AS
             sa_1.store,
             sa_1.category,
             sa_1.rating,
-            sa_1.review_count,
             sa_1.installs,
             sa_1.installs_sum_1w,
             sa_1.installs_sum_4w,
@@ -2075,7 +2118,6 @@ CREATE MATERIALIZED VIEW frontend.apps_new_yearly AS
     ra.store,
     ra.category,
     ra.rating,
-    ra.review_count,
     ra.installs,
     ra.installs_sum_1w,
     ra.installs_sum_4w,
@@ -2128,7 +2170,7 @@ CREATE MATERIALIZED VIEW frontend.category_tag_stats AS
             sa.installs,
             sa.rating_count
            FROM ((adtech.combined_store_apps_companies csac
-             LEFT JOIN public.store_apps sa ON ((csac.store_app = sa.id)))
+             LEFT JOIN frontend.store_apps_overview sa ON ((csac.store_app = sa.id)))
              CROSS JOIN LATERAL ( VALUES ('sdk'::text,csac.sdk), ('api_call'::text,csac.api_call), ('app_ads_direct'::text,csac.app_ads_direct), ('app_ads_reseller'::text,csac.app_ads_reseller)) tag(tag_source, present))
           WHERE (tag.present IS TRUE)
         )
@@ -2197,7 +2239,7 @@ CREATE MATERIALIZED VIEW frontend.companies_category_stats AS
             sa.rating_count
            FROM ((adtech.combined_store_apps_companies csac
              LEFT JOIN adtech.companies c ON ((csac.company_id = c.id)))
-             LEFT JOIN public.store_apps sa ON ((csac.store_app = sa.id)))
+             LEFT JOIN frontend.store_apps_overview sa ON ((csac.store_app = sa.id)))
         )
  SELECT dag.store,
     dag.app_category,
@@ -2239,7 +2281,7 @@ CREATE MATERIALIZED VIEW frontend.companies_category_tag_stats AS
             sa.rating_count
            FROM (((adtech.combined_store_apps_companies csac
              LEFT JOIN adtech.companies c ON ((csac.company_id = c.id)))
-             LEFT JOIN public.store_apps sa ON ((csac.store_app = sa.id)))
+             LEFT JOIN frontend.store_apps_overview sa ON ((csac.store_app = sa.id)))
              CROSS JOIN LATERAL ( VALUES ('sdk'::text,csac.sdk), ('api_call'::text,csac.api_call), ('app_ads_direct'::text,csac.app_ads_direct), ('app_ads_reseller'::text,csac.app_ads_reseller)) tag(tag_source, present))
           WHERE (tag.present IS TRUE)
         )
@@ -2290,7 +2332,7 @@ CREATE MATERIALIZED VIEW frontend.companies_category_tag_type_stats AS
     sum(sa.rating_count) AS rating_count_total
    FROM ((((((adtech.combined_store_apps_companies csac
      LEFT JOIN adtech.companies c ON ((csac.company_id = c.id)))
-     LEFT JOIN public.store_apps sa ON ((csac.store_app = sa.id)))
+     LEFT JOIN frontend.store_apps_overview sa ON ((csac.store_app = sa.id)))
      LEFT JOIN d30_counts dc ON ((csac.store_app = dc.store_app)))
      LEFT JOIN adtech.company_categories ccats ON ((csac.company_id = ccats.company_id)))
      LEFT JOIN adtech.categories cats ON ((ccats.category_id = cats.id)))
@@ -2371,16 +2413,8 @@ CREATE MATERIALIZED VIEW frontend.companies_creative_rankings AS
     saa.name AS advertiser_name,
     saa.store,
     saa.store_id AS advertiser_store_id,
-        CASE
-            WHEN (saa.icon_url_100 IS NOT NULL) THEN (concat('https://media.appgoblin.info/app-icons/', saa.store_id, '/', saa.icon_url_100))::character varying
-            ELSE saa.icon_url_512
-        END AS advertiser_icon_url,
     sap.store_id AS publisher_store_id,
     sap.name AS publisher_name,
-        CASE
-            WHEN (sap.icon_url_100 IS NOT NULL) THEN (concat('https://media.appgoblin.info/app-icons/', sap.store_id, '/', sap.icon_url_100))::character varying
-            ELSE sap.icon_url_512
-        END AS publisher_icon_url,
     saa.installs,
     saa.rating_count,
     saa.rating,
@@ -2388,7 +2422,15 @@ CREATE MATERIALIZED VIEW frontend.companies_creative_rankings AS
     saa.ratings_sum_1w,
     saa.installs_sum_4w,
     saa.ratings_sum_4w,
-    vd.last_seen
+    vd.last_seen,
+        CASE
+            WHEN (saa.icon_url_100 IS NOT NULL) THEN (concat('https://media.appgoblin.info/app-icons/', saa.store_id, '/', saa.icon_url_100))::character varying
+            ELSE saa.icon_url_512
+        END AS advertiser_icon_url,
+        CASE
+            WHEN (sap.icon_url_100 IS NOT NULL) THEN (concat('https://media.appgoblin.info/app-icons/', sap.store_id, '/', sap.icon_url_100))::character varying
+            ELSE sap.icon_url_512
+        END AS publisher_icon_url
    FROM (((((visually_distinct vd
      LEFT JOIN public.api_calls ac ON ((vd.last_api_call_id = ac.id)))
      LEFT JOIN adtech.companies c ON ((vd.company_id = c.id)))
@@ -2467,16 +2509,8 @@ CREATE MATERIALIZED VIEW frontend.companies_creative_rankings_new AS
     saa.name AS advertiser_name,
     saa.store,
     saa.store_id AS advertiser_store_id,
-        CASE
-            WHEN (saa.icon_url_100 IS NOT NULL) THEN (concat('https://media.appgoblin.info/app-icons/', saa.store_id, '/', saa.icon_url_100))::character varying
-            ELSE saa.icon_url_512
-        END AS advertiser_icon_url,
     sap.store_id AS publisher_store_id,
     sap.name AS publisher_name,
-        CASE
-            WHEN (sap.icon_url_100 IS NOT NULL) THEN (concat('https://media.appgoblin.info/app-icons/', sap.store_id, '/', sap.icon_url_100))::character varying
-            ELSE sap.icon_url_512
-        END AS publisher_icon_url,
     saa.installs,
     saa.rating_count,
     saa.rating,
@@ -2484,7 +2518,15 @@ CREATE MATERIALIZED VIEW frontend.companies_creative_rankings_new AS
     saa.ratings_sum_1w,
     saa.installs_sum_4w,
     saa.ratings_sum_4w,
-    vd.last_seen
+    vd.last_seen,
+        CASE
+            WHEN (saa.icon_url_100 IS NOT NULL) THEN (concat('https://media.appgoblin.info/app-icons/', saa.store_id, '/', saa.icon_url_100))::character varying
+            ELSE saa.icon_url_512
+        END AS advertiser_icon_url,
+        CASE
+            WHEN (sap.icon_url_100 IS NOT NULL) THEN (concat('https://media.appgoblin.info/app-icons/', sap.store_id, '/', sap.icon_url_100))::character varying
+            ELSE sap.icon_url_512
+        END AS publisher_icon_url
    FROM (((((visually_distinct vd
      LEFT JOIN public.api_calls ac ON ((vd.last_api_call_id = ac.id)))
      LEFT JOIN adtech.companies c ON ((vd.company_id = c.id)))
@@ -2541,7 +2583,7 @@ CREATE MATERIALIZED VIEW frontend.companies_parent_category_stats AS
            FROM (((adtech.combined_store_apps_companies csac
              LEFT JOIN adtech.companies c ON ((csac.parent_id = c.id)))
              LEFT JOIN public.domains ad ON ((c.domain_id = ad.id)))
-             LEFT JOIN public.store_apps sa ON ((csac.store_app = sa.id)))
+             LEFT JOIN frontend.store_apps_overview sa ON ((csac.store_app = sa.id)))
           WHERE (csac.parent_id IN ( SELECT DISTINCT pc.id
                    FROM (adtech.companies pc
                      LEFT JOIN adtech.companies c_1 ON ((pc.id = c_1.parent_company_id)))
@@ -2588,7 +2630,7 @@ CREATE MATERIALIZED VIEW frontend.companies_parent_category_tag_stats AS
            FROM ((((adtech.combined_store_apps_companies csac
              LEFT JOIN adtech.companies c ON ((csac.parent_id = c.id)))
              LEFT JOIN public.domains ad ON ((c.domain_id = ad.id)))
-             LEFT JOIN public.store_apps sa ON ((csac.store_app = sa.id)))
+             LEFT JOIN frontend.store_apps_overview sa ON ((csac.store_app = sa.id)))
              CROSS JOIN LATERAL ( VALUES ('sdk'::text,csac.sdk), ('api_call'::text,csac.api_call), ('app_ads_direct'::text,csac.app_ads_direct), ('app_ads_reseller'::text,csac.app_ads_reseller)) tag(tag_source, present))
           WHERE ((tag.present IS TRUE) AND (csac.parent_id IN ( SELECT DISTINCT pc.id
                    FROM (adtech.companies pc
@@ -2952,7 +2994,7 @@ CREATE MATERIALIZED VIEW frontend.latest_sdk_scanned_apps AS
             sa.rating_count,
             row_number() OVER (PARTITION BY sa.store, lvc.crawl_result ORDER BY lvc.updated_at DESC) AS updated_rank
            FROM (latest_version_codes lvc
-             LEFT JOIN public.store_apps sa ON ((lvc.store_app = sa.id)))
+             LEFT JOIN frontend.store_apps_overview sa ON ((lvc.store_app = sa.id)))
           WHERE (lvc.updated_at <= (CURRENT_DATE - '1 day'::interval))
         )
  SELECT sdk_crawled_at,
@@ -3114,7 +3156,6 @@ CREATE MATERIALIZED VIEW frontend.store_app_ranks_latest AS
     sa.installs,
     sa.rating_count,
     sa.rating,
-    sa.review_count,
     sa.installs_sum_1w,
     sa.installs_sum_4w,
     sa.ratings_sum_1w,
@@ -3139,7 +3180,13 @@ ALTER MATERIALIZED VIEW frontend.store_app_ranks_latest OWNER TO postgres;
 --
 
 CREATE MATERIALIZED VIEW frontend.store_apps_z_scores AS
- WITH ranked_z_scores AS (
+ WITH app_metrics AS (
+         SELECT app_global_metrics_latest.store_app,
+            app_global_metrics_latest.rating,
+            app_global_metrics_latest.rating_count,
+            app_global_metrics_latest.installs
+           FROM public.app_global_metrics_latest
+        ), ranked_z_scores AS (
          SELECT saz.store_app,
             saz.latest_week,
             saz.installs_sum_1w,
@@ -3160,33 +3207,19 @@ CREATE MATERIALIZED VIEW frontend.store_apps_z_scores AS
             sa.store_id,
             sa.store,
             sa.category,
-            sa.rating,
-            sa.review_count,
-            sa.installs,
+            am.installs,
             sa.free,
             sa.price,
-            sa.size,
-            sa.minimum_android,
-            sa.developer_email,
             sa.store_last_updated,
             sa.content_rating,
             sa.ad_supported,
             sa.in_app_purchases,
-            sa.editors_choice,
             sa.created_at,
             sa.updated_at,
             sa.crawl_result,
-            sa.icon_url_512,
             sa.release_date,
-            sa.rating_count,
-            sa.featured_image_url,
-            sa.phone_image_url_1,
-            sa.phone_image_url_2,
-            sa.phone_image_url_3,
-            sa.tablet_image_url_1,
-            sa.tablet_image_url_2,
-            sa.tablet_image_url_3,
-            sa.textsearchable_index_col,
+            am.rating_count,
+            sa.icon_url_100,
             cm.original_category,
             cm.mapped_category,
             row_number() OVER (PARTITION BY sa.store, cm.mapped_category,
@@ -3199,8 +3232,9 @@ CREATE MATERIALIZED VIEW frontend.store_apps_z_scores AS
                     WHEN (sa.store = 1) THEN saz.installs_z_score_2w
                     ELSE NULL::numeric
                 END DESC NULLS LAST) AS rn
-           FROM ((public.store_app_z_scores saz
+           FROM (((public.store_app_z_scores saz
              LEFT JOIN public.store_apps sa ON ((saz.store_app = sa.id)))
+             LEFT JOIN app_metrics am ON ((saz.store_app = am.store_app)))
              LEFT JOIN public.category_mapping cm ON (((sa.category)::text = (cm.original_category)::text)))
         )
  SELECT store,
@@ -3209,7 +3243,7 @@ CREATE MATERIALIZED VIEW frontend.store_apps_z_scores AS
     mapped_category AS app_category,
     in_app_purchases,
     ad_supported,
-    icon_url_512,
+    icon_url_100,
     installs,
     rating_count,
     installs_sum_1w,
@@ -3249,6 +3283,20 @@ CREATE MATERIALIZED VIEW frontend.total_categories_app_counts AS
 
 
 ALTER MATERIALIZED VIEW frontend.total_categories_app_counts OWNER TO postgres;
+
+--
+-- Name: app_country_crawls; Type: TABLE; Schema: logging; Owner: postgres
+--
+
+CREATE TABLE logging.app_country_crawls (
+    crawl_result smallint,
+    store_app integer,
+    country_id smallint,
+    crawled_at timestamp without time zone
+);
+
+
+ALTER TABLE logging.app_country_crawls OWNER TO postgres;
 
 --
 -- Name: creative_scan_results; Type: TABLE; Schema: logging; Owner: postgres
@@ -3309,6 +3357,20 @@ CREATE TABLE logging.snapshot_pub_domains (
 
 
 ALTER TABLE logging.snapshot_pub_domains OWNER TO postgres;
+
+--
+-- Name: store_app_country_crawl; Type: TABLE; Schema: logging; Owner: postgres
+--
+
+CREATE TABLE logging.store_app_country_crawl (
+    crawl_result smallint,
+    store_app integer,
+    country_id smallint,
+    crawled_at timestamp without time zone
+);
+
+
+ALTER TABLE logging.store_app_country_crawl OWNER TO postgres;
 
 --
 -- Name: store_app_downloads; Type: TABLE; Schema: logging; Owner: postgres
@@ -3379,22 +3441,6 @@ CREATE TABLE logging.store_apps_audit (
 
 
 ALTER TABLE logging.store_apps_audit OWNER TO postgres;
-
---
--- Name: store_apps_crawl; Type: TABLE; Schema: logging; Owner: postgres
---
-
-CREATE TABLE logging.store_apps_crawl (
-    index bigint,
-    crawl_result bigint,
-    store bigint,
-    store_id text,
-    store_app bigint,
-    crawled_at timestamp without time zone
-);
-
-
-ALTER TABLE logging.store_apps_crawl OWNER TO postgres;
 
 --
 -- Name: store_apps_snapshot; Type: TABLE; Schema: logging; Owner: postgres
@@ -3547,6 +3593,50 @@ ALTER TABLE public.app_ads_map ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENT
 
 
 --
+-- Name: app_country_metrics_history; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.app_country_metrics_history (
+    snapshot_date date NOT NULL,
+    store_app integer NOT NULL,
+    country_id smallint NOT NULL,
+    review_count integer,
+    rating real,
+    rating_count integer,
+    one_star integer,
+    two_star integer,
+    three_star integer,
+    four_star integer,
+    five_star integer
+);
+
+
+ALTER TABLE public.app_country_metrics_history OWNER TO postgres;
+
+--
+-- Name: app_country_metrics_latest; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.app_country_metrics_latest AS
+ SELECT DISTINCT ON (store_app, country_id) snapshot_date,
+    store_app,
+    country_id,
+    review_count,
+    rating,
+    rating_count,
+    one_star,
+    two_star,
+    three_star,
+    four_star,
+    five_star
+   FROM public.app_country_metrics_history sacs
+  ORDER BY store_app, country_id, snapshot_date DESC
+  WITH NO DATA;
+
+
+ALTER MATERIALIZED VIEW public.app_country_metrics_latest OWNER TO postgres;
+
+--
 -- Name: app_keyword_rankings; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -3647,6 +3737,81 @@ ALTER TABLE public.crawl_results ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDE
 
 
 --
+-- Name: crawl_scenario_country_config; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.crawl_scenario_country_config (
+    id integer NOT NULL,
+    country_id integer,
+    scenario_id integer,
+    enabled boolean DEFAULT true,
+    priority integer DEFAULT 1,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now()
+);
+
+
+ALTER TABLE public.crawl_scenario_country_config OWNER TO postgres;
+
+--
+-- Name: crawl_scenario_country_config_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.crawl_scenario_country_config_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.crawl_scenario_country_config_id_seq OWNER TO postgres;
+
+--
+-- Name: crawl_scenario_country_config_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.crawl_scenario_country_config_id_seq OWNED BY public.crawl_scenario_country_config.id;
+
+
+--
+-- Name: crawl_scenarios; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.crawl_scenarios (
+    id integer NOT NULL,
+    name character varying(50) NOT NULL,
+    description text,
+    created_at timestamp with time zone DEFAULT now()
+);
+
+
+ALTER TABLE public.crawl_scenarios OWNER TO postgres;
+
+--
+-- Name: crawl_scenarios_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.crawl_scenarios_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.crawl_scenarios_id_seq OWNER TO postgres;
+
+--
+-- Name: crawl_scenarios_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.crawl_scenarios_id_seq OWNED BY public.crawl_scenarios.id;
+
+
+--
 -- Name: creative_assets_new_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
 --
 
@@ -3725,13 +3890,7 @@ CREATE MATERIALIZED VIEW public.developer_store_apps AS
              LEFT JOIN public.developers d_1 ON ((sa_1.developer = d_1.id)))
         )
  SELECT sa.store,
-    sa.store_id,
-    sa.name,
-    sa.icon_url_512,
-    sa.installs,
-    sa.rating,
-    sa.rating_count,
-    sa.review_count,
+    sa.id AS store_app,
     d.name AS developer_name,
     pd.domain_name AS developer_url,
     d.store AS developer_store,
@@ -3741,7 +3900,6 @@ CREATE MATERIALIZED VIEW public.developer_store_apps AS
      LEFT JOIN public.developers d ON ((sa.developer = d.id)))
      LEFT JOIN public.app_urls_map aum ON ((sa.id = aum.store_app)))
      LEFT JOIN public.domains pd ON ((aum.pub_domain = pd.id)))
-  ORDER BY sa.installs DESC NULLS LAST, sa.rating_count DESC NULLS LAST
   WITH NO DATA;
 
 
@@ -3957,7 +4115,7 @@ ALTER TABLE public.store_app_z_scores_history OWNER TO postgres;
 -- Name: store_apps_country_history_idx_seq; Type: SEQUENCE; Schema: public; Owner: postgres
 --
 
-ALTER TABLE public.store_apps_country_history ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+ALTER TABLE public.store_apps_country_history_old ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
     SEQUENCE NAME public.store_apps_country_history_idx_seq
     START WITH 1
     INCREMENT BY 1
@@ -4047,7 +4205,7 @@ CREATE MATERIALIZED VIEW public.store_apps_in_latest_rankings AS
             sa.rating_count,
             sa.store_id
            FROM (frontend.store_apps_z_scores saz
-             LEFT JOIN public.store_apps sa ON (((saz.store_id)::text = (sa.store_id)::text)))
+             LEFT JOIN frontend.store_apps_overview sa ON (((saz.store_id)::text = (sa.store_id)::text)))
           WHERE sa.free
           ORDER BY COALESCE(saz.installs_z_score_2w, saz.ratings_z_score_2w) DESC
          LIMIT 500
@@ -4060,7 +4218,7 @@ CREATE MATERIALIZED VIEW public.store_apps_in_latest_rankings AS
             sa.rating_count,
             sa.store_id
            FROM ((frontend.store_app_ranks_weekly ar
-             LEFT JOIN public.store_apps sa ON ((ar.store_app = sa.id)))
+             LEFT JOIN frontend.store_apps_overview sa ON ((ar.store_app = sa.id)))
              LEFT JOIN public.countries c ON ((ar.country = c.id)))
           WHERE (sa.free AND (ar.store_collection = ANY (ARRAY[1, 3, 4, 6])) AND (ar.crawled_date > (CURRENT_DATE - '15 days'::interval)) AND ((c.alpha2)::text = ANY (ARRAY[('US'::character varying)::text, ('GB'::character varying)::text, ('CA'::character varying)::text, ('AR'::character varying)::text, ('CN'::character varying)::text, ('DE'::character varying)::text, ('ID'::character varying)::text, ('IN'::character varying)::text, ('JP'::character varying)::text, ('FR'::character varying)::text, ('BR'::character varying)::text, ('MX'::character varying)::text, ('KR'::character varying)::text, ('RU'::character varying)::text])) AND (ar.rank < 150))
         )
@@ -4178,93 +4336,6 @@ ALTER SEQUENCE public.stores_column1_seq OWNER TO james;
 
 ALTER SEQUENCE public.stores_column1_seq OWNED BY public.stores.id;
 
-
---
--- Name: top_categories; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
---
-
-CREATE MATERIALIZED VIEW public.top_categories AS
- WITH rankedapps AS (
-         SELECT sa.id,
-            sa.developer,
-            sa.name,
-            sa.store_id,
-            sa.store,
-            sa.category,
-            sa.rating,
-            sa.review_count,
-            sa.installs,
-            sa.free,
-            sa.price,
-            sa.size,
-            sa.minimum_android,
-            sa.developer_email,
-            sa.store_last_updated,
-            sa.content_rating,
-            sa.ad_supported,
-            sa.in_app_purchases,
-            sa.editors_choice,
-            sa.created_at,
-            sa.updated_at,
-            sa.crawl_result,
-            sa.icon_url_512,
-            sa.release_date,
-            sa.rating_count,
-            sa.featured_image_url,
-            sa.phone_image_url_1,
-            sa.phone_image_url_2,
-            sa.phone_image_url_3,
-            sa.tablet_image_url_1,
-            sa.tablet_image_url_2,
-            sa.tablet_image_url_3,
-            cm.original_category,
-            cm.mapped_category,
-            row_number() OVER (PARTITION BY sa.store, cm.mapped_category ORDER BY sa.installs DESC NULLS LAST, sa.rating_count DESC NULLS LAST) AS rn
-           FROM (public.store_apps sa
-             JOIN public.category_mapping cm ON (((sa.category)::text = (cm.original_category)::text)))
-          WHERE (sa.crawl_result = 1)
-        )
- SELECT id,
-    developer,
-    name,
-    store_id,
-    store,
-    category,
-    rating,
-    review_count,
-    installs,
-    free,
-    price,
-    size,
-    minimum_android,
-    developer_email,
-    store_last_updated,
-    content_rating,
-    ad_supported,
-    in_app_purchases,
-    editors_choice,
-    created_at,
-    updated_at,
-    crawl_result,
-    icon_url_512,
-    release_date,
-    rating_count,
-    featured_image_url,
-    phone_image_url_1,
-    phone_image_url_2,
-    phone_image_url_3,
-    tablet_image_url_1,
-    tablet_image_url_2,
-    tablet_image_url_3,
-    original_category,
-    mapped_category,
-    rn
-   FROM rankedapps
-  WHERE (rn <= 50)
-  WITH NO DATA;
-
-
-ALTER MATERIALIZED VIEW public.top_categories OWNER TO postgres;
 
 --
 -- Name: total_count_overview; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
@@ -4573,6 +4644,20 @@ ALTER TABLE ONLY public.api_calls ALTER COLUMN id SET DEFAULT nextval('public.ap
 --
 
 ALTER TABLE ONLY public.app_keyword_rankings ALTER COLUMN id SET DEFAULT nextval('public.app_keyword_rankings_id_seq'::regclass);
+
+
+--
+-- Name: crawl_scenario_country_config id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.crawl_scenario_country_config ALTER COLUMN id SET DEFAULT nextval('public.crawl_scenario_country_config_id_seq'::regclass);
+
+
+--
+-- Name: crawl_scenarios id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.crawl_scenarios ALTER COLUMN id SET DEFAULT nextval('public.crawl_scenarios_id_seq'::regclass);
 
 
 --
@@ -4955,6 +5040,38 @@ ALTER TABLE ONLY public.crawl_results
 
 
 --
+-- Name: crawl_scenario_country_config crawl_scenario_country_config_country_id_scenario_id_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.crawl_scenario_country_config
+    ADD CONSTRAINT crawl_scenario_country_config_country_id_scenario_id_key UNIQUE (country_id, scenario_id);
+
+
+--
+-- Name: crawl_scenario_country_config crawl_scenario_country_config_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.crawl_scenario_country_config
+    ADD CONSTRAINT crawl_scenario_country_config_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: crawl_scenarios crawl_scenarios_name_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.crawl_scenarios
+    ADD CONSTRAINT crawl_scenarios_name_key UNIQUE (name);
+
+
+--
+-- Name: crawl_scenarios crawl_scenarios_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.crawl_scenarios
+    ADD CONSTRAINT crawl_scenarios_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: creative_assets creative_assets_new_md5_hash_key; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -5099,10 +5216,10 @@ ALTER TABLE ONLY public.store_app_z_scores_history
 
 
 --
--- Name: store_apps_country_history store_apps_country_history_pk; Type: CONSTRAINT; Schema: public; Owner: postgres
+-- Name: store_apps_country_history_old store_apps_country_history_pk; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.store_apps_country_history
+ALTER TABLE ONLY public.store_apps_country_history_old
     ADD CONSTRAINT store_apps_country_history_pk PRIMARY KEY (id);
 
 
@@ -5724,10 +5841,17 @@ CREATE UNIQUE INDEX store_apps_overview_unique_idx ON frontend.store_apps_overvi
 
 
 --
--- Name: ix_logging_store_apps_crawl_index; Type: INDEX; Schema: logging; Owner: postgres
+-- Name: store_apps_overview_unique_store_app_idx; Type: INDEX; Schema: frontend; Owner: postgres
 --
 
-CREATE INDEX ix_logging_store_apps_crawl_index ON logging.store_apps_crawl USING btree (index);
+CREATE UNIQUE INDEX store_apps_overview_unique_store_app_idx ON frontend.store_apps_overview USING btree (id);
+
+
+--
+-- Name: store_apps_overview_unique_store_id_idx; Type: INDEX; Schema: frontend; Owner: postgres
+--
+
+CREATE UNIQUE INDEX store_apps_overview_unique_store_id_idx ON frontend.store_apps_overview USING btree (store_id);
 
 
 --
@@ -5742,6 +5866,62 @@ CREATE UNIQUE INDEX logging_store_app_upsert_unique ON logging.store_app_waydroi
 --
 
 CREATE INDEX store_apps_audit_stamp_idx ON logging.store_apps_audit USING btree (stamp);
+
+
+--
+-- Name: app_country_metrics_history_date_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX app_country_metrics_history_date_idx ON public.app_country_metrics_history USING btree (snapshot_date);
+
+
+--
+-- Name: app_country_metrics_history_store_app_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX app_country_metrics_history_store_app_idx ON public.app_country_metrics_history USING btree (store_app);
+
+
+--
+-- Name: app_country_metrics_history_unique_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX app_country_metrics_history_unique_idx ON public.app_country_metrics_history USING btree (store_app, country_id, snapshot_date);
+
+
+--
+-- Name: app_country_metrics_latest_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX app_country_metrics_latest_idx ON public.app_country_metrics_latest USING btree (store_app, country_id);
+
+
+--
+-- Name: app_global_metrics_history_date_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX app_global_metrics_history_date_idx ON public.app_global_metrics_history USING btree (snapshot_date);
+
+
+--
+-- Name: app_global_metrics_history_store_app_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX app_global_metrics_history_store_app_idx ON public.app_global_metrics_history USING btree (store_app);
+
+
+--
+-- Name: app_global_metrics_history_unique_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX app_global_metrics_history_unique_idx ON public.app_global_metrics_history USING btree (store_app, snapshot_date);
+
+
+--
+-- Name: app_global_metrics_latest_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX app_global_metrics_latest_idx ON public.app_global_metrics_latest USING btree (store_app);
 
 
 --
@@ -5801,6 +5981,13 @@ CREATE INDEX idx_api_calls_store_app ON public.api_calls USING btree (store_app)
 
 
 --
+-- Name: idx_country_crawl_config_lookup; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_country_crawl_config_lookup ON public.crawl_scenario_country_config USING btree (scenario_id, country_id) WHERE (enabled = true);
+
+
+--
 -- Name: idx_creative_assets_phash; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -5832,7 +6019,7 @@ CREATE INDEX idx_developer_store_apps_domain_id ON public.developer_store_apps U
 -- Name: idx_developer_store_apps_unique; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE UNIQUE INDEX idx_developer_store_apps_unique ON public.developer_store_apps USING btree (developer_id, store_id);
+CREATE UNIQUE INDEX idx_developer_store_apps_unique ON public.developer_store_apps USING btree (developer_id, store_app);
 
 
 --
@@ -5878,24 +6065,17 @@ CREATE UNIQUE INDEX idx_store_apps_updated_at ON public.store_apps_updated_at US
 
 
 --
--- Name: idx_top_categories; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE UNIQUE INDEX idx_top_categories ON public.top_categories USING btree (store, mapped_category, store_id);
-
-
---
 -- Name: store_apps_country_history_store_app_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE INDEX store_apps_country_history_store_app_idx ON public.store_apps_country_history USING btree (store_app);
+CREATE INDEX store_apps_country_history_store_app_idx ON public.store_apps_country_history_old USING btree (store_app);
 
 
 --
 -- Name: store_apps_country_history_unique_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE UNIQUE INDEX store_apps_country_history_unique_idx ON public.store_apps_country_history USING btree (store_app, country_id, crawled_date);
+CREATE UNIQUE INDEX store_apps_country_history_unique_idx ON public.store_apps_country_history_old USING btree (store_app, country_id, crawled_date);
 
 
 --
@@ -6201,6 +6381,30 @@ ALTER TABLE ONLY frontend.store_app_ranks_daily
 
 
 --
+-- Name: app_country_crawls app_country_crawls_app_fk; Type: FK CONSTRAINT; Schema: logging; Owner: postgres
+--
+
+ALTER TABLE ONLY logging.app_country_crawls
+    ADD CONSTRAINT app_country_crawls_app_fk FOREIGN KEY (store_app) REFERENCES public.store_apps(id);
+
+
+--
+-- Name: store_app_country_crawl fk_country; Type: FK CONSTRAINT; Schema: logging; Owner: postgres
+--
+
+ALTER TABLE ONLY logging.store_app_country_crawl
+    ADD CONSTRAINT fk_country FOREIGN KEY (country_id) REFERENCES public.countries(id);
+
+
+--
+-- Name: app_country_crawls fk_country; Type: FK CONSTRAINT; Schema: logging; Owner: postgres
+--
+
+ALTER TABLE ONLY logging.app_country_crawls
+    ADD CONSTRAINT fk_country FOREIGN KEY (country_id) REFERENCES public.countries(id);
+
+
+--
 -- Name: keywords_crawled_at keywords_crawled_at_fk; Type: FK CONSTRAINT; Schema: logging; Owner: postgres
 --
 
@@ -6214,6 +6418,14 @@ ALTER TABLE ONLY logging.keywords_crawled_at
 
 ALTER TABLE ONLY logging.developers_crawled_at
     ADD CONSTRAINT newtable_fk FOREIGN KEY (developer) REFERENCES public.developers(id);
+
+
+--
+-- Name: store_app_country_crawl store_app_country_history_app_fk; Type: FK CONSTRAINT; Schema: logging; Owner: postgres
+--
+
+ALTER TABLE ONLY logging.store_app_country_crawl
+    ADD CONSTRAINT store_app_country_history_app_fk FOREIGN KEY (store_app) REFERENCES public.store_apps(id);
 
 
 --
@@ -6313,6 +6525,22 @@ ALTER TABLE ONLY public.app_ads_map
 
 
 --
+-- Name: app_country_metrics_history app_country_metrics_history_app_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.app_country_metrics_history
+    ADD CONSTRAINT app_country_metrics_history_app_fk FOREIGN KEY (store_app) REFERENCES public.store_apps(id);
+
+
+--
+-- Name: app_global_metrics_history app_global_metrics_history_app_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.app_global_metrics_history
+    ADD CONSTRAINT app_global_metrics_history_app_fk FOREIGN KEY (store_app) REFERENCES public.store_apps(id);
+
+
+--
 -- Name: app_urls_map app_urls_fk; Type: FK CONSTRAINT; Schema: public; Owner: james
 --
 
@@ -6326,6 +6554,22 @@ ALTER TABLE ONLY public.app_urls_map
 
 ALTER TABLE ONLY public.app_urls_map
     ADD CONSTRAINT app_urls_map_fk_domain FOREIGN KEY (pub_domain) REFERENCES public.domains(id);
+
+
+--
+-- Name: crawl_scenario_country_config crawl_scenario_country_config_country_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.crawl_scenario_country_config
+    ADD CONSTRAINT crawl_scenario_country_config_country_id_fkey FOREIGN KEY (country_id) REFERENCES public.countries(id);
+
+
+--
+-- Name: crawl_scenario_country_config crawl_scenario_country_config_scenario_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.crawl_scenario_country_config
+    ADD CONSTRAINT crawl_scenario_country_config_scenario_id_fkey FOREIGN KEY (scenario_id) REFERENCES public.crawl_scenarios(id);
 
 
 --
@@ -6409,10 +6653,10 @@ ALTER TABLE ONLY public.developers
 
 
 --
--- Name: store_apps_country_history fk_country; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+-- Name: store_apps_country_history_old fk_country; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.store_apps_country_history
+ALTER TABLE ONLY public.store_apps_country_history_old
     ADD CONSTRAINT fk_country FOREIGN KEY (country_id) REFERENCES public.countries(id);
 
 
@@ -6429,6 +6673,14 @@ ALTER TABLE ONLY public.app_keyword_rankings
 --
 
 ALTER TABLE ONLY public.ip_geo_snapshots
+    ADD CONSTRAINT fk_country FOREIGN KEY (country_id) REFERENCES public.countries(id);
+
+
+--
+-- Name: app_country_metrics_history fk_country; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.app_country_metrics_history
     ADD CONSTRAINT fk_country FOREIGN KEY (country_id) REFERENCES public.countries(id);
 
 
@@ -6465,10 +6717,10 @@ ALTER TABLE ONLY public.version_manifests
 
 
 --
--- Name: store_apps_country_history store_apps_country_history_app_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+-- Name: store_apps_country_history_old store_apps_country_history_app_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.store_apps_country_history
+ALTER TABLE ONLY public.store_apps_country_history_old
     ADD CONSTRAINT store_apps_country_history_app_fk FOREIGN KEY (store_app) REFERENCES public.store_apps(id);
 
 
@@ -6580,5 +6832,5 @@ GRANT ALL ON SCHEMA public TO PUBLIC;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict BqFyFaD8zu9TXgAqQfZtPfpfmTUv5lIeji6xZf1sr94Uuw9WIgQeM5M87ztwBA5
+\unrestrict m0ulV088vkFePYcAX0An7L8MB5vVYceeN3BytRkxjwyOg56sDWkPFZ8SdkYpRMZ
 

@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict tNKb5P7LM452MgV4ddk3BCy93cncPn4Oq6wYTbFqT0h19dxnpokMQ5gdVVt677t
+\restrict 5BVBFrMCMr0cXN1WWF4Ub5PdB5hxYf9icqjsrvsX9yuPyIc9odm6fQdPdAd5ncl
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -28,16 +28,14 @@ SET default_table_access_method = heap;
 --
 
 CREATE MATERIALIZED VIEW frontend.store_app_ranks_latest AS
-WITH latest_crawled_date AS (
-    SELECT
-        arr.store_collection,
-        arr.country,
-        max(arr.crawled_date) AS crawled_date
-    FROM frontend.store_app_ranks_weekly AS arr
-    GROUP BY arr.store_collection, arr.country
-)
-SELECT
-    ar.rank,
+ WITH latest_crawled_date AS (
+         SELECT arr.store_collection,
+            arr.country,
+            max(arr.crawled_date) AS crawled_date
+           FROM frontend.store_app_ranks_weekly arr
+          GROUP BY arr.store_collection, arr.country
+        )
+ SELECT ar.rank,
     sa.name,
     sa.store_id,
     sa.store,
@@ -53,25 +51,12 @@ SELECT
     ar.store_category,
     c.alpha2 AS country,
     ar.crawled_date
-FROM (((
-    frontend.store_app_ranks_weekly ar
-    INNER JOIN
-        latest_crawled_date AS lcd
-        ON
-            (
-                (
-                    (ar.store_collection = lcd.store_collection)
-                    AND (ar.country = lcd.country)
-                    AND (ar.crawled_date = lcd.crawled_date)
-                )
-            )
-)
-INNER JOIN public.countries AS c ON ((ar.country = c.id))
-)
-LEFT JOIN frontend.store_apps_overview AS sa ON ((ar.store_app = sa.id))
-)
-ORDER BY ar.rank
-WITH NO DATA;
+   FROM (((frontend.store_app_ranks_weekly ar
+     JOIN latest_crawled_date lcd ON (((ar.store_collection = lcd.store_collection) AND (ar.country = lcd.country) AND (ar.crawled_date = lcd.crawled_date))))
+     JOIN public.countries c ON ((ar.country = c.id)))
+     LEFT JOIN frontend.store_apps_overview sa ON ((ar.store_app = sa.id)))
+  ORDER BY ar.rank
+  WITH NO DATA;
 
 
 ALTER MATERIALIZED VIEW frontend.store_app_ranks_latest OWNER TO postgres;
@@ -80,13 +65,12 @@ ALTER MATERIALIZED VIEW frontend.store_app_ranks_latest OWNER TO postgres;
 -- Name: idx_store_app_ranks_latest_filter_sort; Type: INDEX; Schema: frontend; Owner: postgres
 --
 
-CREATE UNIQUE INDEX idx_store_app_ranks_latest_filter_sort ON frontend.store_app_ranks_latest USING btree (
-    store_collection, store_category, country, rank
-);
+CREATE UNIQUE INDEX idx_store_app_ranks_latest_filter_sort ON frontend.store_app_ranks_latest USING btree (store_collection, store_category, country, rank);
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict tNKb5P7LM452MgV4ddk3BCy93cncPn4Oq6wYTbFqT0h19dxnpokMQ5gdVVt677t
+\unrestrict 5BVBFrMCMr0cXN1WWF4Ub5PdB5hxYf9icqjsrvsX9yuPyIc9odm6fQdPdAd5ncl
+

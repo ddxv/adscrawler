@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict PyjkYa1TC8SaN8MZ6RT7gEaYEUioOrVvYgyGmwQv31ZnAXWg4lVMq6TFGyPbLvr
+\restrict QE9UaRE98UiSDtV0fMT1v49h9ml9g2GyRHXtqboRO7rXZqHJlbfLLWYVpklLykE
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -28,79 +28,60 @@ SET default_table_access_method = heap;
 --
 
 CREATE MATERIALIZED VIEW frontend.companies_creative_rankings_new AS
-WITH creative_rankings AS (
-    SELECT
-        ca.file_extension,
-        ac_1.id AS api_call_id,
-        cr.advertiser_store_app_id,
-        cr.creative_initial_domain_id,
-        cr.creative_host_domain_id,
-        cr.additional_ad_domain_ids,
-        vcasr.run_at,
-        ca.md5_hash,
-        COALESCE(ca.phash, ca.md5_hash) AS vhash
-    FROM (((
-        public.creative_records cr
-        LEFT JOIN
-            public.creative_assets AS ca
-            ON ((cr.creative_asset_id = ca.id))
-    )
-    LEFT JOIN public.api_calls AS ac_1 ON ((cr.api_call_id = ac_1.id))
-    )
-    LEFT JOIN
-        public.version_code_api_scan_results AS vcasr
-        ON ((ac_1.run_id = vcasr.id))
-    )
-), combined_domains AS (
-    SELECT
-        cr.api_call_id,
-        cr.vhash,
-        cr.md5_hash,
-        cr.file_extension,
-        cr.creative_initial_domain_id AS domain_id,
-        cr.advertiser_store_app_id,
-        cr.run_at
-    FROM creative_rankings AS cr
-    UNION
-    SELECT
-        cr.api_call_id,
-        cr.vhash,
-        cr.md5_hash,
-        cr.file_extension,
-        cr.creative_host_domain_id,
-        cr.advertiser_store_app_id,
-        cr.run_at
-    FROM creative_rankings AS cr
-    UNION
-    SELECT
-        cr.api_call_id,
-        cr.vhash,
-        cr.md5_hash,
-        cr.file_extension,
-        UNNEST(cr.additional_ad_domain_ids) AS unnest,
-        cr.advertiser_store_app_id,
-        cr.run_at
-    FROM creative_rankings AS cr
-), visually_distinct AS (
-    SELECT
-        cdm.company_id,
-        cd.file_extension,
-        cd.advertiser_store_app_id,
-        cd.vhash,
-        MIN((cd.md5_hash)::text) AS md5_hash,
-        MAX(cd.api_call_id) AS last_api_call_id,
-        MAX(cd.run_at) AS last_seen
-    FROM (
-        combined_domains AS cd
-        LEFT JOIN
-            adtech.company_domain_mapping AS cdm
-            ON ((cd.domain_id = cdm.domain_id))
-    )
-    GROUP BY
-        cdm.company_id, cd.file_extension, cd.advertiser_store_app_id, cd.vhash
-)
-SELECT
-    vd.company_id,
+ WITH creative_rankings AS (
+         SELECT ca.file_extension,
+            ac_1.id AS api_call_id,
+            cr.advertiser_store_app_id,
+            cr.creative_initial_domain_id,
+            cr.creative_host_domain_id,
+            cr.additional_ad_domain_ids,
+            vcasr.run_at,
+            ca.md5_hash,
+            COALESCE(ca.phash, ca.md5_hash) AS vhash
+           FROM (((public.creative_records cr
+             LEFT JOIN public.creative_assets ca ON ((cr.creative_asset_id = ca.id)))
+             LEFT JOIN public.api_calls ac_1 ON ((cr.api_call_id = ac_1.id)))
+             LEFT JOIN public.version_code_api_scan_results vcasr ON ((ac_1.run_id = vcasr.id)))
+        ), combined_domains AS (
+         SELECT cr.api_call_id,
+            cr.vhash,
+            cr.md5_hash,
+            cr.file_extension,
+            cr.creative_initial_domain_id AS domain_id,
+            cr.advertiser_store_app_id,
+            cr.run_at
+           FROM creative_rankings cr
+        UNION
+         SELECT cr.api_call_id,
+            cr.vhash,
+            cr.md5_hash,
+            cr.file_extension,
+            cr.creative_host_domain_id,
+            cr.advertiser_store_app_id,
+            cr.run_at
+           FROM creative_rankings cr
+        UNION
+         SELECT cr.api_call_id,
+            cr.vhash,
+            cr.md5_hash,
+            cr.file_extension,
+            unnest(cr.additional_ad_domain_ids) AS unnest,
+            cr.advertiser_store_app_id,
+            cr.run_at
+           FROM creative_rankings cr
+        ), visually_distinct AS (
+         SELECT cdm.company_id,
+            cd.file_extension,
+            cd.advertiser_store_app_id,
+            cd.vhash,
+            min((cd.md5_hash)::text) AS md5_hash,
+            max(cd.api_call_id) AS last_api_call_id,
+            max(cd.run_at) AS last_seen
+           FROM (combined_domains cd
+             LEFT JOIN adtech.company_domain_mapping cdm ON ((cd.domain_id = cdm.domain_id)))
+          GROUP BY cdm.company_id, cd.file_extension, cd.advertiser_store_app_id, cd.vhash
+        )
+ SELECT vd.company_id,
     vd.md5_hash,
     vd.file_extension,
     ad.domain_name AS company_domain,
@@ -117,51 +98,23 @@ SELECT
     saa.installs_sum_4w,
     saa.ratings_sum_4w,
     vd.last_seen,
-    CASE
-        WHEN
-            (saa.icon_url_100 IS NOT null)
-            THEN
-                (
-                    CONCAT(
-                        'https://media.appgoblin.info/app-icons/',
-                        saa.store_id,
-                        '/',
-                        saa.icon_url_100
-                    )
-                )::character varying
-        ELSE saa.icon_url_512
-    END AS advertiser_icon_url,
-    CASE
-        WHEN
-            (sap.icon_url_100 IS NOT null)
-            THEN
-                (
-                    CONCAT(
-                        'https://media.appgoblin.info/app-icons/',
-                        sap.store_id,
-                        '/',
-                        sap.icon_url_100
-                    )
-                )::character varying
-        ELSE sap.icon_url_512
-    END AS publisher_icon_url
-FROM (((((
-    visually_distinct vd
-    LEFT JOIN public.api_calls AS ac ON ((vd.last_api_call_id = ac.id))
-)
-LEFT JOIN adtech.companies AS c ON ((vd.company_id = c.id))
-)
-LEFT JOIN public.domains AS ad ON ((c.domain_id = ad.id))
-)
-LEFT JOIN
-    frontend.store_apps_overview AS saa
-    ON ((vd.advertiser_store_app_id = saa.id))
-)
-LEFT JOIN frontend.store_apps_overview AS sap ON ((ac.store_app = sap.id))
-)
-WHERE (c.id IS NOT null)
-ORDER BY vd.last_seen DESC
-WITH NO DATA;
+        CASE
+            WHEN (saa.icon_url_100 IS NOT NULL) THEN (concat('https://media.appgoblin.info/app-icons/', saa.store_id, '/', saa.icon_url_100))::character varying
+            ELSE saa.icon_url_512
+        END AS advertiser_icon_url,
+        CASE
+            WHEN (sap.icon_url_100 IS NOT NULL) THEN (concat('https://media.appgoblin.info/app-icons/', sap.store_id, '/', sap.icon_url_100))::character varying
+            ELSE sap.icon_url_512
+        END AS publisher_icon_url
+   FROM (((((visually_distinct vd
+     LEFT JOIN public.api_calls ac ON ((vd.last_api_call_id = ac.id)))
+     LEFT JOIN adtech.companies c ON ((vd.company_id = c.id)))
+     LEFT JOIN public.domains ad ON ((c.domain_id = ad.id)))
+     LEFT JOIN frontend.store_apps_overview saa ON ((vd.advertiser_store_app_id = saa.id)))
+     LEFT JOIN frontend.store_apps_overview sap ON ((ac.store_app = sap.id)))
+  WHERE (c.id IS NOT NULL)
+  ORDER BY vd.last_seen DESC
+  WITH NO DATA;
 
 
 ALTER MATERIALIZED VIEW frontend.companies_creative_rankings_new OWNER TO postgres;
@@ -170,4 +123,5 @@ ALTER MATERIALIZED VIEW frontend.companies_creative_rankings_new OWNER TO postgr
 -- PostgreSQL database dump complete
 --
 
-\unrestrict PyjkYa1TC8SaN8MZ6RT7gEaYEUioOrVvYgyGmwQv31ZnAXWg4lVMq6TFGyPbLvr
+\unrestrict QE9UaRE98UiSDtV0fMT1v49h9ml9g2GyRHXtqboRO7rXZqHJlbfLLWYVpklLykE
+

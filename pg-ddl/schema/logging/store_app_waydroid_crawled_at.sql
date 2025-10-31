@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict Lw2LNuJuuibJhXmvy40KP8kmDk84j4KKME5VQm1DwbrYpvByEV6cAg9OI0APsj1
+\restrict AuTGwwAe43aIXaDDIMSIGJXD44csixeKM0mu65NVimb2ErailSdaShghIYfowzf
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -40,9 +40,7 @@ ALTER TABLE logging.store_app_waydroid_crawled_at OWNER TO postgres;
 -- Name: logging_store_app_upsert_unique; Type: INDEX; Schema: logging; Owner: postgres
 --
 
-CREATE UNIQUE INDEX logging_store_app_upsert_unique ON logging.store_app_waydroid_crawled_at USING btree (
-    store_app, crawl_result, crawled_at
-);
+CREATE UNIQUE INDEX logging_store_app_upsert_unique ON logging.store_app_waydroid_crawled_at USING btree (store_app, crawl_result, crawled_at);
 
 
 --
@@ -50,9 +48,7 @@ CREATE UNIQUE INDEX logging_store_app_upsert_unique ON logging.store_app_waydroi
 --
 
 ALTER TABLE ONLY logging.store_app_waydroid_crawled_at
-ADD CONSTRAINT waydroid_crawl_result_fk FOREIGN KEY (
-    crawl_result
-) REFERENCES public.crawl_results (id);
+    ADD CONSTRAINT waydroid_crawl_result_fk FOREIGN KEY (crawl_result) REFERENCES public.crawl_results(id);
 
 
 --
@@ -60,13 +56,12 @@ ADD CONSTRAINT waydroid_crawl_result_fk FOREIGN KEY (
 --
 
 ALTER TABLE ONLY logging.store_app_waydroid_crawled_at
-ADD CONSTRAINT waydroid_store_apps_crawl_fk FOREIGN KEY (
-    store_app
-) REFERENCES public.store_apps (id);
+    ADD CONSTRAINT waydroid_store_apps_crawl_fk FOREIGN KEY (store_app) REFERENCES public.store_apps(id);
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict Lw2LNuJuuibJhXmvy40KP8kmDk84j4KKME5VQm1DwbrYpvByEV6cAg9OI0APsj1
+\unrestrict AuTGwwAe43aIXaDDIMSIGJXD44csixeKM0mu65NVimb2ErailSdaShghIYfowzf
+

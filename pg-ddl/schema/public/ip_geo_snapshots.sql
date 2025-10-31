@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 8L3JbRz9AeGz9Gc4o9jV4mkAoVyPomPCxAejCWZXhZWqOhfebXtFnV09SgIaWh6
+\restrict whRspqoV50cxy3EPhcWF3izrilZ6g275J7zJrbItgjnAc7gwpsdxxLJcWVGe8Mh
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -35,9 +35,7 @@ CREATE TABLE public.ip_geo_snapshots (
     state_iso character varying(4),
     city_name character varying,
     org character varying,
-    created_at timestamp with time zone DEFAULT timezone(
-        'utc'::text, now()
-    ) NOT NULL
+    created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
 
@@ -48,12 +46,12 @@ ALTER TABLE public.ip_geo_snapshots OWNER TO postgres;
 --
 
 CREATE SEQUENCE public.ip_geo_snapshots_id_seq
-AS integer
-START WITH 1
-INCREMENT BY 1
-NO MINVALUE
-NO MAXVALUE
-CACHE 1;
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
 
 
 ALTER SEQUENCE public.ip_geo_snapshots_id_seq OWNER TO postgres;
@@ -69,9 +67,7 @@ ALTER SEQUENCE public.ip_geo_snapshots_id_seq OWNED BY public.ip_geo_snapshots.i
 -- Name: ip_geo_snapshots id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.ip_geo_snapshots ALTER COLUMN id SET DEFAULT nextval(
-    'public.ip_geo_snapshots_id_seq'::regclass
-);
+ALTER TABLE ONLY public.ip_geo_snapshots ALTER COLUMN id SET DEFAULT nextval('public.ip_geo_snapshots_id_seq'::regclass);
 
 
 --
@@ -79,7 +75,7 @@ ALTER TABLE ONLY public.ip_geo_snapshots ALTER COLUMN id SET DEFAULT nextval(
 --
 
 ALTER TABLE ONLY public.ip_geo_snapshots
-ADD CONSTRAINT ip_geo_snapshots_pkey PRIMARY KEY (id);
+    ADD CONSTRAINT ip_geo_snapshots_pkey PRIMARY KEY (id);
 
 
 --
@@ -87,25 +83,21 @@ ADD CONSTRAINT ip_geo_snapshots_pkey PRIMARY KEY (id);
 --
 
 ALTER TABLE ONLY public.ip_geo_snapshots
-ADD CONSTRAINT ip_geo_unique_key UNIQUE (mitm_uuid);
+    ADD CONSTRAINT ip_geo_unique_key UNIQUE (mitm_uuid);
 
 
 --
 -- Name: idx_ip_geo_ip_created; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE INDEX idx_ip_geo_ip_created ON public.ip_geo_snapshots USING btree (
-    ip_address, created_at DESC
-);
+CREATE INDEX idx_ip_geo_ip_created ON public.ip_geo_snapshots USING btree (ip_address, created_at DESC);
 
 
 --
 -- Name: idx_ip_geo_mitm_uuid; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE INDEX idx_ip_geo_mitm_uuid ON public.ip_geo_snapshots USING btree (
-    mitm_uuid
-);
+CREATE INDEX idx_ip_geo_mitm_uuid ON public.ip_geo_snapshots USING btree (mitm_uuid);
 
 
 --
@@ -113,13 +105,12 @@ CREATE INDEX idx_ip_geo_mitm_uuid ON public.ip_geo_snapshots USING btree (
 --
 
 ALTER TABLE ONLY public.ip_geo_snapshots
-ADD CONSTRAINT fk_country FOREIGN KEY (
-    country_id
-) REFERENCES public.countries (id);
+    ADD CONSTRAINT fk_country FOREIGN KEY (country_id) REFERENCES public.countries(id);
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 8L3JbRz9AeGz9Gc4o9jV4mkAoVyPomPCxAejCWZXhZWqOhfebXtFnV09SgIaWh6
+\unrestrict whRspqoV50cxy3EPhcWF3izrilZ6g275J7zJrbItgjnAc7gwpsdxxLJcWVGe8Mh
+

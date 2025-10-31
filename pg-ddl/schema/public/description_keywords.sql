@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict MgQ4wP6H3TQvfq9ZN2NILZlmRXSdNQZJOquzJIeZODanf4OFxJkex56mS99YohL
+\restrict KFmLagvMeP5HkceZbOntVceYhZhgnrViXy05sqiCuAUTYJYwrsUzLmsuu3wCAfr
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -42,12 +42,12 @@ ALTER TABLE public.description_keywords OWNER TO postgres;
 --
 
 CREATE SEQUENCE public.description_keywords_id_seq
-AS integer
-START WITH 1
-INCREMENT BY 1
-NO MINVALUE
-NO MAXVALUE
-CACHE 1;
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
 
 
 ALTER SEQUENCE public.description_keywords_id_seq OWNER TO postgres;
@@ -63,9 +63,7 @@ ALTER SEQUENCE public.description_keywords_id_seq OWNED BY public.description_ke
 -- Name: description_keywords id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.description_keywords ALTER COLUMN id SET DEFAULT nextval(
-    'public.description_keywords_id_seq'::regclass
-);
+ALTER TABLE ONLY public.description_keywords ALTER COLUMN id SET DEFAULT nextval('public.description_keywords_id_seq'::regclass);
 
 
 --
@@ -73,9 +71,7 @@ ALTER TABLE ONLY public.description_keywords ALTER COLUMN id SET DEFAULT nextval
 --
 
 ALTER TABLE ONLY public.description_keywords
-ADD CONSTRAINT description_keywords_description_id_keyword_id_key UNIQUE (
-    description_id, keyword_id
-);
+    ADD CONSTRAINT description_keywords_description_id_keyword_id_key UNIQUE (description_id, keyword_id);
 
 
 --
@@ -83,7 +79,7 @@ ADD CONSTRAINT description_keywords_description_id_keyword_id_key UNIQUE (
 --
 
 ALTER TABLE ONLY public.description_keywords
-ADD CONSTRAINT description_keywords_pkey PRIMARY KEY (id);
+    ADD CONSTRAINT description_keywords_pkey PRIMARY KEY (id);
 
 
 --
@@ -91,9 +87,7 @@ ADD CONSTRAINT description_keywords_pkey PRIMARY KEY (id);
 --
 
 ALTER TABLE ONLY public.description_keywords
-ADD CONSTRAINT description_keywords_description_id_fkey FOREIGN KEY (
-    description_id
-) REFERENCES public.store_apps_descriptions (id) ON DELETE CASCADE;
+    ADD CONSTRAINT description_keywords_description_id_fkey FOREIGN KEY (description_id) REFERENCES public.store_apps_descriptions(id) ON DELETE CASCADE;
 
 
 --
@@ -101,13 +95,12 @@ ADD CONSTRAINT description_keywords_description_id_fkey FOREIGN KEY (
 --
 
 ALTER TABLE ONLY public.description_keywords
-ADD CONSTRAINT description_keywords_keyword_id_fkey FOREIGN KEY (
-    keyword_id
-) REFERENCES public.keywords (id) ON DELETE CASCADE;
+    ADD CONSTRAINT description_keywords_keyword_id_fkey FOREIGN KEY (keyword_id) REFERENCES public.keywords(id) ON DELETE CASCADE;
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict MgQ4wP6H3TQvfq9ZN2NILZlmRXSdNQZJOquzJIeZODanf4OFxJkex56mS99YohL
+\unrestrict KFmLagvMeP5HkceZbOntVceYhZhgnrViXy05sqiCuAUTYJYwrsUzLmsuu3wCAfr
+

@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict l3gd54c661i5cZZhiNbPOeSfyqeCvpH0NwH6phY7TMOo1aZaBHnXFZjbDUUjJfn
+\restrict Vhu1qnUQtRkyWDSszNoV8QpkhPUHgsTjBXrFrNQ7G9dloVQzJISrR5aXZMy3lrU
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -40,12 +40,12 @@ ALTER TABLE public.languages OWNER TO postgres;
 --
 
 CREATE SEQUENCE public.languages_id_seq
-AS smallint
-START WITH 1
-INCREMENT BY 1
-NO MINVALUE
-NO MAXVALUE
-CACHE 1;
+    AS smallint
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
 
 
 ALTER SEQUENCE public.languages_id_seq OWNER TO postgres;
@@ -61,9 +61,7 @@ ALTER SEQUENCE public.languages_id_seq OWNED BY public.languages.id;
 -- Name: languages id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.languages ALTER COLUMN id SET DEFAULT nextval(
-    'public.languages_id_seq'::regclass
-);
+ALTER TABLE ONLY public.languages ALTER COLUMN id SET DEFAULT nextval('public.languages_id_seq'::regclass);
 
 
 --
@@ -71,7 +69,7 @@ ALTER TABLE ONLY public.languages ALTER COLUMN id SET DEFAULT nextval(
 --
 
 ALTER TABLE ONLY public.languages
-ADD CONSTRAINT language_pkey PRIMARY KEY (id);
+    ADD CONSTRAINT language_pkey PRIMARY KEY (id);
 
 
 --
@@ -79,11 +77,12 @@ ADD CONSTRAINT language_pkey PRIMARY KEY (id);
 --
 
 ALTER TABLE ONLY public.languages
-ADD CONSTRAINT language_unique_key UNIQUE (language_slug);
+    ADD CONSTRAINT language_unique_key UNIQUE (language_slug);
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict l3gd54c661i5cZZhiNbPOeSfyqeCvpH0NwH6phY7TMOo1aZaBHnXFZjbDUUjJfn
+\unrestrict Vhu1qnUQtRkyWDSszNoV8QpkhPUHgsTjBXrFrNQ7G9dloVQzJISrR5aXZMy3lrU
+

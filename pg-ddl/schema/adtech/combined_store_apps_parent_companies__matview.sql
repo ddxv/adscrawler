@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict s9Fp2oKRoIwUFPWaV5JegJE8l91b8pX0h90SVbHHBjNfoG5XKLZlABaGqUL6NJq
+\restrict 386dLDp67mqZF8AHuRI3zw5Ra7YItqzMtDWb371DaOJrXVk3bqJTlNd3Cfcksf6
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -28,34 +28,22 @@ SET default_table_access_method = heap;
 --
 
 CREATE MATERIALIZED VIEW adtech.combined_store_apps_parent_companies AS
-SELECT
-    csac.store_app,
+ SELECT csac.store_app,
     csac.app_category,
     csac.parent_id AS company_id,
     COALESCE(ad.domain_name, csac.ad_domain) AS ad_domain,
-    BOOL_OR(csac.sdk) AS sdk,
-    BOOL_OR(csac.api_call) AS api_call,
-    BOOL_OR(csac.app_ads_direct) AS app_ads_direct
-FROM ((
-    adtech.combined_store_apps_companies csac
-    LEFT JOIN adtech.companies AS c ON ((csac.parent_id = c.id))
-)
-LEFT JOIN public.domains AS ad ON ((c.domain_id = ad.id))
-)
-WHERE (csac.parent_id IN (
-    SELECT DISTINCT pc.id
-    FROM (
-        adtech.companies AS pc
-        LEFT JOIN adtech.companies AS c_1 ON ((pc.id = c_1.parent_company_id))
-    )
-    WHERE (c_1.id IS NOT null)
-))
-GROUP BY
-    COALESCE(ad.domain_name, csac.ad_domain),
-    csac.store_app,
-    csac.app_category,
-    csac.parent_id
-WITH NO DATA;
+    bool_or(csac.sdk) AS sdk,
+    bool_or(csac.api_call) AS api_call,
+    bool_or(csac.app_ads_direct) AS app_ads_direct
+   FROM ((adtech.combined_store_apps_companies csac
+     LEFT JOIN adtech.companies c ON ((csac.parent_id = c.id)))
+     LEFT JOIN public.domains ad ON ((c.domain_id = ad.id)))
+  WHERE (csac.parent_id IN ( SELECT DISTINCT pc.id
+           FROM (adtech.companies pc
+             LEFT JOIN adtech.companies c_1 ON ((pc.id = c_1.parent_company_id)))
+          WHERE (c_1.id IS NOT NULL)))
+  GROUP BY COALESCE(ad.domain_name, csac.ad_domain), csac.store_app, csac.app_category, csac.parent_id
+  WITH NO DATA;
 
 
 ALTER MATERIALIZED VIEW adtech.combined_store_apps_parent_companies OWNER TO postgres;
@@ -64,13 +52,12 @@ ALTER MATERIALIZED VIEW adtech.combined_store_apps_parent_companies OWNER TO pos
 -- Name: idx_combined_store_apps_parent_companies_idx; Type: INDEX; Schema: adtech; Owner: postgres
 --
 
-CREATE UNIQUE INDEX idx_combined_store_apps_parent_companies_idx ON adtech.combined_store_apps_parent_companies USING btree (
-    ad_domain, store_app, app_category, company_id
-);
+CREATE UNIQUE INDEX idx_combined_store_apps_parent_companies_idx ON adtech.combined_store_apps_parent_companies USING btree (ad_domain, store_app, app_category, company_id);
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict s9Fp2oKRoIwUFPWaV5JegJE8l91b8pX0h90SVbHHBjNfoG5XKLZlABaGqUL6NJq
+\unrestrict 386dLDp67mqZF8AHuRI3zw5Ra7YItqzMtDWb371DaOJrXVk3bqJTlNd3Cfcksf6
+

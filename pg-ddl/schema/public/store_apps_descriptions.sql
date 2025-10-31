@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict Xc6gjJchoOF6ZW98n6dGZXhqxNhd1LcDHi2Bm9TiAHlFfeFdG5yeH1QCSvW7oCC
+\restrict GYWj4YbxqTt8jGgAfkegakUdHvdjVXOqRzfYyf7xjNznagNIQHvWxCBN5HBmxJ7
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -46,12 +46,12 @@ ALTER TABLE public.store_apps_descriptions OWNER TO postgres;
 --
 
 CREATE SEQUENCE public.store_apps_descriptions_id_seq
-AS integer
-START WITH 1
-INCREMENT BY 1
-NO MINVALUE
-NO MAXVALUE
-CACHE 1;
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
 
 
 ALTER SEQUENCE public.store_apps_descriptions_id_seq OWNER TO postgres;
@@ -67,9 +67,7 @@ ALTER SEQUENCE public.store_apps_descriptions_id_seq OWNED BY public.store_apps_
 -- Name: store_apps_descriptions id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.store_apps_descriptions ALTER COLUMN id SET DEFAULT nextval(
-    'public.store_apps_descriptions_id_seq'::regclass
-);
+ALTER TABLE ONLY public.store_apps_descriptions ALTER COLUMN id SET DEFAULT nextval('public.store_apps_descriptions_id_seq'::regclass);
 
 
 --
@@ -77,25 +75,21 @@ ALTER TABLE ONLY public.store_apps_descriptions ALTER COLUMN id SET DEFAULT next
 --
 
 ALTER TABLE ONLY public.store_apps_descriptions
-ADD CONSTRAINT store_apps_descriptions_pkey PRIMARY KEY (id);
+    ADD CONSTRAINT store_apps_descriptions_pkey PRIMARY KEY (id);
 
 
 --
 -- Name: idx_description_tsv; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE INDEX idx_description_tsv ON public.store_apps_descriptions USING gin (
-    description_tsv
-);
+CREATE INDEX idx_description_tsv ON public.store_apps_descriptions USING gin (description_tsv);
 
 
 --
 -- Name: store_apps_descriptions_unique_hash_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE UNIQUE INDEX store_apps_descriptions_unique_hash_idx ON public.store_apps_descriptions USING btree (
-    store_app, language_id, md5(description), md5(description_short)
-);
+CREATE UNIQUE INDEX store_apps_descriptions_unique_hash_idx ON public.store_apps_descriptions USING btree (store_app, language_id, md5(description), md5(description_short));
 
 
 --
@@ -103,9 +97,7 @@ CREATE UNIQUE INDEX store_apps_descriptions_unique_hash_idx ON public.store_apps
 --
 
 ALTER TABLE ONLY public.store_apps_descriptions
-ADD CONSTRAINT store_apps_descriptions_language_id_fkey FOREIGN KEY (
-    language_id
-) REFERENCES public.languages (id) ON DELETE CASCADE;
+    ADD CONSTRAINT store_apps_descriptions_language_id_fkey FOREIGN KEY (language_id) REFERENCES public.languages(id) ON DELETE CASCADE;
 
 
 --
@@ -113,13 +105,12 @@ ADD CONSTRAINT store_apps_descriptions_language_id_fkey FOREIGN KEY (
 --
 
 ALTER TABLE ONLY public.store_apps_descriptions
-ADD CONSTRAINT store_apps_descriptions_store_app_fkey FOREIGN KEY (
-    store_app
-) REFERENCES public.store_apps (id) ON DELETE CASCADE;
+    ADD CONSTRAINT store_apps_descriptions_store_app_fkey FOREIGN KEY (store_app) REFERENCES public.store_apps(id) ON DELETE CASCADE;
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict Xc6gjJchoOF6ZW98n6dGZXhqxNhd1LcDHi2Bm9TiAHlFfeFdG5yeH1QCSvW7oCC
+\unrestrict GYWj4YbxqTt8jGgAfkegakUdHvdjVXOqRzfYyf7xjNznagNIQHvWxCBN5HBmxJ7
+

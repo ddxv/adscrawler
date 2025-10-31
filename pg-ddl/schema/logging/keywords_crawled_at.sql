@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict VvFQbhiazWHVWIzNpaa81YdDeaMEoUHqmCfjKgIC8LHF2mWgyXdwzJOImpCZVEC
+\restrict VOgDa0cKRQMz0LQJSqg5iT8gozeuH63iC3b7MNG4838uYHq6FxkiVJ4gHhId2mE
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -40,7 +40,7 @@ ALTER TABLE logging.keywords_crawled_at OWNER TO postgres;
 --
 
 ALTER TABLE ONLY logging.keywords_crawled_at
-ADD CONSTRAINT keywords_crawled_at_pk PRIMARY KEY (keyword);
+    ADD CONSTRAINT keywords_crawled_at_pk PRIMARY KEY (keyword);
 
 
 --
@@ -48,13 +48,12 @@ ADD CONSTRAINT keywords_crawled_at_pk PRIMARY KEY (keyword);
 --
 
 ALTER TABLE ONLY logging.keywords_crawled_at
-ADD CONSTRAINT keywords_crawled_at_fk FOREIGN KEY (
-    keyword
-) REFERENCES public.keywords (id);
+    ADD CONSTRAINT keywords_crawled_at_fk FOREIGN KEY (keyword) REFERENCES public.keywords(id);
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict VvFQbhiazWHVWIzNpaa81YdDeaMEoUHqmCfjKgIC8LHF2mWgyXdwzJOImpCZVEC
+\unrestrict VOgDa0cKRQMz0LQJSqg5iT8gozeuH63iC3b7MNG4838uYHq6FxkiVJ4gHhId2mE
+

@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict JtBwy3YhXzrpXbpuHt66MTdqkUdL5s78ekCV778vf5XN72P1x2PE9IAlJegmTqR
+\restrict CbdvoK0JwiA8XcpR0zzE7xZlq2MyHoQFhlJdWBofmQCabZbYVgx76rpwdskULCq
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -40,7 +40,7 @@ ALTER TABLE adtech.company_domain_mapping OWNER TO postgres;
 --
 
 ALTER TABLE ONLY adtech.company_domain_mapping
-ADD CONSTRAINT company_domain_mapping_pkey PRIMARY KEY (company_id, domain_id);
+    ADD CONSTRAINT company_domain_mapping_pkey PRIMARY KEY (company_id, domain_id);
 
 
 --
@@ -48,9 +48,7 @@ ADD CONSTRAINT company_domain_mapping_pkey PRIMARY KEY (company_id, domain_id);
 --
 
 ALTER TABLE ONLY adtech.company_domain_mapping
-ADD CONSTRAINT company_domain_mapping_company_id_fkey FOREIGN KEY (
-    company_id
-) REFERENCES adtech.companies (id);
+    ADD CONSTRAINT company_domain_mapping_company_id_fkey FOREIGN KEY (company_id) REFERENCES adtech.companies(id);
 
 
 --
@@ -58,13 +56,12 @@ ADD CONSTRAINT company_domain_mapping_company_id_fkey FOREIGN KEY (
 --
 
 ALTER TABLE ONLY adtech.company_domain_mapping
-ADD CONSTRAINT company_domain_mapping_domain_id_fkey FOREIGN KEY (
-    domain_id
-) REFERENCES public.domains (id) ON DELETE CASCADE;
+    ADD CONSTRAINT company_domain_mapping_domain_id_fkey FOREIGN KEY (domain_id) REFERENCES public.domains(id) ON DELETE CASCADE;
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict JtBwy3YhXzrpXbpuHt66MTdqkUdL5s78ekCV778vf5XN72P1x2PE9IAlJegmTqR
+\unrestrict CbdvoK0JwiA8XcpR0zzE7xZlq2MyHoQFhlJdWBofmQCabZbYVgx76rpwdskULCq
+

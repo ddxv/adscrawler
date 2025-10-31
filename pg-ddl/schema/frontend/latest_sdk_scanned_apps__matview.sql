@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict Syjhy340KSW75NcDY1RubRc8KPCuFhYe9mY364kxX0UYtOLPw656Sf8qIth9ggv
+\restrict hsMqaQpPjPZuIsDG8MDEGtTMK1zgYzHpz1SgTBH3GAC71XPcaUgmoPB2rpAYvHA
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -28,43 +28,29 @@ SET default_table_access_method = heap;
 --
 
 CREATE MATERIALIZED VIEW frontend.latest_sdk_scanned_apps AS
-WITH latest_version_codes AS (
-    SELECT DISTINCT ON (version_codes.store_app)
-        version_codes.id,
-        version_codes.store_app,
-        version_codes.version_code,
-        version_codes.updated_at,
-        version_codes.crawl_result
-    FROM public.version_codes
-    ORDER BY
-        version_codes.store_app,
-        (
-            string_to_array((version_codes.version_code)::text, '.'::text)
-        )::bigint [] DESC
-), ranked_apps AS (
-    SELECT
-        lvc.updated_at AS sdk_crawled_at,
-        lvc.version_code,
-        lvc.crawl_result,
-        sa.store,
-        sa.store_id,
-        sa.name,
-        sa.installs,
-        sa.rating_count,
-        row_number()
-            OVER (
-                PARTITION BY sa.store, lvc.crawl_result
-                ORDER BY lvc.updated_at DESC
-            )
-            AS updated_rank
-    FROM (
-        latest_version_codes AS lvc
-        LEFT JOIN frontend.store_apps_overview AS sa ON ((lvc.store_app = sa.id))
-    )
-    WHERE (lvc.updated_at <= (current_date - '1 day'::interval))
-)
-SELECT
-    sdk_crawled_at,
+ WITH latest_version_codes AS (
+         SELECT DISTINCT ON (version_codes.store_app) version_codes.id,
+            version_codes.store_app,
+            version_codes.version_code,
+            version_codes.updated_at,
+            version_codes.crawl_result
+           FROM public.version_codes
+          ORDER BY version_codes.store_app, (string_to_array((version_codes.version_code)::text, '.'::text))::bigint[] DESC
+        ), ranked_apps AS (
+         SELECT lvc.updated_at AS sdk_crawled_at,
+            lvc.version_code,
+            lvc.crawl_result,
+            sa.store,
+            sa.store_id,
+            sa.name,
+            sa.installs,
+            sa.rating_count,
+            row_number() OVER (PARTITION BY sa.store, lvc.crawl_result ORDER BY lvc.updated_at DESC) AS updated_rank
+           FROM (latest_version_codes lvc
+             LEFT JOIN frontend.store_apps_overview sa ON ((lvc.store_app = sa.id)))
+          WHERE (lvc.updated_at <= (CURRENT_DATE - '1 day'::interval))
+        )
+ SELECT sdk_crawled_at,
     version_code,
     crawl_result,
     store,
@@ -73,9 +59,9 @@ SELECT
     installs,
     rating_count,
     updated_rank
-FROM ranked_apps
-WHERE (updated_rank <= 100)
-WITH NO DATA;
+   FROM ranked_apps
+  WHERE (updated_rank <= 100)
+  WITH NO DATA;
 
 
 ALTER MATERIALIZED VIEW frontend.latest_sdk_scanned_apps OWNER TO postgres;
@@ -84,13 +70,12 @@ ALTER MATERIALIZED VIEW frontend.latest_sdk_scanned_apps OWNER TO postgres;
 -- Name: latest_sdk_scanned_apps_unique_index; Type: INDEX; Schema: frontend; Owner: postgres
 --
 
-CREATE UNIQUE INDEX latest_sdk_scanned_apps_unique_index ON frontend.latest_sdk_scanned_apps USING btree (
-    version_code, crawl_result, store, store_id
-);
+CREATE UNIQUE INDEX latest_sdk_scanned_apps_unique_index ON frontend.latest_sdk_scanned_apps USING btree (version_code, crawl_result, store, store_id);
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict Syjhy340KSW75NcDY1RubRc8KPCuFhYe9mY364kxX0UYtOLPw656Sf8qIth9ggv
+\unrestrict hsMqaQpPjPZuIsDG8MDEGtTMK1zgYzHpz1SgTBH3GAC71XPcaUgmoPB2rpAYvHA
+

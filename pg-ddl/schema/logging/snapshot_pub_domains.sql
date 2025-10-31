@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict ZLK8cE9sg9IgwLtvh7b1sk0gGV5kgfRJsugBeBZ46RQNM8fCIKwcCvPWf6m2syE
+\restrict 94mzd0nj2SwnRLJpM0Woa6HQxuaTt0aaPSmllAfqXdHAyyUB1AAbZRcKD55Hdma
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -28,9 +28,7 @@ SET default_table_access_method = heap;
 --
 
 CREATE TABLE logging.snapshot_pub_domains (
-    updated_at timestamp without time zone DEFAULT timezone(
-        'utc'::text, now()
-    ) NOT NULL,
+    updated_at timestamp without time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
     crawl_result integer,
     total_rows integer,
     avg_days numeric,
@@ -45,4 +43,5 @@ ALTER TABLE logging.snapshot_pub_domains OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict ZLK8cE9sg9IgwLtvh7b1sk0gGV5kgfRJsugBeBZ46RQNM8fCIKwcCvPWf6m2syE
+\unrestrict 94mzd0nj2SwnRLJpM0Woa6HQxuaTt0aaPSmllAfqXdHAyyUB1AAbZRcKD55Hdma
+

@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict abkOGGPRjyJVrWsnzSjMjGOZWDlegPKNwToHfg0gEn7ubHhf5v2OTvhp5HbvBE3
+\restrict 4nngyhkRjmUprss36wNz5lrxJ6JRb3B149Rdf3nLA4P6hJ2pahAhkfnrFcBd7MQ
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -38,4 +38,5 @@ ALTER TABLE public.keywords_base OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict abkOGGPRjyJVrWsnzSjMjGOZWDlegPKNwToHfg0gEn7ubHhf5v2OTvhp5HbvBE3
+\unrestrict 4nngyhkRjmUprss36wNz5lrxJ6JRb3B149Rdf3nLA4P6hJ2pahAhkfnrFcBd7MQ
+

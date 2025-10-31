@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict gtpYquhpzhRvm8Bx3SGESdBtKqj2niEb7XA71ZBq5QSLjgZBjEZrD1DWs6jCLH7
+\restrict gUS4kgT7mjAFIyjOuaWB16hFHhgBnvBKX3xRIWktDWJafMY933noPaBJ5FTMZiU
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -28,16 +28,12 @@ SET default_table_access_method = heap;
 --
 
 CREATE MATERIALIZED VIEW adtech.company_categories AS
-SELECT DISTINCT
-    c.id AS company_id,
+ SELECT DISTINCT c.id AS company_id,
     sc.category_id
-FROM ((
-    adtech.sdk_categories sc
-    LEFT JOIN adtech.sdks AS sd ON ((sc.sdk_id = sd.id))
-)
-INNER JOIN adtech.companies AS c ON ((sd.company_id = c.id))
-)
-WITH NO DATA;
+   FROM ((adtech.sdk_categories sc
+     LEFT JOIN adtech.sdks sd ON ((sc.sdk_id = sd.id)))
+     JOIN adtech.companies c ON ((sd.company_id = c.id)))
+  WITH NO DATA;
 
 
 ALTER MATERIALIZED VIEW adtech.company_categories OWNER TO postgres;
@@ -46,4 +42,5 @@ ALTER MATERIALIZED VIEW adtech.company_categories OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict gtpYquhpzhRvm8Bx3SGESdBtKqj2niEb7XA71ZBq5QSLjgZBjEZrD1DWs6jCLH7
+\unrestrict gUS4kgT7mjAFIyjOuaWB16hFHhgBnvBKX3xRIWktDWJafMY933noPaBJ5FTMZiU
+

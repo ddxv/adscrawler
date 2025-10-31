@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict uffQl5zPHMtKoDQ6Tme6qvfHSkd2UcpDR5OCEUp5q7rTdbvIiWBBCqt75MewCjy
+\restrict Ag9J4rIwTVFVU1UlvEcAuCsY34CqrkUf7TP2mH1r07RJ99sTmbqTIS6ya6AmtGn
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -28,50 +28,27 @@ SET default_table_access_method = heap;
 --
 
 CREATE MATERIALIZED VIEW public.store_apps_created_at AS
-WITH my_dates AS (
-    SELECT
-        num_series.store,
-        (
-            generate_series(
-                (current_date - '365 days'::interval),
-                (current_date)::timestamp without time zone,
-                '1 day'::interval
-            )
-        )::date AS date
-    FROM generate_series(1, 2, 1) AS num_series (store)
-), created_dates AS (
-    SELECT
-        sa.store,
-        (sa.created_at)::date AS created_date,
-        sas.crawl_source,
-        count(*) AS created_count
-    FROM (
-        public.store_apps AS sa
-        LEFT JOIN
-            logging.store_app_sources AS sas
-            ON (((sa.id = sas.store_app) AND (sa.store = sas.store)))
-    )
-    WHERE (sa.created_at >= (current_date - '365 days'::interval))
-    GROUP BY sa.store, ((sa.created_at)::date), sas.crawl_source
-)
-SELECT
-    my_dates.store,
+ WITH my_dates AS (
+         SELECT num_series.store,
+            (generate_series((CURRENT_DATE - '365 days'::interval), (CURRENT_DATE)::timestamp without time zone, '1 day'::interval))::date AS date
+           FROM generate_series(1, 2, 1) num_series(store)
+        ), created_dates AS (
+         SELECT sa.store,
+            (sa.created_at)::date AS created_date,
+            sas.crawl_source,
+            count(*) AS created_count
+           FROM (public.store_apps sa
+             LEFT JOIN logging.store_app_sources sas ON (((sa.id = sas.store_app) AND (sa.store = sas.store))))
+          WHERE (sa.created_at >= (CURRENT_DATE - '365 days'::interval))
+          GROUP BY sa.store, ((sa.created_at)::date), sas.crawl_source
+        )
+ SELECT my_dates.store,
     my_dates.date,
     created_dates.crawl_source,
     created_dates.created_count
-FROM (
-    my_dates
-    LEFT JOIN
-        created_dates
-        ON
-            (
-                (
-                    (my_dates.date = created_dates.created_date)
-                    AND (my_dates.store = created_dates.store)
-                )
-            )
-)
-WITH NO DATA;
+   FROM (my_dates
+     LEFT JOIN created_dates ON (((my_dates.date = created_dates.created_date) AND (my_dates.store = created_dates.store))))
+  WITH NO DATA;
 
 
 ALTER MATERIALIZED VIEW public.store_apps_created_at OWNER TO postgres;
@@ -80,22 +57,19 @@ ALTER MATERIALIZED VIEW public.store_apps_created_at OWNER TO postgres;
 -- Name: idx_store_apps_created_at; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE INDEX idx_store_apps_created_at ON public.store_apps_created_at USING btree (
-    store, date, crawl_source
-);
+CREATE INDEX idx_store_apps_created_at ON public.store_apps_created_at USING btree (store, date, crawl_source);
 
 
 --
 -- Name: idx_store_apps_created_atx; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE UNIQUE INDEX idx_store_apps_created_atx ON public.store_apps_created_at USING btree (
-    store, date, crawl_source
-);
+CREATE UNIQUE INDEX idx_store_apps_created_atx ON public.store_apps_created_at USING btree (store, date, crawl_source);
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict uffQl5zPHMtKoDQ6Tme6qvfHSkd2UcpDR5OCEUp5q7rTdbvIiWBBCqt75MewCjy
+\unrestrict Ag9J4rIwTVFVU1UlvEcAuCsY34CqrkUf7TP2mH1r07RJ99sTmbqTIS6ya6AmtGn
+

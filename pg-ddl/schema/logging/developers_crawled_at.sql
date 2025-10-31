@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict ulWT5ZAAp0EUFHt1fqy1J8WuO9nvyOIGpqiwmRUA9x1LBgpjg9C0s7jQoJZLUe6
+\restrict FbKqQhu3cZMfD1dRdxRligY4yqE8C2vTUPJ4b5cTQYaSVOXB87rnKiQJ436Q77L
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -40,7 +40,7 @@ ALTER TABLE logging.developers_crawled_at OWNER TO postgres;
 --
 
 ALTER TABLE ONLY logging.developers_crawled_at
-ADD CONSTRAINT developers_crawled_at_pk PRIMARY KEY (developer);
+    ADD CONSTRAINT developers_crawled_at_pk PRIMARY KEY (developer);
 
 
 --
@@ -48,13 +48,12 @@ ADD CONSTRAINT developers_crawled_at_pk PRIMARY KEY (developer);
 --
 
 ALTER TABLE ONLY logging.developers_crawled_at
-ADD CONSTRAINT newtable_fk FOREIGN KEY (
-    developer
-) REFERENCES public.developers (id);
+    ADD CONSTRAINT newtable_fk FOREIGN KEY (developer) REFERENCES public.developers(id);
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict ulWT5ZAAp0EUFHt1fqy1J8WuO9nvyOIGpqiwmRUA9x1LBgpjg9C0s7jQoJZLUe6
+\unrestrict FbKqQhu3cZMfD1dRdxRligY4yqE8C2vTUPJ4b5cTQYaSVOXB87rnKiQJ436Q77L
+

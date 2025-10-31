@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict fR5Mo9PJcyFyvo0T8ALGj68kbGI617KQyriFs98jy48Keh2Ko3M0mMbp9cP9gff
+\restrict kEmqAIRGMgfhnuniaN6DSavejaqUQO3aRoKnad4c6qg304cORfHspdVlIcP7JAZ
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -28,46 +28,27 @@ SET default_table_access_method = heap;
 --
 
 CREATE MATERIALIZED VIEW public.store_apps_updated_at AS
-WITH my_dates AS (
-    SELECT
-        num_series.store,
-        (
-            generate_series(
-                (current_date - '365 days'::interval),
-                (current_date)::timestamp without time zone,
-                '1 day'::interval
-            )
-        )::date AS date
-    FROM generate_series(1, 2, 1) AS num_series (store)
-), updated_dates AS (
-    SELECT
-        store_apps.store,
-        (store_apps.updated_at)::date AS last_updated_date,
-        count(*) AS last_updated_count
-    FROM public.store_apps
-    WHERE (store_apps.updated_at >= (current_date - '365 days'::interval))
-    GROUP BY store_apps.store, ((store_apps.updated_at)::date)
-)
-SELECT
-    my_dates.store,
+ WITH my_dates AS (
+         SELECT num_series.store,
+            (generate_series((CURRENT_DATE - '365 days'::interval), (CURRENT_DATE)::timestamp without time zone, '1 day'::interval))::date AS date
+           FROM generate_series(1, 2, 1) num_series(store)
+        ), updated_dates AS (
+         SELECT store_apps.store,
+            (store_apps.updated_at)::date AS last_updated_date,
+            count(*) AS last_updated_count
+           FROM public.store_apps
+          WHERE (store_apps.updated_at >= (CURRENT_DATE - '365 days'::interval))
+          GROUP BY store_apps.store, ((store_apps.updated_at)::date)
+        )
+ SELECT my_dates.store,
     my_dates.date,
     updated_dates.last_updated_count,
     audit_dates.updated_count
-FROM ((
-    my_dates
-    LEFT JOIN
-        updated_dates
-        ON
-            (
-                (
-                    (my_dates.date = updated_dates.last_updated_date)
-                    AND (my_dates.store = updated_dates.store)
-                )
-            )
-)
-LEFT JOIN public.audit_dates ON ((my_dates.date = audit_dates.updated_date)))
-ORDER BY my_dates.date DESC
-WITH NO DATA;
+   FROM ((my_dates
+     LEFT JOIN updated_dates ON (((my_dates.date = updated_dates.last_updated_date) AND (my_dates.store = updated_dates.store))))
+     LEFT JOIN public.audit_dates ON ((my_dates.date = audit_dates.updated_date)))
+  ORDER BY my_dates.date DESC
+  WITH NO DATA;
 
 
 ALTER MATERIALIZED VIEW public.store_apps_updated_at OWNER TO postgres;
@@ -76,22 +57,19 @@ ALTER MATERIALIZED VIEW public.store_apps_updated_at OWNER TO postgres;
 -- Name: idx_my_materialized_view_store_date; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE INDEX idx_my_materialized_view_store_date ON public.store_apps_updated_at USING btree (
-    store, date
-);
+CREATE INDEX idx_my_materialized_view_store_date ON public.store_apps_updated_at USING btree (store, date);
 
 
 --
 -- Name: idx_store_apps_updated_at; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE UNIQUE INDEX idx_store_apps_updated_at ON public.store_apps_updated_at USING btree (
-    store, date
-);
+CREATE UNIQUE INDEX idx_store_apps_updated_at ON public.store_apps_updated_at USING btree (store, date);
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict fR5Mo9PJcyFyvo0T8ALGj68kbGI617KQyriFs98jy48Keh2Ko3M0mMbp9cP9gff
+\unrestrict kEmqAIRGMgfhnuniaN6DSavejaqUQO3aRoKnad4c6qg304cORfHspdVlIcP7JAZ
+

@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict Hg5B2UzjLDZUFV48iJOIG5z06q8ccFWkk9kMfl5GWNSODByerDkA6NYSi7XLsNW
+\restrict Lpq6jrsWWYgS8LeN0Dmv9Nz1kaKwoGdoXbcULWeV71nsumA8wjXyPBlA86a48zv
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -28,82 +28,38 @@ SET default_table_access_method = heap;
 --
 
 CREATE MATERIALIZED VIEW public.store_apps_history_weekly AS
-WITH date_diffs AS (
-    SELECT
-        sach.store_app,
-        sach.country_id,
-        sach.crawled_date,
-        sach.installs,
-        sach.rating_count,
-        max(sach.crawled_date)
-            OVER (PARTITION BY sach.store_app, sach.country_id)
-            AS last_date,
-        (
-            sach.installs
-            - lead(sach.installs)
-                OVER (
-                    PARTITION BY sach.store_app, sach.country_id
-                    ORDER BY sach.crawled_date DESC
-                )
-        ) AS installs_diff,
-        (
-            sach.rating_count
-            - lead(sach.rating_count)
-                OVER (
-                    PARTITION BY sach.store_app, sach.country_id
-                    ORDER BY sach.crawled_date DESC
-                )
-        ) AS rating_count_diff,
-        (
-            sach.crawled_date
-            - lead(sach.crawled_date)
-                OVER (
-                    PARTITION BY sach.store_app, sach.country_id
-                    ORDER BY sach.crawled_date DESC
-                )
-        ) AS days_diff
-    FROM public.store_apps_country_history AS sach
-    WHERE ((sach.store_app IN (
-        SELECT sa.id
-        FROM public.store_apps AS sa
-        WHERE (sa.crawl_result = 1)
-    )) AND (sach.crawled_date > (current_date - '375 days'::interval
-    )))
-), weekly_totals AS (
-    SELECT
-        (
-            date_trunc(
-                'week'::text,
-                (date_diffs.crawled_date)::timestamp with time zone
-            )
-        )::date AS week_start,
-        date_diffs.store_app,
-        date_diffs.country_id,
-        sum(date_diffs.installs_diff) AS installs_diff,
-        sum(date_diffs.rating_count_diff) AS rating_count_diff,
-        sum(date_diffs.days_diff) AS days_diff
-    FROM date_diffs
-    GROUP BY
-        (
-            (
-                date_trunc(
-                    'week'::text,
-                    (date_diffs.crawled_date)::timestamp with time zone
-                )
-            )::date
-        ),
-        date_diffs.store_app,
-        date_diffs.country_id
-)
-SELECT
-    week_start,
+ WITH date_diffs AS (
+         SELECT sach.store_app,
+            sach.country_id,
+            sach.crawled_date,
+            sach.installs,
+            sach.rating_count,
+            max(sach.crawled_date) OVER (PARTITION BY sach.store_app, sach.country_id) AS last_date,
+            (sach.installs - lead(sach.installs) OVER (PARTITION BY sach.store_app, sach.country_id ORDER BY sach.crawled_date DESC)) AS installs_diff,
+            (sach.rating_count - lead(sach.rating_count) OVER (PARTITION BY sach.store_app, sach.country_id ORDER BY sach.crawled_date DESC)) AS rating_count_diff,
+            (sach.crawled_date - lead(sach.crawled_date) OVER (PARTITION BY sach.store_app, sach.country_id ORDER BY sach.crawled_date DESC)) AS days_diff
+           FROM public.store_apps_country_history_old sach
+          WHERE ((sach.store_app IN ( SELECT sa.id
+                   FROM public.store_apps sa
+                  WHERE (sa.crawl_result = 1))) AND (sach.crawled_date > (CURRENT_DATE - '375 days'::interval)))
+        ), weekly_totals AS (
+         SELECT (date_trunc('week'::text, (date_diffs.crawled_date)::timestamp with time zone))::date AS week_start,
+            date_diffs.store_app,
+            date_diffs.country_id,
+            sum(date_diffs.installs_diff) AS installs_diff,
+            sum(date_diffs.rating_count_diff) AS rating_count_diff,
+            sum(date_diffs.days_diff) AS days_diff
+           FROM date_diffs
+          GROUP BY ((date_trunc('week'::text, (date_diffs.crawled_date)::timestamp with time zone))::date), date_diffs.store_app, date_diffs.country_id
+        )
+ SELECT week_start,
     store_app,
     country_id,
     installs_diff,
     rating_count_diff
-FROM weekly_totals
-ORDER BY week_start DESC, store_app ASC, country_id ASC
-WITH NO DATA;
+   FROM weekly_totals
+  ORDER BY week_start DESC, store_app, country_id
+  WITH NO DATA;
 
 
 ALTER MATERIALIZED VIEW public.store_apps_history_weekly OWNER TO postgres;
@@ -112,4 +68,5 @@ ALTER MATERIALIZED VIEW public.store_apps_history_weekly OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict Hg5B2UzjLDZUFV48iJOIG5z06q8ccFWkk9kMfl5GWNSODByerDkA6NYSi7XLsNW
+\unrestrict Lpq6jrsWWYgS8LeN0Dmv9Nz1kaKwoGdoXbcULWeV71nsumA8wjXyPBlA86a48zv
+
