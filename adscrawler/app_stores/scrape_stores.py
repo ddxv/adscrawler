@@ -94,7 +94,7 @@ def process_chunk(
             store=store,
             results_df=results_df,
             database_connection=database_connection,
-            process_icon=process_app_icon,
+            process_icon=process_icon,
             df_chunk=df_chunk,
         )
     except Exception as e:
@@ -652,9 +652,9 @@ def save_developer_info(
     apps_df: pd.DataFrame,
     database_connection: PostgresCon,
 ) -> pd.DataFrame:
-    assert apps_df["developer_id"].to_numpy()[0], (
-        f"{apps_df['store_id']} Missing Developer ID"
-    )
+    assert apps_df["developer_id"].to_numpy()[
+        0
+    ], f"{apps_df['store_id']} Missing Developer ID"
     df = (
         apps_df[["store", "developer_id", "developer_name"]]
         .rename(columns={"developer_name": "name"})
