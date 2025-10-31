@@ -40,7 +40,7 @@ WITH growth_apps AS (
     FROM (
         frontend.store_apps_z_scores AS saz
         LEFT JOIN
-            public.store_apps AS sa
+            frontend.store_apps_overview AS sa
             ON (((saz.store_id)::text = (sa.store_id)::text))
     )
     WHERE sa.free
@@ -57,7 +57,7 @@ WITH growth_apps AS (
         sa.store_id
     FROM ((
         frontend.store_app_ranks_weekly ar
-        LEFT JOIN public.store_apps AS sa ON ((ar.store_app = sa.id))
+        LEFT JOIN frontend.store_apps_overview AS sa ON ((ar.store_app = sa.id))
     )
     LEFT JOIN public.countries AS c ON ((ar.country = c.id))
     )

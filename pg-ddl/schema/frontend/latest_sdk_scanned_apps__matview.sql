@@ -59,7 +59,7 @@ WITH latest_version_codes AS (
             AS updated_rank
     FROM (
         latest_version_codes AS lvc
-        LEFT JOIN public.store_apps AS sa ON ((lvc.store_app = sa.id))
+        LEFT JOIN frontend.store_apps_overview AS sa ON ((lvc.store_app = sa.id))
     )
     WHERE (lvc.updated_at <= (current_date - '1 day'::interval))
 )

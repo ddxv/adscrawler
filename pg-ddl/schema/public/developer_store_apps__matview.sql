@@ -55,7 +55,6 @@ LEFT JOIN public.app_urls_map AS aum ON ((sa.id = aum.store_app))
 )
 LEFT JOIN public.domains AS pd ON ((aum.pub_domain = pd.id))
 )
-ORDER BY sa.installs DESC NULLS LAST, sa.rating_count DESC NULLS LAST
 WITH NO DATA;
 
 
@@ -93,7 +92,7 @@ CREATE INDEX idx_developer_store_apps_domain_id ON public.developer_store_apps U
 --
 
 CREATE UNIQUE INDEX idx_developer_store_apps_unique ON public.developer_store_apps USING btree (
-    developer_id, store_id
+    developer_id, store_app
 );
 
 

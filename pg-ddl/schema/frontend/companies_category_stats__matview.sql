@@ -57,7 +57,7 @@ WITH d30_counts AS (
         adtech.combined_store_apps_companies csac
         LEFT JOIN adtech.companies AS c ON ((csac.company_id = c.id))
     )
-    LEFT JOIN public.store_apps AS sa ON ((csac.store_app = sa.id))
+    LEFT JOIN frontend.store_apps_overview AS sa ON ((csac.store_app = sa.id))
     )
 )
 SELECT

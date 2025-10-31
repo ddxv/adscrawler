@@ -54,7 +54,7 @@ WITH d30_counts AS (
         sa.rating_count
     FROM ((
         adtech.combined_store_apps_companies csac
-        LEFT JOIN public.store_apps AS sa ON ((csac.store_app = sa.id))
+        LEFT JOIN frontend.store_apps_overview AS sa ON ((csac.store_app = sa.id))
     )
     CROSS JOIN
         LATERAL (

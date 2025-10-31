@@ -59,7 +59,7 @@ WITH d30_counts AS (
     )
     LEFT JOIN public.domains AS ad ON ((c.domain_id = ad.id))
     )
-    LEFT JOIN public.store_apps AS sa ON ((csac.store_app = sa.id))
+    LEFT JOIN frontend.store_apps_overview AS sa ON ((csac.store_app = sa.id))
     )
     WHERE (csac.parent_id IN (
         SELECT DISTINCT pc.id

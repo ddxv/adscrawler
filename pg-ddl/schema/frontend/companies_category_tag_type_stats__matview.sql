@@ -66,7 +66,7 @@ FROM ((((((
     adtech.combined_store_apps_companies csac
     LEFT JOIN adtech.companies AS c ON ((csac.company_id = c.id))
 )
-LEFT JOIN public.store_apps AS sa ON ((csac.store_app = sa.id))
+LEFT JOIN frontend.store_apps_overview AS sa ON ((csac.store_app = sa.id))
 )
 LEFT JOIN d30_counts AS dc ON ((csac.store_app = dc.store_app))
 )
