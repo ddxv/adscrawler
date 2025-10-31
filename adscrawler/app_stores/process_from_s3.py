@@ -178,7 +178,7 @@ def get_s3_agg_daily_snapshots(
     return df
 
 
-def check_for_duplicates(df: pd.DataFrame, key_columns: list[str]):
+def check_for_duplicates(df: pd.DataFrame, key_columns: list[str]) -> None:
     any_duplicates = df.duplicated(subset=key_columns).any()
     if any_duplicates:
         dups = df[df.duplicated(subset=key_columns)][
@@ -189,7 +189,9 @@ def check_for_duplicates(df: pd.DataFrame, key_columns: list[str]):
     return
 
 
-def make_s3_app_country_metrics_history(store, snapshot_date) -> None:
+def make_s3_app_country_metrics_history(
+    store: int, snapshot_date: pd.DatetimeIndex
+) -> None:
     app_detail_parquets = get_s3_app_details_parquet_paths(
         snapshot_date=snapshot_date,
         store=store,
@@ -346,7 +348,7 @@ def process_app_metrics_to_db(
     )
 
 
-def get_parquet_paths_by_prefix(bucket, prefix: str) -> list[str]:
+def get_parquet_paths_by_prefix(bucket: str, prefix: str) -> list[str]:
     s3 = get_s3_client()
     continuation_token = None
     all_parquet_paths = []
