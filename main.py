@@ -264,9 +264,7 @@ class ProcessManager:
         return False
 
     def setup_database_connection(self) -> None:
-        self.pgcon = get_db_connection(
-            use_ssh_tunnel=self.args.use_ssh_tunnel, config_key="devdb"
-        )
+        self.pgcon = get_db_connection(use_ssh_tunnel=self.args.use_ssh_tunnel)
 
     def main(self) -> None:
         logger.info(f"Main starting with args: {self.args}")

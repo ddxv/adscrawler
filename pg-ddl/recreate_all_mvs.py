@@ -295,7 +295,7 @@ if __name__ == "__main__":
         "--config-key",
         type=str,
         required=True,
-        help="Database config key (e.g., 'devdb', 'proddb')",
+        help="Database config key (e.g., 'devdb', 'madrone')",
     )
     parser.add_argument(
         "--stop-on-error", action="store_true", help="Stop execution on first error"
