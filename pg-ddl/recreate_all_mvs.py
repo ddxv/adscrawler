@@ -91,9 +91,9 @@ def drop_all_mvs(mv_files: list[Path]) -> None:
         with open(mv_file) as f:
             file_content = f.read()
         # Remove \restrict line that causes errors
-        file_content = re.sub(r"\\restrict.*\n?", "", file_content, flags=re.IGNORECASE)
+        file_content_str = re.sub(r"\\restrict.*\n?", "", file_content flags=re.IGNORECASE)
         file_content_str = re.sub(
-            r"\\unrestrict.*\n?", "", file_content, flags=re.IGNORECASE
+            r"\\unrestrict.*\n?", "", file_content_str, flags=re.IGNORECASE
         )
         mv_name = extract_mv_name_from_file(file_content_str, mv_file)
         if not mv_name:
@@ -133,9 +133,11 @@ def create_all_mvs(mv_files: list[Path], stop_on_error: bool = False) -> None:
             file_content = f.read()
 
         # Remove \restrict line that causes errors
-        file_content = re.sub(r"\\restrict.*\n?", "", file_content, flags=re.IGNORECASE)
         file_content_str = re.sub(
-            r"\\unrestrict.*\n?", "", file_content, flags=re.IGNORECASE
+            r"\\restrict.*\n?", "", file_content, flags=re.IGNORECASE
+        )
+        file_content_str = re.sub(
+            r"\\unrestrict.*\n?", "", file_content_str, flags=re.IGNORECASE
         )
         mv_name = extract_mv_name_from_file(file_content_str, mv_file)
         if not mv_name:
@@ -143,7 +145,7 @@ def create_all_mvs(mv_files: list[Path], stop_on_error: bool = False) -> None:
             continue
 
         if mv_name not in existing_mvs:
-            mvs_missing_in_db.append((mv_name, file_content.strip(), mv_file.name))
+            mvs_missing_in_db.append((mv_name, file_content_str.strip(), mv_file.name))
 
     logger.info(f"Found {len(mvs_missing_in_db)} missing MVs to create in db")
 
@@ -207,9 +209,9 @@ def run_all_mvs(mv_files: list[Path], stop_on_error: bool = False) -> None:
         with open(mv_file) as f:
             file_content = f.read()
         # Remove \restrict line that causes errors
-        file_content = re.sub(r"\\restrict.*\n?", "", file_content, flags=re.IGNORECASE)
+        file_content_str = re.sub(r"\\restrict.*\n?", "", file_content flags=re.IGNORECASE)
         file_content_str = re.sub(
-            r"\\unrestrict.*\n?", "", file_content, flags=re.IGNORECASE
+            r"\\unrestrict.*\n?", "", file_content_str, flags=re.IGNORECASE
         )
         mv_name = extract_mv_name_from_file(file_content_str, mv_file)
         if not mv_name:
