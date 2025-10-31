@@ -69,6 +69,7 @@ def app_details_to_s3(
     s3_client = get_s3_client()
     bucket = CONFIG["s3"]["bucket"]
     # handles edge case of a crawl spanning a date change
+    df["store_id"] = df["store_id"].astype(str)
     for crawled_date, date_df in df.groupby("crawled_date"):
         if isinstance(crawled_date, datetime.date):
             crawled_date = crawled_date.strftime("%Y-%m-%d")
@@ -173,13 +174,17 @@ def get_s3_agg_daily_snapshots(
             f"No parquet paths found for agg app snapshots {store=} {start_date=} {end_date=}"
         )
         return pd.DataFrame()
-    duckdb_con = get_duckdb_connection(s3_config_key)
-    query = f"""
-      SELECT *
+    query = f"""SELECT
+       * 
       FROM read_parquet({parquet_paths})
+      WHERE store_id IS NOT NULL
     """
+    duckdb_con = get_duckdb_connection(s3_config_key)
     df = duckdb_con.execute(query).df()
     duckdb_con.close()
+    na_rows = df["store_id"].isna().sum()
+    if na_rows > 0:
+        logger.warning("Missing store_id values found")
     return df
 
 
@@ -260,10 +265,10 @@ def prep_app_metrics_history(
 def manual_import_app_metrics_from_s3() -> None:
     use_tunnel = False
     database_connection = get_db_connection(
-        use_ssh_tunnel=use_tunnel, config_key="devdb"
+        use_ssh_tunnel=use_tunnel, config_key="madrone"
     )
-    start_date = datetime.date(2025, 10, 10)
-    end_date = datetime.date(2025, 10, 28)
+    start_date = datetime.date(2025, 10, 31)
+    end_date = datetime.date(2025, 10, 31)
     for snapshot_date in pd.date_range(start_date, end_date, freq="D"):
         snapshot_date = snapshot_date.date()
         for store in [1, 2]:
@@ -291,6 +296,10 @@ def process_app_metrics_to_db(
     make_s3_app_country_metrics_history(store, snapshot_date=snapshot_date)
     logger.info(f"date={snapshot_date}, store={store} agg df load")
     df = get_s3_agg_daily_snapshots(snapshot_date, snapshot_date, store)
+    if store == 2:
+        df.loc[df["store_id"].str.contains(".0"), "store_id"] = (
+            df.loc[df["store_id"].str.contains(".0"), "store_id"].str.split(".").str[0]
+        )
     if df.empty:
         logger.warning(
             f"No data found for S3 agg app metrics {store=} {snapshot_date=}"
@@ -342,11 +351,13 @@ def process_app_metrics_to_db(
             **{col: (col, "sum") for col in STAR_COLS},
         )
         df["rating"] = weighted_sum / weight_total
+        df["rating"] = df["rating"].astype("float64")
         df = df.reset_index()
     check_for_duplicates(
         df=df,
         key_columns=GLOBAL_HISTORY_KEYS,
     )
+    df = df.replace({pd.NA: None, np.nan: None})
     insert_columns = [x for x in GLOBAL_HISTORY_COLS if x in df.columns]
     logger.info(f"date={snapshot_date}, store={store} agg df global upsert")
     upsert_df(
@@ -394,7 +405,7 @@ def app_details_country_history_query(
 ) -> str:
     if store == 2:
         data_cols = """
-             trackId AS store_id,
+             CAST(trackId AS VARCHAR) AS store_id,
              country,
              crawled_date,
              averageUserRating AS rating,
