@@ -109,10 +109,9 @@ class ProcessManager:
             help="Number of workers to use for updating app store details",
         )
         parser.add_argument(
-            "--country-crawl-priority-group",
-            help="Country crawl priority group to use when updating app store details",
+            "--country-priority-group",
+            help="Country priority group to use when updating app store details",
             type=int,
-            default=1,
         )
         parser.add_argument(
             "-a",
@@ -198,19 +197,16 @@ class ProcessManager:
             if any([" -u " in x, " --update-app-store-details" in x])
         ]
 
-        if self.args.country_crawl_priority_group:
-            found_processes = [
-                x
-                for x in found_processes
-                if any(
-                    [
-                        f"--country-crawl-priority-group={self.args.country_crawl_priority_group}"
-                        in x,
-                        f"--country-crawl-priority-group {self.args.country_crawl_priority_group}"
-                        in x,
-                    ]
-                )
-            ]
+        found_processes = [
+            x
+            for x in found_processes
+            if any(
+                [
+                    f"--country-priority-group={self.args.country_priority_group}" in x,
+                    f"--country-priority-group {self.args.country_priority_group}" in x,
+                ]
+            )
+        ]
 
         if self.args.platform:
             found_processes = [x for x in found_processes if self.args.platform in x]
@@ -296,7 +292,7 @@ class ProcessManager:
             self.scrape_new_apps_devs(store)
 
         if self.args.update_app_store_details:
-            self.update_app_details(store)
+            self.update_app_details(store, self.args.country_priority_group)
 
         if self.args.app_ads_txt_scrape:
             self.crawl_app_ads()
@@ -367,14 +363,19 @@ class ProcessManager:
         except Exception:
             logger.exception(f"Crawling developers for {store=} failed")
 
-    def update_app_details(self, store: int) -> None:
+    def update_app_details(self, store: int, country_priority_group: int) -> None:
+        if not country_priority_group:
+            logger.error(
+                "No country priority group provided, ie country-priority-group=1"
+            )
+            return
         update_app_details(
             store=store,
             database_connection=self.pgcon,
             use_ssh_tunnel=self.args.use_ssh_tunnel,
             workers=int(self.args.workers),
             process_icon=self.args.process_icons,
-            country_crawl_priority=self.args.country_crawl_priority_group,
+            country_crawl_priority=self.args.country_priority_group,
             limit=self.args.limit_query_rows,
         )
 
