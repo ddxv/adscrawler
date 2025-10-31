@@ -118,8 +118,8 @@ user_requested_apps_crawl AS (
         sa.id AS store_app,
         sa.store_id,
         sa.name,
-        sa.installs,
-        sa.rating_count,
+        agm.installs,
+        agm.rating_count,
         urs.created_at AS user_last_requested,
         lvc.crawl_result AS last_crawl_result,
         lvc.updated_at AS last_download_attempt,
@@ -131,6 +131,8 @@ user_requested_apps_crawl AS (
     LEFT JOIN store_apps AS sa
         ON
             urs.store_id = sa.store_id
+    LEFT JOIN app_global_metrics_latest AS agm
+        ON sa.id = agm.store_app
     LEFT JOIN latest_success_version_codes AS lsvc
         ON
             sa.id = lsvc.store_app

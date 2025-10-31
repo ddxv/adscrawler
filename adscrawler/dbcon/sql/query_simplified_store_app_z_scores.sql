@@ -125,7 +125,7 @@ ranked_z_scores AS (
         sa.store_id,
         sa.store,
         sa.category,
-        sa.installs,
+        agm.installs,
         sa.free,
         sa.price,
         sa.size,
@@ -175,6 +175,8 @@ ranked_z_scores AS (
     LEFT JOIN store_apps AS sa
         ON
             saz.store_app = sa.id
+      LEFT JOIN app_global_metrics_latest AS agm
+        ON sa.id = agm.store_app
     LEFT JOIN category_mapping AS cm ON
         sa.category::text = cm.original_category::text
 )

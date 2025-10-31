@@ -1,3 +1,4 @@
+
 WITH latest_version_codes AS (
     SELECT DISTINCT ON
     (store_app)
@@ -22,6 +23,7 @@ last_scanned AS (
     SELECT DISTINCT ON
     (vc.store_app)
         vasr.version_code_id,
+        vc.store_app,
         vasr.run_at,
         vasr.run_result
     FROM
@@ -62,7 +64,7 @@ all_scheduled_to_run AS (
         sa.name,
         sa.store_id,
         lvc.version_code AS version_string,
-        sa.installs,
+        agm.installs,
         ls.run_at AS last_run_at,
         fr.failed_attempts,
         ls.run_result AS last_run_result,
@@ -77,12 +79,14 @@ all_scheduled_to_run AS (
     LEFT JOIN store_apps AS sa
         ON
             lvc.store_app = sa.id
+    LEFT JOIN app_global_metrics_latest AS agm
+        ON sa.id = agm.store_app
     LEFT JOIN failed_runs AS fr ON sa.id = fr.store_app
     WHERE
         (ls.run_at <= current_date - interval '120 days' OR ls.run_at IS NULL)
         AND sa.store = :store
         AND (fr.failed_attempts < 1 OR fr.failed_attempts IS NULL)
-    ORDER BY sa.installs DESC
+    ORDER BY agm.installs DESC
 ),
 monthly_ads_scheduled_to_run AS (
     SELECT
@@ -90,7 +94,7 @@ monthly_ads_scheduled_to_run AS (
         sa.name,
         sa.store_id,
         lvc.version_code AS version_string,
-        sa.installs,
+        agm.installs,
         ls.run_at AS last_run_at,
         fr.failed_attempts,
         ls.run_result AS last_run_result,
@@ -105,6 +109,8 @@ monthly_ads_scheduled_to_run AS (
     LEFT JOIN store_apps AS sa
         ON
             lvc.store_app = sa.id
+        LEFT JOIN app_global_metrics_latest AS agm
+        ON sa.id = agm.store_app
     LEFT JOIN failed_runs AS fr ON sa.id = fr.store_app
     WHERE
         (ls.run_at <= current_date - interval '29 days' OR ls.run_at IS NULL)
@@ -117,7 +123,7 @@ monthly_ads_scheduled_to_run AS (
             FROM creative_records
             LEFT JOIN api_calls AS ac ON creative_records.api_call_id = ac.id
         )
-    ORDER BY sa.installs DESC
+    ORDER BY agm.installs DESC
 ),
 user_requested_apps_crawl AS (
     SELECT DISTINCT ON (sa.id)
@@ -125,7 +131,7 @@ user_requested_apps_crawl AS (
         sa.store_id,
         sa.name,
         lsvc.version_code AS version_string,
-        sa.installs,
+        agm.installs,
         ls.run_at AS last_run_at,
         fr.failed_attempts,
         ls.run_result AS last_run_result,
@@ -137,6 +143,8 @@ user_requested_apps_crawl AS (
     LEFT JOIN store_apps AS sa
         ON
             urs.store_id = sa.store_id
+        LEFT JOIN app_global_metrics_latest AS agm
+        ON sa.id = agm.store_app
     INNER JOIN latest_version_codes AS lsvc
         ON
             sa.id = lsvc.store_app

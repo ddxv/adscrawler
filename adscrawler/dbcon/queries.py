@@ -250,9 +250,10 @@ def query_developers(
     before_date = (datetime.datetime.today() - datetime.timedelta(days=15)).strftime(
         "%Y-%m-%d",
     )
-    sel_query = f"""SELECT 
+    sel_query = f"""
+    SELECT 
             d.*,
-            SUM(sa.installs) AS total_installs,
+            SUM(agm.installs) AS total_installs,
             dc.apps_crawled_at
         FROM
             developers d
@@ -260,6 +261,8 @@ def query_developers(
             ON d.id = dc.developer
         LEFT JOIN store_apps sa 
             ON d.id = sa.developer 
+        LEFT JOIN app_global_metrics_latest agm
+            ON sa.id = agm.store_app
         WHERE d.store = {store} 
             AND (apps_crawled_at <= '{before_date}' OR apps_crawled_at IS NULL)
             AND sa.crawl_result = 1

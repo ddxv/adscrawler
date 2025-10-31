@@ -118,8 +118,8 @@ user_requested_apps_crawl AS (
         sa.id AS store_app,
         sa.store_id,
         sa.name,
-        sa.installs,
-        sa.rating_count,
+        agm.installs,
+        agm.rating_count,
         'user' AS mysource,
         ls.scan_result AS last_analyzed_result,
         ls.scanned_at AS last_scanned_at,
@@ -130,6 +130,8 @@ user_requested_apps_crawl AS (
     LEFT JOIN store_apps AS sa
         ON
             urs.store_id = sa.store_id
+      LEFT JOIN app_global_metrics_latest AS agm
+        ON sa.id = agm.store_app
     LEFT JOIN last_scan AS ls ON sa.id = ls.store_app
     LEFT JOIN last_scan_succeed AS lsvc
         ON
