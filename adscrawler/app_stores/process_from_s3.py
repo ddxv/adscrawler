@@ -227,7 +227,7 @@ def prep_app_metrics_history(
     if store == 2:
         ratings_str = df["user_ratings"].str.extractall(r"(\d+)").unstack()
         ratings_str = ratings_str.reindex(df.index, fill_value=0)
-        df[STAR_COLS] = ratings_str.iloc[:, 1::2].astype(int).values
+        df[STAR_COLS] = ratings_str.iloc[:, 1::2].astype(int).to_numpy()
         df["store_last_updated"] = pd.to_datetime(
             df["store_last_updated"], format="ISO8601", utc=True
         )
@@ -291,7 +291,7 @@ def process_app_metrics_to_db(
     if not df[df["store_id"].isna()].empty:
         # Why are there many records with missing store_id?
         logger.warning("Found records with missing store_id")
-        raise
+        raise ValueError("Records with missing store_id found in S3 app history data")
     check_for_duplicates(
         df=df,
         key_columns=COUNTRY_HISTORY_KEYS,
@@ -474,6 +474,7 @@ def import_ranks_from_s3(
                 dt=dt,
                 database_connection=database_connection,
                 period=period,
+                s3_config_key=s3_config_key,
             )
 
 

@@ -28,18 +28,20 @@ SET default_table_access_method = heap;
 --
 
 CREATE MATERIALIZED VIEW public.audit_dates AS
- WITH sa AS (
-         SELECT (store_apps_audit.stamp)::date AS updated_date,
-            'store_apps'::text AS table_name,
-            count(*) AS updated_count
-           FROM logging.store_apps_audit
-          GROUP BY ((store_apps_audit.stamp)::date)
-        )
- SELECT updated_date,
+WITH sa AS (
+    SELECT
+        (store_apps_audit.stamp)::date AS updated_date,
+        'store_apps'::text AS table_name,
+        count(*) AS updated_count
+    FROM logging.store_apps_audit
+    GROUP BY ((store_apps_audit.stamp)::date)
+)
+SELECT
+    updated_date,
     table_name,
     updated_count
-   FROM sa
-  WITH NO DATA;
+FROM sa
+WITH NO DATA;
 
 
 ALTER MATERIALIZED VIEW public.audit_dates OWNER TO postgres;
@@ -48,7 +50,9 @@ ALTER MATERIALIZED VIEW public.audit_dates OWNER TO postgres;
 -- Name: audit_dates_updated_date_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE UNIQUE INDEX audit_dates_updated_date_idx ON public.audit_dates USING btree (updated_date, table_name);
+CREATE UNIQUE INDEX audit_dates_updated_date_idx ON public.audit_dates USING btree (
+    updated_date, table_name
+);
 
 
 --
@@ -56,4 +60,3 @@ CREATE UNIQUE INDEX audit_dates_updated_date_idx ON public.audit_dates USING btr
 --
 
 \unrestrict UM6BvAJXaCK4qAFgZp1JmxhSLusCMOLC3pXosgujZAKA3gq9gc7bW7rv0KHhmzd
-

@@ -1,3 +1,5 @@
+# noqa: PLC0415
+import os
 import re
 from collections import Counter
 
@@ -84,13 +86,12 @@ def extract_keywords_spacy(
 ) -> list[str]:
     """Extracts noun phrase keywords using spaCy with token limit."""
     # Load spaCy model
-    import spacy
+    import spacy  # noqa: PLC0415
 
     try:
         nlp = spacy.load("en_core_web_sm")
     except OSError:
         print("Downloading spaCy model...")
-        import os
 
         os.system("python -m spacy download en_core_web_sm")
         nlp = spacy.load("en_core_web_sm")
@@ -198,7 +199,7 @@ def get_global_keywords(database_connection: PostgresCon) -> list[str]:
         clean_text(description) for description in df["description"].tolist()
     ]
 
-    from sklearn.feature_extraction.text import TfidfVectorizer
+    from sklearn.feature_extraction.text import TfidfVectorizer  # noqa: PLC0415
 
     vectorizer = TfidfVectorizer(
         ngram_range=(1, 2),  # Include 1-grams, 2-grams, and 3-grams

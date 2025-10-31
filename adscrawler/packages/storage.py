@@ -63,7 +63,7 @@ def get_s3_client(key_name: str = "s3") -> boto3.client:
     This supports both self hosted and regular cloud S3. For the self hosted it also supports SSH port forwarding if the S3 is not public.
 
     """
-    global S3_CLIENTS
+    global S3_CLIENTS  # noqa: PLW0602
 
     if key_name in S3_CLIENTS:
         return S3_CLIENTS[key_name]

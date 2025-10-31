@@ -6,7 +6,7 @@ def get_tld(url: str) -> str | None:
     tld = tldextract.extract(url)
     if not tld.suffix:
         return None
-    tld_url = tld.domain + "." + tld.suffix
+    tld_url: str = tld.domain + "." + tld.suffix
     if tld_url == ".":
         tld_url = None
     return tld_url

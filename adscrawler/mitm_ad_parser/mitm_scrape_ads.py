@@ -569,9 +569,6 @@ def parse_all_runs_for_store_id(
         log_creative_scan_results(error_msg_df, database_connection)
 
 
-_worker_db_connection = None
-
-
 def _init_worker(use_ssh_tunnel: bool):
     """Initialize worker process with a database connection that will be reused."""
     global _worker_db_connection

@@ -134,7 +134,7 @@ global_loggers: dict[str, logging.Logger] = {}
 
 
 def get_logger(mod_name: str, sep_file: str | None = "main") -> logging.Logger:
-    global global_loggers
+    global global_loggers  # noqa: PLW0602
 
     if mod_name in global_loggers:
         return global_loggers[mod_name]

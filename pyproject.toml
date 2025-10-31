@@ -99,6 +99,9 @@ exclude_rules = [
     'AM04', # using *, agreed this should be TODO, 
     'LT08', # Avoid new lines after CTEs to help copy pasting between editors
 ]
+[tool.sqlfluff.rules.layout.long_lines]
+ignore_comment_lines = true
+
 
 [tool.sqlfluff.templater.placeholder]
 param_style = 'colon'

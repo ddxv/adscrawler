@@ -149,7 +149,7 @@ def create_all_mvs(mv_files: list[Path], stop_on_error: bool = False) -> None:
     logger.info(f"Found {len(mvs_missing_in_db)} missing MVs to create in db")
 
     with database_connection.engine.connect() as conn:
-        for mv_name, create_statement, file_name in mvs_missing_in_db:
+        for mv_name, create_statement, _file_name in mvs_missing_in_db:
             trans = conn.begin()
             try:
                 conn.execute(text(create_statement))

@@ -190,7 +190,6 @@ def update_app_details(
 
 
 def crawl_keyword_cranks(database_connection: PostgresCon) -> None:
-    countries_map = query_countries(database_connection)
     languages_map = query_languages(database_connection)
     country = "us"
     language = "en"
@@ -211,12 +210,13 @@ def crawl_keyword_cranks(database_connection: PostgresCon) -> None:
             )
             df["keyword"] = keyword_id
             df["lang"] = language_key
-            process_scraped(
-                database_connection=database_connection,
-                ranked_dicts=df.to_dict(orient="records"),
-                crawl_source="scrape_keywords",
-                countries_map=countries_map,
-            )
+            #  _countries_map = query_countries(database_connection)
+            # process_scraped(
+            #     database_connection=database_connection,
+            #     ranked_dicts=df.to_dict(orient="records"),
+            #     crawl_source="scrape_keywords",
+            #     countries_map=countries_map,
+            # )
         except Exception:
             logger.exception(f"Scrape keyword={keyword} hit error, skipping")
         key_columns = ["keyword"]
