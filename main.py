@@ -210,7 +210,6 @@ class ProcessManager:
                         in x,
                     ]
                 )
-                in x
             ]
 
         if self.args.platform:
