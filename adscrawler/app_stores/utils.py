@@ -44,31 +44,27 @@ def check_and_insert_new_apps(
     if new_apps_df.empty:
         logger.info(f"Scrape {store=} {crawl_source=} no new apps")
         return
-    else:
-        logger.info(
-            f"Scrape {store=} {crawl_source=} insert new apps to db {new_apps_df.shape=}",
-        )
-        insert_columns = ["store", "store_id"]
-        inserted_apps: pd.DataFrame = upsert_df(
-            table_name="store_apps",
-            insert_columns=insert_columns,
-            df=new_apps_df,
+    logger.info(
+        f"Scrape {store=} {crawl_source=} insert new apps to db {new_apps_df.shape[0]}",
+    )
+    insert_columns = ["store", "store_id"]
+    inserted_apps: pd.DataFrame = upsert_df(
+        table_name="store_apps",
+        insert_columns=insert_columns,
+        df=new_apps_df,
+        key_columns=insert_columns,
+        database_connection=database_connection,
+        return_rows=True,
+    )
+    if inserted_apps is not None and not inserted_apps.empty:
+        inserted_apps["crawl_source"] = crawl_source
+        inserted_apps = inserted_apps.rename(columns={"id": "store_app"})
+        insert_columns = ["store", "store_app"]
+        upsert_df(
+            table_name="store_app_sources",
+            insert_columns=insert_columns + ["crawl_source"],
+            df=inserted_apps,
             key_columns=insert_columns,
             database_connection=database_connection,
-            return_rows=True,
+            schema="logging",
         )
-        if inserted_apps is not None and not inserted_apps.empty:
-            logger.warning(
-                f"No IDs returned for {store=} {crawl_source=} inserted apps {inserted_apps.shape=}"
-            )
-            inserted_apps["crawl_source"] = crawl_source
-            inserted_apps = inserted_apps.rename(columns={"id": "store_app"})
-            insert_columns = ["store", "store_app"]
-            upsert_df(
-                table_name="store_app_sources",
-                insert_columns=insert_columns + ["crawl_source"],
-                df=inserted_apps,
-                key_columns=insert_columns,
-                database_connection=database_connection,
-                schema="logging",
-            )
