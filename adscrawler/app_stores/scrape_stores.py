@@ -130,7 +130,7 @@ def update_app_details(
     df = df.sort_values("country_code").reset_index(drop=True)
     logger.info(f"{log_info} start {len(df)} apps")
 
-    max_chunk_size = 5000
+    max_chunk_size = 3000
     chunks = []
     # Try keeping countries together for larger end S3 files
     for _country, country_df in df.groupby("country_code"):
@@ -644,9 +644,9 @@ def save_developer_info(
     apps_df: pd.DataFrame,
     database_connection: PostgresCon,
 ) -> pd.DataFrame:
-    assert apps_df["developer_id"].to_numpy()[
-        0
-    ], f"{apps_df['store_id']} Missing Developer ID"
+    assert apps_df["developer_id"].to_numpy()[0], (
+        f"{apps_df['store_id']} Missing Developer ID"
+    )
     df = (
         apps_df[["store", "developer_id", "developer_name"]]
         .rename(columns={"developer_name": "name"})
