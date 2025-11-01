@@ -8,7 +8,7 @@ from io import BytesIO
 import numpy as np
 import pandas as pd
 
-from adscrawler.app_stores.utils import insert_new_apps
+from adscrawler.app_stores.utils import check_and_insert_new_apps
 from adscrawler.config import CONFIG, get_logger
 from adscrawler.dbcon.connection import (
     PostgresCon,
@@ -561,7 +561,7 @@ def process_ranks_from_s3(
         if len(new_ids) > 0:
             logger.info(f"Found new store ids: {len(new_ids)}")
             new_ids = [{"store": store, "store_id": store_id} for store_id in new_ids]
-            insert_new_apps(
+            check_and_insert_new_apps(
                 database_connection=database_connection,
                 dicts=new_ids,
                 crawl_source="process_ranks_parquet",

@@ -24,7 +24,7 @@ def truncate_utf8_bytes(s: str, max_bytes: int = 2400) -> str:
             truncated = truncated[:-1]
 
 
-def insert_new_apps(
+def check_and_insert_new_apps(
     dicts: list[dict], database_connection: PostgresCon, crawl_source: str, store: int
 ) -> None:
     df = pd.DataFrame(dicts)

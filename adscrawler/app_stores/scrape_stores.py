@@ -34,7 +34,7 @@ from adscrawler.app_stores.process_from_s3 import (
     app_details_to_s3,
     process_store_rankings,
 )
-from adscrawler.app_stores.utils import insert_new_apps
+from adscrawler.app_stores.utils import check_and_insert_new_apps
 from adscrawler.config import APP_ICONS_TMP_DIR, CONFIG, get_logger
 from adscrawler.dbcon.connection import (
     PostgresCon,
@@ -350,7 +350,7 @@ def process_scraped(
     countries_map: pd.DataFrame | None = None,
     store: int | None = None,
 ) -> None:
-    insert_new_apps(
+    check_and_insert_new_apps(
         database_connection=database_connection,
         dicts=ranked_dicts,
         crawl_source=crawl_source,
@@ -454,7 +454,7 @@ def crawl_developers_for_new_store_ids(
         developer_ids = [unquote_plus(x) for x in developer_ids]
         apps_df = crawl_google_developers(developer_ids, store_ids)
         if not apps_df.empty:
-            insert_new_apps(
+            check_and_insert_new_apps(
                 database_connection=database_connection,
                 dicts=apps_df.to_dict(orient="records"),
                 crawl_source="crawl_developers",
@@ -490,7 +490,7 @@ def crawl_developers_for_new_store_ids(
                 apps_df = crawl_ios_developers(developer_db_id, developer_id, store_ids)
 
                 if not apps_df.empty:
-                    insert_new_apps(
+                    check_and_insert_new_apps(
                         database_connection=database_connection,
                         dicts=apps_df[["store", "store_id"]].to_dict(orient="records"),
                         crawl_source="crawl_developers",
@@ -652,9 +652,9 @@ def save_developer_info(
     apps_df: pd.DataFrame,
     database_connection: PostgresCon,
 ) -> pd.DataFrame:
-    assert apps_df["developer_id"].to_numpy()[
-        0
-    ], f"{apps_df['store_id']} Missing Developer ID"
+    assert apps_df["developer_id"].to_numpy()[0], (
+        f"{apps_df['store_id']} Missing Developer ID"
+    )
     df = (
         apps_df[["store", "developer_id", "developer_name"]]
         .rename(columns={"developer_name": "name"})
