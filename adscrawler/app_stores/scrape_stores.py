@@ -69,7 +69,7 @@ def process_chunk(
     process_icon: bool,
     total_rows: int,
 ):
-    chunk_info = f"Chunk {df_chunk.index[0]}-{df_chunk.index[-1]}/{total_rows}"
+    chunk_info = f"{store=} chunk={df_chunk.index[0]}-{df_chunk.index[-1]}/{total_rows}"
     logger.info(f"{chunk_info} start")
     database_connection = get_db_connection(use_ssh_tunnel=use_ssh_tunnel)
     try:
@@ -99,6 +99,7 @@ def process_chunk(
             process_icon=process_icon,
             df_chunk=df_chunk,
         )
+        logger.info(f"{chunk_info} finished")
     except Exception as e:
         logger.exception(f"{chunk_info} error processing with {e}")
     finally:
@@ -118,7 +119,7 @@ def update_app_details(
     country_priority_group,
 ):
     """Process apps with dynamic work queue - simple and efficient."""
-    log_info = f"Update app details: {store=}"
+    log_info = f"{store=} update app details"
 
     df = query_store_apps_to_update(
         store=store,
@@ -145,7 +146,7 @@ def update_app_details(
                 chunks.append(country_df.iloc[i : i + chunk_size])
     total_chunks = len(chunks)
     total_rows = len(df)
-    logger.info(f"Processing {total_rows} apps in {total_chunks} chunks")
+    logger.info(f"{log_info} processing {total_rows} apps in {total_chunks} chunks")
 
     completed_count = 0
     failed_count = 0
@@ -158,37 +159,26 @@ def update_app_details(
                 process_chunk, df_chunk, store, use_ssh_tunnel, process_icon, total_rows
             )
             future_to_idx[future] = idx
-
             # Only stagger the initial batch to avoid simultaneous API burst
             if idx < workers:
                 time.sleep(0.5)  # 500ms between initial worker starts
-
-        logger.info(f"All {total_chunks} chunks submitted (first {workers} staggered)")
-
+        logger.info(f"{log_info} all {total_chunks} chunks submitted")
         # Process results as they complete
         for future in as_completed(future_to_idx):
             chunk_idx = future_to_idx[future]
-
             try:
                 _result = future.result()
                 completed_count += 1
-
                 if completed_count % 10 == 0 or completed_count == total_chunks:
                     logger.info(
                         f"Progress: {completed_count}/{total_chunks} chunks "
                         f"({completed_count / total_chunks * 100:.1f}%) | "
                         f"Failed: {failed_count}"
                     )
-
             except Exception as e:
                 failed_count += 1
                 logger.error(f"Chunk {chunk_idx} failed: {e}")
-
-    logger.info(
-        f"{log_info} finished | Completed: {completed_count} | Failed: {failed_count}"
-    )
-
-    return completed_count, failed_count
+    logger.info(f"{log_info} completed={completed_count} failed={failed_count}")
 
 
 def crawl_keyword_cranks(database_connection: PostgresCon) -> None:
@@ -592,7 +582,7 @@ def scrape_app(
     country: str,
     language: str,
 ) -> dict:
-    scrape_info = f"{store=}, {country=}, {language=}, {store_id=}, "
+    scrape_info = f"{store=}, {country=}, {language=}, {store_id=}"
     max_retries = 2
     base_delay = 1
     retries = 0
@@ -646,7 +636,7 @@ def scrape_app(
     result_dict["store_id"] = store_id
     result_dict["queried_language"] = language.lower()
     result_dict["country"] = country.upper()
-    logger.info(f"{scrape_info} result={crawl_result} scrape finished")
+    logger.debug(f"{scrape_info} result={crawl_result} scrape finished")
     return result_dict
 
 
@@ -654,9 +644,9 @@ def save_developer_info(
     apps_df: pd.DataFrame,
     database_connection: PostgresCon,
 ) -> pd.DataFrame:
-    assert apps_df["developer_id"].to_numpy()[0], (
-        f"{apps_df['store_id']} Missing Developer ID"
-    )
+    assert apps_df["developer_id"].to_numpy()[
+        0
+    ], f"{apps_df['store_id']} Missing Developer ID"
     df = (
         apps_df[["store", "developer_id", "developer_name"]]
         .rename(columns={"developer_name": "name"})
