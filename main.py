@@ -279,6 +279,7 @@ class ProcessManager:
     def main(self) -> None:
         logger.info(f"Main starting with args: {self.args}")
         platform: str = self.args.platform or None
+        country_priority_group: int = self.args.country_priority_group or None
 
         store = STORES_MAP.get(platform) if platform else None
 
@@ -292,7 +293,7 @@ class ProcessManager:
             self.scrape_new_apps_devs(store)
 
         if self.args.update_app_store_details:
-            self.update_app_details(store, self.args.country_priority_group)
+            self.update_app_details(store, country_priority_group)
 
         if self.args.app_ads_txt_scrape:
             self.crawl_app_ads()
@@ -366,7 +367,7 @@ class ProcessManager:
     def update_app_details(self, store: int, country_priority_group: int) -> None:
         if not country_priority_group:
             logger.error(
-                "No country priority group provided, ie country-priority-group=1"
+                "No country priority group provided, ie --country-priority-group=1"
             )
             return
         update_app_details(

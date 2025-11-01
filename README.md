@@ -41,6 +41,8 @@ Scrapers:
 
 - `-u, --update-app-store-details` Scrape app stores for app details (e.g., downloads, ratings). Requires existing store IDs.
 
+- `--country-priority-group` Default is 1 for US. Other groups for crawling can be configured in db.
+
 - `--workers` Number of workers to use for updating app store details. Default: `1`.
 
 - `-n, --new-apps-check` This crawls app rank data and stores to S3. It is also the source of new apps. Crawl the iTunes and Play Store front pages to discover new apps. Checks top apps for each category and collection.
