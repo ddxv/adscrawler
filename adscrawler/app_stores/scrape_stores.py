@@ -584,7 +584,7 @@ def scrape_app(
 ) -> dict:
     scrape_info = f"{store=}, {country=}, {language=}, {store_id=}"
     max_retries = 2
-    base_delay = 1
+    base_delay = 0.5
     retries = 0
     logger.debug(f"{scrape_info} scrape start")
     while retries <= max_retries:
