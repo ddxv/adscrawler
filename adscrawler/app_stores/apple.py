@@ -61,7 +61,7 @@ def get_app_ids_with_retry(
             time.sleep(delay)
         retries += 1
     if len(app_ids) == 0:
-        logger.info(f"{log_info=} failed to load apps!")
+        logger.info(f"{log_info=} returned empty list of apps")
     return app_ids
 
 
@@ -125,7 +125,7 @@ def scrape_ios_ranks(
     scraper = AppStoreScraper()
     for _coll_key, coll_value in collections.items():
         for cat_key, cat_value in categories.items():
-            logger.info(f"{scrape_info} Collection: {_coll_key}, category: {cat_key}")
+            logger.info(f"{scrape_info} Coll_key: {_coll_key}, cat_key: {cat_key}")
             try:
                 scraped_ids = get_app_ids_with_retry(
                     scraper, coll_value=coll_value, cat_value=cat_value, country=country
@@ -145,9 +145,7 @@ def scrape_ios_ranks(
                     for rank, app in enumerate(scraped_ids)
                 ]
             except Exception as e:
-                logger.error(
-                    f"Failed to scrape collection {_coll_key}, category {cat_key} after multiple retries: {str(e)}"
-                )
+                logger.error(f"{scrape_info} failed after multiple retries: {str(e)}")
     return ranked_dicts
 
 
