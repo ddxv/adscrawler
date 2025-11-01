@@ -63,7 +63,7 @@ def app_details_to_s3(
     df: pd.DataFrame,
     store: int,
 ) -> None:
-    logger.info(f"S3 upload app details {store=} start")
+    logger.info(f"S3 upload app_details {store=}, rows={df.shape[0]} start")
     if store is None:
         raise ValueError("store is required")
     s3_client = get_s3_client()

@@ -43,6 +43,7 @@ from adscrawler.dbcon.connection import (
 from adscrawler.dbcon.queries import (
     get_crawl_scenario_countries,
     get_store_app_columns,
+    prepare_for_psycopg,
     query_categories,
     query_collections,
     query_countries,
@@ -53,6 +54,7 @@ from adscrawler.dbcon.queries import (
     query_store_id_map,
     query_store_id_map_cached,
     query_store_ids,
+    update_from_df,
     upsert_df,
 )
 from adscrawler.packages.storage import get_s3_client
@@ -113,7 +115,7 @@ def update_app_details(
     workers,
     process_icon,
     limit,
-    country_crawl_priority,
+    country_priority_group,
 ):
     """Process apps with dynamic work queue - simple and efficient."""
     log_info = f"Update app details: {store=}"
@@ -122,12 +124,12 @@ def update_app_details(
         store=store,
         database_connection=database_connection,
         limit=limit,
-        country_crawl_priority=country_crawl_priority,
+        country_priority_group=country_priority_group,
     )
     df = df.sort_values("country_code").reset_index(drop=True)
     logger.info(f"{log_info} start {len(df)} apps")
 
-    max_chunk_size = 10000
+    max_chunk_size = 5000
     chunks = []
     # Try keeping countries together for larger end S3 files
     for _country, country_df in df.groupby("country_code"):
@@ -696,6 +698,7 @@ def process_live_app_details(
     df_chunk: pd.DataFrame,
 ) -> None:
     for crawl_result, apps_df in results_df.groupby("crawl_result"):
+        logger.info(f"{store=} {crawl_result=} processing {len(apps_df)} apps for db")
         if crawl_result != 1:
             apps_df = apps_df[["store_id", "store", "crawled_at", "crawl_result"]]
         else:
@@ -725,17 +728,20 @@ def process_live_app_details(
                         )
                 except Exception:
                     logger.exception("failed to process app icon")
-        apps_df = apps_df.convert_dtypes(dtype_backend="pyarrow")
-        apps_df = apps_df.replace({pd.NA: None})
+        # I think only coming from S3?
+        # apps_df = apps_df.convert_dtypes(dtype_backend="pyarrow")
+        # apps_df = apps_df.replace({pd.NA: None})
         apps_details_to_db(
             apps_df=apps_df,
             database_connection=database_connection,
+            crawl_result=crawl_result,
         )
 
 
 def apps_details_to_db(
     apps_df: pd.DataFrame,
     database_connection: PostgresCon,
+    crawl_result: int,
 ) -> None:
     key_columns = ["store", "store_id"]
     if (apps_df["crawl_result"] == 1).all() and apps_df["developer_id"].notna().all():
@@ -743,82 +749,64 @@ def apps_details_to_db(
     insert_columns = [
         x for x in get_store_app_columns(database_connection) if x in apps_df.columns
     ]
-    # Update columns we always want the latest of
-    # Eg name, developer_id
-    store_apps_df = upsert_df(
+    apps_df = prepare_for_psycopg(apps_df)
+    return_rows = crawl_result == 1
+    logger.info(f"{crawl_result=} update store_apps table for {len(apps_df)} apps")
+    store_apps_df = update_from_df(
         table_name="store_apps",
         df=apps_df,
-        insert_columns=insert_columns,
+        update_columns=insert_columns,
         key_columns=key_columns,
         database_connection=database_connection,
-        return_rows=True,
+        return_rows=return_rows,
     )
-    if (
-        store_apps_df is not None
-        and not store_apps_df[store_apps_df["crawl_result"] == 1].empty
-    ):
-        store_apps_descriptions = store_apps_df[
-            store_apps_df["crawl_result"] == 1
-        ].copy()
-        store_apps_descriptions = pd.merge(
-            store_apps_descriptions,
-            apps_df[
-                [
-                    "store_id",
-                    "description",
-                    "description_short",
-                    "queried_language",
-                    "store_language_code",
-                ]
-            ],
-            on="store_id",
-        )
-        upsert_store_apps_descriptions(store_apps_descriptions, database_connection)
-    if store_apps_df is not None and not store_apps_df.empty:
-        store_apps_df = store_apps_df.rename(columns={"id": "store_app"})
-        apps_df = pd.merge(
-            apps_df,
-            store_apps_df[["store_id", "store_app"]],
-            how="left",
-            validate="1:1",
-        )
-        save_app_domains(
-            apps_df=apps_df,
-            database_connection=database_connection,
-        )
+    if store_apps_df is None or store_apps_df.empty or crawl_result != 1:
+        return
+    store_apps_df = store_apps_df.rename(columns={"id": "store_app"})
+    apps_df = pd.merge(
+        apps_df,
+        store_apps_df[["store_id", "store_app"]],
+        how="left",
+        validate="1:1",
+    )
+    upsert_store_apps_descriptions(apps_df, database_connection)
+    save_app_domains(
+        apps_df=apps_df,
+        database_connection=database_connection,
+    )
     return
 
 
 def upsert_store_apps_descriptions(
-    store_apps_descriptions: pd.DataFrame,
+    apps_df: pd.DataFrame,
     database_connection: PostgresCon,
 ) -> None:
     table_name = "store_apps_descriptions"
     languages_map = query_languages(database_connection)
-    store_apps_descriptions = pd.merge(
-        store_apps_descriptions,
+    apps_df = pd.merge(
+        apps_df,
         languages_map[["id", "language_slug"]],
         how="left",
         left_on="store_language_code",
         right_on="language_slug",
         validate="m:1",
     ).rename(columns={"id": "language_id"})
-    if store_apps_descriptions["language_id"].isna().any():
-        null_ids = store_apps_descriptions["language_id"].isna()
-        null_langs = store_apps_descriptions[
+    if apps_df["language_id"].isna().any():
+        null_ids = apps_df["language_id"].isna()
+        null_langs = apps_df[null_ids][
             ["store_id", "store_language_code"]
         ].drop_duplicates()
         logger.error(f"App descriptions dropping unknown language codes: {null_langs}")
-        store_apps_descriptions = store_apps_descriptions[~null_ids]
-        if store_apps_descriptions.empty:
+        apps_df = apps_df[~null_ids]
+        if apps_df.empty:
             logger.debug("Dropped all descriptions, no language id found")
             return
-    if "description_short" not in store_apps_descriptions.columns:
-        store_apps_descriptions["description_short"] = ""
+    if "description_short" not in apps_df.columns:
+        apps_df["description_short"] = ""
     key_columns = ["store_app", "language_id", "description", "description_short"]
     upsert_df(
         table_name=table_name,
-        df=store_apps_descriptions,
+        df=apps_df,
         insert_columns=key_columns,
         key_columns=key_columns,
         md5_key_columns=["description", "description_short"],

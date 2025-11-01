@@ -106,13 +106,13 @@ def clean_google_play_app_df(apps_df: pd.DataFrame) -> pd.DataFrame:
         .fillna("0")
         .astype(int),
         category=apps_df["category"].str.lower(),
+        release_date=pd.to_datetime(
+            apps_df["release_date"], format="%b %d, %Y"
+        ).dt.date,
         store_last_updated=pd.to_datetime(
             apps_df["store_last_updated"],
             unit="s",
         ).fillna(apps_df["release_date"]),
-        release_date=pd.to_datetime(
-            apps_df["release_date"], format="%b %d, %Y"
-        ).dt.date,
     )
     if "developer_name" in apps_df.columns:
         apps_df.loc[apps_df["developer_name"].notna(), "developer_name"] = apps_df.loc[

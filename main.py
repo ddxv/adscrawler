@@ -376,7 +376,7 @@ class ProcessManager:
             use_ssh_tunnel=self.args.use_ssh_tunnel,
             workers=int(self.args.workers),
             process_icon=self.args.process_icons,
-            country_crawl_priority=self.args.country_priority_group,
+            country_priority_group=self.args.country_priority_group,
             limit=self.args.limit_query_rows,
         )
 

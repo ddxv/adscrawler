@@ -118,6 +118,140 @@ def insert_df(
     return return_df
 
 
+def prepare_for_psycopg(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.copy()
+    for col in df.select_dtypes(include=["datetimetz", "datetime64[ns]"]):
+        # Convert to object dtype first so it can hold None
+        df[col] = (
+            df[col]
+            .apply(lambda x: x.to_pydatetime() if pd.notna(x) else None)
+            .astype("object")
+        )
+    # Replace NaN (for floats, strings, etc.)
+    df = df.astype(object).where(pd.notna(df), None)
+    return df
+
+
+def update_from_df(
+    df: pd.DataFrame,
+    table_name: str,
+    database_connection: Connection,
+    key_columns: list[str],
+    update_columns: list[str],
+    return_rows: bool = False,
+    schema: str | None = None,
+    md5_key_columns: list[str] | None = None,
+    log: bool = False,
+) -> pd.DataFrame | None:
+    """Perform an UPDATE on a PostgreSQL table from a DataFrame.
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        The DataFrame containing update data.
+    table_name : str
+        The name of the target table.
+    database_connection : Connection
+        The database connection object.
+    key_columns : list of str
+        Column name(s) on which to match for the UPDATE.
+    update_columns : list of str
+        Columns to update (excluding key columns).
+    return_rows : bool, optional
+        Whether to return the rows that were updated.
+    schema : str, optional
+        The name of the schema containing the target table.
+    md5_key_columns: list of str, optional
+        Key columns that use MD5 hashing in their index.
+    log : bool, optional
+        Print generated SQL statement for debugging.
+    Returns
+    -------
+    pd.DataFrame or None
+        DataFrame of updated rows if return_rows=True, else None.
+    """
+    raw_conn = database_connection.engine.raw_connection()
+    # Handle special date columns
+    if "crawled_date" in df.columns and df["crawled_date"].isna().all():
+        df["crawled_date"] = pd.to_datetime(df["crawled_date"]).dt.date
+        df["crawled_date"] = None
+    if "release_date" in df.columns and df["release_date"].isna().all():
+        df["release_date"] = None
+    # Build table identifier
+    table_identifier = Identifier(table_name)
+    if schema:
+        table_identifier = Composed([Identifier(schema), SQL("."), table_identifier])
+    # Build UPDATE SET clause for update_columns only
+    update_set = SQL(", ").join(
+        SQL("{0} = %s").format(Identifier(col)) for col in update_columns
+    )
+    # Build WHERE conditions for key_columns
+    if md5_key_columns:
+        where_conditions = SQL(" AND ").join(
+            (
+                SQL("md5({col}) = %s").format(col=Identifier(col))
+                if col in md5_key_columns
+                else SQL("{col} = %s").format(col=Identifier(col))
+            )
+            for col in key_columns
+        )
+    else:
+        where_conditions = SQL(" AND ").join(
+            SQL("{col} = %s").format(col=Identifier(col)) for col in key_columns
+        )
+    if return_rows:
+        update_query = SQL(
+            """
+            UPDATE {table}
+            SET {update_set}
+            WHERE {where_conditions}
+            RETURNING *
+            """
+        ).format(
+            table=table_identifier,
+            update_set=update_set,
+            where_conditions=where_conditions,
+        )
+    else:
+        update_query = SQL(
+            """
+            UPDATE {table}
+            SET {update_set}
+            WHERE {where_conditions}
+            """
+        ).format(
+            table=table_identifier,
+            update_set=update_set,
+            where_conditions=where_conditions,
+        )
+    if log:
+        logger.info(f"Update query: {update_query.as_string(raw_conn)}")
+    all_columns = update_columns + key_columns
+    with raw_conn.cursor() as cur:
+        # Prepare data
+        data = [
+            tuple(row) for row in df[all_columns].itertuples(index=False, name=None)
+        ]
+        if log:
+            logger.info(f"Update data sample: {data[:5] if len(data) > 5 else data}")
+        # Execute updates
+        if return_rows:
+            all_results = []
+            for row in data:
+                cur.execute(update_query, row)
+                result = cur.fetchall()
+                all_results.extend(result)
+            if all_results:
+                column_names = [desc[0] for desc in cur.description]
+                return_df = pd.DataFrame(all_results, columns=column_names)
+            else:
+                return_df = pd.DataFrame()
+        else:
+            cur.executemany(update_query, data)
+            return_df = None
+    raw_conn.commit()
+    return return_df
+
+
 def upsert_df(
     df: pd.DataFrame,
     table_name: str,
@@ -717,7 +851,7 @@ def get_crawl_scenario_countries(
 def query_store_apps_to_update(
     database_connection: PostgresCon,
     store: int,
-    country_crawl_priority: int,
+    country_priority_group: int,
     log_query=False,
     limit: int = 1000,
 ) -> pd.DataFrame:
@@ -744,7 +878,7 @@ def query_store_apps_to_update(
         )
     params = {
         "store": store,
-        "country_crawl_priority": country_crawl_priority,
+        "country_crawl_priority": country_priority_group,
         "short_update_ts": short_update_ts,
         "short_update_installs": short_update_installs,
         "short_update_ratings": short_update_ratings,
