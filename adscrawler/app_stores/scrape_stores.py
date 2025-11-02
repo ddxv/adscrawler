@@ -132,7 +132,7 @@ def update_app_details(
     df = df.sort_values("country_code").reset_index(drop=True)
     logger.info(f"{log_info} start {len(df)} apps")
 
-    max_chunk_size = 1000
+    max_chunk_size = 3000
     chunks = []
     # Try keeping countries together for larger end S3 files
     for _country, country_df in df.groupby("country_code"):
@@ -171,12 +171,9 @@ def update_app_details(
             try:
                 _result = future.result()
                 completed_count += 1
-                if completed_count % 10 == 0 or completed_count == total_chunks:
-                    logger.info(
-                        f"Progress: {completed_count}/{total_chunks} chunks "
-                        f"({completed_count / total_chunks * 100:.1f}%) | "
-                        f"Failed: {failed_count}"
-                    )
+                logger.info(
+                    f"{log_info} finished: {completed_count}/{total_chunks} failed: {failed_count}"
+                )
             except Exception as e:
                 failed_count += 1
                 logger.exception(f"Chunk {chunk_idx} failed: {e}")
