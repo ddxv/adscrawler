@@ -44,6 +44,7 @@ from adscrawler.dbcon.queries import (
     get_crawl_scenario_countries,
     get_store_app_columns,
     prepare_for_psycopg,
+    query_all_developers,
     query_all_domains,
     query_categories,
     query_collections,
@@ -514,6 +515,32 @@ def crawl_developers_for_new_store_ids(
                 logger.exception(f"{row_info=} failed!")
 
 
+def check_and_insert_developers(
+    developers_df: pd.DataFrame,
+    apps_df: pd.DataFrame,
+    database_connection: PostgresCon,
+) -> pd.DataFrame:
+    """Adds missing developers to the database and returns updated developer DataFrame."""
+    missing_devs = apps_df[
+        (~apps_df["developer_id"].isin(developers_df["developer_id"]))
+        & (apps_df["developer_id"].notna())
+    ]
+    if not missing_devs.empty:
+        new_devs = missing_devs[
+            ["store", "developer_id", "developer_name"]
+        ].drop_duplicates()
+        new_devs = upsert_df(
+            table_name="developers",
+            df=new_devs.rename(columns={"developer_name": "name"}),
+            insert_columns=["store", "developer_id", "name"],
+            key_columns=["store", "developer_id"],
+            database_connection=database_connection,
+            return_rows=True,
+        )
+        developers_df = pd.concat([new_devs, developers_df])
+    return developers_df
+
+
 def check_and_insert_domains(
     domains_df: pd.DataFrame,
     app_urls: pd.DataFrame,
@@ -671,39 +698,22 @@ def save_developer_info(
     apps_df: pd.DataFrame,
     database_connection: PostgresCon,
 ) -> pd.DataFrame:
-    assert apps_df["developer_id"].to_numpy()[0], (
-        f"{apps_df['store_id']} Missing Developer ID"
+    all_developers_df = query_all_developers(database_connection=database_connection)
+    all_developers_df = check_and_insert_developers(
+        developers_df=all_developers_df,
+        apps_df=apps_df,
+        database_connection=database_connection,
     )
-    df = (
-        apps_df[["store", "developer_id", "developer_name"]]
-        .rename(columns={"developer_name": "name"})
-        .drop_duplicates()
+    apps_df = pd.merge(
+        apps_df,
+        all_developers_df.rename(columns={"id": "developer"})[
+            ["store", "developer_id", "developer"]
+        ],
+        how="left",
+        left_on=["store", "developer_id"],
+        right_on=["store", "developer_id"],
+        validate="m:1",
     )
-    table_name = "developers"
-    insert_columns = ["store", "developer_id", "name"]
-    key_columns = ["store", "developer_id"]
-
-    try:
-        dev_df = upsert_df(
-            table_name=table_name,
-            df=df,
-            insert_columns=insert_columns,
-            key_columns=key_columns,
-            database_connection=database_connection,
-            return_rows=True,
-        )
-        apps_df = pd.merge(
-            apps_df,
-            dev_df.rename(columns={"id": "developer"})[
-                ["store", "developer_id", "developer"]
-            ],
-            how="left",
-            left_on=["store", "developer_id"],
-            right_on=["store", "developer_id"],
-            validate="m:1",
-        )
-    except Exception as error:
-        logger.error(f"Developer insert failed with error {error}")
     return apps_df
 
 

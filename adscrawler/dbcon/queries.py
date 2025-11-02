@@ -376,6 +376,18 @@ def upsert_df(
     return return_df
 
 
+@lru_cache(maxsize=1)
+def query_all_developers(database_connection: PostgresCon) -> pd.DataFrame:
+    """Query all developers from the database."""
+    sel_query = """SELECT 
+     id, store, name, developer_id
+     FROM developers
+     ;
+    """
+    df = pd.read_sql(sel_query, database_connection.engine)
+    return df
+
+
 def query_developers(
     database_connection: PostgresCon,
     store: int,
