@@ -262,13 +262,14 @@ def prep_app_metrics_history(
     return df
 
 
-def manual_import_app_metrics_from_s3() -> None:
+def manual_import_app_metrics_from_s3(
+    start_date: datetime.date, end_date: datetime.date
+) -> None:
     use_tunnel = False
     database_connection = get_db_connection(
         use_ssh_tunnel=use_tunnel, config_key="madrone"
     )
-    start_date = datetime.date(2025, 10, 31)
-    end_date = datetime.date(2025, 10, 31)
+
     for snapshot_date in pd.date_range(start_date, end_date, freq="D"):
         snapshot_date = snapshot_date.date()
         for store in [1, 2]:
@@ -297,9 +298,19 @@ def process_app_metrics_to_db(
     logger.info(f"date={snapshot_date}, store={store} agg df load")
     df = get_s3_agg_daily_snapshots(snapshot_date, snapshot_date, store)
     if store == 2:
-        df.loc[df["store_id"].str.contains(".0"), "store_id"] = (
-            df.loc[df["store_id"].str.contains(".0"), "store_id"].str.split(".").str[0]
-        )
+        # Should be resolved from 11/1/2025
+        problem_rows = df["store_id"].str.contains(".0")
+        if problem_rows.any():
+            logger.warning(
+                f'Apple App IDs: Found {problem_rows.sum()} store_id with ".0" suffix, fixing'
+            )
+            df.loc[problem_rows, "store_id"] = (
+                df.loc[problem_rows, "store_id"].str.split(".").str[0]
+            )
+            df["crawled_at"] = df["crawled_at"].sort_values(ascending=True)
+            df = df.drop_duplicates(
+                ["snapshot_date", "country", "store_id"], keep="last"
+            )
     if df.empty:
         logger.warning(
             f"No data found for S3 agg app metrics {store=} {snapshot_date=}"
