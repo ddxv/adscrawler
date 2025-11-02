@@ -197,33 +197,33 @@ def crawl_keyword_cranks(database_connection: PostgresCon) -> None:
                 language=language,
                 keyword=keyword,
             )
+            df["keyword_text"] = keyword
+            df["keyword_id"] = row["keyword_id"]
             df["language"] = language.lower()
             df["country"] = country.upper()
-            df["crawled_date"] = datetime.datetime.now(tz=datetime.UTC).date()
+            df["crawled_at"] = datetime.datetime.now(tz=datetime.UTC)
+            df["crawled_date"] = df["crawled_at"].dt.date
             all_keywords = pd.concat([all_keywords, df], ignore_index=True)
         except Exception:
             logger.exception(f"Scrape keyword={keyword} hit error, skipping")
     raw_keywords_to_s3(all_keywords)
+    all_keywords = all_keywords.rename(columns={"keyword_id": "keyword"})
+    key_columns = ["keyword"]
+    upsert_df(
+        table_name="keywords_crawled_at",
+        schema="logging",
+        insert_columns=["keyword", "crawled_at"],
+        df=all_keywords[["keyword", "crawled_at"]],
+        key_columns=key_columns,
+        database_connection=database_connection,
+    )
 
 
 # def import_keywords_from_s3(database_connection: PostgresCon) -> None:
 #     languages_map = query_languages(database_connection)
 #     language_dict = languages_map.set_index("language_slug")["id"].to_dict()
 #     language_key = language_dict[language]
-#     key_columns = ["keyword"]
-#     upsert_df(
-#         table_name="keywords_crawled_at",
-#         schema="logging",
-#         insert_columns=["keyword", "crawled_at"],
-#         df=pd.DataFrame(
-#             {
-#                 "keyword": [keyword_id],
-#                 "crawled_at": datetime.datetime.now(tz=datetime.UTC),
-#             }
-#         ),
-#         key_columns=key_columns,
-#         database_connection=database_connection,
-#     )
+#
 
 
 def scrape_store_ranks(database_connection: PostgresCon, store: int) -> None:

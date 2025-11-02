@@ -12,7 +12,13 @@ log_crawled_keywords AS (
     WHERE
         crawled_at > CURRENT_DATE - INTERVAL '7 days'
 )
-SELECT *
+SELECT
+    store,
+    keyword_id,
+    keyword_text,
+    app_count,
+    total_apps,
+    competitiveness_score
 FROM
     frontend.keyword_scores
 WHERE
