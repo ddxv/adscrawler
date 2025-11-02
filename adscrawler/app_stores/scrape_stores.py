@@ -72,21 +72,24 @@ def process_chunk(
     chunk_info = f"{store=} chunk={df_chunk.index[0]}-{df_chunk.index[-1]}/{total_rows}"
     logger.info(f"{chunk_info} start")
     database_connection = get_db_connection(use_ssh_tunnel=use_ssh_tunnel)
+    chunk_results = []
     try:
-        chunk_results = []
         for _, row in df_chunk.iterrows():
             try:
-                result_dict = scrape_app(
+                result = scrape_app(
                     store=store,
                     store_id=row["store_id"],
                     country=row["country_code"].lower(),
                     language=row["language"].lower(),
                 )
-                chunk_results.append(result_dict)
+                chunk_results.append(result)
             except Exception as e:
                 logger.exception(
-                    f"store={row.store}, store_id={row.store_id} update_all_app_info failed with {e}"
+                    f"{chunk_info} store_id={row['store_id']} scrape_app failed: {e}"
                 )
+        if not chunk_results:
+            logger.warning(f"{chunk_info} produced no results.")
+            return
         results_df = pd.DataFrame(chunk_results)
         results_df["crawled_date"] = results_df["crawled_at"].dt.date
         app_details_to_s3(results_df, store=store)
@@ -100,10 +103,7 @@ def process_chunk(
             df_chunk=df_chunk,
         )
         logger.info(f"{chunk_info} finished")
-    except Exception as e:
-        logger.exception(f"{chunk_info} error processing with {e}")
     finally:
-        logger.info(f"{chunk_info} finished")
         if database_connection and hasattr(database_connection, "engine"):
             database_connection.engine.dispose()
             logger.debug(f"{chunk_info} database connection disposed")
@@ -690,6 +690,7 @@ def process_live_app_details(
     for crawl_result, apps_df in results_df.groupby("crawl_result"):
         logger.info(f"{store=} {crawl_result=} processing {len(apps_df)} apps for db")
         if crawl_result != 1:
+            # If bad crawl result, only save minimal info to avoid overwriting good data, ie name
             apps_df = apps_df[["store_id", "store", "crawled_at", "crawl_result"]]
         else:
             apps_df = clean_scraped_df(df=apps_df, store=store)
