@@ -43,7 +43,7 @@ def scrape_app_gp(store_id: str, country: str, language: str = "en") -> dict:
         country=country,
         timeout=10,
     )
-    logger.info(f"{store_id=}, {country=}, {language=} play store scraped")
+    logger.info(f"store=1 {country=} {language=} {store_id=} play store scraped")
     return result_dict
 
 

@@ -853,7 +853,7 @@ def query_store_apps_to_update(
     database_connection: PostgresCon,
     store: int,
     country_priority_group: int,
-    log_query=False,
+    log_query: bool = False,
     limit: int = 1000,
 ) -> pd.DataFrame:
     short_update_days = CONFIG["crawl-settings"].get("short_update_days", 1)
@@ -871,12 +871,6 @@ def query_store_apps_to_update(
         days=max_recrawl_days
     )
     year_ago_ts = datetime.datetime.now(tz=datetime.UTC) - datetime.timedelta(days=365)
-    rankings_mv_apps = ""
-    if check_mv_exists(database_connection, "store_apps_in_latest_rankings"):
-        # TODO: this is not included yet
-        rankings_mv_apps = (
-            " OR (sa.id in (select store_app from store_apps_in_latest_rankings))"
-        )
     params = {
         "store": store,
         "country_crawl_priority": country_priority_group,
@@ -1272,7 +1266,7 @@ def query_api_call_id_for_uuid(mitm_uuid: str, database_connection: PostgresCon)
     api_calls = query_api_calls_id_uuid_map(database_connection)
     filtered_df = api_calls[api_calls["mitm_uuid"] == mitm_uuid]
     assert filtered_df.shape[0] == 1, "Failed to find api_call_id for mitm_uuid"
-    api_call_id = filtered_df["api_call_id"].to_numpy()[0]
+    api_call_id: int = filtered_df["api_call_id"].to_numpy()[0]
     return api_call_id
 
 

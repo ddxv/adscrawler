@@ -229,7 +229,7 @@ def get_urls_from_html(soup: BeautifulSoup) -> dict:
     return urls
 
 
-def get_privacy_details(html: str, country: str, store_id: str) -> bool:
+def get_privacy_details(html: str, country: str, store_id: str) -> dict:
     """
     Get privacy details for an iOS app from the App Store.
 
@@ -265,7 +265,8 @@ def get_privacy_details(html: str, country: str, store_id: str) -> bool:
 
     if not data.get("data") or len(data["data"]) == 0:
         raise ValueError("App not found (404)")
-    return data["data"][0]["attributes"]["privacyDetails"]
+    privacy_details: dict = data["data"][0]["attributes"]["privacyDetails"]
+    return privacy_details
 
 
 def find_privacy_policy_id(soup: BeautifulSoup) -> str | None:
@@ -286,9 +287,10 @@ def find_privacy_policy_id(soup: BeautifulSoup) -> str | None:
                 # Find the position where "id" starts and extract everything after it
                 id_position = url.find("id")
                 if id_position != -1:
-                    id_value = url[id_position + 2 :]  # +2 to skip the "id" prefix
+                    id_value: str = url[id_position + 2 :]  # +2 to skip the "id" prefix
                     print(f"ID: {id_value}")  # This will print: 1538632801
                     return id_value
+    return None
 
 
 def get_developer_url(result: dict, urls: dict) -> str:
@@ -352,7 +354,7 @@ def scrape_app_ios(store_id: str, country: str, language: str) -> dict:
     result_dict: dict = scraper.get_app_details(
         store_id, country=country, add_ratings=True, timeout=10, lang=language
     )
-    logger.info(f"{store_id=}, {country=}, {language=} ios store scraped")
+    logger.info(f"store=2 {country=} {language=} {store_id=} ios store scraped")
     return result_dict
 
 
