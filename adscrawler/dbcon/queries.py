@@ -22,7 +22,8 @@ def load_sql_file(file_name: str) -> TextClause:
         return text(file.read())
 
 
-QUERY_APPS_TO_UPDATE = load_sql_file("query_apps_to_update.sql")
+QUERY_APPS_TO_UPDATE_SECONDARY = load_sql_file("query_apps_to_update_secondary.sql")
+QUERY_APPS_TO_UPDATE_PRIMARY = load_sql_file("query_apps_to_update_primary.sql")
 QUERY_APPS_TO_DOWNLOAD = load_sql_file("query_apps_to_download.sql")
 QUERY_APPS_TO_SDK_SCAN = load_sql_file("query_apps_to_sdk_scan.sql")
 QUERY_APPS_TO_API_SCAN = load_sql_file("query_apps_to_api_scan.sql")
@@ -887,14 +888,19 @@ def query_store_apps_to_update(
         "year_ago_ts": year_ago_ts,
         "mylimit": limit,
     }
+    if country_priority_group == 1:
+        query = QUERY_APPS_TO_UPDATE_PRIMARY
+    else:
+        query = QUERY_APPS_TO_UPDATE_SECONDARY
+
     if log_query:
         # Compile and print the query with parameters
-        compiled_query = QUERY_APPS_TO_UPDATE.bindparams(**params).compile(
+        compiled_query = query.bindparams(**params).compile(
             database_connection.engine, compile_kwargs={"literal_binds": True}
         )
         logger.info(f"Executing query:\n{compiled_query}")
     df = pd.read_sql(
-        QUERY_APPS_TO_UPDATE,
+        query,
         con=database_connection.engine,
         params=params,
         dtype={"store_app": int, "store": int, "store_id": str},
