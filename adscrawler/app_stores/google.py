@@ -52,7 +52,8 @@ def detect_language_safe(text: str) -> str:
     if not isinstance(text, str) or not text.strip():
         return "zz"
     try:
-        return langdetect.detect(text)
+        detected: str = langdetect.detect(text)
+        return detected
     except langdetect.lang_detect_exception.LangDetectException:
         return "zz"
 
@@ -99,12 +100,7 @@ def clean_google_play_app_df(apps_df: pd.DataFrame) -> pd.DataFrame:
         can_replace_min_installs,
         "installs",
     ].astype(str)
-    # apps_df["min_installs"].str.replace(r"[,+]", "", regex=True).fillna("0").astype(int)
     apps_df = apps_df.assign(
-        min_installs=apps_df["min_installs"]
-        .str.replace(r"[,+]", "", regex=True)
-        .fillna("0")
-        .astype(int),
         category=apps_df["category"].str.lower(),
         release_date=pd.to_datetime(
             apps_df["release_date"], format="%b %d, %Y"
