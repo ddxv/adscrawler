@@ -66,9 +66,7 @@ def get_app_ids_with_retry(
 
 
 def get_app_store_collections(
-    category_keyword: str | None = None,
     collection_keyword: str | None = None,
-    country: str = "us",
 ) -> dict:
     # Eg: TOP_PAID / TOP_FREE
     if collection_keyword:
@@ -118,7 +116,7 @@ def scrape_ios_ranks(
     logger.info(f"{scrape_info} starting")
     # Eg: MAGAZINES_MEN, GAMES_ADVENTURE
     collections = get_app_store_collections(
-        collection_keyword=collection_keyword, country=country
+        collection_keyword=collection_keyword,
     )
     categories = get_app_store_categories(category_keyword=category_keyword)
     ranked_dicts: list[dict] = []
