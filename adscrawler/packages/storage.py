@@ -469,9 +469,10 @@ def download_app_by_store_id(
         logger.error(f"S3 only has failed apk for {store_id=}, no version_code")
     if version_str:
         df = df[df["version_code"] == version_str]
+        final_version_str = version_str
     else:
         df = df.sort_values(by="version_code", ascending=False)
-        version_str: str = df["version_code"].to_numpy()[0]
+        final_version_str: str = df["version_code"].to_numpy()[0]
     key = df["key"].to_numpy()[0]
     filename = key.split("/")[-1]
     extension = filename.split(".")[-1]
@@ -495,7 +496,7 @@ def download_app_by_store_id(
         raise FileNotFoundError(f"{downloaded_file_path=} after download not found")
     final_path = move_downloaded_app_to_main_dir(downloaded_file_path)
     logger.info(f"{func_info} to local finished")
-    return final_path, version_str
+    return final_path, final_version_str
 
 
 def download_s3_app_by_key(
@@ -586,4 +587,4 @@ def get_duckdb_connection(s3_config_key: str) -> duckdb.DuckDBPyConnection:
     return duckdb_con
 
 
-S3_CLIENTS = {}
+S3_CLIENTS: dict = {}

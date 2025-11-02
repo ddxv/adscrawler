@@ -600,7 +600,7 @@ def process_parquets_and_insert(
     country_parquet_paths: list[str],
     period: str,
     s3_config_key: str,
-):
+) -> pd.DataFrame:
     """Process parquet files for a specific country and insert into the database."""
     period_query = f"""WITH all_data AS (
                 SELECT * FROM read_parquet({country_parquet_paths})

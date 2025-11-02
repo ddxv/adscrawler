@@ -44,6 +44,7 @@ from adscrawler.dbcon.queries import (
     get_crawl_scenario_countries,
     get_store_app_columns,
     prepare_for_psycopg,
+    query_all_domains,
     query_categories,
     query_collections,
     query_countries,
@@ -68,7 +69,7 @@ def process_chunk(
     use_ssh_tunnel: bool,
     process_icon: bool,
     total_rows: int,
-):
+) -> None:
     chunk_info = f"{store=} chunk={df_chunk.index[0]}-{df_chunk.index[-1]}/{total_rows}"
     logger.info(f"{chunk_info} start")
     database_connection = get_db_connection(use_ssh_tunnel=use_ssh_tunnel)
@@ -110,14 +111,14 @@ def process_chunk(
 
 
 def update_app_details(
-    database_connection,
-    store,
-    use_ssh_tunnel,
-    workers,
-    process_icon,
-    limit,
-    country_priority_group,
-):
+    database_connection: PostgresCon,
+    store: int,
+    use_ssh_tunnel: bool,
+    workers: int,
+    process_icon: bool,
+    limit: int,
+    country_priority_group: int,
+) -> None:
     """Process apps with dynamic work queue - simple and efficient."""
     log_info = f"{store=} update app details"
 
@@ -177,7 +178,7 @@ def update_app_details(
                     )
             except Exception as e:
                 failed_count += 1
-                logger.error(f"Chunk {chunk_idx} failed: {e}")
+                logger.exception(f"Chunk {chunk_idx} failed: {e}")
     logger.info(f"{log_info} completed={completed_count} failed={failed_count}")
 
 
@@ -513,6 +514,33 @@ def crawl_developers_for_new_store_ids(
                 logger.exception(f"{row_info=} failed!")
 
 
+def check_and_insert_domains(
+    domains_df: pd.DataFrame,
+    app_urls: pd.DataFrame,
+    database_connection: PostgresCon,
+) -> pd.DataFrame:
+    """Adds missing ad domains to the database and returns updated domain DataFrame."""
+    missing_ad_domains = app_urls[
+        (~app_urls["url"].isin(domains_df["domain_name"])) & (app_urls["url"].notna())
+    ]
+    if not missing_ad_domains.empty:
+        new_ad_domains = (
+            missing_ad_domains[["url"]]
+            .drop_duplicates()
+            .rename(columns={"url": "domain_name"})
+        )
+        new_ad_domains = upsert_df(
+            table_name="domains",
+            df=new_ad_domains,
+            insert_columns=["domain_name"],
+            key_columns=["domain_name"],
+            database_connection=database_connection,
+            return_rows=True,
+        )
+        domains_df = pd.concat([new_ad_domains, domains_df])
+    return domains_df
+
+
 def save_app_domains(
     apps_df: pd.DataFrame,
     database_connection: PostgresCon,
@@ -522,31 +550,30 @@ def save_app_domains(
         return
     urls_na = apps_df["url"].isna()
     app_urls = apps_df[~urls_na][["store_app", "url"]].drop_duplicates()
+    if app_urls.empty:
+        logger.warning("No app urls found")
+        return
     app_urls["url"] = app_urls["url"].apply(lambda x: extract_domains(x))
-    insert_columns = ["domain_name"]
-    domain_ids_df = upsert_df(
-        table_name="domains",
-        df=app_urls.rename(columns={"url": "domain_name"}),
-        insert_columns=insert_columns,
-        key_columns=["domain_name"],
+    all_domains_df = query_all_domains(database_connection=database_connection)
+    all_domains_df = check_and_insert_domains(
+        domains_df=all_domains_df,
+        app_urls=app_urls,
         database_connection=database_connection,
-        return_rows=True,
-    ).rename(columns={"id": "pub_domain"})
-    if domain_ids_df is not None and not domain_ids_df.empty:
-        app_urls = pd.merge(
-            app_urls,
-            domain_ids_df,
-            how="left",
-            left_on="url",
-            right_on="domain_name",
-            validate="m:1",
-        )
+    )
+    domain_ids_df = app_urls.merge(
+        all_domains_df.rename(columns={"id": "pub_domain"}),
+        left_on="url",
+        right_on="domain_name",
+        how="left",
+        validate="m:1",
+    )
+    if not domain_ids_df.empty:
         insert_columns = ["store_app", "pub_domain"]
         key_columns = ["store_app"]
         upsert_df(
             table_name="app_urls_map",
             insert_columns=insert_columns,
-            df=app_urls,
+            df=domain_ids_df[["store_app", "pub_domain"]],
             key_columns=key_columns,
             database_connection=database_connection,
         )
@@ -644,9 +671,9 @@ def save_developer_info(
     apps_df: pd.DataFrame,
     database_connection: PostgresCon,
 ) -> pd.DataFrame:
-    assert apps_df["developer_id"].to_numpy()[
-        0
-    ], f"{apps_df['store_id']} Missing Developer ID"
+    assert apps_df["developer_id"].to_numpy()[0], (
+        f"{apps_df['store_id']} Missing Developer ID"
+    )
     df = (
         apps_df[["store", "developer_id", "developer_name"]]
         .rename(columns={"developer_name": "name"})
@@ -827,7 +854,9 @@ def upsert_store_apps_descriptions(
     #         upsert_keywords(keywords_df, database_connection)
 
 
-def upsert_keywords(keywords_df: pd.DataFrame, database_connection: PostgresCon):
+def upsert_keywords(
+    keywords_df: pd.DataFrame, database_connection: PostgresCon
+) -> None:
     table_name = "keywords"
     insert_columns = ["keyword_text"]
     key_columns = ["keyword_text"]
