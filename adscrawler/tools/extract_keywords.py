@@ -33,10 +33,7 @@ CUSTOM_STOPWORDS = {
     "that",
     "app",
     "we",
-    "the app",
-    "this app",
     "application",
-    "this application",
     "one",
     "them",
     "use",
@@ -45,16 +42,15 @@ CUSTOM_STOPWORDS = {
     "who",
     "i",
     "also",
-    "our app",
-    "the game",
     "youll",
     "youre",
     "whos",
-    "whatsway",
+    "whats",
     "lets",
     "let",
     "set",
     "com",
+    "game",
 }
 STOPWORDS = set(stopwords.words("english")).union(CUSTOM_STOPWORDS)
 
@@ -194,37 +190,51 @@ def get_global_keywords(database_connection: PostgresCon) -> list[str]:
     """Get the global keywords from the database.
     NOTE: This takes about ~5-8GB of RAM for 50k keywords and 200k descriptions. For now run manually.
     """
-    df = query_all_store_app_descriptions(database_connection=database_connection)
-    cleaned_texts = [
-        clean_text(description) for description in df["description"].tolist()
-    ]
+    df = query_all_store_app_descriptions(
+        language_slug="en", database_connection=database_connection
+    )
+
+    # Note these are same as clean_text function
+    df["description"] = (
+        df["description"]
+        .str.replace("\r", ". ")
+        .replace("\n", ". ")
+        .replace("\t", ". ")
+        .replace("\xa0", ". ")
+        .replace("•", ". ")
+        .replace("'", "")
+        .replace("’", "")
+        .replace("-", " ")
+        .replace(r"\bhttp\S*", "", regex=True)
+        .replace(r"\bwww\S*", "", regex=True)
+        .replace(r"[^a-zA-Z\s]", ". ", regex=True)
+        .str.lower()
+    )
 
     from sklearn.feature_extraction.text import TfidfVectorizer  # noqa: PLC0415
 
     vectorizer = TfidfVectorizer(
-        ngram_range=(1, 2),  # Include 1-grams, 2-grams, and 3-grams
+        ngram_range=(1, 2),  # Include 1-grams, 2-grams
         stop_words=list(STOPWORDS),
-        max_df=0.80,  # Ignore terms in >80% of docs (too common)
-        min_df=30,  # Ignore terms in <10 docs (too rare)
-        max_features=100000,
+        max_df=0.75,  # Ignore terms in >75% of docs (too common)
+        min_df=300,  # Ignore terms in <x docs (too rare)
+        max_features=50000,
     )
 
-    tfidf_matrix = vectorizer.fit_transform(cleaned_texts)
+    # Main slow/memory-intensive step
+    tfidf_matrix = vectorizer.fit_transform(df["description"])
 
     feature_names = vectorizer.get_feature_names_out()
     global_scores = tfidf_matrix.sum(axis=0).A1  # Sum scores per term
-
     keyword_scores = list(zip(feature_names, global_scores, strict=False))
     keyword_scores.sort(key=lambda x: x[1], reverse=True)
-
     global_keywords = [kw for kw, score in keyword_scores if kw not in STOPWORDS]
-
     return global_keywords
 
 
 def insert_global_keywords(database_connection: PostgresCon) -> None:
     """Insert global keywords into the database.
-    NOTE: This takes about ~5-8GB of RAM for 50k keywords and 200k descriptions. For now run manually.
+    NOTE: This takes about ~15-20GB of RAM for 50k keywords and 3.5m descriptions. For now run manually.
     """
 
     global_keywords = get_global_keywords(database_connection)

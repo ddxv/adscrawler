@@ -33,6 +33,7 @@ from adscrawler.app_stores.google import (
 from adscrawler.app_stores.process_from_s3 import (
     app_details_to_s3,
     process_store_rankings,
+    raw_keywords_to_s3,
 )
 from adscrawler.app_stores.utils import check_and_insert_new_apps
 from adscrawler.config import APP_ICONS_TMP_DIR, CONFIG, get_logger
@@ -181,49 +182,48 @@ def update_app_details(
 
 
 def crawl_keyword_cranks(database_connection: PostgresCon) -> None:
-    languages_map = query_languages(database_connection)
     country = "us"
     language = "en"
-    language_dict = languages_map.set_index("language_slug")["id"].to_dict()
-    language_key = language_dict[language]
     kdf = query_keywords_to_crawl(database_connection, limit=1000)
+    all_keywords = pd.DataFrame()
     for _id, row in kdf.iterrows():
         logger.info(
             f"Crawling keywords: {_id}/{kdf.shape[0]} keyword={row.keyword_text}"
         )
         keyword = row.keyword_text
-        keyword_id = row.keyword_id
         try:
             df = scrape_keyword(
                 country=country,
                 language=language,
                 keyword=keyword,
             )
-            df["keyword"] = keyword_id
-            df["lang"] = language_key
-            #  _countries_map = query_countries(database_connection)
-            # process_scraped(
-            #     database_connection=database_connection,
-            #     ranked_dicts=df.to_dict(orient="records"),
-            #     crawl_source="scrape_keywords",
-            #     countries_map=countries_map,
-            # )
+            df["language"] = language.lower()
+            df["country"] = country.upper()
+            df["crawled_date"] = datetime.datetime.now(tz=datetime.UTC).date()
+            all_keywords = pd.concat([all_keywords, df], ignore_index=True)
         except Exception:
             logger.exception(f"Scrape keyword={keyword} hit error, skipping")
-        key_columns = ["keyword"]
-        upsert_df(
-            table_name="keywords_crawled_at",
-            schema="logging",
-            insert_columns=["keyword", "crawled_at"],
-            df=pd.DataFrame(
-                {
-                    "keyword": [keyword_id],
-                    "crawled_at": datetime.datetime.now(tz=datetime.UTC),
-                }
-            ),
-            key_columns=key_columns,
-            database_connection=database_connection,
-        )
+    raw_keywords_to_s3(all_keywords)
+
+
+# def import_keywords_from_s3(database_connection: PostgresCon) -> None:
+#     languages_map = query_languages(database_connection)
+#     language_dict = languages_map.set_index("language_slug")["id"].to_dict()
+#     language_key = language_dict[language]
+#     key_columns = ["keyword"]
+#     upsert_df(
+#         table_name="keywords_crawled_at",
+#         schema="logging",
+#         insert_columns=["keyword", "crawled_at"],
+#         df=pd.DataFrame(
+#             {
+#                 "keyword": [keyword_id],
+#                 "crawled_at": datetime.datetime.now(tz=datetime.UTC),
+#             }
+#         ),
+#         key_columns=key_columns,
+#         database_connection=database_connection,
+#     )
 
 
 def scrape_store_ranks(database_connection: PostgresCon, store: int) -> None:
@@ -326,9 +326,7 @@ def scrape_keyword(
     logger.info(
         f"{keyword=} apple_apps:{adf.shape[0]} google_apps:{gdf.shape[0]} finished"
     )
-    df["country"] = country
-    df["crawled_date"] = datetime.datetime.now(tz=datetime.UTC).date()
-    df = df[["store_id", "store", "country", "rank", "crawled_date"]]
+    df = df[["store", "store_id", "rank"]]
     return df
 
 

@@ -28,6 +28,7 @@ QUERY_APPS_TO_DOWNLOAD = load_sql_file("query_apps_to_download.sql")
 QUERY_APPS_TO_SDK_SCAN = load_sql_file("query_apps_to_sdk_scan.sql")
 QUERY_APPS_TO_API_SCAN = load_sql_file("query_apps_to_api_scan.sql")
 QUERY_API_CALLS_TO_CREATIVE_SCAN = load_sql_file("query_apps_to_creative_scan.sql")
+QUERY_KEYWORDS_TO_CRAWL = load_sql_file("query_keywords_to_crawl.sql")
 QUERY_APPS_MITM_IN_S3 = load_sql_file("query_apps_mitm_in_s3.sql")
 QUERY_ZSCORES = load_sql_file("query_simplified_store_app_z_scores.sql")
 
@@ -917,51 +918,13 @@ def query_store_apps_to_update(
 
 def query_keywords_to_crawl(
     database_connection: PostgresCon,
-    limit: int | None = None,
+    limit: int,
 ) -> pd.DataFrame:
-    limit_str = ""
-    if limit:
-        limit_str = f"LIMIT {limit}"
-    sel_query = f"""WITH rank_crawled_keywords AS (
-                SELECT
-                    DISTINCT akr.keyword
-                FROM
-                    app_keyword_rankings akr
-                WHERE
-                    akr.crawled_date > CURRENT_DATE - INTERVAL '7 days'
-            ),
-            log_crawled_keywords AS (
-                SELECT
-                    DISTINCT keyword
-                FROM
-                    logging.keywords_crawled_at
-                WHERE
-                    crawled_at > CURRENT_DATE - INTERVAL '7 days'
-            )
-            SELECT
-                *
-            FROM
-                frontend.keyword_scores ks
-            WHERE
-                ks.keyword_id NOT IN (
-                    SELECT
-                        keyword
-                    FROM
-                        rank_crawled_keywords
-                )
-                OR ks.keyword_id NOT IN (
-                    SELECT
-                        keyword
-                    FROM
-                        log_crawled_keywords
-                )
-            ORDER BY
-                ks.competitiveness_score
-            DESC
-            {limit_str}
-            ;
-            """
-    df = pd.read_sql(sel_query, database_connection.engine)
+    df = pd.read_sql(
+        QUERY_KEYWORDS_TO_CRAWL,
+        params={"mylimit": limit},
+        con=database_connection.engine,
+    )
     return df
 
 
@@ -1127,13 +1090,16 @@ def query_creative_records(database_connection: PostgresCon) -> pd.DataFrame:
 
 
 def query_all_store_app_descriptions(
+    language_slug: str,
     database_connection: PostgresCon,
 ) -> pd.DataFrame:
-    sel_query = """SELECT
+    sel_query = f"""SELECT
     DISTINCT ON (store_app)
         description
     FROM
-        store_apps_descriptions
+        store_apps_descriptions sad
+    LEFT JOIN languages l ON sad.language_id = l.id
+    WHERE l.language_slug = '{language_slug}'
         ORDER BY store_app, updated_at desc
     ;
     """

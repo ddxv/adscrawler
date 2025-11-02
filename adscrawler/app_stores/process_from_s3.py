@@ -59,6 +59,31 @@ COUNTRY_HISTORY_COLS = COUNTRY_HISTORY_KEYS + METRIC_COLS
 GLOBAL_HISTORY_COLS = GLOBAL_HISTORY_KEYS + METRIC_COLS + ["store_last_updated"]
 
 
+def raw_keywords_to_s3(
+    df: pd.DataFrame,
+) -> None:
+    logger.info(f"S3 upload keywords rows={df.shape[0]} start")
+    s3_client = get_s3_client()
+    bucket = CONFIG["s3"]["bucket"]
+    df["store_id"] = df["store_id"].astype(str)
+    for store, store_df in df.groupby("store"):
+        # handles edge case of a crawl spanning a date change
+        for crawled_date, date_df in store_df.groupby("crawled_date"):
+            if isinstance(crawled_date, datetime.date):
+                crawled_date = crawled_date.strftime("%Y-%m-%d")
+            for country, country_df in date_df.groupby("country"):
+                epoch_ms = int(time.time() * 1000)
+                suffix = uuid.uuid4().hex[:8]
+                file_name = f"keywords_{epoch_ms}_{suffix}.parquet"
+                s3_loc = "raw-data/keywords"
+                s3_key = f"{s3_loc}/store={store}/crawled_date={crawled_date}/country={country}/{file_name}"
+                buffer = BytesIO()
+                country_df.to_parquet(buffer, index=False)
+                buffer.seek(0)
+                s3_client.upload_fileobj(buffer, bucket, s3_key)
+    logger.info(f"S3 upload keywords {store=} finished")
+
+
 def app_details_to_s3(
     df: pd.DataFrame,
     store: int,
