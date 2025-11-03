@@ -12,6 +12,9 @@ Scrapers:
 
 ## Setup and Installation
 
+Note: This project is not a one click setup but feel free to reach out for help.
+
+- Requires Object Storage / S3
 - PostgreSQL: 17/18
 - Setup your database. The files here use the database name 'madrone'
 - Add a password to your default db user if you dont have one yet `ALTER USER postgres WITH PASSWORD 'xxx';`
