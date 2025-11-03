@@ -18,16 +18,13 @@ Note: This project is not a one click setup but feel free to reach out for help.
 - PostgreSQL: 17/18
 - Setup your database. The files here use the database name 'madrone'
 - Add a password to your default db user if you dont have one yet `ALTER USER postgres WITH PASSWORD 'xxx';`
-
 - Python environment: Python 3.13
 - Setup python environment `python3.12 -m venv .virtualenv` & `source .virtualenv/bin/activate`
 - `uv pip install -r pyproject.toml`
 - `cp example_config.toml ~/config/adscrawler/config.toml` and edit any needed values. For using all locally, the main thing that needs to be modified is the `xxx` for postgres pass and S3 host.
 - In your virtualenv, init db `python db_init.py` -> Initializes MVs, inserts 3m+ apps' store_ids from https://github.com/ddxv/appgoblin-data
-
 - Google Play App Ranks Require: NodeJS
 - `npm install --save google-play-scraper`
-
 - an S3 bucket used by app ranks, APK/IPA download, MITM
 
 ## Run
