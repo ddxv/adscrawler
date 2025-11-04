@@ -7,8 +7,8 @@ use_tunnel = False
 database_connection = get_db_connection(use_ssh_tunnel=use_tunnel)
 
 
-start_date = "2025-08-01"
-end_date = "2025-09-30"
+start_date = "2025-10-01"
+end_date = "2025-10-31"
 for week in pd.date_range(start=start_date, end=end_date, freq="W-Mon"):
     df = query_zscores(database_connection, target_week=week)
     df.to_sql(
