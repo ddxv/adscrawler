@@ -1,6 +1,5 @@
 import ast
 import base64
-import hashlib
 import html
 import json
 import re
@@ -20,9 +19,10 @@ from adscrawler.dbcon.queries import (
     get_all_mmp_tlds,
     get_click_url_redirect_chains,
     query_ad_domains,
-    query_all_domains,
     query_api_call_id_for_uuid,
     query_store_app_by_store_id_cached,
+    query_urls_id_map,
+    query_all_domains,
     upsert_df,
 )
 from adscrawler.mitm_ad_parser.models import AdInfo, MultipleAdvertiserIdError
@@ -144,17 +144,16 @@ def extract_and_decode_urls(
 
 def store_found_urls_in_db(
     all_urls: list[str], run_id: int, api_call_id: int, database_connection: PostgresCon
-) -> None:
+) -> pd.DataFrame:
+    """Stores the found URLs in the database."""
     all_urls_df = pd.DataFrame(
         {"run_id": run_id, "url": all_urls, "api_call_id": api_call_id}
     )
-    all_urls_df["url_hash"] = all_urls_df["url"].apply(
-        lambda x: hashlib.md5(str(x).encode()).hexdigest()
-    )
-
+    # all_urls_df["url_hash"] = all_urls_df["url"].apply(
+    #     lambda x: hashlib.md5(str(x).encode()).hexdigest()
+    # )
     all_urls_df["scheme"] = all_urls_df["url"].str.split("://").str[0]
     all_urls_df["scheme"] = all_urls_df["scheme"].fillna("unknown")
-
     urls_df = upsert_df(
         df=all_urls_df,
         database_connection=database_connection,
@@ -164,18 +163,17 @@ def store_found_urls_in_db(
         key_columns=["url"],
         insert_columns=["url", "scheme"],
         return_rows=True,
-        log=True,
     )
-
+    urls_df = urls_df.rename(columns={"id": "url_id"})
+    urls_df["api_call_id"] = api_call_id
+    urls_df["run_id"] = run_id
     all_urls_df = upsert_df(
-        df=all_urls_df,
+        df=urls_df[["run_id", "api_call_id", "url_id"]],
         database_connection=database_connection,
         schema="adtech",
         table_name="api_call_urls",
-        key_columns=["run_id", "api_call_id", "url"],
-        insert_columns=["run_id", "api_call_id", "url"],
-        md5_key_columns=["url"],
-        return_rows=True,
+        key_columns=["run_id", "api_call_id", "url_id"],
+        insert_columns=["run_id", "api_call_id", "url_id"],
     )
 
 
@@ -768,8 +766,10 @@ def parse_text_for_adinfo(
     api_call_id = query_api_call_id_for_uuid(mitm_uuid, database_connection)
     click_urls = check_click_urls(all_urls, run_id, api_call_id, database_connection)
     all_urls = list(set(all_urls + click_urls))
-    store_found_urls_in_db(all_urls, run_id, api_call_id, database_connection)
-
+    # This is going to need to be done before check click and after?
+    _urls_df = store_found_urls_in_db(
+        all_urls, run_id, api_call_id, database_connection
+    )
     error_msg = None
     try:
         ad_info = parse_urls_for_known_parts(
