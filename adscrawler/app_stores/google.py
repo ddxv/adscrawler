@@ -106,8 +106,7 @@ def clean_google_play_app_df(apps_df: pd.DataFrame) -> pd.DataFrame:
             apps_df["release_date"], format="%b %d, %Y"
         ).dt.date,
         store_last_updated=pd.to_datetime(
-            apps_df["store_last_updated"],
-            unit="s",
+            apps_df["store_last_updated"], unit="s", errors="coerce"
         ).fillna(apps_df["release_date"]),
     )
     if "developer_name" in apps_df.columns:
