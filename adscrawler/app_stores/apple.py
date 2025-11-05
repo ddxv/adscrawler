@@ -297,6 +297,7 @@ def get_developer_url(result: dict, urls: dict) -> str:
     """
     Decide if we should crawl the store html for the developer url.
     """
+    final_url: str
     should_crawl_html = False
     if "sellerUrl" not in result.keys():
         should_crawl_html = True
@@ -316,14 +317,14 @@ def get_developer_url(result: dict, urls: dict) -> str:
         if len(found_tlds) == 0:
             if "sellerUrl" not in result.keys():
                 raise Exception(f"No developer url found for {urls=}")
-            final_url: str = result["sellerUrl"]
+            final_url = result["sellerUrl"]
         elif len(found_tlds) == 1:
-            final_url: str = found_tlds[0]
+            final_url = found_tlds[0]
         else:
             logger.warning(f"Multiple developer sites found for {urls=} {found_tlds=}")
-            final_url: str = result["sellerUrl"]
+            final_url = result["sellerUrl"]
     else:
-        final_url: str = result["sellerUrl"]
+        final_url = result["sellerUrl"]
     return final_url
 
 
