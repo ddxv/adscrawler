@@ -454,7 +454,9 @@ def clean_ios_app_df(df: pd.DataFrame) -> pd.DataFrame:
         logger.warning("Unable to parse histogram")
         df["histogram"] = None
     if "description" in df.columns:
-        df["description"] = df["description"].apply(truncate_utf8_bytes)
+        df.loc[df["description"].notna(), "description"] = df.loc[
+            df["description"].notna(), "description"
+        ].apply(truncate_utf8_bytes)
     if (
         "store_language_code" in df.columns
         and df["store_language_code"].str.len().all() == 2
