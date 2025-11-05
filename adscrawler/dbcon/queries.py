@@ -1,4 +1,5 @@
 import datetime
+import hashlib
 import pathlib
 from functools import lru_cache
 
@@ -798,13 +799,44 @@ def query_pub_domains_to_crawl_ads_txt(
     return df
 
 
+def query_urls_id_map(
+    urls: list[str], database_connection: PostgresCon
+) -> pd.DataFrame:
+    """
+    Get URL IDs by looking up MD5 hashes.
+    Returns DataFrame with columns: url, id
+    """
+    if not urls:
+        return pd.DataFrame(columns=["url", "id"])
+    url_hash_map = {url: hashlib.md5(url.encode()).hexdigest() for url in urls}
+    hashes_str = "'" + "','".join(url_hash_map.values()) + "'"
+    sel_query = f"""
+        SELECT url, id, url_hash 
+        FROM adtech.urls 
+        WHERE url_hash IN ({hashes_str})
+    """
+    df = pd.read_sql(sel_query, database_connection.engine)
+    return df
+
+
 @lru_cache(maxsize=1000)
 def get_click_url_redirect_chains(
     run_id: int, database_connection: PostgresCon
 ) -> pd.DataFrame:
-    sel_query = (
-        f"""SELECT * FROM adtech.click_url_redirect_chains WHERE run_id = {run_id}"""
-    )
+    sel_query = f"""SELECT
+        urc.api_call_id,
+        urc.hop_index,
+        urc.is_chain_start,
+        urc.is_chain_end,
+        u.url,
+        ur.url AS redirect_url
+    FROM
+        adtech.url_redirect_chains urc
+    LEFT JOIN adtech.urls u ON urc.url_id = u.id
+    LEFT JOIN adtech.urls ur ON urc.next_url_id = ur.id
+    WHERE
+        urc.run_id = {run_id}
+    """
     df = pd.read_sql(sel_query, database_connection.engine)
     return df
 

@@ -146,14 +146,11 @@ def attribute_creatives(
                 error_messages.append(row)
                 # Send the row itself to check for advertiser there
                 sent_video_df = pd.DataFrame(row).T
-                found_ad_infos, found_error_messages = parse_sent_video_df(
-                    row, pub_store_id, sent_video_df, database_connection, video_id
-                )
             else:
                 sent_video_df["pub_store_id"] = pub_store_id
-                found_ad_infos, found_error_messages = parse_sent_video_df(
-                    row, pub_store_id, sent_video_df, database_connection, video_id
-                )
+            found_ad_infos, found_error_messages = parse_sent_video_df(
+                row, pub_store_id, sent_video_df, database_connection, video_id
+            )
             sent_video_cache[video_id] = sent_video_df
             parse_results_cache[video_id] = (found_ad_infos, found_error_messages)
         for found_error_message in found_error_messages:
