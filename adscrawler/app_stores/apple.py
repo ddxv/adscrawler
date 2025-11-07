@@ -297,6 +297,7 @@ def get_developer_url(result: dict, urls: dict) -> str:
     """
     Decide if we should crawl the store html for the developer url.
     """
+    final_url: str
     should_crawl_html = False
     if "sellerUrl" not in result.keys():
         should_crawl_html = True
@@ -316,14 +317,14 @@ def get_developer_url(result: dict, urls: dict) -> str:
         if len(found_tlds) == 0:
             if "sellerUrl" not in result.keys():
                 raise Exception(f"No developer url found for {urls=}")
-            final_url: str = result["sellerUrl"]
+            final_url = result["sellerUrl"]
         elif len(found_tlds) == 1:
-            final_url: str = found_tlds[0]
+            final_url = found_tlds[0]
         else:
             logger.warning(f"Multiple developer sites found for {urls=} {found_tlds=}")
-            final_url: str = result["sellerUrl"]
+            final_url = result["sellerUrl"]
     else:
-        final_url: str = result["sellerUrl"]
+        final_url = result["sellerUrl"]
     return final_url
 
 
@@ -454,7 +455,9 @@ def clean_ios_app_df(df: pd.DataFrame) -> pd.DataFrame:
         logger.warning("Unable to parse histogram")
         df["histogram"] = None
     if "description" in df.columns:
-        df["description"] = df["description"].apply(truncate_utf8_bytes)
+        df.loc[df["description"].notna(), "description"] = df.loc[
+            df["description"].notna(), "description"
+        ].apply(truncate_utf8_bytes)
     if (
         "store_language_code" in df.columns
         and df["store_language_code"].str.len().all() == 2
