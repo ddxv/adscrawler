@@ -28,8 +28,8 @@ my_advs AS (
         ON
             ic.id = icc.company_id
     WHERE
-        vcasr.run_at > :target_week ::date - interval '7 days'
-        AND vcasr.run_at <= :target_week ::date
+        vcasr.run_at > CAST(:target_week AS date) - interval '7 days'
+        AND vcasr.run_at <= CAST(:target_week AS date)
         AND (
             hcc.category_id = 1
         )
@@ -50,10 +50,10 @@ baseline_period AS (
             s.store_app = m.advertiser_store_app_id
     WHERE
         s.week_start >= (
-            :target_week ::date - interval '22 days'
+            CAST(:target_week AS date) - interval '22 days'
         )
         AND s.week_start <= (
-            :target_week ::date - interval '7 days'
+            CAST(:target_week AS date) - interval '7 days'
         )
         AND s.country_id = 840
     GROUP BY
@@ -62,16 +62,16 @@ baseline_period AS (
 target_weeks_data AS (
     SELECT
         s.store_app,
-        :target_week  ::date AS target_week,
+        CAST(:target_week AS date) AS target_week,
         SUM(s.installs_diff) AS target_week_installs,
         SUM(s.rating_count_diff) AS target_week_rating_count
     FROM
         store_apps_history_weekly AS s
     WHERE
-        s.week_start >= :target_week ::date
+        s.week_start >= CAST(:target_week AS date)
         AND
         s.week_start < (
-            :target_week ::date + interval '7 days'
+            CAST(:target_week AS date) + interval '7 days'
         )
         AND s.country_id = 840
     GROUP BY
@@ -156,8 +156,8 @@ ranked_z_scores AS (
                 sa.store,
                 (
                     CASE
-                        WHEN sa.store = 2 THEN 'rating' ::text
-                        ELSE 'installs' ::text
+                        WHEN sa.store = 2 THEN 'rating'::text
+                        ELSE 'installs'::text
                     END
                 )
             ORDER BY
@@ -165,7 +165,7 @@ ranked_z_scores AS (
                     CASE
                         WHEN sa.store = 2 THEN saz.ratings_z_score_1w
                         WHEN sa.store = 1 THEN saz.installs_z_score_1w
-                        ELSE NULL ::numeric
+                        ELSE NULL::numeric
                     END
                 ) DESC NULLS LAST
         ) AS rn
@@ -174,10 +174,10 @@ ranked_z_scores AS (
     LEFT JOIN store_apps AS sa
         ON
             saz.store_app = sa.id
-      LEFT JOIN app_global_metrics_latest AS agm
+    LEFT JOIN app_global_metrics_latest AS agm
         ON sa.id = agm.store_app
     LEFT JOIN category_mapping AS cm ON
-        sa.category ::text = cm.original_category ::text
+        sa.category::text = cm.original_category::text
 )
 SELECT
     target_week,

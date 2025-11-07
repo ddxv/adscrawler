@@ -200,7 +200,7 @@ combined AS (
         last_crawl_result,
         CASE
             WHEN
-                store_app IN (SELECT store_app FROM growth_apps)
+                store_app IN (SELECT ga.store_app FROM growth_apps AS ga)
                 THEN 'top_scheduled'
             ELSE 'scheduled'
         END AS mysource,

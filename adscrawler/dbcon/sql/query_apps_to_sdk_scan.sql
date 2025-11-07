@@ -22,9 +22,9 @@ last_scan AS (
     SELECT DISTINCT ON
     (vc.store_app)
         vc.store_app,
-        version_code_id AS version_code,
-        scanned_at,
-        scan_result
+        lsscr.version_code_id AS version_code,
+        lsscr.scanned_at,
+        lsscr.scan_result
     FROM
         version_code_sdk_scan_results AS lsscr
     LEFT JOIN version_codes AS vc ON lsscr.version_code_id = vc.id
@@ -130,7 +130,7 @@ user_requested_apps_crawl AS (
     LEFT JOIN store_apps AS sa
         ON
             urs.store_id = sa.store_id
-      LEFT JOIN app_global_metrics_latest AS agm
+    LEFT JOIN app_global_metrics_latest AS agm
         ON sa.id = agm.store_app
     LEFT JOIN last_scan AS ls ON sa.id = ls.store_app
     LEFT JOIN last_scan_succeed AS lsvc
