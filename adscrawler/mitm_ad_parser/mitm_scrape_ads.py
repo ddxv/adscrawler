@@ -22,7 +22,10 @@ from adscrawler.mitm_ad_parser.creative_processor import (
     store_creative_and_thumb_to_local,
 )
 from adscrawler.mitm_ad_parser.mitm_logs import get_mitm_df
-from adscrawler.mitm_ad_parser.network_parsers import parse_sent_video_df
+from adscrawler.mitm_ad_parser.network_parsers import (
+    parse_sent_video_df,
+    parse_creative_request,
+)
 from adscrawler.packages.storage import (
     creative_exists_in_s3,
     get_store_id_mitm_s3_keys,
@@ -145,12 +148,19 @@ def attribute_creatives(
                 row["error_msg"] = error_msg
                 error_messages.append(row)
                 # Send the row itself to check for advertiser there
-                sent_video_df = pd.DataFrame(row).T
+                ad_info, error_msg = parse_creative_request(row, database_connection)
+                found_ad_infos = [ad_info]
+                if error_msg:
+                    row_copy = row.copy()
+                    row_copy["error_msg"] = error_msg
+                    found_error_messages = [row_copy]
+                else:
+                    found_error_messages = []
             else:
                 sent_video_df["pub_store_id"] = pub_store_id
-            found_ad_infos, found_error_messages = parse_sent_video_df(
-                row, pub_store_id, sent_video_df, database_connection, video_id
-            )
+                found_ad_infos, found_error_messages = parse_sent_video_df(
+                    row, pub_store_id, sent_video_df, database_connection, video_id
+                )
             sent_video_cache[video_id] = sent_video_df
             parse_results_cache[video_id] = (found_ad_infos, found_error_messages)
         for found_error_message in found_error_messages:
@@ -316,7 +326,14 @@ def append_missing_domains(
                 database_connection=database_connection,
                 return_rows=True,
             )
-            ad_domains_df = pd.concat([new_ad_domains, ad_domains_df])
+            ad_domains_df = pd.concat(
+                [
+                    new_ad_domains[["id", "domain_name"]].rename(
+                        columns={"id": "domain_id"}
+                    ),
+                    ad_domains_df,
+                ]
+            )
     return ad_domains_df
 
 
@@ -325,19 +342,16 @@ def add_additional_domain_id_column(
 ) -> pd.DataFrame:
     """Adds additional ad domain IDs column by exploding and merging domain lists."""
     cr = creative_records_df.copy()
-
     # Ensure missing values in the list column become empty lists
     cr["found_ad_network_tlds"] = cr["found_ad_network_tlds"].apply(
         lambda x: x if isinstance(x, list) else []
     )
-
     # Explode and keep the original row index in a column
     exploded = (
         cr.explode("found_ad_network_tlds")
         .reset_index()
         .rename(columns={"index": "orig_idx"})
     )
-
     # Merge on the exploded domain value
     merged = exploded.merge(
         ad_domains_df[["domain_name", "domain_id"]],
@@ -345,18 +359,14 @@ def add_additional_domain_id_column(
         right_on="domain_name",
         how="left",
     )
-
     # Group back the matching ids by the original row index
     grouped = merged.groupby("orig_idx")["domain_id"].apply(
         lambda ids: [int(i) for i in ids.dropna().unique()]
     )
-
     # Ensure every original row has an entry (empty list if no matches)
     grouped = grouped.reindex(cr.index, fill_value=[])
-
     # Assign back (aligned by index)
     cr["additional_ad_domain_ids"] = grouped.to_numpy()
-
     return cr
 
 
@@ -383,12 +393,12 @@ def make_creative_records_df(
         validate="1:1",
     )
     ad_domains_df = query_ad_domains(database_connection=database_connection)
-    ad_domains_df = append_missing_domains(
-        ad_domains_df, creative_records_df, database_connection
-    )
     # For mapping we only want the mapped domains
     ad_domains_df = ad_domains_df[~ad_domains_df["domain_id"].isna()].copy()
     ad_domains_df["domain_id"] = ad_domains_df["domain_id"].astype(int)
+    ad_domains_df = append_missing_domains(
+        ad_domains_df, creative_records_df, database_connection
+    )
     creative_records_df = add_additional_domain_id_column(
         creative_records_df, ad_domains_df
     )

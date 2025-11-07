@@ -1264,9 +1264,14 @@ def get_version_code_dbid(
 
 
 def get_failed_mitm_logs(database_connection: PostgresCon) -> pd.DataFrame:
-    sel_query = """SELECT * 
-    FROM logging.creative_scan_results 
-    WHERE error_msg like 'CRITICAL %%';
+    sel_query = """WITH last_run_result AS (SELECT DISTINCT ON (run_id)
+      run_id, pub_store_id, error_msg, inserted_at
+        FROM logging.creative_scan_results 
+      ORDER BY run_id, inserted_at DESC)
+      SELECT * 
+          FROM last_run_result
+          WHERE error_msg like 'CRITICAL %%'
+        ;
     """
     df = pd.read_sql(sel_query, con=database_connection.engine)
     return df

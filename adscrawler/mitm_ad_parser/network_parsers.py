@@ -49,9 +49,7 @@ IGNORE_PRIVACY_URLS = [
 ]
 
 
-def extract_and_decode_urls(
-    text: str, run_id: int, mitm_uuid: str, database_connection: PostgresCon
-) -> list[str]:
+def extract_and_decode_urls(text: str) -> list[str]:
     """Extracts and decodes all URLs from text content, handling various encoding formats."""
     """
     Extracts all URLs from a given text, handles HTML entities and URL encoding.
@@ -117,6 +115,7 @@ def extract_and_decode_urls(
     found_urls = list(
         set(vast_urls + unesc_found_urls + enc_found_urls + orig_found_urls)
     )
+    found_urls = [url.replace("\x00", "") for url in found_urls]
     encoded_delimiters = [
         "%5D",  # ]
         "%3E",  # >
@@ -138,7 +137,6 @@ def extract_and_decode_urls(
         urls.append(decoded_url)
         # print("DECODED:", decoded_url)
     all_urls = list(set(vast_urls + urls))
-
     return all_urls
 
 
@@ -172,77 +170,15 @@ def check_click_urls(
             redirect_urls = follow_url_redirects(
                 url, run_id, api_call_id, database_connection
             )
+        elif "fybernativebrowser://navigate?url=" in url:
+            url = url.replace("fybernativebrowser://navigate?url=", "")
+            redirect_urls = follow_url_redirects(
+                url, run_id, api_call_id, database_connection
+            )
         if len(redirect_urls) > 0:
             click_urls += redirect_urls
     click_urls = list(set(click_urls))
     return click_urls
-
-
-def parse_fyber_html(
-    inner_ad_element: str, run_id: int, mitm_uuid: str, database_connection: PostgresCon
-) -> list[str]:
-    """Parses Fyber HTML content to extract click URLs and ad network URLs."""
-    # Extract all URLs from the raw HTML content first
-    all_extracted_urls = extract_and_decode_urls(
-        inner_ad_element,
-        run_id=run_id,
-        mitm_uuid=mitm_uuid,
-        database_connection=database_connection,
-    )
-    # We're looking for URLs that start with 'fybernativebrowser://navigate?url='
-    # or 'https://gotu.tpbid.com/click'
-    click_urls = []
-    for url in all_extracted_urls:
-        if url.startswith("fybernativebrowser://navigate?url="):
-            pattern = r".*?(https?://.*)"
-            match = re.search(pattern, url)
-            if match:
-                url = match.group(1)
-                click_urls.append(url)
-        elif "https://gotu.tpbid.com/click" in url:
-            click_urls.append(url)
-        elif get_tld(url) in get_all_mmp_tlds(database_connection)["mmp_tld"].to_list():
-            click_urls.append(url)
-    return click_urls
-
-
-def parse_fyber_ad_response(
-    ad_response_text: str, run_id: int, mitm_uuid: str, database_connection: PostgresCon
-) -> list[str]:
-    """Parses Fyber ad response XML to extract VAST URLs and click tracking URLs."""
-    outer_tree = ET.fromstring(ad_response_text)
-    ns = {"tns": "http://www.inner-active.com/SimpleM2M/M2MResponse"}
-    ad_element = outer_tree.find(".//tns:Ad", ns)
-    urls = []
-    vast_tree = None
-    if ad_element is not None and ad_element.text:
-        # Clean up and parse the inner VAST XML
-        inner_ad_element = ad_element.text.strip()
-        try:
-            vast_tree = ET.fromstring(inner_ad_element)
-        except ET.ParseError:
-            try:
-                vast_tree = ET.fromstring(html.unescape(inner_ad_element))
-            except ET.ParseError:
-                urls = parse_fyber_html(
-                    inner_ad_element,
-                    run_id=run_id,
-                    mitm_uuid=mitm_uuid,
-                    database_connection=database_connection,
-                )
-        if vast_tree is not None:
-            # Now extract URLs from the inner VAST tree
-            for tag in [
-                "Impression",
-                "ClickThrough",
-                "ClickTracking",
-                "MediaFile",
-                "Tracking",
-            ]:
-                for el in vast_tree.iter(tag):
-                    if el.text:
-                        urls.append(el.text.strip())
-    return urls
 
 
 def adv_id_from_play_url(url: str) -> str | None:
@@ -461,9 +397,6 @@ def parse_urls_for_known_parts(
             resp_adv_id = adv_id_from_play_url(url)
             if resp_adv_id:
                 found_adv_store_ids.append(resp_adv_id)
-        elif "fybernativebrowser://" in url:
-            url = url.replace("fybernativebrowser://navigate?url=", "")
-            found_ad_network_urls.append(url)
         if (
             tld_url in ad_domains_df["domain_name"].to_list()
             and tld_url
@@ -492,18 +425,43 @@ def parse_urls_for_known_parts(
     )
 
 
+def get_request_text(sent_video_dict: dict[str, Any]) -> str:
+    """Try to match something.
+    It is unknown if this matches anything useful.
+    """
+    text = " ".join(
+        [
+            str(x)
+            for x in [
+                sent_video_dict["query_params"],
+                sent_video_dict["response_headers"],
+                sent_video_dict["post_params"],
+                sent_video_dict["request_text"],
+            ]
+        ]
+    )
+    return text
+
+
 def parse_youappi_ad(
     sent_video_dict: dict[str, Any], database_connection: PostgresCon
 ) -> AdInfo:
     """Parses YouAppi ad response to extract advertiser information and URLs."""
+    if (
+        "image" in sent_video_dict["response_mime_type"]
+        or "video" in sent_video_dict["response_mime_type"]
+    ):
+        text = get_request_text(sent_video_dict)
+    else:
+        text = sent_video_dict["response_text"]
     ad_info, error_msg = parse_text_for_adinfo(
-        text=sent_video_dict["response_text"],
+        text=text,
         run_id=sent_video_dict["run_id"],
         pub_store_id=sent_video_dict["pub_store_id"],
         mitm_uuid=sent_video_dict["mitm_uuid"],
         database_connection=database_connection,
     )
-    return ad_info
+    return ad_info, error_msg
 
 
 def parse_yandex_ad(
@@ -769,12 +727,8 @@ def parse_text_for_adinfo(
 ) -> tuple[AdInfo, str | None]:
     """Extract URL like strings and parse for app store_ids."""
     ad_info = AdInfo(adv_store_id=None, found_ad_network_tlds=None, found_mmp_urls=None)
-    all_urls = extract_and_decode_urls(
-        text,
-        run_id=run_id,
-        mitm_uuid=mitm_uuid,
-        database_connection=database_connection,
-    )
+    error_msg = None
+    all_urls = extract_and_decode_urls(text)
     api_call_id = query_api_call_id_for_uuid(mitm_uuid, database_connection)
     click_urls = check_click_urls(all_urls, run_id, api_call_id, database_connection)
     all_urls = list(set(all_urls + click_urls))
@@ -853,24 +807,6 @@ def parse_fyber_ad(
     sent_video_dict: dict[str, Any], database_connection: PostgresCon
 ) -> AdInfo:
     """Parses Fyber ad response to extract advertiser information and URLs."""
-    parsed_urls = []
-    text = sent_video_dict["response_text"]
-    try:
-        parsed_urls = parse_fyber_ad_response(
-            text,
-            run_id=sent_video_dict["run_id"],
-            mitm_uuid=sent_video_dict["mitm_uuid"],
-            database_connection=database_connection,
-        )
-    except Exception:
-        pass
-    all_urls = extract_and_decode_urls(
-        text=text,
-        run_id=sent_video_dict["run_id"],
-        mitm_uuid=sent_video_dict["mitm_uuid"],
-        database_connection=database_connection,
-    )
-    all_urls = list(set(all_urls + parsed_urls))
     if "inner-active.mobi" in sent_video_dict["tld_url"]:
         if "x-ia-app-bundle" in sent_video_dict["response_headers"].keys():
             adv_store_id = sent_video_dict["response_headers"]["x-ia-app-bundle"]
@@ -878,6 +814,8 @@ def parse_fyber_ad(
                 adv_store_id=adv_store_id,
             )
             return ad_info
+    text = sent_video_dict["response_text"]
+    all_urls = extract_and_decode_urls(text=text)
     ad_info = parse_urls_for_known_parts(
         all_urls, database_connection, sent_video_dict["pub_store_id"]
     )
@@ -986,6 +924,20 @@ def parse_google_ad(
     return ad_info, error_msg
 
 
+def parse_creative_request(
+    sent_video_dict: dict[str, Any], database_connection: PostgresCon
+) -> tuple[AdInfo, list[dict[str, Any]]]:
+    """Parses creative request to extract advertiser information."""
+    text = get_request_text(sent_video_dict)
+    return parse_text_for_adinfo(
+        text=text,
+        pub_store_id=sent_video_dict["pub_store_id"],
+        run_id=sent_video_dict["run_id"],
+        mitm_uuid=sent_video_dict["mitm_uuid"],
+        database_connection=database_connection,
+    )
+
+
 def parse_sent_video_df(
     row: pd.Series,
     pub_store_id: str,
@@ -1027,7 +979,7 @@ def parse_sent_video_df(
         elif "yandex.ru" == init_tld:
             ad_info = parse_yandex_ad(sent_video_dict, database_connection, video_id)
         elif "youappi.com" == init_tld:
-            ad_info = parse_youappi_ad(sent_video_dict, database_connection)
+            ad_info, error_msg = parse_youappi_ad(sent_video_dict, database_connection)
         else:
             ad_info, error_msg = parse_generic_adnetwork(
                 sent_video_dict, database_connection
