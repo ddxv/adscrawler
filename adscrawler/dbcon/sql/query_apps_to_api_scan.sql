@@ -1,4 +1,3 @@
-
 WITH latest_version_codes AS (
     SELECT DISTINCT ON
     (store_app)
@@ -109,7 +108,7 @@ monthly_ads_scheduled_to_run AS (
     LEFT JOIN store_apps AS sa
         ON
             lvc.store_app = sa.id
-        LEFT JOIN app_global_metrics_latest AS agm
+    LEFT JOIN app_global_metrics_latest AS agm
         ON sa.id = agm.store_app
     LEFT JOIN failed_runs AS fr ON sa.id = fr.store_app
     WHERE
@@ -143,7 +142,7 @@ user_requested_apps_crawl AS (
     LEFT JOIN store_apps AS sa
         ON
             urs.store_id = sa.store_id
-        LEFT JOIN app_global_metrics_latest AS agm
+    LEFT JOIN app_global_metrics_latest AS agm
         ON sa.id = agm.store_app
     INNER JOIN latest_version_codes AS lsvc
         ON
@@ -204,5 +203,6 @@ SELECT
     last_downloaded_at,
     NULL AS user_requested_at,
     'scheduled_ads' AS mysource
-FROM monthly_ads_scheduled_to_run
-WHERE store_id NOT IN (SELECT store_id FROM user_requested_apps_crawl);
+FROM monthly_ads_scheduled_to_run AS masr
+WHERE
+    masr.store_id NOT IN (SELECT urac.store_id FROM user_requested_apps_crawl AS urac);
