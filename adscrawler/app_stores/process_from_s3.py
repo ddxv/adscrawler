@@ -295,10 +295,14 @@ def manual_import_app_metrics_from_s3(
         use_ssh_tunnel=use_tunnel, config_key="madrone"
     )
 
+    start_date = datetime.datetime.fromisoformat("2025-10-01").date()
     for snapshot_date in pd.date_range(start_date, end_date, freq="D"):
         snapshot_date = snapshot_date.date()
         for store in [1, 2]:
-            process_app_metrics_to_db(database_connection, store, snapshot_date)
+            try:
+                process_app_metrics_to_db(database_connection, store, snapshot_date)
+            except:
+                process_app_metrics_to_db(database_connection, store, snapshot_date)
 
 
 def import_app_metrics_from_s3(
@@ -322,6 +326,11 @@ def process_app_metrics_to_db(
     make_s3_app_country_metrics_history(store, snapshot_date=snapshot_date)
     logger.info(f"date={snapshot_date}, store={store} agg df load")
     df = get_s3_agg_daily_snapshots(snapshot_date, snapshot_date, store)
+    if df.empty:
+        logger.warning(
+            f"No data found for S3 agg app metrics {store=} {snapshot_date=}"
+        )
+        return
     if store == 2:
         # Should be resolved from 11/1/2025
         problem_rows = df["store_id"].str.contains(".0")
@@ -336,11 +345,6 @@ def process_app_metrics_to_db(
             df = df.drop_duplicates(
                 ["snapshot_date", "country", "store_id"], keep="last"
             )
-    if df.empty:
-        logger.warning(
-            f"No data found for S3 agg app metrics {store=} {snapshot_date=}"
-        )
-        return
     logger.info(f"date={snapshot_date}, store={store} agg df prep")
     df = prep_app_metrics_history(
         df=df, store=store, database_connection=database_connection
@@ -439,6 +443,7 @@ def app_details_country_history_query(
     # lookback_date_str: str,
     snapshot_date_str: str,
 ) -> str:
+    bucket = CONFIG["s3"]["bucket"]
     if store == 2:
         data_cols = """
              CAST(trackId AS VARCHAR) AS store_id,
@@ -500,7 +505,7 @@ def app_details_country_history_query(
         PARTITION BY store_id, country
         ORDER BY crawled_at DESC, {extra_sort_column}
       ) = 1
-    ) TO 's3://adscrawler/agg-data/app_country_metrics/store={store}/snapshot_date={snapshot_date_str}/'
+    ) TO 's3://{bucket}/agg-data/app_country_metrics/store={store}/snapshot_date={snapshot_date_str}/'
     (FORMAT PARQUET, 
     PARTITION_BY (country), 
     ROW_GROUP_SIZE 100000, 
