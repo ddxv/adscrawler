@@ -312,7 +312,7 @@ def upsert_urls(urls: list[str], database_connection: PostgresCon) -> pd.DataFra
     new_urls_df["domain_id"] = np.where(
         pd.isna(new_urls_df["domain_id"]), None, new_urls_df["domain_id"]
     )
-    urls_df = upsert_df(
+    urls_df: pd.DataFrame = upsert_df(
         df=new_urls_df,
         database_connection=database_connection,
         schema="adtech",
@@ -475,16 +475,16 @@ def parse_urls_for_known_parts(
     found_adv_store_ids = list(set(found_adv_store_ids))
     found_adv_store_ids = [x for x in found_adv_store_ids if x != pub_store_id]
     found_ad_network_urls = [x for x in found_ad_network_urls if x is not None]
-    found_ad_network_tlds = [get_tld(url) for url in found_ad_network_urls]
-    found_ad_network_tlds = list(set(found_ad_network_tlds))
+    found_ad_network_tlds_list = [get_tld(url) for url in found_ad_network_urls]
+    found_ad_network_tlds = list(
+        set([x for x in found_ad_network_tlds_list if x is not None])
+    )
     if len(found_adv_store_ids) == 0:
         adv_store_id = None
     elif len(found_adv_store_ids) == 1:
         adv_store_id = found_adv_store_ids[0]
     else:
-        raise MultipleAdvertiserIdError(
-            f"multiple adv_store_id found for {found_adv_store_ids=}"
-        )
+        raise MultipleAdvertiserIdError(found_adv_store_ids=found_adv_store_ids)
     return AdInfo(
         adv_store_id=adv_store_id,
         found_mmp_urls=found_mmp_urls,
