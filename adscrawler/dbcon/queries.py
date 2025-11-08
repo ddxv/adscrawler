@@ -377,6 +377,57 @@ def upsert_df(
     return return_df
 
 
+def delete_and_insert(
+    df: pd.DataFrame,
+    table_name: str,
+    schema: str | None,
+    database_connection: Connection,
+    insert_columns: list[str],
+    delete_by_keys: list[str],
+    delete_keys_have_duplicates: bool = False,
+) -> pd.DataFrame | None:
+    """Replace rows in a table by deleting on key values then inserting the DataFrame."""
+    if df.empty:
+        return None
+
+    keys_df = df[delete_by_keys].drop_duplicates().reset_index(drop=True)
+    if not delete_keys_have_duplicates:
+        assert len(keys_df) == len(df), "Duplicate keys found in df"
+
+    keys_df = prepare_for_psycopg(keys_df)
+
+    raw_conn = database_connection.engine.raw_connection()
+    table_identifier = Identifier(table_name)
+    if schema:
+        table_identifier = Composed([Identifier(schema), SQL("."), table_identifier])
+
+    where_conditions = SQL(" AND ").join(
+        SQL("{col} = %s").format(col=Identifier(col)) for col in delete_by_keys
+    )
+    delete_query = SQL(
+        """
+        DELETE FROM {table}
+        WHERE {where_conditions}
+        """
+    ).format(table=table_identifier, where_conditions=where_conditions)
+
+    delete_data = [tuple(row) for row in keys_df.itertuples(index=False, name=None)]
+
+    with raw_conn.cursor() as cur:
+        if delete_data:
+            cur.executemany(delete_query, delete_data)
+    raw_conn.commit()
+    raw_conn.close()
+
+    return insert_df(
+        df=df,
+        insert_columns=insert_columns,
+        table_name=table_name,
+        database_connection=database_connection,
+        schema=schema,
+    )
+
+
 @lru_cache(maxsize=1)
 def query_all_developers(database_connection: PostgresCon) -> pd.DataFrame:
     """Query all developers from the database."""

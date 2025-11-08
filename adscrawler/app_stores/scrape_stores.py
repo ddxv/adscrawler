@@ -219,13 +219,6 @@ def crawl_keyword_cranks(database_connection: PostgresCon) -> None:
     )
 
 
-# def import_keywords_from_s3(database_connection: PostgresCon) -> None:
-#     languages_map = query_languages(database_connection)
-#     language_dict = languages_map.set_index("language_slug")["id"].to_dict()
-#     language_key = language_dict[language]
-#
-
-
 def scrape_store_ranks(database_connection: PostgresCon, store: int) -> None:
     collections_map = query_collections(database_connection)
     categories_map = query_categories(database_connection)
