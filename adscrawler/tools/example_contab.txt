@@ -29,7 +29,6 @@
 53 * * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW store_apps_created_at"
 
 # Weekly Cleanup
-2 0 * * 1 psql -d madrone -c "DELETE FROM logging.store_apps_crawl WHERE crawled_at < CURRENT_DATE - INTERVAL '365 days';"  >> /var/log/refresh_mv.log 2>&1
 3 0 * * 1 psql -d madrone -c "DELETE FROM logging.store_apps_audit WHERE stamp < CURRENT_DATE - INTERVAL '365 days';"  >> /var/log/refresh_mv.log 2>&1
 
 # Multiple Per Day 3+
@@ -50,8 +49,6 @@
 
 01 5 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW CONCURRENTLY frontend.adstxt_ad_domain_overview" >> /var/log/postgresql/refresh_mv.log 2>&1 
 31 5 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW CONCURRENTLY frontend.adstxt_publishers_overview" >> /var/log/postgresql/refresh_mv.log 2>&1 
-
-38 8 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW store_apps_history_weekly" >> /var/log/postgresql/refresh_mv.log 2>&1 
 
 33 11 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW apps_new_weekly" >> /var/log/postgresql/refresh_mv.log 2>&1 
 35 11 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW apps_new_monthly" >> /var/log/postgresql/refresh_mv.log 2>&1 
