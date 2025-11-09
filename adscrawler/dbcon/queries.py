@@ -32,6 +32,7 @@ QUERY_API_CALLS_TO_CREATIVE_SCAN = load_sql_file("query_apps_to_creative_scan.sq
 QUERY_KEYWORDS_TO_CRAWL = load_sql_file("query_keywords_to_crawl.sql")
 QUERY_APPS_MITM_IN_S3 = load_sql_file("query_apps_mitm_in_s3.sql")
 QUERY_ZSCORES = load_sql_file("query_simplified_store_app_z_scores.sql")
+QUERY_APPS_TO_PROCESS_KEYWORDS = load_sql_file("query_apps_to_process_keywords.sql")
 
 
 def insert_df(
@@ -1130,6 +1131,15 @@ def query_apps_to_api_scan(
     return df
 
 
+def query_apps_to_process_keywords(database_connection: PostgresCon) -> pd.DataFrame:
+    """Query apps to process keywords."""
+    df = pd.read_sql(
+        QUERY_APPS_TO_PROCESS_KEYWORDS,
+        con=database_connection.engine,
+    )
+    return df
+
+
 def query_apps_mitm_in_s3(database_connection: PostgresCon) -> pd.DataFrame:
     df = pd.read_sql(
         QUERY_APPS_MITM_IN_S3,
@@ -1234,7 +1244,7 @@ def query_ad_domains(database_connection: PostgresCon) -> pd.DataFrame:
 @lru_cache(maxsize=1)
 def query_keywords_base(database_connection: PostgresCon) -> pd.DataFrame:
     sel_query = """SELECT
-    k.keyword_text
+    k.id as keyword_id, k.keyword_text
     FROM
     keywords_base kb
     LEFT JOIN keywords k ON
@@ -1242,7 +1252,6 @@ def query_keywords_base(database_connection: PostgresCon) -> pd.DataFrame:
     ;
     """
     df = pd.read_sql(sel_query, con=database_connection.engine)
-    df["keyword_text"] = " " + df["keyword_text"] + " "
     return df
 
 
