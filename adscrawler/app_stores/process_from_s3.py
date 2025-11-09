@@ -699,13 +699,11 @@ def manual_download_rankings(
 def import_keywords_from_s3(
     start_date: datetime.date, end_date: datetime.date, database_connection: PostgresCon
 ) -> None:
-    start_date = datetime.date(2025, 11, 4)
-    end_date = datetime.date(2025, 11, 8)
     language = "en"
     country_map = query_countries(database_connection)
     languages_map = query_languages(database_connection)
     language_dict = languages_map.set_index("language_slug")["id"].to_dict()
-    language_key = language_dict[language]
+    _language_key = language_dict[language]
     s3_config_key = "s3"
     bucket = CONFIG[s3_config_key]["bucket"]
     for snapshot_date in pd.date_range(start_date, end_date, freq="D"):
