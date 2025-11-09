@@ -44,7 +44,7 @@ baseline_period AS (
         AVG(s.rating_count_diff) AS avg_ratings_diff,
         STDDEV(s.rating_count_diff) AS stddev_ratings_diff
     FROM
-        store_apps_history_weekly AS s
+        app_global_metrics_weekly_diffs AS s
     INNER JOIN my_advs AS m
         ON
             s.store_app = m.advertiser_store_app_id
@@ -55,7 +55,6 @@ baseline_period AS (
         AND s.week_start <= (
             CAST(:target_week AS date) - interval '7 days'
         )
-        AND s.country_id = 840
     GROUP BY
         s.store_app
 ),
@@ -66,14 +65,13 @@ target_weeks_data AS (
         SUM(s.installs_diff) AS target_week_installs,
         SUM(s.rating_count_diff) AS target_week_rating_count
     FROM
-        store_apps_history_weekly AS s
+        app_global_metrics_weekly_diffs AS s
     WHERE
         s.week_start >= CAST(:target_week AS date)
         AND
         s.week_start < (
             CAST(:target_week AS date) + interval '7 days'
         )
-        AND s.country_id = 840
     GROUP BY
         s.store_app,
         target_week

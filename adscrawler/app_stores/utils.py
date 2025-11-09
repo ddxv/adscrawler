@@ -28,6 +28,10 @@ def check_and_insert_new_apps(
     dicts: list[dict], database_connection: PostgresCon, crawl_source: str, store: int
 ) -> None:
     df = pd.DataFrame(dicts)
+    if store in [1, 2]:
+        df["store"] = store
+    else:
+        raise ValueError(f"Invalid store: {store}")
     found_bad_ids = df.loc[df["store"] == 2, "store_id"].str.match(r"^[0-9].*\.").any()
     if found_bad_ids:
         logger.error(f"Scrape {store=} {crawl_source=} found bad store_ids")

@@ -5,11 +5,12 @@ import sys
 
 from adscrawler.app_stores.process_from_s3 import (
     import_app_metrics_from_s3,
+    import_keywords_from_s3,
     import_ranks_from_s3,
 )
 from adscrawler.app_stores.scrape_stores import (
     crawl_developers_for_new_store_ids,
-    crawl_keyword_cranks,
+    crawl_keyword_ranks,
     scrape_store_ranks,
     update_app_details,
 )
@@ -349,6 +350,16 @@ class ProcessManager:
             )
         except Exception:
             logger.exception("Importing app metrics from s3 for failed")
+        try:
+            start_date = datetime.date.today() - datetime.timedelta(days=3)
+            end_date = datetime.date.today() - datetime.timedelta(days=1)
+            import_keywords_from_s3(
+                database_connection=self.pgcon,
+                start_date=start_date,
+                end_date=end_date,
+            )
+        except Exception:
+            logger.exception("Importing keywords from s3 for failed")
 
     def scrape_new_apps(self, store: int) -> None:
         try:
@@ -445,7 +456,7 @@ class ProcessManager:
                 logger.exception("Process APKs with Waydroid failed")
 
     def crawl_keywords(self) -> None:
-        crawl_keyword_cranks(database_connection=self.pgcon)
+        crawl_keyword_ranks(database_connection=self.pgcon)
 
     def run(self) -> None:
         if self.args.limit_processes and self.is_script_already_running():

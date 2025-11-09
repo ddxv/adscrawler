@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict bpz5FYFGXTvdg6tvoGzEnouIikfUi0oRmE3r11wYTIfpfVfuqeO9XKa705xogSc
+\restrict E09Dk3OoeJInNfSOA1f9kQUdUkC8qA9g1W4fNbUtwe59R35WEeLQ3TEyAzKFG3H
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -29,14 +29,14 @@ SET default_table_access_method = heap;
 
 CREATE MATERIALIZED VIEW adtech.company_sdk_strings AS
  WITH matched_value_patterns AS (
-         SELECT DISTINCT sd.company_id,
-            lower(vd.value_name) AS value_name_lower
+         SELECT DISTINCT lower(vd.value_name) AS value_name_lower,
+            sd.company_id
            FROM ((public.version_strings vd
              JOIN adtech.sdk_packages sp ON ((lower(vd.value_name) ~~ (lower((sp.package_pattern)::text) || '%'::text))))
              JOIN adtech.sdks sd ON ((sp.sdk_id = sd.id)))
         ), matched_path_patterns AS (
-         SELECT DISTINCT sd.company_id,
-            lower(vd.xml_path) AS xml_path_lower
+         SELECT DISTINCT lower(vd.xml_path) AS xml_path_lower,
+            sd.company_id
            FROM ((public.version_strings vd
              JOIN adtech.sdk_paths ptm ON ((lower(vd.xml_path) = lower((ptm.path_pattern)::text))))
              JOIN adtech.sdks sd ON ((ptm.sdk_id = sd.id)))
@@ -66,5 +66,5 @@ CREATE UNIQUE INDEX company_sdk_strings_version_string_id_company_id_idx ON adte
 -- PostgreSQL database dump complete
 --
 
-\unrestrict bpz5FYFGXTvdg6tvoGzEnouIikfUi0oRmE3r11wYTIfpfVfuqeO9XKa705xogSc
+\unrestrict E09Dk3OoeJInNfSOA1f9kQUdUkC8qA9g1W4fNbUtwe59R35WEeLQ3TEyAzKFG3H
 
