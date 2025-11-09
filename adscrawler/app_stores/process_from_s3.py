@@ -718,7 +718,6 @@ def import_keywords_from_s3(
                 logger.warning(f"No parquet paths found for {s3_key}")
                 continue
             df = query_keywords_from_s3(parquet_paths, s3_config_key)
-
             store_id_map = query_store_id_map_cached(database_connection, store)
             df["store_app"] = df["store_id"].map(
                 store_id_map.set_index("store_id")["id"].to_dict()
@@ -737,12 +736,6 @@ def import_keywords_from_s3(
                 df["store_app"] = df["store_id"].map(
                     store_id_map.set_index("store_id")["id"].to_dict()
                 )
-            dups = df[["crawled_date", "country", "keyword_id", "rank"]].duplicated()
-
-            df[(df["keyword_id"] == 11105) & (df["rank"] == 199)]
-
-            df[dups].tail()
-
             delete_and_insert(
                 df=df,
                 table_name="app_keyword_ranks_daily",
@@ -754,8 +747,7 @@ def import_keywords_from_s3(
                     "keyword_id",
                     "crawled_date",
                     "store_app",
-                    "rank",
-                    "best_rank",
+                    "app_rank",
                 ],
                 delete_keys_have_duplicates=True,
             )
@@ -767,18 +759,32 @@ def query_keywords_from_s3(
 ) -> pd.DataFrame:
     """Query keywords from S3 parquet files."""
     period_query = f"""WITH all_data AS (
-                SELECT * FROM read_parquet({parquet_paths})
-                 ),
-             period_app_ranks as (SELECT ar.rank,
-                min(ar.rank) AS best_rank,
-                ar.country,
-                ar.keyword_id,
-                ar.crawled_date,
-                ar.store_id
-               FROM all_data ar
-                 GROUP BY ar.rank, ar.country, ar.keyword_id, ar.crawled_date, ar.store_id
-                 )
-            SELECT par.rank, par.best_rank, par.country, par.keyword_id, par.crawled_date, par.store_id FROM period_app_ranks par
+               SELECT * FROM read_parquet({parquet_paths})
+           ),
+           latest_per_keyword AS (
+               SELECT
+                   store,
+                   country,
+                   keyword_id,
+                   rank,
+                   MAX(crawled_at) AS latest_crawled_at
+               FROM all_data
+               GROUP BY store, country, keyword_id, rank
+           )
+           SELECT
+               ar.crawled_date,
+               ar.country,
+               ar.store,
+               ar.rank AS app_rank,
+               ar.keyword_id,
+               ar.store_id
+           FROM all_data ar
+           JOIN latest_per_keyword lp
+             ON ar.keyword_id = lp.keyword_id
+            AND ar.store = lp.store
+            AND ar.country = lp.country
+            AND ar.rank = lp.rank
+            AND ar.crawled_at = lp.latest_crawled_at;
             """
     duckdb_con = get_duckdb_connection(s3_config_key)
     return duckdb_con.execute(period_query).df()

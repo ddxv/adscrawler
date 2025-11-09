@@ -9,7 +9,7 @@ from adscrawler.app_stores.process_from_s3 import (
 )
 from adscrawler.app_stores.scrape_stores import (
     crawl_developers_for_new_store_ids,
-    crawl_keyword_cranks,
+    crawl_keyword_ranks,
     scrape_store_ranks,
     update_app_details,
 )
@@ -445,7 +445,7 @@ class ProcessManager:
                 logger.exception("Process APKs with Waydroid failed")
 
     def crawl_keywords(self) -> None:
-        crawl_keyword_cranks(database_connection=self.pgcon)
+        crawl_keyword_ranks(database_connection=self.pgcon)
 
     def run(self) -> None:
         if self.args.limit_processes and self.is_script_already_running():
