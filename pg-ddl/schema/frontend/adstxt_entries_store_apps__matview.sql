@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict Q2pQLiY5WwqB7ShrAbuE06GIbokb1uyyvRvhJs2SqEVB1zSpgmeJ3DoO8MfVh2c
+\restrict ZbcdXlmbpbXmzYrW9UTVZNJwsI7PVaqhcoUNhYXcTxEFZkt1zb1S7Zse8mLM71U
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -81,5 +81,5 @@ CREATE UNIQUE INDEX adstxt_entries_store_apps_unique_idx ON frontend.adstxt_entr
 -- PostgreSQL database dump complete
 --
 
-\unrestrict Q2pQLiY5WwqB7ShrAbuE06GIbokb1uyyvRvhJs2SqEVB1zSpgmeJ3DoO8MfVh2c
+\unrestrict ZbcdXlmbpbXmzYrW9UTVZNJwsI7PVaqhcoUNhYXcTxEFZkt1zb1S7Zse8mLM71U
 

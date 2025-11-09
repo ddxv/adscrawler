@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict CfgvdkSTIHVlzBvstPGhNvGZOLVtxn94QpbW35hUIz2oZ30AFOf5O5ljdJq55a0
+\restrict vYe6z6bKpKdnNtZ6GXBJHvdhjuVYdAYwdbpsJfGPACUaXkI2Lmc94ZXYOPiUHhG
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -3474,22 +3474,6 @@ CREATE TABLE logging.store_apps_audit (
 ALTER TABLE logging.store_apps_audit OWNER TO postgres;
 
 --
--- Name: store_apps_crawl; Type: TABLE; Schema: logging; Owner: postgres
---
-
-CREATE TABLE logging.store_apps_crawl (
-    index bigint,
-    crawl_result bigint,
-    store bigint,
-    store_id text,
-    store_app bigint,
-    crawled_at timestamp without time zone
-);
-
-
-ALTER TABLE logging.store_apps_crawl OWNER TO postgres;
-
---
 -- Name: store_apps_snapshot; Type: TABLE; Schema: logging; Owner: postgres
 --
 
@@ -5946,13 +5930,6 @@ CREATE UNIQUE INDEX store_apps_overview_unique_store_id_idx ON frontend.store_ap
 
 
 --
--- Name: ix_logging_store_apps_crawl_index; Type: INDEX; Schema: logging; Owner: postgres
---
-
-CREATE INDEX ix_logging_store_apps_crawl_index ON logging.store_apps_crawl USING btree (index);
-
-
---
 -- Name: logging_store_app_upsert_unique; Type: INDEX; Schema: logging; Owner: postgres
 --
 
@@ -6923,5 +6900,5 @@ GRANT ALL ON SCHEMA public TO PUBLIC;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict CfgvdkSTIHVlzBvstPGhNvGZOLVtxn94QpbW35hUIz2oZ30AFOf5O5ljdJq55a0
+\unrestrict vYe6z6bKpKdnNtZ6GXBJHvdhjuVYdAYwdbpsJfGPACUaXkI2Lmc94ZXYOPiUHhG
 
