@@ -103,12 +103,12 @@ scheduled_apps_crawl AS (
         )
     ORDER BY
         (CASE
-            WHEN download_result IS NULL THEN 0
+            WHEN vc.download_result IS NULL THEN 0
             ELSE 1
         END),
         greatest(
-            coalesce(installs, 0),
-            coalesce(rating_count::bigint, 0) * 50
+            coalesce(dc.installs, 0),
+            coalesce(dc.rating_count::bigint, 0) * 50
         )
         DESC NULLS LAST
 ),

@@ -23,8 +23,8 @@ from adscrawler.mitm_ad_parser.creative_processor import (
 )
 from adscrawler.mitm_ad_parser.mitm_logs import get_mitm_df
 from adscrawler.mitm_ad_parser.network_parsers import (
-    parse_sent_video_df,
     parse_creative_request,
+    parse_sent_video_df,
 )
 from adscrawler.packages.storage import (
     creative_exists_in_s3,

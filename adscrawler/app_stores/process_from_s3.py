@@ -15,14 +15,14 @@ from adscrawler.dbcon.connection import (
     get_db_connection,
 )
 from adscrawler.dbcon.queries import (
+    delete_and_insert,
     query_categories,
     query_collections,
     query_countries,
+    query_languages,
     query_store_id_map,
     query_store_id_map_cached,
     upsert_df,
-    delete_and_insert,
-    query_languages,
 )
 from adscrawler.packages.storage import get_duckdb_connection, get_s3_client
 

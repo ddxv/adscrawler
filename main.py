@@ -5,8 +5,8 @@ import sys
 
 from adscrawler.app_stores.process_from_s3 import (
     import_app_metrics_from_s3,
-    import_ranks_from_s3,
     import_keywords_from_s3,
+    import_ranks_from_s3,
 )
 from adscrawler.app_stores.scrape_stores import (
     crawl_developers_for_new_store_ids,
