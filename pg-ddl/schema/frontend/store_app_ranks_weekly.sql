@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict BP7j4siyL56hA99Lg5s1QAPyUGrsSNkFkcdSmU1Zcpz1ip5ZnoWPd3cYF1oLWSe
+\restrict XgjM5HVhlHkZeIaxaHbfKeI8bW9ifVCigMdiCgoWwjbkyL4xSuLciShcDmK0Cqy
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -75,7 +75,7 @@ ALTER TABLE ONLY frontend.store_app_ranks_weekly
 --
 
 ALTER TABLE ONLY frontend.store_app_ranks_weekly
-    ADD CONSTRAINT fk_store_app FOREIGN KEY (store_app) REFERENCES public.store_apps(id);
+    ADD CONSTRAINT fk_store_app FOREIGN KEY (store_app) REFERENCES public.store_apps(id) DEFERRABLE INITIALLY DEFERRED;
 
 
 --
@@ -98,5 +98,5 @@ ALTER TABLE ONLY frontend.store_app_ranks_weekly
 -- PostgreSQL database dump complete
 --
 
-\unrestrict BP7j4siyL56hA99Lg5s1QAPyUGrsSNkFkcdSmU1Zcpz1ip5ZnoWPd3cYF1oLWSe
+\unrestrict XgjM5HVhlHkZeIaxaHbfKeI8bW9ifVCigMdiCgoWwjbkyL4xSuLciShcDmK0Cqy
 

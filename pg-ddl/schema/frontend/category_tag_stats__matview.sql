@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 2eMDCHdzdi8mK1dLjiVjLIscvXbPBeKheKwBjhtDJDonzEBDKQYyqIkanRJGd1X
+\restrict aeSLEc9F264KoZRnjNGrlD3FxwuyQrkQufsGrLgoBIeC5GIxy73qqVDEWnRlaYU
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -32,8 +32,8 @@ CREATE MATERIALIZED VIEW frontend.category_tag_stats AS
          SELECT sahw.store_app,
             sum(sahw.installs_diff) AS d30_installs,
             sum(sahw.rating_count_diff) AS d30_rating_count
-           FROM public.store_apps_history_weekly sahw
-          WHERE ((sahw.week_start > (CURRENT_DATE - '31 days'::interval)) AND (sahw.country_id = 840) AND ((sahw.installs_diff > (0)::numeric) OR (sahw.rating_count_diff > 0)))
+           FROM public.app_global_metrics_weekly_diffs sahw
+          WHERE ((sahw.week_start > (CURRENT_DATE - '31 days'::interval)) AND ((sahw.installs_diff > (0)::numeric) OR (sahw.rating_count_diff > (0)::numeric)))
           GROUP BY sahw.store_app
         ), distinct_apps_group AS (
          SELECT sa.store,
@@ -74,5 +74,5 @@ CREATE UNIQUE INDEX idx_category_tag_stats ON frontend.category_tag_stats USING 
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 2eMDCHdzdi8mK1dLjiVjLIscvXbPBeKheKwBjhtDJDonzEBDKQYyqIkanRJGd1X
+\unrestrict aeSLEc9F264KoZRnjNGrlD3FxwuyQrkQufsGrLgoBIeC5GIxy73qqVDEWnRlaYU
 

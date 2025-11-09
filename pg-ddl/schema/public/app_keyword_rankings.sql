@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 4PvrDtDFQNarIFw4vHexAcdg0Dks9IKW3aDN13hCgZMp4cVys2JdVUF3GnURLE0
+\restrict sNjcGNXHPlNoZ3abGjcwGeyox8YjqHwicFDA2gBiO5Nq8x1aiOBlxdh7FT28yv5
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -121,5 +121,5 @@ ALTER TABLE ONLY public.app_keyword_rankings
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 4PvrDtDFQNarIFw4vHexAcdg0Dks9IKW3aDN13hCgZMp4cVys2JdVUF3GnURLE0
+\unrestrict sNjcGNXHPlNoZ3abGjcwGeyox8YjqHwicFDA2gBiO5Nq8x1aiOBlxdh7FT28yv5
 

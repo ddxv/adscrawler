@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict Z7tVAY52faIcZuhFAO65zBZ9dKVLCMj4Q9j78DXZ6rbVGKfiWidqHLaS8eQn1qc
+\restrict IxElYT4yAf66qNrV6WQMKJybyjZjs1NW96Bw6rZkWc09ImUbChBhahkYCzmNLzB
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -116,5 +116,5 @@ CREATE UNIQUE INDEX idx_apps_new_yearly ON frontend.apps_new_yearly USING btree 
 -- PostgreSQL database dump complete
 --
 
-\unrestrict Z7tVAY52faIcZuhFAO65zBZ9dKVLCMj4Q9j78DXZ6rbVGKfiWidqHLaS8eQn1qc
+\unrestrict IxElYT4yAf66qNrV6WQMKJybyjZjs1NW96Bw6rZkWc09ImUbChBhahkYCzmNLzB
 

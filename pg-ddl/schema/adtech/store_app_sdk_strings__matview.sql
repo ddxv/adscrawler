@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict s6mLiB23VfTTbjMDn7OWbHrcGdZPssbSDhTRU2VYNd7u4FDDDcz0ggSMOeo7CAF
+\restrict 4gyHApH4qh3edCg2IlJBkeGC9teBgvdFNpGsz3nYvJ1jST3n5iYmwPxRNvZIAuQ
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -61,5 +61,5 @@ CREATE UNIQUE INDEX store_app_sdk_strings_idx ON adtech.store_app_sdk_strings US
 -- PostgreSQL database dump complete
 --
 
-\unrestrict s6mLiB23VfTTbjMDn7OWbHrcGdZPssbSDhTRU2VYNd7u4FDDDcz0ggSMOeo7CAF
+\unrestrict 4gyHApH4qh3edCg2IlJBkeGC9teBgvdFNpGsz3nYvJ1jST3n5iYmwPxRNvZIAuQ
 

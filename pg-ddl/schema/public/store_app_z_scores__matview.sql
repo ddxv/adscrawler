@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict vdjfSdtweO7IiEQGHylpstgHMRVFA6l3SdIDzTN3fST1UYOJ7razw1H6RAYti7o
+\restrict eNRcpVQ9rfYB7NQVhsa2cZrDtnRn99ga36j53QlR7bhswTAq8ENAqPm0fqoyBUD
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -29,24 +29,23 @@ SET default_table_access_method = heap;
 
 CREATE MATERIALIZED VIEW public.store_app_z_scores AS
  WITH latest_week AS (
-         SELECT max(store_apps_history_weekly.week_start) AS max_week
-           FROM public.store_apps_history_weekly
+         SELECT max(app_global_metrics_weekly_diffs.week_start) AS max_week
+           FROM public.app_global_metrics_weekly_diffs
         ), latest_week_per_app AS (
-         SELECT store_apps_history_weekly.store_app,
-            max(store_apps_history_weekly.week_start) AS app_max_week
-           FROM public.store_apps_history_weekly
-          WHERE (store_apps_history_weekly.country_id = 840)
-          GROUP BY store_apps_history_weekly.store_app
+         SELECT app_global_metrics_weekly_diffs.store_app,
+            max(app_global_metrics_weekly_diffs.week_start) AS app_max_week
+           FROM public.app_global_metrics_weekly_diffs
+          GROUP BY app_global_metrics_weekly_diffs.store_app
         ), baseline_period AS (
-         SELECT store_apps_history_weekly.store_app,
-            avg(store_apps_history_weekly.installs_diff) AS avg_installs_diff,
-            stddev(store_apps_history_weekly.installs_diff) AS stddev_installs_diff,
-            avg(store_apps_history_weekly.rating_count_diff) AS avg_rating_diff,
-            stddev(store_apps_history_weekly.rating_count_diff) AS stddev_rating_diff
-           FROM public.store_apps_history_weekly,
+         SELECT app_global_metrics_weekly_diffs.store_app,
+            avg(app_global_metrics_weekly_diffs.installs_diff) AS avg_installs_diff,
+            stddev(app_global_metrics_weekly_diffs.installs_diff) AS stddev_installs_diff,
+            avg(app_global_metrics_weekly_diffs.rating_count_diff) AS avg_rating_diff,
+            stddev(app_global_metrics_weekly_diffs.rating_count_diff) AS stddev_rating_diff
+           FROM public.app_global_metrics_weekly_diffs,
             latest_week
-          WHERE ((store_apps_history_weekly.week_start >= (latest_week.max_week - '84 days'::interval)) AND (store_apps_history_weekly.week_start <= (latest_week.max_week - '35 days'::interval)) AND (store_apps_history_weekly.country_id = 840))
-          GROUP BY store_apps_history_weekly.store_app
+          WHERE ((app_global_metrics_weekly_diffs.week_start >= (latest_week.max_week - '84 days'::interval)) AND (app_global_metrics_weekly_diffs.week_start <= (latest_week.max_week - '35 days'::interval)))
+          GROUP BY app_global_metrics_weekly_diffs.store_app
         ), recent_data AS (
          SELECT s.store_app,
             lw.max_week,
@@ -65,10 +64,10 @@ CREATE MATERIALIZED VIEW public.store_app_z_scores AS
                     WHEN (s.week_start >= (lwpa.app_max_week - '28 days'::interval)) THEN 1
                     ELSE 0
                 END AS in_4w_period
-           FROM ((public.store_apps_history_weekly s
+           FROM ((public.app_global_metrics_weekly_diffs s
              CROSS JOIN latest_week lw)
              JOIN latest_week_per_app lwpa ON ((s.store_app = lwpa.store_app)))
-          WHERE ((s.week_start >= (lw.max_week - '28 days'::interval)) AND (s.country_id = 840))
+          WHERE (s.week_start >= (lw.max_week - '28 days'::interval))
         ), aggregated_metrics AS (
          SELECT rd.store_app,
             rd.max_week AS latest_week,
@@ -80,7 +79,7 @@ CREATE MATERIALIZED VIEW public.store_app_z_scores AS
             sum(
                 CASE
                     WHEN (rd.is_latest_week = 1) THEN rd.rating_count_diff
-                    ELSE (0)::bigint
+                    ELSE ((0)::bigint)::numeric
                 END) AS ratings_sum_1w,
             (sum(
                 CASE
@@ -94,7 +93,7 @@ CREATE MATERIALIZED VIEW public.store_app_z_scores AS
             (sum(
                 CASE
                     WHEN (rd.in_2w_period = 1) THEN rd.rating_count_diff
-                    ELSE (0)::bigint
+                    ELSE ((0)::bigint)::numeric
                 END) / (NULLIF(sum(
                 CASE
                     WHEN (rd.in_2w_period = 1) THEN 1
@@ -108,7 +107,7 @@ CREATE MATERIALIZED VIEW public.store_app_z_scores AS
             sum(
                 CASE
                     WHEN (rd.in_4w_period = 1) THEN rd.rating_count_diff
-                    ELSE (0)::bigint
+                    ELSE ((0)::bigint)::numeric
                 END) AS ratings_sum_4w,
             (sum(
                 CASE
@@ -122,7 +121,7 @@ CREATE MATERIALIZED VIEW public.store_app_z_scores AS
             (sum(
                 CASE
                     WHEN (rd.in_4w_period = 1) THEN rd.rating_count_diff
-                    ELSE (0)::bigint
+                    ELSE ((0)::bigint)::numeric
                 END) / (NULLIF(sum(
                 CASE
                     WHEN (rd.in_4w_period = 1) THEN 1
@@ -156,5 +155,5 @@ ALTER MATERIALIZED VIEW public.store_app_z_scores OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict vdjfSdtweO7IiEQGHylpstgHMRVFA6l3SdIDzTN3fST1UYOJ7razw1H6RAYti7o
+\unrestrict eNRcpVQ9rfYB7NQVhsa2cZrDtnRn99ga36j53QlR7bhswTAq8ENAqPm0fqoyBUD
 

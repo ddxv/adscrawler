@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 386dLDp67mqZF8AHuRI3zw5Ra7YItqzMtDWb371DaOJrXVk3bqJTlNd3Cfcksf6
+\restrict GZ5zgNHjZhy76fuRiJb9tM6PnSgSHI47PHuNyYpVsyTGkI1cFvdS4WGUHWzJIyc
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -59,5 +59,5 @@ CREATE UNIQUE INDEX idx_combined_store_apps_parent_companies_idx ON adtech.combi
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 386dLDp67mqZF8AHuRI3zw5Ra7YItqzMtDWb371DaOJrXVk3bqJTlNd3Cfcksf6
+\unrestrict GZ5zgNHjZhy76fuRiJb9tM6PnSgSHI47PHuNyYpVsyTGkI1cFvdS4WGUHWzJIyc
 

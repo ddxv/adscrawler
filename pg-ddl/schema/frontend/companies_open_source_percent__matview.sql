@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 2UhvVaN8P3JR7T3uxyDted1RJjBgH8GG38J6JDhAi9lOlNyfKbkUW83EsKCfH0J
+\restrict UFCsbra1WEOnVcObRXXB3tmCdx3EYVxTZJygv9nFyv4gSlrbOavJAI1QpcohVxc
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -54,5 +54,5 @@ CREATE UNIQUE INDEX companies_open_source_percent_unique ON frontend.companies_o
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 2UhvVaN8P3JR7T3uxyDted1RJjBgH8GG38J6JDhAi9lOlNyfKbkUW83EsKCfH0J
+\unrestrict UFCsbra1WEOnVcObRXXB3tmCdx3EYVxTZJygv9nFyv4gSlrbOavJAI1QpcohVxc
 
