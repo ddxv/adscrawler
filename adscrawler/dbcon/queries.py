@@ -1,4 +1,5 @@
 import datetime
+import hashlib
 import pathlib
 from functools import lru_cache
 
@@ -365,7 +366,16 @@ def upsert_df(
 
         # Fetch affected rows if required
         if return_rows:
-            where_values = [df[col].tolist() for col in key_columns]
+            if len(key_columns) == 1 and key_columns[0] in (md5_key_columns or []):
+                md5_values = [
+                    hashlib.md5(v.encode("utf-8")).hexdigest()
+                    if v is not None
+                    else None
+                    for v in df[key_columns[0]].tolist()
+                ]
+                where_values = (md5_values,)
+            else:
+                where_values = [df[col].tolist() for col in key_columns]
             cur.execute(select_query, where_values)
             result = cur.fetchall()
             column_names = [desc[0] for desc in cur.description]
@@ -849,13 +859,44 @@ def query_pub_domains_to_crawl_ads_txt(
     return df
 
 
+def query_urls_id_map(
+    urls: list[str], database_connection: PostgresCon
+) -> pd.DataFrame:
+    """
+    Get URL IDs by looking up MD5 hashes.
+    Returns DataFrame with columns: url, id
+    """
+    if not urls:
+        return pd.DataFrame(columns=["url", "id"])
+    url_hash_map = {url: hashlib.md5(url.encode()).hexdigest() for url in urls}
+    hashes_str = "'" + "','".join(url_hash_map.values()) + "'"
+    sel_query = f"""
+        SELECT url, id, url_hash 
+        FROM adtech.urls 
+        WHERE url_hash IN ({hashes_str})
+    """
+    df = pd.read_sql(sel_query, database_connection.engine)
+    return df
+
+
 @lru_cache(maxsize=1000)
 def get_click_url_redirect_chains(
     run_id: int, database_connection: PostgresCon
 ) -> pd.DataFrame:
-    sel_query = (
-        f"""SELECT * FROM adtech.click_url_redirect_chains WHERE run_id = {run_id}"""
-    )
+    sel_query = f"""SELECT
+        urc.api_call_id,
+        urc.hop_index,
+        urc.is_chain_start,
+        urc.is_chain_end,
+        u.url,
+        ur.url AS redirect_url
+    FROM
+        adtech.url_redirect_chains urc
+    LEFT JOIN adtech.urls u ON urc.url_id = u.id
+    LEFT JOIN adtech.urls ur ON urc.next_url_id = ur.id
+    WHERE
+        urc.run_id = {run_id}
+    """
     df = pd.read_sql(sel_query, database_connection.engine)
     return df
 
@@ -1274,9 +1315,14 @@ def get_version_code_dbid(
 
 
 def get_failed_mitm_logs(database_connection: PostgresCon) -> pd.DataFrame:
-    sel_query = """SELECT * 
-    FROM logging.creative_scan_results 
-    WHERE error_msg like 'CRITICAL %%';
+    sel_query = """WITH last_run_result AS (SELECT DISTINCT ON (run_id)
+      run_id, pub_store_id, error_msg, inserted_at
+        FROM logging.creative_scan_results 
+      ORDER BY run_id, inserted_at DESC)
+      SELECT * 
+          FROM last_run_result
+          WHERE error_msg like 'CRITICAL %%'
+        ;
     """
     df = pd.read_sql(sel_query, con=database_connection.engine)
     return df

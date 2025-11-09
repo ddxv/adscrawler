@@ -8,5 +8,5 @@ def get_tld(url: str) -> str | None:
         return None
     tld_url: str = tld.domain + "." + tld.suffix
     if tld_url == ".":
-        tld_url = None
+        return None
     return tld_url
