@@ -734,15 +734,20 @@ def import_keywords_from_s3(
                 df["store_app"] = df["store_id"].map(
                     store_id_map.set_index("store_id")["id"].to_dict()
                 )
+            df["store"] = store
+            logger.info(
+                f"Keywords from S3 insert {snapshot_date} {store=} {df.shape[0]} rows"
+            )
             delete_and_insert(
                 df=df,
                 table_name="app_keyword_ranks_daily",
                 schema="frontend",
                 database_connection=database_connection,
-                delete_by_keys=["crawled_date"],
+                delete_by_keys=["crawled_date", "store"],
                 insert_columns=[
                     "country",
                     "keyword_id",
+                    "store",
                     "crawled_date",
                     "store_app",
                     "app_rank",
