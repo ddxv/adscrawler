@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict vYe6z6bKpKdnNtZ6GXBJHvdhjuVYdAYwdbpsJfGPACUaXkI2Lmc94ZXYOPiUHhG
+\restrict ySc2meWErSxCQVEpDkycKZtM3csY5mSwW2VJpw5QrDlus0OfJGEc3iNClUysXTC
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -1961,14 +1961,60 @@ ALTER MATERIALIZED VIEW frontend.api_call_countries OWNER TO postgres;
 
 CREATE TABLE frontend.app_keyword_ranks_daily (
     crawled_date date NOT NULL,
+    store smallint NOT NULL,
     country smallint NOT NULL,
-    app_rank smallint NOT NULL,
     keyword_id integer NOT NULL,
-    store_app integer NOT NULL
+    store_app integer NOT NULL,
+    app_rank smallint NOT NULL
 );
 
 
 ALTER TABLE frontend.app_keyword_ranks_daily OWNER TO postgres;
+
+--
+-- Name: app_keyword_rank_stats; Type: MATERIALIZED VIEW; Schema: frontend; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW frontend.app_keyword_rank_stats AS
+ WITH latest_per_country AS (
+         SELECT app_keyword_ranks_daily.country,
+            max(app_keyword_ranks_daily.crawled_date) AS max_crawled_date
+           FROM frontend.app_keyword_ranks_daily
+          GROUP BY app_keyword_ranks_daily.country
+        ), d30_keywords AS (
+         SELECT akr.country,
+            akr.store_app,
+            akr.keyword_id,
+            min(akr.app_rank) AS d30_best_rank
+           FROM frontend.app_keyword_ranks_daily akr
+          WHERE (akr.crawled_date >= (CURRENT_DATE - '30 days'::interval))
+          GROUP BY akr.country, akr.store_app, akr.keyword_id
+        ), latest_ranks AS (
+         SELECT kr.country,
+            kr.store_app,
+            kr.keyword_id,
+            kr.app_rank AS latest_app_rank
+           FROM (frontend.app_keyword_ranks_daily kr
+             JOIN latest_per_country lpc ON (((kr.country = lpc.country) AND (kr.crawled_date = lpc.max_crawled_date))))
+        ), all_ranked_keywords AS (
+         SELECT rk.country,
+            rk.store_app,
+            rk.keyword_id,
+            rk.d30_best_rank,
+            lk.latest_app_rank
+           FROM (d30_keywords rk
+             LEFT JOIN latest_ranks lk ON (((lk.country = rk.country) AND (lk.store_app = rk.store_app) AND (lk.keyword_id = rk.keyword_id))))
+        )
+ SELECT country,
+    store_app,
+    keyword_id,
+    d30_best_rank,
+    latest_app_rank
+   FROM all_ranked_keywords
+  WITH NO DATA;
+
+
+ALTER MATERIALIZED VIEW frontend.app_keyword_rank_stats OWNER TO postgres;
 
 --
 -- Name: apps_new_monthly; Type: MATERIALIZED VIEW; Schema: frontend; Owner: postgres
@@ -2946,18 +2992,18 @@ CREATE MATERIALIZED VIEW frontend.company_top_apps AS
 ALTER MATERIALIZED VIEW frontend.company_top_apps OWNER TO postgres;
 
 --
--- Name: description_keywords; Type: TABLE; Schema: public; Owner: postgres
+-- Name: app_keywords_extracted; Type: TABLE; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.description_keywords (
-    id integer NOT NULL,
-    description_id integer NOT NULL,
+CREATE TABLE public.app_keywords_extracted (
+    store_app integer NOT NULL,
     keyword_id integer NOT NULL,
-    extracted_at timestamp without time zone DEFAULT now() NOT NULL
+    description_id integer NOT NULL,
+    extracted_at timestamp without time zone NOT NULL
 );
 
 
-ALTER TABLE public.description_keywords OWNER TO postgres;
+ALTER TABLE public.app_keywords_extracted OWNER TO postgres;
 
 --
 -- Name: keywords; Type: TABLE; Schema: public; Owner: postgres
@@ -2976,40 +3022,106 @@ ALTER TABLE public.keywords OWNER TO postgres;
 --
 
 CREATE MATERIALIZED VIEW frontend.keyword_scores AS
- WITH latest_en_descriptions AS (
-         SELECT DISTINCT ON (sad.store_app) sad.store_app,
-            sad.id AS description_id
-           FROM (public.store_apps_descriptions sad
-             JOIN public.description_keywords dk ON ((sad.id = dk.description_id)))
-          WHERE (sad.language_id = 1)
-          ORDER BY sad.store_app, sad.updated_at DESC
-        ), keyword_app_counts AS (
+ WITH keyword_app_counts AS (
          SELECT sa.store,
             k.keyword_text,
-            dk.keyword_id,
-            count(DISTINCT led.store_app) AS app_count
-           FROM (((latest_en_descriptions led
-             LEFT JOIN public.description_keywords dk ON ((led.description_id = dk.description_id)))
-             LEFT JOIN public.keywords k ON ((dk.keyword_id = k.id)))
-             LEFT JOIN public.store_apps sa ON ((led.store_app = sa.id)))
-          WHERE (dk.keyword_id IS NOT NULL)
-          GROUP BY sa.store, k.keyword_text, dk.keyword_id
+            ake.keyword_id,
+            count(DISTINCT ake.store_app) AS app_count,
+            array_length(string_to_array((k.keyword_text)::text, ' '::text), 1) AS word_count
+           FROM ((public.app_keywords_extracted ake
+             LEFT JOIN public.keywords k ON ((ake.keyword_id = k.id)))
+             LEFT JOIN public.store_apps sa ON ((ake.store_app = sa.id)))
+          GROUP BY sa.store, k.keyword_text, ake.keyword_id
         ), total_app_count AS (
          SELECT sa.store,
-            count(*) AS total_apps
-           FROM (latest_en_descriptions led
-             LEFT JOIN public.store_apps sa ON ((led.store_app = sa.id)))
+            count(DISTINCT ake.store_app) AS total_apps
+           FROM (public.app_keywords_extracted ake
+             LEFT JOIN public.store_apps sa ON ((ake.store_app = sa.id)))
           GROUP BY sa.store
+        ), keyword_competitors AS (
+         SELECT ake.keyword_id,
+            sa.store,
+            avg(COALESCE(NULLIF(agml.installs, 0), (agml.rating_count * 25))) AS avg_installs,
+            max(COALESCE(NULLIF(agml.installs, 0), (agml.rating_count * 25))) AS max_installs,
+            percentile_cont((0.5)::double precision) WITHIN GROUP (ORDER BY ((COALESCE(NULLIF(agml.installs, 0), (agml.rating_count * 25)))::double precision)) AS median_installs,
+            avg(agml.rating) AS avg_rating,
+            count(*) FILTER (WHERE (COALESCE(NULLIF(agml.installs, 0), (agml.rating_count * 25)) > 1000000)) AS apps_over_1m_installs,
+            count(*) FILTER (WHERE ((sa.name)::text ~~* (('%'::text || (k.keyword_text)::text) || '%'::text))) AS title_matches
+           FROM (((public.app_keywords_extracted ake
+             LEFT JOIN public.store_apps sa ON ((ake.store_app = sa.id)))
+             LEFT JOIN public.app_global_metrics_latest agml ON ((sa.id = agml.store_app)))
+             LEFT JOIN public.keywords k ON ((ake.keyword_id = k.id)))
+          GROUP BY ake.keyword_id, sa.store, k.keyword_text
+        ), keyword_metrics AS (
+         SELECT kac.store,
+            kac.keyword_text,
+            kac.keyword_id,
+            kac.app_count,
+            round(kc.avg_installs, 0) AS avg_installs,
+            tac.total_apps,
+            round(((100.0 * (kac.app_count)::numeric) / (NULLIF(tac.total_apps, 0))::numeric), 2) AS market_penetration_pct,
+            round(((100)::numeric * (((1)::double precision - (ln(((tac.total_apps)::double precision / ((kac.app_count + 1))::double precision)) / ln((tac.total_apps)::double precision))))::numeric), 2) AS competitiveness_score,
+            kac.word_count,
+                CASE
+                    WHEN (kac.word_count = 1) THEN 'short_tail'::text
+                    WHEN (kac.word_count = 2) THEN 'medium_tail'::text
+                    ELSE 'long_tail'::text
+                END AS keyword_type,
+            length((kac.keyword_text)::text) AS char_length,
+            (COALESCE(kc.avg_installs, (0)::numeric))::bigint AS avg_competitor_installs,
+            COALESCE(kc.max_installs, (0)::bigint) AS top_competitor_installs,
+            (COALESCE(kc.median_installs, (0)::double precision))::bigint AS median_competitor_installs,
+            COALESCE(kc.avg_rating, (0)::double precision) AS avg_competitor_rating,
+            COALESCE(kc.apps_over_1m_installs, (0)::bigint) AS major_competitors,
+            COALESCE(kc.title_matches, (0)::bigint) AS title_matches,
+            round(((100.0 * (COALESCE(kc.title_matches, (0)::bigint))::numeric) / (NULLIF(kac.app_count, 0))::numeric), 2) AS title_relevance_pct
+           FROM ((keyword_app_counts kac
+             LEFT JOIN total_app_count tac ON ((kac.store = tac.store)))
+             LEFT JOIN keyword_competitors kc ON (((kac.keyword_id = kc.keyword_id) AND (kac.store = kc.store))))
         )
- SELECT kac.store,
-    kac.keyword_text,
-    kac.keyword_id,
-    kac.app_count,
-    tac.total_apps,
-    round(((100)::numeric * (((1)::double precision - (ln(((tac.total_apps)::double precision / ((kac.app_count + 1))::double precision)) / ln((tac.total_apps)::double precision))))::numeric), 2) AS competitiveness_score
-   FROM (keyword_app_counts kac
-     LEFT JOIN total_app_count tac ON ((kac.store = tac.store)))
-  ORDER BY (round(((100)::numeric * (((1)::double precision - (ln(((tac.total_apps)::double precision / ((kac.app_count + 1))::double precision)) / ln((tac.total_apps)::double precision))))::numeric), 2)) DESC
+ SELECT store,
+    keyword_text,
+    keyword_id,
+    app_count,
+    avg_installs,
+    total_apps,
+    market_penetration_pct,
+    competitiveness_score,
+    word_count,
+    keyword_type,
+    char_length,
+    avg_competitor_installs,
+    top_competitor_installs,
+    median_competitor_installs,
+    avg_competitor_rating,
+    major_competitors,
+    title_matches,
+    title_relevance_pct,
+    round(LEAST((100)::numeric, ((((app_count)::numeric * 10.0) * ((100)::numeric - competitiveness_score)) / 100.0)), 2) AS volume_competition_score,
+    round(LEAST((100)::numeric, ((competitiveness_score * 0.6) + (LEAST((100)::numeric, ((COALESCE(avg_competitor_installs, (0)::bigint))::numeric / 100000.0)) * 0.4))), 2) AS keyword_difficulty,
+    round(
+        CASE
+            WHEN (app_count < 10) THEN (0)::double precision
+            WHEN ((major_competitors)::numeric > ((app_count)::numeric * 0.25)) THEN (20)::double precision
+            ELSE ((LEAST((40)::double precision, (log(((app_count + 1))::double precision) * (10)::double precision)) + ((((100)::numeric - competitiveness_score) * 0.4))::double precision) + (
+            CASE
+                WHEN (COALESCE(median_competitor_installs, (0)::bigint) < 100000) THEN 20
+                WHEN (COALESCE(median_competitor_installs, (0)::bigint) < 1000000) THEN 15
+                WHEN (COALESCE(median_competitor_installs, (0)::bigint) < 10000000) THEN 10
+                ELSE 5
+            END)::double precision)
+        END) AS opportunity_score,
+        CASE
+            WHEN (app_count > 0) THEN round(((((app_count)::numeric * 1000.0) * (1.0 / ((1)::numeric + (competitiveness_score / 50.0)))) *
+            CASE
+                WHEN (word_count = 1) THEN 2.0
+                WHEN (word_count = 2) THEN 1.0
+                ELSE 0.5
+            END), 0)
+            ELSE (0)::numeric
+        END AS estimated_monthly_searches,
+    round(((100)::numeric - LEAST((100)::numeric, ((((major_competitors)::numeric * 10.0) + ((COALESCE(median_competitor_installs, (0)::bigint))::numeric / 100000.0)) + (competitiveness_score * 0.3)))), 2) AS ranking_feasibility
+   FROM keyword_metrics km
   WITH NO DATA;
 
 
@@ -3668,45 +3780,6 @@ CREATE MATERIALIZED VIEW public.app_country_metrics_latest AS
 ALTER MATERIALIZED VIEW public.app_country_metrics_latest OWNER TO postgres;
 
 --
--- Name: app_keyword_rankings; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE public.app_keyword_rankings (
-    id integer NOT NULL,
-    crawled_date date NOT NULL,
-    country smallint NOT NULL,
-    lang smallint NOT NULL,
-    keyword integer NOT NULL,
-    rank smallint NOT NULL,
-    store_app integer NOT NULL
-);
-
-
-ALTER TABLE public.app_keyword_rankings OWNER TO postgres;
-
---
--- Name: app_keyword_rankings_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
---
-
-CREATE SEQUENCE public.app_keyword_rankings_id_seq
-    AS integer
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
-ALTER SEQUENCE public.app_keyword_rankings_id_seq OWNER TO postgres;
-
---
--- Name: app_keyword_rankings_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
---
-
-ALTER SEQUENCE public.app_keyword_rankings_id_seq OWNED BY public.app_keyword_rankings.id;
-
-
---
 -- Name: app_urls_map_id_seq; Type: SEQUENCE; Schema: public; Owner: james
 --
 
@@ -3884,28 +3957,6 @@ ALTER SEQUENCE public.creative_records_id_seq1 OWNER TO postgres;
 --
 
 ALTER SEQUENCE public.creative_records_id_seq1 OWNED BY public.creative_records.id;
-
-
---
--- Name: description_keywords_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
---
-
-CREATE SEQUENCE public.description_keywords_id_seq
-    AS integer
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
-ALTER SEQUENCE public.description_keywords_id_seq OWNER TO postgres;
-
---
--- Name: description_keywords_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
---
-
-ALTER SEQUENCE public.description_keywords_id_seq OWNED BY public.description_keywords.id;
 
 
 --
@@ -4664,13 +4715,6 @@ ALTER TABLE ONLY public.api_calls ALTER COLUMN id SET DEFAULT nextval('public.ap
 
 
 --
--- Name: app_keyword_rankings id; Type: DEFAULT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.app_keyword_rankings ALTER COLUMN id SET DEFAULT nextval('public.app_keyword_rankings_id_seq'::regclass);
-
-
---
 -- Name: crawl_scenario_country_config id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
@@ -4696,13 +4740,6 @@ ALTER TABLE ONLY public.creative_assets ALTER COLUMN id SET DEFAULT nextval('pub
 --
 
 ALTER TABLE ONLY public.creative_records ALTER COLUMN id SET DEFAULT nextval('public.creative_records_id_seq1'::regclass);
-
-
---
--- Name: description_keywords id; Type: DEFAULT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.description_keywords ALTER COLUMN id SET DEFAULT nextval('public.description_keywords_id_seq'::regclass);
 
 
 --
@@ -4924,7 +4961,7 @@ ALTER TABLE ONLY adtech.urls
 --
 
 ALTER TABLE ONLY frontend.app_keyword_ranks_daily
-    ADD CONSTRAINT app_keyword_rankings_unique_test UNIQUE (crawled_date, country, keyword_id, app_rank);
+    ADD CONSTRAINT app_keyword_rankings_unique_test UNIQUE (crawled_date, store, country, keyword_id, app_rank);
 
 
 --
@@ -5029,14 +5066,6 @@ ALTER TABLE ONLY public.app_ads_map
 
 ALTER TABLE ONLY public.app_ads_entrys
     ADD CONSTRAINT app_ads_txt_un UNIQUE (ad_domain, publisher_id, relationship);
-
-
---
--- Name: app_keyword_rankings app_keyword_rankings_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.app_keyword_rankings
-    ADD CONSTRAINT app_keyword_rankings_pkey PRIMARY KEY (id);
 
 
 --
@@ -5152,19 +5181,11 @@ ALTER TABLE ONLY public.creative_records
 
 
 --
--- Name: description_keywords description_keywords_description_id_keyword_id_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+-- Name: app_keywords_extracted description_keywords_app_id_keyword_id_key; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.description_keywords
-    ADD CONSTRAINT description_keywords_description_id_keyword_id_key UNIQUE (description_id, keyword_id);
-
-
---
--- Name: description_keywords description_keywords_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.description_keywords
-    ADD CONSTRAINT description_keywords_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.app_keywords_extracted
+    ADD CONSTRAINT description_keywords_app_id_keyword_id_key UNIQUE (store_app, keyword_id);
 
 
 --
@@ -5341,14 +5362,6 @@ ALTER TABLE ONLY public.stores
 
 ALTER TABLE ONLY public.keywords
     ADD CONSTRAINT unique_keyword UNIQUE (keyword_text);
-
-
---
--- Name: app_keyword_rankings unique_keyword_ranking; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.app_keyword_rankings
-    ADD CONSTRAINT unique_keyword_ranking UNIQUE (crawled_date, country, lang, rank, store_app, keyword);
 
 
 --
@@ -5605,6 +5618,13 @@ CREATE INDEX app_keyword_ranks_daily_app_lookup ON frontend.app_keyword_ranks_da
 --
 
 CREATE INDEX app_keyword_ranks_daily_date ON frontend.app_keyword_ranks_daily USING btree (crawled_date);
+
+
+--
+-- Name: app_keywords_delete_and_insert_on; Type: INDEX; Schema: frontend; Owner: postgres
+--
+
+CREATE INDEX app_keywords_delete_and_insert_on ON frontend.app_keyword_ranks_daily USING btree (crawled_date, store);
 
 
 --
@@ -5881,13 +5901,6 @@ CREATE UNIQUE INDEX idx_unique_company_top_apps ON frontend.company_top_apps USI
 
 
 --
--- Name: keyword_scores_unique; Type: INDEX; Schema: frontend; Owner: postgres
---
-
-CREATE UNIQUE INDEX keyword_scores_unique ON frontend.keyword_scores USING btree (store, keyword_id);
-
-
---
 -- Name: latest_sdk_scanned_apps_unique_index; Type: INDEX; Schema: frontend; Owner: postgres
 --
 
@@ -6004,6 +6017,13 @@ CREATE UNIQUE INDEX app_global_metrics_latest_idx ON public.app_global_metrics_l
 --
 
 CREATE UNIQUE INDEX app_global_metrics_weekly_diffs_week_start_store_app_idx ON public.app_global_metrics_weekly_diffs USING btree (week_start, store_app);
+
+
+--
+-- Name: app_keywords_app_index; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX app_keywords_app_index ON public.app_keywords_extracted USING btree (store_app);
 
 
 --
@@ -6417,6 +6437,14 @@ ALTER TABLE ONLY adtech.urls
 
 
 --
+-- Name: app_keyword_ranks_daily country_kr_fk; Type: FK CONSTRAINT; Schema: frontend; Owner: postgres
+--
+
+ALTER TABLE ONLY frontend.app_keyword_ranks_daily
+    ADD CONSTRAINT country_kr_fk FOREIGN KEY (country) REFERENCES public.countries(id);
+
+
+--
 -- Name: store_app_ranks_weekly fk_country; Type: FK CONSTRAINT; Schema: frontend; Owner: postgres
 --
 
@@ -6478,6 +6506,30 @@ ALTER TABLE ONLY frontend.store_app_ranks_weekly
 
 ALTER TABLE ONLY frontend.store_app_ranks_daily
     ADD CONSTRAINT fk_store_collection FOREIGN KEY (store_collection) REFERENCES public.store_collections(id);
+
+
+--
+-- Name: app_keyword_ranks_daily keyword_kr_fk; Type: FK CONSTRAINT; Schema: frontend; Owner: postgres
+--
+
+ALTER TABLE ONLY frontend.app_keyword_ranks_daily
+    ADD CONSTRAINT keyword_kr_fk FOREIGN KEY (keyword_id) REFERENCES public.keywords(id);
+
+
+--
+-- Name: app_keyword_ranks_daily store_app_kr_fk; Type: FK CONSTRAINT; Schema: frontend; Owner: postgres
+--
+
+ALTER TABLE ONLY frontend.app_keyword_ranks_daily
+    ADD CONSTRAINT store_app_kr_fk FOREIGN KEY (store_app) REFERENCES public.store_apps(id);
+
+
+--
+-- Name: app_keyword_ranks_daily store_kr_fk; Type: FK CONSTRAINT; Schema: frontend; Owner: postgres
+--
+
+ALTER TABLE ONLY frontend.app_keyword_ranks_daily
+    ADD CONSTRAINT store_kr_fk FOREIGN KEY (store) REFERENCES public.stores(id);
 
 
 --
@@ -6713,18 +6765,18 @@ ALTER TABLE ONLY public.creative_records
 
 
 --
--- Name: description_keywords description_keywords_description_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+-- Name: app_keywords_extracted description_keywords_app_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.description_keywords
-    ADD CONSTRAINT description_keywords_description_id_fkey FOREIGN KEY (description_id) REFERENCES public.store_apps_descriptions(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.app_keywords_extracted
+    ADD CONSTRAINT description_keywords_app_id_fkey FOREIGN KEY (store_app) REFERENCES public.store_apps(id) ON DELETE CASCADE;
 
 
 --
--- Name: description_keywords description_keywords_keyword_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+-- Name: app_keywords_extracted description_keywords_keyword_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.description_keywords
+ALTER TABLE ONLY public.app_keywords_extracted
     ADD CONSTRAINT description_keywords_keyword_id_fkey FOREIGN KEY (keyword_id) REFERENCES public.keywords(id) ON DELETE CASCADE;
 
 
@@ -6734,14 +6786,6 @@ ALTER TABLE ONLY public.description_keywords
 
 ALTER TABLE ONLY public.developers
     ADD CONSTRAINT developers_fk FOREIGN KEY (store) REFERENCES public.stores(id);
-
-
---
--- Name: app_keyword_rankings fk_country; Type: FK CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.app_keyword_rankings
-    ADD CONSTRAINT fk_country FOREIGN KEY (country) REFERENCES public.countries(id);
 
 
 --
@@ -6758,30 +6802,6 @@ ALTER TABLE ONLY public.ip_geo_snapshots
 
 ALTER TABLE ONLY public.app_country_metrics_history
     ADD CONSTRAINT fk_country FOREIGN KEY (country_id) REFERENCES public.countries(id);
-
-
---
--- Name: app_keyword_rankings fk_language; Type: FK CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.app_keyword_rankings
-    ADD CONSTRAINT fk_language FOREIGN KEY (lang) REFERENCES public.languages(id);
-
-
---
--- Name: app_keyword_rankings fk_store_app; Type: FK CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.app_keyword_rankings
-    ADD CONSTRAINT fk_store_app FOREIGN KEY (store_app) REFERENCES public.store_apps(id);
-
-
---
--- Name: app_keyword_rankings fk_store_keyword; Type: FK CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.app_keyword_rankings
-    ADD CONSTRAINT fk_store_keyword FOREIGN KEY (keyword) REFERENCES public.keywords(id);
 
 
 --
@@ -6900,5 +6920,5 @@ GRANT ALL ON SCHEMA public TO PUBLIC;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict vYe6z6bKpKdnNtZ6GXBJHvdhjuVYdAYwdbpsJfGPACUaXkI2Lmc94ZXYOPiUHhG
+\unrestrict ySc2meWErSxCQVEpDkycKZtM3csY5mSwW2VJpw5QrDlus0OfJGEc3iNClUysXTC
 

@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict ZOGd1Icm0aDKNJxSwQxA7vAwjYaHMlrg1ye5PXWD4knlQf42hLOZyQgKNDEFTdy
+\restrict IL1Pjl1aNEmwraVYKnXd9MMaPS3DmGjJaVv2tXcFAh5pBA7c09870htBJYSkufN
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -29,10 +29,11 @@ SET default_table_access_method = heap;
 
 CREATE TABLE frontend.app_keyword_ranks_daily (
     crawled_date date NOT NULL,
+    store smallint NOT NULL,
     country smallint NOT NULL,
-    app_rank smallint NOT NULL,
     keyword_id integer NOT NULL,
-    store_app integer NOT NULL
+    store_app integer NOT NULL,
+    app_rank smallint NOT NULL
 );
 
 
@@ -43,7 +44,7 @@ ALTER TABLE frontend.app_keyword_ranks_daily OWNER TO postgres;
 --
 
 ALTER TABLE ONLY frontend.app_keyword_ranks_daily
-    ADD CONSTRAINT app_keyword_rankings_unique_test UNIQUE (crawled_date, country, keyword_id, app_rank);
+    ADD CONSTRAINT app_keyword_rankings_unique_test UNIQUE (crawled_date, store, country, keyword_id, app_rank);
 
 
 --
@@ -61,8 +62,47 @@ CREATE INDEX app_keyword_ranks_daily_date ON frontend.app_keyword_ranks_daily US
 
 
 --
+-- Name: app_keywords_delete_and_insert_on; Type: INDEX; Schema: frontend; Owner: postgres
+--
+
+CREATE INDEX app_keywords_delete_and_insert_on ON frontend.app_keyword_ranks_daily USING btree (crawled_date, store);
+
+
+--
+-- Name: app_keyword_ranks_daily country_kr_fk; Type: FK CONSTRAINT; Schema: frontend; Owner: postgres
+--
+
+ALTER TABLE ONLY frontend.app_keyword_ranks_daily
+    ADD CONSTRAINT country_kr_fk FOREIGN KEY (country) REFERENCES public.countries(id);
+
+
+--
+-- Name: app_keyword_ranks_daily keyword_kr_fk; Type: FK CONSTRAINT; Schema: frontend; Owner: postgres
+--
+
+ALTER TABLE ONLY frontend.app_keyword_ranks_daily
+    ADD CONSTRAINT keyword_kr_fk FOREIGN KEY (keyword_id) REFERENCES public.keywords(id);
+
+
+--
+-- Name: app_keyword_ranks_daily store_app_kr_fk; Type: FK CONSTRAINT; Schema: frontend; Owner: postgres
+--
+
+ALTER TABLE ONLY frontend.app_keyword_ranks_daily
+    ADD CONSTRAINT store_app_kr_fk FOREIGN KEY (store_app) REFERENCES public.store_apps(id);
+
+
+--
+-- Name: app_keyword_ranks_daily store_kr_fk; Type: FK CONSTRAINT; Schema: frontend; Owner: postgres
+--
+
+ALTER TABLE ONLY frontend.app_keyword_ranks_daily
+    ADD CONSTRAINT store_kr_fk FOREIGN KEY (store) REFERENCES public.stores(id);
+
+
+--
 -- PostgreSQL database dump complete
 --
 
-\unrestrict ZOGd1Icm0aDKNJxSwQxA7vAwjYaHMlrg1ye5PXWD4knlQf42hLOZyQgKNDEFTdy
+\unrestrict IL1Pjl1aNEmwraVYKnXd9MMaPS3DmGjJaVv2tXcFAh5pBA7c09870htBJYSkufN
 

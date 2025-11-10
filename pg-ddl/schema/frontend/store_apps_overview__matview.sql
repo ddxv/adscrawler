@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict Rbxh9jMb42s8eRdhP1dxUOhDfqbnOVDlOzhYdoIsJWn0o17BNd6s9Qy89gde2G3
+\restrict 5myfyV5cXRCcNXH2GRftdW7aaP18MwOap1KABOWrzXoDCYdARN0nQumN5Pc3ujN
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -197,5 +197,5 @@ CREATE UNIQUE INDEX store_apps_overview_unique_store_id_idx ON frontend.store_ap
 -- PostgreSQL database dump complete
 --
 
-\unrestrict Rbxh9jMb42s8eRdhP1dxUOhDfqbnOVDlOzhYdoIsJWn0o17BNd6s9Qy89gde2G3
+\unrestrict 5myfyV5cXRCcNXH2GRftdW7aaP18MwOap1KABOWrzXoDCYdARN0nQumN5Pc3ujN
 

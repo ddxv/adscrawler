@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict Syr6lyxP1PlfUN6aJEjK7mIdtKYCHydvUmnrrt4BSmzsIHycKentN4CPT9mI8aZ
+\restrict ddyohlmuMta3TXOAOCqj7tIRlabvAaAmNofIEEJXpGMlExnJDGQVHi4zosKh1wa
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -62,5 +62,5 @@ CREATE UNIQUE INDEX app_global_metrics_weekly_diffs_week_start_store_app_idx ON 
 -- PostgreSQL database dump complete
 --
 
-\unrestrict Syr6lyxP1PlfUN6aJEjK7mIdtKYCHydvUmnrrt4BSmzsIHycKentN4CPT9mI8aZ
+\unrestrict ddyohlmuMta3TXOAOCqj7tIRlabvAaAmNofIEEJXpGMlExnJDGQVHi4zosKh1wa
 
