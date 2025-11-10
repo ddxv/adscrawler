@@ -23,7 +23,7 @@ FROM
 LEFT JOIN store_apps AS sa ON ac.store_app = sa.id
 WHERE
     ac.id IN (
-        SELECT id FROM has_creatives
+        SELECT hc.id FROM has_creatives AS hc
     )
     AND ac.called_at >= :earliest_date
     AND ac.called_at <= current_date - INTERVAL '1 hour';

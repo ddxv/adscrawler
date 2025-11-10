@@ -55,57 +55,117 @@ LEFT JOIN latest_crawls AS lc
 WHERE
     sa.store = :store
     AND (
-        lc.crawled_at IS NULL OR (
+        -- Always crawl new apps
+        sa.crawl_result IS NULL
+        -- Short update conditions
+        OR (
             (
-                -- Short update conditions
-                (
-                    agm.installs >= :short_update_installs
-                    OR agm.rating_count >= :short_update_ratings
-                    OR (
-                        sa.id IN (
-                            SELECT sailr.store_app
-                            FROM store_apps_in_latest_rankings AS sailr
-                        )
+                agm.installs >= :short_update_installs
+                OR agm.rating_count >= :short_update_ratings
+                OR (
+                    sa.id IN (
+                        SELECT sailr.store_app
+                        FROM store_apps_in_latest_rankings AS sailr
                     )
                 )
-                AND sa.updated_at <= :short_update_ts
-                AND (
-                    sa.crawl_result = 1
-                    OR sa.crawl_result IS NULL
-                    OR sa.created_at >= :long_update_ts
-                    OR sa.store_last_updated >= :year_ago_ts
-                )
             )
-            OR (
-                -- Long update conditions
-                sa.updated_at <= :long_update_ts
-                AND (
-                    sa.crawl_result = 1
-                    OR sa.crawl_result IS NULL
-                    OR sa.store_last_updated >= :year_ago_ts
-                )
-            )
-            OR (
-                -- Max update conditions
-                sa.updated_at <= :max_recrawl_ts
+            AND sa.updated_at <= :short_update_ts
+            AND (
+                sa.crawl_result = 1
                 OR sa.crawl_result IS NULL
+                OR sa.created_at >= :long_update_ts
+                OR sa.store_last_updated >= :year_ago_ts
             )
+        )
+        -- Long update conditions
+        OR (
+            sa.updated_at <= :long_update_ts
+            AND (
+                sa.crawl_result = 1
+                OR sa.crawl_result IS NULL
+                OR sa.store_last_updated >= :year_ago_ts
+            )
+        )
+        -- Max update conditions
+        OR (
+            sa.updated_at <= :max_recrawl_ts
         )
     )
 ORDER BY
-    (CASE
-        WHEN sa.crawl_result IS NULL
-            THEN 0
-        ELSE 1
-    END),
-    (CASE
-        WHEN sa.updated_at < :max_recrawl_ts
-            THEN 0
-        ELSE 1
-    END),
-    GREATEST(
-        COALESCE(agm.installs, 0),
-        COALESCE(CAST(agm.rating_count AS bigint), 0)
-    )
-    DESC NULLS LAST
+    (CASE WHEN sa.crawl_result IS NULL THEN 1 ELSE 0 END) DESC, -- always crawl new ones first
+    (
+        GREATEST(
+            COALESCE(agm.installs, 0),
+            COALESCE(agm.rating_count::bigint, 0)
+        )
+        * (10 * EXTRACT(DAY FROM (NOW() - sa.updated_at)))
+    ) DESC
 LIMIT :mylimit;
+
+
+
+WITH latest_descriptions AS (
+    SELECT
+        DISTINCT ON
+        (store_app)
+        sad.id AS description_id,
+        store_app,
+        description_short,
+        description
+    FROM
+        store_apps_descriptions sad
+    WHERE
+        language_id = 1
+    ORDER BY
+        store_app,
+        updated_at DESC
+),
+latest_extractions AS (
+    SELECT
+        DISTINCT ON
+        (store_app)
+        sad.store_app,
+        ak.extracted_at AS last_extracted_at
+    FROM
+        store_apps_descriptions sad
+    LEFT JOIN
+        app_keywords ak
+    ON
+        ak.description_id = sad.id
+    WHERE
+        ak.extracted_at <= '2025-11-02'
+        OR ak.extracted_at IS NULL
+    ORDER BY
+        sad.store_app,
+        ak.extracted_at DESC
+),
+ base AS (
+    SELECT
+        le.store_app,
+        ld.description_id,
+        le.last_extracted_at,
+        ld.description_short,
+        ld.description
+    FROM
+        latest_extractions le
+    JOIN latest_descriptions ld ON
+        le.store_app = ld.store_app
+)
+ SELECT
+    b.store_app,
+    b.description_id,
+    b.last_extracted_at,
+    b.description_short,
+    b.description
+FROM
+    base b
+    JOIN app_global_metrics_latest agml ON b.store_app = agml.store_app
+ORDER BY
+    (CASE WHEN b.last_extracted_at IS NULL THEN 1 ELSE 0 END) DESC, -- always crawl new ones first
+    (
+        GREATEST(
+            COALESCE(agml.installs, 0),
+            COALESCE(agml.rating_count::bigint, 0)
+        )
+        * (10 * COALESCE(EXTRACT(DAY FROM (NOW() - b.last_extracted_at)), 1))
+    ) DESC

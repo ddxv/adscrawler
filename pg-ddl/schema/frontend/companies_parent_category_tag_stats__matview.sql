@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict afGBX2oT3IrLVj6d36TEgCe3Xv42gdg0tGhnvC5hGeNMZaS3ar4OGmbgdI0Obqn
+\restrict mtqaIZJL2aEl0hNEC0uRsHlqnZPCpIzmDSXU2Mi4jXGgnFRRRSucUUn1H9LVpQ5
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -32,8 +32,8 @@ CREATE MATERIALIZED VIEW frontend.companies_parent_category_tag_stats AS
          SELECT sahw.store_app,
             sum(sahw.installs_diff) AS d30_installs,
             sum(sahw.rating_count_diff) AS d30_rating_count
-           FROM public.store_apps_history_weekly sahw
-          WHERE ((sahw.week_start > (CURRENT_DATE - '31 days'::interval)) AND (sahw.country_id = 840) AND ((sahw.installs_diff > (0)::numeric) OR (sahw.rating_count_diff > 0)))
+           FROM public.app_global_metrics_weekly_diffs sahw
+          WHERE ((sahw.week_start > (CURRENT_DATE - '31 days'::interval)) AND ((sahw.installs_diff > (0)::numeric) OR (sahw.rating_count_diff > (0)::numeric)))
           GROUP BY sahw.store_app
         ), distinct_apps_group AS (
          SELECT sa.store,
@@ -90,5 +90,5 @@ CREATE INDEX companies_parent_category_tag_stats_query_idx ON frontend.companies
 -- PostgreSQL database dump complete
 --
 
-\unrestrict afGBX2oT3IrLVj6d36TEgCe3Xv42gdg0tGhnvC5hGeNMZaS3ar4OGmbgdI0Obqn
+\unrestrict mtqaIZJL2aEl0hNEC0uRsHlqnZPCpIzmDSXU2Mi4jXGgnFRRRSucUUn1H9LVpQ5
 

@@ -15,9 +15,11 @@ from adscrawler.dbcon.connection import (
     get_db_connection,
 )
 from adscrawler.dbcon.queries import (
+    delete_and_insert,
     query_categories,
     query_collections,
     query_countries,
+    query_languages,
     query_store_id_map,
     query_store_id_map_cached,
     upsert_df,
@@ -295,10 +297,14 @@ def manual_import_app_metrics_from_s3(
         use_ssh_tunnel=use_tunnel, config_key="madrone"
     )
 
+    start_date = datetime.datetime.fromisoformat("2025-10-01").date()
     for snapshot_date in pd.date_range(start_date, end_date, freq="D"):
         snapshot_date = snapshot_date.date()
         for store in [1, 2]:
-            process_app_metrics_to_db(database_connection, store, snapshot_date)
+            try:
+                process_app_metrics_to_db(database_connection, store, snapshot_date)
+            except:
+                process_app_metrics_to_db(database_connection, store, snapshot_date)
 
 
 def import_app_metrics_from_s3(
@@ -322,6 +328,11 @@ def process_app_metrics_to_db(
     make_s3_app_country_metrics_history(store, snapshot_date=snapshot_date)
     logger.info(f"date={snapshot_date}, store={store} agg df load")
     df = get_s3_agg_daily_snapshots(snapshot_date, snapshot_date, store)
+    if df.empty:
+        logger.warning(
+            f"No data found for S3 agg app metrics {store=} {snapshot_date=}"
+        )
+        return
     if store == 2:
         # Should be resolved from 11/1/2025
         problem_rows = df["store_id"].str.contains(".0")
@@ -336,11 +347,6 @@ def process_app_metrics_to_db(
             df = df.drop_duplicates(
                 ["snapshot_date", "country", "store_id"], keep="last"
             )
-    if df.empty:
-        logger.warning(
-            f"No data found for S3 agg app metrics {store=} {snapshot_date=}"
-        )
-        return
     logger.info(f"date={snapshot_date}, store={store} agg df prep")
     df = prep_app_metrics_history(
         df=df, store=store, database_connection=database_connection
@@ -439,6 +445,7 @@ def app_details_country_history_query(
     # lookback_date_str: str,
     snapshot_date_str: str,
 ) -> str:
+    bucket = CONFIG["s3"]["bucket"]
     if store == 2:
         data_cols = """
              CAST(trackId AS VARCHAR) AS store_id,
@@ -500,7 +507,7 @@ def app_details_country_history_query(
         PARTITION BY store_id, country
         ORDER BY crawled_at DESC, {extra_sort_column}
       ) = 1
-    ) TO 's3://adscrawler/agg-data/app_country_metrics/store={store}/snapshot_date={snapshot_date_str}/'
+    ) TO 's3://{bucket}/agg-data/app_country_metrics/store={store}/snapshot_date={snapshot_date_str}/'
     (FORMAT PARQUET, 
     PARTITION_BY (country), 
     ROW_GROUP_SIZE 100000, 
@@ -571,7 +578,7 @@ def process_ranks_from_s3(
         logger.info(
             f"DuckDB {store=} period_start={period_date_str} {country=} files={len(country_parquet_paths)}"
         )
-        wdf = process_parquets_and_insert(
+        wdf = query_store_collection_ranks(
             country_parquet_paths=country_parquet_paths,
             period=period,
             s3_config_key=s3_config_key,
@@ -632,7 +639,7 @@ def process_ranks_from_s3(
         )
 
 
-def process_parquets_and_insert(
+def query_store_collection_ranks(
     country_parquet_paths: list[str],
     period: str,
     s3_config_key: str,
@@ -687,3 +694,95 @@ def manual_download_rankings(
     s3_client.download_file(bucket, s3_key, str(local_path))
     df = pd.read_parquet(local_path)
     return df
+
+
+def import_keywords_from_s3(
+    start_date: datetime.date, end_date: datetime.date, database_connection: PostgresCon
+) -> None:
+    language = "en"
+    country_map = query_countries(database_connection)
+    languages_map = query_languages(database_connection)
+    language_dict = languages_map.set_index("language_slug")["id"].to_dict()
+    _language_key = language_dict[language]
+    s3_config_key = "s3"
+    bucket = CONFIG[s3_config_key]["bucket"]
+    for snapshot_date in pd.date_range(start_date, end_date, freq="D"):
+        snapshot_date = snapshot_date.date()
+        for store in [1, 2]:
+            s3_loc = "raw-data/keywords"
+            s3_key = f"{s3_loc}/store={store}/crawled_date={snapshot_date}/"
+            parquet_paths = get_parquet_paths_by_prefix(bucket, s3_key)
+            if len(parquet_paths) == 0:
+                logger.warning(f"No parquet paths found for {s3_key}")
+                continue
+            df = query_keywords_from_s3(parquet_paths, s3_config_key)
+            store_id_map = query_store_id_map_cached(database_connection, store)
+            df["store_app"] = df["store_id"].map(
+                store_id_map.set_index("store_id")["id"].to_dict()
+            )
+            df["country"] = df["country"].map(
+                country_map.set_index("alpha2")["id"].to_dict()
+            )
+            if df["store_app"].isna().any():
+                check_and_insert_new_apps(
+                    database_connection=database_connection,
+                    dicts=df.to_dict(orient="records"),
+                    crawl_source="keywords",
+                    store=store,
+                )
+                store_id_map = query_store_id_map_cached(database_connection, store)
+                df["store_app"] = df["store_id"].map(
+                    store_id_map.set_index("store_id")["id"].to_dict()
+                )
+            delete_and_insert(
+                df=df,
+                table_name="app_keyword_ranks_daily",
+                schema="frontend",
+                database_connection=database_connection,
+                delete_by_keys=["crawled_date"],
+                insert_columns=[
+                    "country",
+                    "keyword_id",
+                    "crawled_date",
+                    "store_app",
+                    "app_rank",
+                ],
+                delete_keys_have_duplicates=True,
+            )
+
+
+def query_keywords_from_s3(
+    parquet_paths: list[str],
+    s3_config_key: str,
+) -> pd.DataFrame:
+    """Query keywords from S3 parquet files."""
+    period_query = f"""WITH all_data AS (
+               SELECT * FROM read_parquet({parquet_paths})
+           ),
+           latest_per_keyword AS (
+               SELECT
+                   store,
+                   country,
+                   keyword_id,
+                   rank,
+                   MAX(crawled_at) AS latest_crawled_at
+               FROM all_data
+               GROUP BY store, country, keyword_id, rank
+           )
+           SELECT
+               ar.crawled_date,
+               ar.country,
+               ar.store,
+               ar.rank AS app_rank,
+               ar.keyword_id,
+               ar.store_id
+           FROM all_data ar
+           JOIN latest_per_keyword lp
+             ON ar.keyword_id = lp.keyword_id
+            AND ar.store = lp.store
+            AND ar.country = lp.country
+            AND ar.rank = lp.rank
+            AND ar.crawled_at = lp.latest_crawled_at;
+            """
+    duckdb_con = get_duckdb_connection(s3_config_key)
+    return duckdb_con.execute(period_query).df()

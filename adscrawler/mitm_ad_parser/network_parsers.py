@@ -7,6 +7,7 @@ import urllib
 import xml.etree.ElementTree as ET
 from typing import Any
 
+import numpy as np
 import pandas as pd
 import protod
 import requests
@@ -19,6 +20,7 @@ from adscrawler.dbcon.queries import (
     get_all_mmp_tlds,
     get_click_url_redirect_chains,
     query_ad_domains,
+    query_all_domains,
     query_api_call_id_for_uuid,
     query_store_app_by_store_id_cached,
     upsert_df,
@@ -47,9 +49,7 @@ IGNORE_PRIVACY_URLS = [
 ]
 
 
-def extract_and_decode_urls(
-    text: str, run_id: int, mitm_uuid: str, database_connection: PostgresCon
-) -> list[str]:
+def extract_and_decode_urls(text: str) -> list[str]:
     """Extracts and decodes all URLs from text content, handling various encoding formats."""
     """
     Extracts all URLs from a given text, handles HTML entities and URL encoding.
@@ -115,6 +115,7 @@ def extract_and_decode_urls(
     found_urls = list(
         set(vast_urls + unesc_found_urls + enc_found_urls + orig_found_urls)
     )
+    found_urls = [url.replace("\x00", "") for url in found_urls]
     encoded_delimiters = [
         "%5D",  # ]
         "%3E",  # >
@@ -136,22 +137,24 @@ def extract_and_decode_urls(
         urls.append(decoded_url)
         # print("DECODED:", decoded_url)
     all_urls = list(set(vast_urls + urls))
-    api_call_id = query_api_call_id_for_uuid(mitm_uuid, database_connection)
-    click_urls = check_click_urls(all_urls, run_id, api_call_id, database_connection)
-    all_urls = list(set(all_urls + click_urls))
-    all_urls_df = pd.DataFrame(
-        {"run_id": run_id, "url": all_urls, "api_call_id": api_call_id}
-    )
+    return all_urls
+
+
+def store_found_urls_in_db(
+    all_urls: list[str], run_id: int, api_call_id: int, database_connection: PostgresCon
+) -> None:
+    """Stores the found URLs in the database."""
+    urls_df = upsert_urls(urls=all_urls, database_connection=database_connection)
+    urls_df["api_call_id"] = api_call_id
+    urls_df["run_id"] = run_id
     upsert_df(
-        df=all_urls_df,
+        df=urls_df[["run_id", "api_call_id", "url_id"]],
         database_connection=database_connection,
         schema="adtech",
-        table_name="api_call_found_urls",
-        key_columns=["run_id", "api_call_id", "url"],
-        insert_columns=["run_id", "api_call_id", "url"],
-        md5_key_columns=["url"],
+        table_name="api_call_urls",
+        key_columns=["run_id", "api_call_id", "url_id"],
+        insert_columns=["run_id", "api_call_id", "url_id"],
     )
-    return all_urls
 
 
 def check_click_urls(
@@ -161,9 +164,14 @@ def check_click_urls(
     click_urls = []
     for url in all_urls:
         redirect_urls = []
-        if "/click" in url:
+        if "/click" in url or "/clk" in url:
             if "tpbid.com" in url:
                 url = url.replace("fybernativebrowser://navigate?url=", "")
+            redirect_urls = follow_url_redirects(
+                url, run_id, api_call_id, database_connection
+            )
+        elif "fybernativebrowser://navigate?url=" in url:
+            url = url.replace("fybernativebrowser://navigate?url=", "")
             redirect_urls = follow_url_redirects(
                 url, run_id, api_call_id, database_connection
             )
@@ -171,73 +179,6 @@ def check_click_urls(
             click_urls += redirect_urls
     click_urls = list(set(click_urls))
     return click_urls
-
-
-def parse_fyber_html(
-    inner_ad_element: str, run_id: int, mitm_uuid: str, database_connection: PostgresCon
-) -> list[str]:
-    """Parses Fyber HTML content to extract click URLs and ad network URLs."""
-    # Extract all URLs from the raw HTML content first
-    all_extracted_urls = extract_and_decode_urls(
-        inner_ad_element,
-        run_id=run_id,
-        mitm_uuid=mitm_uuid,
-        database_connection=database_connection,
-    )
-    # We're looking for URLs that start with 'fybernativebrowser://navigate?url='
-    # or 'https://gotu.tpbid.com/click'
-    click_urls = []
-    for url in all_extracted_urls:
-        if url.startswith("fybernativebrowser://navigate?url="):
-            pattern = r".*?(https?://.*)"
-            match = re.search(pattern, url)
-            if match:
-                url = match.group(1)
-                click_urls.append(url)
-        elif "https://gotu.tpbid.com/click" in url:
-            click_urls.append(url)
-        elif get_tld(url) in get_all_mmp_tlds(database_connection)["mmp_tld"].to_list():
-            click_urls.append(url)
-    return click_urls
-
-
-def parse_fyber_ad_response(
-    ad_response_text: str, run_id: int, mitm_uuid: str, database_connection: PostgresCon
-) -> list[str]:
-    """Parses Fyber ad response XML to extract VAST URLs and click tracking URLs."""
-    outer_tree = ET.fromstring(ad_response_text)
-    ns = {"tns": "http://www.inner-active.com/SimpleM2M/M2MResponse"}
-    ad_element = outer_tree.find(".//tns:Ad", ns)
-    urls = []
-    vast_tree = None
-    if ad_element is not None and ad_element.text:
-        # Clean up and parse the inner VAST XML
-        inner_ad_element = ad_element.text.strip()
-        try:
-            vast_tree = ET.fromstring(inner_ad_element)
-        except ET.ParseError:
-            try:
-                vast_tree = ET.fromstring(html.unescape(inner_ad_element))
-            except ET.ParseError:
-                urls = parse_fyber_html(
-                    inner_ad_element,
-                    run_id=run_id,
-                    mitm_uuid=mitm_uuid,
-                    database_connection=database_connection,
-                )
-        if vast_tree is not None:
-            # Now extract URLs from the inner VAST tree
-            for tag in [
-                "Impression",
-                "ClickThrough",
-                "ClickTracking",
-                "MediaFile",
-                "Tracking",
-            ]:
-                for el in vast_tree.iter(tag):
-                    if el.text:
-                        urls.append(el.text.strip())
-    return urls
 
 
 def adv_id_from_play_url(url: str) -> str | None:
@@ -252,17 +193,102 @@ def adv_id_from_play_url(url: str) -> str | None:
     return adv_store_id
 
 
+def check_and_upsert_new_domains(
+    domains_df: pd.DataFrame,
+    urls_df: pd.DataFrame,
+    database_connection: PostgresCon,
+) -> pd.DataFrame:
+    """Adds missing domains to the database and returns updated domain DataFrame."""
+    col = "tld_url"
+    missing_domains = urls_df[
+        (~urls_df[col].isin(domains_df["domain_name"])) & (urls_df[col].notna())
+    ]
+    if not missing_domains.empty:
+        new_domains = (
+            missing_domains[[col]]
+            .drop_duplicates()
+            .rename(columns={col: "domain_name"})
+        )
+        new_domains = upsert_df(
+            table_name="domains",
+            df=new_domains,
+            insert_columns=["domain_name"],
+            key_columns=["domain_name"],
+            database_connection=database_connection,
+            return_rows=True,
+        )
+        domains_df = pd.concat([new_domains, domains_df])
+    domains_df["id"] = domains_df["id"].astype(int)
+    domains_df = domains_df.rename(columns={"id": "domain_id"})
+    return domains_df
+
+
+def upsert_urls(urls: list[str], database_connection: PostgresCon) -> pd.DataFrame:
+    """Upserts the URLs into the database."""
+    new_urls_df = pd.DataFrame({"url": urls})
+    http_urls_df = new_urls_df[new_urls_df["url"].str.startswith("http")].copy()
+    nonhttp_urls_df = new_urls_df[~new_urls_df["url"].str.startswith("http")].copy()
+    http_urls_df["tld_url"] = http_urls_df["url"].apply(lambda x: get_tld(x))
+    domains_df = query_all_domains(database_connection=database_connection)
+    domains_df = check_and_upsert_new_domains(
+        domains_df=domains_df,
+        urls_df=http_urls_df,
+        database_connection=database_connection,
+    )
+    http_urls_df = http_urls_df.merge(
+        domains_df,
+        left_on="tld_url",
+        right_on="domain_name",
+        how="left",
+    )
+    http_urls_df["scheme"] = "http"
+    nonhttp_urls_df["scheme"] = nonhttp_urls_df["url"].str.split("://").str[0]
+    nonhttp_urls_df["scheme"] = nonhttp_urls_df["scheme"].fillna("unknown")
+    new_urls_df = pd.concat([http_urls_df, nonhttp_urls_df])
+    new_urls_df["domain_id"] = np.where(
+        pd.isna(new_urls_df["domain_id"]), None, new_urls_df["domain_id"]
+    )
+    urls_df: pd.DataFrame = upsert_df(
+        df=new_urls_df,
+        database_connection=database_connection,
+        schema="adtech",
+        table_name="urls",
+        insert_columns=["url", "domain_id", "scheme"],
+        key_columns=["url"],
+        md5_key_columns=["url"],
+        return_rows=True,
+    )
+    urls_df = urls_df.rename(columns={"id": "url_id"})
+    return urls_df
+
+
 def upsert_click_url_redirect_chains(
     chain_df: pd.DataFrame, database_connection: PostgresCon
 ) -> None:
+    """Upserts the redirect chain into the database."""
+    urls = list(set(chain_df["url"].to_list() + chain_df["next_url"].to_list()))
+    urls_df = upsert_urls(urls=urls, database_connection=database_connection)
+    chain_df = chain_df.merge(
+        urls_df[["url", "url_id"]],
+        on="url",
+        how="left",
+        validate="m:1",
+    )
+    chain_df = chain_df.merge(
+        urls_df[["url", "url_id"]].rename(
+            columns={"url_id": "next_url_id", "url": "next_url"}
+        ),
+        on="next_url",
+        how="left",
+        validate="m:1",
+    )
     upsert_df(
-        df=chain_df,
+        df=chain_df[["run_id", "api_call_id", "url_id", "next_url_id", "hop_index"]],
         database_connection=database_connection,
         schema="adtech",
-        table_name="click_url_redirect_chains",
-        key_columns=["run_id", "url", "redirect_url"],
-        insert_columns=["run_id", "api_call_id", "url", "redirect_url"],
-        md5_key_columns=["url", "redirect_url"],
+        table_name="url_redirect_chains",
+        key_columns=["run_id", "api_call_id", "url_id", "next_url_id"],
+        insert_columns=["run_id", "api_call_id", "url_id", "next_url_id", "hop_index"],
     )
 
 
@@ -278,32 +304,32 @@ def follow_url_redirects(
     existing_chain_df = get_click_url_redirect_chains(run_id, database_connection)
     if not existing_chain_df.empty and url in existing_chain_df["url"].to_list():
         existing_chain_df = existing_chain_df[existing_chain_df["url"] == url]
-        if existing_chain_df["api_call_id"].isna().any():
-            existing_chain_df["api_call_id"] = api_call_id
-            upsert_click_url_redirect_chains(existing_chain_df, database_connection)
-        redirect_urls = existing_chain_df["redirect_url"].to_list()
+        redirect_chain = existing_chain_df["redirect_url"].to_list()
     else:
-        redirect_urls = get_redirect_chain(url)
-        if len(redirect_urls) > 0:
-            chain_df = pd.DataFrame(
-                {
-                    "run_id": run_id,
-                    "api_call_id": api_call_id,
-                    "url": url,
-                    "redirect_url": redirect_urls,
-                }
-            )
-            logger.info(f"Inserting {chain_df.shape[0]} redirect URLs")
+        # New chain, insert after getting the chain
+        redirect_chain_dict = get_redirect_chain(url)
+        if len(redirect_chain_dict) > 0:
+            logger.info(f"Found new click redirects: {len(redirect_chain_dict)}")
+            chain_df = pd.DataFrame(redirect_chain_dict)
+            chain_df["run_id"] = run_id
+            chain_df["api_call_id"] = api_call_id
+            chain_df["url"] = url
             upsert_click_url_redirect_chains(chain_df, database_connection)
-    return redirect_urls
+            redirect_chain = list(
+                set(chain_df["next_url"].to_list() + chain_df["url"].to_list())
+            )
+        else:
+            redirect_chain = []
+    return redirect_chain
 
 
-def get_redirect_chain(url: str) -> list[str]:
+def get_redirect_chain(url: str) -> list[dict]:
     """Follows HTTP redirects for a given URL and returns the complete redirect chain."""
     max_redirects = 5
     chain = []
     cur_url = url
-    while cur_url and len(chain) < max_redirects:
+    hop_index = 0
+    while cur_url and hop_index < max_redirects:
         try:
             headers = {"User-Agent": ANDROID_USER_AGENT}
             # Do NOT allow requests to auto-follow
@@ -315,7 +341,8 @@ def get_redirect_chain(url: str) -> list[str]:
             next_url = None
             pass
         if next_url:
-            chain.append(next_url)
+            chain.append({"hop_index": hop_index, "url": cur_url, "next_url": next_url})
+            hop_index += 1
         if not next_url or not next_url.startswith("http"):
             break
         cur_url = next_url
@@ -370,9 +397,6 @@ def parse_urls_for_known_parts(
             resp_adv_id = adv_id_from_play_url(url)
             if resp_adv_id:
                 found_adv_store_ids.append(resp_adv_id)
-        elif "fybernativebrowser://" in url:
-            url = url.replace("fybernativebrowser://navigate?url=", "")
-            found_ad_network_urls.append(url)
         if (
             tld_url in ad_domains_df["domain_name"].to_list()
             and tld_url
@@ -383,17 +407,17 @@ def parse_urls_for_known_parts(
     found_mmp_urls = list(set(found_mmp_urls))
     found_adv_store_ids = list(set(found_adv_store_ids))
     found_adv_store_ids = [x for x in found_adv_store_ids if x != pub_store_id]
-    found_ad_network_tlds = [get_tld(url) for url in found_ad_network_urls]
     found_ad_network_urls = [x for x in found_ad_network_urls if x is not None]
-    found_ad_network_tlds = list(set(found_ad_network_tlds))
+    found_ad_network_tlds_list = [get_tld(url) for url in found_ad_network_urls]
+    found_ad_network_tlds = list(
+        set([x for x in found_ad_network_tlds_list if x is not None])
+    )
     if len(found_adv_store_ids) == 0:
         adv_store_id = None
     elif len(found_adv_store_ids) == 1:
         adv_store_id = found_adv_store_ids[0]
     else:
-        raise MultipleAdvertiserIdError(
-            f"multiple adv_store_id found for {found_adv_store_ids=}"
-        )
+        raise MultipleAdvertiserIdError(found_adv_store_ids=found_adv_store_ids)
     return AdInfo(
         adv_store_id=adv_store_id,
         found_mmp_urls=found_mmp_urls,
@@ -401,18 +425,43 @@ def parse_urls_for_known_parts(
     )
 
 
+def get_request_text(sent_video_dict: dict[str, Any]) -> str:
+    """Try to match something.
+    It is unknown if this matches anything useful.
+    """
+    text = " ".join(
+        [
+            str(x)
+            for x in [
+                sent_video_dict["query_params"],
+                sent_video_dict["response_headers"],
+                sent_video_dict["post_params"],
+                sent_video_dict["request_text"],
+            ]
+        ]
+    )
+    return text
+
+
 def parse_youappi_ad(
     sent_video_dict: dict[str, Any], database_connection: PostgresCon
 ) -> AdInfo:
     """Parses YouAppi ad response to extract advertiser information and URLs."""
+    if (
+        "image" in sent_video_dict["response_mime_type"]
+        or "video" in sent_video_dict["response_mime_type"]
+    ):
+        text = get_request_text(sent_video_dict)
+    else:
+        text = sent_video_dict["response_text"]
     ad_info, error_msg = parse_text_for_adinfo(
-        text=sent_video_dict["response_text"],
+        text=text,
         run_id=sent_video_dict["run_id"],
         pub_store_id=sent_video_dict["pub_store_id"],
         mitm_uuid=sent_video_dict["mitm_uuid"],
         database_connection=database_connection,
     )
-    return ad_info
+    return ad_info, error_msg
 
 
 def parse_yandex_ad(
@@ -677,13 +726,17 @@ def parse_text_for_adinfo(
     database_connection: PostgresCon,
 ) -> tuple[AdInfo, str | None]:
     """Extract URL like strings and parse for app store_ids."""
-    all_urls = extract_and_decode_urls(
-        text,
-        run_id=run_id,
-        mitm_uuid=mitm_uuid,
-        database_connection=database_connection,
-    )
+    ad_info = AdInfo(adv_store_id=None, found_ad_network_tlds=None, found_mmp_urls=None)
     error_msg = None
+    all_urls = extract_and_decode_urls(text)
+    api_call_id = query_api_call_id_for_uuid(mitm_uuid, database_connection)
+    click_urls = check_click_urls(all_urls, run_id, api_call_id, database_connection)
+    all_urls = list(set(all_urls + click_urls))
+    if len(all_urls) > 0:
+        store_found_urls_in_db(all_urls, run_id, api_call_id, database_connection)
+    else:
+        logger.debug(f"No URLs found for {mitm_uuid}")
+        error_msg = "No URLs found"
     try:
         ad_info = parse_urls_for_known_parts(
             all_urls, database_connection, pub_store_id
@@ -691,9 +744,6 @@ def parse_text_for_adinfo(
     except MultipleAdvertiserIdError as e:
         error_msg = f"multiple adv_store_id found for: {e.found_adv_store_ids}"
         logger.error(error_msg)
-        ad_info = AdInfo(
-            adv_store_id=None, found_ad_network_tlds=None, found_mmp_urls=None
-        )
     return ad_info, error_msg
 
 
@@ -757,24 +807,6 @@ def parse_fyber_ad(
     sent_video_dict: dict[str, Any], database_connection: PostgresCon
 ) -> AdInfo:
     """Parses Fyber ad response to extract advertiser information and URLs."""
-    parsed_urls = []
-    text = sent_video_dict["response_text"]
-    try:
-        parsed_urls = parse_fyber_ad_response(
-            text,
-            run_id=sent_video_dict["run_id"],
-            mitm_uuid=sent_video_dict["mitm_uuid"],
-            database_connection=database_connection,
-        )
-    except Exception:
-        pass
-    all_urls = extract_and_decode_urls(
-        text=text,
-        run_id=sent_video_dict["run_id"],
-        mitm_uuid=sent_video_dict["mitm_uuid"],
-        database_connection=database_connection,
-    )
-    all_urls = list(set(all_urls + parsed_urls))
     if "inner-active.mobi" in sent_video_dict["tld_url"]:
         if "x-ia-app-bundle" in sent_video_dict["response_headers"].keys():
             adv_store_id = sent_video_dict["response_headers"]["x-ia-app-bundle"]
@@ -782,6 +814,8 @@ def parse_fyber_ad(
                 adv_store_id=adv_store_id,
             )
             return ad_info
+    text = sent_video_dict["response_text"]
+    all_urls = extract_and_decode_urls(text=text)
     ad_info = parse_urls_for_known_parts(
         all_urls, database_connection, sent_video_dict["pub_store_id"]
     )
@@ -801,7 +835,8 @@ def parse_google_ad(
     response_text = sent_video_dict["response_text"]
     try:
         google_response = json.loads(response_text)
-        big_html = ""
+        all_html = ""
+        good_html = ""
         if "ad_networks" in google_response:
             for gadn in google_response["ad_networks"]:
                 ad_html = " "
@@ -813,16 +848,27 @@ def parse_google_ad(
                         ad_html = json.dumps(gad["ad_json"])
                     else:
                         pass
-                    big_html += ad_html
+                    all_html += ad_html
+                    if video_id in ad_html:
+                        logger.info(f"Found video {video_id} in ad html")
+                        good_html += ad_html
             ad_info, error_msg = parse_text_for_adinfo(
-                text=big_html,
+                text=good_html,
                 pub_store_id=sent_video_dict["pub_store_id"],
                 run_id=sent_video_dict["run_id"],
                 mitm_uuid=sent_video_dict["mitm_uuid"],
                 database_connection=database_connection,
             )
             if error_msg:
-                return ad_info, error_msg
+                ad_info, error_msg = parse_text_for_adinfo(
+                    text=all_html,
+                    pub_store_id=sent_video_dict["pub_store_id"],
+                    run_id=sent_video_dict["run_id"],
+                    mitm_uuid=sent_video_dict["mitm_uuid"],
+                    database_connection=database_connection,
+                )
+                if error_msg:
+                    return ad_info, error_msg
         elif "slots" in google_response:
             found_adv_in_slots = None
             for slot in google_response["slots"]:
@@ -878,6 +924,20 @@ def parse_google_ad(
     return ad_info, error_msg
 
 
+def parse_creative_request(
+    sent_video_dict: dict[str, Any], database_connection: PostgresCon
+) -> tuple[AdInfo, list[dict[str, Any]]]:
+    """Parses creative request to extract advertiser information."""
+    text = get_request_text(sent_video_dict)
+    return parse_text_for_adinfo(
+        text=text,
+        pub_store_id=sent_video_dict["pub_store_id"],
+        run_id=sent_video_dict["run_id"],
+        mitm_uuid=sent_video_dict["mitm_uuid"],
+        database_connection=database_connection,
+    )
+
+
 def parse_sent_video_df(
     row: pd.Series,
     pub_store_id: str,
@@ -912,7 +972,6 @@ def parse_sent_video_df(
             ad_info, error_msg = parse_google_ad(
                 sent_video_dict, video_id, database_connection
             )
-
         elif "unityads.unity3d.com" in init_url:
             ad_info, error_msg = parse_unity_ad(sent_video_dict, database_connection)
         elif "mtgglobals.com" == init_tld:
@@ -920,7 +979,7 @@ def parse_sent_video_df(
         elif "yandex.ru" == init_tld:
             ad_info = parse_yandex_ad(sent_video_dict, database_connection, video_id)
         elif "youappi.com" == init_tld:
-            ad_info = parse_youappi_ad(sent_video_dict, database_connection)
+            ad_info, error_msg = parse_youappi_ad(sent_video_dict, database_connection)
         else:
             ad_info, error_msg = parse_generic_adnetwork(
                 sent_video_dict, database_connection

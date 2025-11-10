@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict vK4BckOVae31YOPTAZ5qnFauKdfd14N7LiWQkgO1TaAkGZFFpFDM2AhwaoYt4c7
+\restrict 1GS5X6ZRZi1My9z1uBZaxedq9LqCBbA2BAHKejOrKwbwN85xNgwSCQDNtUL2lZ9
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -57,5 +57,5 @@ ALTER TABLE ONLY logging.app_country_crawls
 -- PostgreSQL database dump complete
 --
 
-\unrestrict vK4BckOVae31YOPTAZ5qnFauKdfd14N7LiWQkgO1TaAkGZFFpFDM2AhwaoYt4c7
+\unrestrict 1GS5X6ZRZi1My9z1uBZaxedq9LqCBbA2BAHKejOrKwbwN85xNgwSCQDNtUL2lZ9
 

@@ -1,4 +1,5 @@
 import datetime
+import hashlib
 import pathlib
 from functools import lru_cache
 
@@ -31,6 +32,7 @@ QUERY_API_CALLS_TO_CREATIVE_SCAN = load_sql_file("query_apps_to_creative_scan.sq
 QUERY_KEYWORDS_TO_CRAWL = load_sql_file("query_keywords_to_crawl.sql")
 QUERY_APPS_MITM_IN_S3 = load_sql_file("query_apps_mitm_in_s3.sql")
 QUERY_ZSCORES = load_sql_file("query_simplified_store_app_z_scores.sql")
+QUERY_APPS_TO_PROCESS_KEYWORDS = load_sql_file("query_apps_to_process_keywords.sql")
 
 
 def insert_df(
@@ -263,6 +265,7 @@ def upsert_df(
     return_rows: bool = False,
     schema: str | None = None,
     md5_key_columns: list[str] | None = None,
+    on_conflict_update: bool = True,
     log: bool = False,
 ) -> pd.DataFrame | None:
     """Perform an "upsert" on a PostgreSQL table from a DataFrame.
@@ -271,11 +274,11 @@ def upsert_df(
 
     Parameters
     ----------
-    data_frame : pandas.DataFrame
+    df : pandas.DataFrame
         The DataFrame to be upserted.
     table_name : str
         The name of the target table.
-    engine : sqlalchemy.engine.Engine
+    database_connection : Connection
         The SQLAlchemy Engine to use.
     schema : str, optional
         The name of the schema containing the target table.
@@ -288,9 +291,18 @@ def upsert_df(
     md5_key_columns: list of str columns (usually >1000 chars needs this)
         that have Postgresql md5() used in the UNIQUE INDEX
         allows upsert without hitting index size limits
+    on_conflict_update: bool, optional
+        Whether to update the existing rows on conflict, default True
     log : bool, optional
         Print generated SQL statement for debugging.
     """
+
+    # Validate parameters
+    if not on_conflict_update and return_rows:
+        raise ValueError(
+            "return_rows=True cannot be used with on_conflict_update=False "
+            "because DO NOTHING doesn't guarantee the returned rows were actually inserted"
+        )
 
     raw_conn = database_connection.engine.raw_connection()
 
@@ -315,9 +327,14 @@ def upsert_df(
         )
     else:
         conflict_columns = SQL(", ").join(map(Identifier, key_columns))
-    update_set = SQL(", ").join(
-        SQL("{0} = EXCLUDED.{0}").format(Identifier(col)) for col in all_columns
-    )
+
+    if on_conflict_update:
+        update_set = SQL(", ").join(
+            SQL("{0} = EXCLUDED.{0}").format(Identifier(col)) for col in all_columns
+        )
+        action_clause = SQL("DO UPDATE SET {update_set}").format(update_set=update_set)
+    else:
+        action_clause = SQL("DO NOTHING")
 
     # Upsert query without RETURNING clause
     upsert_query = SQL(
@@ -325,14 +342,14 @@ def upsert_df(
         INSERT INTO {table} ({columns})
         VALUES ({placeholders})
         ON CONFLICT ({conflict_columns})
-        DO UPDATE SET {update_set}
+        {action_clause}
     """
     ).format(
         table=table_identifier,
         columns=columns,
         placeholders=placeholders,
         conflict_columns=conflict_columns,
-        update_set=update_set,
+        action_clause=action_clause,
     )
 
     sel_where_conditions = SQL(" AND ").join(
@@ -365,7 +382,16 @@ def upsert_df(
 
         # Fetch affected rows if required
         if return_rows:
-            where_values = [df[col].tolist() for col in key_columns]
+            if len(key_columns) == 1 and key_columns[0] in (md5_key_columns or []):
+                md5_values = [
+                    hashlib.md5(v.encode("utf-8")).hexdigest()
+                    if v is not None
+                    else None
+                    for v in df[key_columns[0]].tolist()
+                ]
+                where_values = (md5_values,)
+            else:
+                where_values = [df[col].tolist() for col in key_columns]
             cur.execute(select_query, where_values)
             result = cur.fetchall()
             column_names = [desc[0] for desc in cur.description]
@@ -375,6 +401,57 @@ def upsert_df(
 
     raw_conn.commit()
     return return_df
+
+
+def delete_and_insert(
+    df: pd.DataFrame,
+    table_name: str,
+    schema: str | None,
+    database_connection: Connection,
+    insert_columns: list[str],
+    delete_by_keys: list[str],
+    delete_keys_have_duplicates: bool = False,
+) -> pd.DataFrame | None:
+    """Replace rows in a table by deleting on key values then inserting the DataFrame."""
+    if df.empty:
+        return None
+
+    keys_df = df[delete_by_keys].drop_duplicates().reset_index(drop=True)
+    if not delete_keys_have_duplicates:
+        assert len(keys_df) == len(df), "Duplicate keys found in df"
+
+    keys_df = prepare_for_psycopg(keys_df)
+
+    raw_conn = database_connection.engine.raw_connection()
+    table_identifier = Identifier(table_name)
+    if schema:
+        table_identifier = Composed([Identifier(schema), SQL("."), table_identifier])
+
+    where_conditions = SQL(" AND ").join(
+        SQL("{col} = %s").format(col=Identifier(col)) for col in delete_by_keys
+    )
+    delete_query = SQL(
+        """
+        DELETE FROM {table}
+        WHERE {where_conditions}
+        """
+    ).format(table=table_identifier, where_conditions=where_conditions)
+
+    delete_data = [tuple(row) for row in keys_df.itertuples(index=False, name=None)]
+
+    with raw_conn.cursor() as cur:
+        if delete_data:
+            cur.executemany(delete_query, delete_data)
+    raw_conn.commit()
+    raw_conn.close()
+
+    return insert_df(
+        df=df,
+        insert_columns=insert_columns,
+        table_name=table_name,
+        database_connection=database_connection,
+        schema=schema,
+    )
 
 
 @lru_cache(maxsize=1)
@@ -798,13 +875,44 @@ def query_pub_domains_to_crawl_ads_txt(
     return df
 
 
+def query_urls_id_map(
+    urls: list[str], database_connection: PostgresCon
+) -> pd.DataFrame:
+    """
+    Get URL IDs by looking up MD5 hashes.
+    Returns DataFrame with columns: url, id
+    """
+    if not urls:
+        return pd.DataFrame(columns=["url", "id"])
+    url_hash_map = {url: hashlib.md5(url.encode()).hexdigest() for url in urls}
+    hashes_str = "'" + "','".join(url_hash_map.values()) + "'"
+    sel_query = f"""
+        SELECT url, id, url_hash 
+        FROM adtech.urls 
+        WHERE url_hash IN ({hashes_str})
+    """
+    df = pd.read_sql(sel_query, database_connection.engine)
+    return df
+
+
 @lru_cache(maxsize=1000)
 def get_click_url_redirect_chains(
     run_id: int, database_connection: PostgresCon
 ) -> pd.DataFrame:
-    sel_query = (
-        f"""SELECT * FROM adtech.click_url_redirect_chains WHERE run_id = {run_id}"""
-    )
+    sel_query = f"""SELECT
+        urc.api_call_id,
+        urc.hop_index,
+        urc.is_chain_start,
+        urc.is_chain_end,
+        u.url,
+        ur.url AS redirect_url
+    FROM
+        adtech.url_redirect_chains urc
+    LEFT JOIN adtech.urls u ON urc.url_id = u.id
+    LEFT JOIN adtech.urls ur ON urc.next_url_id = ur.id
+    WHERE
+        urc.run_id = {run_id}
+    """
     df = pd.read_sql(sel_query, database_connection.engine)
     return df
 
@@ -1038,6 +1146,18 @@ def query_apps_to_api_scan(
     return df
 
 
+def query_apps_to_process_keywords(
+    database_connection: PostgresCon, limit: int = 10000
+) -> pd.DataFrame:
+    """Query apps to process keywords."""
+    df = pd.read_sql(
+        QUERY_APPS_TO_PROCESS_KEYWORDS,
+        con=database_connection.engine,
+        params={"mylimit": limit},
+    )
+    return df
+
+
 def query_apps_mitm_in_s3(database_connection: PostgresCon) -> pd.DataFrame:
     df = pd.read_sql(
         QUERY_APPS_MITM_IN_S3,
@@ -1142,7 +1262,7 @@ def query_ad_domains(database_connection: PostgresCon) -> pd.DataFrame:
 @lru_cache(maxsize=1)
 def query_keywords_base(database_connection: PostgresCon) -> pd.DataFrame:
     sel_query = """SELECT
-    k.keyword_text
+    k.id as keyword_id, k.keyword_text
     FROM
     keywords_base kb
     LEFT JOIN keywords k ON
@@ -1150,7 +1270,6 @@ def query_keywords_base(database_connection: PostgresCon) -> pd.DataFrame:
     ;
     """
     df = pd.read_sql(sel_query, con=database_connection.engine)
-    df["keyword_text"] = " " + df["keyword_text"] + " "
     return df
 
 
@@ -1223,9 +1342,14 @@ def get_version_code_dbid(
 
 
 def get_failed_mitm_logs(database_connection: PostgresCon) -> pd.DataFrame:
-    sel_query = """SELECT * 
-    FROM logging.creative_scan_results 
-    WHERE error_msg like 'CRITICAL %%';
+    sel_query = """WITH last_run_result AS (SELECT DISTINCT ON (run_id)
+      run_id, pub_store_id, error_msg, inserted_at
+        FROM logging.creative_scan_results 
+      ORDER BY run_id, inserted_at DESC)
+      SELECT * 
+          FROM last_run_result
+          WHERE error_msg like 'CRITICAL %%'
+        ;
     """
     df = pd.read_sql(sel_query, con=database_connection.engine)
     return df

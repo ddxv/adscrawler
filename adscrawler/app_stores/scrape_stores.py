@@ -181,7 +181,7 @@ def update_app_details(
     logger.info(f"{log_info} completed={completed_count} failed={failed_count}")
 
 
-def crawl_keyword_cranks(database_connection: PostgresCon) -> None:
+def crawl_keyword_ranks(database_connection: PostgresCon) -> None:
     country = "us"
     language = "en"
     kdf = query_keywords_to_crawl(database_connection, limit=1000)
@@ -217,13 +217,6 @@ def crawl_keyword_cranks(database_connection: PostgresCon) -> None:
         key_columns=key_columns,
         database_connection=database_connection,
     )
-
-
-# def import_keywords_from_s3(database_connection: PostgresCon) -> None:
-#     languages_map = query_languages(database_connection)
-#     language_dict = languages_map.set_index("language_slug")["id"].to_dict()
-#     language_key = language_dict[language]
-#
 
 
 def scrape_store_ranks(database_connection: PostgresCon, store: int) -> None:
@@ -834,62 +827,7 @@ def upsert_store_apps_descriptions(
         key_columns=key_columns,
         md5_key_columns=["description", "description_short"],
         database_connection=database_connection,
-        # return_rows=True,
-    )
-    # .rename(columns={"id": "description_id"})
-    # description_df = pd.merge(
-    #     description_df,
-    #     store_apps_descriptions[["store_app", "name"]],
-    #     how="inner",
-    #     on="store_app",
-    #     validate="1:1",
-    # )
-    # if description_df is not None and not description_df.empty:
-    #     for _i, row in description_df.iterrows():
-    #         description = row["description"]
-    #         description_short = row["description_short"]
-    #         language_id = row["language_id"]
-    #         description_id = row["description_id"]
-    #         app_name = row["name"]
-    #         text = ". ".join([app_name, description_short, description])
-    #         keywords = extract_keywords(text, database_connection=database_connection)
-    #         keywords_df = pd.DataFrame(keywords, columns=["keyword_text"])
-    #         keywords_df["language_id"] = language_id
-    #         keywords_df["description_id"] = description_id
-    #         upsert_keywords(keywords_df, database_connection)
-
-
-def upsert_keywords(
-    keywords_df: pd.DataFrame, database_connection: PostgresCon
-) -> None:
-    table_name = "keywords"
-    insert_columns = ["keyword_text"]
-    key_columns = ["keyword_text"]
-    upserted_keywords = upsert_df(
-        table_name=table_name,
-        df=keywords_df,
-        insert_columns=insert_columns,
-        key_columns=key_columns,
-        database_connection=database_connection,
-        return_rows=True,
-    )
-    keywords_df = pd.merge(
-        keywords_df,
-        upserted_keywords,
-        on=["keyword_text"],
-        how="left",
-        validate="m:1",
-    ).rename(columns={"id": "keyword_id"})
-    keywords_df = keywords_df[["keyword_id", "description_id"]]
-    table_name = "description_keywords"
-    insert_columns = ["description_id", "keyword_id"]
-    key_columns = ["description_id", "keyword_id"]
-    upsert_df(
-        table_name=table_name,
-        df=keywords_df,
-        insert_columns=insert_columns,
-        key_columns=key_columns,
-        database_connection=database_connection,
+        on_conflict_update=False,
     )
 
 
