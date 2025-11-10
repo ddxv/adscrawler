@@ -730,7 +730,7 @@ def import_keywords_from_s3(
                     crawl_source="keywords",
                     store=store,
                 )
-                store_id_map = query_store_id_map_cached(database_connection, store)
+                store_id_map = query_store_id_map(database_connection, store)
                 df["store_app"] = df["store_id"].map(
                     store_id_map.set_index("store_id")["id"].to_dict()
                 )
