@@ -4,12 +4,7 @@ import os
 import re
 from collections import Counter
 
-import nltk
 import pandas as pd
-from nltk.corpus import stopwords, wordnet
-from nltk.stem import WordNetLemmatizer
-from nltk.tokenize import word_tokenize
-from rake_nltk import Rake
 
 from adscrawler.dbcon.connection import PostgresCon
 from adscrawler.dbcon.queries import (
@@ -59,7 +54,6 @@ CUSTOM_STOPWORDS = {
     "com",
     "game",
 }
-STOPWORDS = set(stopwords.words("english")).union(CUSTOM_STOPWORDS)
 
 
 def clean_text(text: str) -> str:
@@ -101,6 +95,8 @@ def clean_df_text(df: pd.DataFrame, column: str) -> pd.DataFrame:
 
 def count_tokens(phrase: str) -> int:
     """Count the number of tokens in a phrase."""
+    from nltk.tokenize import word_tokenize
+
     return len(word_tokenize(phrase))
 
 
@@ -110,6 +106,9 @@ def extract_keywords_spacy(
     """Extracts noun phrase keywords using spaCy with token limit."""
     # Load spaCy model
     import spacy  # noqa: PLC0415
+    from nltk.corpus import stopwords
+
+    mystopwords = set(stopwords.words("english")).union(CUSTOM_STOPWORDS)
 
     try:
         nlp = spacy.load("en_core_web_sm")
@@ -126,7 +125,7 @@ def extract_keywords_spacy(
         if chunk.root.text.isalpha():
             # Check token count
             if count_tokens(chunk.text) <= max_tokens:
-                if not any(token.is_stop or token in STOPWORDS for token in chunk):
+                if not any(token.is_stop or token in mystopwords for token in chunk):
                     keywords.append(chunk.text)
 
     keyword_freq = Counter(keywords)
@@ -135,8 +134,16 @@ def extract_keywords_spacy(
 
 def extract_keywords_nltk(text: str, top_n: int = 10) -> list[str]:
     """Extracts lemmatized keywords using NLTK with frequency ranking."""
+    from nltk.tokenize import word_tokenize
+
     words = word_tokenize(text)
     # Ensure necessary NLTK resources are downloaded
+    import nltk
+    from nltk.corpus import stopwords, wordnet
+    from nltk.stem import WordNetLemmatizer
+
+    mystopwords = set(stopwords.words("english")).union(CUSTOM_STOPWORDS)
+
     nltk.download("punkt", quiet=True)
     nltk.download("stopwords", quiet=True)
     nltk.download("wordnet", quiet=True)
@@ -147,7 +154,7 @@ def extract_keywords_nltk(text: str, top_n: int = 10) -> list[str]:
     processed_words = []
     for word, tag in pos_tags:
         # Only process alphabetic words that aren't stopwords
-        if word.isalpha() and word.lower() not in STOPWORDS:
+        if word.isalpha() and word.lower() not in mystopwords:
             # Convert POS tag to WordNet format for better lemmatization
             tag_first_char = tag[0].lower()
             wordnet_pos = {
@@ -165,6 +172,11 @@ def extract_keywords_nltk(text: str, top_n: int = 10) -> list[str]:
 
 def extract_keywords_rake(text: str, top_n: int = 10, max_tokens: int = 3) -> list[str]:
     """Extracts keywords using RAKE with token limit."""
+    from nltk.corpus import stopwords
+    from rake_nltk import Rake
+
+    mystopwords = set(stopwords.words("english")).union(CUSTOM_STOPWORDS)
+
     r = Rake()
     r.extract_keywords_from_text(text)
 
@@ -174,7 +186,7 @@ def extract_keywords_rake(text: str, top_n: int = 10, max_tokens: int = 3) -> li
         if count_tokens(phrase) <= max_tokens:
             filtered_phrases.append(phrase)
     filtered_phrases = [
-        phrase for phrase in filtered_phrases if phrase not in STOPWORDS
+        phrase for phrase in filtered_phrases if phrase not in mystopwords
     ]
     return filtered_phrases[:top_n]
 
@@ -185,6 +197,10 @@ def extract_unique_app_keywords_from_text(
     max_tokens: int = 1,
 ) -> list[str]:
     """Extracts keywords using spaCy, NLTK, and RAKE, then returns a unique set."""
+    from nltk.corpus import stopwords
+
+    mystopwords = set(stopwords.words("english")).union(CUSTOM_STOPWORDS)
+
     text = clean_text(text)
     words_spacy = extract_keywords_spacy(text, top_n, max_tokens)
     words_nltk = extract_keywords_nltk(text, top_n)
@@ -199,7 +215,7 @@ def extract_unique_app_keywords_from_text(
             filtered_keywords.append(kw)
 
     # Remove stopwords from filtered keywords
-    filtered_keywords = [kw for kw in filtered_keywords if kw not in STOPWORDS]
+    filtered_keywords = [kw for kw in filtered_keywords if kw not in mystopwords]
 
     # keywords_base = query_keywords_base(database_connection)
     # matched_base_keywords = keywords_base[
@@ -217,6 +233,9 @@ def get_global_keywords(database_connection: PostgresCon) -> list[str]:
     """Get the global keywords from the database.
     NOTE: This takes about ~5-8GB of RAM for 50k keywords and 200k descriptions. For now run manually.
     """
+    from nltk.corpus import stopwords
+
+    mystopwords = set(stopwords.words("english")).union(CUSTOM_STOPWORDS)
     df = query_all_store_app_descriptions(
         language_slug="en", database_connection=database_connection
     )
@@ -227,7 +246,7 @@ def get_global_keywords(database_connection: PostgresCon) -> list[str]:
 
     vectorizer = TfidfVectorizer(
         ngram_range=(1, 2),  # Include 1-grams, 2-grams
-        stop_words=list(STOPWORDS),
+        stop_words=list(mystopwords),
         max_df=0.75,  # Ignore terms in >75% of docs (too common)
         min_df=300,  # Ignore terms in <x docs (too rare)
         max_features=50000,
@@ -240,7 +259,7 @@ def get_global_keywords(database_connection: PostgresCon) -> list[str]:
     global_scores = tfidf_matrix.sum(axis=0).A1  # Sum scores per term
     keyword_scores = list(zip(feature_names, global_scores, strict=False))
     keyword_scores.sort(key=lambda x: x[1], reverse=True)
-    global_keywords = [kw for kw, score in keyword_scores if kw not in STOPWORDS]
+    global_keywords = [kw for kw, score in keyword_scores if kw not in mystopwords]
     return global_keywords
 
 
