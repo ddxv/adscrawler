@@ -827,7 +827,7 @@ def upsert_store_apps_descriptions(
         key_columns=key_columns,
         md5_key_columns=["description", "description_short"],
         database_connection=database_connection,
-        # return_rows=True,
+        on_conflict_update=False,
     )
 
 

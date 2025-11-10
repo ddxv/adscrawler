@@ -8,6 +8,7 @@ from adscrawler.app_stores.process_from_s3 import (
     import_keywords_from_s3,
     import_ranks_from_s3,
 )
+from adscrawler.app_stores.process_keywords import process_app_keywords
 from adscrawler.app_stores.scrape_stores import (
     crawl_developers_for_new_store_ids,
     crawl_keyword_ranks,
@@ -124,6 +125,11 @@ class ProcessManager:
             "-k",
             "--crawl-keywords",
             help="Crawl keywords",
+            action="store_true",
+        )
+        parser.add_argument(
+            "--extract-app-keywords",
+            help="Extract app keywords from database descriptions",
             action="store_true",
         )
         parser.add_argument(
@@ -259,6 +265,14 @@ class ProcessManager:
         ]
         return len(crawl_processes) > 1
 
+    def check_extract_app_keywords_processes(self) -> bool:
+        processes = self.get_running_processes()
+        my_processes = self.filter_processes(processes, "/adscrawler/main.py")
+        extract_processes = [
+            x for x in my_processes if any([" --extract-app-keywords" in x])
+        ]
+        return len(extract_processes) > 1
+
     def is_script_already_running(self) -> bool:
         if self.args.update_app_store_details:
             return self.check_app_update_processes()
@@ -272,6 +286,8 @@ class ProcessManager:
             return self.check_ads_txt_download_processes()
         elif self.args.crawl_keywords:
             return self.check_crawl_keywords_processes()
+        elif self.args.extract_app_keywords:
+            return self.check_extract_app_keywords_processes()
         return False
 
     def setup_database_connection(self) -> None:
@@ -316,6 +332,9 @@ class ProcessManager:
 
         if self.args.crawl_keywords:
             self.crawl_keywords()
+
+        if self.args.extract_app_keywords:
+            self.extract_app_keywords()
 
         logger.info("Adscrawler exiting main")
 
@@ -457,6 +476,11 @@ class ProcessManager:
 
     def crawl_keywords(self) -> None:
         crawl_keyword_ranks(database_connection=self.pgcon)
+
+    def extract_app_keywords(self) -> None:
+        process_app_keywords(
+            database_connection=self.pgcon, limit=self.args.limit_query_rows
+        )
 
     def run(self) -> None:
         if self.args.limit_processes and self.is_script_already_running():

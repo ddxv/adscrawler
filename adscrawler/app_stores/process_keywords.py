@@ -1,4 +1,5 @@
 # noqa: PLC0415
+import datetime
 import os
 import re
 from collections import Counter
@@ -12,13 +13,16 @@ from rake_nltk import Rake
 
 from adscrawler.dbcon.connection import PostgresCon
 from adscrawler.dbcon.queries import (
+    delete_and_insert,
     query_all_store_app_descriptions,
+    query_apps_to_process_keywords,
     query_keywords_base,
     upsert_df,
-    query_keywords_base,
-    delete_and_insert,
-    query_apps_to_process_keywords,
 )
+
+from adscrawler.config import get_logger
+
+logger = get_logger(__name__)
 
 # Custom stopwords to remove personal pronouns & other irrelevant words
 CUSTOM_STOPWORDS = {
@@ -73,6 +77,26 @@ def clean_text(text: str) -> str:
     text = re.sub(r"\bhttp\S*", "", text)
     text = re.sub(r"\bwww\S*", "", text)
     return re.sub(r"[^a-zA-Z\s]", ". ", text.lower())
+
+
+def clean_df_text(df: pd.DataFrame, column: str) -> pd.DataFrame:
+    # Note these are same as clean_text function
+    df[column] = (
+        df[column]
+        .str.replace("\r", ". ")
+        .replace("\n", ". ")
+        .replace("\t", ". ")
+        .replace("\xa0", ". ")
+        .replace("•", ". ")
+        .replace("'", "")
+        .replace("’", "")
+        .replace("-", " ")
+        .replace(r"\bhttp\S*", "", regex=True)
+        .replace(r"\bwww\S*", "", regex=True)
+        .replace(r"[^a-zA-Z\s]", ". ", regex=True)
+        .str.lower()
+    )
+    return df
 
 
 def count_tokens(phrase: str) -> int:
@@ -177,8 +201,14 @@ def extract_unique_app_keywords_from_text(
     # Remove stopwords from filtered keywords
     filtered_keywords = [kw for kw in filtered_keywords if kw not in STOPWORDS]
 
-    matched_base_keywords = matched_base_keywords["keyword_text"].str.strip().tolist()
-    combined_keywords = list(sorted(set(filtered_keywords + matched_base_keywords)))
+    # keywords_base = query_keywords_base(database_connection)
+    # matched_base_keywords = keywords_base[
+    #         keywords_base["keyword_text"].apply(lambda x: x in description_text)
+    #     ]
+
+    # matched_base_keywords = matched_base_keywords["keyword_text"].str.strip().tolist()
+    # combined_keywords = list(sorted(set(filtered_keywords + matched_base_keywords)))
+    combined_keywords = list(sorted(set(filtered_keywords)))
 
     return combined_keywords
 
@@ -191,22 +221,7 @@ def get_global_keywords(database_connection: PostgresCon) -> list[str]:
         language_slug="en", database_connection=database_connection
     )
 
-    # Note these are same as clean_text function
-    df["description"] = (
-        df["description"]
-        .str.replace("\r", ". ")
-        .replace("\n", ". ")
-        .replace("\t", ". ")
-        .replace("\xa0", ". ")
-        .replace("•", ". ")
-        .replace("'", "")
-        .replace("’", "")
-        .replace("-", " ")
-        .replace(r"\bhttp\S*", "", regex=True)
-        .replace(r"\bwww\S*", "", regex=True)
-        .replace(r"[^a-zA-Z\s]", ". ", regex=True)
-        .str.lower()
-    )
+    df = clean_df_text(df, "description")
 
     from sklearn.feature_extraction.text import TfidfVectorizer  # noqa: PLC0415
 
@@ -261,107 +276,65 @@ def insert_global_keywords(database_connection: PostgresCon) -> None:
     )
 
 
-def process_app_keywords(database_connection: PostgresCon) -> None:
-    """Process app keywords."""
+def process_app_keywords(database_connection: PostgresCon, limit: int) -> None:
+    """Process app keywords.
+
+    While Python might be less efficient than SQL it's more flexible for
+    the query input limiting which apps and when to run.
+    This way apps can be processed in batches and only when really needed.
+    """
+    logger.info(f"Extracting app keywords for {limit} apps")
+    extract_app_keywords_from_descriptions(database_connection, limit)
+    logger.info("Extracted app keywords finished")
 
 
-def process_keywords_for_app(
-    description_df: pd.DataFrame, database_connection: PostgresCon
+def extract_app_keywords_from_descriptions(
+    database_connection: PostgresCon, limit: int
 ) -> None:
-    """Process keywords for an app."""
-    description_df = query_apps_to_process_keywords(database_connection)
+    """Process keywords for app descriptions."""
+    description_df = query_apps_to_process_keywords(database_connection, limit=limit)
     keywords_base = query_keywords_base(database_connection)
+    keywords_base["keyword_text"] = (
+        " " + keywords_base["keyword_text"].str.lower() + " "
+    )
     description_df["description_text"] = (
-        description_df["description_short"] + " " + description_df["description"]
+        " "
+        + description_df["description_short"]
+        + " "
+        + description_df["description"]
+        + " "
     ).str.lower()
+    description_df = clean_df_text(description_df, "description_text")
     all_keywords_dfs = []
+    logger.info(f"Processing {len(description_df)} app descriptions")
     for _i, row in description_df.iterrows():
-        print(f"Processing description: {_i}/{len(description_df)}")
+        logger.debug(f"Processing app description: {_i}/{len(description_df)}")
         description_id = row["description_id"]
+        store_app = row["store_app"]
         description_text = row["description_text"]
         matched_base_keywords = keywords_base[
-            keywords_base["keyword_text"].apply(lambda x: x in description_text)
+            keywords_base["keyword_text"].apply(
+                lambda x, text=description_text: x in text
+            )
         ]
-        keywords_df = pd.DataFrame(matched_base_keywords, columns=["keyword_text"])
+        keywords_df = pd.DataFrame(
+            matched_base_keywords, columns=["keyword_text", "keyword_id"]
+        )
         keywords_df["description_id"] = description_id
-        keywords_df = keywords_df[["keyword_text", "description_id"]]
+        keywords_df["store_app"] = store_app
         all_keywords_dfs.append(keywords_df)
     main_keywords_df = pd.concat(all_keywords_dfs)
-    main_keywords_df = main_keywords_df.merge(
-        keywords_base, on="keyword_text", how="left"
-    )
-    main_keywords_df = main_keywords_df[["description_id", "keyword_id"]]
-    table_name = "description_keywords"
-    insert_columns = ["description_id", "keyword_id"]
-    key_columns = ["description_id", "keyword_id"]
+    main_keywords_df = main_keywords_df[["store_app", "description_id", "keyword_id"]]
+    main_keywords_df["extracted_at"] = datetime.datetime.now(tz=datetime.UTC)
+    table_name = "app_keywords_extracted"
+    insert_columns = ["store_app", "description_id", "keyword_id", "extracted_at"]
+    logger.info(f"Delete and insert {len(main_keywords_df)} app keywords")
     delete_and_insert(
         df=main_keywords_df,
         table_name=table_name,
         schema="public",
         database_connection=database_connection,
         insert_columns=insert_columns,
-        key_columns=key_columns,
-        delete_by_keys=["description_id"],
+        delete_by_keys=["store_app"],
         delete_keys_have_duplicates=True,
-    )
-
-    all_matches = []
-    for _i, keyword in enumerate(keywords_base["keyword_text"].unique()):
-        print(f"Processing keyword: {_i}/{len(keywords_base['keyword_text'].unique())}")
-        # Find all descriptions containing this keyword
-        mask = description_df["description_text"].str.contains(
-            re.escape(keyword),  # Escape special regex characters
-            case=False,
-            regex=True,
-            na=False,
-        )
-        matched_descriptions = description_df[mask]["description_id"]
-        # Create rows for each match
-        for desc_id in matched_descriptions:
-            keyword_rows = keywords_base[keywords_base["keyword_text"] == keyword]
-            for _, kw_row in keyword_rows.iterrows():
-                all_matches.append({"description_id": desc_id, **kw_row.to_dict()})
-
-    all_keywords_df = pd.DataFrame(all_matches)
-
-    pattern = "|".join(re.escape(kw) for kw in keywords_base["keyword_text"].unique())
-
-    # Find matches
-    all_matches = []
-    for _i, desc_row in description_df.iterrows():
-        print(f"Processing description: {_i}/{len(description_df)}")
-        matches = keywords_base[
-            keywords_base["keyword_text"].apply(
-                lambda x: bool(
-                    re.search(
-                        r"\b" + re.escape(x) + r"\b", desc_row["description_text"]
-                    )
-                )
-            )
-        ]
-        if len(matches) > 0:
-            matches["description_id"] = desc_row["description_id"]
-            all_matches.append(matches)
-
-    all_keywords_df = (
-        pd.concat(all_matches, ignore_index=True) if all_matches else pd.DataFrame()
-    )
-
-    # Method 2: Cross join + filter (best for large datasets)
-    description_df["key"] = 1
-    keywords_base["key"] = 1
-
-    # Create cartesian product
-    cross_join = (
-        description_df[["description_id", "description_text", "key"]]
-        .merge(keywords_base, on="key")
-        .drop("key", axis=1)
-    )
-
-    # Filter matches
-    cross_join["match"] = cross_join.apply(
-        lambda row: row["keyword_text"] in row["description_text"], axis=1
-    )
-    all_keywords_df = cross_join[cross_join["match"]].drop(
-        ["match", "description_text"], axis=1
     )

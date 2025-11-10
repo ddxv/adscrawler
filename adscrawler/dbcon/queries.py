@@ -265,6 +265,7 @@ def upsert_df(
     return_rows: bool = False,
     schema: str | None = None,
     md5_key_columns: list[str] | None = None,
+    on_conflict_update: bool = True,
     log: bool = False,
 ) -> pd.DataFrame | None:
     """Perform an "upsert" on a PostgreSQL table from a DataFrame.
@@ -273,11 +274,11 @@ def upsert_df(
 
     Parameters
     ----------
-    data_frame : pandas.DataFrame
+    df : pandas.DataFrame
         The DataFrame to be upserted.
     table_name : str
         The name of the target table.
-    engine : sqlalchemy.engine.Engine
+    database_connection : Connection
         The SQLAlchemy Engine to use.
     schema : str, optional
         The name of the schema containing the target table.
@@ -290,9 +291,18 @@ def upsert_df(
     md5_key_columns: list of str columns (usually >1000 chars needs this)
         that have Postgresql md5() used in the UNIQUE INDEX
         allows upsert without hitting index size limits
+    on_conflict_update: bool, optional
+        Whether to update the existing rows on conflict, default True
     log : bool, optional
         Print generated SQL statement for debugging.
     """
+
+    # Validate parameters
+    if not on_conflict_update and return_rows:
+        raise ValueError(
+            "return_rows=True cannot be used with on_conflict_update=False "
+            "because DO NOTHING doesn't guarantee the returned rows were actually inserted"
+        )
 
     raw_conn = database_connection.engine.raw_connection()
 
@@ -317,9 +327,14 @@ def upsert_df(
         )
     else:
         conflict_columns = SQL(", ").join(map(Identifier, key_columns))
-    update_set = SQL(", ").join(
-        SQL("{0} = EXCLUDED.{0}").format(Identifier(col)) for col in all_columns
-    )
+
+    if on_conflict_update:
+        update_set = SQL(", ").join(
+            SQL("{0} = EXCLUDED.{0}").format(Identifier(col)) for col in all_columns
+        )
+        action_clause = SQL("DO UPDATE SET {update_set}").format(update_set=update_set)
+    else:
+        action_clause = SQL("DO NOTHING")
 
     # Upsert query without RETURNING clause
     upsert_query = SQL(
@@ -327,14 +342,14 @@ def upsert_df(
         INSERT INTO {table} ({columns})
         VALUES ({placeholders})
         ON CONFLICT ({conflict_columns})
-        DO UPDATE SET {update_set}
+        {action_clause}
     """
     ).format(
         table=table_identifier,
         columns=columns,
         placeholders=placeholders,
         conflict_columns=conflict_columns,
-        update_set=update_set,
+        action_clause=action_clause,
     )
 
     sel_where_conditions = SQL(" AND ").join(
@@ -1131,11 +1146,14 @@ def query_apps_to_api_scan(
     return df
 
 
-def query_apps_to_process_keywords(database_connection: PostgresCon) -> pd.DataFrame:
+def query_apps_to_process_keywords(
+    database_connection: PostgresCon, limit: int = 10000
+) -> pd.DataFrame:
     """Query apps to process keywords."""
     df = pd.read_sql(
         QUERY_APPS_TO_PROCESS_KEYWORDS,
         con=database_connection.engine,
+        params={"mylimit": limit},
     )
     return df
 
