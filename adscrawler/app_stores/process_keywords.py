@@ -6,6 +6,7 @@ from collections import Counter
 
 import pandas as pd
 
+from adscrawler.config import get_logger
 from adscrawler.dbcon.connection import PostgresCon
 from adscrawler.dbcon.queries import (
     delete_and_insert,
@@ -14,8 +15,6 @@ from adscrawler.dbcon.queries import (
     query_keywords_base,
     upsert_df,
 )
-
-from adscrawler.config import get_logger
 
 logger = get_logger(__name__)
 
