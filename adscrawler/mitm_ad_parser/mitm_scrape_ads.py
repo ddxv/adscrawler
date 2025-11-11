@@ -61,6 +61,9 @@ def find_sent_video_df(
 
 def get_video_id(row: pd.Series) -> str:
     """Extracts video ID from URL based on the ad network domain."""
+    if not row["tld_url"]:
+        # Likely IP address or other non-URL
+        return ""
     if "2mdn" in row["tld_url"]:
         if "/id/" in row["url"]:
             url_parts = urllib.parse.urlparse(row["url"])
@@ -106,7 +109,6 @@ def attribute_creatives(
     creatives["video_id"] = creatives.apply(lambda x: get_video_id(x), axis=1)
     creatives = creatives.drop_duplicates(subset=["video_id", "response_size_bytes"])
     row_count = creatives.shape[0]
-    # For duplicate video_id
     sent_video_cache = {}
     parse_results_cache = {}
     i = 0
@@ -220,6 +222,12 @@ def attribute_creatives(
         found_ad_network_tlds = list(
             set([item for sublist in found_ad_network_tlds for item in sublist])
         )
+        click_url_ids = [
+            x["click_url_ids"] for x in found_ad_infos if x["click_url_ids"] is not None
+        ]
+        click_url_ids = list(
+            set([item for sublist in click_url_ids for item in sublist])
+        )
         try:
             md5_hash = store_creative_and_thumb_to_local(
                 row,
@@ -249,14 +257,21 @@ def attribute_creatives(
             row["error_msg"] = error_msg
             error_messages.append(row)
             continue
-        init_tlds = [x["init_tld"] for x in found_ad_infos]
+        init_tlds = list(set([x["init_tld"] for x in found_ad_infos]))
         if len(init_tlds) == 0:
             init_tld = None
             error_msg = "No initial domain found"
             row["error_msg"] = error_msg
             error_messages.append(row)
+        elif len(init_tlds) > 1:
+            error_msg = "Multiple initial domains found, perhaps log both?"
+            logger.error(f"{error_msg} for {row['tld_url']} {video_id}")
+            row["error_msg"] = error_msg
+            error_messages.append(row)
+            continue
         else:
             init_tld = init_tlds[0]
+
         adv_creatives.append(
             {
                 "mitm_uuid": row["mitm_uuid"],
@@ -264,6 +279,7 @@ def attribute_creatives(
                 "md5_hash": md5_hash,
                 "host_ad_network_tld": host_ad_network_tld,
                 "creative_initial_domain_tld": init_tld,
+                "click_url_ids": click_url_ids,
                 "adv_store_id": adv_store_id,
                 "advertiser_store_app_id": adv_store_app_id,
                 "mmp_urls": found_mmp_urls,
@@ -431,6 +447,7 @@ def make_creative_records_df(
             "mmp_domain_id",
             "mmp_urls",
             "additional_ad_domain_ids",
+            "click_url_ids",
         ]
     ]
     # Nullable IDs, watch out for Int64
@@ -519,6 +536,7 @@ def parse_store_id_mitm_log(
             "advertiser_store_app_id",
             "advertiser_domain_id",
             "mmp_domain_id",
+            "click_url_ids",
             "additional_ad_domain_ids",
             "mmp_urls",
             "updated_at",

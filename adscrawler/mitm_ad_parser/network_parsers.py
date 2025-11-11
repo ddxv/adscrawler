@@ -1,5 +1,6 @@
 import ast
 import base64
+import hashlib
 import html
 import json
 import re
@@ -23,6 +24,8 @@ from adscrawler.dbcon.queries import (
     query_all_domains,
     query_api_call_id_for_uuid,
     query_store_app_by_store_id_cached,
+    query_urls_by_hashes,
+    query_urls_hash_map_cached,
     upsert_df,
 )
 from adscrawler.mitm_ad_parser.models import AdInfo, MultipleAdvertiserIdError
@@ -137,6 +140,9 @@ def extract_and_decode_urls(text: str) -> list[str]:
         urls.append(decoded_url)
         # print("DECODED:", decoded_url)
     all_urls = list(set(vast_urls + urls))
+    not_urls = [x for x in all_urls if "://" not in x[0:48]]
+    all_urls = [x for x in all_urls if "://" in x[0:48]]
+    logger.info(f"Found {len(all_urls)} urls, dropping {len(not_urls)} not urls")
     return all_urls
 
 
@@ -225,7 +231,21 @@ def check_and_upsert_new_domains(
 
 def upsert_urls(urls: list[str], database_connection: PostgresCon) -> pd.DataFrame:
     """Upserts the URLs into the database."""
-    new_urls_df = pd.DataFrame({"url": urls})
+    urls_df = pd.DataFrame({"url": urls})
+    url_hash_map = query_urls_hash_map_cached(database_connection=database_connection)
+    urls_df["url_hash"] = urls_df["url"].apply(
+        lambda x: hashlib.md5(x.encode()).hexdigest()
+    )
+    new_urls_df = urls_df[
+        ~urls_df["url_hash"].isin(url_hash_map["url_hash"].to_list())
+    ].copy()
+    if new_urls_df.empty:
+        urls_df = urls_df.merge(
+            url_hash_map[["url_hash", "url_id"]],
+            on="url_hash",
+            how="left",
+        )
+        return urls_df
     http_urls_df = new_urls_df[new_urls_df["url"].str.startswith("http")].copy()
     nonhttp_urls_df = new_urls_df[~new_urls_df["url"].str.startswith("http")].copy()
     http_urls_df["tld_url"] = http_urls_df["url"].apply(lambda x: get_tld(x))
@@ -248,17 +268,26 @@ def upsert_urls(urls: list[str], database_connection: PostgresCon) -> pd.DataFra
     new_urls_df["domain_id"] = np.where(
         pd.isna(new_urls_df["domain_id"]), None, new_urls_df["domain_id"]
     )
-    urls_df: pd.DataFrame = upsert_df(
+    new_urls_df["url_hash"] = new_urls_df["url"].apply(
+        lambda x: hashlib.md5(x.encode()).hexdigest()
+    )
+    logger.info(f"Upserting {new_urls_df.shape[0]} new urls")
+    new_urls_df: pd.DataFrame = upsert_df(
         df=new_urls_df,
         database_connection=database_connection,
         schema="adtech",
         table_name="urls",
-        insert_columns=["url", "domain_id", "scheme"],
-        key_columns=["url"],
-        md5_key_columns=["url"],
+        insert_columns=["url", "url_hash", "domain_id", "scheme"],
+        key_columns=["url_hash"],
         return_rows=True,
     )
-    urls_df = urls_df.rename(columns={"id": "url_id"})
+    new_urls_df = new_urls_df.rename(columns={"id": "url_id"})
+    url_hash_map = pd.concat([url_hash_map, new_urls_df[["url_hash", "url_id"]]])
+    urls_df = urls_df.merge(
+        url_hash_map[["url_hash", "url_id"]],
+        on="url_hash",
+        how="left",
+    )
     return urls_df
 
 
@@ -303,23 +332,27 @@ def follow_url_redirects(
     """
     existing_chain_df = get_click_url_redirect_chains(run_id, database_connection)
     if not existing_chain_df.empty and url in existing_chain_df["url"].to_list():
-        existing_chain_df = existing_chain_df[existing_chain_df["url"] == url]
-        redirect_chain = existing_chain_df["redirect_url"].to_list()
+        existing_chain_df = existing_chain_df[
+            (existing_chain_df["url"] == url)
+            & (existing_chain_df["api_call_id"] == api_call_id)
+        ]
+        if not existing_chain_df.empty:
+            redirect_chain = existing_chain_df["redirect_url"].to_list()
+            return redirect_chain
+    # New chain, insert after getting the chain
+    redirect_chain_dict = get_redirect_chain(url)
+    if len(redirect_chain_dict) > 0:
+        logger.info(f"Found new click redirects: {len(redirect_chain_dict)}")
+        chain_df = pd.DataFrame(redirect_chain_dict)
+        chain_df["run_id"] = run_id
+        chain_df["api_call_id"] = api_call_id
+        chain_df["url"] = url
+        upsert_click_url_redirect_chains(chain_df, database_connection)
+        redirect_chain = list(
+            set(chain_df["next_url"].to_list() + chain_df["url"].to_list())
+        )
     else:
-        # New chain, insert after getting the chain
-        redirect_chain_dict = get_redirect_chain(url)
-        if len(redirect_chain_dict) > 0:
-            logger.info(f"Found new click redirects: {len(redirect_chain_dict)}")
-            chain_df = pd.DataFrame(redirect_chain_dict)
-            chain_df["run_id"] = run_id
-            chain_df["api_call_id"] = api_call_id
-            chain_df["url"] = url
-            upsert_click_url_redirect_chains(chain_df, database_connection)
-            redirect_chain = list(
-                set(chain_df["next_url"].to_list() + chain_df["url"].to_list())
-            )
-        else:
-            redirect_chain = []
+        redirect_chain = []
     return redirect_chain
 
 
@@ -744,6 +777,12 @@ def parse_text_for_adinfo(
     except MultipleAdvertiserIdError as e:
         error_msg = f"multiple adv_store_id found for: {e.found_adv_store_ids}"
         logger.error(error_msg)
+    if click_urls and len(click_urls) > 0:
+        click_url_hashes = [hashlib.md5(url.encode()).hexdigest() for url in click_urls]
+        click_url_ids = query_urls_by_hashes(click_url_hashes, database_connection)[
+            "url_id"
+        ].tolist()
+        ad_info.click_url_ids = click_url_ids
     return ad_info, error_msg
 
 

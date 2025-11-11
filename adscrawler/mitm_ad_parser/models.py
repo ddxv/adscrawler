@@ -1,7 +1,7 @@
 import dataclasses
 from typing import Any, Self
 
-import tldextract
+from adscrawler.mitm_ad_parser.utils import get_tld
 
 
 @dataclasses.dataclass
@@ -11,6 +11,7 @@ class AdInfo:
     init_tld: str | None = None
     found_ad_network_tlds: list[str] | None = None
     found_mmp_urls: list[str] | None = None
+    click_url_ids: list[int] | None = None
 
     def __getitem__(self: Self, key: str) -> Any:
         """Support dictionary-style access to dataclass fields."""
@@ -23,11 +24,7 @@ class AdInfo:
     @property
     def mmp_tld(self: Self) -> str | None:
         if self.found_mmp_urls and len(self.found_mmp_urls) > 0:
-            return (
-                tldextract.extract(self.found_mmp_urls[0]).domain
-                + "."
-                + tldextract.extract(self.found_mmp_urls[0]).suffix
-            )
+            return get_tld(self.found_mmp_urls[0])
         return None
 
 

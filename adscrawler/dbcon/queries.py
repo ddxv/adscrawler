@@ -875,23 +875,24 @@ def query_pub_domains_to_crawl_ads_txt(
     return df
 
 
-def query_urls_id_map(
-    urls: list[str], database_connection: PostgresCon
-) -> pd.DataFrame:
+@lru_cache(maxsize=1)
+def query_urls_hash_map_cached(database_connection: PostgresCon) -> pd.DataFrame:
     """
-    Get URL IDs by looking up MD5 hashes.
-    Returns DataFrame with columns: url, id
+    Get URL IDs and hashes from the urls table.
+    Returns DataFrame with columns: url_id, url
     """
-    if not urls:
-        return pd.DataFrame(columns=["url", "id"])
-    url_hash_map = {url: hashlib.md5(url.encode()).hexdigest() for url in urls}
-    hashes_str = "'" + "','".join(url_hash_map.values()) + "'"
-    sel_query = f"""
-        SELECT url, id, url_hash 
-        FROM adtech.urls 
-        WHERE url_hash IN ({hashes_str})
-    """
+    sel_query = """SELECT id, url_hash FROM adtech.urls"""
     df = pd.read_sql(sel_query, database_connection.engine)
+    df = df.rename(columns={"id": "url_id"})
+    return df
+
+
+@lru_cache(maxsize=1000)
+def query_urls_by_hashes(
+    hashes: list[str], database_connection: PostgresCon
+) -> pd.DataFrame:
+    sel_query = """SELECT id, url_hash FROM adtech.urls WHERE url_hash IN (%s)"""
+    df = pd.read_sql(sel_query, database_connection.engine, params=(hashes))
     return df
 
 
@@ -1345,7 +1346,8 @@ def get_failed_mitm_logs(database_connection: PostgresCon) -> pd.DataFrame:
     sel_query = """WITH last_run_result AS (SELECT DISTINCT ON (run_id)
       run_id, pub_store_id, error_msg, inserted_at
         FROM logging.creative_scan_results 
-      ORDER BY run_id, inserted_at DESC)
+      ORDER BY run_id, inserted_at DESC
+      )
       SELECT * 
           FROM last_run_result
           WHERE error_msg like 'CRITICAL %%'
