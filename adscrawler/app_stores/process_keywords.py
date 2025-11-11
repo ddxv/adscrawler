@@ -36,8 +36,14 @@ CUSTOM_STOPWORDS = {
     "we",
     "application",
     "one",
+    "ones",
+    "dont",
+    "us",
+    "takes",
+    "take",
     "them",
     "use",
+    "uses",
     "need",
     "get",
     "who",
@@ -169,12 +175,24 @@ def extract_keywords_nltk(text: str, top_n: int = 10) -> list[str]:
     return [word for word, freq in word_freq.most_common(top_n)]
 
 
+def get_stopwords() -> set[str]:
+    """Get the stopwords from NLTK and spaCy."""
+    from nltk.corpus import stopwords
+    import spacy
+
+    nlp = spacy.load("en_core_web_sm")
+    spacy_stopwords = nlp.Defaults.stop_words
+    mystopwords = (
+        set(stopwords.words("english")).union(CUSTOM_STOPWORDS).union(spacy_stopwords)
+    )
+    return list(mystopwords)
+
+
 def extract_keywords_rake(text: str, top_n: int = 10, max_tokens: int = 3) -> list[str]:
     """Extracts keywords using RAKE with token limit."""
-    from nltk.corpus import stopwords
     from rake_nltk import Rake
 
-    mystopwords = set(stopwords.words("english")).union(CUSTOM_STOPWORDS)
+    mystopwords = get_stopwords()
 
     r = Rake()
     r.extract_keywords_from_text(text)
@@ -196,9 +214,8 @@ def extract_unique_app_keywords_from_text(
     max_tokens: int = 1,
 ) -> list[str]:
     """Extracts keywords using spaCy, NLTK, and RAKE, then returns a unique set."""
-    from nltk.corpus import stopwords
 
-    mystopwords = set(stopwords.words("english")).union(CUSTOM_STOPWORDS)
+    mystopwords = get_stopwords()
 
     text = clean_text(text)
     words_spacy = extract_keywords_spacy(text, top_n, max_tokens)
@@ -232,21 +249,16 @@ def get_global_keywords(database_connection: PostgresCon) -> list[str]:
     """Get the global keywords from the database.
     NOTE: This takes about ~5-8GB of RAM for 50k keywords and 200k descriptions. For now run manually.
     """
-    from nltk.corpus import stopwords
 
-    import spacy
+    from sklearn.feature_extraction.text import TfidfVectorizer  # noqa: PLC0415
 
-    nlp = spacy.load("en_core_web_sm")
-    spacy_stopwords = nlp.Defaults.stop_words
+    mystopwords = get_stopwords()
 
-    mystopwords = set(stopwords.words("english")).union(CUSTOM_STOPWORDS)
     df = query_all_store_app_descriptions(
         language_slug="en", database_connection=database_connection
     )
 
     df = clean_df_text(df, "description")
-
-    from sklearn.feature_extraction.text import TfidfVectorizer  # noqa: PLC0415
 
     vectorizer = TfidfVectorizer(
         ngram_range=(1, 2),  # Include 1-grams, 2-grams
