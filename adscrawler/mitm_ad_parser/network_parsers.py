@@ -779,10 +779,11 @@ def parse_text_for_adinfo(
         logger.error(error_msg)
     if click_urls and len(click_urls) > 0:
         click_url_hashes = [hashlib.md5(url.encode()).hexdigest() for url in click_urls]
-        click_url_ids = query_urls_by_hashes(click_url_hashes, database_connection)[
-            "url_id"
-        ].tolist()
-        ad_info.click_url_ids = click_url_ids
+        cdf = query_urls_by_hashes(click_url_hashes, database_connection)
+        if not cdf.empty:
+            ad_info.click_url_ids = cdf["id"].tolist()
+        else:
+            logger.error("Click URLs found but no URL IDs in DB")
     return ad_info, error_msg
 
 

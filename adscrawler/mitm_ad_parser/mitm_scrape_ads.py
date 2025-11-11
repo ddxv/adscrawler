@@ -163,6 +163,7 @@ def attribute_creatives(
                 found_ad_infos, found_error_messages = parse_sent_video_df(
                     row, pub_store_id, sent_video_df, database_connection, video_id
                 )
+
             sent_video_cache[video_id] = sent_video_df
             parse_results_cache[video_id] = (found_ad_infos, found_error_messages)
         for found_error_message in found_error_messages:
@@ -271,7 +272,6 @@ def attribute_creatives(
             continue
         else:
             init_tld = init_tlds[0]
-
         adv_creatives.append(
             {
                 "mitm_uuid": row["mitm_uuid"],

@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 from psycopg import Connection
 from psycopg.sql import SQL, Composed, Identifier
-from sqlalchemy import text
+from sqlalchemy import bindparam, text
 from sqlalchemy.sql.elements import TextClause
 
 from adscrawler.config import CONFIG, SQL_DIR, get_logger
@@ -887,12 +887,23 @@ def query_urls_hash_map_cached(database_connection: PostgresCon) -> pd.DataFrame
     return df
 
 
-@lru_cache(maxsize=1000)
 def query_urls_by_hashes(
     hashes: list[str], database_connection: PostgresCon
 ) -> pd.DataFrame:
-    sel_query = """SELECT id, url_hash FROM adtech.urls WHERE url_hash IN (%s)"""
-    df = pd.read_sql(sel_query, database_connection.engine, params=(hashes))
+    hashes_tuple = tuple(hashes)
+    if not hashes_tuple:
+        return pd.DataFrame(columns=["id", "url_hash"])
+    return _query_urls_by_hashes_cached(hashes_tuple, database_connection)
+
+
+@lru_cache(maxsize=1000)
+def _query_urls_by_hashes_cached(
+    hashes: tuple[str, ...], database_connection: PostgresCon
+) -> pd.DataFrame:
+    sel_query = text(
+        """SELECT id, url_hash FROM adtech.urls WHERE url_hash IN :hashes"""
+    ).bindparams(bindparam("hashes", expanding=True))
+    df = pd.read_sql(sel_query, database_connection.engine, params={"hashes": hashes})
     return df
 
 
