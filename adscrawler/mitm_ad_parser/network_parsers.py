@@ -170,7 +170,7 @@ def check_click_urls(
     click_urls = []
     for url in all_urls:
         redirect_urls = []
-        if "/click" in url or "/clk" in url:
+        if "/click" in url or "/clk" in url or "onelink.me" in url:
             if "tpbid.com" in url:
                 url = url.replace("fybernativebrowser://navigate?url=", "")
             redirect_urls = follow_url_redirects(
@@ -328,7 +328,7 @@ def follow_url_redirects(
     """
     Follows redirects and returns the final URL.
 
-    Cache the results to avoid repeated requests.
+    Cache the results in the database to avoid repeated requests.
     """
     existing_chain_df = get_click_url_redirect_chains(run_id, database_connection)
     if not existing_chain_df.empty and url in existing_chain_df["url"].to_list():
@@ -410,10 +410,11 @@ def parse_urls_for_known_parts(
             if "websdk.appsflyer.com" in url:
                 continue
             if "appsflyer.com" in tld_url:
-                adv_store_id = re.search(
+                matches = re.search(
                     r"http.*\.appsflyer\.com/([a-zA-Z0-9_.]+)[\?\-]", url
-                )[1]
-                if adv_store_id:
+                )
+                if matches and matches.group(1):
+                    adv_store_id = matches.group(1)
                     found_adv_store_ids.append(adv_store_id)
         elif match := re.search(r"intent://details\?id=([a-zA-Z0-9._]+)", url):
             adv_store_id = match.group(1)

@@ -234,6 +234,11 @@ def get_global_keywords(database_connection: PostgresCon) -> list[str]:
     """
     from nltk.corpus import stopwords
 
+    import spacy
+
+    nlp = spacy.load("en_core_web_sm")
+    spacy_stopwords = nlp.Defaults.stop_words
+
     mystopwords = set(stopwords.words("english")).union(CUSTOM_STOPWORDS)
     df = query_all_store_app_descriptions(
         language_slug="en", database_connection=database_connection
