@@ -1,7 +1,9 @@
 WITH rank_crawled_keywords AS (
-    SELECT DISTINCT akr.keyword
+    SELECT DISTINCT
+        akr.store,
+        akr.keyword_id
     FROM
-        app_keyword_rankings AS akr
+        frontend.app_keyword_ranks_daily AS akr
     WHERE
         akr.crawled_date > CURRENT_DATE - INTERVAL '7 days'
 ),
@@ -23,7 +25,7 @@ FROM
     frontend.keyword_scores
 WHERE
     keyword_id NOT IN (
-        SELECT rck.keyword
+        SELECT rck.keyword_id
         FROM
             rank_crawled_keywords AS rck
     )

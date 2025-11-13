@@ -260,7 +260,6 @@ def scrape_store_ranks(database_connection: PostgresCon, store: int) -> None:
                     crawl_source="scrape_frontpage_top",
                     collections_map=collections_map,
                     categories_map=categories_map,
-                    countries_map=countries_map,
                     store=1,
                 )
             except Exception as e:
@@ -329,7 +328,6 @@ def process_scraped(
     crawl_source: str,
     collections_map: pd.DataFrame | None = None,
     categories_map: pd.DataFrame | None = None,
-    countries_map: pd.DataFrame | None = None,
     store: int | None = None,
 ) -> None:
     check_and_insert_new_apps(
@@ -346,7 +344,6 @@ def process_scraped(
             store,
             collections_map,
             categories_map,
-            countries_map,
         )
 
 
@@ -356,7 +353,6 @@ def save_app_ranks(
     store: int | None,
     collections_map: pd.DataFrame | None = None,
     categories_map: pd.DataFrame | None = None,
-    countries_map: pd.DataFrame | None = None,
 ) -> None:
     all_scraped_ids = df["store_id"].unique().tolist()
     new_existing_ids_map = query_store_id_map(
@@ -376,38 +372,6 @@ def save_app_ranks(
             store=store,
             df=df,
         )
-    if "keyword" in df.columns:
-        df = df.drop("store_id", axis=1)
-        df = (
-            pd.merge(
-                df,
-                countries_map[["id", "alpha2"]],
-                how="left",
-                left_on=["country"],
-                right_on="alpha2",
-                validate="m:1",
-            )
-            .drop(["country", "alpha2"], axis=1)
-            .rename(columns={"id": "country"})
-        )
-        process_keyword_rankings(
-            df=df,
-            database_connection=database_connection,
-        )
-
-
-def process_keyword_rankings(
-    df: pd.DataFrame,
-    database_connection: PostgresCon,
-) -> None:
-    upsert_df(
-        database_connection=database_connection,
-        df=df,
-        table_name="app_keyword_rankings",
-        key_columns=["crawled_date", "country", "lang", "keyword", "rank", "store_app"],
-        insert_columns=[],
-    )
-    logger.info("keyword rankings inserted")
 
 
 def extract_domains(x: str) -> str:
