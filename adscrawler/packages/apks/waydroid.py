@@ -451,6 +451,7 @@ def remove_all_third_party_apps() -> None:
             timeout=30,
         )
     logger.info(f"{function_info} success")
+    os.system(f"sudo bash -c 'rm -rf {WAYDROID_MEDIA_DIR}/*'")
 
 
 THIRD_PARTY_APPS_TO_KEEP = ["org.mozilla.firefox", "io.github.huskydg.magisk"]
