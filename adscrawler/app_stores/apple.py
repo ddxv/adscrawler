@@ -477,6 +477,16 @@ def clean_ios_app_df(df: pd.DataFrame) -> pd.DataFrame:
         df.loc[
             df["store_language_code"].str.startswith("zh-"), "store_language_code"
         ] = "zh"
+    # Fix .0 int to string issues
+    # Mixing nulls in and ints cause .0 to be added to the end of the string
+    problem_rows = df["developer_id"].str.contains(".0")
+    if problem_rows.any():
+        logger.warning(
+            f'Found {problem_rows.sum()} developer_id with ".0" suffix, fixing'
+        )
+        df.loc[problem_rows, "developer_id"] = (
+            df.loc[problem_rows, "developer_id"].str.split(".").str[0]
+        )
     return df
 
 
