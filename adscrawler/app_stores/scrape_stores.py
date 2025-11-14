@@ -292,8 +292,23 @@ def scrape_keyword(
     keyword: str,
 ) -> pd.DataFrame:
     logger.info(f"{keyword=} start")
+    retry_delay = 0.5
+    retry_delays = (0, retry_delay, 1.0)
     try:
-        google_apps = search_play_store(keyword, country=country, language=language)
+        google_apps = None
+        last_google_error = None
+        for delay in retry_delays:
+            try:
+                if delay:
+                    time.sleep(delay)
+                google_apps = search_play_store(
+                    keyword, country=country, language=language
+                )
+                break
+            except Exception as exc:
+                last_google_error = exc
+        if google_apps is None and last_google_error is not None:
+            raise last_google_error
         gdf = pd.DataFrame(google_apps)
         gdf["store"] = 1
         gdf["rank"] = range(1, len(gdf) + 1)
@@ -301,9 +316,20 @@ def scrape_keyword(
         gdf = pd.DataFrame()
         logger.exception(f"{keyword=} google failed")
     try:
-        apple_apps = search_app_store_for_ids(
-            keyword, country=country, language=language
-        )
+        apple_apps = None
+        last_apple_error = None
+        for delay in retry_delays:
+            try:
+                if delay:
+                    time.sleep(delay)
+                apple_apps = search_app_store_for_ids(
+                    keyword, country=country, language=language
+                )
+                break
+            except Exception as exc:
+                last_apple_error = exc
+        if apple_apps is None and last_apple_error is not None:
+            raise last_apple_error
         adf = pd.DataFrame(
             {
                 "store": 2,
