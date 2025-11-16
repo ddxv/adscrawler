@@ -161,14 +161,14 @@ def get_js_data(filepath: str, is_json: bool = True) -> list[dict] | list:
 
 
 def scrape_google_ranks(country: str) -> list[dict]:
-    logger.info("Scrape Google ranks start")
+    logger.info(f"Scrape Google ranks {country=} start")
     filepath = f"/tmp/googleplay_json_{country}.txt"
     try:
         call_js_to_update_file(filepath, country)
     except Exception as error:
-        logger.exception(f"JS pull failed with {error=}")
+        logger.exception(f"JS pull failed with {country=} {error=}")
     ranked_dicts = get_js_data(filepath)
-    logger.info(f"Scrape Google ranks finished: {len(ranked_dicts)}")
+    logger.info(f"Scrape Google ranks {country=} finished: {len(ranked_dicts)}")
     return ranked_dicts
 
 
