@@ -25,7 +25,10 @@ def truncate_utf8_bytes(s: str, max_bytes: int = 2400) -> str:
 
 
 def check_and_insert_new_apps(
-    dicts: list[dict], database_connection: PostgresCon, crawl_source: str, store: int
+    dicts: list[dict],
+    database_connection: PostgresCon,
+    crawl_source: str,
+    store: int,
 ) -> None:
     df = pd.DataFrame(dicts)
     if store in [1, 2]:
@@ -72,3 +75,4 @@ def check_and_insert_new_apps(
             database_connection=database_connection,
             schema="logging",
         )
+    return None
