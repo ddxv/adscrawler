@@ -1,4 +1,5 @@
 import logging
+import logging.handlers
 import os
 import pathlib
 import sys
@@ -6,7 +7,6 @@ import tomllib
 import traceback
 import typing
 from logging import Formatter
-from logging.handlers import RotatingFileHandler
 
 HOME = pathlib.Path.home()
 PROJECT_NAME = "adscrawler"
@@ -135,6 +135,22 @@ FORMATTER.datefmt = "%Y-%m-%d %H:%M:%S"
 global_loggers: dict[str, logging.Logger] = {}
 
 
+def _truncate_oversized_log(log_file: str, max_size: int) -> None:
+    """Check log file size on startup and truncate if too large"""
+    if not os.path.exists(log_file):
+        return
+    size = os.path.getsize(log_file)
+    if size > max_size:
+        keep_size = int(max_size * 0.2)
+        with open(log_file, "rb") as f:
+            f.seek(-keep_size, os.SEEK_END)
+            f.readline()  # Skip to next newline
+            content = f.read()
+        with open(log_file, "wb") as f:
+            warning = b"\n=== LOG TRUNCATED ON STARTUP (exceeded size limit) ===\n\n"
+            f.write(warning + content)
+
+
 def get_logger(mod_name: str, sep_file: str | None = "main") -> logging.Logger:
     global global_loggers  # noqa: PLW0602
 
@@ -157,11 +173,12 @@ def get_logger(mod_name: str, sep_file: str | None = "main") -> logging.Logger:
     syslog_handler.ident = f"{sep_file}: "
     logger.addHandler(syslog_handler)
 
-    # Add fallback log file, but struggles in multi-process environments
-    indiv_handler = RotatingFileHandler(
+    _truncate_oversized_log(
+        os.path.join(LOG_DIR, f"{sep_file}.log"), 500 * 1024 * 1024
+    )  # 500MB
+
+    indiv_handler = logging.handlers.WatchedFileHandler(
         filename=os.path.join(LOG_DIR, f"{sep_file}.log"),
-        maxBytes=50 * 1024 * 1024,
-        backupCount=10,
     )
     indiv_handler.setFormatter(FORMATTER)
     logger.addHandler(indiv_handler)
