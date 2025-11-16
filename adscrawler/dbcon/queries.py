@@ -25,6 +25,7 @@ def load_sql_file(file_name: str) -> TextClause:
 
 QUERY_APPS_TO_UPDATE_SECONDARY = load_sql_file("query_apps_to_update_secondary.sql")
 QUERY_APPS_TO_UPDATE_PRIMARY = load_sql_file("query_apps_to_update_primary.sql")
+QUERY_APPS_TO_UPDATE_ANY_NEW = load_sql_file("query_apps_to_update_any_new.sql")
 QUERY_APPS_TO_DOWNLOAD = load_sql_file("query_apps_to_download.sql")
 QUERY_APPS_TO_SDK_SCAN = load_sql_file("query_apps_to_sdk_scan.sql")
 QUERY_APPS_TO_API_SCAN = load_sql_file("query_apps_to_api_scan.sql")
@@ -1015,10 +1016,12 @@ def query_store_apps_to_update(
         "year_ago_ts": year_ago_ts,
         "mylimit": limit,
     }
-    if country_priority_group == 1:
-        query = QUERY_APPS_TO_UPDATE_PRIMARY
-    else:
-        query = QUERY_APPS_TO_UPDATE_SECONDARY
+    country_priority_group_query = {
+        -1: QUERY_APPS_TO_UPDATE_ANY_NEW,
+        1: QUERY_APPS_TO_UPDATE_PRIMARY,
+        2: QUERY_APPS_TO_UPDATE_SECONDARY,
+    }
+    query = country_priority_group_query[country_priority_group]
 
     if log_query:
         # Compile and print the query with parameters

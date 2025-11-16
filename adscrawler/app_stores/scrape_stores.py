@@ -85,6 +85,7 @@ def process_scrape_apps_and_save(
         total_rows = len(df_chunk)
     chunk_info = f"{store=} chunk={df_chunk.index[0]}-{df_chunk.index[-1]}/{total_rows}"
     logger.info(f"{chunk_info} start")
+    database_connection = get_db_connection(use_ssh_tunnel=use_ssh_tunnel)
     chunk_results = []
     try:
         for _, row in df_chunk.iterrows():
@@ -108,7 +109,6 @@ def process_scrape_apps_and_save(
         results_df = pd.DataFrame(chunk_results)
         results_df["crawled_date"] = results_df["crawled_at"].dt.date
         app_details_to_s3(results_df, store=store)
-        database_connection = get_db_connection(use_ssh_tunnel=use_ssh_tunnel)
         log_crawl_results(results_df, store, database_connection=database_connection)
         results_df = results_df[(results_df["country"] == "US")]
         process_live_app_details(
@@ -634,6 +634,8 @@ def scrape_app(
     base_delay = 0.5
     retries = 0
     logger.debug(f"{scrape_info} scrape start")
+    # Satisfy mypy
+    crawl_result = 0
     while retries <= max_retries:
         retries += 1
         try:

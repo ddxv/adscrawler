@@ -87,7 +87,7 @@ def unzip_apk(store_id: str, file_path: pathlib.Path) -> pathlib.Path:
         )
         if "filename not matched" in output.stderr:
             unzip_command = f"unzip -o {file_path.as_posix()} base.apk -d {partial_apk_dir.as_posix()}"
-            output = subprocess.run(
+            _output = subprocess.run(
                 unzip_command, shell=True, check=True, capture_output=True, timeout=60
             )
             base_apk_path = pathlib.Path(partial_apk_dir, "base.apk")
