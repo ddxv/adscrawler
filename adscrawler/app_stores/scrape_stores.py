@@ -222,7 +222,6 @@ def crawl_keyword_ranks(database_connection: PostgresCon) -> None:
 def scrape_store_ranks(database_connection: PostgresCon, store: int) -> None:
     collections_map = query_collections(database_connection)
     categories_map = query_categories(database_connection)
-    countries_map = query_countries(database_connection)
     collections_map = collections_map.rename(columns={"id": "store_collection"})
     categories_map = categories_map.rename(columns={"id": "store_category"})
     ranks_country_list = get_crawl_scenario_countries(
@@ -242,7 +241,6 @@ def scrape_store_ranks(database_connection: PostgresCon, store: int) -> None:
                     crawl_source="scrape_frontpage_top",
                     collections_map=collections_map,
                     categories_map=categories_map,
-                    countries_map=countries_map,
                     store=2,
                 )
             except Exception as e:
