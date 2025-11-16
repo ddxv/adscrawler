@@ -85,6 +85,8 @@ def process_chunk(
                     country=row["country_code"].lower(),
                     language=row["language"].lower(),
                 )
+                if process_icon:
+                    result["icon_url_100"] = row.get("icon_url_100", None)
                 chunk_results.append(result)
             except Exception as e:
                 logger.exception(
@@ -103,7 +105,6 @@ def process_chunk(
             results_df=results_df,
             database_connection=database_connection,
             process_icon=process_icon,
-            df_chunk=df_chunk,
         )
         logger.info(f"{chunk_info} finished")
     finally:
@@ -698,7 +699,6 @@ def process_live_app_details(
     results_df: pd.DataFrame,
     database_connection: PostgresCon,
     process_icon: bool,
-    df_chunk: pd.DataFrame,
 ) -> None:
     for crawl_result, apps_df in results_df.groupby("crawl_result"):
         logger.info(f"{store=} {crawl_result=} processing {len(apps_df)} apps for db")
@@ -712,12 +712,6 @@ def process_live_app_details(
             apps_df.loc[apps_df["description_short"].isna(), "description_short"] = ""
             if process_icon:
                 try:
-                    apps_df = pd.merge(
-                        apps_df,
-                        df_chunk[["store_id", "icon_url_100"]],
-                        on="store_id",
-                        how="inner",
-                    )
                     no_icon = apps_df["icon_url_100"].isna()
                     if apps_df[no_icon].empty:
                         pass
