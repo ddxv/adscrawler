@@ -367,9 +367,9 @@ def process_scraped(
     database_connection: PostgresCon,
     ranked_dicts: list[dict],
     crawl_source: str,
+    store: int,
     collections_map: pd.DataFrame | None = None,
     categories_map: pd.DataFrame | None = None,
-    store: int | None = None,
 ) -> None:
     check_and_insert_new_apps(
         database_connection=database_connection,
@@ -391,7 +391,7 @@ def process_scraped(
 def save_app_ranks(
     df: pd.DataFrame,
     database_connection: PostgresCon,
-    store: int | None,
+    store: int,
     collections_map: pd.DataFrame | None = None,
     categories_map: pd.DataFrame | None = None,
 ) -> None:
