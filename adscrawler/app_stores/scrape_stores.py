@@ -19,16 +19,16 @@ from adscrawler.app_stores.appbrain import get_appbrain_android_apps
 from adscrawler.app_stores.apple import (
     clean_ios_app_df,
     crawl_ios_developers,
-    keyword_search_app_store_for_ids,
     scrape_app_ios,
     scrape_ios_ranks,
+    search_app_store_for_ids,
 )
 from adscrawler.app_stores.google import (
     clean_google_play_app_df,
     crawl_google_developers,
-    keyword_search_play_store,
     scrape_app_gp,
     scrape_google_ranks,
+    search_play_store,
 )
 from adscrawler.app_stores.process_from_s3 import (
     app_details_to_s3,
@@ -65,16 +65,26 @@ from adscrawler.packages.storage import get_s3_client
 logger = get_logger(__name__, "scrape_stores")
 
 
-def process_chunk(
+def process_scrape_apps_and_save(
     df_chunk: pd.DataFrame,
     store: int,
     use_ssh_tunnel: bool,
     process_icon: bool,
-    total_rows: int,
+    total_rows: int | None = None,
 ) -> None:
+    """Process a chunk of apps, scrape app, store to S3 and if coutnry === US store app details to db store_apps table.
+    s
+    Args:
+        df_chunk: DataFrame of apps to process, needs to have columns: store_id, country_code, language, icon_url_100
+        store: Store ID
+        use_ssh_tunnel: Whether to use SSH tunnel
+        process_icon: Whether to process app icons
+        total_rows: Total number of apps in the chunk, if None, will be calculated from df_chunk
+    """
+    if total_rows is None:
+        total_rows = len(df_chunk)
     chunk_info = f"{store=} chunk={df_chunk.index[0]}-{df_chunk.index[-1]}/{total_rows}"
     logger.info(f"{chunk_info} start")
-    database_connection = get_db_connection(use_ssh_tunnel=use_ssh_tunnel)
     chunk_results = []
     try:
         for _, row in df_chunk.iterrows():
@@ -98,6 +108,7 @@ def process_chunk(
         results_df = pd.DataFrame(chunk_results)
         results_df["crawled_date"] = results_df["crawled_at"].dt.date
         app_details_to_s3(results_df, store=store)
+        database_connection = get_db_connection(use_ssh_tunnel=use_ssh_tunnel)
         log_crawl_results(results_df, store, database_connection=database_connection)
         results_df = results_df[(results_df["country"] == "US")]
         process_live_app_details(
@@ -160,7 +171,12 @@ def update_app_details(
         future_to_idx = {}
         for idx, df_chunk in enumerate(chunks):
             future = executor.submit(
-                process_chunk, df_chunk, store, use_ssh_tunnel, process_icon, total_rows
+                process_scrape_apps_and_save,
+                df_chunk,
+                store,
+                use_ssh_tunnel,
+                process_icon,
+                total_rows,
             )
             future_to_idx[future] = idx
             # Only stagger the initial batch to avoid simultaneous API burst
@@ -300,7 +316,7 @@ def scrape_keyword(
             try:
                 if delay:
                     time.sleep(delay)
-                google_apps = keyword_search_play_store(
+                google_apps = search_play_store(
                     keyword, country=country, language=language
                 )
                 break
@@ -321,7 +337,7 @@ def scrape_keyword(
             try:
                 if delay:
                     time.sleep(delay)
-                apple_apps = keyword_search_app_store_for_ids(
+                apple_apps = search_app_store_for_ids(
                     keyword, country=country, language=language
                 )
                 break

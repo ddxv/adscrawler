@@ -490,7 +490,7 @@ def clean_ios_app_df(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def keyword_search_app_store_for_ids(
+def search_app_store_for_ids(
     search_term: str, country: str = "us", language: str = "en"
 ) -> list[str]:
     """Search store for new apps or keyword rankings."""
