@@ -19,16 +19,16 @@ from adscrawler.app_stores.appbrain import get_appbrain_android_apps
 from adscrawler.app_stores.apple import (
     clean_ios_app_df,
     crawl_ios_developers,
+    keyword_search_app_store_for_ids,
     scrape_app_ios,
     scrape_ios_ranks,
-    search_app_store_for_ids,
 )
 from adscrawler.app_stores.google import (
     clean_google_play_app_df,
     crawl_google_developers,
+    keyword_search_play_store,
     scrape_app_gp,
     scrape_google_ranks,
-    search_play_store,
 )
 from adscrawler.app_stores.process_from_s3 import (
     app_details_to_s3,
@@ -299,7 +299,7 @@ def scrape_keyword(
             try:
                 if delay:
                     time.sleep(delay)
-                google_apps = search_play_store(
+                google_apps = keyword_search_play_store(
                     keyword, country=country, language=language
                 )
                 break
@@ -320,7 +320,7 @@ def scrape_keyword(
             try:
                 if delay:
                     time.sleep(delay)
-                apple_apps = search_app_store_for_ids(
+                apple_apps = keyword_search_app_store_for_ids(
                     keyword, country=country, language=language
                 )
                 break

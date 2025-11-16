@@ -210,7 +210,7 @@ def crawl_google_developers(
     return apps_df
 
 
-def search_play_store(
+def keyword_search_play_store(
     search_term: str, country: str = "us", language: str = "en"
 ) -> list[dict]:
     """Search store for new apps or keyword rankings."""
