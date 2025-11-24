@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 1c3e0dwGEVAw1CBFNs6Ap9ovGhjZFlSHn747frEmiSwerxCVciGJgkxbFJta1gD
+\restrict LPBQhOxE1sVkjM0SWnwpvZViwmxNyXhPG0GveAWgLeAvofxHzT8aB8dhqAUcUIi
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -155,5 +155,5 @@ ALTER MATERIALIZED VIEW public.store_app_z_scores OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 1c3e0dwGEVAw1CBFNs6Ap9ovGhjZFlSHn747frEmiSwerxCVciGJgkxbFJta1gD
+\unrestrict LPBQhOxE1sVkjM0SWnwpvZViwmxNyXhPG0GveAWgLeAvofxHzT8aB8dhqAUcUIi
 

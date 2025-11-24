@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict CJQVCBsnAPakytBZfez5IIoNv5kKAuHgoLwfP308aWlkrButsWv9fYs0KjFSzDE
+\restrict YN5pf2W3Mo9kwVZB0VjdIB2Z7lpYJOnffPfo4LzSTgsnmhTIKYWxdk1O4Q3BgSJ
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -3483,23 +3483,6 @@ CREATE TABLE logging.store_app_waydroid_crawled_at (
 ALTER TABLE logging.store_app_waydroid_crawled_at OWNER TO postgres;
 
 --
--- Name: store_apps_audit; Type: TABLE; Schema: logging; Owner: postgres
---
-
-CREATE TABLE logging.store_apps_audit (
-    operation character(1) NOT NULL,
-    stamp timestamp without time zone NOT NULL,
-    userid text NOT NULL,
-    row_id bigint NOT NULL,
-    store smallint NOT NULL,
-    store_id text NOT NULL,
-    crawl_result integer
-);
-
-
-ALTER TABLE logging.store_apps_audit OWNER TO postgres;
-
---
 -- Name: store_apps_snapshot; Type: TABLE; Schema: logging; Owner: postgres
 --
 
@@ -5783,13 +5766,6 @@ CREATE UNIQUE INDEX logging_store_app_upsert_unique ON logging.store_app_waydroi
 
 
 --
--- Name: store_apps_audit_stamp_idx; Type: INDEX; Schema: logging; Owner: postgres
---
-
-CREATE INDEX store_apps_audit_stamp_idx ON logging.store_apps_audit USING btree (stamp);
-
-
---
 -- Name: app_country_metrics_history_date_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -6711,5 +6687,5 @@ GRANT ALL ON SCHEMA public TO PUBLIC;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict CJQVCBsnAPakytBZfez5IIoNv5kKAuHgoLwfP308aWlkrButsWv9fYs0KjFSzDE
+\unrestrict YN5pf2W3Mo9kwVZB0VjdIB2Z7lpYJOnffPfo4LzSTgsnmhTIKYWxdk1O4Q3BgSJ
 

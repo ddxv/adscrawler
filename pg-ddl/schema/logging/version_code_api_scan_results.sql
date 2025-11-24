@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict aF3lNloopHkMTV0wSZ5BNfMhgdbqg1RVV4sVO6gsoPPoNcFll3WtDU1bLZl2z5x
+\restrict 33IKjk5a8Q1osoa4s35vyovoQTPTrPrNIiyic76GSKz48MO2ijmHSsNbfx90KFK
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -42,5 +42,5 @@ ALTER TABLE logging.version_code_api_scan_results OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict aF3lNloopHkMTV0wSZ5BNfMhgdbqg1RVV4sVO6gsoPPoNcFll3WtDU1bLZl2z5x
+\unrestrict 33IKjk5a8Q1osoa4s35vyovoQTPTrPrNIiyic76GSKz48MO2ijmHSsNbfx90KFK
 

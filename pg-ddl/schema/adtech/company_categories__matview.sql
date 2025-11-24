@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict OABCCeo7stAutvtaesszt4cxJrFSiZ2a0xhdcIHzvzNVrYeVWboRBQyVeCFeFaI
+\restrict xo8ia6rwW2ScRCiwTra6d4XKycKxb87xgskAgEDKdN3fhnv0iSTOzXGt62hcNYe
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -42,5 +42,5 @@ ALTER MATERIALIZED VIEW adtech.company_categories OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict OABCCeo7stAutvtaesszt4cxJrFSiZ2a0xhdcIHzvzNVrYeVWboRBQyVeCFeFaI
+\unrestrict xo8ia6rwW2ScRCiwTra6d4XKycKxb87xgskAgEDKdN3fhnv0iSTOzXGt62hcNYe
 

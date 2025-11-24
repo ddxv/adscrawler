@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 0m8Qrma9OWGrD72QNq5oX5uofgd4KIQx33f8fPItgzcwZy88axJDJgxyuWmKnEZ
+\restrict YKc3exCpzxt1hQyJLHo22jOlye4QMIFb97djcilhkvh9AJAZ6f5jaVopvEV2szT
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -86,5 +86,5 @@ CREATE UNIQUE INDEX companies_category_tag_stats_idx ON frontend.companies_categ
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 0m8Qrma9OWGrD72QNq5oX5uofgd4KIQx33f8fPItgzcwZy88axJDJgxyuWmKnEZ
+\unrestrict YKc3exCpzxt1hQyJLHo22jOlye4QMIFb97djcilhkvh9AJAZ6f5jaVopvEV2szT
 
