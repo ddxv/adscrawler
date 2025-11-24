@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 1XwdI5IQl7AjB51xGmRX7SRrMjrhGwuf1kr7BLhCcne7letSSSaTpNOMoHta4pu
+\restrict KYWGYsz8MymhwUazSNBApSjqleqjYaWgOIxRa5pjI3OWyuhSXbe3SpwNYHBt0zi
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -124,5 +124,5 @@ CREATE UNIQUE INDEX frontend_store_apps_z_scores_unique ON frontend.store_apps_z
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 1XwdI5IQl7AjB51xGmRX7SRrMjrhGwuf1kr7BLhCcne7letSSSaTpNOMoHta4pu
+\unrestrict KYWGYsz8MymhwUazSNBApSjqleqjYaWgOIxRa5pjI3OWyuhSXbe3SpwNYHBt0zi
 

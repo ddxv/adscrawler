@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict gSyzhupDV8JFuOXozTckfRYqJ6TjHNZAkqnS8zfKJpDFX7HCSQs4urxK4IdZptw
+\restrict RXwGpwVNii2M9pQdc1lyWfTFHMEvmxjSd1IpZ5QnJn4GFbQepjUX0qsHGCFwPb9
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -129,13 +129,6 @@ CREATE INDEX textsearch_generated_idx ON public.store_apps USING gin (textsearch
 
 
 --
--- Name: store_apps store_app_audit; Type: TRIGGER; Schema: public; Owner: james
---
-
-CREATE TRIGGER store_app_audit AFTER INSERT OR DELETE OR UPDATE ON public.store_apps FOR EACH ROW EXECUTE FUNCTION public.process_store_app_audit();
-
-
---
 -- Name: store_apps store_apps_updated_at; Type: TRIGGER; Schema: public; Owner: james
 --
 
@@ -170,5 +163,5 @@ ALTER TABLE ONLY public.store_apps
 -- PostgreSQL database dump complete
 --
 
-\unrestrict gSyzhupDV8JFuOXozTckfRYqJ6TjHNZAkqnS8zfKJpDFX7HCSQs4urxK4IdZptw
+\unrestrict RXwGpwVNii2M9pQdc1lyWfTFHMEvmxjSd1IpZ5QnJn4GFbQepjUX0qsHGCFwPb9
 

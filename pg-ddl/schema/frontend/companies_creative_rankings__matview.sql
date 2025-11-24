@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict zrEPmlJkuE9ChT6kYgoG44KmG3moFScNEybvCxCbZvZVPDMUcKwCAZlU11IMueE
+\restrict 6xctBjXgKBSlPrzH2yqBfbvlHQttoSAzbtd1Iu93VwC3M9owh0or9FyZ4CPvzJ0
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -32,6 +32,7 @@ CREATE MATERIALIZED VIEW frontend.companies_creative_rankings AS
          SELECT ca.file_extension,
             ac_1.id AS api_call_id,
             cr.advertiser_store_app_id,
+            cr.advertiser_domain_id,
             cr.creative_initial_domain_id,
             cr.creative_host_domain_id,
             cr.additional_ad_domain_ids,
@@ -49,6 +50,7 @@ CREATE MATERIALIZED VIEW frontend.companies_creative_rankings AS
             cr.file_extension,
             cr.creative_initial_domain_id AS domain_id,
             cr.advertiser_store_app_id,
+            cr.advertiser_domain_id,
             cr.run_at
            FROM creative_rankings cr
         UNION
@@ -58,6 +60,7 @@ CREATE MATERIALIZED VIEW frontend.companies_creative_rankings AS
             cr.file_extension,
             cr.creative_host_domain_id,
             cr.advertiser_store_app_id,
+            cr.advertiser_domain_id,
             cr.run_at
            FROM creative_rankings cr
         UNION
@@ -67,19 +70,21 @@ CREATE MATERIALIZED VIEW frontend.companies_creative_rankings AS
             cr.file_extension,
             unnest(cr.additional_ad_domain_ids) AS unnest,
             cr.advertiser_store_app_id,
+            cr.advertiser_domain_id,
             cr.run_at
            FROM creative_rankings cr
         ), visually_distinct AS (
          SELECT cdm.company_id,
             cd.file_extension,
             cd.advertiser_store_app_id,
+            cd.advertiser_domain_id,
             cd.vhash,
             min((cd.md5_hash)::text) AS md5_hash,
             max(cd.api_call_id) AS last_api_call_id,
             max(cd.run_at) AS last_seen
            FROM (combined_domains cd
              LEFT JOIN adtech.company_domain_mapping cdm ON ((cd.domain_id = cdm.domain_id)))
-          GROUP BY cdm.company_id, cd.file_extension, cd.advertiser_store_app_id, cd.vhash
+          GROUP BY cdm.company_id, cd.file_extension, cd.advertiser_store_app_id, cd.advertiser_domain_id, cd.vhash
         )
  SELECT vd.company_id,
     vd.md5_hash,
@@ -88,6 +93,7 @@ CREATE MATERIALIZED VIEW frontend.companies_creative_rankings AS
     saa.name AS advertiser_name,
     saa.store,
     saa.store_id AS advertiser_store_id,
+    adv.domain_name AS advertiser_domain_name,
     sap.store_id AS publisher_store_id,
     sap.name AS publisher_name,
     saa.installs,
@@ -106,10 +112,11 @@ CREATE MATERIALIZED VIEW frontend.companies_creative_rankings AS
             WHEN (sap.icon_url_100 IS NOT NULL) THEN (concat('https://media.appgoblin.info/app-icons/', sap.store_id, '/', sap.icon_url_100))::character varying
             ELSE sap.icon_url_512
         END AS publisher_icon_url
-   FROM (((((visually_distinct vd
+   FROM ((((((visually_distinct vd
      LEFT JOIN public.api_calls ac ON ((vd.last_api_call_id = ac.id)))
      LEFT JOIN adtech.companies c ON ((vd.company_id = c.id)))
      LEFT JOIN public.domains ad ON ((c.domain_id = ad.id)))
+     LEFT JOIN public.domains adv ON ((vd.advertiser_domain_id = adv.id)))
      LEFT JOIN frontend.store_apps_overview saa ON ((vd.advertiser_store_app_id = saa.id)))
      LEFT JOIN frontend.store_apps_overview sap ON ((ac.store_app = sap.id)))
   WHERE (c.id IS NOT NULL)
@@ -123,5 +130,5 @@ ALTER MATERIALIZED VIEW frontend.companies_creative_rankings OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict zrEPmlJkuE9ChT6kYgoG44KmG3moFScNEybvCxCbZvZVPDMUcKwCAZlU11IMueE
+\unrestrict 6xctBjXgKBSlPrzH2yqBfbvlHQttoSAzbtd1Iu93VwC3M9owh0or9FyZ4CPvzJ0
 

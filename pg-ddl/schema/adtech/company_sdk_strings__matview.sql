@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict cht6nERLBNFXIxvqrGlUtTqRwtjaKM9BWiEiAcu7J2oXgMj5caQ1XzCEcJTa6OQ
+\restrict R45HuOui3ZfuCQEEDtmydCfZagqRBYQZmgDfQiVCgkcMR0eVSrVpF1UYnDDNKcc
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -66,5 +66,5 @@ CREATE UNIQUE INDEX company_sdk_strings_version_string_id_company_id_idx ON adte
 -- PostgreSQL database dump complete
 --
 
-\unrestrict cht6nERLBNFXIxvqrGlUtTqRwtjaKM9BWiEiAcu7J2oXgMj5caQ1XzCEcJTa6OQ
+\unrestrict R45HuOui3ZfuCQEEDtmydCfZagqRBYQZmgDfQiVCgkcMR0eVSrVpF1UYnDDNKcc
 

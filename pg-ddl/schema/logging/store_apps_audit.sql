@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict Z6LBhmP3rtL0nqwCNRJkxEjzdXcWFPQTkykgC3TQEmaT9i9AU8oUsrDKfz8RXVK
+\restrict AZ9q6rCieMNdfChCz8JIlINx6VPYRdHQzqEvPHmeCI4y0K4H4DXeeaOaKv4Ck7g
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -51,5 +51,5 @@ CREATE INDEX store_apps_audit_stamp_idx ON logging.store_apps_audit USING btree 
 -- PostgreSQL database dump complete
 --
 
-\unrestrict Z6LBhmP3rtL0nqwCNRJkxEjzdXcWFPQTkykgC3TQEmaT9i9AU8oUsrDKfz8RXVK
+\unrestrict AZ9q6rCieMNdfChCz8JIlINx6VPYRdHQzqEvPHmeCI4y0K4H4DXeeaOaKv4Ck7g
 

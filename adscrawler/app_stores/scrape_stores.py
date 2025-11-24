@@ -133,7 +133,7 @@ def update_app_details(
     limit: int,
     country_priority_group: int,
 ) -> None:
-    """Process apps with dynamic work queue - simple and efficient."""
+    """Process apps with dynamic work queue"""
     log_info = f"{store=} update app details"
 
     df = query_store_apps_to_update(
@@ -751,9 +751,6 @@ def process_live_app_details(
                         )
                 except Exception:
                     logger.exception("failed to process app icon")
-        # I think only coming from S3?
-        # apps_df = apps_df.convert_dtypes(dtype_backend="pyarrow")
-        # apps_df = apps_df.replace({pd.NA: None})
         apps_details_to_db(
             apps_df=apps_df,
             database_connection=database_connection,

@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 5myfyV5cXRCcNXH2GRftdW7aaP18MwOap1KABOWrzXoDCYdARN0nQumN5Pc3ujN
+\restrict psQnnMWzQO1a5s2QvM8EpFMcygZRCOfwbkxmANZt7knt3q74DVv9v6Mc3ixhgUi
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -134,6 +134,7 @@ CREATE MATERIALIZED VIEW frontend.store_apps_overview AS
     sa.tablet_image_url_1,
     sa.tablet_image_url_2,
     sa.tablet_image_url_3,
+    to_tsvector('simple'::regconfig, (((((COALESCE(sa.name, ''::character varying))::text || ' '::text) || (COALESCE(sa.store_id, ''::character varying))::text) || ' '::text) || (COALESCE(d.name, ''::character varying))::text)) AS textsearchable,
     d.developer_id,
     d.name AS developer_name,
     pd.domain_name AS developer_url,
@@ -197,5 +198,5 @@ CREATE UNIQUE INDEX store_apps_overview_unique_store_id_idx ON frontend.store_ap
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 5myfyV5cXRCcNXH2GRftdW7aaP18MwOap1KABOWrzXoDCYdARN0nQumN5Pc3ujN
+\unrestrict psQnnMWzQO1a5s2QvM8EpFMcygZRCOfwbkxmANZt7knt3q74DVv9v6Mc3ixhgUi
 

@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict Y0JJIFw521sNVOCa8Iz8rVnOmLkH9ujeefWBNQZuu2DFzcqOnZ17o7Dv7qSRgfU
+\restrict Zx22EPBQ6dcYL5UGYFRAXzzjdonQya9hQ5EYACkhOcTgiHhxIJ6PdmwiMAYA88h
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -137,5 +137,5 @@ ALTER MATERIALIZED VIEW frontend.keyword_scores OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict Y0JJIFw521sNVOCa8Iz8rVnOmLkH9ujeefWBNQZuu2DFzcqOnZ17o7Dv7qSRgfU
+\unrestrict Zx22EPBQ6dcYL5UGYFRAXzzjdonQya9hQ5EYACkhOcTgiHhxIJ6PdmwiMAYA88h
 

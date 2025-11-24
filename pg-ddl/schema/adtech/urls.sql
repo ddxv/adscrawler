@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict qgfVXyetkc14xrTahsb4z7mBd1KoMcegOJGzM7Bhl61K2lcTrroPH9wc0hhFAtF
+\restrict fSlwh9mTckU8Zs2jZUn5KH2RLEuIKj7Q2nzATNSz5hJgBaqcHatn9DpPewFKUsi
 
 -- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
 -- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
@@ -30,12 +30,12 @@ SET default_table_access_method = heap;
 CREATE TABLE adtech.urls (
     id integer NOT NULL,
     url text NOT NULL,
-    url_hash character(32) GENERATED ALWAYS AS (md5(url)) STORED,
     domain_id integer,
     scheme text NOT NULL,
     is_deep_link boolean GENERATED ALWAYS AS ((scheme <> ALL (ARRAY['http'::text, 'https'::text, 'ftp'::text]))) STORED,
     created_at timestamp with time zone DEFAULT now(),
-    hostname text
+    hostname text,
+    url_hash character(32)
 );
 
 
@@ -93,10 +93,10 @@ CREATE INDEX idx_urls_scheme ON adtech.urls USING btree (scheme);
 
 
 --
--- Name: urls_idx; Type: INDEX; Schema: adtech; Owner: postgres
+-- Name: urls_url_hash_idx; Type: INDEX; Schema: adtech; Owner: postgres
 --
 
-CREATE UNIQUE INDEX urls_idx ON adtech.urls USING btree (md5(url));
+CREATE UNIQUE INDEX urls_url_hash_idx ON adtech.urls USING btree (url_hash);
 
 
 --
@@ -111,5 +111,5 @@ ALTER TABLE ONLY adtech.urls
 -- PostgreSQL database dump complete
 --
 
-\unrestrict qgfVXyetkc14xrTahsb4z7mBd1KoMcegOJGzM7Bhl61K2lcTrroPH9wc0hhFAtF
+\unrestrict fSlwh9mTckU8Zs2jZUn5KH2RLEuIKj7Q2nzATNSz5hJgBaqcHatn9DpPewFKUsi
 
