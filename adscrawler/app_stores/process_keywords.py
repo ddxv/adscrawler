@@ -177,8 +177,8 @@ def extract_keywords_nltk(text: str, top_n: int = 10) -> list[str]:
 
 def get_stopwords() -> set[str]:
     """Get the stopwords from NLTK and spaCy."""
-    from nltk.corpus import stopwords
     import spacy
+    from nltk.corpus import stopwords
 
     nlp = spacy.load("en_core_web_sm")
     spacy_stopwords = nlp.Defaults.stop_words
