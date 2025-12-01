@@ -459,7 +459,7 @@ def delete_and_insert(
 def query_all_developers(database_connection: PostgresCon) -> pd.DataFrame:
     """Query all developers from the database."""
     sel_query = """SELECT 
-     id, store, name, developer_id
+     id, store, developer_id
      FROM developers
      ;
     """

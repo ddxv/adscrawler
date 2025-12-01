@@ -55,7 +55,6 @@ from adscrawler.dbcon.queries import (
     query_languages,
     query_store_apps_to_update,
     query_store_id_map,
-    query_store_id_map_cached,
     query_store_ids,
     update_from_df,
     upsert_df,
@@ -96,6 +95,7 @@ def process_scrape_apps_and_save(
                     country=row["country_code"].lower(),
                     language=row["language"].lower(),
                 )
+                result['store_app_db_id'] = row['store_app']
                 if process_icon:
                     result["icon_url_100"] = row.get("icon_url_100", None)
                 chunk_results.append(result)
@@ -109,7 +109,8 @@ def process_scrape_apps_and_save(
         results_df = pd.DataFrame(chunk_results)
         results_df["crawled_date"] = results_df["crawled_at"].dt.date
         app_details_to_s3(results_df, store=store)
-        log_crawl_results(results_df, store, database_connection=database_connection)
+        results_df['store_app'] = results_df['store_app_db_id'].astype(int)
+        log_crawl_results(results_df, database_connection=database_connection)
         results_df = results_df[(results_df["country"] == "US")]
         process_live_app_details(
             store=store,
@@ -770,25 +771,16 @@ def apps_details_to_db(
         x for x in get_store_app_columns(database_connection) if x in apps_df.columns
     ]
     apps_df = prepare_for_psycopg(apps_df)
-    return_rows = crawl_result == 1
     logger.info(f"{crawl_result=} update store_apps table for {len(apps_df)} apps")
-    store_apps_df = update_from_df(
+    update_from_df(
         table_name="store_apps",
         df=apps_df,
         update_columns=insert_columns,
         key_columns=key_columns,
         database_connection=database_connection,
-        return_rows=return_rows,
     )
-    if store_apps_df is None or store_apps_df.empty or crawl_result != 1:
+    if apps_df is None or apps_df.empty or crawl_result != 1:
         return
-    store_apps_df = store_apps_df.rename(columns={"id": "store_app"})
-    apps_df = pd.merge(
-        apps_df,
-        store_apps_df[["store_id", "store_app"]],
-        how="left",
-        validate="1:1",
-    )
     upsert_store_apps_descriptions(apps_df, database_connection)
     save_app_domains(
         apps_df=apps_df,
@@ -836,17 +828,11 @@ def upsert_store_apps_descriptions(
 
 
 def log_crawl_results(
-    app_df: pd.DataFrame, store: int, database_connection: PostgresCon
+    app_df: pd.DataFrame, database_connection: PostgresCon
 ) -> None:
-    store_id_map = query_store_id_map_cached(
-        store=store, database_connection=database_connection
-    )
     country_map = query_countries(database_connection)
     app_df["country_id"] = app_df["country"].map(
         country_map.set_index("alpha2")["id"].to_dict()
-    )
-    app_df["store_app"] = app_df["store_id"].map(
-        store_id_map.set_index("store_id")["id"].to_dict()
     )
     insert_columns = [
         "crawl_result",
