@@ -181,30 +181,24 @@ def get_local_file_path(store: int, store_id: str) -> pathlib.Path | None:
     Returns:
         The file extension ('.apk' or '.xapk') if found, None otherwise
     """
-
     # Define all possible paths to check
     # In the future we would check version codes as well
-
     apk_paths = [
         pathlib.Path(APKS_DIR, f"{store_id}.apk"),
         pathlib.Path(XAPKS_DIR, f"{store_id}.xapk"),
         pathlib.Path(APKS_INCOMING_DIR, f"{store_id}.apk"),
         pathlib.Path(XAPKS_INCOMING_DIR, f"{store_id}.xapk"),
     ]
-
     ipa_paths = [
         pathlib.Path(IPAS_DIR, f"{store_id}.ipa"),
         pathlib.Path(IPAS_INCOMING_DIR, f"{store_id}.ipa"),
     ]
-
     paths_to_check = apk_paths if store == 1 else ipa_paths
-
-    logger.info(f"Checking {store_id=} if exists locally")
-
     for path in paths_to_check:
         if path.exists():
+            logger.info(f"{store_id=} {path=} exists locally")
             return path
-
+    logger.info(f"{store_id=} no local file found")
     return None
 
 

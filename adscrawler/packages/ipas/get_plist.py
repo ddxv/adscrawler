@@ -88,6 +88,17 @@ def get_parsed_plist(
         plist_bytes = f.read()
     data = plistlib.loads(plist_bytes)
     plist_str = str(data)
+    # Interesting data in here, but also many keys
+    # jdata = data['CFBundleConfigDataJSONBase64']
+    # jdata = data['CFBundlePagesJSONBase64']
+    # if jdata:
+    #     jdata = base64.b64decode(jdata).decode('utf-8')
+    #     jdata = json.loads(jdata)
+    #     jdata = pd.json_normalize(jdata)
+    #     jdata = jdata[["path", "value"]]
+    # drop for now
+    data.pop('CFBundleConfigDataJSONBase64')
+    data.pop('CFBundlePagesJSONBase64')
     df = (
         pd.json_normalize(data, sep="/")
         .T.explode(0)
