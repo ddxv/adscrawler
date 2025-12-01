@@ -359,8 +359,6 @@ def process_app_metrics_to_db(
         df=df,
         key_columns=COUNTRY_HISTORY_KEYS,
     )
-    # TESTING ONLY, ignore new apps since devdb is not updated
-    df = df[df["store_app"].notna()]
     insert_columns = [x for x in COUNTRY_HISTORY_COLS if x in df.columns]
     if store == 1:
         # TODO: Can get installs per Country by getting review_count sum for all countries
