@@ -1,7 +1,7 @@
 import datetime
 import pathlib
 import time
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from io import BytesIO
 from urllib.error import URLError
 from urllib.parse import unquote_plus
@@ -64,12 +64,38 @@ from adscrawler.packages.storage import get_s3_client
 logger = get_logger(__name__, "scrape_stores")
 
 
+def _scrape_single_app(
+    row: pd.Series,
+    store: int,
+    process_icon: bool,
+    chunk_info: str,
+) -> dict | None:
+    """Helper function to scrape a single app - used by ThreadPoolExecutor."""
+    try:
+        result = scrape_app(
+            store=store,
+            store_id=row["store_id"],
+            country=row["country_code"].lower(),
+            language=row["language"].lower(),
+        )
+        result['store_app_db_id'] = row['store_app']
+        if process_icon:
+            result["icon_url_100"] = row.get("icon_url_100", None)
+        return result
+    except Exception as e:
+        logger.exception(
+            f"{chunk_info} store_id={row['store_id']} scrape_app failed: {e}"
+        )
+        return None
+
+
 def process_scrape_apps_and_save(
     df_chunk: pd.DataFrame,
     store: int,
     use_ssh_tunnel: bool,
     process_icon: bool,
     total_rows: int | None = None,
+    thread_workers: int = 5,
 ) -> None:
     """Process a chunk of apps, scrape app, store to S3 and if coutnry === US store app details to db store_apps table.
     s
@@ -79,30 +105,35 @@ def process_scrape_apps_and_save(
         use_ssh_tunnel: Whether to use SSH tunnel
         process_icon: Whether to process app icons
         total_rows: Total number of apps in the chunk, if None, will be calculated from df_chunk
+        thread_workers: Number of threads to use for parallel scraping within this process
     """
     if total_rows is None:
         total_rows = len(df_chunk)
     chunk_info = f"{store=} chunk={df_chunk.index[0]}-{df_chunk.index[-1]}/{total_rows}"
-    logger.info(f"{chunk_info} start")
+    logger.info(f"{chunk_info} start with {thread_workers} threads")
     database_connection = get_db_connection(use_ssh_tunnel=use_ssh_tunnel)
     chunk_results = []
     try:
-        for _, row in df_chunk.iterrows():
-            try:
-                result = scrape_app(
-                    store=store,
-                    store_id=row["store_id"],
-                    country=row["country_code"].lower(),
-                    language=row["language"].lower(),
-                )
-                result['store_app_db_id'] = row['store_app']
-                if process_icon:
-                    result["icon_url_100"] = row.get("icon_url_100", None)
-                chunk_results.append(result)
-            except Exception as e:
-                logger.exception(
-                    f"{chunk_info} store_id={row['store_id']} scrape_app failed: {e}"
-                )
+        # Use ThreadPoolExecutor to parallelize scraping within this chunk
+        with ThreadPoolExecutor(max_workers=thread_workers) as executor:
+            # Submit all scraping tasks
+            future_to_row = {
+                executor.submit(_scrape_single_app, row, store, process_icon, chunk_info): idx
+                for idx, row in df_chunk.iterrows()
+            }
+            
+            # Collect results as they complete
+            for future in as_completed(future_to_row):
+                try:
+                    result = future.result()
+                    if result is not None:
+                        chunk_results.append(result)
+                except Exception as e:
+                    row_idx = future_to_row[future]
+                    logger.exception(
+                        f"{chunk_info} row_idx={row_idx} thread processing failed: {e}"
+                    )
+        
         if not chunk_results:
             logger.warning(f"{chunk_info} produced no results.")
             return
@@ -133,9 +164,21 @@ def update_app_details(
     process_icon: bool,
     limit: int,
     country_priority_group: int,
+    thread_workers: int = 3,
 ) -> None:
-    """Process apps with dynamic work queue"""
-    log_info = f"{store=} update app details"
+    """Process apps with dynamic work queue
+    
+    Args:
+        database_connection: Database connection
+        store: Store ID
+        use_ssh_tunnel: Whether to use SSH tunnel
+        workers: Number of processes to use
+        process_icon: Whether to process app icons
+        limit: Limit on number of apps to process
+        country_priority_group: Country priority group
+        thread_workers: Number of threads per process for parallel scraping (default: 5)
+    """
+    log_info = f"{store=} group={country_priority_group} update app details"
 
     df = query_store_apps_to_update(
         store=store,
@@ -144,9 +187,14 @@ def update_app_details(
         country_priority_group=country_priority_group,
     )
     df = df.sort_values("country_code").reset_index(drop=True)
-    logger.info(f"{log_info} start {len(df)} apps")
+    if df.empty:
+        logger.info(f"{log_info} no apps to update")
+        return
+    logger.info(f"{log_info} start apps={len(df)}")
 
-    max_chunk_size = 3000
+    # Keep chunk size large for efficient S3 parquet files
+    # Threading within chunks provides parallelism
+    max_chunk_size = 5000
     chunks = []
     # Try keeping countries together for larger end S3 files
     for _country, country_df in df.groupby("country_code"):
@@ -162,13 +210,16 @@ def update_app_details(
                 chunks.append(country_df.iloc[i : i + chunk_size])
     total_chunks = len(chunks)
     total_rows = len(df)
-    logger.info(f"{log_info} processing {total_rows} apps in {total_chunks} chunks")
+    logger.info(
+        f"{log_info} processing {total_rows} apps in {total_chunks} chunks "
+        f"({workers} processes × {thread_workers} threads = {workers * thread_workers} concurrent)"
+    )
 
     completed_count = 0
     failed_count = 0
 
     with ProcessPoolExecutor(max_workers=workers) as executor:
-        # Submit all chunks, but stagger the first wave to avoid API thundering herd
+        # Submit all chunks, but stagger the first wave to avoid API bursts
         future_to_idx = {}
         for idx, df_chunk in enumerate(chunks):
             future = executor.submit(
@@ -178,6 +229,7 @@ def update_app_details(
                 use_ssh_tunnel,
                 process_icon,
                 total_rows,
+                thread_workers,
             )
             future_to_idx[future] = idx
             # Only stagger the initial batch to avoid simultaneous API burst
