@@ -78,7 +78,7 @@ def _scrape_single_app(
             country=row["country_code"].lower(),
             language=row["language"].lower(),
         )
-        result['store_app_db_id'] = row['store_app']
+        result["store_app_db_id"] = row["store_app"]
         if process_icon:
             result["icon_url_100"] = row.get("icon_url_100", None)
         return result
@@ -118,10 +118,12 @@ def process_scrape_apps_and_save(
         with ThreadPoolExecutor(max_workers=thread_workers) as executor:
             # Submit all scraping tasks
             future_to_row = {
-                executor.submit(_scrape_single_app, row, store, process_icon, chunk_info): idx
+                executor.submit(
+                    _scrape_single_app, row, store, process_icon, chunk_info
+                ): idx
                 for idx, row in df_chunk.iterrows()
             }
-            
+
             # Collect results as they complete
             for future in as_completed(future_to_row):
                 try:
@@ -133,14 +135,14 @@ def process_scrape_apps_and_save(
                     logger.exception(
                         f"{chunk_info} row_idx={row_idx} thread processing failed: {e}"
                     )
-        
+
         if not chunk_results:
             logger.warning(f"{chunk_info} produced no results.")
             return
         results_df = pd.DataFrame(chunk_results)
         results_df["crawled_date"] = results_df["crawled_at"].dt.date
         app_details_to_s3(results_df, store=store)
-        results_df['store_app'] = results_df['store_app_db_id'].astype(int)
+        results_df["store_app"] = results_df["store_app_db_id"].astype(int)
         log_crawl_results(results_df, database_connection=database_connection)
         results_df = results_df[(results_df["country"] == "US")]
         process_live_app_details(
@@ -167,7 +169,7 @@ def update_app_details(
     thread_workers: int = 3,
 ) -> None:
     """Process apps with dynamic work queue
-    
+
     Args:
         database_connection: Database connection
         store: Store ID
@@ -879,9 +881,7 @@ def upsert_store_apps_descriptions(
     )
 
 
-def log_crawl_results(
-    app_df: pd.DataFrame, database_connection: PostgresCon
-) -> None:
+def log_crawl_results(app_df: pd.DataFrame, database_connection: PostgresCon) -> None:
     country_map = query_countries(database_connection)
     app_df["country_id"] = app_df["country"].map(
         country_map.set_index("alpha2")["id"].to_dict()
