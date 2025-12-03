@@ -94,8 +94,8 @@ def process_scrape_apps_and_save(
     store: int,
     use_ssh_tunnel: bool,
     process_icon: bool,
+    thread_workers: int,
     total_rows: int | None = None,
-    thread_workers: int = 5,
 ) -> None:
     """Process a chunk of apps, scrape app, store to S3 and if coutnry === US store app details to db store_apps table.
     s
@@ -104,8 +104,8 @@ def process_scrape_apps_and_save(
         store: Store ID
         use_ssh_tunnel: Whether to use SSH tunnel
         process_icon: Whether to process app icons
-        total_rows: Total number of apps in the chunk, if None, will be calculated from df_chunk
         thread_workers: Number of threads to use for parallel scraping within this process
+        total_rows: Total number of apps in the chunk, if None, will be calculated from df_chunk
     """
     if total_rows is None:
         total_rows = len(df_chunk)
@@ -166,7 +166,7 @@ def update_app_details(
     process_icon: bool,
     limit: int,
     country_priority_group: int,
-    thread_workers: int = 3,
+    thread_workers: int = 2,
 ) -> None:
     """Process apps with dynamic work queue
 
