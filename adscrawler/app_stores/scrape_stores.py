@@ -194,7 +194,7 @@ def update_app_details(
     log_info = f"{store=} group={country_priority_group} update app details"
 
     if store == 1:
-        thread_workers = 1
+        thread_workers = 2
     elif store == 2:
         # Apple has slower response times, so use more threads
         thread_workers = 3
