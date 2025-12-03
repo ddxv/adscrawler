@@ -1,5 +1,7 @@
 import datetime
 import pathlib
+import random
+import ssl
 import time
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from io import BytesIO
@@ -69,8 +71,13 @@ def _scrape_single_app(
     store: int,
     process_icon: bool,
     chunk_info: str,
+    use_thread_jitter: bool,
 ) -> dict | None:
     """Helper function to scrape a single app - used by ThreadPoolExecutor."""
+    if use_thread_jitter:
+        # Add small random jitter to avoid SSL connection conflicts
+        time.sleep(random.uniform(0.05, 0.2))
+
     try:
         result = scrape_app(
             store=store,
@@ -98,7 +105,7 @@ def process_scrape_apps_and_save(
     total_rows: int | None = None,
 ) -> None:
     """Process a chunk of apps, scrape app, store to S3 and if coutnry === US store app details to db store_apps table.
-    s
+
     Args:
         df_chunk: DataFrame of apps to process, needs to have columns: store_id, country_code, language, icon_url_100
         store: Store ID
@@ -113,13 +120,19 @@ def process_scrape_apps_and_save(
     logger.info(f"{chunk_info} start with {thread_workers} threads")
     database_connection = get_db_connection(use_ssh_tunnel=use_ssh_tunnel)
     chunk_results = []
+    use_thread_jitter = thread_workers > 1
     try:
         # Use ThreadPoolExecutor to parallelize scraping within this chunk
         with ThreadPoolExecutor(max_workers=thread_workers) as executor:
             # Submit all scraping tasks
             future_to_row = {
                 executor.submit(
-                    _scrape_single_app, row, store, process_icon, chunk_info
+                    _scrape_single_app,
+                    row,
+                    store,
+                    process_icon,
+                    chunk_info,
+                    use_thread_jitter,
                 ): idx
                 for idx, row in df_chunk.iterrows()
             }
@@ -166,7 +179,6 @@ def update_app_details(
     process_icon: bool,
     limit: int,
     country_priority_group: int,
-    thread_workers: int = 2,
 ) -> None:
     """Process apps with dynamic work queue
 
@@ -178,9 +190,16 @@ def update_app_details(
         process_icon: Whether to process app icons
         limit: Limit on number of apps to process
         country_priority_group: Country priority group
-        thread_workers: Number of threads per process for parallel scraping (default: 5)
     """
     log_info = f"{store=} group={country_priority_group} update app details"
+
+    if store == 1:
+        thread_workers = 1
+    elif store == 2:
+        # Apple has slower response times, so use more threads
+        thread_workers = 3
+    else:
+        thread_workers = 2
 
     df = query_store_apps_to_update(
         store=store,
@@ -721,12 +740,13 @@ def scrape_app(
                 crawl_result = 4
                 logger.exception(f"{scrape_info} unexpected error: {error=}")
             break
-        except URLError as error:
-            logger.warning(f"{scrape_info} {error=}")
+        except (URLError, ssl.SSLError, requests.exceptions.SSLError) as error:
+            logger.warning(f"{scrape_info} Network/SSL error: {error=}")
             crawl_result = 4
             if retries <= max_retries:
-                sleep_time = base_delay * (2**retries)
-                logger.info(f"{scrape_info} Retrying in {sleep_time} seconds...")
+                # Add extra jitter for SSL errors to avoid connection conflicts
+                sleep_time = base_delay * (2**retries) + random.uniform(0.1, 0.5)
+                logger.info(f"{scrape_info} Retrying in {sleep_time:.2f} seconds...")
                 time.sleep(sleep_time)
                 continue
             else:
