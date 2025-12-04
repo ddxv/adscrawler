@@ -805,7 +805,7 @@ def scrape_app(
     result_dict["store_id"] = store_id
     result_dict["queried_language"] = language.lower()
     result_dict["country"] = country.upper()
-    logger.debug(f"{scrape_info} {crawl_result=} finished")
+    logger.info(f"{scrape_info} {crawl_result=} finished")
     return result_dict
 
 
