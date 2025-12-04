@@ -116,7 +116,7 @@ def process_scrape_apps_and_save(
     """
     if total_rows is None:
         total_rows = len(df_chunk)
-    chunk_info = f"{store=} chunk={df_chunk.index[0]}-{df_chunk.index[-1]}/{total_rows}"
+    chunk_info = f"{store=} process_scrape_apps_and_save chunk={df_chunk.index[0]}-{df_chunk.index[-1]}/{total_rows}"
 
     # Store 1 (Google Play) uses sequential processing to avoid SSL issues
     # Store 2 (Apple) can use threading
@@ -220,7 +220,7 @@ def update_app_details(
         limit: Limit on number of apps to process
         country_priority_group: Country priority group
     """
-    log_info = f"{store=} group={country_priority_group} update app details"
+    log_info = f"{store=} group={country_priority_group} update_app_details"
 
     # Store 1 (Google Play): No threading due to urllib SSL issues
     # Store 2 (Apple): Use threading as it has slower response times
@@ -748,11 +748,11 @@ def scrape_app(
     country: str,
     language: str,
 ) -> dict:
-    scrape_info = f"{store=}, {country=}, {language=}, {store_id=}"
+    scrape_info = f"{store=}, {country=}, {language=}, {store_id=} scrape_app"
     max_retries = 2
     base_delay = 0.5
     retries = 0
-    logger.debug(f"{scrape_info} scrape start")
+    logger.debug(f"{scrape_info} start")
     # Satisfy mypy
     crawl_result = 0
     while retries <= max_retries:
@@ -805,7 +805,7 @@ def scrape_app(
     result_dict["store_id"] = store_id
     result_dict["queried_language"] = language.lower()
     result_dict["country"] = country.upper()
-    logger.debug(f"{scrape_info} result={crawl_result} scrape finished")
+    logger.debug(f"{scrape_info} {crawl_result=} finished")
     return result_dict
 
 

@@ -333,7 +333,7 @@ def scrape_app_ios(store_id: str, country: str, language: str) -> dict:
     yt_us = scrape_app_ios("544007664", "us", language="en")
     yt_de = scrape_app_ios("544007664", "de", language="en")
 
-    # SAME FOR ALL COUNTRIES
+    ## SAME FOR ALL COUNTRIES
     yt_de['sellerName'] == yt_us['sellerName']
     yt_us['currentVersionReleaseDate'] == yt_de['currentVersionReleaseDate']
 
@@ -344,7 +344,7 @@ def scrape_app_ios(store_id: str, country: str, language: str) -> dict:
     yt_de['user_ratings'] != yt_us['user_ratings']
     yt_de['description'] != yt_us['description']
 
-    # These very by country but are also the same as each other?
+    ### These very by country but are also the same as each other?
     yt_de['userRatingCount'] == yt_de['userRatingCountForCurrentVersion']
 
 
@@ -355,7 +355,7 @@ def scrape_app_ios(store_id: str, country: str, language: str) -> dict:
     result_dict: dict = scraper.get_app_details(
         store_id, country=country, add_ratings=True, timeout=10, lang=language
     )
-    logger.info(f"store=2 {country=} {language=} {store_id=} ios store scraped")
+    logger.debug(f"store=2 {country=} {language=} {store_id=} ios store scraped")
     return result_dict
 
 
