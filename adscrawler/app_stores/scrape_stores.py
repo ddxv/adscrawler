@@ -154,6 +154,8 @@ def process_scrape_apps_and_save(
                         result = future.result()
                         if result is not None:
                             chunk_results.append(result)
+                        # Add slight jitter so threads don't pick up next task simultaneously
+                        time.sleep(random.uniform(0.01, 0.05))
                     except Exception as e:
                         row_idx = future_to_row[future]
                         logger.exception(
@@ -292,7 +294,7 @@ def update_app_details(
             )
             future_to_idx[future] = idx
             # Only stagger the initial batch to avoid simultaneous API burst
-            if idx < workers:
+            if idx <= workers:
                 time.sleep(0.5)  # 500ms between initial worker starts
         logger.info(f"{log_info} all {total_chunks} chunks submitted")
         # Process results as they complete
