@@ -97,8 +97,14 @@ def get_parsed_plist(
     #     jdata = pd.json_normalize(jdata)
     #     jdata = jdata[["path", "value"]]
     # drop for now
-    data.pop("CFBundleConfigDataJSONBase64")
-    data.pop("CFBundlePagesJSONBase64")
+    try:
+       data.pop("CFBundleConfigDataJSONBase64")
+    except KeyError:
+        pass
+    try:
+        data.pop("CFBundlePagesJSONBase64")
+    except KeyError:
+        pass
     df = (
         pd.json_normalize(data, sep="/")
         .T.explode(0)
