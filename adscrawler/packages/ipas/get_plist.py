@@ -98,7 +98,7 @@ def get_parsed_plist(
     #     jdata = jdata[["path", "value"]]
     # drop for now
     try:
-       data.pop("CFBundleConfigDataJSONBase64")
+        data.pop("CFBundleConfigDataJSONBase64")
     except KeyError:
         pass
     try:

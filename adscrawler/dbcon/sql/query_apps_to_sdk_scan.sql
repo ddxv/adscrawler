@@ -126,7 +126,7 @@ user_requested_apps_crawl AS (
         lsvc.scanned_at AS last_scuccess_scanned_at,
         lvc.id AS latest_version_code_db_id
     FROM
-        user_requested_scan AS urs
+        agadmin.user_requested_scan AS urs
     LEFT JOIN store_apps AS sa
         ON
             urs.store_id = sa.store_id

@@ -127,7 +127,7 @@ user_requested_apps_crawl AS (
         coalesce(fd.attempt_count, 0) AS failed_attempts_month,
         coalesce(fdq.attempt_count, 0) AS failed_attempts_quarter
     FROM
-        user_requested_scan AS urs
+        agadmin.user_requested_scan AS urs
     LEFT JOIN store_apps AS sa
         ON
             urs.store_id = sa.store_id
