@@ -97,29 +97,34 @@ def clean_df_text(df: pd.DataFrame, column: str) -> pd.DataFrame:
     )
     return df
 
+
 def clean_df_text(df: pd.DataFrame, column: str) -> pd.DataFrame:
     # 1. Extract the Series to work on it efficiently
     s = df[column].astype(str)
-    
+
     # 2. Convert all structural separators and whitespace-like noise to periods
     # This handles \r, \n, \t, \xa0, and bullets in one pass
     s = s.str.replace(r"[\r\n\t\xa0•]+", ". ", regex=True)
-    
+
     # 3. Handle Apostrophes and Hyphens specifically (don't turn them into periods)
     s = s.str.replace(r"['’]", "", regex=True)
     s = s.str.replace(r"-", " ", regex=True)
-    
+
     # 4. Remove URLs
     s = s.str.replace(r"\b(?:http|www)\S*", "", regex=True, flags=re.IGNORECASE)
-    
+
     # 5. Replace everything else that isn't a letter or space with a period
     # We remove \s from the exclusion so newlines/tabs are finally nuked if any remain
     s = s.str.replace(r"[^a-zA-Z ]", ". ", regex=True)
-    
+
     # 6. Final Cleanup: lowercase and collapse multiple spaces/periods
     # "Design. . . . Community" -> "design. community"
-    df[column] = s.str.lower().str.replace(r"\s+", " ", regex=True).str.replace(r"\.+", ".", regex=True)
-    
+    df[column] = (
+        s.str.lower()
+        .str.replace(r"\s+", " ", regex=True)
+        .str.replace(r"\.+", ".", regex=True)
+    )
+
     return df
 
 
@@ -203,7 +208,6 @@ def extract_keywords_nltk(text: str, top_n: int = 10) -> list[str]:
 def get_stopwords() -> set[str]:
     """Get the stopwords from NLTK and spaCy."""
     import spacy
-    
     from nltk.corpus import stopwords
 
     nlp = spacy.load("en_core_web_sm")
@@ -277,15 +281,15 @@ def extract_unique_app_keywords_from_text(
 #     #spacy.cli.download("en_core_web_sm")
 #     # Load model once, disable what we don't need for speed
 #     nlp = spacy.load("en_core_web_sm", disable=["parser", "ner", "lemmatizer"])
-#     # Note: We keep the lemmatizer if you want 'games' -> 'game', 
+#     # Note: We keep the lemmatizer if you want 'games' -> 'game',
 #     # but for raw speed, you can disable it too.
-    
+
 #     processed_texts = []
 #     # nlp.pipe processes in batches and is much faster than .apply()
 #     for doc in nlp.pipe(texts, batch_size=1000, n_process=-1): # -1 uses all cores
 #         tokens = [
-#             token.text.lower() 
-#             for token in doc 
+#             token.text.lower()
+#             for token in doc
 #             if token.pos_ in {"NOUN", "PROPN", "ADJ"} and not token.is_stop
 #         ]
 #         processed_texts.append(" ".join(tokens))
@@ -299,22 +303,27 @@ def extract_unique_app_keywords_from_text(
 # 600/14 = 21000
 # 800/12 = 24000
 
+
 def pos_filter_descriptions(texts: pd.Series, batch_size=1000) -> list[str]:
     # Load light model; disable everything but the tagger (for POS) and lemmatizer
     import spacy
     import tqdm
+
     nlp = spacy.load("en_core_web_sm", disable=["parser", "ner"])
     processed_texts = []
     # for doc in nlp.pipe(texts, batch_size=batch_size, n_process=4):
-    for doc in tqdm.tqdm(nlp.pipe(texts, batch_size=batch_size, n_process=12), total=len(texts)):
+    for doc in tqdm.tqdm(
+        nlp.pipe(texts, batch_size=batch_size, n_process=12), total=len(texts)
+    ):
         # Keep only Nouns, Proper Nouns, and Adjectives
         tokens = [
             token.lemma_.lower()  # Use lemma to group 'games' and 'game'
-            for token in doc 
+            for token in doc
             if token.pos_ in {"NOUN", "PROPN", "ADJ"} and not token.is_stop
         ]
         processed_texts.append(" ".join(tokens))
     return processed_texts
+
 
 def get_global_keywords(database_connection: PostgresCon) -> list[str]:
     """Get the global keywords from the database.
@@ -328,8 +337,6 @@ def get_global_keywords(database_connection: PostgresCon) -> list[str]:
     df = query_all_store_app_descriptions(
         language_slug="en", database_connection=database_connection
     )
-
-    
 
     df = pd.read_pickle("descriptions_df.pkl")
     df = clean_df_text(df, "description")
