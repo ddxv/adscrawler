@@ -88,26 +88,27 @@ scheduled_apps_crawl AS (
         ON
             vc.store_app = fdq.store_app
     WHERE
-        dc.store = :store
-        AND
+        dc.store = :store AND
         (
             vc.updated_at IS NULL
             OR
             (
+                -- succesful app not downloaded > x days
                 (
-                    vc.crawl_result = 1
-                    AND (
-                        vc.updated_at < current_date - interval '180 days'
-                        OR vc.updated_at < '2025-05-01'
-                    )
+                    lsvc.created_at IS NULL OR
+                        lsvc.created_at < current_date - interval '120 days'
                 )
                 OR
+                -- Retry failing every couple days, including same x days from above
                 (
-                    (lsvc.created_at IS NULL OR lsvc.created_at < '2025-05-01')
-                    AND vc.crawl_result IN (
+                lsvc.created_at IS NULL OR
+                        lsvc.created_at < current_date - interval '120 days'
+                        AND (
+                 vc.crawl_result IN (
                         2, 3, 4
                     )
                     AND vc.updated_at < current_date - interval '2 days'
+                )
                 )
             )
         )
@@ -212,7 +213,7 @@ combined AS (
         failed_attempts_month < 2 AND failed_attempts_quarter < 4
         AND (
             last_downloaded_at IS NULL
-            OR last_downloaded_at < current_date - interval '180 days'
+            OR last_downloaded_at < current_date - interval '120 days'
         )
 ),
 final_selection AS (
@@ -250,4 +251,5 @@ final_selection AS (
 )
 SELECT *
 FROM
-    final_selection;
+    final_selection
+;
