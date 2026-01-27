@@ -97,6 +97,31 @@ def clean_df_text(df: pd.DataFrame, column: str) -> pd.DataFrame:
     )
     return df
 
+def clean_df_text(df: pd.DataFrame, column: str) -> pd.DataFrame:
+    # 1. Extract the Series to work on it efficiently
+    s = df[column].astype(str)
+    
+    # 2. Convert all structural separators and whitespace-like noise to periods
+    # This handles \r, \n, \t, \xa0, and bullets in one pass
+    s = s.str.replace(r"[\r\n\t\xa0•]+", ". ", regex=True)
+    
+    # 3. Handle Apostrophes and Hyphens specifically (don't turn them into periods)
+    s = s.str.replace(r"['’]", "", regex=True)
+    s = s.str.replace(r"-", " ", regex=True)
+    
+    # 4. Remove URLs
+    s = s.str.replace(r"\b(?:http|www)\S*", "", regex=True, flags=re.IGNORECASE)
+    
+    # 5. Replace everything else that isn't a letter or space with a period
+    # We remove \s from the exclusion so newlines/tabs are finally nuked if any remain
+    s = s.str.replace(r"[^a-zA-Z ]", ". ", regex=True)
+    
+    # 6. Final Cleanup: lowercase and collapse multiple spaces/periods
+    # "Design. . . . Community" -> "design. community"
+    df[column] = s.str.lower().str.replace(r"\s+", " ", regex=True).str.replace(r"\.+", ".", regex=True)
+    
+    return df
+
 
 def count_tokens(phrase: str) -> int:
     """Count the number of tokens in a phrase."""
@@ -178,6 +203,7 @@ def extract_keywords_nltk(text: str, top_n: int = 10) -> list[str]:
 def get_stopwords() -> set[str]:
     """Get the stopwords from NLTK and spaCy."""
     import spacy
+    
     from nltk.corpus import stopwords
 
     nlp = spacy.load("en_core_web_sm")
@@ -245,6 +271,51 @@ def extract_unique_app_keywords_from_text(
     return combined_keywords
 
 
+# def pos_filter_descriptions(texts: pd.Series) -> list[str]:
+#     """Batch processes text to keep only NOUN, PROPN, and ADJ."""
+#     import spacy
+#     #spacy.cli.download("en_core_web_sm")
+#     # Load model once, disable what we don't need for speed
+#     nlp = spacy.load("en_core_web_sm", disable=["parser", "ner", "lemmatizer"])
+#     # Note: We keep the lemmatizer if you want 'games' -> 'game', 
+#     # but for raw speed, you can disable it too.
+    
+#     processed_texts = []
+#     # nlp.pipe processes in batches and is much faster than .apply()
+#     for doc in nlp.pipe(texts, batch_size=1000, n_process=-1): # -1 uses all cores
+#         tokens = [
+#             token.text.lower() 
+#             for token in doc 
+#             if token.pos_ in {"NOUN", "PROPN", "ADJ"} and not token.is_stop
+#         ]
+#         processed_texts.append(" ".join(tokens))
+#     return processed_texts
+
+# 2000/4 = 15000
+# 1000/8 = 26000
+# 2000/8 = oom
+# 200/14 = 30000
+# 1000/14 = oom
+# 600/14 = 21000
+# 800/12 = 24000
+
+def pos_filter_descriptions(texts: pd.Series, batch_size=1000) -> list[str]:
+    # Load light model; disable everything but the tagger (for POS) and lemmatizer
+    import spacy
+    import tqdm
+    nlp = spacy.load("en_core_web_sm", disable=["parser", "ner"])
+    processed_texts = []
+    # for doc in nlp.pipe(texts, batch_size=batch_size, n_process=4):
+    for doc in tqdm.tqdm(nlp.pipe(texts, batch_size=batch_size, n_process=12), total=len(texts)):
+        # Keep only Nouns, Proper Nouns, and Adjectives
+        tokens = [
+            token.lemma_.lower()  # Use lemma to group 'games' and 'game'
+            for token in doc 
+            if token.pos_ in {"NOUN", "PROPN", "ADJ"} and not token.is_stop
+        ]
+        processed_texts.append(" ".join(tokens))
+    return processed_texts
+
 def get_global_keywords(database_connection: PostgresCon) -> list[str]:
     """Get the global keywords from the database.
     NOTE: This takes about ~5-8GB of RAM for 50k keywords and 200k descriptions. For now run manually.
@@ -258,14 +329,21 @@ def get_global_keywords(database_connection: PostgresCon) -> list[str]:
         language_slug="en", database_connection=database_connection
     )
 
+    
+
+    df = pd.read_pickle("descriptions_df.pkl")
     df = clean_df_text(df, "description")
+    # df.to_pickle("descriptions_df_cleaned.pkl")
+    df = pd.read_pickle("descriptions_df_cleaned.pkl")
+
+    df["description"] = pos_filter_descriptions(df["description"])
 
     vectorizer = TfidfVectorizer(
-        ngram_range=(1, 2),  # Include 1-grams, 2-grams
+        ngram_range=(1, 3),  # Include 1-grams, 2-grams, 3-grams
         stop_words=list(mystopwords),
-        max_df=0.75,  # Ignore terms in >75% of docs (too common)
-        min_df=300,  # Ignore terms in <x docs (too rare)
-        max_features=50000,
+        max_df=0.20,  # Ignore terms in at least % of docs (too common)
+        min_df=100,  # Ignore terms in <x docs (too rare)
+        max_features=20000,
     )
 
     # Main slow/memory-intensive step
