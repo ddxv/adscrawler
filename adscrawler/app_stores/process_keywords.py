@@ -78,29 +78,51 @@ def clean_text(text: str) -> str:
     return re.sub(r"[^a-zA-Z\s]", ". ", text.lower())
 
 
-def clean_df_text(df: pd.DataFrame, column: str) -> pd.DataFrame:
-    # Note these are same as clean_text function
-    df[column] = (
-        df[column]
-        .str.replace("\r", ". ")
-        .replace("\n", ". ")
-        .replace("\t", ". ")
-        .replace("\xa0", ". ")
-        .replace("•", ". ")
-        .replace("'", "")
-        .replace("’", "")
-        .replace("-", " ")
-        .replace(r"\bhttp\S*", "", regex=True)
-        .replace(r"\bwww\S*", "", regex=True)
-        .replace(r"[^a-zA-Z\s]", ". ", regex=True)
-        .str.lower()
-    )
-    return df
+def clean_series_text(s: pd.Series) -> pd.Series:
+    import emoji
+
+    # 1. Replace emojis with periods
+    # emoji_regex = re.compile(
+    # "|".join(re.escape(e) for e in emoji.EMOJI_DATA.keys())
+    # )
+    # s = s.str.replace(emoji_regex, ". ", regex=True)
+    s = s.map(lambda x: emoji.replace_emoji(x, replace=". "))
+    logger.info(f"Replaced emojis with periods")
+
+    # 2. Convert all structural separators and whitespace-like noise to periods
+    # This handles \r, \n, \t, \xa0, and bullets in one pass
+    s = s.str.replace(r"[\r\n\t\xa0•]+", ". ", regex=True)
+
+    # 3. Handle Apostrophes and Hyphens specifically (don't turn them into periods)
+    s = s.str.replace(r"['’]", "", regex=True)
+    s = s.str.replace(r"-", " ", regex=True)
+
+    # 4. Remove URLs
+    s = s.str.replace(r"\b(?:http|www)\S*", "", regex=True, flags=re.IGNORECASE)
+
+    # 5. Replace everything else that isn't a letter or space with a period
+    # We remove \s from the exclusion so newlines/tabs are finally nuked if any remain
+    s = s.str.replace(r"[^a-zA-Z ]", ". ", regex=True)
+
+    # 6. Final Cleanup: lowercase and collapse multiple spaces/periods
+    # "Design. . . . Community" -> "design. community"
+    s = s.str.lower().str.replace(r"\s+", " ", regex=True).str.replace(r"\.+", ".", regex=True)
+
+    return s
 
 
-def clean_df_text(df: pd.DataFrame, column: str) -> pd.DataFrame:
-    # 1. Extract the Series to work on it efficiently
+
+def clean_df_text(df: pd.DataFrame, column: str, lang='en') -> pd.DataFrame:
+    import emoji
     s = df[column].astype(str)
+
+    # 1. Replace emojis with periods
+    # emoji_regex = re.compile(
+    # "|".join(re.escape(e) for e in emoji.EMOJI_DATA.keys())
+    # )
+    # s = s.str.replace(emoji_regex, ". ", regex=True)
+    s = s.map(lambda x: emoji.replace_emoji(x, replace=". "))
+    logger.info(f"Replaced emojis with periods")
 
     # 2. Convert all structural separators and whitespace-like noise to periods
     # This handles \r, \n, \t, \xa0, and bullets in one pass
@@ -126,6 +148,8 @@ def clean_df_text(df: pd.DataFrame, column: str) -> pd.DataFrame:
     )
 
     return df
+
+
 
 
 def count_tokens(phrase: str) -> int:
@@ -275,35 +299,6 @@ def extract_unique_app_keywords_from_text(
     return combined_keywords
 
 
-# def pos_filter_descriptions(texts: pd.Series) -> list[str]:
-#     """Batch processes text to keep only NOUN, PROPN, and ADJ."""
-#     import spacy
-#     #spacy.cli.download("en_core_web_sm")
-#     # Load model once, disable what we don't need for speed
-#     nlp = spacy.load("en_core_web_sm", disable=["parser", "ner", "lemmatizer"])
-#     # Note: We keep the lemmatizer if you want 'games' -> 'game',
-#     # but for raw speed, you can disable it too.
-
-#     processed_texts = []
-#     # nlp.pipe processes in batches and is much faster than .apply()
-#     for doc in nlp.pipe(texts, batch_size=1000, n_process=-1): # -1 uses all cores
-#         tokens = [
-#             token.text.lower()
-#             for token in doc
-#             if token.pos_ in {"NOUN", "PROPN", "ADJ"} and not token.is_stop
-#         ]
-#         processed_texts.append(" ".join(tokens))
-#     return processed_texts
-
-# 2000/4 = 15000
-# 1000/8 = 26000
-# 2000/8 = oom
-# 200/14 = 30000
-# 1000/14 = oom
-# 600/14 = 21000
-# 800/12 = 24000
-
-
 def pos_filter_descriptions(texts: pd.Series, batch_size=1000) -> list[str]:
     # Load light model; disable everything but the tagger (for POS) and lemmatizer
     import spacy
@@ -325,12 +320,21 @@ def pos_filter_descriptions(texts: pd.Series, batch_size=1000) -> list[str]:
     return processed_texts
 
 
+
+
+
+
+
+
+
+
 def get_global_keywords(database_connection: PostgresCon) -> list[str]:
     """Get the global keywords from the database.
     NOTE: This takes about ~5-8GB of RAM for 50k keywords and 200k descriptions. For now run manually.
     """
 
     from sklearn.feature_extraction.text import TfidfVectorizer  # noqa: PLC0415
+    from multiprocessing import Pool
 
     mystopwords = get_stopwords()
 
@@ -338,12 +342,24 @@ def get_global_keywords(database_connection: PostgresCon) -> list[str]:
         language_slug="en", database_connection=database_connection
     )
 
-    df = pd.read_pickle("descriptions_df.pkl")
-    df = clean_df_text(df, "description")
+    # df = pd.read_pickle("descriptions_df.pkl")
+
+    # Number of chunks
+    n_chunks = 8
+    chunk_size = len(df) // n_chunks + 1
+    chunks = [df['description'].iloc[i*chunk_size:(i+1)*chunk_size] for i in range(n_chunks)]
+    with Pool(n_chunks) as pool:
+        cleaned_chunks = pool.map(clean_series_text, chunks)
+    # Combine back into one Series
+    df['description'] = pd.concat(cleaned_chunks).reset_index(drop=True)
+
     # df.to_pickle("descriptions_df_cleaned.pkl")
-    df = pd.read_pickle("descriptions_df_cleaned.pkl")
+    # df = pd.read_pickle("descriptions_df_cleaned.pkl")
+
 
     df["description"] = pos_filter_descriptions(df["description"])
+    # df.to_pickle("descriptions_df_cleaned_pos_filtered.pkl")
+    # df = pd.read_pickle("descriptions_df_cleaned_pos_filtered.pkl")
 
     vectorizer = TfidfVectorizer(
         ngram_range=(1, 3),  # Include 1-grams, 2-grams, 3-grams
@@ -361,7 +377,7 @@ def get_global_keywords(database_connection: PostgresCon) -> list[str]:
     keyword_scores = list(zip(feature_names, global_scores, strict=False))
     keyword_scores.sort(key=lambda x: x[1], reverse=True)
     global_keywords = [kw for kw, score in keyword_scores if kw not in mystopwords]
-    return global_keywords
+    return df, global_keywords
 
 
 def insert_global_keywords(database_connection: PostgresCon) -> None:
@@ -387,6 +403,10 @@ def insert_global_keywords(database_connection: PostgresCon) -> None:
     table_name = "keywords_base"
     insert_columns = ["keyword_id"]
     key_columns = ["keyword_id"]
+
+    keywords_df.head()
+
+    # Replace old base keywords
     keywords_df.to_sql(
         name=table_name,
         con=database_connection.engine,
@@ -412,7 +432,9 @@ def extract_app_keywords_from_descriptions(
     database_connection: PostgresCon, limit: int
 ) -> None:
     """Process keywords for app descriptions."""
+    
     description_df = query_apps_to_process_keywords(database_connection, limit=limit)
+
     keywords_base = query_keywords_base(database_connection)
     keywords_base["keyword_text"] = (
         " " + keywords_base["keyword_text"].str.lower() + " "
@@ -424,7 +446,7 @@ def extract_app_keywords_from_descriptions(
         + description_df["description"]
         + " "
     ).str.lower()
-    description_df = clean_df_text(description_df, "description_text")
+    description_df["description_text"] = clean_series_text(description_df["description_text"])
     all_keywords_dfs = []
     logger.info(f"Processing {len(description_df)} app descriptions")
     for _i, row in description_df.iterrows():
@@ -458,3 +480,15 @@ def extract_app_keywords_from_descriptions(
         delete_by_keys=["store_app"],
         delete_keys_have_duplicates=True,
     )
+    table_name = "app_description_keywords_extracted"
+    apps_extracted_df = main_keywords_df[['store_app', 'description_id', 'extracted_at']].drop_duplicates()
+    apps_extracted_df["extracted_at"] = apps_extracted_df["extracted_at"]
+    apps_extracted_df.to_sql(
+        name=table_name,
+        con=database_connection.engine,
+        if_exists="append",
+        index=False,
+        schema="logging",
+    )
+
+
