@@ -34,7 +34,7 @@ dependencies = [
 
 
 [project.optional-dependencies]
-dev = ["pre-commit", "pytest","scikit-learn", "spacy" ]
+dev = ["pre-commit", "pytest","scikit-learn", "spacy", "emoji", "tqdm" ]
 
 
 [build-system]
