@@ -87,7 +87,7 @@ def clean_series_text(s: pd.Series) -> pd.Series:
     # )
     # s = s.str.replace(emoji_regex, ". ", regex=True)
     s = s.map(lambda x: emoji.replace_emoji(x, replace=". "))
-    logger.info(f"Replaced emojis with periods")
+    logger.info("Replaced emojis with periods")
 
     # 2. Convert all structural separators and whitespace-like noise to periods
     # This handles \r, \n, \t, \xa0, and bullets in one pass
@@ -106,14 +106,18 @@ def clean_series_text(s: pd.Series) -> pd.Series:
 
     # 6. Final Cleanup: lowercase and collapse multiple spaces/periods
     # "Design. . . . Community" -> "design. community"
-    s = s.str.lower().str.replace(r"\s+", " ", regex=True).str.replace(r"\.+", ".", regex=True)
+    s = (
+        s.str.lower()
+        .str.replace(r"\s+", " ", regex=True)
+        .str.replace(r"\.+", ".", regex=True)
+    )
 
     return s
 
 
-
-def clean_df_text(df: pd.DataFrame, column: str, lang='en') -> pd.DataFrame:
+def clean_df_text(df: pd.DataFrame, column: str, lang="en") -> pd.DataFrame:
     import emoji
+
     s = df[column].astype(str)
 
     # 1. Replace emojis with periods
@@ -122,7 +126,7 @@ def clean_df_text(df: pd.DataFrame, column: str, lang='en') -> pd.DataFrame:
     # )
     # s = s.str.replace(emoji_regex, ". ", regex=True)
     s = s.map(lambda x: emoji.replace_emoji(x, replace=". "))
-    logger.info(f"Replaced emojis with periods")
+    logger.info("Replaced emojis with periods")
 
     # 2. Convert all structural separators and whitespace-like noise to periods
     # This handles \r, \n, \t, \xa0, and bullets in one pass
@@ -148,8 +152,6 @@ def clean_df_text(df: pd.DataFrame, column: str, lang='en') -> pd.DataFrame:
     )
 
     return df
-
-
 
 
 def count_tokens(phrase: str) -> int:
@@ -320,21 +322,14 @@ def pos_filter_descriptions(texts: pd.Series, batch_size=1000) -> list[str]:
     return processed_texts
 
 
-
-
-
-
-
-
-
-
 def get_global_keywords(database_connection: PostgresCon) -> list[str]:
     """Get the global keywords from the database.
     NOTE: This takes about ~5-8GB of RAM for 50k keywords and 200k descriptions. For now run manually.
     """
 
-    from sklearn.feature_extraction.text import TfidfVectorizer  # noqa: PLC0415
     from multiprocessing import Pool
+
+    from sklearn.feature_extraction.text import TfidfVectorizer  # noqa: PLC0415
 
     mystopwords = get_stopwords()
 
@@ -347,15 +342,17 @@ def get_global_keywords(database_connection: PostgresCon) -> list[str]:
     # Number of chunks
     n_chunks = 8
     chunk_size = len(df) // n_chunks + 1
-    chunks = [df['description'].iloc[i*chunk_size:(i+1)*chunk_size] for i in range(n_chunks)]
+    chunks = [
+        df["description"].iloc[i * chunk_size : (i + 1) * chunk_size]
+        for i in range(n_chunks)
+    ]
     with Pool(n_chunks) as pool:
         cleaned_chunks = pool.map(clean_series_text, chunks)
     # Combine back into one Series
-    df['description'] = pd.concat(cleaned_chunks).reset_index(drop=True)
+    df["description"] = pd.concat(cleaned_chunks).reset_index(drop=True)
 
     # df.to_pickle("descriptions_df_cleaned.pkl")
     # df = pd.read_pickle("descriptions_df_cleaned.pkl")
-
 
     df["description"] = pos_filter_descriptions(df["description"])
     # df.to_pickle("descriptions_df_cleaned_pos_filtered.pkl")
@@ -432,7 +429,7 @@ def extract_app_keywords_from_descriptions(
     database_connection: PostgresCon, limit: int
 ) -> None:
     """Process keywords for app descriptions."""
-    
+
     description_df = query_apps_to_process_keywords(database_connection, limit=limit)
 
     keywords_base = query_keywords_base(database_connection)
@@ -446,7 +443,9 @@ def extract_app_keywords_from_descriptions(
         + description_df["description"]
         + " "
     ).str.lower()
-    description_df["description_text"] = clean_series_text(description_df["description_text"])
+    description_df["description_text"] = clean_series_text(
+        description_df["description_text"]
+    )
     all_keywords_dfs = []
     logger.info(f"Processing {len(description_df)} app descriptions")
     for _i, row in description_df.iterrows():
@@ -481,7 +480,9 @@ def extract_app_keywords_from_descriptions(
         delete_keys_have_duplicates=True,
     )
     table_name = "app_description_keywords_extracted"
-    apps_extracted_df = main_keywords_df[['store_app', 'description_id', 'extracted_at']].drop_duplicates()
+    apps_extracted_df = main_keywords_df[
+        ["store_app", "description_id", "extracted_at"]
+    ].drop_duplicates()
     apps_extracted_df["extracted_at"] = apps_extracted_df["extracted_at"]
     apps_extracted_df.to_sql(
         name=table_name,
@@ -490,5 +491,3 @@ def extract_app_keywords_from_descriptions(
         index=False,
         schema="logging",
     )
-
-

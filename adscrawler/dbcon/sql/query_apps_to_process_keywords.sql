@@ -1,4 +1,4 @@
- WITH latest_descriptions AS (
+WITH latest_descriptions AS (
     SELECT DISTINCT ON (sad.store_app)
         sad.id AS description_id,
         sad.store_app,
@@ -13,9 +13,9 @@
         sad.store_app ASC,
         sad.updated_at DESC
 ),
- latest_extractions AS (
+latest_extractions AS (
     SELECT DISTINCT ON
-        (adke.description_id)
+    (adke.description_id)
         adke.description_id,
         adke.store_app,
         adke.extracted_at AS app_keywords_extracted_at
@@ -37,13 +37,12 @@ base AS (
         latest_extractions AS le
         ON
             ld.description_id = le.description_id
-            WHERE
-le.app_keywords_extracted_at IS NULL
-OR ld.description_last_updated > le.app_keywords_extracted_at
-OR le.app_keywords_extracted_at <= NOW() - INTERVAL '31 days'
-    )
+    WHERE
+        le.app_keywords_extracted_at IS NULL
+        OR ld.description_last_updated > le.app_keywords_extracted_at
+        OR le.app_keywords_extracted_at <= NOW() - INTERVAL '31 days'
 )
-SELECT	
+SELECT
     b.store_app,
     b.description_id,
     b.app_keywords_extracted_at,
@@ -59,6 +58,11 @@ ORDER BY
             COALESCE(agml.installs, 0),
             COALESCE(agml.rating_count::BIGINT, 0)
         )
-        * (10 * COALESCE(EXTRACT(DAY FROM (NOW() - b.app_keywords_extracted_at)), 1))
+        * (
+            10
+            * COALESCE(
+                EXTRACT(DAY FROM (NOW() - b.app_keywords_extracted_at)), 1
+            )
+        )
     ) DESC
 LIMIT :mylimit;
