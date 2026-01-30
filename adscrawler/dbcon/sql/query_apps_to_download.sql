@@ -1,281 +1,279 @@
 WITH latest_version_codes AS (
-	SELECT
-		DISTINCT ON
-		(store_app)
+    SELECT DISTINCT ON
+    (store_app)
         id,
-		store_app,
-		version_code,
-		updated_at,
-		crawl_result
-	FROM
-		version_codes
-	ORDER BY
-		store_app ASC,
-		updated_at DESC,
-		string_to_array(version_code, '.')::bigint [] DESC
+        store_app,
+        version_code,
+        updated_at,
+        crawl_result
+    FROM
+        version_codes
+    ORDER BY
+        store_app ASC,
+        updated_at DESC,
+        string_to_array(version_code, '.')::bigint [] DESC
 ),
 latest_success_version_codes AS (
-	SELECT
-		DISTINCT ON
-		(store_app)
+    SELECT DISTINCT ON
+    (store_app)
         id,
-		store_app,
-		version_code,
-		created_at,
-		updated_at,
-		crawl_result
-	FROM
-		version_codes
-	WHERE
-		crawl_result = 1
-	ORDER BY
-		store_app ASC,
-		updated_at DESC,
-		string_to_array(version_code, '.')::bigint [] DESC
+        store_app,
+        version_code,
+        created_at,
+        updated_at,
+        crawl_result
+    FROM
+        version_codes
+    WHERE
+        crawl_result = 1
+    ORDER BY
+        store_app ASC,
+        updated_at DESC,
+        string_to_array(version_code, '.')::bigint [] DESC
 ),
 faily_downloads_monthly AS (
-	SELECT
-		store_app,
-		count(*) AS attempt_count
-	FROM
-		logging.store_app_downloads
-	WHERE
-		crawl_result != 1
-		AND updated_at >= current_date - INTERVAL '30 days'
-	GROUP BY
-		store_app
+    SELECT
+        store_app,
+        count(*) AS attempt_count
+    FROM
+        logging.store_app_downloads
+    WHERE
+        crawl_result != 1
+        AND updated_at >= current_date - interval '30 days'
+    GROUP BY
+        store_app
 ),
 faily_downloads_quarter AS (
-	SELECT
-		store_app,
-		count(*) AS attempt_count
-	FROM
-		logging.store_app_downloads
-	WHERE
-		crawl_result != 1
-		AND updated_at >= current_date - INTERVAL '90 days'
-	GROUP BY
-		store_app
+    SELECT
+        store_app,
+        count(*) AS attempt_count
+    FROM
+        logging.store_app_downloads
+    WHERE
+        crawl_result != 1
+        AND updated_at >= current_date - interval '90 days'
+    GROUP BY
+        store_app
 ),
 growth_apps AS (
-	SELECT
-		sa.id AS store_app,
-		saz.store_id
-	FROM
-		frontend.store_apps_z_scores AS saz
-	LEFT JOIN store_apps AS sa ON
-		saz.store_id = sa.store_id
+    SELECT
+        sa.id AS store_app,
+        saz.store_id
+    FROM
+        frontend.store_apps_z_scores AS saz
+    LEFT JOIN store_apps AS sa ON
+        saz.store_id = sa.store_id
 ),
 scheduled_apps_crawl AS (
-	SELECT
-		dc.store_app,
-		dc.store_id,
-		dc.name,
-		dc.installs,
-		dc.rating_count,
-		vc.crawl_result AS last_crawl_result,
-		vc.updated_at AS last_download_attempt,
-		lsvc.created_at AS last_downloaded_at,
-		COALESCE(fd.attempt_count, 0) AS failed_attempts_month,
-		COALESCE(fdq.attempt_count, 0) AS failed_attempts_quarter
-	FROM
-		store_apps_in_latest_rankings AS dc
-	LEFT JOIN latest_version_codes AS vc
+    SELECT
+        dc.store_app,
+        dc.store_id,
+        dc.name,
+        dc.installs,
+        dc.rating_count,
+        vc.crawl_result AS last_crawl_result,
+        vc.updated_at AS last_download_attempt,
+        lsvc.created_at AS last_downloaded_at,
+        coalesce(fd.attempt_count, 0) AS failed_attempts_month,
+        coalesce(fdq.attempt_count, 0) AS failed_attempts_quarter
+    FROM
+        store_apps_in_latest_rankings AS dc
+    LEFT JOIN latest_version_codes AS vc
         ON
-		dc.store_app = vc.store_app
-	LEFT JOIN latest_success_version_codes AS lsvc
+            dc.store_app = vc.store_app
+    LEFT JOIN latest_success_version_codes AS lsvc
         ON
-		dc.store_app = lsvc.store_app
-	LEFT JOIN faily_downloads_monthly AS fd
+            dc.store_app = lsvc.store_app
+    LEFT JOIN faily_downloads_monthly AS fd
         ON
-		vc.store_app = fd.store_app
-	LEFT JOIN faily_downloads_quarter AS fdq
+            vc.store_app = fd.store_app
+    LEFT JOIN faily_downloads_quarter AS fdq
         ON
-		vc.store_app = fdq.store_app
-	LEFT JOIN store_apps sa ON
-		dc.store_app = sa.id
-	WHERE
-		dc.store = :store
-		AND (
-			vc.updated_at IS NULL
-				OR
+            vc.store_app = fdq.store_app
+    LEFT JOIN store_apps AS sa
+        ON
+            dc.store_app = sa.id
+    WHERE
+        dc.store = :store
+        AND (
+            vc.updated_at IS NULL
+            OR
             (
-					(
-						-- never downloaded
-						lsvc.created_at IS NULL
-						-- success not downloaded > x days and store recently updated
-							OR (
-								lsvc.updated_at < current_date - INTERVAL '120 days'
-									AND (
-																		sa.store_last_updated > current_date - INTERVAL '90 days'
-											OR sa.store_last_updated IS NULL
-									)
-							)
-					)
-					OR
-					-- Retry failing every couple days, including same x days from above
                 (
-								lsvc.created_at IS NULL
-							OR lsvc.created_at < current_date - INTERVAL '120 days'
-							AND (
-																		sa.store_last_updated > current_date - INTERVAL '90 days'
-									OR sa.store_last_updated IS NULL
-							)
-							AND (
-										vc.crawl_result IN (
-											2, 3, 4
-								)
-									AND vc.updated_at < current_date - INTERVAL '2 days'
-							)
-					)
-				)
-		)
+                    -- never downloaded
+                    lsvc.created_at IS NULL
+                    -- success not downloaded > x days and store recently updated
+                    OR (
+                        lsvc.updated_at < current_date - interval '120 days'
+                        AND (
+                            sa.store_last_updated
+                            > current_date - interval '90 days'
+                            OR sa.store_last_updated IS NULL
+                        )
+                    )
+                )
+                OR
+                -- Retry failing every couple days, including same x days from above
+                (
+                    lsvc.created_at IS NULL
+                    OR lsvc.created_at < current_date - interval '120 days'
+                    AND (
+                        sa.store_last_updated
+                        > current_date - interval '90 days'
+                        OR sa.store_last_updated IS NULL
+                    )
+                    AND (
+                        vc.crawl_result IN (
+                            2, 3, 4
+                        )
+                        AND vc.updated_at < current_date - interval '2 days'
+                    )
+                )
+            )
+        )
 ),
-		user_requested_apps_crawl AS (
-	SELECT
-				DISTINCT ON
-				(sa.id)
+user_requested_apps_crawl AS (
+    SELECT DISTINCT ON
+    (sa.id)
         sa.id AS store_app,
-				sa.store_id,
-				sa.name,
-				agm.installs,
-				agm.rating_count,
-				urs.created_at AS user_last_requested,
-				lvc.crawl_result AS last_crawl_result,
-				lvc.updated_at AS last_download_attempt,
-				lsvc.created_at AS last_downloaded_at,
-				COALESCE(fd.attempt_count, 0) AS failed_attempts_month,
-				COALESCE(fdq.attempt_count, 0) AS failed_attempts_quarter
-	FROM
-				agadmin.user_requested_scan AS urs
-	LEFT JOIN store_apps AS sa
+        sa.store_id,
+        sa.name,
+        agm.installs,
+        agm.rating_count,
+        urs.created_at AS user_last_requested,
+        lvc.crawl_result AS last_crawl_result,
+        lvc.updated_at AS last_download_attempt,
+        lsvc.created_at AS last_downloaded_at,
+        coalesce(fd.attempt_count, 0) AS failed_attempts_month,
+        coalesce(fdq.attempt_count, 0) AS failed_attempts_quarter
+    FROM
+        agadmin.user_requested_scan AS urs
+    LEFT JOIN store_apps AS sa
         ON
-				urs.store_id = sa.store_id
-	LEFT JOIN app_global_metrics_latest AS agm
+            urs.store_id = sa.store_id
+    LEFT JOIN app_global_metrics_latest AS agm
         ON
-				sa.id = agm.store_app
-	LEFT JOIN latest_success_version_codes AS lsvc
+            sa.id = agm.store_app
+    LEFT JOIN latest_success_version_codes AS lsvc
         ON
-				sa.id = lsvc.store_app
-	LEFT JOIN latest_version_codes AS lvc
+            sa.id = lsvc.store_app
+    LEFT JOIN latest_version_codes AS lvc
         ON
-				sa.id = lvc.store_app
-	LEFT JOIN faily_downloads_monthly AS fd
+            sa.id = lvc.store_app
+    LEFT JOIN faily_downloads_monthly AS fd
         ON
-				sa.id = fd.store_app
-	LEFT JOIN faily_downloads_quarter AS fdq
+            sa.id = fd.store_app
+    LEFT JOIN faily_downloads_quarter AS fdq
         ON
-				sa.id = fdq.store_app
-	WHERE
-				(
-					(
-						lsvc.created_at < urs.created_at
-					AND (
-								(
-									sa.store_last_updated > lsvc.created_at
-								AND lsvc.created_at > '2025-05-01'
-						)
-						OR lsvc.created_at < '2025-05-01'
-					)
-			)
-			OR lsvc.created_at IS NULL
-		)
-		AND (
-					lvc.updated_at < current_date - INTERVAL '1 days'
-				OR lvc.updated_at IS NULL
-		)
-		AND sa.store = :store
-		AND sa.free
-		-- random apps requested directly BY users NOT FOUND ON store
-		AND sa.name IS NOT NULL
-	ORDER BY
-				sa.id ASC,
-				urs.created_at DESC
+            sa.id = fdq.store_app
+    WHERE
+        (
+            (
+                lsvc.created_at < urs.created_at
+                AND (
+                    (
+                        sa.store_last_updated > lsvc.created_at
+                        AND lsvc.created_at > '2025-05-01'
+                    )
+                    OR lsvc.created_at < '2025-05-01'
+                )
+            )
+            OR lsvc.created_at IS NULL
+        )
+        AND (
+            lvc.updated_at < current_date - interval '1 days'
+            OR lvc.updated_at IS NULL
+        )
+        AND sa.store = :store
+        AND sa.free
+        -- random apps requested directly BY users NOT FOUND ON store
+        AND sa.name IS NOT NULL
+    ORDER BY
+        sa.id ASC,
+        urs.created_at DESC
 ),
-		combined AS (
-	SELECT
-				store_app,
-				store_id,
-				name,
-				installs,
-				rating_count,
-				failed_attempts_month,
-				failed_attempts_quarter,
-				last_crawl_result,
-				'user' AS mysource,
-				last_download_attempt,
-				last_downloaded_at
-	FROM
-				user_requested_apps_crawl
-	WHERE
-				failed_attempts_month < 3
-UNION ALL
-	SELECT
-				store_app,
-				store_id,
-				name,
-				installs,
-				rating_count,
-				failed_attempts_month,
-				failed_attempts_quarter,
-				last_crawl_result,
-				CASE
-					WHEN
+combined AS (
+    SELECT
+        store_app,
+        store_id,
+        name,
+        installs,
+        rating_count,
+        failed_attempts_month,
+        failed_attempts_quarter,
+        last_crawl_result,
+        'user' AS mysource,
+        last_download_attempt,
+        last_downloaded_at
+    FROM
+        user_requested_apps_crawl
+    WHERE
+        failed_attempts_month < 3
+    UNION ALL
+    SELECT
+        store_app,
+        store_id,
+        name,
+        installs,
+        rating_count,
+        failed_attempts_month,
+        failed_attempts_quarter,
+        last_crawl_result,
+        CASE
+            WHEN
                 store_app IN (
-				SELECT
-							ga.store_app
-				FROM
-							growth_apps AS ga
-			)
+                    SELECT ga.store_app
+                    FROM
+                        growth_apps AS ga
+                )
                 THEN 'top_scheduled'
-			ELSE 'scheduled'
-		END AS mysource,
-				last_download_attempt,
-				last_downloaded_at
-	FROM
-				scheduled_apps_crawl
-	WHERE
-				failed_attempts_month < 2
-		AND failed_attempts_quarter < 4
-		AND (
-					last_downloaded_at IS NULL
-				OR last_downloaded_at < current_date - INTERVAL '120 days'
-		)
+            ELSE 'scheduled'
+        END AS mysource,
+        last_download_attempt,
+        last_downloaded_at
+    FROM
+        scheduled_apps_crawl
+    WHERE
+        failed_attempts_month < 2
+        AND failed_attempts_quarter < 4
+        AND (
+            last_downloaded_at IS NULL
+            OR last_downloaded_at < current_date - interval '120 days'
+        )
 ),
-		final_selection AS (
-	SELECT
-				*,
-				(
-					COALESCE(
+final_selection AS (
+    SELECT
+        *,
+        (
+            coalesce(
                 date_part('day', current_date - last_download_attempt), 10000
             )
-            + COALESCE(date_part('day', current_date - last_downloaded_at), 100)
-		) / 2
-        * GREATEST(
-            COALESCE(installs, 0),
-            COALESCE(rating_count::bigint, 0) * 50
+            + coalesce(date_part('day', current_date - last_downloaded_at), 100)
+        ) / 2
+        * greatest(
+            coalesce(installs, 0),
+            coalesce(rating_count::bigint, 0) * 50
         ) AS mynum,
-				ROW_NUMBER() OVER (
-		ORDER BY
-					mysource DESC,
-					(
-						COALESCE(
+        row_number() OVER (
+            ORDER BY
+                mysource DESC,
+                (
+                    coalesce(
                         date_part('day', current_date - last_download_attempt),
                         10000
                     )
-                    + COALESCE(
+                    + coalesce(
                         date_part('day', current_date - last_downloaded_at), 100
                     )
-			) / 2
-                * GREATEST(
-                    COALESCE(installs, 0),
-                    COALESCE(rating_count::bigint, 0) * 50
+                ) / 2
+                * greatest(
+                    coalesce(installs, 0),
+                    coalesce(rating_count::bigint, 0) * 50
                 ) DESC NULLS LAST
-		) AS app_rank
-	FROM
-				combined
+        ) AS app_rank
+    FROM
+        combined
 )
-		SELECT
-			*
+SELECT *
 FROM
-			final_selection;
+    final_selection;
