@@ -467,7 +467,7 @@ def download_app_by_store_id(
     df = df[~(df["version_code"] == "failed")]
     if df.empty:
         logger.error(f"S3 only has failed apk for {store_id=}, no version_code")
-    if version_str or version_str == -1:
+    if version_str or version_str == '-1':
         df = df[df["version_code"] == version_str]
         final_version_str = version_str
     else:
