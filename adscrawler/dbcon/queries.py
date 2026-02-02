@@ -406,7 +406,7 @@ def upsert_df(
 
 def clean_app_ranks_weekly_table(database_connection: PostgresCon):
     # Use a smaller limit to prevent long locks
-    batch_size = 100000 
+    batch_size = 100000
     del_query = f"""
         DELETE FROM frontend.store_app_ranks_weekly
         WHERE ctid IN (
@@ -418,14 +418,14 @@ def clean_app_ranks_weekly_table(database_connection: PostgresCon):
     """
     raw_conn = database_connection.engine.raw_connection()
     # Ensure we aren't in an implicit transaction block that stays open
-    raw_conn.set_session(autocommit=True) 
+    raw_conn.set_session(autocommit=True)
     try:
         with raw_conn.cursor() as cur:
             while True:
                 cur.execute(del_query)
                 rows_affected = cur.rowcount
                 print(f"Deleted {rows_affected} rows...")
-                
+
                 if rows_affected == 0:
                     break
     finally:

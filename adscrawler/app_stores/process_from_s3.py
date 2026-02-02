@@ -15,8 +15,8 @@ from adscrawler.dbcon.connection import (
     get_db_connection,
 )
 from adscrawler.dbcon.queries import (
-    delete_and_insert,
     clean_app_ranks_weekly_table,
+    delete_and_insert,
     query_categories,
     query_collections,
     query_countries,
@@ -615,7 +615,7 @@ def process_ranks_from_s3(
             store_id_map.set_index("store_id")["id"].to_dict()
         )
         wdf = wdf.drop(columns=["store_id", "collection", "category"])
-        table_name=f"store_app_ranks_{table_suffix}"
+        table_name = f"store_app_ranks_{table_suffix}"
         upsert_df(
             df=wdf,
             table_name=table_name,
@@ -637,7 +637,7 @@ def process_ranks_from_s3(
                 "store_app",
                 "best_rank",
             ],
-           )
+        )
 
 
 def query_store_collection_ranks(
