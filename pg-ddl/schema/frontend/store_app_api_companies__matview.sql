@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict 8DBf4vawmGwsxb8O6hKgb2M0Y22uxKPs21O03NJhKcmrPCVYGyZQzXv2R7LEpUA
+\restrict Ulz1KD8Uz9vlOQQmrYeAI9jKQSpcszmqqdG4qb8xbm2hZj1CE56OZt2dLydoziN
 
--- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
--- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
+-- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
+-- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -61,5 +61,5 @@ ALTER MATERIALIZED VIEW frontend.store_app_api_companies OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 8DBf4vawmGwsxb8O6hKgb2M0Y22uxKPs21O03NJhKcmrPCVYGyZQzXv2R7LEpUA
+\unrestrict Ulz1KD8Uz9vlOQQmrYeAI9jKQSpcszmqqdG4qb8xbm2hZj1CE56OZt2dLydoziN
 

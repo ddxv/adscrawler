@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict bHxMGD2MyZTL0geELEYYhZthLErpjn3T52DHT4HgAs7swxbanzyk9qubRFfcBJh
+\restrict SHtZRLImzWYLvZX5T4sToumJ0HTFOF6bKbw9RVCk1wTuWex1ZigllSKcGoEbxBx
 
--- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
--- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
+-- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
+-- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -174,6 +174,13 @@ CREATE MATERIALIZED VIEW frontend.store_apps_overview AS
 ALTER MATERIALIZED VIEW frontend.store_apps_overview OWNER TO postgres;
 
 --
+-- Name: store_apps_overview_textsearch_idx; Type: INDEX; Schema: frontend; Owner: postgres
+--
+
+CREATE INDEX store_apps_overview_textsearch_idx ON frontend.store_apps_overview USING gin (textsearchable);
+
+
+--
 -- Name: store_apps_overview_unique_idx; Type: INDEX; Schema: frontend; Owner: postgres
 --
 
@@ -198,5 +205,5 @@ CREATE UNIQUE INDEX store_apps_overview_unique_store_id_idx ON frontend.store_ap
 -- PostgreSQL database dump complete
 --
 
-\unrestrict bHxMGD2MyZTL0geELEYYhZthLErpjn3T52DHT4HgAs7swxbanzyk9qubRFfcBJh
+\unrestrict SHtZRLImzWYLvZX5T4sToumJ0HTFOF6bKbw9RVCk1wTuWex1ZigllSKcGoEbxBx
 

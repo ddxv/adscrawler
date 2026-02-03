@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict DgwhzKP0BpeThmlr8SiSKJy6dXOm3FZcng8RuECNbWyFUN6XfXpnbjhwwBXjTbH
+\restrict V6SmVPd7uSAnAo8jQ56QbrW4zxQAW8A8wb66hclE8NO6Nmfmzr8jR9sfBUIuQol
 
--- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
--- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
+-- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
+-- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -57,5 +57,5 @@ ALTER TABLE ONLY logging.app_country_crawls
 -- PostgreSQL database dump complete
 --
 
-\unrestrict DgwhzKP0BpeThmlr8SiSKJy6dXOm3FZcng8RuECNbWyFUN6XfXpnbjhwwBXjTbH
+\unrestrict V6SmVPd7uSAnAo8jQ56QbrW4zxQAW8A8wb66hclE8NO6Nmfmzr8jR9sfBUIuQol
 

@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict cdgVxINSOXcDZutKE95l5uE8HBy7nTcgqINBftX7mHAaTzuQahPLu1pdGhu6gSP
+\restrict MEgSaT8uiGxwVxpJYv6qQYyeNSs9XOxG2TMblWe0nljzcYxBRekazJYl0A5T4xo
 
--- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
--- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
+-- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
+-- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -74,5 +74,5 @@ CREATE UNIQUE INDEX idx_category_tag_stats ON frontend.category_tag_stats USING 
 -- PostgreSQL database dump complete
 --
 
-\unrestrict cdgVxINSOXcDZutKE95l5uE8HBy7nTcgqINBftX7mHAaTzuQahPLu1pdGhu6gSP
+\unrestrict MEgSaT8uiGxwVxpJYv6qQYyeNSs9XOxG2TMblWe0nljzcYxBRekazJYl0A5T4xo
 

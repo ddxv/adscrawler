@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict EzPplFECrQRWDZRaCCeLc1MgHwQdwRzQR2sILLJsQTseBs83AQnsTkKkUAeKAdO
+\restrict SJS4RcJjnqRUvTtIYVkyuoz2MckHTRieXUtWYUfNOJVxUYPAjxSTtqdHfHAJIHN
 
--- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
--- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
+-- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
+-- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -46,6 +46,13 @@ ALTER TABLE ONLY public.app_keywords_extracted
 
 
 --
+-- Name: ake_latest_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX ake_latest_idx ON public.app_keywords_extracted USING btree (store_app, extracted_at DESC);
+
+
+--
 -- Name: app_keywords_app_index; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -72,5 +79,5 @@ ALTER TABLE ONLY public.app_keywords_extracted
 -- PostgreSQL database dump complete
 --
 
-\unrestrict EzPplFECrQRWDZRaCCeLc1MgHwQdwRzQR2sILLJsQTseBs83AQnsTkKkUAeKAdO
+\unrestrict SJS4RcJjnqRUvTtIYVkyuoz2MckHTRieXUtWYUfNOJVxUYPAjxSTtqdHfHAJIHN
 

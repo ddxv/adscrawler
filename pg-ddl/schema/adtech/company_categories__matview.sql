@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict xo8ia6rwW2ScRCiwTra6d4XKycKxb87xgskAgEDKdN3fhnv0iSTOzXGt62hcNYe
+\restrict Fu7uLenhH1FEN7u5YgIaNPbmMZCwm7GziCXkYN5LfXtccIgks0QwxXU85sUE0Oi
 
--- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
--- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
+-- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
+-- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -42,5 +42,5 @@ ALTER MATERIALIZED VIEW adtech.company_categories OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict xo8ia6rwW2ScRCiwTra6d4XKycKxb87xgskAgEDKdN3fhnv0iSTOzXGt62hcNYe
+\unrestrict Fu7uLenhH1FEN7u5YgIaNPbmMZCwm7GziCXkYN5LfXtccIgks0QwxXU85sUE0Oi
 

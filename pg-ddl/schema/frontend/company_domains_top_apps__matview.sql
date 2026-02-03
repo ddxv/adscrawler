@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict 7oHB0SYSHduhrvvQdqTznt8GdMGJQv3pFU5je00Q3ymSiKMwpIRNobYeQSi2GbZ
+\restrict zjpSAD3Y7Li8JUpZ3vqd3gRPLIurIA0J8IzvaoUkAvvzfcRXeqca0NhCQzX8wO9
 
--- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
--- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
+-- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
+-- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -115,5 +115,5 @@ CREATE UNIQUE INDEX idx_unique_company_domains_top_apps ON frontend.company_doma
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 7oHB0SYSHduhrvvQdqTznt8GdMGJQv3pFU5je00Q3ymSiKMwpIRNobYeQSi2GbZ
+\unrestrict zjpSAD3Y7Li8JUpZ3vqd3gRPLIurIA0J8IzvaoUkAvvzfcRXeqca0NhCQzX8wO9
 

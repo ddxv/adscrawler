@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict XtZwxdXJZEL5haag2cDXg8NxO9SVs7NcKqYpWSnhUeYvM2Zs35MEGxjSuXeh3t0
+\restrict kMZj0re3qbuI4ufbuLyYnfStAFzE8uqJkU9kQ4qksJiVKVXWKmIrPMS0ZrNnHFt
 
--- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
--- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
+-- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
+-- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -130,5 +130,5 @@ ALTER MATERIALIZED VIEW frontend.companies_creative_rankings OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict XtZwxdXJZEL5haag2cDXg8NxO9SVs7NcKqYpWSnhUeYvM2Zs35MEGxjSuXeh3t0
+\unrestrict kMZj0re3qbuI4ufbuLyYnfStAFzE8uqJkU9kQ4qksJiVKVXWKmIrPMS0ZrNnHFt
 
