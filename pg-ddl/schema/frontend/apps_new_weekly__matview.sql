@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict VJOsLogw2xf5IMGYDGivSkuKx1tuI847hMGZ43Vqe4aG6yCNTOwCkgREyaUENlz
+\restrict OaW58FXF9cJemkuHBEeUBpLwZsUnErgXONmyUYeo4OfuaMr52BLmDuVrgjiQ7WA
 
--- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
--- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
+-- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
+-- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -34,6 +34,7 @@ CREATE MATERIALIZED VIEW frontend.apps_new_weekly AS
             sa_1.store_id,
             sa_1.store,
             sa_1.category,
+            sa_1.developer_name,
             sa_1.rating,
             sa_1.installs,
             sa_1.installs_sum_1w,
@@ -46,7 +47,7 @@ CREATE MATERIALIZED VIEW frontend.apps_new_weekly AS
             sa_1.created_at,
             sa_1.updated_at,
             sa_1.crawl_result,
-            sa_1.icon_url_512,
+            sa_1.icon_url_100,
             sa_1.release_date,
             sa_1.rating_count,
             sa_1.featured_image_url,
@@ -60,39 +61,38 @@ CREATE MATERIALIZED VIEW frontend.apps_new_weekly AS
            FROM frontend.store_apps_overview sa_1
           WHERE ((sa_1.release_date >= (CURRENT_DATE - '7 days'::interval)) AND (sa_1.created_at >= (CURRENT_DATE - '11 days'::interval)) AND (sa_1.crawl_result = 1))
         )
- SELECT ra.id,
-    ra.name,
-    ra.store_id,
-    ra.store,
-    ra.category,
-    ra.rating,
-    ra.installs,
-    ra.installs_sum_1w,
-    ra.installs_sum_4w,
-    ra.ratings_sum_1w,
-    ra.ratings_sum_4w,
-    ra.store_last_updated,
-    ra.ad_supported,
-    ra.in_app_purchases,
-    ra.created_at,
-    ra.updated_at,
-    ra.crawl_result,
-    sa.icon_url_100,
-    ra.icon_url_512,
-    ra.release_date,
-    ra.rating_count,
-    ra.featured_image_url,
-    ra.phone_image_url_1,
-    ra.phone_image_url_2,
-    ra.phone_image_url_3,
-    ra.tablet_image_url_1,
-    ra.tablet_image_url_2,
-    ra.tablet_image_url_3,
-    ra.category AS app_category,
-    ra.rn
-   FROM (rankedapps ra
-     LEFT JOIN public.store_apps sa ON ((ra.id = sa.id)))
-  WHERE (ra.rn <= 100)
+ SELECT id,
+    name,
+    store_id,
+    store,
+    category,
+    developer_name,
+    rating,
+    installs,
+    installs_sum_1w,
+    installs_sum_4w,
+    ratings_sum_1w,
+    ratings_sum_4w,
+    store_last_updated,
+    ad_supported,
+    in_app_purchases,
+    created_at,
+    updated_at,
+    crawl_result,
+    icon_url_100,
+    release_date,
+    rating_count,
+    featured_image_url,
+    phone_image_url_1,
+    phone_image_url_2,
+    phone_image_url_3,
+    tablet_image_url_1,
+    tablet_image_url_2,
+    tablet_image_url_3,
+    category AS app_category,
+    rn
+   FROM rankedapps ra
+  WHERE (rn <= 100)
   WITH NO DATA;
 
 
@@ -123,5 +123,5 @@ CREATE UNIQUE INDEX idx_apps_new_weekly_f ON frontend.apps_new_weekly USING btre
 -- PostgreSQL database dump complete
 --
 
-\unrestrict VJOsLogw2xf5IMGYDGivSkuKx1tuI847hMGZ43Vqe4aG6yCNTOwCkgREyaUENlz
+\unrestrict OaW58FXF9cJemkuHBEeUBpLwZsUnErgXONmyUYeo4OfuaMr52BLmDuVrgjiQ7WA
 

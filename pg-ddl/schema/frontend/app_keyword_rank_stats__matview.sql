@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict 3TrRJJMNChYX97vNmMWfDOpcbKCQeczmFHh9uVuaUWKTJXNlCzbfYEzhZv7mCHQ
+\restrict 6afgnTeT0OFmAtAMAmerckub4FkAp4c1m8I0I0oH7ej0YY1mYrGc71mNooIoYa6
 
--- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
--- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
+-- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
+-- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -72,5 +72,5 @@ ALTER MATERIALIZED VIEW frontend.app_keyword_rank_stats OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 3TrRJJMNChYX97vNmMWfDOpcbKCQeczmFHh9uVuaUWKTJXNlCzbfYEzhZv7mCHQ
+\unrestrict 6afgnTeT0OFmAtAMAmerckub4FkAp4c1m8I0I0oH7ej0YY1mYrGc71mNooIoYa6
 

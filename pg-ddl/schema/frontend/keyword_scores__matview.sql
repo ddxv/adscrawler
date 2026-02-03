@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict 2WtDDWINDaH9mPSYVmqd9YuqC9xWxPoCDssZEQ1p3viy0riQ1DI4jZP0Nc3XKdU
+\restrict mFZea2caNHqSEAEKE0MygioFaGUzzRzJdB2dgadmbDNWVdwG8oWA0a6TUDBwEKa
 
--- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
--- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
+-- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
+-- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -134,8 +134,15 @@ CREATE MATERIALIZED VIEW frontend.keyword_scores AS
 ALTER MATERIALIZED VIEW frontend.keyword_scores OWNER TO postgres;
 
 --
+-- Name: keyword_scores_store_keyword_id_idx; Type: INDEX; Schema: frontend; Owner: postgres
+--
+
+CREATE UNIQUE INDEX keyword_scores_store_keyword_id_idx ON frontend.keyword_scores USING btree (store, keyword_id);
+
+
+--
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 2WtDDWINDaH9mPSYVmqd9YuqC9xWxPoCDssZEQ1p3viy0riQ1DI4jZP0Nc3XKdU
+\unrestrict mFZea2caNHqSEAEKE0MygioFaGUzzRzJdB2dgadmbDNWVdwG8oWA0a6TUDBwEKa
 

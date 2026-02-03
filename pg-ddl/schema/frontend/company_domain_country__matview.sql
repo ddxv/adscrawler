@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict Rhu0cIcSovHzzvcVyoTcGN4ElnbnTgdSS8FeRGghKAvpGvnKe4ZMurETcwv1dM9
+\restrict lwdkjtrzGGWUkQRo11xGVj61f7iogCklKWYU62ey1KWW6TSQBa6wsnbachg9xlV
 
--- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
--- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
+-- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
+-- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -74,5 +74,5 @@ ALTER MATERIALIZED VIEW frontend.company_domain_country OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict Rhu0cIcSovHzzvcVyoTcGN4ElnbnTgdSS8FeRGghKAvpGvnKe4ZMurETcwv1dM9
+\unrestrict lwdkjtrzGGWUkQRo11xGVj61f7iogCklKWYU62ey1KWW6TSQBa6wsnbachg9xlV
 

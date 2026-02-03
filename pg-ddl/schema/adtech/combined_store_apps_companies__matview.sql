@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict QBe0hItBIcOV4rOmpvm10RGptOMvo1e1iEljHXjeYPdOp6ihMeKimOmQXacv6Uc
+\restrict UZKhbF6VSbEOEcKlVfw36m5JAqKN7eEneUwgbF0sbIoI0edSVHl2ysxzvaOpdwr
 
--- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
--- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
+-- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
+-- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -55,16 +55,17 @@ CREATE MATERIALIZED VIEW adtech.combined_store_apps_companies AS
              LEFT JOIN public.domains d ON ((c_1.domain_id = d.id)))
              LEFT JOIN public.category_mapping cm ON (((sa_1.category)::text = (cm.original_category)::text)))
         ), sdk_based_companies AS (
-         SELECT DISTINCT sac.store_app,
+         SELECT DISTINCT sasd.store_app,
             cm.mapped_category AS app_category,
             sac.company_id,
             ad_1.domain_name AS ad_domain,
             'sdk'::text AS tag_source,
             COALESCE(c_1.parent_company_id, sac.company_id) AS parent_id
-           FROM ((((adtech.store_app_sdk_strings sac
+           FROM (((((adtech.store_app_sdk_strings sasd
+             LEFT JOIN adtech.sdks sac ON ((sac.id = sasd.sdk_id)))
              LEFT JOIN adtech.companies c_1 ON ((sac.company_id = c_1.id)))
              LEFT JOIN public.domains ad_1 ON ((c_1.domain_id = ad_1.id)))
-             LEFT JOIN public.store_apps sa_1 ON ((sac.store_app = sa_1.id)))
+             LEFT JOIN public.store_apps sa_1 ON ((sasd.store_app = sa_1.id)))
              LEFT JOIN public.category_mapping cm ON (((sa_1.category)::text = (cm.original_category)::text)))
         ), distinct_ad_and_pub_domains AS (
          SELECT DISTINCT pd.domain_name AS publisher_domain_url,
@@ -164,5 +165,5 @@ CREATE UNIQUE INDEX combined_store_app_companies_idx ON adtech.combined_store_ap
 -- PostgreSQL database dump complete
 --
 
-\unrestrict QBe0hItBIcOV4rOmpvm10RGptOMvo1e1iEljHXjeYPdOp6ihMeKimOmQXacv6Uc
+\unrestrict UZKhbF6VSbEOEcKlVfw36m5JAqKN7eEneUwgbF0sbIoI0edSVHl2ysxzvaOpdwr
 

@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict I1rfTQYe2tJtOUmWVZVVK5iSIIzqe9POCLHAYTEfUYfkl2gkozymb5IMxqhg8u5
+\restrict 9vqUuxl09Jw8aa58lnNETGirgLknu7TZO9WphV5zCZrqu10rxKCHxcbcqCt144m
 
--- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
--- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
+-- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
+-- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -30,8 +30,9 @@ SET default_table_access_method = heap;
 CREATE MATERIALIZED VIEW frontend.companies_apps_overview AS
  WITH store_app_sdk_companies AS (
          SELECT DISTINCT savs.store_app,
-            savs.company_id
+            sd.company_id
            FROM adtech.store_app_sdk_strings savs
+           LEFT JOIN adtech.sdks sd ON ((savs.sdk_id = sd.id))
         )
  SELECT sa.store_id,
     sacs.company_id,
@@ -68,5 +69,5 @@ CREATE UNIQUE INDEX companies_apps_overview_unique_idx ON frontend.companies_app
 -- PostgreSQL database dump complete
 --
 
-\unrestrict I1rfTQYe2tJtOUmWVZVVK5iSIIzqe9POCLHAYTEfUYfkl2gkozymb5IMxqhg8u5
+\unrestrict 9vqUuxl09Jw8aa58lnNETGirgLknu7TZO9WphV5zCZrqu10rxKCHxcbcqCt144m
 

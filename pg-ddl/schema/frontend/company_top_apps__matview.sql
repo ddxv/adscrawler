@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict E3wij5mxR0GFYKjle0z3NcdD7dkjT6Mbw2433RATEK2eHgTWl3IYYX7uj4pfIZF
+\restrict sbubiDP11YvyGThUgg0GjQLYRb9XGLvEH7DYq4OpJwaSUpeBJG1MP2VfqIAizV7
 
--- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
--- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
+-- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
+-- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -35,6 +35,8 @@ CREATE MATERIALIZED VIEW frontend.company_top_apps AS
             sa.name,
             sa.store_id,
             cac.app_category,
+            sa.developer_name,
+            sa.icon_url_100,
             sa.installs_sum_4w AS installs_d30,
             sa.ratings_sum_4w AS rating_count_d30,
             cac.sdk,
@@ -50,6 +52,8 @@ CREATE MATERIALIZED VIEW frontend.company_top_apps AS
             deduped_data.store,
             deduped_data.name,
             deduped_data.store_id,
+            deduped_data.developer_name,
+            deduped_data.icon_url_100,
             deduped_data.app_category,
             deduped_data.installs_d30,
             deduped_data.rating_count_d30,
@@ -65,6 +69,8 @@ CREATE MATERIALIZED VIEW frontend.company_top_apps AS
     store,
     name,
     store_id,
+    developer_name,
+    icon_url_100,
     app_category,
     installs_d30,
     rating_count_d30,
@@ -112,5 +118,5 @@ CREATE UNIQUE INDEX idx_unique_company_top_apps ON frontend.company_top_apps USI
 -- PostgreSQL database dump complete
 --
 
-\unrestrict E3wij5mxR0GFYKjle0z3NcdD7dkjT6Mbw2433RATEK2eHgTWl3IYYX7uj4pfIZF
+\unrestrict sbubiDP11YvyGThUgg0GjQLYRb9XGLvEH7DYq4OpJwaSUpeBJG1MP2VfqIAizV7
 

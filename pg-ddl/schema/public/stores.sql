@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict dcbdEafgWBr9WnfU1HVm9uNsvHLpjvREldY2tACRyPKDuqeXyxdKnWSHvEUzsvp
+\restrict R6DhPIIWwWjgFs2HtAQjr49RIFT2vdeKPJ151jHctpCVCjhshiZ5waojA2yex3u
 
--- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
--- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
+-- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
+-- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -93,5 +93,5 @@ ALTER TABLE ONLY public.stores
 -- PostgreSQL database dump complete
 --
 
-\unrestrict dcbdEafgWBr9WnfU1HVm9uNsvHLpjvREldY2tACRyPKDuqeXyxdKnWSHvEUzsvp
+\unrestrict R6DhPIIWwWjgFs2HtAQjr49RIFT2vdeKPJ151jHctpCVCjhshiZ5waojA2yex3u
 

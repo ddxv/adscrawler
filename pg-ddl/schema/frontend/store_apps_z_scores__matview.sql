@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict VFUxBYpJJzqefKYdcakYJSLTXibJuahu9PWm9T5LZsBW2AoSKo5wXhVDPVN5v9u
+\restrict bw5kuKLgFqali6aMN9kAman9YJdC3caat6gDTJBWhyEIjcDLsxlielFaxj6ZcbU
 
--- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
--- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
+-- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
+-- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -84,6 +84,7 @@ CREATE MATERIALIZED VIEW frontend.store_apps_z_scores AS
              LEFT JOIN public.store_apps sa ON ((saz.store_app = sa.id)))
              LEFT JOIN app_metrics am ON ((saz.store_app = am.store_app)))
              LEFT JOIN public.category_mapping cm ON (((sa.category)::text = (cm.original_category)::text)))
+          WHERE (sa.store = ANY (ARRAY[1, 2]))
         )
  SELECT store,
     store_id,
@@ -124,5 +125,5 @@ CREATE UNIQUE INDEX frontend_store_apps_z_scores_unique ON frontend.store_apps_z
 -- PostgreSQL database dump complete
 --
 
-\unrestrict VFUxBYpJJzqefKYdcakYJSLTXibJuahu9PWm9T5LZsBW2AoSKo5wXhVDPVN5v9u
+\unrestrict bw5kuKLgFqali6aMN9kAman9YJdC3caat6gDTJBWhyEIjcDLsxlielFaxj6ZcbU
 

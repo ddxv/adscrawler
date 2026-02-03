@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict rDKCV0vejaO5aiowL8LAPJpvTrf4FD0mXbjSz1IQWyaZWAvThw9ytIFh7gHoa0l
+\restrict Dpv0qfLHRN4sBWCxbPq3re6jHLOOoLErMbdPDUbhcgFu5m2Zw4cby8npQbycZ3q
 
--- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
--- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
+-- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
+-- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -58,5 +58,5 @@ CREATE UNIQUE INDEX companies_sdks_overview_unique_idx ON frontend.companies_sdk
 -- PostgreSQL database dump complete
 --
 
-\unrestrict rDKCV0vejaO5aiowL8LAPJpvTrf4FD0mXbjSz1IQWyaZWAvThw9ytIFh7gHoa0l
+\unrestrict Dpv0qfLHRN4sBWCxbPq3re6jHLOOoLErMbdPDUbhcgFu5m2Zw4cby8npQbycZ3q
 

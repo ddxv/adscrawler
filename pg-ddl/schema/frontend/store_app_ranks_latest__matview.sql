@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict uw9YV8rv2tRdcsLreoX6ND9DdgDt82Ri5wxiK4Jk3hgqncOesDAgssyXfY4Dtlw
+\restrict VQsHRS7BDYoqsMdR8rArhA3jTCu2ONRW9wzYTlRcE1OUy9gwLzbjCR62dbx1te5
 
--- Dumped from database version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
--- Dumped by pg_dump version 18.0 (Ubuntu 18.0-1.pgdg24.04+3)
+-- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
+-- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -39,6 +39,7 @@ CREATE MATERIALIZED VIEW frontend.store_app_ranks_latest AS
     sa.name,
     sa.store_id,
     sa.store,
+    sa.developer_name,
     sa.installs,
     sa.rating_count,
     sa.rating,
@@ -72,5 +73,5 @@ CREATE UNIQUE INDEX idx_store_app_ranks_latest_filter_sort ON frontend.store_app
 -- PostgreSQL database dump complete
 --
 
-\unrestrict uw9YV8rv2tRdcsLreoX6ND9DdgDt82Ri5wxiK4Jk3hgqncOesDAgssyXfY4Dtlw
+\unrestrict VQsHRS7BDYoqsMdR8rArhA3jTCu2ONRW9wzYTlRcE1OUy9gwLzbjCR62dbx1te5
 
