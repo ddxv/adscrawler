@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict kXECfafi0dhIR6lyPKgwfcnJp0bdcCAH3EyP97qaecmV0T7mHu3a8nVrDvttINE
+\restrict NkAYt5bAEwwhbb2kX3CGeCgj8Jl3L9Ti8bwQTw9blf2mdAoYBjkQYhiEgJ6wIDH
 
 -- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 -- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
@@ -64,5 +64,5 @@ ALTER TABLE ONLY public.store_app_z_scores_history
 -- PostgreSQL database dump complete
 --
 
-\unrestrict kXECfafi0dhIR6lyPKgwfcnJp0bdcCAH3EyP97qaecmV0T7mHu3a8nVrDvttINE
+\unrestrict NkAYt5bAEwwhbb2kX3CGeCgj8Jl3L9Ti8bwQTw9blf2mdAoYBjkQYhiEgJ6wIDH
 

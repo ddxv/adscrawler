@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict HpNr3HwgeRLkM41yPWEA4bLaUU0jDjSEsqoBIinlNsGMO3Ogy0esRYWAC0fbjzr
+\restrict hV5I6p7EUTHF0FhIepg3Stye897eyW1KWAX79ZnWPgkz1NKHxV8UWxThpZUNb3w
 
 -- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 -- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
@@ -41,10 +41,10 @@ CREATE MATERIALIZED VIEW adtech.store_app_sdk_strings AS
         )
  SELECT vc.store_app,
     vdm.string_id AS version_string_id,
-    css.company_id
+    css.sdk_id
    FROM ((latest_version_codes vc
      JOIN public.version_details_map vdm ON ((vc.id = vdm.version_code)))
-     LEFT JOIN adtech.company_sdk_strings css ON ((vdm.string_id = css.version_string_id)))
+     LEFT JOIN adtech.sdk_strings css ON ((vdm.string_id = css.version_string_id)))
   WITH NO DATA;
 
 
@@ -54,12 +54,12 @@ ALTER MATERIALIZED VIEW adtech.store_app_sdk_strings OWNER TO postgres;
 -- Name: store_app_sdk_strings_idx; Type: INDEX; Schema: adtech; Owner: postgres
 --
 
-CREATE UNIQUE INDEX store_app_sdk_strings_idx ON adtech.store_app_sdk_strings USING btree (store_app, version_string_id, company_id);
+CREATE UNIQUE INDEX store_app_sdk_strings_idx ON adtech.store_app_sdk_strings USING btree (store_app, version_string_id, sdk_id);
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict HpNr3HwgeRLkM41yPWEA4bLaUU0jDjSEsqoBIinlNsGMO3Ogy0esRYWAC0fbjzr
+\unrestrict hV5I6p7EUTHF0FhIepg3Stye897eyW1KWAX79ZnWPgkz1NKHxV8UWxThpZUNb3w
 

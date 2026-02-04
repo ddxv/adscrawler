@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 9vqUuxl09Jw8aa58lnNETGirgLknu7TZO9WphV5zCZrqu10rxKCHxcbcqCt144m
+\restrict EZrKYdXYMFxS0qzIcLBCNT5M6gUEpNTfCFtBdjK4kuPNFz1jGSZVXwkn2EPyIWX
 
 -- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 -- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
@@ -31,8 +31,8 @@ CREATE MATERIALIZED VIEW frontend.companies_apps_overview AS
  WITH store_app_sdk_companies AS (
          SELECT DISTINCT savs.store_app,
             sd.company_id
-           FROM adtech.store_app_sdk_strings savs
-           LEFT JOIN adtech.sdks sd ON ((savs.sdk_id = sd.id))
+           FROM (adtech.store_app_sdk_strings savs
+             LEFT JOIN adtech.sdks sd ON ((savs.sdk_id = sd.id)))
         )
  SELECT sa.store_id,
     sacs.company_id,
@@ -69,5 +69,5 @@ CREATE UNIQUE INDEX companies_apps_overview_unique_idx ON frontend.companies_app
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 9vqUuxl09Jw8aa58lnNETGirgLknu7TZO9WphV5zCZrqu10rxKCHxcbcqCt144m
+\unrestrict EZrKYdXYMFxS0qzIcLBCNT5M6gUEpNTfCFtBdjK4kuPNFz1jGSZVXwkn2EPyIWX
 

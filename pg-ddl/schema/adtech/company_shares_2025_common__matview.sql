@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 0frgW3Uq8HfX8IArBx9SsXMmxZeg7h52bURnIdYDnH6IgOemjK0UABgOmNlINl5
+\restrict TSqWY0D3l0agaK0o6xWLQNOpGZB10T56hUdgdJEWSx2g47saZ3BxLKa1rylm5T8
 
 -- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 -- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
@@ -37,16 +37,16 @@ CREATE MATERIALIZED VIEW adtech.company_shares_2025_common AS
         ), h1_stats AS (
          SELECT sd.company_id,
             count(DISTINCT store_app_sdk_strings_2025_h1.store_app) AS h1_app_count
-           FROM adtech.store_app_sdk_strings_2025_h1
-           JOIN adtech.sdks sd ON ((store_app_sdk_strings_2025_h1.sdk_id = sd.id))
+           FROM (adtech.store_app_sdk_strings_2025_h1
+             JOIN adtech.sdks sd ON ((store_app_sdk_strings_2025_h1.sdk_id = sd.id)))
           WHERE (store_app_sdk_strings_2025_h1.store_app IN ( SELECT common_apps.store_app
                    FROM common_apps))
           GROUP BY sd.company_id
         ), h2_stats AS (
          SELECT sd.company_id,
             count(DISTINCT store_app_sdk_strings_2025_h2.store_app) AS h2_app_count
-           FROM adtech.store_app_sdk_strings_2025_h2
-           JOIN adtech.sdks sd ON ((store_app_sdk_strings_2025_h2.sdk_id = sd.id))
+           FROM (adtech.store_app_sdk_strings_2025_h2
+             JOIN adtech.sdks sd ON ((store_app_sdk_strings_2025_h2.sdk_id = sd.id)))
           WHERE (store_app_sdk_strings_2025_h2.store_app IN ( SELECT common_apps.store_app
                    FROM common_apps))
           GROUP BY sd.company_id
@@ -80,5 +80,5 @@ ALTER MATERIALIZED VIEW adtech.company_shares_2025_common OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 0frgW3Uq8HfX8IArBx9SsXMmxZeg7h52bURnIdYDnH6IgOemjK0UABgOmNlINl5
+\unrestrict TSqWY0D3l0agaK0o6xWLQNOpGZB10T56hUdgdJEWSx2g47saZ3BxLKa1rylm5T8
 

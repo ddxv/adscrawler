@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict PNo82BVN0eedB5rDOBv6Gu7eL0Ecnl4qn3b5pPDHddOgIfrbEhVzz5XvtQgRsaL
+\restrict iohu4YfqBuWTcrzUs1aQHCKvFTmgfvg1aQ6tSeEbadQcMUg4B3AcTDgXf8HXXz2
 
 -- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 -- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
@@ -28,6 +28,7 @@ SET default_table_access_method = heap;
 --
 
 CREATE MATERIALIZED VIEW frontend.companies_category_tag_type_stats AS
+xxx
  WITH d30_counts AS (
          SELECT sahw.store_app,
             sum(sahw.installs_diff) AS d30_installs,
@@ -63,7 +64,7 @@ CREATE MATERIALIZED VIEW frontend.companies_category_tag_type_stats AS
             WHEN (tag.tag_source ~~ 'app_ads%'::text) THEN 'ad-networks'::character varying
             ELSE cats.url_slug
         END
-  WITH NO DATA;
+  WITH NO DATAx;
 
 
 ALTER MATERIALIZED VIEW frontend.companies_category_tag_type_stats OWNER TO postgres;
@@ -86,5 +87,5 @@ CREATE INDEX companies_category_tag_type_stats_query_idx ON frontend.companies_c
 -- PostgreSQL database dump complete
 --
 
-\unrestrict PNo82BVN0eedB5rDOBv6Gu7eL0Ecnl4qn3b5pPDHddOgIfrbEhVzz5XvtQgRsaL
+\unrestrict iohu4YfqBuWTcrzUs1aQHCKvFTmgfvg1aQ6tSeEbadQcMUg4B3AcTDgXf8HXXz2
 

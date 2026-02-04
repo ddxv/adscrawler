@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict TK2ZKMnkVHPQXEYnEFHdYV8iq2kLcx3btBG7eeQBAo9X4JdYLTnZIaECixqB3wJ
+\restrict 0yGd4SFAvRXV4w8Nt2xYgEb9wyrs1DC17np0Pk5amruAeUv38nvQTVzr2fLyYQd
 
 -- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 -- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
@@ -85,5 +85,5 @@ ALTER TABLE ONLY public.app_country_metrics_history
 -- PostgreSQL database dump complete
 --
 
-\unrestrict TK2ZKMnkVHPQXEYnEFHdYV8iq2kLcx3btBG7eeQBAo9X4JdYLTnZIaECixqB3wJ
+\unrestrict 0yGd4SFAvRXV4w8Nt2xYgEb9wyrs1DC17np0Pk5amruAeUv38nvQTVzr2fLyYQd
 

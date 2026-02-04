@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict dxTiIr3M2HnW3BHz7pcpm4ufaRpCiSIUL0PgJbPs41y6bBabTPPGheLIuzFMCz1
+\restrict s5xK5a4Lc5gdSkHhq70Kyy4zSK3DoH9wrf91Ne0ypZWr5k5rQkCMcPRRTnZAz1H
 
 -- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 -- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
@@ -41,10 +41,10 @@ CREATE MATERIALIZED VIEW adtech.store_app_sdk_strings_2025_h1 AS
         )
  SELECT vc.store_app,
     vdm.string_id AS version_string_id,
-    sd.id as sdk_id
+    sd.id AS sdk_id
    FROM (((latest_version_codes vc
      JOIN public.version_details_map vdm ON ((vc.id = vdm.version_code)))
-     JOIN adtech.company_sdk_strings css ON ((vdm.string_id = css.version_string_id)))
+     JOIN adtech.sdk_strings css ON ((vdm.string_id = css.version_string_id)))
      JOIN adtech.sdks sd ON ((css.sdk_id = sd.id)))
   WITH NO DATA;
 
@@ -55,5 +55,5 @@ ALTER MATERIALIZED VIEW adtech.store_app_sdk_strings_2025_h1 OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict dxTiIr3M2HnW3BHz7pcpm4ufaRpCiSIUL0PgJbPs41y6bBabTPPGheLIuzFMCz1
+\unrestrict s5xK5a4Lc5gdSkHhq70Kyy4zSK3DoH9wrf91Ne0ypZWr5k5rQkCMcPRRTnZAz1H
 

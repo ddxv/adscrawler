@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 6hikIorENh7ySqTZa405betCcCp1WBUPdIBkokNYuinfV0Ys5N3bp2NzNqZVO2I
+\restrict aqdCDhOUfwguc1CIPkT21MkIlxS4KFyhXyzdIaQ4MQNERMWqaKvWwZFTV8T98cz
 
 -- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 -- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
@@ -124,5 +124,5 @@ ALTER MATERIALIZED VIEW adtech.combined_store_apps_companies_2025_h2 OWNER TO po
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 6hikIorENh7ySqTZa405betCcCp1WBUPdIBkokNYuinfV0Ys5N3bp2NzNqZVO2I
+\unrestrict aqdCDhOUfwguc1CIPkT21MkIlxS4KFyhXyzdIaQ4MQNERMWqaKvWwZFTV8T98cz
 
