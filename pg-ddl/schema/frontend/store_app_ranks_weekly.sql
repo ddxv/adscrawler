@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict p2HbOPyJbFI9ypY1QAyYxHv7OANw5SU4lGSiDVr2aUqpTu6oI8uVlgReKKfW0oF
+\restrict hcoYdH3x3WmWNCODRr8BLmH96CDqquEC7nYUo6wEJaYPxWTQCgsbAzuaNGymwTI
 
 -- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 -- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
@@ -98,5 +98,5 @@ ALTER TABLE ONLY frontend.store_app_ranks_weekly
 -- PostgreSQL database dump complete
 --
 
-\unrestrict p2HbOPyJbFI9ypY1QAyYxHv7OANw5SU4lGSiDVr2aUqpTu6oI8uVlgReKKfW0oF
+\unrestrict hcoYdH3x3WmWNCODRr8BLmH96CDqquEC7nYUo6wEJaYPxWTQCgsbAzuaNGymwTI
 

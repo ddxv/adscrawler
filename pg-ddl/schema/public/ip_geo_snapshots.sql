@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 0hJJzRTZYOXRLULUpyE15spzursACYglfGwEiakcgINUmBpGSGMAU38MyATj3sH
+\restrict NJMNZbbU7bz87M6xuHZsb7je2dKv3txtaceE1fXxiALjI12loKnMYlazZOM4FsS
 
 -- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 -- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
@@ -112,5 +112,5 @@ ALTER TABLE ONLY public.ip_geo_snapshots
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 0hJJzRTZYOXRLULUpyE15spzursACYglfGwEiakcgINUmBpGSGMAU38MyATj3sH
+\unrestrict NJMNZbbU7bz87M6xuHZsb7je2dKv3txtaceE1fXxiALjI12loKnMYlazZOM4FsS
 

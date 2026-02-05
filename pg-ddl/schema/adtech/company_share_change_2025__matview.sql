@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict ILaEL4h3OrEqLOyHG4OuFeRFXHkM1MK5Z0BJACT5puCb674vT8vWRh3dVebTNn1
+\restrict YcBxoIQLTFwdtbZjVHjIHmH73KfACsPw9sQP7iH4akrKSn0RGerWgoH4MFZ5dse
 
 -- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 -- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
@@ -110,5 +110,5 @@ ALTER MATERIALIZED VIEW adtech.company_share_change_2025 OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict ILaEL4h3OrEqLOyHG4OuFeRFXHkM1MK5Z0BJACT5puCb674vT8vWRh3dVebTNn1
+\unrestrict YcBxoIQLTFwdtbZjVHjIHmH73KfACsPw9sQP7iH4akrKSn0RGerWgoH4MFZ5dse
 

@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict FP1pIdUbNiD1ScfgzCI6qK3OPD6GRh5f9VSILN6pQyKDPIvsLPBGiwxejhYNRi3
+\restrict WXPevfkkVRI9d8SEAHDPgZK0BBuCQCM7gN0sRaMcLW4X9nOpWk8SzvvhangYlkf
 
 -- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 -- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
@@ -96,5 +96,5 @@ ALTER TABLE ONLY public.adstxt_crawl_results
 -- PostgreSQL database dump complete
 --
 
-\unrestrict FP1pIdUbNiD1ScfgzCI6qK3OPD6GRh5f9VSILN6pQyKDPIvsLPBGiwxejhYNRi3
+\unrestrict WXPevfkkVRI9d8SEAHDPgZK0BBuCQCM7gN0sRaMcLW4X9nOpWk8SzvvhangYlkf
 
