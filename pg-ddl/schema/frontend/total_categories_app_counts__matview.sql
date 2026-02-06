@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict cQfrSrUGdIzroXwaMz1NJtCI3k6EiHzk4iVjEZMshbBFpLlRcmaSBzr18IJXKt2
+\restrict 5hmNnrGVQKqTQDrELpfw1pmbT7c2JyNSJfhE9nxT5cmldWKtJy4hVnRnIwDGbM7
 
 -- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 -- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
@@ -53,5 +53,5 @@ CREATE UNIQUE INDEX idx_total_categories_app_counts ON frontend.total_categories
 -- PostgreSQL database dump complete
 --
 
-\unrestrict cQfrSrUGdIzroXwaMz1NJtCI3k6EiHzk4iVjEZMshbBFpLlRcmaSBzr18IJXKt2
+\unrestrict 5hmNnrGVQKqTQDrELpfw1pmbT7c2JyNSJfhE9nxT5cmldWKtJy4hVnRnIwDGbM7
 

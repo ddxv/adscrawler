@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict huKgYTTlZKfQSLvbts2SbEVvBFGjXcX4LOLCNgoHrzYnNpYUMfWV2Ph6AGQXubz
+\restrict MHihmzmR5DPmFm9Z48yoXYFO2G3qLupkzd34CMM9c4ghkaStRdaC20OT50P2xcv
 
 -- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 -- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
@@ -71,5 +71,5 @@ CREATE UNIQUE INDEX store_app_ranks_best_monthly_uidx ON frontend.store_app_rank
 -- PostgreSQL database dump complete
 --
 
-\unrestrict huKgYTTlZKfQSLvbts2SbEVvBFGjXcX4LOLCNgoHrzYnNpYUMfWV2Ph6AGQXubz
+\unrestrict MHihmzmR5DPmFm9Z48yoXYFO2G3qLupkzd34CMM9c4ghkaStRdaC20OT50P2xcv
 
