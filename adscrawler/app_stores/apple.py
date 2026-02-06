@@ -190,18 +190,17 @@ def scrape_store_html(store_id: str, country: str) -> dict:
     soup = BeautifulSoup(response.text, "html.parser")
 
     in_app_purchase_element = soup.find(
-    "p",
-    class_=["attributes"],
-    string=re.compile(r"Purchases", re.I)
-)
+        "p", class_=["attributes"], string=re.compile(r"Purchases", re.I)
+    )
 
     has_in_app_purchases = in_app_purchase_element is not None
 
     purpose_section = soup.find(
-    "section",
-    class_=lambda classes: classes and "purpose-section" in classes
+        "section", class_=lambda classes: classes and "purpose-section" in classes
     )
-    has_third_party_advertising = 'third-party advertising' in purpose_section.get_text(strip=True).lower()
+    has_third_party_advertising = (
+        "third-party advertising" in purpose_section.get_text(strip=True).lower()
+    )
 
     urls = get_urls_from_html(soup)
 
@@ -227,7 +226,6 @@ def get_urls_from_html(soup: BeautifulSoup) -> dict:
         elif "privacy policy" in text and "apple.com" not in href:
             urls["privacy_policy"] = href
     return urls
-
 
 
 def get_developer_url(result: dict, urls: dict) -> str:
@@ -265,7 +263,9 @@ def get_developer_url(result: dict, urls: dict) -> str:
     return final_url
 
 
-def scrape_app_ios(store_id: str, country: str, language: str, scrape_html: bool = False) -> dict:
+def scrape_app_ios(
+    store_id: str, country: str, language: str, scrape_html: bool = False
+) -> dict:
     """Scrape iOS app details from the App Store.
     yt_us = scrape_app_ios("544007664", "us", language="en")
     yt_de = scrape_app_ios("544007664", "de", language="en")
@@ -305,9 +305,9 @@ def scrape_itunes_additional_html(result: dict, store_id: str, country: str) -> 
         result["in_app_purchases"] = html_res["in_app_purchases"]
         result["ad_supported"] = html_res["ad_supported"]
         result["sellerUrl"] = get_developer_url(result, html_res["urls"])
+        result["additional_html_scraped_at"] = datetime.datetime.now(tz=datetime.UTC)
     except Exception as e:
         logger.warning(f"Failed to get developer url for {store_id=} {country=} {e}")
-    result["additional_html_scraped_at"] = datetime.datetime.now(tz=datetime.UTC)
     return result
 
 

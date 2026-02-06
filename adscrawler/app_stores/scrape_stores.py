@@ -84,7 +84,7 @@ def _scrape_single_app(
             store_id=row["store_id"],
             country=row["country_code"].lower(),
             language=row["language"].lower(),
-            html_last_scraped_at=row['html_last_scraped_at'],
+            html_last_scraped_at=row.get("html_last_scraped_at", None),
         )
         result["store_app_db_id"] = row["store_app"]
         if process_icon:
@@ -733,9 +733,15 @@ def scrape_from_store(
         result_dict = scrape_app_gp(store_id, country=country, language=language)
     elif store == 2:
         scrape_html = False
-        if country == "us" and (html_last_scraped_at is None or html_last_scraped_at < datetime.datetime.now(tz=datetime.UTC) - datetime.timedelta(days=30)):
+        if country == "us" and (
+            html_last_scraped_at is None
+            or html_last_scraped_at
+            < datetime.datetime.now(tz=datetime.UTC) - datetime.timedelta(days=30)
+        ):
             scrape_html = True
-        result_dict = scrape_app_ios(store_id, country=country, language=language, scrape_html=scrape_html)
+        result_dict = scrape_app_ios(
+            store_id, country=country, language=language, scrape_html=scrape_html
+        )
     else:
         logger.error(f"Store not supported {store=}")
     return result_dict

@@ -41,7 +41,7 @@ SELECT
     ctc.alpha2 AS country_code,
     ctc.priority,
     sa.icon_url_100,
-    sa.additional_html_scraped_at,
+    sa.additional_html_scraped_at AS html_last_scraped_at,
     sa.updated_at AS app_updated_at,
     lc.crawled_at AS country_crawled_at
 FROM
