@@ -183,25 +183,25 @@ def scrape_store_html(store_id: str, country: str) -> dict:
     headers = {"User-Agent": "Mozilla/5.0"}
     response = requests.get(url, headers=headers)
 
-    html = response.text
-
     if response.status_code != 200:
         logger.error(f"Failed to retrieve the page: {response.status_code}")
         return {}
 
     soup = BeautifulSoup(response.text, "html.parser")
+
     in_app_purchase_element = soup.find(
-        "li", class_="inline-list__item--bulleted", string="Offers In-App Purchases"
-    )
+    "p",
+    class_=["attributes"],
+    string=re.compile(r"Purchases", re.I)
+)
+
     has_in_app_purchases = in_app_purchase_element is not None
 
-    try:
-        privacy_details = get_privacy_details(html, country, store_id)
-    except Exception as e:
-        logger.error(f"Failed to get privacy details for {store_id=} {country=} {e}")
-        privacy_details = None
-
-    has_third_party_advertising = "THIRD_PARTY_ADVERTISING" in str(privacy_details)
+    purpose_section = soup.find(
+    "section",
+    class_=lambda classes: classes and "purpose-section" in classes
+    )
+    has_third_party_advertising = 'third-party advertising' in purpose_section.get_text(strip=True).lower()
 
     urls = get_urls_from_html(soup)
 
@@ -228,69 +228,6 @@ def get_urls_from_html(soup: BeautifulSoup) -> dict:
             urls["privacy_policy"] = href
     return urls
 
-
-def get_privacy_details(html: str, country: str, store_id: str) -> dict:
-    """
-    Get privacy details for an iOS app from the App Store.
-
-    Args:
-        html: HTML of the App Store page
-        country: Country code (default: 'US')
-        store_id: App Store ID of the app
-
-    Returns:
-        True if the app has third-party advertising, False otherwise
-    """
-
-    # Extract the token using regex
-    reg_exp = r"token%22%3A%22([^%]+)%22%7D"
-    match = re.search(reg_exp, html)
-    if not match:
-        raise ValueError("Could not extract token from App Store page")
-
-    token = match.group(1)
-
-    # Make request to the API for privacy details
-    api_url = f"https://amp-api-edge.apps.apple.com/v1/catalog/{country}/apps/{store_id}?platform=web&fields=privacyDetails"
-    api_headers = {
-        "Origin": "https://apps.apple.com",
-        "Authorization": f"Bearer {token}",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-    }
-
-    response = requests.get(api_url, headers=api_headers)
-    response.raise_for_status()
-
-    data = response.json()
-
-    if not data.get("data") or len(data["data"]) == 0:
-        raise ValueError("App not found (404)")
-    privacy_details: dict = data["data"][0]["attributes"]["privacyDetails"]
-    return privacy_details
-
-
-def find_privacy_policy_id(soup: BeautifulSoup) -> str | None:
-    privacy_learn_more = soup.find("p", class_="app-privacy__learn-more")
-
-    if privacy_learn_more:
-        # Get the anchor tag inside the paragraph
-        link = privacy_learn_more.find("a")
-
-        if link:
-            # Extract the full URL
-            url = link.get("href")
-            print(f"URL: {url}")
-
-            # Extract the ID from the URL
-            # The URL format is https://apps.apple.com/story/id1538632801
-            if "id" in url:
-                # Find the position where "id" starts and extract everything after it
-                id_position = url.find("id")
-                if id_position != -1:
-                    id_value: str = url[id_position + 2 :]  # +2 to skip the "id" prefix
-                    print(f"ID: {id_value}")  # This will print: 1538632801
-                    return id_value
-    return None
 
 
 def get_developer_url(result: dict, urls: dict) -> str:
@@ -328,7 +265,7 @@ def get_developer_url(result: dict, urls: dict) -> str:
     return final_url
 
 
-def scrape_app_ios(store_id: str, country: str, language: str) -> dict:
+def scrape_app_ios(store_id: str, country: str, language: str, scrape_html: bool = False) -> dict:
     """Scrape iOS app details from the App Store.
     yt_us = scrape_app_ios("544007664", "us", language="en")
     yt_de = scrape_app_ios("544007664", "de", language="en")
@@ -355,6 +292,8 @@ def scrape_app_ios(store_id: str, country: str, language: str) -> dict:
     result_dict: dict = scraper.get_app_details(
         store_id, country=country, add_ratings=True, timeout=10, lang=language
     )
+    if scrape_html:
+        result_dict = scrape_itunes_additional_html(result_dict, store_id, country)
     logger.debug(f"store=2 {country=} {language=} {store_id=} ios store scraped")
     return result_dict
 
