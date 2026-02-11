@@ -1466,3 +1466,44 @@ def get_all_mmp_tlds(database_connection: PostgresCon) -> pd.DataFrame:
             """
     df = pd.read_sql(sel_query, con=database_connection.engine)
     return df
+
+
+def get_ios_app_country_history(
+    database_connection: PostgresCon, snapshot_date: datetime.date, days_back: int
+) -> pd.DataFrame:
+    start_date = (snapshot_date - datetime.timedelta(days=days_back)).strftime(
+        "%Y-%m-%d"
+    )
+    end_date = snapshot_date.strftime("%Y-%m-%d")
+    sel_query = f"""SELECT
+	     DISTINCT ON
+	     (
+		    store_app,
+		    country_id
+	     ) 
+         acmh.store_app,
+	     acmh.snapshot_date,
+	     acmh.country_id,
+	     review_count,
+	     rating,
+	     rating_count,
+	     one_star,
+	     two_star,
+	     three_star,
+	     four_star,
+	     five_star
+     FROM
+	     app_country_metrics_history acmh
+     LEFT JOIN store_apps sa ON
+	     acmh.store_app = sa.id
+     WHERE
+	     snapshot_date >= '{start_date}'
+	     AND snapshot_date <= '{end_date}'
+	     AND sa.store = 2
+     ORDER BY
+	     store_app,
+	     country_id,
+	     snapshot_date DESC
+        """
+    df = pd.read_sql(sel_query, con=database_connection.engine)
+    return df

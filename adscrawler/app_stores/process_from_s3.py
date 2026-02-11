@@ -17,6 +17,7 @@ from adscrawler.dbcon.connection import (
 from adscrawler.dbcon.queries import (
     clean_app_ranks_weekly_table,
     delete_and_insert,
+    get_ios_app_country_history,
     query_categories,
     query_collections,
     query_countries,
@@ -158,18 +159,6 @@ def get_s3_rank_parquet_paths(
     return all_parquet_paths
 
 
-def get_s3_app_details_parquet_paths(
-    snapshot_date: pd.DatetimeIndex,
-    store: int,
-) -> list[str]:
-    bucket = CONFIG["s3"]["bucket"]
-    all_parquet_paths = []
-    ddt_str = snapshot_date.strftime("%Y-%m-%d")
-    prefix = f"raw-data/app_details/store={store}/crawled_date={ddt_str}/country="
-    all_parquet_paths += get_parquet_paths_by_prefix(bucket, prefix)
-    return all_parquet_paths
-
-
 def get_s3_agg_app_snapshots_parquet_paths(
     bucket: str,
     start_date: pd.DatetimeIndex,
@@ -230,17 +219,18 @@ def check_for_duplicates(df: pd.DataFrame, key_columns: list[str]) -> None:
 def make_s3_app_country_metrics_history(
     store: int, snapshot_date: pd.DatetimeIndex
 ) -> None:
-    app_detail_parquets = get_s3_app_details_parquet_paths(
-        snapshot_date=snapshot_date,
-        store=store,
-    )
+    s3_config_key = "s3"
+    bucket = CONFIG[s3_config_key]["bucket"]
     snapshot_date_str = snapshot_date.strftime("%Y-%m-%d")
+    prefix = (
+        f"raw-data/app_details/store={store}/crawled_date={snapshot_date_str}/country="
+    )
+    app_detail_parquets = get_parquet_paths_by_prefix(bucket, prefix)
     if len(app_detail_parquets) == 0:
         logger.error(
             f"No app detail parquet files found for store={store} snapshot_date={snapshot_date_str}"
         )
         return
-    s3_config_key = "s3"
     query = app_details_country_history_query(
         store=store,
         app_detail_parquets=app_detail_parquets,
@@ -265,8 +255,13 @@ def prep_app_metrics_history(
             unit="s",
         )
     if store == 2:
-        ratings_str = df["user_ratings"].str.extractall(r"(\d+)").unstack()
-        ratings_str = ratings_str.reindex(df.index, fill_value=0)
+        ratings_str = (
+            df["user_ratings"]
+            .str.extractall(r"(\d+)")
+            .unstack()
+            .astype("Int64")
+            .reindex(df.index, fill_value=0)
+        )
         df[STAR_COLS] = ratings_str.iloc[:, 1::2].astype(int).to_numpy()
         df["store_last_updated"] = pd.to_datetime(
             df["store_last_updated"], format="ISO8601", utc=True
@@ -298,7 +293,8 @@ def manual_import_app_metrics_from_s3(
         use_ssh_tunnel=use_tunnel, config_key="madrone"
     )
 
-    start_date = datetime.datetime.fromisoformat("2025-10-01").date()
+    start_date = datetime.datetime.fromisoformat("2025-12-15").date()
+    end_date = datetime.datetime.today().date()
     for snapshot_date in pd.date_range(start_date, end_date, freq="D"):
         snapshot_date = snapshot_date.date()
         for store in [1, 2]:
@@ -339,7 +335,7 @@ def process_app_metrics_to_db(
         problem_rows = df["store_id"].str.contains(".0")
         if problem_rows.any():
             logger.warning(
-                f'Apple App IDs: Found {problem_rows.sum()} store_id with ".0" suffix, fixing'
+                f'Apple App IDs: Found {problem_rows.sum()}/{df.shape[0]} store_id with ".0" suffix, fixing'
             )
             df.loc[problem_rows, "store_id"] = (
                 df.loc[problem_rows, "store_id"].str.split(".").str[0]
@@ -378,6 +374,21 @@ def process_app_metrics_to_db(
         df = df[df["country"] == "US"]
         df[STAR_COLS] = df["histogram"].apply(pd.Series)
     if store == 2:
+        ios_app_country_history = get_ios_app_country_history(
+            database_connection, snapshot_date=snapshot_date, days_back=90
+        )
+        ios_app_country_history = ios_app_country_history[
+            ios_app_country_history["store_app"].isin(df["store_app"])
+        ]
+        ios_app_country_history["crawled_date"] = pd.to_datetime(
+            ios_app_country_history["snapshot_date"]
+        )
+        # For the group by this will need to be the snapshot_date from start
+        ios_app_country_history["snapshot_date"] = snapshot_date
+        df = pd.concat([ios_app_country_history, df], axis=0)
+        df = df.sort_values(by=["crawled_date"], ascending=True).drop_duplicates(
+            subset=["store_app", "country_id"], keep="last"
+        )
         weighted_sum = (
             (df["rating"] * df["rating_count"])
             .groupby([df[k] for k in GLOBAL_HISTORY_KEYS])
@@ -394,6 +405,7 @@ def process_app_metrics_to_db(
         df["rating"] = weighted_sum / weight_total
         df["rating"] = df["rating"].astype("float64")
         df = df.reset_index()
+
     check_for_duplicates(
         df=df,
         key_columns=GLOBAL_HISTORY_KEYS,
