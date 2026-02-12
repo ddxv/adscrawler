@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict tGYjYA1ZLarS740jjY8C3MHq9cOpWMEOWcTtpU3wriXUQRjoc4sZHQ477YGcSFc
+\restrict ezk0cgrbGp7teJKLhA5wQ8YXJ1m8O8ARP9rsrF9SOv0ae7fZ0DHEjyfNpaagKzh
 
 -- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 -- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
@@ -28,14 +28,7 @@ SET default_table_access_method = heap;
 --
 
 CREATE MATERIALIZED VIEW frontend.companies_category_tag_type_stats AS
- WITH d30_counts AS (
-         SELECT sahw.store_app,
-            sum(sahw.installs_diff) AS d30_installs,
-            sum(sahw.rating_count_diff) AS d30_rating_count
-           FROM public.app_global_metrics_weekly_diffs sahw
-          WHERE ((sahw.week_start > (CURRENT_DATE - '31 days'::interval)) AND ((sahw.installs_diff > (0)::numeric) OR (sahw.rating_count_diff > (0)::numeric)))
-          GROUP BY sahw.store_app
-        ), minimized_company_categories AS (
+ WITH minimized_company_categories AS (
          SELECT company_categories.company_id,
             min(company_categories.category_id) AS category_id
            FROM adtech.company_categories
@@ -51,14 +44,11 @@ CREATE MATERIALIZED VIEW frontend.companies_category_tag_type_stats AS
                     ELSE cats.url_slug
                 END AS type_url_slug,
             count(DISTINCT csac.store_app) AS app_count,
-            sum(dc.d30_installs) AS installs_d30,
-            sum(dc.d30_rating_count) AS rating_count_d30,
-            sum(sa.installs) AS installs_total,
-            sum(sa.rating_count) AS rating_count_total
-           FROM ((((((adtech.combined_store_apps_companies csac
+            sum(sa.installs_sum_4w_est) AS installs_d30,
+            sum(sa.installs_est) AS installs_total
+           FROM (((((adtech.combined_store_apps_companies csac
              LEFT JOIN adtech.companies c ON ((csac.company_id = c.id)))
              LEFT JOIN frontend.store_apps_overview sa ON ((csac.store_app = sa.id)))
-             LEFT JOIN d30_counts dc ON ((csac.store_app = dc.store_app)))
              LEFT JOIN minimized_company_categories mcc ON ((csac.company_id = mcc.company_id)))
              LEFT JOIN adtech.categories cats ON ((mcc.category_id = cats.id)))
              CROSS JOIN LATERAL ( VALUES ('api_call'::text,csac.api_call), ('app_ads_direct'::text,csac.app_ads_direct), ('app_ads_reseller'::text,csac.app_ads_reseller)) tag(tag_source, present))
@@ -81,16 +71,13 @@ CREATE MATERIALIZED VIEW frontend.companies_category_tag_type_stats AS
             c.name AS company_name,
             cats.url_slug AS type_url_slug,
             count(DISTINCT sas.store_app) AS app_count,
-            sum(dc.d30_installs) AS installs_d30,
-            sum(dc.d30_rating_count) AS rating_count_d30,
-            sum(sa.installs) AS installs_total,
-            sum(sa.rating_count) AS rating_count_total
-           FROM (((((((store_app_sdks sas
+            sum(sa.installs_sum_4w_est) AS installs_d30,
+            sum(sa.installs_est) AS installs_total
+           FROM ((((((store_app_sdks sas
              LEFT JOIN adtech.sdks s ON ((sas.sdk_id = s.id)))
              LEFT JOIN adtech.companies c ON ((s.company_id = c.id)))
              LEFT JOIN public.domains d ON ((c.domain_id = d.id)))
              LEFT JOIN frontend.store_apps_overview sa ON ((sas.store_app = sa.id)))
-             LEFT JOIN d30_counts dc ON ((sas.store_app = dc.store_app)))
              LEFT JOIN adtech.sdk_categories sc ON ((sas.sdk_id = sc.sdk_id)))
              LEFT JOIN adtech.categories cats ON ((sc.category_id = cats.id)))
           GROUP BY sa.store, sa.category, 'sdk'::text, d.domain_name, c.name, cats.url_slug
@@ -103,9 +90,7 @@ CREATE MATERIALIZED VIEW frontend.companies_category_tag_type_stats AS
     api_and_app_ads.type_url_slug,
     api_and_app_ads.app_count,
     api_and_app_ads.installs_d30,
-    api_and_app_ads.rating_count_d30,
-    api_and_app_ads.installs_total,
-    api_and_app_ads.rating_count_total
+    api_and_app_ads.installs_total
    FROM api_and_app_ads
 UNION ALL
  SELECT sdk_and_mediation.store,
@@ -116,9 +101,7 @@ UNION ALL
     sdk_and_mediation.type_url_slug,
     sdk_and_mediation.app_count,
     sdk_and_mediation.installs_d30,
-    sdk_and_mediation.rating_count_d30,
-    sdk_and_mediation.installs_total,
-    sdk_and_mediation.rating_count_total
+    sdk_and_mediation.installs_total
    FROM sdk_and_mediation
   WITH NO DATA;
 
@@ -126,8 +109,15 @@ UNION ALL
 ALTER MATERIALIZED VIEW frontend.companies_category_tag_type_stats OWNER TO postgres;
 
 --
+-- Name: frontend_companies_category_tag_type_stats_unique; Type: INDEX; Schema: frontend; Owner: postgres
+--
+
+CREATE UNIQUE INDEX frontend_companies_category_tag_type_stats_unique ON frontend.companies_category_tag_type_stats USING btree (store, app_category, tag_source, company_domain, type_url_slug);
+
+
+--
 -- PostgreSQL database dump complete
 --
 
-\unrestrict tGYjYA1ZLarS740jjY8C3MHq9cOpWMEOWcTtpU3wriXUQRjoc4sZHQ477YGcSFc
+\unrestrict ezk0cgrbGp7teJKLhA5wQ8YXJ1m8O8ARP9rsrF9SOv0ae7fZ0DHEjyfNpaagKzh
 

@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 2lswl9uWBr6tPsrv3n5EsY4EUSxp7mX1d3irQ5ezrmd2LIIAmoRlVttfghLpvyb
+\restrict iNCFqr2y3Zo7loWUkicSYhyMmcb1Z1ZnX4U8Bn3Te46K0rFibwtYsNIiW40hFsn
 
 -- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 -- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
@@ -108,6 +108,13 @@ CREATE INDEX store_apps_name_idx ON public.store_apps USING gin (to_tsvector('si
 
 
 --
+-- Name: store_apps_store_and_id_idx; Type: INDEX; Schema: public; Owner: james
+--
+
+CREATE INDEX store_apps_store_and_id_idx ON public.store_apps USING btree (store, id);
+
+
+--
 -- Name: store_apps_store_id_idx; Type: INDEX; Schema: public; Owner: james
 --
 
@@ -163,5 +170,5 @@ ALTER TABLE ONLY public.store_apps
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 2lswl9uWBr6tPsrv3n5EsY4EUSxp7mX1d3irQ5ezrmd2LIIAmoRlVttfghLpvyb
+\unrestrict iNCFqr2y3Zo7loWUkicSYhyMmcb1Z1ZnX4U8Bn3Te46K0rFibwtYsNIiW40hFsn
 

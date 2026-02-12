@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict H8HMtkDkYggiiYeKcTWAfeZZbH0PdPaq1xAHjMcJbSMkJcdpS7FTANjZwyfksa7
+\restrict 1jTBQd34td7kKcJ9DQSWz50m62FW5RaQzU3jrvdDu5Y76BGT9NVt5k9K9JObhCb
 
 -- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 -- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
@@ -1191,7 +1191,9 @@ CREATE MATERIALIZED VIEW frontend.store_apps_overview AS
     lac.run_result,
     lsac.run_at AS api_successful_last_crawled,
     acr.ad_creative_count,
-    amc.ad_mon_creatives
+    amc.ad_mon_creatives,
+    GREATEST(COALESCE(am.installs, (0)::bigint), (COALESCE(am.rating_count, (0)::bigint) * 50)) AS installs_est,
+    GREATEST(COALESCE(saz.installs_sum_4w, (0)::numeric), (COALESCE(saz.ratings_sum_4w, (0)::numeric) * (50)::numeric)) AS installs_sum_4w_est
    FROM ((((((((((((((((public.store_apps sa
      LEFT JOIN public.category_mapping cm ON (((sa.category)::text = (cm.original_category)::text)))
      LEFT JOIN public.developers d ON ((sa.developer = d.id)))
@@ -2687,40 +2689,109 @@ ALTER MATERIALIZED VIEW frontend.apps_new_yearly OWNER TO postgres;
 --
 
 CREATE MATERIALIZED VIEW frontend.category_tag_stats AS
- WITH d30_counts AS (
-         SELECT sahw.store_app,
-            sum(sahw.installs_diff) AS d30_installs,
-            sum(sahw.rating_count_diff) AS d30_rating_count
-           FROM public.app_global_metrics_weekly_diffs sahw
-          WHERE ((sahw.week_start > (CURRENT_DATE - '31 days'::interval)) AND ((sahw.installs_diff > (0)::numeric) OR (sahw.rating_count_diff > (0)::numeric)))
-          GROUP BY sahw.store_app
-        ), distinct_apps_group AS (
-         SELECT sa.store,
-            csac.store_app,
-            csac.app_category,
-            tag.tag_source,
-            sa.installs,
-            sa.rating_count
-           FROM ((adtech.combined_store_apps_companies csac
-             LEFT JOIN frontend.store_apps_overview sa ON ((csac.store_app = sa.id)))
+ WITH distinct_apps_group AS (
+         SELECT DISTINCT csac.store_app,
+            tag.tag_source
+           FROM (adtech.combined_store_apps_companies csac
              CROSS JOIN LATERAL ( VALUES ('sdk'::text,csac.sdk), ('api_call'::text,csac.api_call), ('app_ads_direct'::text,csac.app_ads_direct), ('app_ads_reseller'::text,csac.app_ads_reseller)) tag(tag_source, present))
           WHERE (tag.present IS TRUE)
         )
- SELECT dag.store,
-    dag.app_category,
+ SELECT sa.store,
+    sa.category AS app_category,
     dag.tag_source,
     count(DISTINCT dag.store_app) AS app_count,
-    sum(dc.d30_installs) AS installs_d30,
-    sum(dc.d30_rating_count) AS rating_count_d30,
-    sum(dag.installs) AS installs_total,
-    sum(dag.rating_count) AS rating_count_total
+    sum(sa.installs_sum_4w_est) AS installs_d30,
+    sum(sa.installs_est) AS installs_total
    FROM (distinct_apps_group dag
-     LEFT JOIN d30_counts dc ON ((dag.store_app = dc.store_app)))
-  GROUP BY dag.store, dag.app_category, dag.tag_source
+     LEFT JOIN frontend.store_apps_overview sa ON ((dag.store_app = sa.id)))
+  GROUP BY sa.store, sa.category, dag.tag_source
   WITH NO DATA;
 
 
 ALTER MATERIALIZED VIEW frontend.category_tag_stats OWNER TO postgres;
+
+--
+-- Name: category_tag_type_stats; Type: MATERIALIZED VIEW; Schema: frontend; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW frontend.category_tag_type_stats AS
+ WITH minimized_company_categories AS (
+         SELECT company_categories.company_id,
+            min(company_categories.category_id) AS category_id
+           FROM adtech.company_categories
+          GROUP BY company_categories.company_id
+        ), api_and_app_ads AS (
+         SELECT x.store,
+            x.app_category,
+            x.tag_source,
+            x.type_url_slug,
+            count(*) AS app_count,
+            sum(x.installs_sum_4w_est) AS installs_d30,
+            sum(x.installs_est) AS installs_total
+           FROM ( SELECT DISTINCT csac.store_app,
+                    sa.store,
+                    csac.app_category,
+                    tag.tag_source,
+                        CASE
+                            WHEN (tag.tag_source ~~ 'app_ads%'::text) THEN 'ad-networks'::character varying
+                            ELSE cats.url_slug
+                        END AS type_url_slug,
+                    sa.installs_sum_4w_est,
+                    sa.installs_est
+                   FROM ((((adtech.combined_store_apps_companies csac
+                     LEFT JOIN frontend.store_apps_overview sa ON ((csac.store_app = sa.id)))
+                     JOIN minimized_company_categories mcc ON ((csac.company_id = mcc.company_id)))
+                     LEFT JOIN adtech.categories cats ON ((mcc.category_id = cats.id)))
+                     CROSS JOIN LATERAL ( VALUES ('api_call'::text,csac.api_call), ('app_ads_direct'::text,csac.app_ads_direct), ('app_ads_reseller'::text,csac.app_ads_reseller)) tag(tag_source, present))
+                  WHERE ((tag.present IS TRUE) AND (sa.id IS NOT NULL))) x
+          GROUP BY x.store, x.app_category, x.tag_source, x.type_url_slug
+        ), store_app_sdks AS (
+         SELECT DISTINCT sass.store_app,
+            sass.sdk_id
+           FROM adtech.store_app_sdk_strings sass
+          WHERE (sass.sdk_id IS NOT NULL)
+        ), sdk_and_mediation AS (
+         SELECT x.store,
+            x.app_category,
+            'sdk'::text AS tag_source,
+            x.type_url_slug,
+            count(*) AS app_count,
+            sum(x.installs_sum_4w_est) AS installs_d30,
+            sum(x.installs_est) AS installs_total
+           FROM ( SELECT DISTINCT sas.store_app,
+                    sa.store,
+                    sa.category AS app_category,
+                    cats.url_slug AS type_url_slug,
+                    sa.installs_sum_4w_est,
+                    sa.installs_est
+                   FROM (((store_app_sdks sas
+                     LEFT JOIN frontend.store_apps_overview sa ON ((sas.store_app = sa.id)))
+                     LEFT JOIN adtech.sdk_categories sc ON ((sas.sdk_id = sc.sdk_id)))
+                     LEFT JOIN adtech.categories cats ON ((sc.category_id = cats.id)))
+                  WHERE (sa.id IS NOT NULL)) x
+          GROUP BY x.store, x.app_category, x.type_url_slug
+        )
+ SELECT api_and_app_ads.store,
+    api_and_app_ads.app_category,
+    api_and_app_ads.tag_source,
+    api_and_app_ads.type_url_slug,
+    api_and_app_ads.app_count,
+    api_and_app_ads.installs_d30,
+    api_and_app_ads.installs_total
+   FROM api_and_app_ads
+UNION ALL
+ SELECT sdk_and_mediation.store,
+    sdk_and_mediation.app_category,
+    sdk_and_mediation.tag_source,
+    sdk_and_mediation.type_url_slug,
+    sdk_and_mediation.app_count,
+    sdk_and_mediation.installs_d30,
+    sdk_and_mediation.installs_total
+   FROM sdk_and_mediation
+  WITH NO DATA;
+
+
+ALTER MATERIALIZED VIEW frontend.category_tag_type_stats OWNER TO postgres;
 
 --
 -- Name: companies_apps_overview; Type: MATERIALIZED VIEW; Schema: frontend; Owner: postgres
@@ -2755,37 +2826,17 @@ ALTER MATERIALIZED VIEW frontend.companies_apps_overview OWNER TO postgres;
 --
 
 CREATE MATERIALIZED VIEW frontend.companies_category_stats AS
- WITH d30_counts AS (
-         SELECT sahw.store_app,
-            sum(sahw.installs_diff) AS d30_installs,
-            sum(sahw.rating_count_diff) AS d30_rating_count
-           FROM public.app_global_metrics_weekly_diffs sahw
-          WHERE ((sahw.week_start > (CURRENT_DATE - '31 days'::interval)) AND ((sahw.installs_diff > (0)::numeric) OR (sahw.rating_count_diff > (0)::numeric)))
-          GROUP BY sahw.store_app
-        ), distinct_apps_group AS (
-         SELECT sa.store,
-            csac.store_app,
-            csac.app_category,
-            csac.ad_domain AS company_domain,
-            c.name AS company_name,
-            sa.installs,
-            sa.rating_count
-           FROM ((adtech.combined_store_apps_companies csac
-             LEFT JOIN adtech.companies c ON ((csac.company_id = c.id)))
-             LEFT JOIN frontend.store_apps_overview sa ON ((csac.store_app = sa.id)))
-        )
- SELECT dag.store,
-    dag.app_category,
-    dag.company_domain,
-    dag.company_name,
-    count(DISTINCT dag.store_app) AS app_count,
-    sum(dc.d30_installs) AS installs_d30,
-    sum(dc.d30_rating_count) AS rating_count_d30,
-    sum(dag.installs) AS installs_total,
-    sum(dag.rating_count) AS rating_count_total
-   FROM (distinct_apps_group dag
-     LEFT JOIN d30_counts dc ON ((dag.store_app = dc.store_app)))
-  GROUP BY dag.store, dag.app_category, dag.company_domain, dag.company_name
+ SELECT sa.store,
+    sa.category AS app_category,
+    csac.ad_domain AS company_domain,
+    c.name AS company_name,
+    count(DISTINCT csac.store_app) AS app_count,
+    sum(sa.installs_est) AS installs_total,
+    sum(sa.installs_sum_4w_est) AS installs_d30
+   FROM ((adtech.combined_store_apps_companies csac
+     LEFT JOIN adtech.companies c ON ((csac.company_id = c.id)))
+     LEFT JOIN frontend.store_apps_overview sa ON ((csac.store_app = sa.id)))
+  GROUP BY sa.store, sa.category, csac.ad_domain, c.name
   WITH NO DATA;
 
 
@@ -2796,41 +2847,28 @@ ALTER MATERIALIZED VIEW frontend.companies_category_stats OWNER TO postgres;
 --
 
 CREATE MATERIALIZED VIEW frontend.companies_category_tag_stats AS
- WITH d30_counts AS (
-         SELECT sahw.store_app,
-            sum(sahw.installs_diff) AS d30_installs,
-            sum(sahw.rating_count_diff) AS d30_rating_count
-           FROM public.app_global_metrics_weekly_diffs sahw
-          WHERE ((sahw.week_start > (CURRENT_DATE - '31 days'::interval)) AND ((sahw.installs_diff > (0)::numeric) OR (sahw.rating_count_diff > (0)::numeric)))
-          GROUP BY sahw.store_app
-        ), distinct_apps_group AS (
-         SELECT sa.store,
-            csac.store_app,
+ WITH distinct_apps_group AS (
+         SELECT csac.store_app,
             csac.app_category,
             tag.tag_source,
             csac.ad_domain AS company_domain,
-            c.name AS company_name,
-            sa.installs,
-            sa.rating_count
-           FROM (((adtech.combined_store_apps_companies csac
+            c.name AS company_name
+           FROM ((adtech.combined_store_apps_companies csac
              LEFT JOIN adtech.companies c ON ((csac.company_id = c.id)))
-             LEFT JOIN frontend.store_apps_overview sa ON ((csac.store_app = sa.id)))
              CROSS JOIN LATERAL ( VALUES ('sdk'::text,csac.sdk), ('api_call'::text,csac.api_call), ('app_ads_direct'::text,csac.app_ads_direct), ('app_ads_reseller'::text,csac.app_ads_reseller)) tag(tag_source, present))
           WHERE (tag.present IS TRUE)
         )
- SELECT dag.store,
-    dag.app_category,
+ SELECT sa.store,
+    sa.category AS app_category,
     dag.tag_source,
     dag.company_domain,
     dag.company_name,
     count(DISTINCT dag.store_app) AS app_count,
-    sum(dc.d30_installs) AS installs_d30,
-    sum(dc.d30_rating_count) AS rating_count_d30,
-    sum(dag.installs) AS installs_total,
-    sum(dag.rating_count) AS rating_count_total
+    sum(sa.installs_sum_4w_est) AS installs_d30,
+    sum(sa.installs_est) AS installs_total
    FROM (distinct_apps_group dag
-     LEFT JOIN d30_counts dc ON ((dag.store_app = dc.store_app)))
-  GROUP BY dag.store, dag.app_category, dag.tag_source, dag.company_domain, dag.company_name
+     LEFT JOIN frontend.store_apps_overview sa ON ((dag.store_app = sa.id)))
+  GROUP BY sa.store, sa.category, dag.tag_source, dag.company_domain, dag.company_name
   WITH NO DATA;
 
 
@@ -2841,14 +2879,7 @@ ALTER MATERIALIZED VIEW frontend.companies_category_tag_stats OWNER TO postgres;
 --
 
 CREATE MATERIALIZED VIEW frontend.companies_category_tag_type_stats AS
- WITH d30_counts AS (
-         SELECT sahw.store_app,
-            sum(sahw.installs_diff) AS d30_installs,
-            sum(sahw.rating_count_diff) AS d30_rating_count
-           FROM public.app_global_metrics_weekly_diffs sahw
-          WHERE ((sahw.week_start > (CURRENT_DATE - '31 days'::interval)) AND ((sahw.installs_diff > (0)::numeric) OR (sahw.rating_count_diff > (0)::numeric)))
-          GROUP BY sahw.store_app
-        ), minimized_company_categories AS (
+ WITH minimized_company_categories AS (
          SELECT company_categories.company_id,
             min(company_categories.category_id) AS category_id
            FROM adtech.company_categories
@@ -2864,14 +2895,11 @@ CREATE MATERIALIZED VIEW frontend.companies_category_tag_type_stats AS
                     ELSE cats.url_slug
                 END AS type_url_slug,
             count(DISTINCT csac.store_app) AS app_count,
-            sum(dc.d30_installs) AS installs_d30,
-            sum(dc.d30_rating_count) AS rating_count_d30,
-            sum(sa.installs) AS installs_total,
-            sum(sa.rating_count) AS rating_count_total
-           FROM ((((((adtech.combined_store_apps_companies csac
+            sum(sa.installs_sum_4w_est) AS installs_d30,
+            sum(sa.installs_est) AS installs_total
+           FROM (((((adtech.combined_store_apps_companies csac
              LEFT JOIN adtech.companies c ON ((csac.company_id = c.id)))
              LEFT JOIN frontend.store_apps_overview sa ON ((csac.store_app = sa.id)))
-             LEFT JOIN d30_counts dc ON ((csac.store_app = dc.store_app)))
              LEFT JOIN minimized_company_categories mcc ON ((csac.company_id = mcc.company_id)))
              LEFT JOIN adtech.categories cats ON ((mcc.category_id = cats.id)))
              CROSS JOIN LATERAL ( VALUES ('api_call'::text,csac.api_call), ('app_ads_direct'::text,csac.app_ads_direct), ('app_ads_reseller'::text,csac.app_ads_reseller)) tag(tag_source, present))
@@ -2894,16 +2922,13 @@ CREATE MATERIALIZED VIEW frontend.companies_category_tag_type_stats AS
             c.name AS company_name,
             cats.url_slug AS type_url_slug,
             count(DISTINCT sas.store_app) AS app_count,
-            sum(dc.d30_installs) AS installs_d30,
-            sum(dc.d30_rating_count) AS rating_count_d30,
-            sum(sa.installs) AS installs_total,
-            sum(sa.rating_count) AS rating_count_total
-           FROM (((((((store_app_sdks sas
+            sum(sa.installs_sum_4w_est) AS installs_d30,
+            sum(sa.installs_est) AS installs_total
+           FROM ((((((store_app_sdks sas
              LEFT JOIN adtech.sdks s ON ((sas.sdk_id = s.id)))
              LEFT JOIN adtech.companies c ON ((s.company_id = c.id)))
              LEFT JOIN public.domains d ON ((c.domain_id = d.id)))
              LEFT JOIN frontend.store_apps_overview sa ON ((sas.store_app = sa.id)))
-             LEFT JOIN d30_counts dc ON ((sas.store_app = dc.store_app)))
              LEFT JOIN adtech.sdk_categories sc ON ((sas.sdk_id = sc.sdk_id)))
              LEFT JOIN adtech.categories cats ON ((sc.category_id = cats.id)))
           GROUP BY sa.store, sa.category, 'sdk'::text, d.domain_name, c.name, cats.url_slug
@@ -2916,9 +2941,7 @@ CREATE MATERIALIZED VIEW frontend.companies_category_tag_type_stats AS
     api_and_app_ads.type_url_slug,
     api_and_app_ads.app_count,
     api_and_app_ads.installs_d30,
-    api_and_app_ads.rating_count_d30,
-    api_and_app_ads.installs_total,
-    api_and_app_ads.rating_count_total
+    api_and_app_ads.installs_total
    FROM api_and_app_ads
 UNION ALL
  SELECT sdk_and_mediation.store,
@@ -2929,9 +2952,7 @@ UNION ALL
     sdk_and_mediation.type_url_slug,
     sdk_and_mediation.app_count,
     sdk_and_mediation.installs_d30,
-    sdk_and_mediation.rating_count_d30,
-    sdk_and_mediation.installs_total,
-    sdk_and_mediation.rating_count_total
+    sdk_and_mediation.installs_total
    FROM sdk_and_mediation
   WITH NO DATA;
 
@@ -3066,42 +3087,28 @@ ALTER MATERIALIZED VIEW frontend.companies_open_source_percent OWNER TO postgres
 --
 
 CREATE MATERIALIZED VIEW frontend.companies_parent_category_stats AS
- WITH d30_counts AS (
-         SELECT sahw.store_app,
-            sum(sahw.installs_diff) AS d30_installs,
-            sum(sahw.rating_count_diff) AS d30_rating_count
-           FROM public.app_global_metrics_weekly_diffs sahw
-          WHERE ((sahw.week_start > (CURRENT_DATE - '31 days'::interval)) AND ((sahw.installs_diff > (0)::numeric) OR (sahw.rating_count_diff > (0)::numeric)))
-          GROUP BY sahw.store_app
-        ), distinct_apps_group AS (
-         SELECT sa.store,
-            csac.store_app,
-            csac.app_category,
-            c.name AS company_name,
-            sa.installs,
-            sa.rating_count,
-            COALESCE(ad.domain_name, csac.ad_domain) AS company_domain
-           FROM (((adtech.combined_store_apps_companies csac
+ WITH distinct_apps_group AS (
+         SELECT DISTINCT csac.store_app,
+            COALESCE(ad.domain_name, csac.ad_domain) AS company_domain,
+            c.name AS company_name
+           FROM ((adtech.combined_store_apps_companies csac
              LEFT JOIN adtech.companies c ON ((csac.parent_id = c.id)))
              LEFT JOIN public.domains ad ON ((c.domain_id = ad.id)))
-             LEFT JOIN frontend.store_apps_overview sa ON ((csac.store_app = sa.id)))
           WHERE (csac.parent_id IN ( SELECT DISTINCT pc.id
                    FROM (adtech.companies pc
                      LEFT JOIN adtech.companies c_1 ON ((pc.id = c_1.parent_company_id)))
                   WHERE (c_1.id IS NOT NULL)))
         )
- SELECT dag.store,
-    dag.app_category,
+ SELECT sa.store,
+    sa.category AS app_category,
     dag.company_domain,
     dag.company_name,
     count(DISTINCT dag.store_app) AS app_count,
-    sum(dc.d30_installs) AS installs_d30,
-    sum(dc.d30_rating_count) AS rating_count_d30,
-    sum(dag.installs) AS installs_total,
-    sum(dag.rating_count) AS rating_count_total
+    sum(sa.installs_sum_4w_est) AS installs_d30,
+    sum(sa.installs_est) AS installs_total
    FROM (distinct_apps_group dag
-     LEFT JOIN d30_counts dc ON ((dag.store_app = dc.store_app)))
-  GROUP BY dag.store, dag.app_category, dag.company_domain, dag.company_name
+     LEFT JOIN frontend.store_apps_overview sa ON ((dag.store_app = sa.id)))
+  GROUP BY sa.store, sa.category, dag.company_domain, dag.company_name
   WITH NO DATA;
 
 
@@ -3112,45 +3119,31 @@ ALTER MATERIALIZED VIEW frontend.companies_parent_category_stats OWNER TO postgr
 --
 
 CREATE MATERIALIZED VIEW frontend.companies_parent_category_tag_stats AS
- WITH d30_counts AS (
-         SELECT sahw.store_app,
-            sum(sahw.installs_diff) AS d30_installs,
-            sum(sahw.rating_count_diff) AS d30_rating_count
-           FROM public.app_global_metrics_weekly_diffs sahw
-          WHERE ((sahw.week_start > (CURRENT_DATE - '31 days'::interval)) AND ((sahw.installs_diff > (0)::numeric) OR (sahw.rating_count_diff > (0)::numeric)))
-          GROUP BY sahw.store_app
-        ), distinct_apps_group AS (
-         SELECT sa.store,
-            csac.store_app,
-            csac.app_category,
+ WITH distinct_apps_group AS (
+         SELECT DISTINCT csac.store_app,
             tag.tag_source,
             c.name AS company_name,
-            sa.installs,
-            sa.rating_count,
             COALESCE(ad.domain_name, csac.ad_domain) AS company_domain
-           FROM ((((adtech.combined_store_apps_companies csac
+           FROM (((adtech.combined_store_apps_companies csac
              LEFT JOIN adtech.companies c ON ((csac.parent_id = c.id)))
              LEFT JOIN public.domains ad ON ((c.domain_id = ad.id)))
-             LEFT JOIN frontend.store_apps_overview sa ON ((csac.store_app = sa.id)))
              CROSS JOIN LATERAL ( VALUES ('sdk'::text,csac.sdk), ('api_call'::text,csac.api_call), ('app_ads_direct'::text,csac.app_ads_direct), ('app_ads_reseller'::text,csac.app_ads_reseller)) tag(tag_source, present))
           WHERE ((tag.present IS TRUE) AND (csac.parent_id IN ( SELECT DISTINCT pc.id
                    FROM (adtech.companies pc
                      LEFT JOIN adtech.companies c_1 ON ((pc.id = c_1.parent_company_id)))
                   WHERE (c_1.id IS NOT NULL))))
         )
- SELECT dag.store,
-    dag.app_category,
+ SELECT sa.store,
+    sa.category AS app_category,
     dag.tag_source,
     dag.company_domain,
     dag.company_name,
     count(DISTINCT dag.store_app) AS app_count,
-    sum(dc.d30_installs) AS installs_d30,
-    sum(dc.d30_rating_count) AS rating_count_d30,
-    sum(dag.installs) AS installs_total,
-    sum(dag.rating_count) AS rating_count_total
+    sum(sa.installs_sum_4w_est) AS installs_d30,
+    sum(sa.installs_est) AS installs_total
    FROM (distinct_apps_group dag
-     LEFT JOIN d30_counts dc ON ((dag.store_app = dc.store_app)))
-  GROUP BY dag.store, dag.app_category, dag.tag_source, dag.company_domain, dag.company_name
+     LEFT JOIN frontend.store_apps_overview sa ON ((dag.store_app = sa.id)))
+  GROUP BY sa.store, sa.category, dag.tag_source, dag.company_domain, dag.company_name
   WITH NO DATA;
 
 
@@ -3879,25 +3872,6 @@ CREATE MATERIALIZED VIEW frontend.store_apps_z_scores AS
 
 
 ALTER MATERIALIZED VIEW frontend.store_apps_z_scores OWNER TO postgres;
-
---
--- Name: total_categories_app_counts; Type: MATERIALIZED VIEW; Schema: frontend; Owner: postgres
---
-
-CREATE MATERIALIZED VIEW frontend.total_categories_app_counts AS
- SELECT sa.store,
-    tag.tag_source,
-    csac.app_category,
-    count(DISTINCT csac.store_app) AS app_count
-   FROM ((adtech.combined_store_apps_companies csac
-     LEFT JOIN public.store_apps sa ON ((csac.store_app = sa.id)))
-     CROSS JOIN LATERAL ( VALUES ('sdk'::text,csac.sdk), ('api_call'::text,csac.api_call), ('app_ads_direct'::text,csac.app_ads_direct), ('app_ads_reseller'::text,csac.app_ads_reseller)) tag(tag_source, present))
-  WHERE (tag.present IS TRUE)
-  GROUP BY sa.store, tag.tag_source, csac.app_category
-  WITH NO DATA;
-
-
-ALTER MATERIALIZED VIEW frontend.total_categories_app_counts OWNER TO postgres;
 
 --
 -- Name: app_country_crawls; Type: TABLE; Schema: logging; Owner: postgres
@@ -6059,6 +6033,13 @@ CREATE UNIQUE INDEX companies_sdks_overview_unique_idx ON frontend.companies_sdk
 
 
 --
+-- Name: frontend_companies_category_tag_type_stats_unique; Type: INDEX; Schema: frontend; Owner: postgres
+--
+
+CREATE UNIQUE INDEX frontend_companies_category_tag_type_stats_unique ON frontend.companies_category_tag_type_stats USING btree (store, app_category, tag_source, company_domain, type_url_slug);
+
+
+--
 -- Name: frontend_store_apps_z_scores_unique; Type: INDEX; Schema: frontend; Owner: postgres
 --
 
@@ -6213,13 +6194,6 @@ CREATE UNIQUE INDEX idx_store_app_ranks_latest_filter_sort ON frontend.store_app
 
 
 --
--- Name: idx_total_categories_app_counts; Type: INDEX; Schema: frontend; Owner: postgres
---
-
-CREATE UNIQUE INDEX idx_total_categories_app_counts ON frontend.total_categories_app_counts USING btree (store, tag_source, app_category);
-
-
---
 -- Name: idx_unique_company_domains_top_apps; Type: INDEX; Schema: frontend; Owner: postgres
 --
 
@@ -6259,6 +6233,27 @@ CREATE INDEX sarw_crawled_store_collection_category_country_idx ON frontend.stor
 --
 
 CREATE UNIQUE INDEX store_app_ranks_best_monthly_uidx ON frontend.store_app_ranks_best_monthly USING btree (store_id, country, collection, category);
+
+
+--
+-- Name: store_apps_overview_installs_est_idx; Type: INDEX; Schema: frontend; Owner: postgres
+--
+
+CREATE INDEX store_apps_overview_installs_est_idx ON frontend.store_apps_overview USING btree (installs_est DESC);
+
+
+--
+-- Name: store_apps_overview_installs_sum_4w_est_idx; Type: INDEX; Schema: frontend; Owner: postgres
+--
+
+CREATE INDEX store_apps_overview_installs_sum_4w_est_idx ON frontend.store_apps_overview USING btree (installs_sum_4w_est DESC);
+
+
+--
+-- Name: store_apps_overview_store_last_updated_idx; Type: INDEX; Schema: frontend; Owner: postgres
+--
+
+CREATE INDEX store_apps_overview_store_last_updated_idx ON frontend.store_apps_overview USING btree (store_last_updated);
 
 
 --
@@ -6504,6 +6499,13 @@ CREATE INDEX store_apps_developer_idx ON public.store_apps USING btree (develope
 --
 
 CREATE INDEX store_apps_name_idx ON public.store_apps USING gin (to_tsvector('simple'::regconfig, (name)::text));
+
+
+--
+-- Name: store_apps_store_and_id_idx; Type: INDEX; Schema: public; Owner: james
+--
+
+CREATE INDEX store_apps_store_and_id_idx ON public.store_apps USING btree (store, id);
 
 
 --
@@ -7248,5 +7250,5 @@ GRANT ALL ON SCHEMA public TO PUBLIC;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict H8HMtkDkYggiiYeKcTWAfeZZbH0PdPaq1xAHjMcJbSMkJcdpS7FTANjZwyfksa7
+\unrestrict 1jTBQd34td7kKcJ9DQSWz50m62FW5RaQzU3jrvdDu5Y76BGT9NVt5k9K9JObhCb
 

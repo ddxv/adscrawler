@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict NgGEiixDj3zCahyhffvDTaFOP43LFEol8Dm6IzQZDznsabfIK3prgk8U3m04xCs
+\restrict GXRckyjgVGQ6bYbcBEMMJ5rGnBg3fsZgsgXJblNH8cAOs2Zggguhrm8JZQdeM4f
 
 -- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 -- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
@@ -150,7 +150,9 @@ CREATE MATERIALIZED VIEW frontend.store_apps_overview AS
     lac.run_result,
     lsac.run_at AS api_successful_last_crawled,
     acr.ad_creative_count,
-    amc.ad_mon_creatives
+    amc.ad_mon_creatives,
+    GREATEST(COALESCE(am.installs, (0)::bigint), (COALESCE(am.rating_count, (0)::bigint) * 50)) AS installs_est,
+    GREATEST(COALESCE(saz.installs_sum_4w, (0)::numeric), (COALESCE(saz.ratings_sum_4w, (0)::numeric) * (50)::numeric)) AS installs_sum_4w_est
    FROM ((((((((((((((((public.store_apps sa
      LEFT JOIN public.category_mapping cm ON (((sa.category)::text = (cm.original_category)::text)))
      LEFT JOIN public.developers d ON ((sa.developer = d.id)))
@@ -172,6 +174,27 @@ CREATE MATERIALIZED VIEW frontend.store_apps_overview AS
 
 
 ALTER MATERIALIZED VIEW frontend.store_apps_overview OWNER TO postgres;
+
+--
+-- Name: store_apps_overview_installs_est_idx; Type: INDEX; Schema: frontend; Owner: postgres
+--
+
+CREATE INDEX store_apps_overview_installs_est_idx ON frontend.store_apps_overview USING btree (installs_est DESC);
+
+
+--
+-- Name: store_apps_overview_installs_sum_4w_est_idx; Type: INDEX; Schema: frontend; Owner: postgres
+--
+
+CREATE INDEX store_apps_overview_installs_sum_4w_est_idx ON frontend.store_apps_overview USING btree (installs_sum_4w_est DESC);
+
+
+--
+-- Name: store_apps_overview_store_last_updated_idx; Type: INDEX; Schema: frontend; Owner: postgres
+--
+
+CREATE INDEX store_apps_overview_store_last_updated_idx ON frontend.store_apps_overview USING btree (store_last_updated);
+
 
 --
 -- Name: store_apps_overview_textsearch_idx; Type: INDEX; Schema: frontend; Owner: postgres
@@ -205,5 +228,5 @@ CREATE UNIQUE INDEX store_apps_overview_unique_store_id_idx ON frontend.store_ap
 -- PostgreSQL database dump complete
 --
 
-\unrestrict NgGEiixDj3zCahyhffvDTaFOP43LFEol8Dm6IzQZDznsabfIK3prgk8U3m04xCs
+\unrestrict GXRckyjgVGQ6bYbcBEMMJ5rGnBg3fsZgsgXJblNH8cAOs2Zggguhrm8JZQdeM4f
 
