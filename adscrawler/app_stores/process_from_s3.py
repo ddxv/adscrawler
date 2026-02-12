@@ -293,11 +293,12 @@ def manual_import_app_metrics_from_s3(
         use_ssh_tunnel=use_tunnel, config_key="madrone"
     )
 
-    start_date = datetime.datetime.fromisoformat("2025-12-15").date()
+    start_date = datetime.datetime.fromisoformat("2026-01-21").date()
     end_date = datetime.datetime.today().date()
     for snapshot_date in pd.date_range(start_date, end_date, freq="D"):
         snapshot_date = snapshot_date.date()
-        for store in [1, 2]:
+        # for store in [1, 2]:
+        for store in [2]:
             try:
                 process_app_metrics_to_db(database_connection, store, snapshot_date)
             except:
@@ -383,8 +384,8 @@ def process_app_metrics_to_db(
         ios_app_country_history["crawled_date"] = pd.to_datetime(
             ios_app_country_history["snapshot_date"]
         )
-        # For the group by this will need to be the snapshot_date from start
-        ios_app_country_history["snapshot_date"] = snapshot_date
+        # For the group by this will need to be the snapshot_date being calculated for
+        ios_app_country_history["snapshot_date"] = pd.to_datetime(snapshot_date)
         df = pd.concat([ios_app_country_history, df], axis=0)
         df = df.sort_values(by=["crawled_date"], ascending=True).drop_duplicates(
             subset=["store_app", "country_id"], keep="last"
