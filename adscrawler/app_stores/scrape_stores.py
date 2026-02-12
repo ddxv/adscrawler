@@ -286,12 +286,12 @@ def update_app_details(
         for idx, df_chunk in enumerate(chunks):
             future = executor.submit(
                 process_scrape_apps_and_save,
-                df_chunk,
-                store,
-                use_ssh_tunnel,
-                process_icon,
-                total_rows,
-                thread_workers,
+                df_chunk=df_chunk,
+                store=store,
+                use_ssh_tunnel=use_ssh_tunnel,
+                process_icon=process_icon,
+                total_rows=total_rows,
+                thread_workers=thread_workers,
             )
             future_to_idx[future] = idx
             # Only stagger the initial batch to avoid simultaneous API burst

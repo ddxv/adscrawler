@@ -127,6 +127,7 @@ def prepare_for_psycopg(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
     for col in df.select_dtypes(include=["datetimetz", "datetime64[ns]"]):
         # Convert to object dtype first so it can hold None
+        # Note: This may be breaking in pandas3.0
         df[col] = (
             df[col]
             .apply(lambda x: x.to_pydatetime() if pd.notna(x) else None)
