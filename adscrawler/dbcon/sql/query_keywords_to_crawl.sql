@@ -14,25 +14,29 @@ log_crawled_keywords AS (
 ),
 scheduled_keywords AS (
     SELECT
-        keyword_id,
-        keyword_text,
-        app_count,
-        total_apps
+        ks.keyword_id,
+        ks.keyword_text,
+        ks.app_count,
+        ks.total_apps
     FROM
-        frontend.keyword_scores
+        frontend.keyword_scores AS ks
     WHERE
-        keyword_id NOT IN (
-            SELECT rck.keyword_id
-            FROM
-                rank_crawled_keywords AS rck
-        )
-        OR keyword_id NOT IN (
-            SELECT lck.keyword
-            FROM
-                log_crawled_keywords AS lck
+        ks.keyword_id IN (SELECT kb.keyword_id FROM keywords_base AS kb)
+        AND
+        (
+            ks.keyword_id NOT IN (
+                SELECT rck.keyword_id
+                FROM
+                    rank_crawled_keywords AS rck
+            )
+            OR ks.keyword_id NOT IN (
+                SELECT lck.keyword
+                FROM
+                    log_crawled_keywords AS lck
+            )
         )
     ORDER BY
-        competitiveness_score
+        ks.competitiveness_score
         DESC
 ),
 distinct_sq AS (
@@ -59,11 +63,11 @@ WHERE
     )
 UNION ALL
 SELECT
-    keyword_id,
-    keyword_text,
+    sk.keyword_id,
+    sk.keyword_text,
     'scheduled' AS priority,
-    app_count,
-    total_apps
+    sk.app_count,
+    sk.total_apps
 FROM
-    scheduled_keywords
+    scheduled_keywords AS sk
 LIMIT :mylimit;
