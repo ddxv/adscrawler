@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 8MJubzaSn3MyQiDnT2rVXeDoVQX5hdWxogr50FgYfv2XwrUKi2aFPJ3aKRT6iBC
+\restrict BDYVeqQAbV5Wag6iNnxaOseoJR6TxFmv1rzFBaCwfAfbYR8FWu5AdhA2cBQb4yY
 
 -- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 -- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
@@ -110,5 +110,5 @@ ALTER MATERIALIZED VIEW frontend.category_tag_type_stats OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 8MJubzaSn3MyQiDnT2rVXeDoVQX5hdWxogr50FgYfv2XwrUKi2aFPJ3aKRT6iBC
+\unrestrict BDYVeqQAbV5Wag6iNnxaOseoJR6TxFmv1rzFBaCwfAfbYR8FWu5AdhA2cBQb4yY
 

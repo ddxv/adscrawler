@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 5u4fVDlAwn2Ca7CozjgElNFMqdFmhA8DyOXk2ndVEdedkCQbWAa4FfBuYsZfOW8
+\restrict ddWtpSJfdNPgxYmck8goqKbZspctMZuKfoBHOr0bvgdjyAMeRYXcWaY97MjUdFI
 
 -- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 -- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
@@ -78,5 +78,5 @@ ALTER TABLE ONLY public.version_manifests
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 5u4fVDlAwn2Ca7CozjgElNFMqdFmhA8DyOXk2ndVEdedkCQbWAa4FfBuYsZfOW8
+\unrestrict ddWtpSJfdNPgxYmck8goqKbZspctMZuKfoBHOr0bvgdjyAMeRYXcWaY97MjUdFI
 

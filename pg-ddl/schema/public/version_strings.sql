@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 3MnskNDVyds1WZoBJvrC54fTDM0gH5uoWFpeJ01AbUg05iCsGPuda12bthw2HaW
+\restrict YhYbKnM9DyZln11Uf9fUHn0SilKvrXtQIzSOtygIt1GRAcXswOuKL8jA8wXG4O5
 
 -- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 -- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
@@ -106,5 +106,5 @@ CREATE INDEX version_strings_xml_path_trgm_idx ON public.version_strings USING g
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 3MnskNDVyds1WZoBJvrC54fTDM0gH5uoWFpeJ01AbUg05iCsGPuda12bthw2HaW
+\unrestrict YhYbKnM9DyZln11Uf9fUHn0SilKvrXtQIzSOtygIt1GRAcXswOuKL8jA8wXG4O5
 

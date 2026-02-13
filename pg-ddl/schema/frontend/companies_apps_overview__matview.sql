@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict BBYbqAp5shdaO9Zjh5R1HNm7UaHGrwwNh9YFfeXTaTa9Whk1xS5Is1ht8eAlRJt
+\restrict CZKm0CGXlpImPPmMWoTyHc9mb5gNChQQDDKzTozgfJ4SxmyfD9eYfc0WKnicGE9
 
 -- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 -- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
@@ -28,23 +28,24 @@ SET default_table_access_method = heap;
 --
 
 CREATE MATERIALIZED VIEW frontend.companies_apps_overview AS
- WITH store_app_sdk_companies AS (
+ WITH store_app_sdk_company_category AS (
          SELECT DISTINCT savs.store_app,
-            sd.company_id
-           FROM (adtech.store_app_sdk_strings savs
+            sd.company_id,
+            sc.category_id
+           FROM ((adtech.store_app_sdk_strings savs
              LEFT JOIN adtech.sdks sd ON ((savs.sdk_id = sd.id)))
+             JOIN adtech.sdk_categories sc ON ((savs.sdk_id = sc.sdk_id)))
         )
  SELECT sa.store_id,
     sacs.company_id,
     c.name AS company_name,
     d.domain_name AS company_domain,
     cc2.url_slug AS category_slug
-   FROM (((((store_app_sdk_companies sacs
+   FROM ((((store_app_sdk_company_category sacs
      LEFT JOIN public.store_apps sa ON ((sacs.store_app = sa.id)))
      LEFT JOIN adtech.companies c ON ((sacs.company_id = c.id)))
      LEFT JOIN public.domains d ON ((c.domain_id = d.id)))
-     LEFT JOIN adtech.company_categories cc ON ((c.id = cc.company_id)))
-     LEFT JOIN adtech.categories cc2 ON ((cc.category_id = cc2.id)))
+     LEFT JOIN adtech.categories cc2 ON ((sacs.category_id = cc2.id)))
   WHERE (sacs.company_id IS NOT NULL)
   WITH NO DATA;
 
@@ -69,5 +70,5 @@ CREATE UNIQUE INDEX companies_apps_overview_unique_idx ON frontend.companies_app
 -- PostgreSQL database dump complete
 --
 
-\unrestrict BBYbqAp5shdaO9Zjh5R1HNm7UaHGrwwNh9YFfeXTaTa9Whk1xS5Is1ht8eAlRJt
+\unrestrict CZKm0CGXlpImPPmMWoTyHc9mb5gNChQQDDKzTozgfJ4SxmyfD9eYfc0WKnicGE9
 

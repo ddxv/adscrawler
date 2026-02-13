@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict KbUCc6TT3GXdAGUXfFIbRTtkPCQhQcfa6qUjZaybTbyX5kV44dc58pqztKpNedg
+\restrict nRYdlW2ZMyUcLNGWcIpRRhV1yvCheRZv1SHd4bUpHmHqd1akGAEU3PU9dQG3VyS
 
 -- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 -- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
@@ -78,5 +78,5 @@ ALTER TABLE ONLY public.store_collections
 -- PostgreSQL database dump complete
 --
 
-\unrestrict KbUCc6TT3GXdAGUXfFIbRTtkPCQhQcfa6qUjZaybTbyX5kV44dc58pqztKpNedg
+\unrestrict nRYdlW2ZMyUcLNGWcIpRRhV1yvCheRZv1SHd4bUpHmHqd1akGAEU3PU9dQG3VyS
 

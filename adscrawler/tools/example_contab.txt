@@ -45,7 +45,6 @@
 
 # Zscores
 16 2 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW store_app_z_scores" >> /var/log/postgresql/refresh_mv.log 2>&1 
-24 2 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW CONCURRENTLY frontend.store_apps_z_scores" >> /var/log/postgresql/refresh_mv.log 2>&1 
 
 01 5 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW CONCURRENTLY frontend.adstxt_ad_domain_overview" >> /var/log/postgresql/refresh_mv.log 2>&1 
 31 5 * * * psql -d madrone -c "REFRESH MATERIALIZED VIEW CONCURRENTLY frontend.adstxt_publishers_overview" >> /var/log/postgresql/refresh_mv.log 2>&1 

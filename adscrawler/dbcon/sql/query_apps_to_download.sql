@@ -60,7 +60,7 @@ growth_apps AS (
         sa.id AS store_app,
         saz.store_id
     FROM
-        frontend.store_apps_z_scores AS saz
+        frontend.z_scores_top_apps AS saz
     LEFT JOIN store_apps AS sa ON
         saz.store_id = sa.store_id
 ),

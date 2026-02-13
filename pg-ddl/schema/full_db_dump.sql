@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 1jTBQd34td7kKcJ9DQSWz50m62FW5RaQzU3jrvdDu5Y76BGT9NVt5k9K9JObhCb
+\restrict aqSyUPuJghUSivRpPmJ0wjpiuNqZ0Xb7iDHpQcCoga4fxvxnfEJs5GfAimQHJSS
 
 -- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 -- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
@@ -2798,23 +2798,24 @@ ALTER MATERIALIZED VIEW frontend.category_tag_type_stats OWNER TO postgres;
 --
 
 CREATE MATERIALIZED VIEW frontend.companies_apps_overview AS
- WITH store_app_sdk_companies AS (
+ WITH store_app_sdk_company_category AS (
          SELECT DISTINCT savs.store_app,
-            sd.company_id
-           FROM (adtech.store_app_sdk_strings savs
+            sd.company_id,
+            sc.category_id
+           FROM ((adtech.store_app_sdk_strings savs
              LEFT JOIN adtech.sdks sd ON ((savs.sdk_id = sd.id)))
+             JOIN adtech.sdk_categories sc ON ((savs.sdk_id = sc.sdk_id)))
         )
  SELECT sa.store_id,
     sacs.company_id,
     c.name AS company_name,
     d.domain_name AS company_domain,
     cc2.url_slug AS category_slug
-   FROM (((((store_app_sdk_companies sacs
+   FROM ((((store_app_sdk_company_category sacs
      LEFT JOIN public.store_apps sa ON ((sacs.store_app = sa.id)))
      LEFT JOIN adtech.companies c ON ((sacs.company_id = c.id)))
      LEFT JOIN public.domains d ON ((c.domain_id = d.id)))
-     LEFT JOIN adtech.company_categories cc ON ((c.id = cc.company_id)))
-     LEFT JOIN adtech.categories cc2 ON ((cc.category_id = cc2.id)))
+     LEFT JOIN adtech.categories cc2 ON ((sacs.category_id = cc2.id)))
   WHERE (sacs.company_id IS NOT NULL)
   WITH NO DATA;
 
@@ -3783,10 +3784,10 @@ CREATE MATERIALIZED VIEW frontend.store_app_ranks_latest AS
 ALTER MATERIALIZED VIEW frontend.store_app_ranks_latest OWNER TO postgres;
 
 --
--- Name: store_apps_z_scores; Type: MATERIALIZED VIEW; Schema: frontend; Owner: postgres
+-- Name: z_scores_top_apps; Type: MATERIALIZED VIEW; Schema: frontend; Owner: postgres
 --
 
-CREATE MATERIALIZED VIEW frontend.store_apps_z_scores AS
+CREATE MATERIALIZED VIEW frontend.z_scores_top_apps AS
  WITH app_metrics AS (
          SELECT app_global_metrics_latest.store_app,
             app_global_metrics_latest.rating,
@@ -3802,23 +3803,22 @@ CREATE MATERIALIZED VIEW frontend.store_apps_z_scores AS
             saz.ratings_avg_2w,
             saz.installs_z_score_2w,
             saz.ratings_z_score_2w,
-            saz.installs_sum_4w,
+            sa.installs_sum_4w_est AS installs_sum_4w,
             saz.ratings_sum_4w,
             saz.installs_avg_4w,
             saz.ratings_avg_4w,
             saz.installs_z_score_4w,
             saz.ratings_z_score_4w,
             sa.id,
-            sa.developer,
+            sa.developer_id,
+            sa.developer_name,
             sa.name,
             sa.store_id,
             sa.store,
-            sa.category,
-            am.installs,
+            sa.category AS app_category,
+            sa.installs_est AS installs,
             sa.free,
-            sa.price,
             sa.store_last_updated,
-            sa.content_rating,
             sa.ad_supported,
             sa.in_app_purchases,
             sa.created_at,
@@ -3827,9 +3827,7 @@ CREATE MATERIALIZED VIEW frontend.store_apps_z_scores AS
             sa.release_date,
             am.rating_count,
             sa.icon_url_100,
-            cm.original_category,
-            cm.mapped_category,
-            row_number() OVER (PARTITION BY sa.store, cm.mapped_category,
+            row_number() OVER (PARTITION BY sa.store, sa.category,
                 CASE
                     WHEN (sa.store = 2) THEN 'rating'::text
                     ELSE 'installs'::text
@@ -3839,16 +3837,16 @@ CREATE MATERIALIZED VIEW frontend.store_apps_z_scores AS
                     WHEN (sa.store = 1) THEN saz.installs_z_score_2w
                     ELSE NULL::numeric
                 END DESC NULLS LAST) AS rn
-           FROM (((public.store_app_z_scores saz
-             LEFT JOIN public.store_apps sa ON ((saz.store_app = sa.id)))
+           FROM ((public.store_app_z_scores saz
+             LEFT JOIN frontend.store_apps_overview sa ON ((saz.store_app = sa.id)))
              LEFT JOIN app_metrics am ON ((saz.store_app = am.store_app)))
-             LEFT JOIN public.category_mapping cm ON (((sa.category)::text = (cm.original_category)::text)))
           WHERE (sa.store = ANY (ARRAY[1, 2]))
         )
  SELECT store,
     store_id,
     name AS app_name,
-    mapped_category AS app_category,
+    developer_name,
+    app_category,
     in_app_purchases,
     ad_supported,
     icon_url_100,
@@ -3871,7 +3869,7 @@ CREATE MATERIALIZED VIEW frontend.store_apps_z_scores AS
   WITH NO DATA;
 
 
-ALTER MATERIALIZED VIEW frontend.store_apps_z_scores OWNER TO postgres;
+ALTER MATERIALIZED VIEW frontend.z_scores_top_apps OWNER TO postgres;
 
 --
 -- Name: app_country_crawls; Type: TABLE; Schema: logging; Owner: postgres
@@ -4431,6 +4429,25 @@ ALTER SEQUENCE public.domains_id_seq OWNED BY public.domains.id;
 
 
 --
+-- Name: global_retention_benchmarks; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.global_retention_benchmarks (
+    store_id smallint NOT NULL,
+    app_category text NOT NULL,
+    d1 numeric(6,5) NOT NULL,
+    d7 numeric(6,5) NOT NULL,
+    d30 numeric(6,5) NOT NULL,
+    CONSTRAINT global_retention_benchmarks_d1_check CHECK (((d1 > (0)::numeric) AND (d1 <= (1)::numeric))),
+    CONSTRAINT global_retention_benchmarks_d30_check CHECK (((d30 > (0)::numeric) AND (d30 <= (1)::numeric))),
+    CONSTRAINT global_retention_benchmarks_d7_check CHECK (((d7 > (0)::numeric) AND (d7 <= (1)::numeric))),
+    CONSTRAINT retention_monotonic_check CHECK (((d1 >= d7) AND (d7 >= d30)))
+);
+
+
+ALTER TABLE public.global_retention_benchmarks OWNER TO postgres;
+
+--
 -- Name: ip_geo_snapshots_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
 --
 
@@ -4649,7 +4666,7 @@ CREATE MATERIALIZED VIEW public.store_apps_in_latest_rankings AS
             sa.installs,
             sa.rating_count,
             sa.store_id
-           FROM (frontend.store_apps_z_scores saz
+           FROM (frontend.z_scores_top_apps saz
              LEFT JOIN frontend.store_apps_overview sa ON (((saz.store_id)::text = (sa.store_id)::text)))
           WHERE sa.free
           ORDER BY COALESCE(saz.installs_z_score_2w, saz.ratings_z_score_2w) DESC
@@ -5550,6 +5567,14 @@ ALTER TABLE ONLY public.domains
 
 
 --
+-- Name: global_retention_benchmarks global_retention_benchmarks_pk; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.global_retention_benchmarks
+    ADD CONSTRAINT global_retention_benchmarks_pk PRIMARY KEY (store_id, app_category);
+
+
+--
 -- Name: ip_geo_snapshots ip_geo_snapshots_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -6040,10 +6065,10 @@ CREATE UNIQUE INDEX frontend_companies_category_tag_type_stats_unique ON fronten
 
 
 --
--- Name: frontend_store_apps_z_scores_unique; Type: INDEX; Schema: frontend; Owner: postgres
+-- Name: frontend_z_scores_top_apps_unique; Type: INDEX; Schema: frontend; Owner: postgres
 --
 
-CREATE UNIQUE INDEX frontend_store_apps_z_scores_unique ON frontend.store_apps_z_scores USING btree (store, store_id);
+CREATE UNIQUE INDEX frontend_z_scores_top_apps_unique ON frontend.z_scores_top_apps USING btree (store, store_id);
 
 
 --
@@ -7250,5 +7275,5 @@ GRANT ALL ON SCHEMA public TO PUBLIC;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 1jTBQd34td7kKcJ9DQSWz50m62FW5RaQzU3jrvdDu5Y76BGT9NVt5k9K9JObhCb
+\unrestrict aqSyUPuJghUSivRpPmJ0wjpiuNqZ0Xb7iDHpQcCoga4fxvxnfEJs5GfAimQHJSS
 
