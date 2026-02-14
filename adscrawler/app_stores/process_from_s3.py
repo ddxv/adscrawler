@@ -319,6 +319,7 @@ def import_app_metrics_from_s3(
                 logger.error(
                     f"Error processing S3 app metrics for {snapshot_date} {store}: {e}"
                 )
+    import_all_app_global_metrics_weekly(database_connection)
 
 
 def process_app_metrics_to_db(
