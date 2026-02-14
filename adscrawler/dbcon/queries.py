@@ -34,6 +34,7 @@ QUERY_KEYWORDS_TO_CRAWL = load_sql_file("query_keywords_to_crawl.sql")
 QUERY_APPS_MITM_IN_S3 = load_sql_file("query_apps_mitm_in_s3.sql")
 QUERY_ZSCORES = load_sql_file("query_simplified_store_app_z_scores.sql")
 QUERY_APPS_TO_PROCESS_KEYWORDS = load_sql_file("query_apps_to_process_keywords.sql")
+QUERY_APPS_TO_PROCESS_METRICS = load_sql_file("query_apps_to_process_metrics.sql")
 
 
 def insert_df(
@@ -1202,6 +1203,18 @@ def query_apps_to_process_keywords(
     return df
 
 
+def query_apps_to_process_metrics(
+    database_connection: PostgresCon, batch_size: int = 10000
+) -> pd.DataFrame:
+    """Query apps to process metrics."""
+    df = pd.read_sql(
+        QUERY_APPS_TO_PROCESS_METRICS,
+        con=database_connection.engine,
+        params={"batch_size": batch_size},
+    )
+    return df
+
+
 def query_apps_mitm_in_s3(database_connection: PostgresCon) -> pd.DataFrame:
     df = pd.read_sql(
         QUERY_APPS_MITM_IN_S3,
@@ -1506,5 +1519,53 @@ def get_ios_app_country_history(
 	     country_id,
 	     snapshot_date DESC
         """
+    df = pd.read_sql(sel_query, con=database_connection.engine)
+    return df
+
+
+def get_retention_benchmarks(database_connection: PostgresCon) -> pd.DataFrame:
+    sel_query = """WITH 
+         retention_benchmarks AS (
+	         SELECT
+		         mac.store,
+		         mac.category AS app_category,
+		         -- Retention D1 Logic
+             COALESCE(rgb.d1, 
+                 CASE 
+                     WHEN mac.category LIKE 'game%%' THEN (SELECT d1 FROM retention_global_benchmarks WHERE app_category = 'games' LIMIT 1)
+                     ELSE (SELECT d1 FROM retention_global_benchmarks WHERE app_category = 'apps' LIMIT 1)
+                 END
+             ) AS d1,
+		         -- Retention D7 Logic
+             COALESCE(rgb.d7, 
+                 CASE 
+                     WHEN mac.category LIKE 'game%%' THEN (SELECT d7 FROM retention_global_benchmarks WHERE app_category = 'games' LIMIT 1)
+                     ELSE (SELECT d7 FROM retention_global_benchmarks WHERE app_category = 'apps' LIMIT 1)
+                 END
+             ) AS d7,
+		         -- Retention D30 Logic
+             COALESCE(rgb.d30, 
+                 CASE 
+                     WHEN mac.category LIKE 'game%%' THEN (SELECT d30 FROM retention_global_benchmarks WHERE app_category = 'games' LIMIT 1)
+                     ELSE (SELECT d30 FROM retention_global_benchmarks WHERE app_category = 'apps' LIMIT 1)
+                 END
+             ) AS d30
+	         FROM
+		         mv_app_categories mac
+	         LEFT JOIN retention_global_benchmarks rgb 
+             ON
+		         mac.category = rgb.app_category
+		         AND mac.store = rgb.store
+         )
+         SELECT
+	         store,
+	         app_category,
+	         d1,
+	         d7,
+	         d30
+         FROM
+	         retention_benchmarks
+    ;
+    """
     df = pd.read_sql(sel_query, con=database_connection.engine)
     return df

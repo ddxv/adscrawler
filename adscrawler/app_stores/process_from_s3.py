@@ -18,6 +18,8 @@ from adscrawler.dbcon.queries import (
     clean_app_ranks_weekly_table,
     delete_and_insert,
     get_ios_app_country_history,
+    get_retention_benchmarks,
+    query_apps_to_process_metrics,
     query_categories,
     query_collections,
     query_countries,
@@ -805,3 +807,125 @@ def query_keywords_from_s3(
             """
     duckdb_con = get_duckdb_connection(s3_config_key)
     return duckdb_con.execute(period_query).df()
+
+
+def get_next_app_global_metrics_weekly(
+    database_connection: PostgresCon, batch_size: int = 5000
+) -> pd.DataFrame:
+    """Process app global metrics weekly."""
+    logger.info(f"Querying app global metrics for weekly processing {batch_size=}")
+    df = query_apps_to_process_metrics(database_connection, batch_size=batch_size)
+    logger.info("Starting with {df.shape[0]} rows to process")
+    star_cols = ["one_star", "two_star", "three_star", "four_star", "five_star"]
+    metrics = ["installs", "rating", "review_count", "rating_count", *star_cols]
+    xaxis_col = "snapshot_date"
+    # Convert to date to datetime and sort by country and date, required
+    df[xaxis_col] = pd.to_datetime(df[xaxis_col])
+    df = df.sort_values(["store_app", xaxis_col])
+    df = (
+        df.set_index(xaxis_col)
+        .groupby(["store_app", "store", "app_category"])[metrics]
+        .resample("W-MON")
+        .last()
+        .apply(pd.to_numeric, errors="coerce")
+        .interpolate(method="linear", limit_direction="forward")
+        .fillna(0)
+        .reset_index()
+    )
+    df["installs_diff"] = df.groupby("store_app")["installs"].diff().fillna(0)
+    retention_benchmarks = get_retention_benchmarks(database_connection)
+    merged_df = df.merge(retention_benchmarks, on=["app_category", "store"], how="left")
+    merged_df["k"] = np.log(
+        merged_df["d30"].replace(0, np.nan) / merged_df["d7"].replace(0, np.nan)
+    ) / np.log(30.0 / 7.0)
+    cohorts = merged_df[
+        ["store_app", "snapshot_date", "installs_diff", "d1", "d7", "k"]
+    ].copy()
+    logger.info("Starting historical merge, memory intensive step")
+    df_dau = cohorts.merge(
+        cohorts[["store_app", "snapshot_date", "installs_diff"]],
+        on="store_app",
+        suffixes=("", "_historical"),
+    )
+    df_dau = df_dau[df_dau["snapshot_date"] >= df_dau["snapshot_date_historical"]]
+    df_dau["weeks_passed"] = (
+        (df_dau["snapshot_date"] - df_dau["snapshot_date_historical"]).dt.days / 7
+    ).astype(int)
+    wau_mult = 2.0
+    df_dau["retention_rate"] = np.where(
+        df_dau["weeks_passed"] == 0,
+        1.0,
+        (
+            df_dau["d7"]
+            * wau_mult
+            * (df_dau["weeks_passed"].replace(0, 1) ** df_dau["k"])
+        ).clip(upper=1.0),
+    )
+    # df_dau['retention_rate'] = df_dau.apply(calculate_wau_retention, axis=1)
+    df_dau["surviving_users"] = (
+        df_dau["installs_diff_historical"] * df_dau["retention_rate"]
+    )
+    dau_df = (
+        df_dau.groupby(["store_app", "snapshot_date"])["surviving_users"]
+        .sum()
+        .reset_index()
+    )
+    dau_df.rename(columns={"surviving_users": "wau"}, inplace=True)
+    cols = ["store_app", "snapshot_date", "installs_diff"] + metrics
+    df = pd.merge(
+        df[cols], dau_df, on=["store_app", "snapshot_date"], how="left", validate="1:1"
+    )
+    logger.info("Finished calculating WAU")
+    df["weekly_ratings"] = (
+        df.groupby("store_app")["rating_count"].diff().fillna(df["rating_count"])
+    )
+    df["weekly_reviews"] = (
+        df.groupby("store_app")["review_count"].diff().fillna(df["review_count"])
+    )
+    rename_map = {
+        "snapshot_date": "week_start",
+        "installs_diff": "weekly_installs",
+        "wau": "weekly_active_users",
+        "installs": "total_installs",
+        "rating_count": "total_ratings_count",
+    }
+    df = df.rename(columns=rename_map)
+    df["weekly_iap_revenue"] = 0.0
+    df["weekly_ad_revenue"] = 0.0
+    final_cols = [
+        "store_app",
+        "week_start",
+        "weekly_installs",
+        "weekly_ratings",
+        "weekly_reviews",
+        "weekly_active_users",
+        "weekly_iap_revenue",
+        "weekly_ad_revenue",
+        "total_installs",
+        "total_ratings_count",
+        "rating",
+        "one_star",
+        "two_star",
+        "three_star",
+        "four_star",
+        "five_star",
+    ]
+    df = df[final_cols]
+    return df
+
+
+def import_all_app_global_metrics_weekly(database_connection: PostgresCon) -> None:
+    i = 0
+    while True:
+        logger.info(f"Processing batch {i} of app global metrics weekly")
+        df = get_next_app_global_metrics_weekly(database_connection, batch_size=5000)
+        if df.empty:
+            break
+        upsert_df(
+            df=df,
+            table_name="app_global_metrics_weekly",
+            database_connection=database_connection,
+            key_columns=["store_app", "week_start"],
+            insert_columns=df.columns.tolist(),
+        )
+        i += 1
