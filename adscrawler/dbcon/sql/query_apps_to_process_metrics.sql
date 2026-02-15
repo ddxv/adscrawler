@@ -1,13 +1,4 @@
-WITH already_processed AS (
-    SELECT lg.store_app
-    FROM
-        logging.app_global_metrics_weekly AS lg
-    WHERE
-        lg.updated_at > (
-            current_date - INTERVAL '3 days'
-        )
-),
-candidate_apps AS (
+WITH candidate_apps AS (
     SELECT
         sa.store,
         sa.id AS store_app,
@@ -19,12 +10,8 @@ candidate_apps AS (
             sa.crawl_result = 1
             OR sa.store_last_updated >= current_date - INTERVAL '365 days'
         )
-        AND sa.id NOT IN (
-            SELECT ap.store_app
-            FROM
-                already_processed AS ap
-        )
-    LIMIT :batch_size
+    ORDER BY sa.id  -- helps predictable batching
+    LIMIT :batch_size * 5
 )
 SELECT
     agmh.snapshot_date,
@@ -40,10 +27,16 @@ SELECT
     agmh.three_star,
     agmh.four_star,
     agmh.five_star
-FROM
-    app_global_metrics_history AS agmh
-INNER JOIN candidate_apps AS ca
-    ON
-        agmh.store_app = ca.store_app
+FROM candidate_apps AS ca
+INNER JOIN app_global_metrics_history AS agmh
+    ON ca.store_app = agmh.store_app
 WHERE
-    agmh.snapshot_date >= current_date - INTERVAL '400 days';
+    agmh.snapshot_date >= current_date - INTERVAL '400 days'
+    AND NOT EXISTS (
+        SELECT 1
+        FROM logging.app_global_metrics_weekly AS lg
+        WHERE
+            lg.store_app = ca.store_app
+            AND lg.updated_at > current_date - INTERVAL '3 days'
+    )
+LIMIT :batch_size;

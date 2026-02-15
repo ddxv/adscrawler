@@ -927,7 +927,7 @@ def get_next_app_global_metrics_weekly(
 def import_all_app_global_metrics_weekly(database_connection: PostgresCon) -> None:
     i = 0
     while True:
-        logger.info(f"Processing batch {i} of app global metrics weekly")
+        logger.info(f"batch {i} of app global metrics weekly start")
         df = query_apps_to_process_metrics(database_connection, batch_size=5000)
         apps = df["store_app"].tolist()
         df = get_next_app_global_metrics_weekly(database_connection, df)
