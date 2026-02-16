@@ -387,9 +387,11 @@ def upsert_df(
         if return_rows:
             if len(key_columns) == 1 and key_columns[0] in (md5_key_columns or []):
                 md5_values = [
-                    hashlib.md5(v.encode("utf-8")).hexdigest()
-                    if v is not None
-                    else None
+                    (
+                        hashlib.md5(v.encode("utf-8")).hexdigest()
+                        if v is not None
+                        else None
+                    )
                     for v in df[key_columns[0]].tolist()
                 ]
                 where_values = (md5_values,)

@@ -240,6 +240,7 @@ def update_app_details(
         limit=limit,
         country_priority_group=country_priority_group,
     )
+
     df = df.sort_values("country_code").reset_index(drop=True)
     if df.empty:
         logger.info(f"{log_info} no apps to update")
