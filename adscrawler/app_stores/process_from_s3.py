@@ -17,6 +17,7 @@ from adscrawler.dbcon.connection import (
 from adscrawler.dbcon.queries import (
     clean_app_ranks_weekly_table,
     delete_and_insert,
+    get_ecpm_benchmarks,
     get_latest_app_country_history,
     get_retention_benchmarks,
     query_apps_to_process_global_metrics,
@@ -26,6 +27,7 @@ from adscrawler.dbcon.queries import (
     query_languages,
     query_store_id_map,
     query_store_id_map_cached,
+    upsert_bulk,
     upsert_df,
 )
 from adscrawler.packages.storage import get_duckdb_connection, get_s3_client
@@ -40,10 +42,7 @@ STAR_COLS = [
     "five_star",
 ]
 
-
 METRIC_COLS = [
-    "snapshot_date",
-    "store_app",
     "review_count",
     "rating",
     "rating_count",
@@ -302,7 +301,7 @@ def prep_app_metrics_history(
             database_connection,
             snapshot_date=snapshot_date,
             days_back=180,
-            chunk_size=5000,
+            chunk_size=50000,
             store_app_ids=df["store_app"].unique(),
         )
         # If data is being rerun, prefer 'newer' data from S3
@@ -351,6 +350,8 @@ def prep_app_metrics_history(
         df = df.drop(columns=["review_count"]).rename(
             columns={"review_count_y": "review_count"}
         )
+        df["review_count"] = df["review_count"].astype(int)
+        df["rating_count"] = df["rating_count"].fillna(0).astype(int)
     if store == 2:
         ratings_str = (
             df["user_ratings"]
@@ -376,13 +377,11 @@ def manual_import_app_metrics_from_s3(
     database_connection = get_db_connection(
         use_ssh_tunnel=use_tunnel, config_key="madrone"
     )
-
-    start_date = datetime.datetime.fromisoformat("2026-01-21").date()
+    start_date = datetime.datetime.fromisoformat("2025-09-28").date()
     end_date = datetime.datetime.today().date()
     for snapshot_date in pd.date_range(start_date, end_date, freq="D"):
         snapshot_date = snapshot_date.date()
-        # for store in [1, 2]:
-        for store in [2]:
+        for store in [1, 2]:
             try:
                 process_app_metrics_to_db(database_connection, store, snapshot_date)
             except:
@@ -407,9 +406,9 @@ def import_app_metrics_from_s3(
 def process_app_metrics_to_db(
     database_connection: PostgresCon, store: int, snapshot_date: datetime.date
 ) -> None:
-    logger.info(f"date={snapshot_date}, store={store} Make S3 agg")
+    log_info = f"date={snapshot_date} store={store}"
+    logger.info(f"{log_info} start")
     make_s3_app_country_metrics_history(store, snapshot_date=snapshot_date)
-    logger.info(f"date={snapshot_date}, store={store} agg df load")
     df = get_s3_agg_daily_snapshots(snapshot_date, snapshot_date, store)
     if df.empty:
         logger.warning(
@@ -430,7 +429,7 @@ def process_app_metrics_to_db(
             df = df.drop_duplicates(
                 ["snapshot_date", "country", "store_id"], keep="last"
             )
-    logger.info(f"date={snapshot_date}, store={store} agg df prep")
+    logger.info(f"{log_info} prep country df")
     df = prep_app_metrics_history(
         df=df,
         store=store,
@@ -446,13 +445,24 @@ def process_app_metrics_to_db(
         key_columns=COUNTRY_HISTORY_KEYS,
     )
     insert_columns = [x for x in COUNTRY_HISTORY_COLS if x in df.columns]
-    logger.info(f"date={snapshot_date}, store={store} agg df country upsert")
-    upsert_df(
-        df=df,
+    logger.info(f"{log_info} app_country_metrics_history upsert")
+    # start_time = time.time()
+    # upsert_df(
+    #     df=df,
+    #     table_name="app_country_metrics_history",
+    #     database_connection=database_connection,
+    #     key_columns=COUNTRY_HISTORY_KEYS,
+    #     insert_columns=insert_columns,
+    # )
+    # logger.info(
+    #     f"date={snapshot_date}, store={store} app_country_metrics_history upsert took {time.time() - start_time:.2f}s"
+    # )
+
+    upsert_bulk(
+        df=df[insert_columns],
         table_name="app_country_metrics_history",
         database_connection=database_connection,
         key_columns=COUNTRY_HISTORY_KEYS,
-        insert_columns=insert_columns,
     )
     tier_installs = df.pivot_table(
         index=GLOBAL_HISTORY_KEYS,
@@ -478,7 +488,7 @@ def process_app_metrics_to_db(
             database_connection,
             snapshot_date=snapshot_date,
             days_back=180,
-            chunk_size=5000,
+            chunk_size=20000,
             store_app_ids=df["store_app"].unique(),
         )
         # Should overwrite existing values if there, but could be removed when all rerun
@@ -497,14 +507,6 @@ def process_app_metrics_to_db(
             how="left",
             validate="m:1",
         )
-        # weighted_sum = (
-        #     (df["rating"] * df["rating_count"])
-        #     .groupby([df[k] for k in GLOBAL_HISTORY_KEYS])
-        #     .sum()
-        # )
-        # weight_total = (
-        #     df["rating_count"].groupby([df[k] for k in GLOBAL_HISTORY_KEYS]).sum()
-        # )
         df["rating_prod"] = df["rating"] * df["rating_count"]
         df = df.groupby(GLOBAL_HISTORY_KEYS).agg(
             rating_count=("rating_count", "sum"),
@@ -512,14 +514,14 @@ def process_app_metrics_to_db(
             store_last_updated=("store_last_updated", "max"),
             **{col: (col, "sum") for col in STAR_COLS},
         )
-        # df["rating"] = weighted_sum / weight_total
         df["rating"] = (
             df["rating_prod"] / df["rating_count"].replace(0, np.nan)
         ).astype("float64")
-        # df["rating"] = df["rating"].astype("float64")
     df = df.join(tier_pct)
     df = df.reset_index()
     for col in ["tier1_pct", "tier2_pct", "tier3_pct"]:
+        if col not in df.columns:
+            df[col] = 0.0
         df[col] = (df[col] * 10000).round().astype("int16")
     check_for_duplicates(
         df=df,
@@ -527,14 +529,20 @@ def process_app_metrics_to_db(
     )
     df = df.replace({pd.NA: None, np.nan: None})
     insert_columns = [x for x in GLOBAL_HISTORY_COLS if x in df.columns]
-    logger.info(f"date={snapshot_date}, store={store} agg df global upsert")
-    upsert_df(
-        df=df,
+    logger.info(f"{log_info} app_global_metrics_history upsert")
+    upsert_bulk(
+        df=df[insert_columns],
         table_name="app_global_metrics_history",
         database_connection=database_connection,
         key_columns=GLOBAL_HISTORY_KEYS,
-        insert_columns=insert_columns,
     )
+    # upsert_df(
+    #     df=df,
+    #     table_name="app_global_metrics_history",
+    #     database_connection=database_connection,
+    #     key_columns=GLOBAL_HISTORY_KEYS,
+    #     insert_columns=insert_columns,
+    # )
 
 
 def get_parquet_paths_by_prefix(bucket: str, prefix: str) -> list[str]:
@@ -1010,6 +1018,7 @@ def get_next_app_global_metrics_weekly(
         "rating_count": "total_ratings_count",
     }
     df = df.rename(columns=rename_map)
+    ecpm_benchmarks = get_ecpm_benchmarks(database_connection)
     df["weekly_iap_revenue"] = 0.0
     df["weekly_ad_revenue"] = 0.0
     final_cols = [

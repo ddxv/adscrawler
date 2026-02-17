@@ -26,7 +26,10 @@ SELECT
     agmh.two_star,
     agmh.three_star,
     agmh.four_star,
-    agmh.five_star
+    agmh.five_star,
+    agmh.tier1_pct,
+    agmh.tier2_pct,
+    agmh.tier3_pct
 FROM candidate_apps AS ca
 INNER JOIN app_global_metrics_history AS agmh
     ON ca.store_app = agmh.store_app
