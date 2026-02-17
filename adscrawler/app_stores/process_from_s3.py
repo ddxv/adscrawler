@@ -17,7 +17,6 @@ from adscrawler.dbcon.connection import (
 from adscrawler.dbcon.queries import (
     clean_app_ranks_weekly_table,
     delete_and_insert,
-    get_ecpm_benchmarks,
     get_latest_app_country_history,
     get_retention_benchmarks,
     query_apps_to_process_global_metrics,
@@ -27,8 +26,9 @@ from adscrawler.dbcon.queries import (
     query_languages,
     query_store_id_map,
     query_store_id_map_cached,
-    upsert_bulk,
     upsert_df,
+    upsert_bulk,
+    get_ecpm_benchmarks,
 )
 from adscrawler.packages.storage import get_duckdb_connection, get_s3_client
 
@@ -446,18 +446,6 @@ def process_app_metrics_to_db(
     )
     insert_columns = [x for x in COUNTRY_HISTORY_COLS if x in df.columns]
     logger.info(f"{log_info} app_country_metrics_history upsert")
-    # start_time = time.time()
-    # upsert_df(
-    #     df=df,
-    #     table_name="app_country_metrics_history",
-    #     database_connection=database_connection,
-    #     key_columns=COUNTRY_HISTORY_KEYS,
-    #     insert_columns=insert_columns,
-    # )
-    # logger.info(
-    #     f"date={snapshot_date}, store={store} app_country_metrics_history upsert took {time.time() - start_time:.2f}s"
-    # )
-
     upsert_bulk(
         df=df[insert_columns],
         table_name="app_country_metrics_history",
@@ -536,13 +524,6 @@ def process_app_metrics_to_db(
         database_connection=database_connection,
         key_columns=GLOBAL_HISTORY_KEYS,
     )
-    # upsert_df(
-    #     df=df,
-    #     table_name="app_global_metrics_history",
-    #     database_connection=database_connection,
-    #     key_columns=GLOBAL_HISTORY_KEYS,
-    #     insert_columns=insert_columns,
-    # )
 
 
 def get_parquet_paths_by_prefix(bucket: str, prefix: str) -> list[str]:
