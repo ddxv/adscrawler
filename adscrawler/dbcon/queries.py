@@ -387,9 +387,11 @@ def upsert_df(
         if return_rows:
             if len(key_columns) == 1 and key_columns[0] in (md5_key_columns or []):
                 md5_values = [
-                    hashlib.md5(v.encode("utf-8")).hexdigest()
-                    if v is not None
-                    else None
+                    (
+                        hashlib.md5(v.encode("utf-8")).hexdigest()
+                        if v is not None
+                        else None
+                    )
                     for v in df[key_columns[0]].tolist()
                 ]
                 where_values = (md5_values,)
@@ -797,9 +799,10 @@ def query_categories(database_connection: PostgresCon) -> pd.DataFrame:
 @lru_cache(maxsize=1)
 def query_countries(database_connection: PostgresCon) -> pd.DataFrame:
     sel_query = """SELECT
-        *
+        c.*, t.tier_slug as tier
         FROM
-        countries
+        countries c
+        LEFT JOIN public.tiers t on c.tier_id = t.id
         ;
         """
     df = pd.read_sql(sel_query, database_connection.engine)
@@ -1203,7 +1206,7 @@ def query_apps_to_process_keywords(
     return df
 
 
-def query_apps_to_process_metrics(
+def query_apps_to_process_global_metrics(
     database_connection: PostgresCon, batch_size: int = 10000
 ) -> pd.DataFrame:
     """Query apps to process metrics."""
@@ -1482,45 +1485,104 @@ def get_all_mmp_tlds(database_connection: PostgresCon) -> pd.DataFrame:
     return df
 
 
-def get_ios_app_country_history(
-    database_connection: PostgresCon, snapshot_date: datetime.date, days_back: int
+import pandas as pd
+
+
+def get_latest_app_country_history(
+    database_connection: PostgresCon,
+    snapshot_date: datetime.date,
+    store_app_ids: list,  # The 200k IDs from your DuckDB/S3 query
+    days_back: int = 30,
+    chunk_size: int = 5000,
 ) -> pd.DataFrame:
     start_date = (snapshot_date - datetime.timedelta(days=days_back)).strftime(
         "%Y-%m-%d"
     )
     end_date = snapshot_date.strftime("%Y-%m-%d")
-    sel_query = f"""SELECT
-	     DISTINCT ON
-	     (
-		    store_app,
-		    country_id
-	     ) 
-         acmh.store_app,
-	     acmh.snapshot_date,
-	     acmh.country_id,
-	     review_count,
-	     rating,
-	     rating_count,
-	     one_star,
-	     two_star,
-	     three_star,
-	     four_star,
-	     five_star
-     FROM
-	     app_country_metrics_history acmh
-     LEFT JOIN store_apps sa ON
-	     acmh.store_app = sa.id
-     WHERE
-	     snapshot_date >= '{start_date}'
-	     AND snapshot_date <= '{end_date}'
-	     AND sa.store = 2
-     ORDER BY
-	     store_app,
-	     country_id,
-	     snapshot_date DESC
+    chunks = [
+        store_app_ids[i : i + chunk_size]
+        for i in range(0, len(store_app_ids), chunk_size)
+    ]
+    results = []
+    print(f"Processing {len(store_app_ids)} apps in {len(chunks)} chunks...")
+    for i, chunk_ids in enumerate(chunks):
+        id_list_str = ",".join(map(str, chunk_ids))
+        sel_query = f"""
+            SELECT DISTINCT ON (acmh.store_app, acmh.country_id)
+                acmh.store_app,
+                acmh.snapshot_date,
+                acmh.country_id,
+                review_count,
+                rating,
+                rating_count,
+                one_star,
+                two_star,
+                three_star,
+                four_star,
+                five_star
+            FROM app_country_metrics_history acmh
+            WHERE acmh.store_app IN ({id_list_str})
+              AND acmh.snapshot_date >= '{start_date}'
+              AND acmh.snapshot_date <= '{end_date}'
+            ORDER BY
+                store_app,
+                country_id,
+                snapshot_date DESC
         """
-    df = pd.read_sql(sel_query, con=database_connection.engine)
+        # Pull chunk and append to results list
+        chunk_df = pd.read_sql(sel_query, con=database_connection.engine)
+        results.append(chunk_df)
+        if (i + 1) % 5 == 0:
+            print(f"Finished chunk {i + 1}/{len(chunks)}...")
+    if not results:
+        return pd.DataFrame()
+    df = pd.concat(results, ignore_index=True)
+    df["crawled_date"] = pd.to_datetime(df["snapshot_date"])
     return df
+
+
+# def get_latest_app_country_history(
+#     store: int,
+#     database_connection: PostgresCon,
+#     snapshot_date: datetime.date,
+#     days_back: int,
+# ) -> pd.DataFrame:
+#     start_date = (snapshot_date - datetime.timedelta(days=days_back)).strftime(
+#         "%Y-%m-%d"
+#     )
+#     end_date = snapshot_date.strftime("%Y-%m-%d")
+#     sel_query = f"""SELECT
+# 	     DISTINCT ON
+# 	     (
+# 		    store_app,
+# 		    country_id
+# 	     )
+#          acmh.store_app,
+# 	     acmh.snapshot_date,
+# 	     acmh.country_id,
+# 	     review_count,
+# 	     rating,
+# 	     rating_count,
+# 	     one_star,
+# 	     two_star,
+# 	     three_star,
+# 	     four_star,
+# 	     five_star
+#      FROM
+# 	     app_country_metrics_history acmh
+#      LEFT JOIN store_apps sa ON
+# 	     acmh.store_app = sa.id
+#      WHERE
+# 	     snapshot_date >= '{start_date}'
+# 	     AND snapshot_date <= '{end_date}'
+# 	     AND sa.store = {store}
+#      ORDER BY
+# 	     store_app,
+# 	     country_id,
+# 	     snapshot_date DESC
+#         """
+#     df = pd.read_sql(sel_query, con=database_connection.engine)
+#     return df
 
 
 def get_retention_benchmarks(database_connection: PostgresCon) -> pd.DataFrame:

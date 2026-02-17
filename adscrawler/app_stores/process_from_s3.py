@@ -17,9 +17,9 @@ from adscrawler.dbcon.connection import (
 from adscrawler.dbcon.queries import (
     clean_app_ranks_weekly_table,
     delete_and_insert,
-    get_ios_app_country_history,
+    get_latest_app_country_history,
     get_retention_benchmarks,
-    query_apps_to_process_metrics,
+    query_apps_to_process_global_metrics,
     query_categories,
     query_collections,
     query_countries,
@@ -60,9 +60,13 @@ COUNTRY_HISTORY_KEYS = [
     "store_app",
 ]
 
-COUNTRY_HISTORY_COLS = COUNTRY_HISTORY_KEYS + METRIC_COLS
+COUNTRY_HISTORY_COLS = COUNTRY_HISTORY_KEYS + [
+    x for x in METRIC_COLS if x != "installs"
+]
 
-GLOBAL_HISTORY_COLS = GLOBAL_HISTORY_KEYS + METRIC_COLS + ["store_last_updated"]
+GLOBAL_HISTORY_COLS = (
+    GLOBAL_HISTORY_KEYS + METRIC_COLS + ["installs_est", "store_last_updated"]
+)
 
 
 def raw_keywords_to_s3(
@@ -243,9 +247,30 @@ def make_s3_app_country_metrics_history(
     duckdb_con.close()
 
 
+def estimate_ios_installs(df):
+    # For iOS we don't have installs, but we can estimate them using the review count and a conversion rate
+    # This is a very rough estimate and should be replaced with actual install data if possible
+    conversion_rate = 0.02
+    df["installs_est"] = (df["rating_count"] / conversion_rate).fillna(0).astype(int)
+    return df
+
+
 def prep_app_metrics_history(
-    df: pd.DataFrame, store: int, database_connection: PostgresCon
+    df: pd.DataFrame,
+    store: int,
+    database_connection: PostgresCon,
+    snapshot_date: datetime.date,
 ) -> pd.DataFrame:
+    store_id_map = query_store_id_map_cached(
+        store=store, database_connection=database_connection
+    )
+    new_ids = df[~df["store_id"].isin(store_id_map["store_id"])]["store_id"].unique()
+    if len(new_ids) > 0:
+        logger.warning(f"Found new store ids: {len(new_ids)}")
+        raise ValueError("New store ids found in S3 app history data")
+    df["store_app"] = df["store_id"].map(
+        store_id_map.set_index("store_id")["id"].to_dict()
+    )
     if store == 1:
         df["store_last_updated"] = np.where(
             (df["store_last_updated"] < 0) | (df["store_last_updated"].isna()),
@@ -255,6 +280,59 @@ def prep_app_metrics_history(
         df.loc[df["store_last_updated"].notna(), "store_last_updated"] = pd.to_datetime(
             df.loc[df["store_last_updated"].notna(), "store_last_updated"],
             unit="s",
+        )
+        google_app_country_history = get_latest_app_country_history(
+            database_connection,
+            snapshot_date=snapshot_date,
+            days_back=90,
+            chunk_size=5000,
+            store_app_ids=df["store_app"].unique(),
+        )
+        # If data is being rerun, prefer 'newer' data from S3
+        df["crawled_date"] = df["crawled_date"] + pd.Timedelta(seconds=1)
+        cdf = pd.concat([df, google_app_country_history], axis=0)
+        cdf = cdf.sort_values(by=["crawled_date"], ascending=True).drop_duplicates(
+            subset=["store_app", "country_id"], keep="last"
+        )
+        cdf["review_count"] = pd.to_numeric(
+            cdf["review_count"], errors="coerce"
+        ).fillna(0)
+        cdf["installs"] = pd.to_numeric(cdf["installs"], errors="coerce").fillna(0)
+        # 1. Find the maximum review_count for each app
+        cdf["max_reviews"] = cdf.groupby("store_app")["review_count"].transform("max")
+        cdf["max_installs"] = cdf.groupby("store_app")["installs"].transform("max")
+        # 2. Flag as global if it's within a 1% threshold of the max
+        cdf["is_global_fallback"] = (
+            cdf["review_count"] >= cdf["max_reviews"] * 0.99
+        ) & (cdf["max_reviews"] > 200)
+        cdf["true_global_count"] = np.where(
+            cdf["is_global_fallback"], cdf["max_reviews"], None
+        )
+        cdf["true_global_count"] = cdf.groupby("store_app")[
+            "true_global_count"
+        ].transform("max")
+        # Remove review_count where it's just the global_fallback
+        cdf["review_count"] = np.where(
+            cdf["is_global_fallback"], 0, cdf["review_count"]
+        )
+        # Calculate local share only for unique, non-fallback rows
+        # Use .replace(0, np.nan) to handle divide-by-zero safely
+        cdf["pct_of_global"] = (
+            cdf["review_count"] / cdf["true_global_count"].replace(0, np.nan)
+        ).fillna(0)
+        cdf["installs_est"] = (
+            (cdf["installs"] * cdf["pct_of_global"]).round().astype(int)
+        )
+        df = pd.merge(
+            df,
+            cdf[["store_app", "country_id", "review_count", "installs_est"]],
+            on=["store_app", "country_id"],
+            how="left",
+            suffixes=("", "_y"),
+            validate="1:1",
+        )
+        df = df.drop(columns=["review_count"]).rename(
+            columns={"review_count_y": "review_count"}
         )
     if store == 2:
         ratings_str = (
@@ -268,20 +346,21 @@ def prep_app_metrics_history(
         df["store_last_updated"] = pd.to_datetime(
             df["store_last_updated"], format="ISO8601", utc=True
         )
-    store_id_map = query_store_id_map_cached(
-        store=store, database_connection=database_connection
-    )
+        df = estimate_ios_installs(df)
+
     country_map = query_countries(database_connection)
-    df["country_id"] = df["country"].map(
-        country_map.set_index("alpha2")["id"].to_dict()
+    df = pd.merge(
+        df,
+        country_map[["id", "alpha2", "tier"]].rename(
+            columns={"id": "country_id", "alpha2": "country"}
+        ),
+        on="country",
+        how="left",
+        validate="m:1",
     )
-    new_ids = df[~df["store_id"].isin(store_id_map["store_id"])]["store_id"].unique()
-    if len(new_ids) > 0:
-        logger.warning(f"Found new store ids: {len(new_ids)}")
-        raise ValueError("New store ids found in S3 app history data")
-    df["store_app"] = df["store_id"].map(
-        store_id_map.set_index("store_id")["id"].to_dict()
-    )
+    # df["country_id"] = df["country"].map(
+    # country_map.set_index("alpha2")["id"].to_dict()
+    # )
     df = df.convert_dtypes(dtype_backend="pyarrow")
     df = df.replace({pd.NA: None})
     return df
@@ -350,7 +429,10 @@ def process_app_metrics_to_db(
             )
     logger.info(f"date={snapshot_date}, store={store} agg df prep")
     df = prep_app_metrics_history(
-        df=df, store=store, database_connection=database_connection
+        df=df,
+        store=store,
+        database_connection=database_connection,
+        snapshot_date=snapshot_date,
     )
     if not df[df["store_id"].isna()].empty:
         # Why are there many records with missing store_id?
@@ -361,11 +443,6 @@ def process_app_metrics_to_db(
         key_columns=COUNTRY_HISTORY_KEYS,
     )
     insert_columns = [x for x in COUNTRY_HISTORY_COLS if x in df.columns]
-    if store == 1:
-        # TODO: Can get installs per Country by getting review_count sum for all countries
-        # Cannot do with this data set since it is snapshot_date only
-        # and not every app for every country crawled on this date
-        insert_columns = [x for x in insert_columns if x != "installs"]
     logger.info(f"date={snapshot_date}, store={store} agg df country upsert")
     upsert_df(
         df=df,
@@ -375,23 +452,37 @@ def process_app_metrics_to_db(
         insert_columns=insert_columns,
     )
     if store == 1:
+        tier_distribution = df.groupby(["store_app", "tier"])[
+            "installs_est"
+        ].sum() / df.groupby("store_app")["installs_est"].transform("sum")
         df = df[df["country"] == "US"]
+
         df[STAR_COLS] = df["histogram"].apply(pd.Series)
+
     if store == 2:
-        ios_app_country_history = get_ios_app_country_history(
-            database_connection, snapshot_date=snapshot_date, days_back=90
+        ios_app_country_history = get_latest_app_country_history(
+            database_connection,
+            snapshot_date=snapshot_date,
+            days_back=90,
+            chunk_size=5000,
+            store_app_ids=df["store_app"].unique(),
         )
-        ios_app_country_history = ios_app_country_history[
-            ios_app_country_history["store_app"].isin(df["store_app"])
-        ]
-        ios_app_country_history["crawled_date"] = pd.to_datetime(
-            ios_app_country_history["snapshot_date"]
-        )
+        # Should overwrite existing values if there, but could be removed when all rerun
+        ios_app_country_history = estimate_ios_installs(ios_app_country_history)
+
         # For the group by this will need to be the snapshot_date being calculated for
         ios_app_country_history["snapshot_date"] = pd.to_datetime(snapshot_date)
         df = pd.concat([ios_app_country_history, df], axis=0)
         df = df.sort_values(by=["crawled_date"], ascending=True).drop_duplicates(
             subset=["store_app", "country_id"], keep="last"
+        )
+        countries_map = query_countries(database_connection)
+        df = df.merge(
+            countries_map[["id", "tier"]],
+            left_on="country_id",
+            right_on="id",
+            how="left",
+            validate="m:1",
         )
         weighted_sum = (
             (df["rating"] * df["rating_count"])
@@ -401,6 +492,7 @@ def process_app_metrics_to_db(
         weight_total = (
             df["rating_count"].groupby([df[k] for k in GLOBAL_HISTORY_KEYS]).sum()
         )
+
         df = df.groupby(GLOBAL_HISTORY_KEYS).agg(
             rating_count=("rating_count", "sum"),
             store_last_updated=("store_last_updated", "max"),
@@ -408,7 +500,18 @@ def process_app_metrics_to_db(
         )
         df["rating"] = weighted_sum / weight_total
         df["rating"] = df["rating"].astype("float64")
-        df = df.reset_index()
+        tier_installs = df.pivot_table(
+            index=GLOBAL_HISTORY_KEYS,
+            columns="tier",
+            values="installs",
+            aggfunc="sum",
+            fill_value=0,
+        )
+    tier_pct = tier_installs.div(tier_installs.sum(axis=1), axis=0)
+    tier_pct = tier_pct.add_suffix("_pct")
+    tier_pct = tier_pct.fillna(0)
+    df = df.join(tier_pct)
+    df = df.reset_index()
 
     check_for_duplicates(
         df=df,
@@ -928,7 +1031,7 @@ def import_all_app_global_metrics_weekly(database_connection: PostgresCon) -> No
     i = 0
     while True:
         logger.info(f"batch {i} of app global metrics weekly start")
-        df = query_apps_to_process_metrics(database_connection, batch_size=5000)
+        df = query_apps_to_process_global_metrics(database_connection, batch_size=5000)
         apps = df["store_app"].tolist()
         df = get_next_app_global_metrics_weekly(database_connection, df)
         if df.empty:
