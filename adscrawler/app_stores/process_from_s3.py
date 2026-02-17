@@ -60,12 +60,16 @@ COUNTRY_HISTORY_KEYS = [
     "store_app",
 ]
 
-COUNTRY_HISTORY_COLS = COUNTRY_HISTORY_KEYS + [
-    x for x in METRIC_COLS if x != "installs"
-]
+COUNTRY_HISTORY_COLS = (
+    COUNTRY_HISTORY_KEYS
+    + [x for x in METRIC_COLS if x != "installs"]
+    + ["installs_est"]
+)
 
 GLOBAL_HISTORY_COLS = (
-    GLOBAL_HISTORY_KEYS + METRIC_COLS + ["installs_est", "store_last_updated"]
+    GLOBAL_HISTORY_KEYS
+    + METRIC_COLS
+    + ["store_last_updated", "tier1_pct", "tier2_pct", "tier3_pct"]
 )
 
 
@@ -264,16 +268,29 @@ def prep_app_metrics_history(
     store_id_map = query_store_id_map_cached(
         store=store, database_connection=database_connection
     )
-    new_ids = df[~df["store_id"].isin(store_id_map["store_id"])]["store_id"].unique()
-    if len(new_ids) > 0:
-        logger.warning(f"Found new store ids: {len(new_ids)}")
+    df = pd.merge(
+        df,
+        store_id_map[["store_id", "id"]].rename(columns={"id": "store_app"}),
+        on="store_id",
+        how="left",
+        validate="m:1",
+    )
+    if df["store_app"].isna().any():
+        logger.warning(f"Found new store ids: {len(df[df['store_app'].isna()])}")
         raise ValueError("New store ids found in S3 app history data")
-    df["store_app"] = df["store_id"].map(
-        store_id_map.set_index("store_id")["id"].to_dict()
+    country_map = query_countries(database_connection)
+    df = pd.merge(
+        df,
+        country_map[["id", "alpha2", "tier"]].rename(
+            columns={"id": "country_id", "alpha2": "country"}
+        ),
+        on="country",
+        how="left",
+        validate="m:1",
     )
     if store == 1:
         df["store_last_updated"] = np.where(
-            (df["store_last_updated"] < 0) | (df["store_last_updated"].isna()),
+            (df["store_last_updated"].isna() | df["store_last_updated"] < 0),
             None,
             df["store_last_updated"],
         )
@@ -284,7 +301,7 @@ def prep_app_metrics_history(
         google_app_country_history = get_latest_app_country_history(
             database_connection,
             snapshot_date=snapshot_date,
-            days_back=90,
+            days_back=180,
             chunk_size=5000,
             store_app_ids=df["store_app"].unique(),
         )
@@ -347,20 +364,6 @@ def prep_app_metrics_history(
             df["store_last_updated"], format="ISO8601", utc=True
         )
         df = estimate_ios_installs(df)
-
-    country_map = query_countries(database_connection)
-    df = pd.merge(
-        df,
-        country_map[["id", "alpha2", "tier"]].rename(
-            columns={"id": "country_id", "alpha2": "country"}
-        ),
-        on="country",
-        how="left",
-        validate="m:1",
-    )
-    # df["country_id"] = df["country"].map(
-    # country_map.set_index("alpha2")["id"].to_dict()
-    # )
     df = df.convert_dtypes(dtype_backend="pyarrow")
     df = df.replace({pd.NA: None})
     return df
@@ -435,7 +438,7 @@ def process_app_metrics_to_db(
         snapshot_date=snapshot_date,
     )
     if not df[df["store_id"].isna()].empty:
-        # Why are there many records with missing store_id?
+        # Why are there any records with missing store_id?
         logger.warning("Found records with missing store_id")
         raise ValueError("Records with missing store_id found in S3 app history data")
     check_for_duplicates(
@@ -451,25 +454,35 @@ def process_app_metrics_to_db(
         key_columns=COUNTRY_HISTORY_KEYS,
         insert_columns=insert_columns,
     )
+    tier_installs = df.pivot_table(
+        index=GLOBAL_HISTORY_KEYS,
+        columns="tier",
+        values="installs_est",
+        aggfunc="sum",
+        fill_value=0,
+    )
+    tier_pct = tier_installs.div(tier_installs.sum(axis=1), axis=0)
+    tier_pct = tier_pct.add_suffix("_pct")
+    tier_pct = tier_pct.fillna(0)
     if store == 1:
-        tier_distribution = df.groupby(["store_app", "tier"])[
-            "installs_est"
-        ].sum() / df.groupby("store_app")["installs_est"].transform("sum")
-        df = df[df["country"] == "US"]
-
-        df[STAR_COLS] = df["histogram"].apply(pd.Series)
-
+        global_reviews = df.groupby(GLOBAL_HISTORY_KEYS)["review_count"].sum()
+        df = df[df["country"] == "US"].copy()
+        df = df.set_index(GLOBAL_HISTORY_KEYS)
+        df["us_review_count"] = df["review_count"]
+        df["review_count"] = global_reviews
+        hist_df = pd.DataFrame(df["histogram"].tolist(), index=df.index)
+        hist_df.columns = STAR_COLS
+        df = pd.concat([df, hist_df], axis=1)
     if store == 2:
         ios_app_country_history = get_latest_app_country_history(
             database_connection,
             snapshot_date=snapshot_date,
-            days_back=90,
+            days_back=180,
             chunk_size=5000,
             store_app_ids=df["store_app"].unique(),
         )
         # Should overwrite existing values if there, but could be removed when all rerun
         ios_app_country_history = estimate_ios_installs(ios_app_country_history)
-
         # For the group by this will need to be the snapshot_date being calculated for
         ios_app_country_history["snapshot_date"] = pd.to_datetime(snapshot_date)
         df = pd.concat([ios_app_country_history, df], axis=0)
@@ -484,35 +497,30 @@ def process_app_metrics_to_db(
             how="left",
             validate="m:1",
         )
-        weighted_sum = (
-            (df["rating"] * df["rating_count"])
-            .groupby([df[k] for k in GLOBAL_HISTORY_KEYS])
-            .sum()
-        )
-        weight_total = (
-            df["rating_count"].groupby([df[k] for k in GLOBAL_HISTORY_KEYS]).sum()
-        )
-
+        # weighted_sum = (
+        #     (df["rating"] * df["rating_count"])
+        #     .groupby([df[k] for k in GLOBAL_HISTORY_KEYS])
+        #     .sum()
+        # )
+        # weight_total = (
+        #     df["rating_count"].groupby([df[k] for k in GLOBAL_HISTORY_KEYS]).sum()
+        # )
+        df["rating_prod"] = df["rating"] * df["rating_count"]
         df = df.groupby(GLOBAL_HISTORY_KEYS).agg(
             rating_count=("rating_count", "sum"),
+            rating_prod=("rating_prod", "sum"),
             store_last_updated=("store_last_updated", "max"),
             **{col: (col, "sum") for col in STAR_COLS},
         )
-        df["rating"] = weighted_sum / weight_total
-        df["rating"] = df["rating"].astype("float64")
-        tier_installs = df.pivot_table(
-            index=GLOBAL_HISTORY_KEYS,
-            columns="tier",
-            values="installs",
-            aggfunc="sum",
-            fill_value=0,
-        )
-    tier_pct = tier_installs.div(tier_installs.sum(axis=1), axis=0)
-    tier_pct = tier_pct.add_suffix("_pct")
-    tier_pct = tier_pct.fillna(0)
+        # df["rating"] = weighted_sum / weight_total
+        df["rating"] = (
+            df["rating_prod"] / df["rating_count"].replace(0, np.nan)
+        ).astype("float64")
+        # df["rating"] = df["rating"].astype("float64")
     df = df.join(tier_pct)
     df = df.reset_index()
-
+    for col in ["tier1_pct", "tier2_pct", "tier3_pct"]:
+        df[col] = (df[col] * 10000).round().astype("int16")
     check_for_duplicates(
         df=df,
         key_columns=GLOBAL_HISTORY_KEYS,

@@ -1504,7 +1504,9 @@ def get_latest_app_country_history(
         for i in range(0, len(store_app_ids), chunk_size)
     ]
     results = []
-    print(f"Processing {len(store_app_ids)} apps in {len(chunks)} chunks...")
+    logger.info(
+        f"Get apps:{len(store_app_ids)} chunks:{len(chunks)} from app_country_metrics_history"
+    )
     for i, chunk_ids in enumerate(chunks):
         id_list_str = ",".join(map(str, chunk_ids))
         sel_query = f"""
