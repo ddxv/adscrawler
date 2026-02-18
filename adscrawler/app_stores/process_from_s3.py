@@ -377,7 +377,7 @@ def manual_import_app_metrics_from_s3(
     database_connection = get_db_connection(
         use_ssh_tunnel=use_tunnel, config_key="madrone"
     )
-    start_date = datetime.datetime.fromisoformat("2025-09-28").date()
+    start_date = datetime.datetime.fromisoformat("2025-11-29").date()
     end_date = datetime.datetime.today().date()
     for snapshot_date in pd.date_range(start_date, end_date, freq="D"):
         snapshot_date = snapshot_date.date()
@@ -469,7 +469,12 @@ def process_app_metrics_to_db(
         df["us_review_count"] = df["review_count"]
         df["review_count"] = global_reviews
         hist_df = pd.DataFrame(df["histogram"].tolist(), index=df.index)
-        hist_df.columns = STAR_COLS
+        try:
+            hist_df.columns = STAR_COLS
+        except ValueError:
+            for col in STAR_COLS:
+                if col not in hist_df.columns:
+                    hist_df[col] = 0
         df = pd.concat([df, hist_df], axis=1)
     if store == 2:
         ios_app_country_history = get_latest_app_country_history(
