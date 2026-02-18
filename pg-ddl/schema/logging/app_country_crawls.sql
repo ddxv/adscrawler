@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict XLhCRL3eTUmBgoiSluev9YN7Yz6uAz7S0EcHyPTsOQxC8S8XtvMTA7JG6yikH6W
+\restrict sgqsdXNJ6SdQTRYSvfDXPfHUkg7P3VRIm988Lb9VTdPXcYHphSWRK2YdhB06g9V
 
 -- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 -- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
@@ -28,34 +28,25 @@ SET default_table_access_method = heap;
 --
 
 CREATE TABLE logging.app_country_crawls (
-    crawl_result smallint,
-    store_app integer,
-    country_id smallint,
-    crawled_at timestamp without time zone
+    crawl_result bigint,
+    store_app bigint,
+    country_id bigint,
+    crawled_at timestamp with time zone
 );
 
 
 ALTER TABLE logging.app_country_crawls OWNER TO postgres;
 
 --
--- Name: app_country_crawls app_country_crawls_app_fk; Type: FK CONSTRAINT; Schema: logging; Owner: postgres
+-- Name: idx_app_country_crawls_latest; Type: INDEX; Schema: logging; Owner: postgres
 --
 
-ALTER TABLE ONLY logging.app_country_crawls
-    ADD CONSTRAINT app_country_crawls_app_fk FOREIGN KEY (store_app) REFERENCES public.store_apps(id);
-
-
---
--- Name: app_country_crawls fk_country; Type: FK CONSTRAINT; Schema: logging; Owner: postgres
---
-
-ALTER TABLE ONLY logging.app_country_crawls
-    ADD CONSTRAINT fk_country FOREIGN KEY (country_id) REFERENCES public.countries(id);
+CREATE INDEX idx_app_country_crawls_latest ON logging.app_country_crawls USING btree (store_app, crawled_at DESC);
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict XLhCRL3eTUmBgoiSluev9YN7Yz6uAz7S0EcHyPTsOQxC8S8XtvMTA7JG6yikH6W
+\unrestrict sgqsdXNJ6SdQTRYSvfDXPfHUkg7P3VRIm988Lb9VTdPXcYHphSWRK2YdhB06g9V
 
