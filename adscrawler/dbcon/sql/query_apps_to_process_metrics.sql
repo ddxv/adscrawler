@@ -2,6 +2,8 @@ WITH candidate_apps AS (
     SELECT
         sa.store,
         sa.id AS store_app,
+        sa.ad_supported,
+        sa.in_app_purchases,
         sa.category AS app_category
     FROM
         frontend.store_apps_overview AS sa
@@ -10,7 +12,7 @@ WITH candidate_apps AS (
             sa.crawl_result = 1
             OR sa.store_last_updated >= current_date - INTERVAL '365 days'
         )
-    ORDER BY sa.id  -- helps predictable batching
+    ORDER BY sa.id  -- helps predictable batching?
     LIMIT :batch_size * 5
 )
 SELECT
@@ -18,6 +20,8 @@ SELECT
     ca.store,
     agmh.store_app,
     ca.app_category,
+    ca.ad_supported,
+    ca.in_app_purchases,
     agmh.installs,
     agmh.rating_count,
     agmh.review_count,
@@ -26,7 +30,10 @@ SELECT
     agmh.two_star,
     agmh.three_star,
     agmh.four_star,
-    agmh.five_star
+    agmh.five_star,
+    agmh.tier1_pct,
+    agmh.tier2_pct,
+    agmh.tier3_pct
 FROM candidate_apps AS ca
 INNER JOIN app_global_metrics_history AS agmh
     ON ca.store_app = agmh.store_app

@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict aqSyUPuJghUSivRpPmJ0wjpiuNqZ0Xb7iDHpQcCoga4fxvxnfEJs5GfAimQHJSS
+\restrict PkTexdaQPC3EpSM5tYEqhiMVF3VNuNavBwbtM0igtd6cjCnsgB5JLvesgMncINz
 
 -- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 -- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
@@ -358,6 +358,18 @@ SET default_tablespace = '';
 SET default_table_access_method = heap;
 
 --
+-- Name: ad_formats; Type: TABLE; Schema: adtech; Owner: postgres
+--
+
+CREATE TABLE adtech.ad_formats (
+    id smallint NOT NULL,
+    name text NOT NULL
+);
+
+
+ALTER TABLE adtech.ad_formats OWNER TO postgres;
+
+--
 -- Name: api_call_urls; Type: TABLE; Schema: adtech; Owner: postgres
 --
 
@@ -702,7 +714,10 @@ CREATE TABLE public.app_global_metrics_history (
     three_star bigint,
     four_star bigint,
     five_star bigint,
-    store_last_updated date
+    store_last_updated date,
+    tier1_pct smallint,
+    tier2_pct smallint,
+    tier3_pct smallint
 );
 
 
@@ -2320,7 +2335,8 @@ CREATE TABLE public.countries (
     langes character varying(45) NOT NULL,
     langfr character varying(45) NOT NULL,
     langit character varying(45) NOT NULL,
-    langnl character varying(45) NOT NULL
+    langnl character varying(45) NOT NULL,
+    tier_id smallint
 );
 
 
@@ -3876,10 +3892,10 @@ ALTER MATERIALIZED VIEW frontend.z_scores_top_apps OWNER TO postgres;
 --
 
 CREATE TABLE logging.app_country_crawls (
-    crawl_result smallint,
-    store_app integer,
-    country_id smallint,
-    crawled_at timestamp without time zone
+    crawl_result bigint,
+    store_app bigint,
+    country_id bigint,
+    crawled_at timestamp with time zone
 );
 
 
@@ -3897,6 +3913,32 @@ CREATE TABLE logging.app_description_keywords_extracted (
 
 
 ALTER TABLE logging.app_description_keywords_extracted OWNER TO postgres;
+
+--
+-- Name: app_global_crawls; Type: TABLE; Schema: logging; Owner: postgres
+--
+
+CREATE TABLE logging.app_global_crawls (
+    crawl_result smallint,
+    store_app integer,
+    success_country_count smallint,
+    crawled_at timestamp without time zone
+);
+
+
+ALTER TABLE logging.app_global_crawls OWNER TO postgres;
+
+--
+-- Name: app_global_metrics_weekly; Type: TABLE; Schema: logging; Owner: postgres
+--
+
+CREATE TABLE logging.app_global_metrics_weekly (
+    store_app integer NOT NULL,
+    updated_at timestamp without time zone DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+
+ALTER TABLE logging.app_global_metrics_weekly OWNER TO postgres;
 
 --
 -- Name: creative_scan_results; Type: TABLE; Schema: logging; Owner: postgres
@@ -4176,7 +4218,8 @@ CREATE TABLE public.app_country_metrics_history (
     two_star integer,
     three_star integer,
     four_star integer,
-    five_star integer
+    five_star integer,
+    installs_est bigint
 );
 
 
@@ -4204,6 +4247,33 @@ CREATE MATERIALIZED VIEW public.app_country_metrics_latest AS
 
 
 ALTER MATERIALIZED VIEW public.app_country_metrics_latest OWNER TO postgres;
+
+--
+-- Name: app_global_metrics_weekly; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.app_global_metrics_weekly (
+    store_app integer NOT NULL,
+    week_start date NOT NULL,
+    weekly_installs bigint,
+    weekly_ratings bigint,
+    weekly_reviews bigint,
+    weekly_active_users bigint,
+    monthly_active_users bigint,
+    weekly_iap_revenue double precision,
+    weekly_ad_revenue double precision,
+    total_installs bigint,
+    total_ratings_count bigint,
+    rating real,
+    one_star bigint,
+    two_star bigint,
+    three_star bigint,
+    four_star bigint,
+    five_star bigint
+);
+
+
+ALTER TABLE public.app_global_metrics_weekly OWNER TO postgres;
 
 --
 -- Name: app_urls_map_id_seq; Type: SEQUENCE; Schema: public; Owner: james
@@ -4429,23 +4499,18 @@ ALTER SEQUENCE public.domains_id_seq OWNED BY public.domains.id;
 
 
 --
--- Name: global_retention_benchmarks; Type: TABLE; Schema: public; Owner: postgres
+-- Name: ecpm_benchmarks; Type: TABLE; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.global_retention_benchmarks (
-    store_id smallint NOT NULL,
-    app_category text NOT NULL,
-    d1 numeric(6,5) NOT NULL,
-    d7 numeric(6,5) NOT NULL,
-    d30 numeric(6,5) NOT NULL,
-    CONSTRAINT global_retention_benchmarks_d1_check CHECK (((d1 > (0)::numeric) AND (d1 <= (1)::numeric))),
-    CONSTRAINT global_retention_benchmarks_d30_check CHECK (((d30 > (0)::numeric) AND (d30 <= (1)::numeric))),
-    CONSTRAINT global_retention_benchmarks_d7_check CHECK (((d7 > (0)::numeric) AND (d7 <= (1)::numeric))),
-    CONSTRAINT retention_monotonic_check CHECK (((d1 >= d7) AND (d7 >= d30)))
+CREATE TABLE public.ecpm_benchmarks (
+    store smallint NOT NULL,
+    tier_id smallint NOT NULL,
+    ad_format_id smallint NOT NULL,
+    ecpm numeric(6,2) NOT NULL
 );
 
 
-ALTER TABLE public.global_retention_benchmarks OWNER TO postgres;
+ALTER TABLE public.ecpm_benchmarks OWNER TO postgres;
 
 --
 -- Name: ip_geo_snapshots_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
@@ -4587,6 +4652,25 @@ ALTER SEQUENCE public.newtable_id_seq OWNER TO james;
 
 ALTER SEQUENCE public.newtable_id_seq OWNED BY public.platforms.id;
 
+
+--
+-- Name: retention_global_benchmarks; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.retention_global_benchmarks (
+    store smallint CONSTRAINT global_retention_benchmarks_store_id_not_null NOT NULL,
+    app_category text CONSTRAINT global_retention_benchmarks_app_category_not_null NOT NULL,
+    d1 numeric(6,5) CONSTRAINT global_retention_benchmarks_d1_not_null NOT NULL,
+    d7 numeric(6,5) CONSTRAINT global_retention_benchmarks_d7_not_null NOT NULL,
+    d30 numeric(6,5) CONSTRAINT global_retention_benchmarks_d30_not_null NOT NULL,
+    CONSTRAINT global_retention_benchmarks_d1_check CHECK (((d1 > (0)::numeric) AND (d1 <= (1)::numeric))),
+    CONSTRAINT global_retention_benchmarks_d30_check CHECK (((d30 > (0)::numeric) AND (d30 <= (1)::numeric))),
+    CONSTRAINT global_retention_benchmarks_d7_check CHECK (((d7 > (0)::numeric) AND (d7 <= (1)::numeric))),
+    CONSTRAINT retention_monotonic_check CHECK (((d1 >= d7) AND (d7 >= d30)))
+);
+
+
+ALTER TABLE public.retention_global_benchmarks OWNER TO postgres;
 
 --
 -- Name: store_app_z_scores_history; Type: TABLE; Schema: public; Owner: postgres
@@ -4767,6 +4851,41 @@ ALTER SEQUENCE public.stores_column1_seq OWNER TO james;
 --
 
 ALTER SEQUENCE public.stores_column1_seq OWNED BY public.stores.id;
+
+
+--
+-- Name: tiers; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.tiers (
+    id smallint NOT NULL,
+    tier_slug text NOT NULL,
+    tier_name text NOT NULL
+);
+
+
+ALTER TABLE public.tiers OWNER TO postgres;
+
+--
+-- Name: tiers_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.tiers_id_seq
+    AS smallint
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.tiers_id_seq OWNER TO postgres;
+
+--
+-- Name: tiers_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.tiers_id_seq OWNED BY public.tiers.id;
 
 
 --
@@ -5121,6 +5240,13 @@ ALTER TABLE ONLY public.stores ALTER COLUMN id SET DEFAULT nextval('public.store
 
 
 --
+-- Name: tiers id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.tiers ALTER COLUMN id SET DEFAULT nextval('public.tiers_id_seq'::regclass);
+
+
+--
 -- Name: version_code_api_scan_results id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
@@ -5132,6 +5258,22 @@ ALTER TABLE ONLY public.version_code_api_scan_results ALTER COLUMN id SET DEFAUL
 --
 
 ALTER TABLE ONLY public.version_code_sdk_scan_results ALTER COLUMN id SET DEFAULT nextval('public.version_code_sdk_scan_results_id_seq'::regclass);
+
+
+--
+-- Name: ad_formats ad_formats_name_key; Type: CONSTRAINT; Schema: adtech; Owner: postgres
+--
+
+ALTER TABLE ONLY adtech.ad_formats
+    ADD CONSTRAINT ad_formats_name_key UNIQUE (name);
+
+
+--
+-- Name: ad_formats ad_formats_pkey; Type: CONSTRAINT; Schema: adtech; Owner: postgres
+--
+
+ALTER TABLE ONLY adtech.ad_formats
+    ADD CONSTRAINT ad_formats_pkey PRIMARY KEY (id);
 
 
 --
@@ -5351,6 +5493,14 @@ ALTER TABLE ONLY logging.store_app_sources
 
 
 --
+-- Name: ecpm_benchmarks ad_revenue_benchmarks_pk; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.ecpm_benchmarks
+    ADD CONSTRAINT ad_revenue_benchmarks_pk PRIMARY KEY (store, tier_id, ad_format_id);
+
+
+--
 -- Name: adstxt_crawl_results adstxt_crawl_results_domain_un; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -5412,6 +5562,14 @@ ALTER TABLE ONLY public.app_ads_map
 
 ALTER TABLE ONLY public.app_ads_entrys
     ADD CONSTRAINT app_ads_txt_un UNIQUE (ad_domain, publisher_id, relationship);
+
+
+--
+-- Name: app_global_metrics_weekly app_global_metrics_weekly_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.app_global_metrics_weekly
+    ADD CONSTRAINT app_global_metrics_weekly_pkey PRIMARY KEY (store_app, week_start);
 
 
 --
@@ -5567,11 +5725,11 @@ ALTER TABLE ONLY public.domains
 
 
 --
--- Name: global_retention_benchmarks global_retention_benchmarks_pk; Type: CONSTRAINT; Schema: public; Owner: postgres
+-- Name: retention_global_benchmarks global_retention_benchmarks_pk; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.global_retention_benchmarks
-    ADD CONSTRAINT global_retention_benchmarks_pk PRIMARY KEY (store_id, app_category);
+ALTER TABLE ONLY public.retention_global_benchmarks
+    ADD CONSTRAINT global_retention_benchmarks_pk PRIMARY KEY (store, app_category);
 
 
 --
@@ -5708,6 +5866,14 @@ ALTER TABLE ONLY public.stores
 
 ALTER TABLE ONLY public.stores
     ADD CONSTRAINT stores_un UNIQUE (name);
+
+
+--
+-- Name: tiers tiers_pk; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.tiers
+    ADD CONSTRAINT tiers_pk PRIMARY KEY (id);
 
 
 --
@@ -6317,6 +6483,20 @@ CREATE INDEX app_description_keywords_extrac_description_id_extracted_at_idx ON 
 
 
 --
+-- Name: idx_app_country_crawls_latest; Type: INDEX; Schema: logging; Owner: postgres
+--
+
+CREATE INDEX idx_app_country_crawls_latest ON logging.app_country_crawls USING btree (store_app, crawled_at DESC);
+
+
+--
+-- Name: idx_app_global_crawls_latest; Type: INDEX; Schema: logging; Owner: postgres
+--
+
+CREATE INDEX idx_app_global_crawls_latest ON logging.app_global_crawls USING btree (store_app, crawled_at DESC);
+
+
+--
 -- Name: logging_store_app_upsert_unique; Type: INDEX; Schema: logging; Owner: postgres
 --
 
@@ -6433,6 +6613,13 @@ CREATE INDEX developers_developer_id_idx ON public.developers USING btree (devel
 --
 
 CREATE INDEX developers_name_idx ON public.developers USING gin (to_tsvector('simple'::regconfig, (name)::text));
+
+
+--
+-- Name: idx_agmh_store_app_snapshot_date; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_agmh_store_app_snapshot_date ON public.app_global_metrics_history USING btree (store_app, snapshot_date DESC);
 
 
 --
@@ -6888,19 +7075,11 @@ ALTER TABLE ONLY frontend.app_keyword_ranks_daily
 
 
 --
--- Name: app_country_crawls app_country_crawls_app_fk; Type: FK CONSTRAINT; Schema: logging; Owner: postgres
+-- Name: app_global_metrics_weekly app_global_metrics_weekly_store_app_fkey; Type: FK CONSTRAINT; Schema: logging; Owner: postgres
 --
 
-ALTER TABLE ONLY logging.app_country_crawls
-    ADD CONSTRAINT app_country_crawls_app_fk FOREIGN KEY (store_app) REFERENCES public.store_apps(id);
-
-
---
--- Name: app_country_crawls fk_country; Type: FK CONSTRAINT; Schema: logging; Owner: postgres
---
-
-ALTER TABLE ONLY logging.app_country_crawls
-    ADD CONSTRAINT fk_country FOREIGN KEY (country_id) REFERENCES public.countries(id);
+ALTER TABLE ONLY logging.app_global_metrics_weekly
+    ADD CONSTRAINT app_global_metrics_weekly_store_app_fkey FOREIGN KEY (store_app) REFERENCES public.store_apps(id);
 
 
 --
@@ -7032,6 +7211,14 @@ ALTER TABLE ONLY public.app_global_metrics_history
 
 
 --
+-- Name: app_global_metrics_weekly app_global_metrics_weekly_store_app_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.app_global_metrics_weekly
+    ADD CONSTRAINT app_global_metrics_weekly_store_app_fkey FOREIGN KEY (store_app) REFERENCES public.store_apps(id);
+
+
+--
 -- Name: app_urls_map app_urls_fk; Type: FK CONSTRAINT; Schema: public; Owner: james
 --
 
@@ -7045,6 +7232,14 @@ ALTER TABLE ONLY public.app_urls_map
 
 ALTER TABLE ONLY public.app_urls_map
     ADD CONSTRAINT app_urls_map_fk_domain FOREIGN KEY (pub_domain) REFERENCES public.domains(id);
+
+
+--
+-- Name: countries countries_tier_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.countries
+    ADD CONSTRAINT countries_tier_id_fkey FOREIGN KEY (tier_id) REFERENCES public.tiers(id);
 
 
 --
@@ -7141,6 +7336,30 @@ ALTER TABLE ONLY public.app_keywords_extracted
 
 ALTER TABLE ONLY public.developers
     ADD CONSTRAINT developers_fk FOREIGN KEY (store) REFERENCES public.stores(id);
+
+
+--
+-- Name: ecpm_benchmarks ecpm_benchmarks_ad_format_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.ecpm_benchmarks
+    ADD CONSTRAINT ecpm_benchmarks_ad_format_id_fkey FOREIGN KEY (ad_format_id) REFERENCES adtech.ad_formats(id);
+
+
+--
+-- Name: ecpm_benchmarks ecpm_benchmarks_store_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.ecpm_benchmarks
+    ADD CONSTRAINT ecpm_benchmarks_store_fkey FOREIGN KEY (store) REFERENCES public.stores(id);
+
+
+--
+-- Name: ecpm_benchmarks ecpm_benchmarks_tier_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.ecpm_benchmarks
+    ADD CONSTRAINT ecpm_benchmarks_tier_id_fkey FOREIGN KEY (tier_id) REFERENCES public.tiers(id);
 
 
 --
@@ -7275,5 +7494,5 @@ GRANT ALL ON SCHEMA public TO PUBLIC;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict aqSyUPuJghUSivRpPmJ0wjpiuNqZ0Xb7iDHpQcCoga4fxvxnfEJs5GfAimQHJSS
+\unrestrict PkTexdaQPC3EpSM5tYEqhiMVF3VNuNavBwbtM0igtd6cjCnsgB5JLvesgMncINz
 

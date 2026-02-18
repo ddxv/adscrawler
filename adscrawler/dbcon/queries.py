@@ -2,6 +2,7 @@ import datetime
 import hashlib
 import pathlib
 from functools import lru_cache
+from io import StringIO
 
 import numpy as np
 import pandas as pd
@@ -257,6 +258,49 @@ def update_from_df(
             return_df = None
     raw_conn.commit()
     return return_df
+
+
+def upsert_bulk(
+    df: pd.DataFrame,
+    table_name: str,
+    database_connection: Connection,
+    key_columns: list[str],
+) -> None:
+    temp_table = f"temp_{table_name}"
+    with database_connection.engine.begin() as conn:
+        conn.execute(
+            text(
+                f"CREATE TEMP TABLE {temp_table} "
+                f"(LIKE {table_name} INCLUDING DEFAULTS) ON COMMIT DROP"
+            )
+        )
+        buffer = StringIO()
+        df.to_csv(buffer, index=False, header=False)
+        buffer.seek(0)
+        raw = conn.connection
+        with raw.cursor() as cur:
+            with cur.copy(
+                f"COPY {temp_table} ({', '.join(df.columns)}) FROM STDIN WITH CSV"
+            ) as copy:
+                copy.write(buffer.getvalue())
+            # cur.execute(f"ANALYZE {temp_table}")
+        all_cols = [f'"{c}"' for c in df.columns]
+        update_cols = [
+            f'"{c}" = EXCLUDED."{c}"' for c in df.columns if c not in key_columns
+        ]
+        where_clause = " OR ".join(
+            f'{table_name}."{c}" IS DISTINCT FROM EXCLUDED."{c}"'
+            for c in df.columns
+            if c not in key_columns
+        )
+        query = f"""
+            INSERT INTO {table_name} ({", ".join(all_cols)})
+            SELECT {", ".join(all_cols)} FROM {temp_table}
+            ON CONFLICT ({", ".join(f'"{c}"' for c in key_columns)})
+            DO UPDATE SET {", ".join(update_cols)}
+            WHERE {where_clause}
+        """
+        conn.execute(text(query))
 
 
 def upsert_df(
@@ -1215,6 +1259,8 @@ def query_apps_to_process_global_metrics(
         con=database_connection.engine,
         params={"batch_size": batch_size},
     )
+    tiers = ["tier1_pct", "tier2_pct", "tier3_pct"]
+    df[tiers] = (df[tiers] / 10000).fillna(0)
     return df
 
 
@@ -1485,9 +1531,6 @@ def get_all_mmp_tlds(database_connection: PostgresCon) -> pd.DataFrame:
     return df
 
 
-import pandas as pd
-
-
 def get_latest_app_country_history(
     database_connection: PostgresCon,
     snapshot_date: datetime.date,
@@ -1540,51 +1583,8 @@ def get_latest_app_country_history(
         return pd.DataFrame()
     df = pd.concat(results, ignore_index=True)
     df["crawled_date"] = pd.to_datetime(df["snapshot_date"])
+    df = df.drop(columns=["snapshot_date"])
     return df
-
-
-# def get_latest_app_country_history(
-#     store: int,
-#     database_connection: PostgresCon,
-#     snapshot_date: datetime.date,
-#     days_back: int,
-# ) -> pd.DataFrame:
-#     start_date = (snapshot_date - datetime.timedelta(days=days_back)).strftime(
-#         "%Y-%m-%d"
-#     )
-#     end_date = snapshot_date.strftime("%Y-%m-%d")
-#     sel_query = f"""SELECT
-# 	     DISTINCT ON
-# 	     (
-# 		    store_app,
-# 		    country_id
-# 	     )
-#          acmh.store_app,
-# 	     acmh.snapshot_date,
-# 	     acmh.country_id,
-# 	     review_count,
-# 	     rating,
-# 	     rating_count,
-# 	     one_star,
-# 	     two_star,
-# 	     three_star,
-# 	     four_star,
-# 	     five_star
-#      FROM
-# 	     app_country_metrics_history acmh
-#      LEFT JOIN store_apps sa ON
-# 	     acmh.store_app = sa.id
-#      WHERE
-# 	     snapshot_date >= '{start_date}'
-# 	     AND snapshot_date <= '{end_date}'
-# 	     AND sa.store = {store}
-#      ORDER BY
-# 	     store_app,
-# 	     country_id,
-# 	     snapshot_date DESC
-#         """
-#     df = pd.read_sql(sel_query, con=database_connection.engine)
-#     return df
 
 
 def get_retention_benchmarks(database_connection: PostgresCon) -> pd.DataFrame:
@@ -1630,6 +1630,18 @@ def get_retention_benchmarks(database_connection: PostgresCon) -> pd.DataFrame:
          FROM
 	         retention_benchmarks
     ;
+    """
+    df = pd.read_sql(sel_query, con=database_connection.engine)
+    return df
+
+
+def get_ecpm_benchmarks(database_connection: PostgresCon) -> pd.DataFrame:
+    sel_query = """SELECT 
+        store, tier_slug, af."name" ad_format, ecpm 
+    FROM public.ecpm_benchmarks eb
+    LEFT JOIN tiers t ON eb.tier_id = t.id
+    LEFT JOIN adtech.ad_formats af ON eb.ad_format_id = af.id
+        ;
     """
     df = pd.read_sql(sel_query, con=database_connection.engine)
     return df

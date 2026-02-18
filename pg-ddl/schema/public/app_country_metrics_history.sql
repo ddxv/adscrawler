@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict ANh2lWa2FfRbz3rXRBv9rs0NO5YM7vEgUAZEIpezN7nM4peG00h2NwHwOxchhca
+\restrict eYBThMFpA6lDDk56Pvst0nBQvzVPkDcn7LUzcriCq92Sc9nGwVhgrGICnK6r4q5
 
 -- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 -- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
@@ -38,7 +38,8 @@ CREATE TABLE public.app_country_metrics_history (
     two_star integer,
     three_star integer,
     four_star integer,
-    five_star integer
+    five_star integer,
+    installs_est bigint
 );
 
 
@@ -85,5 +86,5 @@ ALTER TABLE ONLY public.app_country_metrics_history
 -- PostgreSQL database dump complete
 --
 
-\unrestrict ANh2lWa2FfRbz3rXRBv9rs0NO5YM7vEgUAZEIpezN7nM4peG00h2NwHwOxchhca
+\unrestrict eYBThMFpA6lDDk56Pvst0nBQvzVPkDcn7LUzcriCq92Sc9nGwVhgrGICnK6r4q5
 

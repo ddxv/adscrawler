@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict ZzbmOlxhPhLVUWDYI4sQ9mOAKsGLkJ3PEtJskHKE7wlaivPpClx0Cn2WGebJ9zH
+\restrict WeXfkpa09ycm0nNFGY4B6thRKTO5YliOEbdxRomrgL5fTC6g4mfuPi4UiRLUHQR
 
 -- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 -- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
@@ -24,15 +24,15 @@ SET default_tablespace = '';
 SET default_table_access_method = heap;
 
 --
--- Name: global_retention_benchmarks; Type: TABLE; Schema: public; Owner: postgres
+-- Name: retention_global_benchmarks; Type: TABLE; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.global_retention_benchmarks (
-    store_id smallint NOT NULL,
-    app_category text NOT NULL,
-    d1 numeric(6,5) NOT NULL,
-    d7 numeric(6,5) NOT NULL,
-    d30 numeric(6,5) NOT NULL,
+CREATE TABLE public.retention_global_benchmarks (
+    store smallint CONSTRAINT global_retention_benchmarks_store_id_not_null NOT NULL,
+    app_category text CONSTRAINT global_retention_benchmarks_app_category_not_null NOT NULL,
+    d1 numeric(6,5) CONSTRAINT global_retention_benchmarks_d1_not_null NOT NULL,
+    d7 numeric(6,5) CONSTRAINT global_retention_benchmarks_d7_not_null NOT NULL,
+    d30 numeric(6,5) CONSTRAINT global_retention_benchmarks_d30_not_null NOT NULL,
     CONSTRAINT global_retention_benchmarks_d1_check CHECK (((d1 > (0)::numeric) AND (d1 <= (1)::numeric))),
     CONSTRAINT global_retention_benchmarks_d30_check CHECK (((d30 > (0)::numeric) AND (d30 <= (1)::numeric))),
     CONSTRAINT global_retention_benchmarks_d7_check CHECK (((d7 > (0)::numeric) AND (d7 <= (1)::numeric))),
@@ -40,19 +40,19 @@ CREATE TABLE public.global_retention_benchmarks (
 );
 
 
-ALTER TABLE public.global_retention_benchmarks OWNER TO postgres;
+ALTER TABLE public.retention_global_benchmarks OWNER TO postgres;
 
 --
--- Name: global_retention_benchmarks global_retention_benchmarks_pk; Type: CONSTRAINT; Schema: public; Owner: postgres
+-- Name: retention_global_benchmarks global_retention_benchmarks_pk; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.global_retention_benchmarks
-    ADD CONSTRAINT global_retention_benchmarks_pk PRIMARY KEY (store_id, app_category);
+ALTER TABLE ONLY public.retention_global_benchmarks
+    ADD CONSTRAINT global_retention_benchmarks_pk PRIMARY KEY (store, app_category);
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict ZzbmOlxhPhLVUWDYI4sQ9mOAKsGLkJ3PEtJskHKE7wlaivPpClx0Cn2WGebJ9zH
+\unrestrict WeXfkpa09ycm0nNFGY4B6thRKTO5YliOEbdxRomrgL5fTC6g4mfuPi4UiRLUHQR
 

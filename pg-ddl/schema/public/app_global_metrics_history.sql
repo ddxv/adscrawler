@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict nm2Ymju9xTwTbTT6qMpGHXk6lev3UGDSl4oIVVvjJ7vGDTb41BNJEXpOHOAQwxw
+\restrict YhhAdXtpPi9fcbLSyhNd5PsO7gNLUeUrYG9ijoslSYovJOdFbbJeisfdZzXm6jb
 
 -- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 -- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
@@ -39,7 +39,10 @@ CREATE TABLE public.app_global_metrics_history (
     three_star bigint,
     four_star bigint,
     five_star bigint,
-    store_last_updated date
+    store_last_updated date,
+    tier1_pct smallint,
+    tier2_pct smallint,
+    tier3_pct smallint
 );
 
 
@@ -67,6 +70,13 @@ CREATE UNIQUE INDEX app_global_metrics_history_unique_idx ON public.app_global_m
 
 
 --
+-- Name: idx_agmh_store_app_snapshot_date; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_agmh_store_app_snapshot_date ON public.app_global_metrics_history USING btree (store_app, snapshot_date DESC);
+
+
+--
 -- Name: app_global_metrics_history app_global_metrics_history_app_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -78,5 +88,5 @@ ALTER TABLE ONLY public.app_global_metrics_history
 -- PostgreSQL database dump complete
 --
 
-\unrestrict nm2Ymju9xTwTbTT6qMpGHXk6lev3UGDSl4oIVVvjJ7vGDTb41BNJEXpOHOAQwxw
+\unrestrict YhhAdXtpPi9fcbLSyhNd5PsO7gNLUeUrYG9ijoslSYovJOdFbbJeisfdZzXm6jb
 

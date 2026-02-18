@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict LFwZdqDfg6GRjKe2GcSx8Y0UizEGvOHy0msSAJcLwZ9rdlcJVPK47bzMF5xXpqQ
+\restrict bCiW28shFErUJo81YDRdSEIT9Ip9GrKGgS5QevQQi1931iEX9CBazWt4oyQ45vx
 
 -- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 -- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
@@ -37,7 +37,8 @@ CREATE TABLE public.countries (
     langes character varying(45) NOT NULL,
     langfr character varying(45) NOT NULL,
     langit character varying(45) NOT NULL,
-    langnl character varying(45) NOT NULL
+    langnl character varying(45) NOT NULL,
+    tier_id smallint
 );
 
 
@@ -68,8 +69,16 @@ ALTER TABLE ONLY public.countries
 
 
 --
+-- Name: countries countries_tier_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.countries
+    ADD CONSTRAINT countries_tier_id_fkey FOREIGN KEY (tier_id) REFERENCES public.tiers(id);
+
+
+--
 -- PostgreSQL database dump complete
 --
 
-\unrestrict LFwZdqDfg6GRjKe2GcSx8Y0UizEGvOHy0msSAJcLwZ9rdlcJVPK47bzMF5xXpqQ
+\unrestrict bCiW28shFErUJo81YDRdSEIT9Ip9GrKGgS5QevQQi1931iEX9CBazWt4oyQ45vx
 
