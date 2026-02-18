@@ -1259,6 +1259,8 @@ def query_apps_to_process_global_metrics(
         con=database_connection.engine,
         params={"batch_size": batch_size},
     )
+    tiers = ["tier1_pct", "tier2_pct", "tier3_pct"]
+    df[tiers] = (df[tiers] / 10000).fillna(0)
     return df
 
 

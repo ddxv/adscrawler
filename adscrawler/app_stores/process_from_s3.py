@@ -17,6 +17,7 @@ from adscrawler.dbcon.connection import (
 from adscrawler.dbcon.queries import (
     clean_app_ranks_weekly_table,
     delete_and_insert,
+    get_ecpm_benchmarks,
     get_latest_app_country_history,
     get_retention_benchmarks,
     query_apps_to_process_global_metrics,
@@ -26,9 +27,8 @@ from adscrawler.dbcon.queries import (
     query_languages,
     query_store_id_map,
     query_store_id_map_cached,
-    upsert_df,
     upsert_bulk,
-    get_ecpm_benchmarks,
+    upsert_df,
 )
 from adscrawler.packages.storage import get_duckdb_connection, get_s3_client
 
@@ -250,7 +250,7 @@ def make_s3_app_country_metrics_history(
     duckdb_con.close()
 
 
-def estimate_ios_installs(df):
+def estimate_ios_installs(df: pd.DataFrame) -> pd.DataFrame:
     # For iOS we don't have installs, but we can estimate them using the review count and a conversion rate
     # This is a very rough estimate and should be replaced with actual install data if possible
     conversion_rate = 0.02
@@ -915,7 +915,7 @@ def query_keywords_from_s3(
     return duckdb_con.execute(period_query).df()
 
 
-def get_next_app_global_metrics_weekly(
+def calculate_active_users(
     database_connection: PostgresCon, df: pd.DataFrame
 ) -> pd.DataFrame:
     """Process app global metrics weekly."""
@@ -927,7 +927,18 @@ def get_next_app_global_metrics_weekly(
     df = df.sort_values(["store_app", xaxis_col])
     df = (
         df.set_index(xaxis_col)
-        .groupby(["store_app", "store", "app_category"])[metrics]
+        .groupby(
+            [
+                "store_app",
+                "store",
+                "app_category",
+                "ad_supported",
+                "in_app_purchases",
+                "tier1_pct",
+                "tier2_pct",
+                "tier3_pct",
+            ]
+        )[metrics]
         .resample("W-MON")
         .last()
         .apply(pd.to_numeric, errors="coerce")
@@ -984,10 +995,20 @@ def get_next_app_global_metrics_weekly(
         .reset_index()
     )
     ddf.rename(columns={"surviving_users": "wau", "surviving_mau": "mau"}, inplace=True)
-    cols = ["store_app", "snapshot_date", "installs_diff"] + metrics
+    cols = [
+        "store_app",
+        "in_app_purchases",
+        "ad_supported",
+        "snapshot_date",
+        "installs_diff",
+        "tier1_pct",
+        "tier2_pct",
+        "tier3_pct",
+    ] + metrics
     df = pd.merge(
         df[cols], ddf, on=["store_app", "snapshot_date"], how="left", validate="1:1"
     )
+
     logger.info("Finished calculating WAU")
     df["weekly_ratings"] = (
         df.groupby("store_app")["rating_count"].diff().fillna(df["rating_count"])
@@ -1004,29 +1025,43 @@ def get_next_app_global_metrics_weekly(
         "rating_count": "total_ratings_count",
     }
     df = df.rename(columns=rename_map)
+    return df
+
+
+def calculate_revenue_cols(
+    database_connection: PostgresCon, df: pd.DataFrame
+) -> pd.DataFrame:
     ecpm_benchmarks = get_ecpm_benchmarks(database_connection)
-    df["weekly_iap_revenue"] = 0.0
-    df["weekly_ad_revenue"] = 0.0
-    final_cols = [
-        "store_app",
-        "week_start",
-        "weekly_installs",
-        "weekly_ratings",
-        "weekly_reviews",
-        "weekly_active_users",
-        "monthly_active_users",
-        "weekly_iap_revenue",
-        "weekly_ad_revenue",
-        "total_installs",
-        "total_ratings_count",
-        "rating",
-        "one_star",
-        "two_star",
-        "three_star",
-        "four_star",
-        "five_star",
-    ]
-    df = df[final_cols]
+    # Fill in blank rows with default
+    df["tier_pct_sum"] = df["tier1_pct"] + df["tier2_pct"] + df["tier3_pct"]
+    df.loc[df["tier_pct_sum"] < 0.5, "tier1_pct"] = 0.33
+    df.loc[df["tier_pct_sum"] < 0.5, "tier2_pct"] = 0.33
+    df.loc[df["tier_pct_sum"] < 0.5, "tier3_pct"] = 0.34
+    df["wau_tier1"] = df["weekly_active_users"] * df["tier1_pct"]
+    df["wau_tier2"] = df["weekly_active_users"] * df["tier2_pct"]
+    df["wau_tier3"] = df["weekly_active_users"] * df["tier3_pct"]
+    df["mau_tier1"] = df["monthly_active_users"] * df["tier1_pct"]
+    df["mau_tier2"] = df["monthly_active_users"] * df["tier2_pct"]
+    df["mau_tier3"] = df["monthly_active_users"] * df["tier3_pct"]
+    # Placeholder ARPU. Replace with Paying User rate or ARPU benchmarks by tier if available
+    df["weekly_iap_revenue"] = df.apply(
+        lambda x: x["weekly_active_users"] * 0.05 if x["in_app_purchases"] else 0.0,
+        axis=1,
+    )
+    # 2. Calculate Ad Revenue
+    avg_ecpm = ecpm_benchmarks.groupby("tier_slug")["ecpm"].mean()
+
+    def calculate_ad_rev(row: pd.Series) -> float:
+        if not row["ad_supported"]:
+            return 0.0
+        # Need benchmark for impressions per user
+        imps_per_user = 3
+        rev_t1 = (row["wau_tier1"] * imps_per_user * avg_ecpm.get("tier1", 0)) / 1000
+        rev_t2 = (row["wau_tier2"] * imps_per_user * avg_ecpm.get("tier2", 0)) / 1000
+        rev_t3 = (row["wau_tier3"] * imps_per_user * avg_ecpm.get("tier3", 0)) / 1000
+        return rev_t1 + rev_t2 + rev_t3
+
+    df["weekly_ad_revenue"] = df.apply(calculate_ad_rev, axis=1)
     return df
 
 
@@ -1035,10 +1070,32 @@ def import_all_app_global_metrics_weekly(database_connection: PostgresCon) -> No
     while True:
         logger.info(f"batch {i} of app global metrics weekly start")
         df = query_apps_to_process_global_metrics(database_connection, batch_size=5000)
-        apps = df["store_app"].tolist()
-        df = get_next_app_global_metrics_weekly(database_connection, df)
         if df.empty:
             break
+        log_apps = df["store_app"].tolist()
+        df = calculate_active_users(database_connection, df)
+        df = calculate_revenue_cols(database_connection, df)
+        final_cols = [
+            "store_app",
+            "week_start",
+            "weekly_installs",
+            "weekly_ratings",
+            "weekly_reviews",
+            "weekly_active_users",
+            "monthly_active_users",
+            "weekly_iap_revenue",
+            "weekly_ad_revenue",
+            "total_installs",
+            "total_ratings_count",
+            "rating",
+            "one_star",
+            "two_star",
+            "three_star",
+            "four_star",
+            "five_star",
+        ]
+        df = df[final_cols]
+
         upsert_df(
             df=df,
             table_name="app_global_metrics_weekly",
@@ -1046,7 +1103,7 @@ def import_all_app_global_metrics_weekly(database_connection: PostgresCon) -> No
             key_columns=["store_app", "week_start"],
             insert_columns=df.columns.tolist(),
         )
-        log_df = pd.DataFrame({"store_app": apps})
+        log_df = pd.DataFrame({"store_app": log_apps})
         log_df["updated_at"] = datetime.datetime.now()
         log_df.to_sql(
             name="app_global_metrics_weekly",
