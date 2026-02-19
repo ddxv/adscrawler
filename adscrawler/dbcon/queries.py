@@ -1534,13 +1534,11 @@ def get_all_mmp_tlds(database_connection: PostgresCon) -> pd.DataFrame:
 def get_latest_app_country_history(
     database_connection: PostgresCon,
     snapshot_date: datetime.date,
-    store_app_ids: list,  # The 200k IDs from your DuckDB/S3 query
-    days_back: int = 30,
-    chunk_size: int = 5000,
+    store_app_ids: list,
+    days_back: int,
+    chunk_size: int,
+    store: int,
 ) -> pd.DataFrame:
-    start_date = (snapshot_date - datetime.timedelta(days=days_back)).strftime(
-        "%Y-%m-%d"
-    )
     end_date = snapshot_date.strftime("%Y-%m-%d")
     chunks = [
         store_app_ids[i : i + chunk_size]
@@ -1550,21 +1548,33 @@ def get_latest_app_country_history(
     logger.info(
         f"Get apps:{len(store_app_ids)} chunks:{len(chunks)} from app_country_metrics_history"
     )
+    if store == 1:
+        metric_cols = "review_count"
+    elif store == 2:
+        metric_cols = "rating, rating_count, one_star, two_star, three_star, four_star, five_star, installs_est"
     for i, chunk_ids in enumerate(chunks):
         id_list_str = ",".join(map(str, chunk_ids))
-        sel_query = f"""
+        if days_back == 1:
+            sel_query = f"""
+            SELECT
+                acmh.store_app,
+                acmh.snapshot_date,
+                acmh.country_id,
+                {metric_cols}
+            FROM app_country_metrics_history acmh
+            WHERE acmh.store_app IN ({id_list_str})
+              AND acmh.snapshot_date = '{end_date}'
+            """
+        else:
+            start_date = (snapshot_date - datetime.timedelta(days=days_back)).strftime(
+                "%Y-%m-%d"
+            )
+            sel_query = f"""
             SELECT DISTINCT ON (acmh.store_app, acmh.country_id)
                 acmh.store_app,
                 acmh.snapshot_date,
                 acmh.country_id,
-                review_count,
-                rating,
-                rating_count,
-                one_star,
-                two_star,
-                three_star,
-                four_star,
-                five_star
+                {metric_cols}
             FROM app_country_metrics_history acmh
             WHERE acmh.store_app IN ({id_list_str})
               AND acmh.snapshot_date >= '{start_date}'

@@ -258,12 +258,7 @@ def estimate_ios_installs(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def prep_app_metrics_history(
-    df: pd.DataFrame,
-    store: int,
-    database_connection: PostgresCon,
-    snapshot_date: datetime.date,
-) -> pd.DataFrame:
+def merge_in_db_ids(df: pd.DataFrame, store: int, database_connection: PostgresCon):
     store_id_map = query_store_id_map_cached(
         store=store, database_connection=database_connection
     )
@@ -287,6 +282,14 @@ def prep_app_metrics_history(
         how="left",
         validate="m:1",
     )
+    return df
+
+
+def prep_app_country_metrics_history(
+    df: pd.DataFrame,
+    store: int,
+    app_country_db_latest: pd.DataFrame,
+) -> pd.DataFrame:
     if store == 1:
         df["store_last_updated"] = np.where(
             (df["store_last_updated"].isna() | df["store_last_updated"] < 0),
@@ -297,61 +300,79 @@ def prep_app_metrics_history(
             df.loc[df["store_last_updated"].notna(), "store_last_updated"],
             unit="s",
         )
-        google_app_country_history = get_latest_app_country_history(
-            database_connection,
-            snapshot_date=snapshot_date,
-            days_back=180,
-            chunk_size=50000,
-            store_app_ids=df["store_app"].unique(),
+        df = df.rename(
+            columns={
+                "installs": "global_installs",
+                "rating_count": "global_rating_count",
+            }
         )
         # If data is being rerun, prefer 'newer' data from S3
         df["crawled_date"] = df["crawled_date"] + pd.Timedelta(seconds=1)
-        cdf = pd.concat([df, google_app_country_history], axis=0)
+        cdf = pd.concat(
+            [
+                df,
+                app_country_db_latest[
+                    app_country_db_latest["store_app"].isin(df["store_app"].unique())
+                ],
+            ],
+            axis=0,
+        )
         cdf = cdf.sort_values(by=["crawled_date"], ascending=True).drop_duplicates(
             subset=["store_app", "country_id"], keep="last"
         )
         cdf["review_count"] = pd.to_numeric(
             cdf["review_count"], errors="coerce"
         ).fillna(0)
-        cdf["installs"] = pd.to_numeric(cdf["installs"], errors="coerce").fillna(0)
-        # 1. Find the maximum review_count for each app
-        cdf["max_reviews"] = cdf.groupby("store_app")["review_count"].transform("max")
-        cdf["max_installs"] = cdf.groupby("store_app")["installs"].transform("max")
-        # 2. Flag as global if it's within a 1% threshold of the max
-        cdf["is_global_fallback"] = (
-            cdf["review_count"] >= cdf["max_reviews"] * 0.99
-        ) & (cdf["max_reviews"] > 200)
-        cdf["true_global_count"] = np.where(
-            cdf["is_global_fallback"], cdf["max_reviews"], None
-        )
-        cdf["true_global_count"] = cdf.groupby("store_app")[
-            "true_global_count"
-        ].transform("max")
-        # Remove review_count where it's just the global_fallback
-        cdf["review_count"] = np.where(
-            cdf["is_global_fallback"], 0, cdf["review_count"]
-        )
-        # Calculate local share only for unique, non-fallback rows
-        # Use .replace(0, np.nan) to handle divide-by-zero safely
-        cdf["pct_of_global"] = (
-            cdf["review_count"] / cdf["true_global_count"].replace(0, np.nan)
+        cdf["global_installs"] = pd.to_numeric(
+            cdf["global_installs"], errors="coerce"
         ).fillna(0)
+        cdf["global_rating_count"] = pd.to_numeric(
+            cdf["global_rating_count"], errors="coerce"
+        ).fillna(0)
+        cdf["max_reviews"] = cdf.groupby("store_app")["review_count"].transform("max")
+        cdf["is_max_candidate"] = (cdf["review_count"] >= cdf["max_reviews"] * 0.99) & (
+            cdf["max_reviews"] > 200
+        )
+        candidate_counts = cdf.groupby("store_app")["is_max_candidate"].transform("sum")
+        cdf["is_global_fallback"] = cdf["is_max_candidate"] & (candidate_counts > 1)
+        local_app_sums = (
+            cdf[~cdf["is_global_fallback"]].groupby("store_app")["review_count"].sum()
+        )
+        cdf["global_review_count"] = np.where(
+            candidate_counts > 1,
+            cdf["max_reviews"],  # Use the Max if we detected ghosting
+            cdf["store_app"].map(
+                local_app_sums
+            ),  # Otherwise, use the sum of local data
+        )
+        # Remove review_count where is_global_fallback is VERY tempting, but deletes data
+        # cdf["review_count"] = np.where(
+        #     cdf["is_global_fallback"], 0, cdf["review_count"]
+        # )
+        cdf["pct_of_global"] = (
+            (
+                np.where(cdf["is_global_fallback"], np.nan, cdf["review_count"])
+                / cdf["global_review_count"]
+            )
+            .replace(0, np.nan)
+            .fillna(0)
+        )
         cdf["installs_est"] = (
-            (cdf["installs"] * cdf["pct_of_global"]).round().astype(int)
+            (cdf["global_installs"] * cdf["pct_of_global"]).round().astype(int)
+        )
+        cdf["rating_count_est"] = (
+            (cdf["global_rating_count"] * cdf["pct_of_global"]).round().astype(int)
         )
         df = pd.merge(
             df,
-            cdf[["store_app", "country_id", "review_count", "installs_est"]],
+            cdf[["store_app", "country_id", "installs_est", "rating_count_est"]],
             on=["store_app", "country_id"],
             how="left",
-            suffixes=("", "_y"),
             validate="1:1",
         )
-        df = df.drop(columns=["review_count"]).rename(
-            columns={"review_count_y": "review_count"}
-        )
-        df["review_count"] = df["review_count"].astype(int)
-        df["rating_count"] = df["rating_count"].fillna(0).astype(int)
+        df["review_count"] = df["review_count"].replace(np.nan, 0).astype(int)
+        # Db currently does not have a rating_count_est column just for country
+        df["rating_count"] = df["rating_count_est"]
     if store == 2:
         ratings_str = (
             df["user_ratings"]
@@ -367,91 +388,19 @@ def prep_app_metrics_history(
         df = estimate_ios_installs(df)
     df = df.convert_dtypes(dtype_backend="pyarrow")
     df = df.replace({pd.NA: None})
-    return df
-
-
-def manual_import_app_metrics_from_s3(
-    start_date: datetime.date, end_date: datetime.date
-) -> None:
-    use_tunnel = False
-    database_connection = get_db_connection(
-        use_ssh_tunnel=use_tunnel, config_key="madrone"
-    )
-    start_date = datetime.datetime.fromisoformat("2025-11-29").date()
-    end_date = datetime.datetime.today().date()
-    for snapshot_date in pd.date_range(start_date, end_date, freq="D"):
-        snapshot_date = snapshot_date.date()
-        for store in [1, 2]:
-            try:
-                process_app_metrics_to_db(database_connection, store, snapshot_date)
-            except:
-                process_app_metrics_to_db(database_connection, store, snapshot_date)
-
-
-def import_app_metrics_from_s3(
-    start_date: datetime.date, end_date: datetime.date, database_connection: PostgresCon
-) -> None:
-    for snapshot_date in pd.date_range(start_date, end_date, freq="D"):
-        snapshot_date = snapshot_date.date()
-        for store in [1, 2]:
-            try:
-                process_app_metrics_to_db(database_connection, store, snapshot_date)
-            except Exception as e:
-                logger.error(
-                    f"Error processing S3 app metrics for {snapshot_date} {store}: {e}"
-                )
-    import_all_app_global_metrics_weekly(database_connection)
-
-
-def process_app_metrics_to_db(
-    database_connection: PostgresCon, store: int, snapshot_date: datetime.date
-) -> None:
-    log_info = f"date={snapshot_date} store={store}"
-    logger.info(f"{log_info} start")
-    make_s3_app_country_metrics_history(store, snapshot_date=snapshot_date)
-    df = get_s3_agg_daily_snapshots(snapshot_date, snapshot_date, store)
-    if df.empty:
-        logger.warning(
-            f"No data found for S3 agg app metrics {store=} {snapshot_date=}"
-        )
-        return
-    if store == 2:
-        # Should be resolved from 11/1/2025
-        problem_rows = df["store_id"].str.contains(".0")
-        if problem_rows.any():
-            logger.warning(
-                f'Apple App IDs: Found {problem_rows.sum()}/{df.shape[0]} store_id with ".0" suffix, fixing'
-            )
-            df.loc[problem_rows, "store_id"] = (
-                df.loc[problem_rows, "store_id"].str.split(".").str[0]
-            )
-            df["crawled_at"] = df["crawled_at"].sort_values(ascending=True)
-            df = df.drop_duplicates(
-                ["snapshot_date", "country", "store_id"], keep="last"
-            )
-    logger.info(f"{log_info} prep country df")
-    df = prep_app_metrics_history(
-        df=df,
-        store=store,
-        database_connection=database_connection,
-        snapshot_date=snapshot_date,
-    )
-    if not df[df["store_id"].isna()].empty:
-        # Why are there any records with missing store_id?
-        logger.warning("Found records with missing store_id")
-        raise ValueError("Records with missing store_id found in S3 app history data")
     check_for_duplicates(
         df=df,
         key_columns=COUNTRY_HISTORY_KEYS,
     )
-    insert_columns = [x for x in COUNTRY_HISTORY_COLS if x in df.columns]
-    logger.info(f"{log_info} app_country_metrics_history upsert")
-    upsert_bulk(
-        df=df[insert_columns],
-        table_name="app_country_metrics_history",
-        database_connection=database_connection,
-        key_columns=COUNTRY_HISTORY_KEYS,
-    )
+    return df
+
+
+def prep_app_global_metrics_history(
+    df: pd.DataFrame,
+    store: int,
+    database_connection: PostgresCon,
+    app_country_db_latest: pd.DataFrame,
+) -> pd.DataFrame:
     tier_installs = df.pivot_table(
         index=GLOBAL_HISTORY_KEYS,
         columns="tier",
@@ -477,18 +426,20 @@ def process_app_metrics_to_db(
                     hist_df[col] = 0
         df = pd.concat([df, hist_df], axis=1)
     if store == 2:
-        ios_app_country_history = get_latest_app_country_history(
-            database_connection,
-            snapshot_date=snapshot_date,
-            days_back=180,
-            chunk_size=20000,
-            store_app_ids=df["store_app"].unique(),
-        )
         # Should overwrite existing values if there, but could be removed when all rerun
-        ios_app_country_history = estimate_ios_installs(ios_app_country_history)
+        # ios_app_country_history = estimate_ios_installs(ios_app_country_history)
         # For the group by this will need to be the snapshot_date being calculated for
-        ios_app_country_history["snapshot_date"] = pd.to_datetime(snapshot_date)
-        df = pd.concat([ios_app_country_history, df], axis=0)
+        # ios_app_country_history["snapshot_date"] = pd.to_datetime(snapshot_date)
+        df = pd.concat(
+            [
+                app_country_db_latest[
+                    app_country_db_latest["store_app"].isin(df["store_app"].unique())
+                ],
+                df,
+            ],
+            axis=0,
+        )
+        df = estimate_ios_installs(df)
         df = df.sort_values(by=["crawled_date"], ascending=True).drop_duplicates(
             subset=["store_app", "country_id"], keep="last"
         )
@@ -516,6 +467,131 @@ def process_app_metrics_to_db(
         if col not in df.columns:
             df[col] = 0.0
         df[col] = (df[col] * 10000).round().astype("int16")
+    return df
+
+
+def manual_import_app_metrics_from_s3(
+    start_date: datetime.date, end_date: datetime.date
+) -> None:
+    use_tunnel = False
+    database_connection = get_db_connection(
+        use_ssh_tunnel=use_tunnel, config_key="madrone"
+    )
+    start_date = datetime.datetime.fromisoformat("2026-01-29").date()
+    end_date = datetime.datetime.today().date()
+    for store in [1, 2]:
+        last_history_df = pd.DataFrame()
+        for snapshot_date in [
+            # "2026-01-19",
+            # "2026-01-22",
+            # "2026-02-04",
+            "2026-02-16",
+        ]:
+            snapshot_date = datetime.datetime.fromisoformat(snapshot_date).date()
+            # for snapshot_date in pd.date_range(start_date, end_date, freq="D"):
+            # snapshot_date = snapshot_date.date()
+            try:
+                last_history_df = process_app_metrics_to_db(
+                    database_connection, store, snapshot_date, last_history_df
+                )
+            except:
+                # process_app_metrics_to_db(database_connection, store, snapshot_date)
+                pass
+
+
+def import_app_metrics_from_s3(
+    start_date: datetime.date, end_date: datetime.date, database_connection: PostgresCon
+) -> None:
+    for store in [1, 2]:
+        last_history_df = pd.DataFrame()
+        for snapshot_date in pd.date_range(start_date, end_date, freq="D"):
+            snapshot_date = snapshot_date.date()
+            try:
+                last_history_df = process_app_metrics_to_db(
+                    database_connection, store, snapshot_date, last_history_df
+                )
+            except Exception as e:
+                logger.error(
+                    f"Error processing S3 app metrics for {snapshot_date} {store}: {e}"
+                )
+    import_all_app_global_metrics_weekly(database_connection)
+
+
+def process_app_metrics_to_db(
+    database_connection: PostgresCon,
+    store: int,
+    snapshot_date: datetime.date,
+    last_history_df: pd.DataFrame,
+) -> pd.DataFrame:
+    log_info = f"date={snapshot_date} store={store}"
+    logger.info(f"{log_info} start")
+    make_s3_app_country_metrics_history(store, snapshot_date=snapshot_date)
+    df = get_s3_agg_daily_snapshots(snapshot_date, snapshot_date, store)
+    if df.empty:
+        logger.warning(
+            f"No data found for S3 agg app metrics {store=} {snapshot_date=}"
+        )
+        return
+    if store == 2:
+        # Should be resolved from 11/1/2025
+        problem_rows = df["store_id"].str.contains(".0")
+        if problem_rows.any():
+            logger.warning(
+                f'Apple App IDs: Found {problem_rows.sum()}/{df.shape[0]} store_id with ".0" suffix, fixing'
+            )
+            df.loc[problem_rows, "store_id"] = (
+                df.loc[problem_rows, "store_id"].str.split(".").str[0]
+            )
+            df["crawled_at"] = df["crawled_at"].sort_values(ascending=True)
+            df = df.drop_duplicates(
+                ["snapshot_date", "country", "store_id"], keep="last"
+            )
+    logger.info(f"{log_info} prep country df")
+    df = merge_in_db_ids(df, store, database_connection)
+    if last_history_df.empty:
+        days_back = 180
+    else:
+        days_back = 1
+    app_country_db_latest = get_latest_app_country_history(
+        database_connection,
+        snapshot_date=snapshot_date,
+        days_back=days_back,
+        chunk_size=50000,
+        store_app_ids=df["store_app"].unique(),
+        store=store,
+    )
+    if days_back == 1:
+        app_country_db_latest = pd.concat(
+            [app_country_db_latest, last_history_df], ignore_index=True
+        ).drop_duplicates(subset=["store_app", "country_id"], keep="last")
+        start_date = snapshot_date - datetime.timedelta(days=180)
+        app_country_db_latest = app_country_db_latest[
+            app_country_db_latest["snapshot_date"] > start_date
+        ]
+
+    df = prep_app_country_metrics_history(
+        df=df,
+        store=store,
+        app_country_db_latest=app_country_db_latest,
+    )
+    if not df[df["store_id"].isna()].empty:
+        # Why are there any records with missing store_id?
+        logger.warning("Found records with missing store_id")
+        raise ValueError("Records with missing store_id found in S3 app history data")
+    insert_columns = [x for x in COUNTRY_HISTORY_COLS if x in df.columns]
+    logger.info(f"{log_info} app_country_metrics_history upsert")
+    upsert_bulk(
+        df=df[insert_columns],
+        table_name="app_country_metrics_history",
+        database_connection=database_connection,
+        key_columns=COUNTRY_HISTORY_KEYS,
+    )
+    df = prep_app_global_metrics_history(
+        df=df,
+        store=store,
+        database_connection=database_connection,
+        app_country_db_latest=app_country_db_latest,
+    )
     check_for_duplicates(
         df=df,
         key_columns=GLOBAL_HISTORY_KEYS,
@@ -529,6 +605,7 @@ def process_app_metrics_to_db(
         database_connection=database_connection,
         key_columns=GLOBAL_HISTORY_KEYS,
     )
+    return app_country_db_latest
 
 
 def get_parquet_paths_by_prefix(bucket: str, prefix: str) -> list[str]:
@@ -920,7 +997,15 @@ def calculate_active_users(
 ) -> pd.DataFrame:
     """Process app global metrics weekly."""
     star_cols = ["one_star", "two_star", "three_star", "four_star", "five_star"]
-    metrics = ["installs", "rating", "review_count", "rating_count", *star_cols]
+    tier_pct_cols = ["tier1_pct", "tier2_pct", "tier3_pct"]
+    metrics = [
+        "installs",
+        "rating",
+        "review_count",
+        "rating_count",
+        *star_cols,
+        *tier_pct_cols,
+    ]
     xaxis_col = "snapshot_date"
     # Convert to date to datetime and sort by country and date, required
     df[xaxis_col] = pd.to_datetime(df[xaxis_col])
@@ -934,9 +1019,6 @@ def calculate_active_users(
                 "app_category",
                 "ad_supported",
                 "in_app_purchases",
-                "tier1_pct",
-                "tier2_pct",
-                "tier3_pct",
             ]
         )[metrics]
         .resample("W-MON")
@@ -946,12 +1028,26 @@ def calculate_active_users(
         .fillna(0)
         .reset_index()
     )
+
+    df[(df["store_app"] == 191)][
+        [
+            "store_app",
+            "snapshot_date",
+            "installs",
+            "tier1_pct",
+            "tier2_pct",
+            "tier3_pct",
+        ]
+    ]
+
     df["installs_diff"] = df.groupby("store_app")["installs"].diff().fillna(0)
     df["installs_diff"] = (
         df.groupby("store_app")["installs"].diff().fillna(df["installs"]).fillna(0)
     )
     retention_benchmarks = get_retention_benchmarks(database_connection)
-    merged_df = df.merge(retention_benchmarks, on=["app_category", "store"], how="left")
+    merged_df = df.merge(
+        retention_benchmarks, on=["app_category", "store"], how="left", validate="m:1"
+    )
     merged_df["k"] = np.log(
         merged_df["d30"].replace(0, np.nan) / merged_df["d7"].replace(0, np.nan)
     ) / np.log(30.0 / 7.0)
@@ -1001,13 +1097,12 @@ def calculate_active_users(
         "ad_supported",
         "snapshot_date",
         "installs_diff",
-        "tier1_pct",
-        "tier2_pct",
-        "tier3_pct",
     ] + metrics
     df = pd.merge(
         df[cols], ddf, on=["store_app", "snapshot_date"], how="left", validate="1:1"
     )
+
+    df[df[["store_app", "snapshot_date"]].duplicated()][["store_app", "snapshot_date"]]
 
     logger.info("Finished calculating WAU")
     df["weekly_ratings"] = (
