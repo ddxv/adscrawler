@@ -568,7 +568,6 @@ def process_app_metrics_to_db(
         app_country_db_latest = app_country_db_latest[
             app_country_db_latest["snapshot_date"] > start_date
         ]
-
     df = prep_app_country_metrics_history(
         df=df,
         store=store,
@@ -1028,18 +1027,6 @@ def calculate_active_users(
         .fillna(0)
         .reset_index()
     )
-
-    df[(df["store_app"] == 191)][
-        [
-            "store_app",
-            "snapshot_date",
-            "installs",
-            "tier1_pct",
-            "tier2_pct",
-            "tier3_pct",
-        ]
-    ]
-
     df["installs_diff"] = df.groupby("store_app")["installs"].diff().fillna(0)
     df["installs_diff"] = (
         df.groupby("store_app")["installs"].diff().fillna(df["installs"]).fillna(0)
@@ -1101,9 +1088,6 @@ def calculate_active_users(
     df = pd.merge(
         df[cols], ddf, on=["store_app", "snapshot_date"], how="left", validate="1:1"
     )
-
-    df[df[["store_app", "snapshot_date"]].duplicated()][["store_app", "snapshot_date"]]
-
     logger.info("Finished calculating WAU")
     df["weekly_ratings"] = (
         df.groupby("store_app")["rating_count"].diff().fillna(df["rating_count"])
