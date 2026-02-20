@@ -1,6 +1,7 @@
 import datetime
 import time
 
+import duckdb
 import numpy as np
 import pandas as pd
 
@@ -124,6 +125,24 @@ def check_for_duplicates(df: pd.DataFrame, key_columns: list[str]) -> None:
     return
 
 
+def handle_missing_trackid_files(
+    duckdb_con: duckdb.DuckDBPyConnection, app_detail_parquets: list[str], bucket: str
+) -> None:
+    bad_parquets = []
+    ok_parquets = []
+    for parquet in app_detail_parquets:
+        try:
+            duckdb_con.execute(f"SELECT trackId FROM read_parquet({[parquet]}) LIMIT 1")
+            logger.info("trackId column found in file")
+            ok_parquets.append(parquet)
+        except duckdb.BinderException:
+            logger.info(f"trackId column not found in file {parquet}")
+            bad_parquets.append(parquet)
+    for parquet in bad_parquets:
+        logger.warning(f"Deleting bad parquet file {parquet}")
+        delete_s3_objects_by_prefix(bucket, prefix=parquet)
+
+
 def make_s3_app_country_metrics_history(
     store: int, snapshot_date: pd.DatetimeIndex
 ) -> None:
@@ -149,7 +168,14 @@ def make_s3_app_country_metrics_history(
         snapshot_date_str=snapshot_date_str,
     )
     duckdb_con = get_duckdb_connection(s3_config_key)
-    duckdb_con.execute(query)
+    try:
+        duckdb_con.execute(query)
+    except duckdb.BinderException as e:
+        if """"trackId" not found""" in str(e):
+            logger.error(
+                f"trackId column not found in parquets for store={store}, skipping"
+            )
+            # handle_missing_trackid_files(duckdb_con, app_detail_parquets, bucket)
     duckdb_con.close()
 
 
@@ -210,19 +236,16 @@ def prep_app_google_metrics(
         }
     )
     # If data is being rerun, prefer 'newer' data from S3
-    df["crawled_date"] = df["crawled_date"] + pd.Timedelta(seconds=1)
     cdf = pd.concat(
         [
-            df,
             app_country_db_latest[
                 app_country_db_latest["store_app"].isin(df["store_app"].unique())
             ],
+            df,
         ],
         axis=0,
-    )
-    cdf = cdf.sort_values(by=["crawled_date"], ascending=True).drop_duplicates(
-        subset=["store_app", "country_id"], keep="last"
-    )
+        ignore_index=True,
+    ).drop_duplicates(subset=["store_app", "country_id"], keep="last")
     cdf["review_count"] = pd.to_numeric(cdf["review_count"], errors="coerce").fillna(0)
     cdf["global_installs"] = pd.to_numeric(
         cdf["global_installs"], errors="coerce"
@@ -231,6 +254,12 @@ def prep_app_google_metrics(
         cdf["global_rating_count"], errors="coerce"
     ).fillna(0)
     cdf["max_reviews"] = cdf.groupby("store_app")["review_count"].transform("max")
+    cdf["global_installs"] = cdf.groupby("store_app")["global_installs"].transform(
+        "max"
+    )
+    cdf["global_rating_count"] = cdf.groupby("store_app")[
+        "global_rating_count"
+    ].transform("max")
     cdf["is_max_candidate"] = (cdf["review_count"] >= cdf["max_reviews"] * 0.99) & (
         cdf["max_reviews"] > 200
     )
@@ -263,7 +292,7 @@ def prep_app_google_metrics(
         (cdf["global_rating_count"] * cdf["pct_of_global"]).round().astype(int)
     )
     country_df = pd.merge(
-        df,
+        df.drop(columns=["global_installs", "global_rating_count"]),
         cdf[
             [
                 "store_app",
@@ -271,6 +300,8 @@ def prep_app_google_metrics(
                 "installs_est",
                 "rating_count_est",
                 "global_review_count",
+                "global_installs",
+                "global_rating_count",
             ]
         ],
         on=["store_app", "country_id"],
@@ -317,7 +348,7 @@ def prep_app_google_metrics(
         aggfunc="sum",
         fill_value=0,
         dropna=False,
-    )
+    ).rename(columns={"tier1": "tier1_pct", "tier2": "tier2_pct", "tier3": "tier3_pct"})
     global_df = global_df.join(tier_pct)
     global_df = global_df.reset_index()
     return country_df, global_df
@@ -346,8 +377,9 @@ def prep_app_apple_metrics(
             ],
             df,
         ],
+        ignore_index=True,
         axis=0,
-    )
+    ).drop_duplicates(subset=["store_app", "country_id"], keep="last")
     # overwrites installs_est from db, but quick fix for missing, same value
     cdf = estimate_ios_installs(cdf)
     cdf = cdf.sort_values(by=["crawled_date"], ascending=True).drop_duplicates(
@@ -391,9 +423,9 @@ def manual_import_app_metrics_from_s3(
     database_connection = get_db_connection(
         use_ssh_tunnel=use_tunnel, config_key="madrone"
     )
-    start_date = datetime.datetime.fromisoformat("2025-11-22").date()
+    start_date = datetime.datetime.fromisoformat("2026-02-18").date()
     end_date = datetime.datetime.today() - datetime.timedelta(days=1)
-    for store in [2]:
+    for store in [1]:
         last_history_df = pd.DataFrame()
         for snapshot_date in pd.date_range(start_date, end_date, freq="D"):
             # snapshot_date = datetime.datetime.fromisoformat(snapshot_date).date()
@@ -501,7 +533,7 @@ def process_app_metrics_to_db(
         database_connection,
         snapshot_date=snapshot_date,
         days_back=days_back,
-        chunk_size=50000,
+        chunk_size=10000,
         store_app_ids=df["store_app"].unique(),
         store=store,
     )
@@ -513,6 +545,7 @@ def process_app_metrics_to_db(
         app_country_db_latest = app_country_db_latest[
             app_country_db_latest["crawled_date"] > pd.to_datetime(start_date)
         ]
+    # odf = df.copy()
     country_df, global_df = process_store_metrics(
         store=store, app_country_db_latest=app_country_db_latest, df=df
     )
@@ -770,6 +803,8 @@ def import_all_app_global_metrics_weekly(database_connection: PostgresCon) -> No
     while True:
         logger.info(f"batch {i} of app global metrics weekly start")
         df = query_apps_to_process_global_metrics(database_connection, batch_size=5000)
+        df[df["tier2_pct"] > 0].shape
+        df
         if df.empty:
             break
         log_apps = df["store_app"].tolist()
@@ -795,7 +830,6 @@ def import_all_app_global_metrics_weekly(database_connection: PostgresCon) -> No
             "five_star",
         ]
         df = df[final_cols]
-
         upsert_df(
             df=df,
             table_name="app_global_metrics_weekly",

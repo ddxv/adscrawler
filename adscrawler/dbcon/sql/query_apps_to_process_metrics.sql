@@ -44,7 +44,7 @@ WHERE
         FROM logging.app_global_metrics_weekly AS lg
         WHERE
             lg.store_app = ca.store_app
-            AND lg.updated_at > current_date - INTERVAL '3 days'
+            AND lg.updated_at > current_date - INTERVAL '1 days'
     )
     AND ca.store = 1
 LIMIT :batch_size;
