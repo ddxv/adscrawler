@@ -81,6 +81,22 @@ def get_s3_client(key_name: str = "s3") -> boto3.client:
     return client
 
 
+def delete_s3_objects_by_prefix(bucket: str, prefix: str, key_name: str = "s3") -> None:
+    """Delete all S3 objects with the given prefix."""
+    s3 = get_s3_client(key_name)
+
+    response = s3.list_objects_v2(
+        Bucket=bucket,
+        Prefix=prefix,
+    )
+
+    if "Contents" in response:
+        s3.delete_objects(
+            Bucket=bucket,
+            Delete={"Objects": [{"Key": obj["Key"]} for obj in response["Contents"]]},
+        )
+
+
 def upload_mitm_log_to_s3(
     store: int,
     store_id: str,
@@ -467,7 +483,7 @@ def download_app_by_store_id(
     df = df[~(df["version_code"] == "failed")]
     if df.empty:
         logger.error(f"S3 only has failed apk for {store_id=}, no version_code")
-    if version_str and version_str != '-1':
+    if version_str and version_str != "-1":
         df = df[df["version_code"] == version_str]
         final_version_str = version_str
     else:

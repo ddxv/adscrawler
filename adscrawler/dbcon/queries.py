@@ -291,17 +291,11 @@ def upsert_bulk(
         update_cols = [
             f'"{c}" = EXCLUDED."{c}"' for c in df.columns if c not in key_columns
         ]
-        where_clause = " OR ".join(
-            f'{table_name}."{c}" IS DISTINCT FROM EXCLUDED."{c}"'
-            for c in df.columns
-            if c not in key_columns
-        )
         query = f"""
             INSERT INTO {table_name} ({", ".join(all_cols)})
             SELECT {", ".join(all_cols)} FROM {temp_table}
             ON CONFLICT ({", ".join(f'"{c}"' for c in key_columns)})
             DO UPDATE SET {", ".join(update_cols)}
-            WHERE {where_clause}
         """
         conn.execute(text(query))
     logger.info(f"{log_info} finish")

@@ -19,9 +19,13 @@ from adscrawler.dbcon.queries import (
     query_apps_to_process_global_metrics,
     query_countries,
     query_store_id_map_cached,
+    upsert_bulk,
     upsert_df,
 )
-from adscrawler.packages.storage import get_duckdb_connection, get_s3_client
+from adscrawler.packages.storage import (
+    delete_s3_objects_by_prefix,
+    get_duckdb_connection,
+)
 
 logger = get_logger(__name__, "scrape_stores")
 
@@ -125,15 +129,15 @@ def make_s3_app_country_metrics_history(
 ) -> None:
     s3_config_key = "s3"
     bucket = CONFIG[s3_config_key]["bucket"]
-    s3 = get_s3_client()
     snapshot_date_str = snapshot_date.strftime("%Y-%m-%d")
     prefix = (
         f"raw-data/app_details/store={store}/crawled_date={snapshot_date_str}/country="
     )
     app_detail_parquets = get_parquet_paths_by_prefix(bucket, prefix)
-    s3.Bucket("adscrawler").objects.filter(
-        Prefix=f"agg-data/app_country_metrics/store={store}/snapshot_date={snapshot_date_str}/"
-    ).delete()
+    agg_prefix = (
+        f"agg-data/app_country_metrics/store={store}/snapshot_date={snapshot_date_str}/"
+    )
+    delete_s3_objects_by_prefix(bucket, prefix=agg_prefix)
     if len(app_detail_parquets) == 0:
         logger.error(
             f"No app detail parquet files found for store={store} snapshot_date={snapshot_date_str}"
@@ -383,7 +387,7 @@ def manual_import_app_metrics_from_s3(
     database_connection = get_db_connection(
         use_ssh_tunnel=use_tunnel, config_key="madrone"
     )
-    start_date = datetime.datetime.fromisoformat("2026-02-02").date()
+    start_date = datetime.datetime.fromisoformat("2025-10-28").date()
     end_date = datetime.datetime.today() - datetime.timedelta(days=1)
     for store in [1]:
         last_history_df = pd.DataFrame()
@@ -508,34 +512,20 @@ def process_app_metrics_to_db(
     country_df, global_df = process_store_metrics(
         store=store, app_country_db_latest=app_country_db_latest, df=df
     )
-    # upsert_bulk(
-    #     df=country_df,
-    #     table_name="app_country_metrics_history",
-    #     database_connection=database_connection,
-    #     key_columns=COUNTRY_HISTORY_KEYS,
-    # )
-    # upsert_bulk(
-    #     df=global_df,
-    #     table_name="app_global_metrics_history",
-    #     database_connection=database_connection,
-    #     key_columns=GLOBAL_HISTORY_KEYS,
-    # )
     start_time = time.time()
-    upsert_df(
+    upsert_bulk(
         df=country_df,
         table_name="app_country_metrics_history",
         database_connection=database_connection,
         key_columns=COUNTRY_HISTORY_KEYS,
-        insert_columns=country_df.columns.tolist(),
     )
     logger.info(f"Upserted country_df in {time.time() - start_time:.2f} seconds")
     start_time = time.time()
-    upsert_df(
+    upsert_bulk(
         df=global_df,
         table_name="app_global_metrics_history",
         database_connection=database_connection,
         key_columns=GLOBAL_HISTORY_KEYS,
-        insert_columns=global_df.columns.tolist(),
     )
     logger.info(f"Upserted global_df in {time.time() - start_time:.2f} seconds")
     return app_country_db_latest
