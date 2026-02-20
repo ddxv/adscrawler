@@ -438,7 +438,7 @@ def upsert_df(
                     )
                     for v in df[key_columns[0]].tolist()
                 ]
-                where_values = (md5_values,)
+                where_values = [md5_values]
             else:
                 where_values = [df[col].tolist() for col in key_columns]
             cur.execute(select_query, where_values)
@@ -452,7 +452,7 @@ def upsert_df(
     return return_df
 
 
-def clean_app_ranks_weekly_table(database_connection: PostgresCon):
+def clean_app_ranks_weekly_table(database_connection: PostgresCon) -> None:
     # Use a smaller limit to prevent long locks
     batch_size = 100000
     del_query = f"""
@@ -1539,13 +1539,13 @@ def get_latest_app_country_history(
     chunk_size: int,
     store: int,
 ) -> pd.DataFrame:
-    log_info = f"query app_country_metrics_history latest apps:{len(store_app_ids)}"
-    logger.info(f"{log_info} start chunks:{len(chunks)}")
-    end_date = snapshot_date.strftime("%Y-%m-%d")
     chunks = [
         store_app_ids[i : i + chunk_size]
         for i in range(0, len(store_app_ids), chunk_size)
     ]
+    log_info = f"query app_country_metrics_history latest apps:{len(store_app_ids)}"
+    logger.info(f"{log_info} start days:{days_back} chunks:{len(chunks)}")
+    end_date = snapshot_date.strftime("%Y-%m-%d")
     results = []
     if store == 1:
         metric_cols = "review_count"
@@ -1602,45 +1602,45 @@ def get_latest_app_country_history(
 def get_retention_benchmarks(database_connection: PostgresCon) -> pd.DataFrame:
     sel_query = """WITH 
          retention_benchmarks AS (
-	         SELECT
-		         mac.store,
-		         mac.category AS app_category,
-		         -- Retention D1 Logic
+             SELECT
+                 mac.store,
+                 mac.category AS app_category,
+                 -- Retention D1 Logic
              COALESCE(rgb.d1, 
                  CASE 
                      WHEN mac.category LIKE 'game%%' THEN (SELECT d1 FROM retention_global_benchmarks WHERE app_category = 'games' LIMIT 1)
                      ELSE (SELECT d1 FROM retention_global_benchmarks WHERE app_category = 'apps' LIMIT 1)
                  END
              ) AS d1,
-		         -- Retention D7 Logic
+                 -- Retention D7 Logic
              COALESCE(rgb.d7, 
                  CASE 
                      WHEN mac.category LIKE 'game%%' THEN (SELECT d7 FROM retention_global_benchmarks WHERE app_category = 'games' LIMIT 1)
                      ELSE (SELECT d7 FROM retention_global_benchmarks WHERE app_category = 'apps' LIMIT 1)
                  END
              ) AS d7,
-		         -- Retention D30 Logic
+                 -- Retention D30 Logic
              COALESCE(rgb.d30, 
                  CASE 
                      WHEN mac.category LIKE 'game%%' THEN (SELECT d30 FROM retention_global_benchmarks WHERE app_category = 'games' LIMIT 1)
                      ELSE (SELECT d30 FROM retention_global_benchmarks WHERE app_category = 'apps' LIMIT 1)
                  END
              ) AS d30
-	         FROM
-		         mv_app_categories mac
-	         LEFT JOIN retention_global_benchmarks rgb 
+             FROM
+                 mv_app_categories mac
+             LEFT JOIN retention_global_benchmarks rgb 
              ON
-		         mac.category = rgb.app_category
-		         AND mac.store = rgb.store
+                 mac.category = rgb.app_category
+                 AND mac.store = rgb.store
          )
          SELECT
-	         store,
-	         app_category,
-	         d1,
-	         d7,
-	         d30
+             store,
+             app_category,
+             d1,
+             d7,
+             d30
          FROM
-	         retention_benchmarks
+             retention_benchmarks
     ;
     """
     df = pd.read_sql(sel_query, con=database_connection.engine)
