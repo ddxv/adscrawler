@@ -717,7 +717,7 @@ def query_latest_api_scan_by_store_id(
     return df
 
 
-def upser_sdk_details_df(
+def upsert_sdk_details_df(
     details_df: pd.DataFrame,
     database_connection: PostgresCon,
     store_id: str,

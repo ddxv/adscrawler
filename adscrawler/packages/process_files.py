@@ -9,7 +9,7 @@ from adscrawler.dbcon.queries import (
     insert_version_code,
     query_apps_to_download,
     query_apps_to_sdk_scan,
-    upser_sdk_details_df,
+    upsert_sdk_details_df,
 )
 from adscrawler.packages.apks.download_apk import (
     manage_apk_download,
@@ -237,7 +237,7 @@ def process_sdks(
             index=False,
         )
         if crawl_result == 1:
-            upser_sdk_details_df(
+            upsert_sdk_details_df(
                 details_df=details_df,
                 database_connection=database_connection,
                 store_id=store_id,
