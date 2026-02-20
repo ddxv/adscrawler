@@ -1,7 +1,7 @@
 import datetime
 import time
-
 import duckdb
+
 import numpy as np
 import pandas as pd
 
@@ -20,12 +20,12 @@ from adscrawler.dbcon.queries import (
     query_apps_to_process_global_metrics,
     query_countries,
     query_store_id_map_cached,
-    upsert_bulk,
     upsert_df,
+    upsert_bulk,
 )
 from adscrawler.packages.storage import (
-    delete_s3_objects_by_prefix,
     get_duckdb_connection,
+    delete_s3_objects_by_prefix,
 )
 
 logger = get_logger(__name__, "scrape_stores")
@@ -133,7 +133,7 @@ def handle_missing_trackid_files(
     for parquet in app_detail_parquets:
         try:
             duckdb_con.execute(f"SELECT trackId FROM read_parquet({[parquet]}) LIMIT 1")
-            logger.info("trackId column found in file")
+            logger.info(f"trackId column found in file")
             ok_parquets.append(parquet)
         except duckdb.BinderException:
             logger.info(f"trackId column not found in file {parquet}")
@@ -320,9 +320,9 @@ def prep_app_google_metrics(
     country_df["global_installs"] = country_df["global_installs"].fillna(0).astype(int)
     # Db currently does not have a rating_count_est column just for country
     country_df["rating_count"] = country_df["rating_count_est"]
-    assert country_df["global_rating_count"].ge(country_df["rating_count"]).all(), (
-        "global_rating_count should be >= rating_count"
-    )
+    assert (
+        country_df["global_rating_count"].ge(country_df["rating_count"]).all()
+    ), "global_rating_count should be >= rating_count"
     global_df = country_df[country_df["country"] == "US"].copy()
     global_df = global_df.drop(columns=["rating_count", "review_count"]).rename(
         columns={
@@ -545,7 +545,6 @@ def process_app_metrics_to_db(
         app_country_db_latest = app_country_db_latest[
             app_country_db_latest["crawled_date"] > pd.to_datetime(start_date)
         ]
-    # odf = df.copy()
     country_df, global_df = process_store_metrics(
         store=store, app_country_db_latest=app_country_db_latest, df=df
     )
@@ -803,8 +802,6 @@ def import_all_app_global_metrics_weekly(database_connection: PostgresCon) -> No
     while True:
         logger.info(f"batch {i} of app global metrics weekly start")
         df = query_apps_to_process_global_metrics(database_connection, batch_size=5000)
-        df[df["tier2_pct"] > 0].shape
-        df
         if df.empty:
             break
         log_apps = df["store_app"].tolist()
