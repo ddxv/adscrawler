@@ -46,4 +46,5 @@ WHERE
             lg.store_app = ca.store_app
             AND lg.updated_at > current_date - INTERVAL '3 days'
     )
+    AND ca.store = 1
 LIMIT :batch_size;

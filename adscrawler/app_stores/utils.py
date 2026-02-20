@@ -76,3 +76,33 @@ def check_and_insert_new_apps(
             schema="logging",
         )
     return None
+
+
+def get_parquet_paths_by_prefix(bucket: str, prefix: str) -> list[str]:
+    from adscrawler.packages.storage import get_s3_client
+
+    s3 = get_s3_client()
+    continuation_token = None
+    all_parquet_paths = []
+    while True:
+        params = {
+            "Bucket": bucket,
+            "Prefix": prefix,
+            "MaxKeys": 1000,
+        }
+        if continuation_token:
+            params["ContinuationToken"] = continuation_token
+        response = s3.list_objects_v2(**params)
+        # Extract parquet paths from this page
+        if "Contents" in response:
+            parquet_paths = [
+                f"s3://{bucket}/{obj['Key']}"
+                for obj in response["Contents"]
+                if obj["Key"].endswith(".parquet")
+            ]
+            all_parquet_paths += parquet_paths
+        if "NextContinuationToken" in response:
+            continuation_token = response["NextContinuationToken"]
+        else:
+            break
+    return all_parquet_paths

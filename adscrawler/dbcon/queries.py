@@ -1539,20 +1539,19 @@ def get_latest_app_country_history(
     chunk_size: int,
     store: int,
 ) -> pd.DataFrame:
+    log_info = f"query app_country_metrics_history latest apps:{len(store_app_ids)}"
+    logger.info(f"{log_info} start chunks:{len(chunks)}")
     end_date = snapshot_date.strftime("%Y-%m-%d")
     chunks = [
         store_app_ids[i : i + chunk_size]
         for i in range(0, len(store_app_ids), chunk_size)
     ]
     results = []
-    logger.info(
-        f"Get apps:{len(store_app_ids)} chunks:{len(chunks)} from app_country_metrics_history"
-    )
     if store == 1:
         metric_cols = "review_count"
     elif store == 2:
         metric_cols = "rating, rating_count, one_star, two_star, three_star, four_star, five_star, installs_est"
-    for i, chunk_ids in enumerate(chunks):
+    for _i, chunk_ids in enumerate(chunks):
         id_list_str = ",".join(map(str, chunk_ids))
         if days_back == 1:
             sel_query = f"""
@@ -1587,13 +1586,16 @@ def get_latest_app_country_history(
         # Pull chunk and append to results list
         chunk_df = pd.read_sql(sel_query, con=database_connection.engine)
         results.append(chunk_df)
-        if (i + 1) % 5 == 0:
-            print(f"Finished chunk {i + 1}/{len(chunks)}...")
     if not results:
         return pd.DataFrame()
+    country_map = query_countries(database_connection)
     df = pd.concat(results, ignore_index=True)
+    df = pd.merge(
+        df, country_map[["id", "tier"]], how="left", left_on="country_id", right_on="id"
+    )
     df["crawled_date"] = pd.to_datetime(df["snapshot_date"])
     df = df.drop(columns=["snapshot_date"])
+    logger.info(f"{log_info} returning {len(df.shape)} rows")
     return df
 
 
