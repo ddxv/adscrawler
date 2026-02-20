@@ -354,12 +354,14 @@ def prep_app_apple_metrics(
         subset=["store_app", "country_id"], keep="last"
     )
     cdf["rating_prod"] = cdf["rating"] * cdf["rating_count"]
-    global_df = cdf.groupby(GLOBAL_HISTORY_KEYS).agg(
+    global_df = cdf.groupby(["store_app"]).agg(
         rating_count=("rating_count", "sum"),
         rating_prod=("rating_prod", "sum"),
+        installs=("installs_est", "sum"),
         store_last_updated=("store_last_updated", "max"),
         **{col: (col, "sum") for col in STAR_COLS},
     )
+    global_df["snapshot_date"] = df["snapshot_date"].iloc[0]
     global_df["rating"] = (
         global_df["rating_prod"] / global_df["rating_count"].replace(0, np.nan)
     ).astype("float64")
@@ -375,6 +377,8 @@ def prep_app_apple_metrics(
     tier_pct = tier_pct.fillna(0)
     global_df = global_df.join(tier_pct)
     global_df = global_df.reset_index()
+    global_df["installs"] = global_df["installs"].astype("Int64")
+    global_df["rating_count"] = global_df["rating_count"].astype("Int64")
     # Note, we return the df which for iOS is the country level data
     return df, global_df
 
@@ -387,9 +391,9 @@ def manual_import_app_metrics_from_s3(
     database_connection = get_db_connection(
         use_ssh_tunnel=use_tunnel, config_key="madrone"
     )
-    start_date = datetime.datetime.fromisoformat("2025-10-28").date()
+    start_date = datetime.datetime.fromisoformat("2025-11-22").date()
     end_date = datetime.datetime.today() - datetime.timedelta(days=1)
-    for store in [1]:
+    for store in [2]:
         last_history_df = pd.DataFrame()
         for snapshot_date in pd.date_range(start_date, end_date, freq="D"):
             # snapshot_date = datetime.datetime.fromisoformat(snapshot_date).date()
