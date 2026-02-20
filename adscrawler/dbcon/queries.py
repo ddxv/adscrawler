@@ -266,6 +266,9 @@ def upsert_bulk(
     database_connection: Connection,
     key_columns: list[str],
 ) -> None:
+    """Perform a bulk "upsert" on a PostgreSQL table from a DataFrame using COPY and ON CONFLICT."""
+    log_info = f"upsert_bulk table={table_name} rows={df.shape[0]}"
+    logger.info(f"{log_info} start")
     temp_table = f"temp_{table_name}"
     with database_connection.engine.begin() as conn:
         conn.execute(
@@ -301,6 +304,7 @@ def upsert_bulk(
             WHERE {where_clause}
         """
         conn.execute(text(query))
+    logger.info(f"{log_info} finish")
 
 
 def upsert_df(
@@ -1595,7 +1599,7 @@ def get_latest_app_country_history(
     )
     df["crawled_date"] = pd.to_datetime(df["snapshot_date"])
     df = df.drop(columns=["snapshot_date"])
-    logger.info(f"{log_info} returning {len(df.shape)} rows")
+    logger.info(f"{log_info} returning {df.shape[0]} rows")
     return df
 
 

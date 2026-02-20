@@ -153,7 +153,9 @@ def estimate_ios_installs(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def merge_in_db_ids(df: pd.DataFrame, store: int, database_connection: PostgresCon):
+def merge_in_db_ids(
+    df: pd.DataFrame, store: int, database_connection: PostgresCon
+) -> pd.DataFrame:
     store_id_map = query_store_id_map_cached(
         store=store, database_connection=database_connection
     )
@@ -273,6 +275,10 @@ def prep_app_google_metrics(
     country_df["global_rating_count"] = (
         country_df["global_rating_count"].fillna(0).astype(int)
     )
+    country_df["global_review_count"] = (
+        country_df["global_review_count"].fillna(0).astype(int)
+    )
+    country_df["global_installs"] = country_df["global_installs"].fillna(0).astype(int)
     # Db currently does not have a rating_count_est column just for country
     country_df["rating_count"] = country_df["rating_count_est"]
     assert country_df["global_rating_count"].ge(country_df["rating_count"]).all(), (
@@ -427,7 +433,6 @@ def process_store_metrics(
         df=country_df,
         key_columns=COUNTRY_HISTORY_KEYS,
     )
-
     for col in ["tier1_pct", "tier2_pct", "tier3_pct"]:
         if col not in global_df.columns:
             global_df[col] = 0.0
@@ -437,6 +442,10 @@ def process_store_metrics(
         key_columns=GLOBAL_HISTORY_KEYS,
     )
     global_df = global_df.replace({pd.NA: None, np.nan: None})
+    country_df = country_df[
+        [x for x in COUNTRY_HISTORY_COLS if x in country_df.columns]
+    ]
+    global_df = global_df[[x for x in GLOBAL_HISTORY_COLS if x in global_df.columns]]
     logger.info(f"{log_info} finished")
     return country_df, global_df
 
@@ -490,19 +499,17 @@ def process_app_metrics_to_db(
         app_country_db_latest = app_country_db_latest[
             app_country_db_latest["crawled_date"] > pd.to_datetime(start_date)
         ]
-    country_df, global_df = process_store_metrics(store, app_country_db_latest, df)
-    insert_columns = [x for x in COUNTRY_HISTORY_COLS if x in country_df.columns]
-    logger.info(f"{log_info} app_country_metrics_history upsert")
+    country_df, global_df = process_store_metrics(
+        store=store, app_country_db_latest=app_country_db_latest, df=df
+    )
     upsert_bulk(
-        df=country_df[insert_columns],
+        df=country_df,
         table_name="app_country_metrics_history",
         database_connection=database_connection,
         key_columns=COUNTRY_HISTORY_KEYS,
     )
-    insert_columns = [x for x in GLOBAL_HISTORY_COLS if x in global_df.columns]
-    logger.info(f"{log_info} app_global_metrics_history upsert")
     upsert_bulk(
-        df=global_df[insert_columns],
+        df=global_df,
         table_name="app_global_metrics_history",
         database_connection=database_connection,
         key_columns=GLOBAL_HISTORY_KEYS,
@@ -735,7 +742,8 @@ def calculate_revenue_cols(
         rev_t1 = (row["wau_tier1"] * imps_per_user * avg_ecpm.get("tier1", 0)) / 1000
         rev_t2 = (row["wau_tier2"] * imps_per_user * avg_ecpm.get("tier2", 0)) / 1000
         rev_t3 = (row["wau_tier3"] * imps_per_user * avg_ecpm.get("tier3", 0)) / 1000
-        return rev_t1 + rev_t2 + rev_t3
+        rev: float = rev_t1 + rev_t2 + rev_t3
+        return rev
 
     df["weekly_ad_revenue"] = df.apply(calculate_ad_rev, axis=1)
     return df
