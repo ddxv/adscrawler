@@ -35,7 +35,7 @@ mycountries AS (
         ON
             cc.country_id = c.id
     WHERE
-        priority = :country_crawl_priority AND cc.crawl_scenario_id = 1
+        priority = :country_crawl_priority AND cc.scenario_id = 1
 ),
 apps_last_crawled_at AS (
     SELECT DISTINCT ON
