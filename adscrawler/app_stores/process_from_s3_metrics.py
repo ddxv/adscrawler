@@ -683,6 +683,15 @@ def calculate_active_users(
     df["installs_diff"] = (
         df.groupby("store_app")["installs"].diff().fillna(df["installs"]).fillna(0)
     )
+    # iOS data is very estimated and noisy, so we smooth
+    mask = df["store"] == 2
+    df.loc[mask, "installs_diff"] = (
+        df[mask]
+        .groupby("store_app")["installs_diff"]
+        .rolling(window=3, min_periods=1)
+        .mean()
+        .reset_index(level=0, drop=True)
+    )
     retention_benchmarks = get_retention_benchmarks(database_connection)
     merged_df = df.merge(
         retention_benchmarks, on=["app_category", "store"], how="left", validate="m:1"
@@ -806,7 +815,7 @@ def import_all_app_global_metrics_weekly(database_connection: PostgresCon) -> No
         )
         if df.empty:
             break
-        log_apps = df["store_app"].tolist()
+        log_apps = df["store_app"].unique().tolist()
         df = calculate_active_users(database_connection, df)
         df = calculate_revenue_cols(database_connection, df)
         final_cols = [
