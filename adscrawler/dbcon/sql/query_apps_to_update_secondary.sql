@@ -26,7 +26,7 @@ WITH target_apps AS (
         )
 ),
 mycountries AS (
-    SELECT
+    SELECT DISTINCT
         c.alpha2 AS country_code,
         country_id
     FROM
@@ -35,7 +35,7 @@ mycountries AS (
         ON
             cc.country_id = c.id
     WHERE
-        priority = :country_crawl_priority
+        priority = :country_crawl_priority AND cc.crawl_scenario_id = 1
 ),
 apps_last_crawled_at AS (
     SELECT DISTINCT ON
