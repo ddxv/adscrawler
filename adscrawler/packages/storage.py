@@ -84,12 +84,10 @@ def get_s3_client(key_name: str = "s3") -> boto3.client:
 def delete_s3_objects_by_prefix(bucket: str, prefix: str, key_name: str = "s3") -> None:
     """Delete all S3 objects with the given prefix."""
     s3 = get_s3_client(key_name)
-
     response = s3.list_objects_v2(
         Bucket=bucket,
         Prefix=prefix,
     )
-
     if "Contents" in response:
         s3.delete_objects(
             Bucket=bucket,

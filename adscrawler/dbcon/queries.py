@@ -1249,13 +1249,16 @@ def query_apps_to_process_keywords(
 
 
 def query_apps_to_process_global_metrics(
-    database_connection: PostgresCon, batch_size: int = 10000
+    database_connection: PostgresCon, batch_size: int, days_back: int
 ) -> pd.DataFrame:
     """Query apps to process metrics."""
+    start_date = (
+        datetime.datetime.now() - datetime.timedelta(days=days_back)
+    ).strftime("%Y-%m-%d")
     df = pd.read_sql(
         QUERY_APPS_TO_PROCESS_METRICS,
         con=database_connection.engine,
-        params={"batch_size": batch_size},
+        params={"batch_size": batch_size, "start_date": start_date},
     )
     tiers = ["tier1_pct", "tier2_pct", "tier3_pct"]
     df[tiers] = (df[tiers] / 10000).fillna(0)

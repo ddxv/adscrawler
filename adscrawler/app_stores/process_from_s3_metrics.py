@@ -1,7 +1,7 @@
 import datetime
 import time
-import duckdb
 
+import duckdb
 import numpy as np
 import pandas as pd
 
@@ -20,12 +20,12 @@ from adscrawler.dbcon.queries import (
     query_apps_to_process_global_metrics,
     query_countries,
     query_store_id_map_cached,
-    upsert_df,
     upsert_bulk,
+    upsert_df,
 )
 from adscrawler.packages.storage import (
-    get_duckdb_connection,
     delete_s3_objects_by_prefix,
+    get_duckdb_connection,
 )
 
 logger = get_logger(__name__, "scrape_stores")
@@ -133,7 +133,7 @@ def handle_missing_trackid_files(
     for parquet in app_detail_parquets:
         try:
             duckdb_con.execute(f"SELECT trackId FROM read_parquet({[parquet]}) LIMIT 1")
-            logger.info(f"trackId column found in file")
+            logger.info("trackId column found in file")
             ok_parquets.append(parquet)
         except duckdb.BinderException:
             logger.info(f"trackId column not found in file {parquet}")
@@ -320,9 +320,9 @@ def prep_app_google_metrics(
     country_df["global_installs"] = country_df["global_installs"].fillna(0).astype(int)
     # Db currently does not have a rating_count_est column just for country
     country_df["rating_count"] = country_df["rating_count_est"]
-    assert (
-        country_df["global_rating_count"].ge(country_df["rating_count"]).all()
-    ), "global_rating_count should be >= rating_count"
+    assert country_df["global_rating_count"].ge(country_df["rating_count"]).all(), (
+        "global_rating_count should be >= rating_count"
+    )
     global_df = country_df[country_df["country"] == "US"].copy()
     global_df = global_df.drop(columns=["rating_count", "review_count"]).rename(
         columns={
@@ -419,11 +419,11 @@ def manual_import_app_metrics_from_s3(
     start_date: datetime.date, end_date: datetime.date
 ) -> None:
     use_tunnel = False
-    rerun_s3_agg = True
+    rerun_s3_agg = False
     database_connection = get_db_connection(
         use_ssh_tunnel=use_tunnel, config_key="madrone"
     )
-    start_date = datetime.datetime.fromisoformat("2026-02-18").date()
+    start_date = datetime.datetime.fromisoformat("2026-02-16").date()
     end_date = datetime.datetime.today() - datetime.timedelta(days=1)
     for store in [1]:
         last_history_df = pd.DataFrame()
@@ -533,7 +533,7 @@ def process_app_metrics_to_db(
         database_connection,
         snapshot_date=snapshot_date,
         days_back=days_back,
-        chunk_size=10000,
+        chunk_size=25000,
         store_app_ids=df["store_app"].unique(),
         store=store,
     )
@@ -729,7 +729,7 @@ def calculate_active_users(
         .sum()
         .reset_index()
     )
-    ddf.rename(columns={"surviving_users": "wau", "surviving_mau": "mau"}, inplace=True)
+    ddf = ddf.rename(columns={"surviving_users": "wau", "surviving_mau": "mau"})
     cols = [
         "store_app",
         "in_app_purchases",
@@ -801,7 +801,9 @@ def import_all_app_global_metrics_weekly(database_connection: PostgresCon) -> No
     i = 0
     while True:
         logger.info(f"batch {i} of app global metrics weekly start")
-        df = query_apps_to_process_global_metrics(database_connection, batch_size=5000)
+        df = query_apps_to_process_global_metrics(
+            database_connection, batch_size=10000, days_back=2
+        )
         if df.empty:
             break
         log_apps = df["store_app"].tolist()
