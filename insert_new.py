@@ -16,6 +16,7 @@ def load_yaml_file(file_path: str) -> dict:
 def main():
     data = load_yaml_file("new_company.yml")
     company_name = data["company_name"]
+    company_linkedin = data["linkedin_url"]
     domain = data["domain"]
     sdk_name = data["sdk_name"]
     sdk_slug = data["sdk_slug"]
@@ -25,7 +26,9 @@ def main():
     sdk_package_patterns = data["sdk_package_patterns"]
     try:
         with database_connection.get_cursor() as cur:
-            company_id = insert_company_with_domain(cur, company_name, domain)
+            company_id = insert_company_with_domain(
+                cur, company_name, domain, company_linkedin
+            )
             sdk_id = insert_sdk(
                 cur,
                 sdk_name,
@@ -42,7 +45,9 @@ def main():
         print("Error:", e)
 
 
-def insert_company_with_domain(cur, company_name: str, domain: str) -> int:
+def insert_company_with_domain(
+    cur, company_name: str, domain: str, company_linkedin: str | None
+) -> int:
     # Insert ad_domain if not exists and get its ID
     cur.execute(
         """
@@ -64,12 +69,12 @@ def insert_company_with_domain(cur, company_name: str, domain: str) -> int:
     # Insert company if not exists and get its ID
     cur.execute(
         """
-            INSERT INTO adtech.companies (name, domain_id) 
-            VALUES (%s, %s) 
+            INSERT INTO adtech.companies (name, domain_id, linkedin_url) 
+            VALUES (%s, %s, %s) 
             ON CONFLICT (name) DO NOTHING
             RETURNING id;
         """,
-        (company_name, ad_domain_id),
+        (company_name, ad_domain_id, company_linkedin),
     )
     company_id = cur.fetchone()
 

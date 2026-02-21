@@ -12,8 +12,7 @@ WITH candidate_apps AS (
             sa.crawl_result = 1
             OR sa.store_last_updated >= current_date - INTERVAL '365 days'
         )
-    ORDER BY sa.id  -- helps predictable batching?
-    LIMIT :batch_size * 5
+    LIMIT :batch_size
 )
 SELECT
     agmh.snapshot_date,
@@ -45,6 +44,4 @@ WHERE
         WHERE
             lg.store_app = ca.store_app
             AND lg.updated_at > :start_date
-    )
-    AND ca.store = 1
-LIMIT :batch_size;
+    );
