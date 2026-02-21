@@ -517,7 +517,7 @@ def download_s3_app_by_key(
     s3_key: str,
 ) -> pathlib.Path:
     func_info = "S3 download_s3_file_by_key "
-    filename = s3_key.split("/")[-1]
+    filename = s3_key.rsplit("/", maxsplit=1)[-1]
     extension = filename.split(".")[-1]
     if extension == "apk":
         local_path = pathlib.Path(APKS_INCOMING_DIR, filename)

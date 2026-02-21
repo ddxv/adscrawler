@@ -337,7 +337,7 @@ def follow_url_redirects(
             & (existing_chain_df["api_call_id"] == api_call_id)
         ]
         if not existing_chain_df.empty:
-            redirect_chain = existing_chain_df["redirect_url"].to_list()
+            redirect_chain: list[str] = existing_chain_df["redirect_url"].to_list()
             return redirect_chain
     # New chain, insert after getting the chain
     redirect_chain_dict = get_redirect_chain(url)
@@ -479,7 +479,7 @@ def get_request_text(sent_video_dict: dict[str, Any]) -> str:
 
 def parse_youappi_ad(
     sent_video_dict: dict[str, Any], database_connection: PostgresCon
-) -> AdInfo:
+) -> tuple[AdInfo, str | None]:
     """Parses YouAppi ad response to extract advertiser information and URLs."""
     if (
         "image" in sent_video_dict["response_mime_type"]
@@ -681,7 +681,7 @@ def parse_bidmachine_ad(
         except Exception:
             pass
     if additional_ad_network_tld is not None and not ad_info.found_ad_network_tlds:
-        ad_info.found_ad_network_tlds.append(additional_ad_network_tld)
+        ad_info.found_ad_network_tlds = [additional_ad_network_tld]
     return ad_info
 
 
@@ -730,7 +730,7 @@ def parse_unity_ad(
             # with open("adhtml.html", "w") as f:
             #     f.write(jsadcontent["ad_networks"][0]["ad"]["ad_html"])
             if "referrer" in adcontent:
-                referrer = adcontent.split("referrer=")[1].split(",")[0]
+                referrer = adcontent.split("referrer=")[1].split(",", maxsplit=1)[0]
                 if "adjust_external" in referrer:
                     found_mmp_urls.append("adjust.com")
         except Exception:
@@ -804,9 +804,9 @@ def parse_generic_adnetwork(
 
 def parse_vungle_ad(
     sent_video_dict: dict[str, Any], database_connection: PostgresCon
-) -> AdInfo:
+) -> tuple[AdInfo, str | None]:
     """Parses Vungle ad response to extract advertiser market ID and tracking URLs."""
-    found_mmp_urls = None
+    found_mmp_urls = []
     adv_store_id = None
     error_msg = None
     ad_response_text = sent_video_dict["response_text"]
@@ -839,7 +839,7 @@ def parse_vungle_ad(
     else:
         ad_info = AdInfo(
             adv_store_id=adv_store_id,
-            found_mmp_urls=found_mmp_urls,
+            found_mmp_urls=found_mmp_urls if found_mmp_urls else None,
         )
     return ad_info, error_msg
 
@@ -967,7 +967,7 @@ def parse_google_ad(
 
 def parse_creative_request(
     sent_video_dict: dict[str, Any], database_connection: PostgresCon
-) -> tuple[AdInfo, list[dict[str, Any]]]:
+) -> tuple[AdInfo, str | None]:
     """Parses creative request to extract advertiser information."""
     text = get_request_text(sent_video_dict)
     return parse_text_for_adinfo(

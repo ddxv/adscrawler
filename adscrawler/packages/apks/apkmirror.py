@@ -77,7 +77,7 @@ def get_app_details(scraper: cloudscraper.CloudScraper, app_link: str) -> str:
     data = soup.find_all("div", {"class": ["table-row", "headerFont"]})[1]
 
     try:
-        download_link = (
+        download_link: str = (
             APKMIRROR_BASE_URL
             + data.find_all("a", {"class": "accent_color"})[0]["href"]
         )
@@ -115,8 +115,9 @@ def get_direct_download_link(
         {
             "rel": "nofollow",
             "data-google-interstitial": "false",
-            "href": lambda href: href
-            and "/wp-content/themes/APKMirror/download.php" in href,
+            "href": lambda href: (
+                href and "/wp-content/themes/APKMirror/download.php" in href
+            ),
         },
     )["href"]
 
