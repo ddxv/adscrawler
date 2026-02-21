@@ -14,6 +14,7 @@ from adscrawler.dbcon.connection import (
     get_db_connection,
 )
 from adscrawler.dbcon.queries import (
+    delete_and_insert,
     get_ecpm_benchmarks,
     get_latest_app_country_history,
     get_retention_benchmarks,
@@ -21,7 +22,6 @@ from adscrawler.dbcon.queries import (
     query_countries,
     query_store_id_map_cached,
     upsert_bulk,
-    upsert_df,
 )
 from adscrawler.packages.storage import (
     delete_s3_objects_by_prefix,
@@ -802,7 +802,7 @@ def import_all_app_global_metrics_weekly(database_connection: PostgresCon) -> No
     while True:
         logger.info(f"batch {i} of app global metrics weekly start")
         df = query_apps_to_process_global_metrics(
-            database_connection, batch_size=10000, days_back=2
+            database_connection, batch_size=5000, days_back=2
         )
         if df.empty:
             break
@@ -829,13 +829,21 @@ def import_all_app_global_metrics_weekly(database_connection: PostgresCon) -> No
             "five_star",
         ]
         df = df[final_cols]
-        upsert_df(
+        delete_and_insert(
             df=df,
+            schema="public",
             table_name="app_global_metrics_weekly",
             database_connection=database_connection,
-            key_columns=["store_app", "week_start"],
+            delete_by_keys=["store_app", "week_start"],
             insert_columns=df.columns.tolist(),
         )
+        # upsert_df(
+        #     df=df,
+        #     table_name="app_global_metrics_weekly",
+        #     database_connection=database_connection,
+        #     key_columns=["store_app", "week_start"],
+        #     insert_columns=df.columns.tolist(),
+        # )
         log_df = pd.DataFrame({"store_app": log_apps})
         log_df["updated_at"] = datetime.datetime.now()
         log_df.to_sql(

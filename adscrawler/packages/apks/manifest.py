@@ -51,16 +51,22 @@ def get_json_df(apk_tmp_decoded_output_path: pathlib.Path) -> pd.DataFrame:
             with file.open("r") as f:
                 file_name = file.name.replace(".json", "")
                 data = json.load(f)
-                for key in data.keys():
-                    store_key = {}
-                    my_path = "res.raw." + file_name + "." + key
-                    store_key["path"] = my_path
-                    str_data = str(data[key])
-                    str_data = str_data[:500]
-                    store_key["found_json"] = str_data
-                    raw_jsons.append(store_key)
+                if isinstance(data, dict):
+                    for key in data.keys():
+                        store_key = {}
+                        my_path = "res.raw." + file_name + "." + key
+                        store_key["path"] = my_path
+                        str_data = str(data[key])
+                        str_data = str_data[:500]
+                        store_key["found_json"] = str_data
+                        raw_jsons.append(store_key)
+                elif isinstance(data, list):
+                    logger.info(
+                        f"JSON file {file} contains a list, skipping: {str(data)[:100]}..."
+                    )
         except Exception as e:
             logger.error(f"Error loading json file {file}: {e}")
+            break
             pass
     # flatten the list of jsons where the key is a column and the value is the value
     jsons_df = pd.DataFrame(raw_jsons)

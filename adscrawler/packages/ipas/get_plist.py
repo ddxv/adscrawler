@@ -119,6 +119,7 @@ def get_parsed_plist(
         .fillna("")
         .apply(lambda row: "".join([str(x) for x in row]), axis=1)
     )
+    ddf["value"] = ddf["value"].str[:500]
     ddf = ddf[["path", "value"]]
     version_id = data["CFBundleVersion"]
     version_str = data["CFBundleShortVersionString"]
