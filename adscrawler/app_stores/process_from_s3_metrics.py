@@ -15,13 +15,14 @@ from adscrawler.dbcon.connection import (
 )
 from adscrawler.dbcon.queries import (
     delete_and_insert,
+    delete_app_metrics_by_date_and_store,
     get_ecpm_benchmarks,
     get_latest_app_country_history,
     get_retention_benchmarks,
+    insert_bulk,
     query_apps_to_process_global_metrics,
     query_countries,
     query_store_id_map_cached,
-    upsert_bulk,
 )
 from adscrawler.packages.storage import (
     delete_s3_objects_by_prefix,
@@ -66,6 +67,11 @@ GLOBAL_HISTORY_COLS = (
     + METRIC_COLS
     + ["store_last_updated", "tier1_pct", "tier2_pct", "tier3_pct"]
 )
+
+TABLE_KEYS = {
+    "app_country_metrics_history": COUNTRY_HISTORY_KEYS,
+    "app_global_metrics_history": GLOBAL_HISTORY_KEYS,
+}
 
 
 def get_s3_agg_app_snapshots_parquet_paths(
@@ -419,13 +425,15 @@ def manual_import_app_metrics_from_s3(
     start_date: datetime.date, end_date: datetime.date
 ) -> None:
     use_tunnel = False
-    rerun_s3_agg = False
+    rerun_s3_agg = True
     database_connection = get_db_connection(
         use_ssh_tunnel=use_tunnel, config_key="madrone"
     )
-    start_date = datetime.datetime.fromisoformat("2026-02-16").date()
-    end_date = datetime.datetime.today() - datetime.timedelta(days=1)
-    for store in [1]:
+    start_date = datetime.datetime.fromisoformat("2024-01-01").date()
+    # This run for OLD data and CLEAN
+    end_date = datetime.datetime.fromisoformat("2025-10-31").date()
+    # end_date = datetime.datetime.today() - datetime.timedelta(days=1)
+    for store in [1, 2]:
         last_history_df = pd.DataFrame()
         for snapshot_date in pd.date_range(start_date, end_date, freq="D"):
             # snapshot_date = datetime.datetime.fromisoformat(snapshot_date).date()
@@ -496,6 +504,46 @@ def process_store_metrics(
     return country_df, global_df
 
 
+def delete_and_insert_app_metrics(
+    database_connection: PostgresCon,
+    country_df: pd.DataFrame,
+    global_df: pd.DataFrame,
+    table_name: str,
+    store: int,
+    snapshot_date: datetime.date,
+) -> None:
+    start_time = time.time()
+    table_name = "app_country_metrics_history"
+    delete_app_metrics_by_date_and_store(
+        database_connection=database_connection,
+        snapshot_date=snapshot_date,
+        store=store,
+        table_name=table_name,
+    )
+    insert_bulk(
+        df=country_df,
+        table_name=table_name,
+        database_connection=database_connection,
+    )
+    mytime: float = time.time() - start_time
+    logger.info(f"{table_name} insert {country_df.shape[0]} rows in {mytime:.2f}s")
+    start_time = time.time()
+    table_name = "app_global_metrics_history"
+    delete_app_metrics_by_date_and_store(
+        database_connection=database_connection,
+        snapshot_date=snapshot_date,
+        store=store,
+        table_name=table_name,
+    )
+    insert_bulk(
+        df=global_df,
+        table_name=table_name,
+        database_connection=database_connection,
+    )
+    mytime: float = time.time() - start_time
+    logger.info(f"{table_name} insert {global_df.shape[0]} rows in {mytime:.2f}s")
+
+
 def process_app_metrics_to_db(
     database_connection: PostgresCon,
     store: int,
@@ -548,22 +596,14 @@ def process_app_metrics_to_db(
     country_df, global_df = process_store_metrics(
         store=store, app_country_db_latest=app_country_db_latest, df=df
     )
-    start_time = time.time()
-    upsert_bulk(
-        df=country_df,
+    delete_and_insert_app_metrics(
+        database_connection=database_connection,
+        country_df=country_df,
+        global_df=global_df,
         table_name="app_country_metrics_history",
-        database_connection=database_connection,
-        key_columns=COUNTRY_HISTORY_KEYS,
+        store=store,
+        snapshot_date=snapshot_date,
     )
-    logger.info(f"Upserted country_df in {time.time() - start_time:.2f} seconds")
-    start_time = time.time()
-    upsert_bulk(
-        df=global_df,
-        table_name="app_global_metrics_history",
-        database_connection=database_connection,
-        key_columns=GLOBAL_HISTORY_KEYS,
-    )
-    logger.info(f"Upserted global_df in {time.time() - start_time:.2f} seconds")
     return app_country_db_latest
 
 
@@ -846,13 +886,6 @@ def import_all_app_global_metrics_weekly(database_connection: PostgresCon) -> No
             delete_by_keys=["store_app", "week_start"],
             insert_columns=df.columns.tolist(),
         )
-        # upsert_df(
-        #     df=df,
-        #     table_name="app_global_metrics_weekly",
-        #     database_connection=database_connection,
-        #     key_columns=["store_app", "week_start"],
-        #     insert_columns=df.columns.tolist(),
-        # )
         log_df = pd.DataFrame({"store_app": log_apps})
         log_df["updated_at"] = datetime.datetime.now()
         log_df.to_sql(

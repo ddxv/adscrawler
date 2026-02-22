@@ -260,45 +260,74 @@ def update_from_df(
     return return_df
 
 
+def _copy_df_to_temp_table(
+    df: pd.DataFrame,
+    table_name: str,
+    conn,
+) -> str:
+    """Copy a DataFrame into a temp table mirroring table_name. Returns temp table name."""
+    temp_table = f"temp_{table_name}_{pd.Timestamp.now().strftime('%M%S')}"
+    conn.execute(
+        text(
+            f"CREATE TEMP TABLE {temp_table} "
+            f"(LIKE {table_name} INCLUDING DEFAULTS) ON COMMIT DROP"
+        )
+    )
+    buffer = StringIO()
+    df.to_csv(buffer, index=False, header=False)
+    buffer.seek(0)
+    raw = conn.connection
+    with raw.cursor() as cur:
+        with cur.copy(
+            f"COPY {temp_table} ({', '.join(df.columns)}) FROM STDIN WITH CSV"
+        ) as copy:
+            copy.write(buffer.getvalue())
+    return temp_table
+
+
 def upsert_bulk(
     df: pd.DataFrame,
     table_name: str,
     database_connection: Connection,
     key_columns: list[str],
 ) -> None:
-    """Perform a bulk "upsert" on a PostgreSQL table from a DataFrame using COPY and ON CONFLICT."""
+    """Perform a bulk upsert on a PostgreSQL table from a DataFrame using COPY and ON CONFLICT."""
     log_info = f"upsert_bulk table={table_name} rows={df.shape[0]}"
     logger.info(f"{log_info} start")
-    temp_table = f"temp_{table_name}"
+    all_cols = [f'"{c}"' for c in df.columns]
+    update_cols = [
+        f'"{c}" = EXCLUDED."{c}"' for c in df.columns if c not in key_columns
+    ]
+    query = f"""
+        INSERT INTO {table_name} ({", ".join(all_cols)})
+        SELECT {", ".join(all_cols)} FROM {{temp_table}}
+        ON CONFLICT ({", ".join(f'"{c}"' for c in key_columns)})
+        DO UPDATE SET {", ".join(update_cols)}
+    """
     with database_connection.engine.begin() as conn:
-        conn.execute(
-            text(
-                f"CREATE TEMP TABLE {temp_table} "
-                f"(LIKE {table_name} INCLUDING DEFAULTS) ON COMMIT DROP"
-            )
-        )
-        buffer = StringIO()
-        df.to_csv(buffer, index=False, header=False)
-        buffer.seek(0)
-        raw = conn.connection
-        with raw.cursor() as cur:
-            with cur.copy(
-                f"COPY {temp_table} ({', '.join(df.columns)}) FROM STDIN WITH CSV"
-            ) as copy:
-                copy.write(buffer.getvalue())
-            # cur.execute(f"ANALYZE {temp_table}")
-        all_cols = [f'"{c}"' for c in df.columns]
-        update_cols = [
-            f'"{c}" = EXCLUDED."{c}"' for c in df.columns if c not in key_columns
-        ]
-        query = f"""
-            INSERT INTO {table_name} ({", ".join(all_cols)})
-            SELECT {", ".join(all_cols)} FROM {temp_table}
-            ON CONFLICT ({", ".join(f'"{c}"' for c in key_columns)})
-            DO UPDATE SET {", ".join(update_cols)}
-        """
-        conn.execute(text(query))
+        temp_table = _copy_df_to_temp_table(df, table_name, conn)
+        conn.execute(text(query.format(temp_table=temp_table)))
     logger.info(f"{log_info} finish")
+
+
+def insert_bulk(
+    df: pd.DataFrame,
+    table_name: str,
+    database_connection: Connection,
+) -> None:
+    """Perform a bulk insert on a PostgreSQL table from a DataFrame using COPY."""
+    log_info = f"insert_bulk table={table_name} rows={df.shape[0]}"
+    logger.info(f"{log_info} start")
+    with database_connection.engine.begin() as conn:
+        raw_conn = conn.connection.dbapi_connection
+        with raw_conn.cursor() as cur:
+            with cur.copy(
+                f"COPY {table_name} ({','.join(df.columns)}) FROM STDIN"
+            ) as copy:
+                buffer = StringIO()
+                df.to_csv(buffer, index=False, header=False, sep="\t", na_rep="\\N")
+                buffer.seek(0)
+                copy.write(buffer.read())
 
 
 def upsert_df(
@@ -451,31 +480,27 @@ def upsert_df(
 
 
 def clean_app_ranks_weekly_table(database_connection: PostgresCon) -> None:
-    # Use a smaller limit to prevent long locks
     batch_size = 100000
-    del_query = f"""
+    del_query = text(
+        f"""
         DELETE FROM frontend.store_app_ranks_weekly
         WHERE ctid IN (
             SELECT ctid FROM frontend.store_app_ranks_weekly
             WHERE crawled_date < CURRENT_DATE - INTERVAL '14 days'
               AND EXTRACT(DOW FROM crawled_date) != 1
             LIMIT {batch_size}
-        );
+        )
     """
-    raw_conn = database_connection.engine.raw_connection()
-    # Ensure we aren't in an implicit transaction block that stays open
-    raw_conn.set_session(autocommit=True)
-    try:
-        with raw_conn.cursor() as cur:
-            while True:
-                cur.execute(del_query)
-                rows_affected = cur.rowcount
-                print(f"Deleted {rows_affected} rows...")
-
-                if rows_affected == 0:
-                    break
-    finally:
-        raw_conn.close()
+    )
+    with database_connection.engine.connect().execution_options(
+        isolation_level="AUTOCOMMIT"
+    ) as conn:
+        while True:
+            result = conn.execute(del_query)
+            rows_affected = result.rowcount
+            logger.info(f"Deleted {rows_affected} rows...")
+            if rows_affected == 0:
+                break
 
 
 def delete_and_insert(
@@ -1658,3 +1683,31 @@ def get_ecpm_benchmarks(database_connection: PostgresCon) -> pd.DataFrame:
     """
     df = pd.read_sql(sel_query, con=database_connection.engine)
     return df
+
+
+def delete_app_metrics_by_date_and_store(
+    database_connection: PostgresCon,
+    snapshot_date: datetime.date,
+    store: int,
+    table_name: str,
+) -> None:
+    assert table_name in [
+        "app_country_metrics_history",
+        "app_global_metrics_history",
+    ], "Invalid table name"
+    del_query = f"""
+        DELETE FROM public.{table_name} acmh
+        USING store_apps sa
+        WHERE acmh.store_app = sa.id
+        AND acmh.snapshot_date = :snapshot_date
+        AND sa.store = :store
+    """
+    with database_connection.engine.connect().execution_options(
+        isolation_level="AUTOCOMMIT"
+    ) as conn:
+        result = conn.execute(
+            text(del_query), {"snapshot_date": snapshot_date, "store": store}
+        )
+        logger.info(
+            f"{snapshot_date=} {store=} deleted {result.rowcount} rows from {table_name}"
+        )
