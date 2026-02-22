@@ -429,7 +429,7 @@ def manual_import_app_metrics_from_s3(
     database_connection = get_db_connection(
         use_ssh_tunnel=use_tunnel, config_key="madrone"
     )
-    start_date = datetime.datetime.fromisoformat("2024-01-01").date()
+    start_date = datetime.datetime.fromisoformat("2025-01-01").date()
     # This run for OLD data and CLEAN
     end_date = datetime.datetime.fromisoformat("2025-10-31").date()
     # end_date = datetime.datetime.today() - datetime.timedelta(days=1)

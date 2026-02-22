@@ -1,14 +1,16 @@
 import datetime
 import hashlib
+import io
 import pathlib
+import time
 from functools import lru_cache
-from io import StringIO
 
 import numpy as np
 import pandas as pd
 from psycopg import Connection
 from psycopg.sql import SQL, Composed, Identifier
 from sqlalchemy import bindparam, text
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.sql.elements import TextClause
 
 from adscrawler.config import CONFIG, SQL_DIR, get_logger
@@ -273,7 +275,7 @@ def _copy_df_to_temp_table(
             f"(LIKE {table_name} INCLUDING DEFAULTS) ON COMMIT DROP"
         )
     )
-    buffer = StringIO()
+    buffer = io.StringIO()
     df.to_csv(buffer, index=False, header=False)
     buffer.seek(0)
     raw = conn.connection
@@ -313,21 +315,60 @@ def upsert_bulk(
 def insert_bulk(
     df: pd.DataFrame,
     table_name: str,
-    database_connection: Connection,
+    database_connection,
+    chunk_size: int = 25000,
 ) -> None:
-    """Perform a bulk insert on a PostgreSQL table from a DataFrame using COPY."""
-    log_info = f"insert_bulk table={table_name} rows={df.shape[0]}"
-    logger.info(f"{log_info} start")
-    with database_connection.engine.begin() as conn:
-        raw_conn = conn.connection.dbapi_connection
-        with raw_conn.cursor() as cur:
-            with cur.copy(
-                f"COPY {table_name} ({','.join(df.columns)}) FROM STDIN"
-            ) as copy:
-                buffer = StringIO()
-                df.to_csv(buffer, index=False, header=False, sep="\t", na_rep="\\N")
-                buffer.seek(0)
-                copy.write(buffer.read())
+    """
+    Perform a bulk insert with chunking, sorting, and deadlock retries.
+    """
+    # SORTING: to prevent deadlocks.
+    if "store_app" in df.columns:
+        df = df.sort_values("store_app")
+
+    total_rows = len(df)
+
+    for i in range(0, total_rows, chunk_size):
+        chunk = df.iloc[i : i + chunk_size]
+        log_info = f"insert_bulk table={table_name} chunk={i // chunk_size + 1} rows={len(chunk)}"
+
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                with database_connection.engine.begin() as conn:
+                    logger.info(f"{log_info} start")
+
+                    # Optional: speed up validation by increasing work memory for this session
+                    conn.execute(text("SET LOCAL work_mem = '64MB'"))
+
+                    raw_conn = conn.connection.dbapi_connection
+                    with raw_conn.cursor() as cur:
+                        with cur.copy(
+                            f"COPY {table_name} ({','.join(chunk.columns)}) FROM STDIN"
+                        ) as copy:
+                            buffer = io.StringIO()
+                            chunk.to_csv(
+                                buffer,
+                                index=False,
+                                header=False,
+                                sep="\t",
+                                na_rep="\\N",
+                            )
+                            buffer.seek(0)
+                            copy.write(buffer.read())
+
+                logger.info(f"{log_info} finish")
+                break  # Success
+
+            except OperationalError as e:
+                # Check for the specific Postgres Deadlock error code (40P01)
+                if "deadlock_detected" in str(e) and attempt < max_retries - 1:
+                    wait_time = (attempt + 1) * 2
+                    logger.warning(
+                        f"Deadlock detected. Retrying in {wait_time}s... (Attempt {attempt + 1})"
+                    )
+                    time.sleep(wait_time)
+                    continue
+                raise
 
 
 def upsert_df(
