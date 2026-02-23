@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict Z27eGEDtL3BzUKauDasaEgTrOBms0vcBHRf8g8UyLt0wiq9Jdrj2LDixniGMHbD
+\restrict TDOVb6rjqOWyN99RyGRkcRenaiMiOHRPH4oUl7R7SlhkqOXs8Y6fLafmAZzr8bY
 
 -- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 -- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
@@ -58,5 +58,5 @@ CREATE UNIQUE INDEX app_global_metrics_latest_idx ON public.app_global_metrics_l
 -- PostgreSQL database dump complete
 --
 
-\unrestrict Z27eGEDtL3BzUKauDasaEgTrOBms0vcBHRf8g8UyLt0wiq9Jdrj2LDixniGMHbD
+\unrestrict TDOVb6rjqOWyN99RyGRkcRenaiMiOHRPH4oUl7R7SlhkqOXs8Y6fLafmAZzr8bY
 

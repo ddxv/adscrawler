@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict PkTexdaQPC3EpSM5tYEqhiMVF3VNuNavBwbtM0igtd6cjCnsgB5JLvesgMncINz
+\restrict ko4WWy6E6rrQ3fTw87XcSUrat2xs64d5fNWre2qGwgoSYDgxsplF1UwVUrEKRi6
 
 -- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 -- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
@@ -4226,29 +4226,6 @@ CREATE TABLE public.app_country_metrics_history (
 ALTER TABLE public.app_country_metrics_history OWNER TO postgres;
 
 --
--- Name: app_country_metrics_latest; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
---
-
-CREATE MATERIALIZED VIEW public.app_country_metrics_latest AS
- SELECT DISTINCT ON (store_app, country_id) snapshot_date,
-    store_app,
-    country_id,
-    review_count,
-    rating,
-    rating_count,
-    one_star,
-    two_star,
-    three_star,
-    four_star,
-    five_star
-   FROM public.app_country_metrics_history sacs
-  ORDER BY store_app, country_id, snapshot_date DESC
-  WITH NO DATA;
-
-
-ALTER MATERIALIZED VIEW public.app_country_metrics_latest OWNER TO postgres;
-
---
 -- Name: app_global_metrics_weekly; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -4260,10 +4237,10 @@ CREATE TABLE public.app_global_metrics_weekly (
     weekly_reviews bigint,
     weekly_active_users bigint,
     monthly_active_users bigint,
-    weekly_iap_revenue double precision,
-    weekly_ad_revenue double precision,
+    weekly_iap_revenue real,
+    weekly_ad_revenue real,
     total_installs bigint,
-    total_ratings_count bigint,
+    total_ratings bigint,
     rating real,
     one_star bigint,
     two_star bigint,
@@ -6532,13 +6509,6 @@ CREATE UNIQUE INDEX app_country_metrics_history_unique_idx ON public.app_country
 
 
 --
--- Name: app_country_metrics_latest_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE UNIQUE INDEX app_country_metrics_latest_idx ON public.app_country_metrics_latest USING btree (store_app, country_id);
-
-
---
 -- Name: app_global_metrics_history_date_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -7195,27 +7165,35 @@ ALTER TABLE ONLY public.app_ads_map
 
 
 --
--- Name: app_country_metrics_history app_country_metrics_history_app_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+-- Name: app_country_metrics_history app_country_metrics_history_country_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.app_country_metrics_history
-    ADD CONSTRAINT app_country_metrics_history_app_fk FOREIGN KEY (store_app) REFERENCES public.store_apps(id);
+    ADD CONSTRAINT app_country_metrics_history_country_id_fk FOREIGN KEY (country_id) REFERENCES public.countries(id) DEFERRABLE INITIALLY DEFERRED;
 
 
 --
--- Name: app_global_metrics_history app_global_metrics_history_app_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+-- Name: app_country_metrics_history app_country_metrics_history_store_app_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.app_country_metrics_history
+    ADD CONSTRAINT app_country_metrics_history_store_app_fk FOREIGN KEY (store_app) REFERENCES public.store_apps(id) DEFERRABLE INITIALLY DEFERRED;
+
+
+--
+-- Name: app_global_metrics_history app_global_metrics_history_store_app_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.app_global_metrics_history
-    ADD CONSTRAINT app_global_metrics_history_app_fk FOREIGN KEY (store_app) REFERENCES public.store_apps(id);
+    ADD CONSTRAINT app_global_metrics_history_store_app_fk FOREIGN KEY (store_app) REFERENCES public.store_apps(id) DEFERRABLE INITIALLY DEFERRED;
 
 
 --
--- Name: app_global_metrics_weekly app_global_metrics_weekly_store_app_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+-- Name: app_global_metrics_weekly app_global_metrics_weekly_store_app_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.app_global_metrics_weekly
-    ADD CONSTRAINT app_global_metrics_weekly_store_app_fkey FOREIGN KEY (store_app) REFERENCES public.store_apps(id);
+    ADD CONSTRAINT app_global_metrics_weekly_store_app_id_fkey FOREIGN KEY (store_app) REFERENCES public.store_apps(id) DEFERRABLE INITIALLY DEFERRED;
 
 
 --
@@ -7363,14 +7341,6 @@ ALTER TABLE ONLY public.ecpm_benchmarks
 
 
 --
--- Name: app_country_metrics_history fk_country; Type: FK CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.app_country_metrics_history
-    ADD CONSTRAINT fk_country FOREIGN KEY (country_id) REFERENCES public.countries(id);
-
-
---
 -- Name: ip_geo_snapshots fk_country; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -7494,5 +7464,5 @@ GRANT ALL ON SCHEMA public TO PUBLIC;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict PkTexdaQPC3EpSM5tYEqhiMVF3VNuNavBwbtM0igtd6cjCnsgB5JLvesgMncINz
+\unrestrict ko4WWy6E6rrQ3fTw87XcSUrat2xs64d5fNWre2qGwgoSYDgxsplF1UwVUrEKRi6
 

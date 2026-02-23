@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict PNdLM7B1OByK3IGjFrPUvEmT8fl0A9M9gJGDZrPqXIWGj7BojUytqq7EdEGf0J2
+\restrict BVYhTGTTXtgIsO6a03kIqaeMtrN23nORZoXJChEMTgHEMPw1doO3ZTQlJOJCTON
 
 -- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 -- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
@@ -35,10 +35,10 @@ CREATE TABLE public.app_global_metrics_weekly (
     weekly_reviews bigint,
     weekly_active_users bigint,
     monthly_active_users bigint,
-    weekly_iap_revenue double precision,
-    weekly_ad_revenue double precision,
+    weekly_iap_revenue real,
+    weekly_ad_revenue real,
     total_installs bigint,
-    total_ratings_count bigint,
+    total_ratings bigint,
     rating real,
     one_star bigint,
     two_star bigint,
@@ -59,16 +59,16 @@ ALTER TABLE ONLY public.app_global_metrics_weekly
 
 
 --
--- Name: app_global_metrics_weekly app_global_metrics_weekly_store_app_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+-- Name: app_global_metrics_weekly app_global_metrics_weekly_store_app_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.app_global_metrics_weekly
-    ADD CONSTRAINT app_global_metrics_weekly_store_app_fkey FOREIGN KEY (store_app) REFERENCES public.store_apps(id);
+    ADD CONSTRAINT app_global_metrics_weekly_store_app_id_fkey FOREIGN KEY (store_app) REFERENCES public.store_apps(id) DEFERRABLE INITIALLY DEFERRED;
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict PNdLM7B1OByK3IGjFrPUvEmT8fl0A9M9gJGDZrPqXIWGj7BojUytqq7EdEGf0J2
+\unrestrict BVYhTGTTXtgIsO6a03kIqaeMtrN23nORZoXJChEMTgHEMPw1doO3ZTQlJOJCTON
 

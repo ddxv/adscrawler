@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict YhhAdXtpPi9fcbLSyhNd5PsO7gNLUeUrYG9ijoslSYovJOdFbbJeisfdZzXm6jb
+\restrict iyQrvOmmee7gBYmKqz8QricYfDT2wrzjETCWmZeKvW2FkNeZXof16HIgoULC3l8
 
 -- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 -- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
@@ -77,16 +77,16 @@ CREATE INDEX idx_agmh_store_app_snapshot_date ON public.app_global_metrics_histo
 
 
 --
--- Name: app_global_metrics_history app_global_metrics_history_app_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+-- Name: app_global_metrics_history app_global_metrics_history_store_app_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.app_global_metrics_history
-    ADD CONSTRAINT app_global_metrics_history_app_fk FOREIGN KEY (store_app) REFERENCES public.store_apps(id);
+    ADD CONSTRAINT app_global_metrics_history_store_app_fk FOREIGN KEY (store_app) REFERENCES public.store_apps(id) DEFERRABLE INITIALLY DEFERRED;
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict YhhAdXtpPi9fcbLSyhNd5PsO7gNLUeUrYG9ijoslSYovJOdFbbJeisfdZzXm6jb
+\unrestrict iyQrvOmmee7gBYmKqz8QricYfDT2wrzjETCWmZeKvW2FkNeZXof16HIgoULC3l8
 

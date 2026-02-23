@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict eYBThMFpA6lDDk56Pvst0nBQvzVPkDcn7LUzcriCq92Sc9nGwVhgrGICnK6r4q5
+\restrict OGL0SvU98G9QHG4d18wGdrdJ7ozfWHyJkeFy84hcjVfqE5edqn6BriNrodeDRYD
 
 -- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 -- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
@@ -67,24 +67,24 @@ CREATE UNIQUE INDEX app_country_metrics_history_unique_idx ON public.app_country
 
 
 --
--- Name: app_country_metrics_history app_country_metrics_history_app_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+-- Name: app_country_metrics_history app_country_metrics_history_country_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.app_country_metrics_history
-    ADD CONSTRAINT app_country_metrics_history_app_fk FOREIGN KEY (store_app) REFERENCES public.store_apps(id);
+    ADD CONSTRAINT app_country_metrics_history_country_id_fk FOREIGN KEY (country_id) REFERENCES public.countries(id) DEFERRABLE INITIALLY DEFERRED;
 
 
 --
--- Name: app_country_metrics_history fk_country; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+-- Name: app_country_metrics_history app_country_metrics_history_store_app_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.app_country_metrics_history
-    ADD CONSTRAINT fk_country FOREIGN KEY (country_id) REFERENCES public.countries(id);
+    ADD CONSTRAINT app_country_metrics_history_store_app_fk FOREIGN KEY (store_app) REFERENCES public.store_apps(id) DEFERRABLE INITIALLY DEFERRED;
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict eYBThMFpA6lDDk56Pvst0nBQvzVPkDcn7LUzcriCq92Sc9nGwVhgrGICnK6r4q5
+\unrestrict OGL0SvU98G9QHG4d18wGdrdJ7ozfWHyJkeFy84hcjVfqE5edqn6BriNrodeDRYD
 

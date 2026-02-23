@@ -3,6 +3,7 @@ import hashlib
 import io
 import pathlib
 import time
+import uuid
 from functools import lru_cache
 
 import numpy as np
@@ -262,28 +263,28 @@ def update_from_df(
     return return_df
 
 
-def _copy_df_to_temp_table(
-    df: pd.DataFrame,
-    table_name: str,
-    conn,
-) -> str:
-    """Copy a DataFrame into a temp table mirroring table_name. Returns temp table name."""
-    temp_table = f"temp_{table_name}_{pd.Timestamp.now().strftime('%M%S')}"
+def _copy_df_to_temp_table(df, table_name, conn):
+    temp_table = f"temp_{table_name}_{uuid.uuid4().hex[:8]}"
     conn.execute(
         text(
             f"CREATE TEMP TABLE {temp_table} "
             f"(LIKE {table_name} INCLUDING DEFAULTS) ON COMMIT DROP"
         )
     )
+    raw = conn.connection.dbapi_connection
+
     buffer = io.StringIO()
-    df.to_csv(buffer, index=False, header=False)
+    df.to_csv(buffer, index=False, header=False, sep="\t", na_rep="\\N")
     buffer.seek(0)
-    raw = conn.connection
+
     with raw.cursor() as cur:
         with cur.copy(
-            f"COPY {temp_table} ({', '.join(df.columns)}) FROM STDIN WITH CSV"
+            f"COPY {temp_table} ({', '.join(df.columns)}) FROM STDIN"
         ) as copy:
-            copy.write(buffer.getvalue())
+            # Write in chunks rather than all at once or row by row
+            while chunk := buffer.read(65536):  # 64KB chunks
+                copy.write(chunk)
+
     return temp_table
 
 
@@ -312,63 +313,58 @@ def upsert_bulk(
     logger.info(f"{log_info} finish")
 
 
+def _copy_chunk(chunk: pd.DataFrame, table_name: str, conn) -> None:
+    raw_conn = conn.connection.dbapi_connection
+    buffer = io.StringIO()
+    chunk.to_csv(buffer, index=False, header=False, sep="\t", na_rep="\\N")
+    buffer.seek(0)
+    with raw_conn.cursor() as cur:
+        with cur.copy(
+            f"COPY {table_name} ({','.join(chunk.columns)}) FROM STDIN"
+        ) as copy:
+            while data := buffer.read(65536):
+                copy.write(data)
+
+
+def _with_deadlock_retry(fn, max_retries: int = 3) -> None:
+    for attempt in range(max_retries):
+        try:
+            fn()
+            return
+        except OperationalError as e:
+            if "deadlock_detected" not in str(e) or attempt >= max_retries - 1:
+                raise
+            wait_time = (attempt + 1) * 2
+            logger.warning(
+                f"Deadlock detected. Retrying in {wait_time}s... (Attempt {attempt + 1})"
+            )
+            time.sleep(wait_time)
+
+
 def insert_bulk(
     df: pd.DataFrame,
     table_name: str,
     database_connection,
-    chunk_size: int = 25000,
+    chunk_size: int | None = None,
 ) -> None:
-    """
-    Perform a bulk insert with chunking, sorting, and deadlock retries.
-    """
-    # SORTING: to prevent deadlocks.
-    if "store_app" in df.columns:
-        df = df.sort_values("store_app")
-
     total_rows = len(df)
+    chunk_size = chunk_size or total_rows
 
     for i in range(0, total_rows, chunk_size):
         chunk = df.iloc[i : i + chunk_size]
-        log_info = f"insert_bulk table={table_name} chunk={i // chunk_size + 1} rows={len(chunk)}"
+        chunk_num = i // chunk_size + 1
+        logger.info(
+            f"insert_bulk table={table_name} chunk={chunk_num} rows={len(chunk)} start"
+        )
 
-        max_retries = 3
-        for attempt in range(max_retries):
-            try:
-                with database_connection.engine.begin() as conn:
-                    logger.info(f"{log_info} start")
+        def do_insert():
+            with database_connection.engine.begin() as conn:
+                _copy_chunk(chunk, table_name, conn)
 
-                    # Optional: speed up validation by increasing work memory for this session
-                    conn.execute(text("SET LOCAL work_mem = '64MB'"))
-
-                    raw_conn = conn.connection.dbapi_connection
-                    with raw_conn.cursor() as cur:
-                        with cur.copy(
-                            f"COPY {table_name} ({','.join(chunk.columns)}) FROM STDIN"
-                        ) as copy:
-                            buffer = io.StringIO()
-                            chunk.to_csv(
-                                buffer,
-                                index=False,
-                                header=False,
-                                sep="\t",
-                                na_rep="\\N",
-                            )
-                            buffer.seek(0)
-                            copy.write(buffer.read())
-
-                logger.info(f"{log_info} finish")
-                break  # Success
-
-            except OperationalError as e:
-                # Check for the specific Postgres Deadlock error code (40P01)
-                if "deadlock_detected" in str(e) and attempt < max_retries - 1:
-                    wait_time = (attempt + 1) * 2
-                    logger.warning(
-                        f"Deadlock detected. Retrying in {wait_time}s... (Attempt {attempt + 1})"
-                    )
-                    time.sleep(wait_time)
-                    continue
-                raise
+        _with_deadlock_retry(do_insert)
+        logger.info(
+            f"insert_bulk table={table_name} chunk={chunk_num} rows={len(chunk)} finish"
+        )
 
 
 def upsert_df(
@@ -1728,7 +1724,8 @@ def get_ecpm_benchmarks(database_connection: PostgresCon) -> pd.DataFrame:
 
 def delete_app_metrics_by_date_and_store(
     database_connection: PostgresCon,
-    snapshot_date: datetime.date,
+    snapshot_start_date: datetime.date,
+    snapshot_end_date: datetime.date,
     store: int,
     table_name: str,
 ) -> None:
@@ -1740,15 +1737,20 @@ def delete_app_metrics_by_date_and_store(
         DELETE FROM public.{table_name} acmh
         USING store_apps sa
         WHERE acmh.store_app = sa.id
-        AND acmh.snapshot_date = :snapshot_date
+        AND acmh.snapshot_date BETWEEN :snapshot_start_date AND :snapshot_end_date
         AND sa.store = :store
     """
     with database_connection.engine.connect().execution_options(
         isolation_level="AUTOCOMMIT"
     ) as conn:
         result = conn.execute(
-            text(del_query), {"snapshot_date": snapshot_date, "store": store}
+            text(del_query),
+            {
+                "snapshot_start_date": snapshot_start_date,
+                "snapshot_end_date": snapshot_end_date,
+                "store": store,
+            },
         )
         logger.info(
-            f"{snapshot_date=} {store=} deleted {result.rowcount} rows from {table_name}"
+            f"{snapshot_start_date=} {snapshot_end_date=} {store=} deleted {result.rowcount} rows from {table_name}"
         )

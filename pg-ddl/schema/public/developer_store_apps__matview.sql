@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict naNDZ2J9aOoIVbqmGQyGCoTJnMWMtro00gYOStlfKwE7X6SRULfVYm8Qru8kfAx
+\restrict ilVwhp58es9Mz1ImkybRcN2EiLEBomtrBkCCWccjZbOszVyFotPbkbNmCYk7rPG
 
 -- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 -- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
@@ -83,5 +83,5 @@ CREATE UNIQUE INDEX idx_developer_store_apps_unique ON public.developer_store_ap
 -- PostgreSQL database dump complete
 --
 
-\unrestrict naNDZ2J9aOoIVbqmGQyGCoTJnMWMtro00gYOStlfKwE7X6SRULfVYm8Qru8kfAx
+\unrestrict ilVwhp58es9Mz1ImkybRcN2EiLEBomtrBkCCWccjZbOszVyFotPbkbNmCYk7rPG
 
