@@ -73,6 +73,10 @@ TABLE_KEYS = {
     "app_global_metrics_history": GLOBAL_HISTORY_KEYS,
 }
 
+APP_COUNTRY_WEEKLY_PREFIX = "agg-data/app_country_metrics/weekly"
+APP_COUNTRY_DAILY_PREFIX = "agg-data/app_country_metrics/daily"
+RAW_DATA_PREFIX = "raw-data/app_details"
+
 
 def get_s3_agg_app_snapshots_parquet_paths(
     bucket: str,
@@ -84,7 +88,7 @@ def get_s3_agg_app_snapshots_parquet_paths(
     all_parquet_paths = []
     for ddt in pd.date_range(start_date, end_date, freq=freq):
         ddt_str = ddt.strftime("%Y-%m-%d")
-        prefix = f"agg-data/app_country_metrics/weekly/store={store}/snapshot_date={ddt_str}/country="
+        prefix = f"{APP_COUNTRY_WEEKLY_PREFIX}/store={store}/snapshot_date={ddt_str}/country="
         all_parquet_paths += get_parquet_paths_by_prefix(bucket, prefix)
     return all_parquet_paths
 
@@ -134,38 +138,71 @@ def check_for_duplicates(df: pd.DataFrame, key_columns: list[str]) -> None:
 def handle_missing_trackid_files(
     duckdb_con: duckdb.DuckDBPyConnection, app_detail_parquets: list[str], store: int
 ) -> None:
+    required_id_column = "trackId" if store == 2 else "appId"
     if store == 2:
         bad_parquets = []
         ok_parquets = []
         for parquet in app_detail_parquets:
             try:
-                duckdb_con.execute(f"SELECT trackId FROM read_parquet({[parquet]})")
-                logger.info("trackId column found in file")
+                duckdb_con.execute(
+                    f"SELECT {required_id_column} FROM read_parquet({[parquet]})"
+                )
+                logger.info(f"{required_id_column} column found in file")
                 ok_parquets.append(parquet)
             except duckdb.BinderException:
-                logger.info(f"trackId column not found in file {parquet}")
-                bad_parquets.append(parquet)
-            except duckdb.IOException as e:
-                logger.error(f"IO error reading parquet file {parquet}: {e}")
+                logger.info(f"{required_id_column} column not found in file {parquet}")
                 bad_parquets.append(parquet)
         for parquet in bad_parquets:
-            logger.warning(f"Deleting bad parquet file {parquet}")
-            # delete_s3_objects_by_prefix(bucket, prefix=parquet)
+            logger.warning(f"Wanting to deleting raw bad parquet file {parquet}")
+            # delete_s3_objects_by_prefix(bucket='adscrawler', prefix=parquet)
     else:
         logger.error(
             "trackId column missing but store is not Apple, investigate data issue"
         )
 
 
-duckdb_con = get_duckdb_connection("s3")
-duckdb.execute(f"DESCRIBE SELECT * FROM read_parquet(['{parquet_path}'])")
-
-parquet_path = "raw-data/app_details/store=2/crawled_date=2025-12-15/country=AU/app_details_1765762585595_87eeb1a4.parquet"
-parquet_path = "s3://adscrawler/raw-data/app_details/store=2/crawled_date=2025-12-15/country=AU/app_details_1765762282109_02f34370.parquet"
-parquet_path = "http://192.168.0.182:3900/adscrawler/raw-data/app_details/store=2/crawled_date=2025-12-15/country=AU/app_details_1765762282109_02f34370.parquet"
-duckdb_con.execute(f"SELECT trackID FROM read_parquet(['{parquet_path}'])")
-duckdb_con.execute(f"SELECT trackId FROM read_parquet({[parquet_path]})")
-duckdb_con.close()
+def make_s3_app_country_metrics_history_daily(
+    store: int, snapshot_date: pd.DatetimeIndex
+) -> None:
+    s3_config_key = "s3"
+    bucket = CONFIG[s3_config_key]["bucket"]
+    snapshot_date_str = snapshot_date.strftime("%Y-%m-%d")
+    prefix = (
+        f"{RAW_DATA_PREFIX}/store={store}/crawled_date={snapshot_date_str}/country="
+    )
+    all_parquet_paths = get_parquet_paths_by_prefix(bucket, prefix)
+    agg_prefix = (
+        f"{APP_COUNTRY_DAILY_PREFIX}/store={store}/snapshot_date={snapshot_date_str}/"
+    )
+    delete_s3_objects_by_prefix(
+        bucket=bucket, prefix=agg_prefix, key_name=s3_config_key
+    )
+    if len(all_parquet_paths) == 0:
+        logger.error(
+            f"No app detail parquet files found for store={store} snapshot_date={snapshot_date_str}"
+        )
+        return
+    query = copy_raw_details_to_daily_agg(
+        store=store,
+        app_detail_parquets=all_parquet_paths,
+        snapshot_date_str=snapshot_date_str,
+    )
+    duckdb_con = get_duckdb_connection(s3_config_key)
+    try:
+        duckdb_con.execute(query)
+    except duckdb.BinderException as e:
+        if store == 2 and """"trackId" not found""" in str(e):
+            logger.error(
+                f"trackId column not found in parquets for store={store}, skipping"
+            )
+            handle_missing_trackid_files(duckdb_con, all_parquet_paths, store)
+    except duckdb.BinderException as e:
+        if store == 1 and """"appId" not found""" in str(e):
+            logger.error(
+                f"appId column not found in parquets for store={store}, skipping"
+            )
+            handle_missing_trackid_files(duckdb_con, all_parquet_paths, store)
+    duckdb_con.close()
 
 
 def make_s3_app_country_metrics_history_week(
@@ -177,9 +214,13 @@ def make_s3_app_country_metrics_history_week(
     all_parquet_paths = []
     for ddt in pd.date_range(snapshot_date, snapshot_end_date, freq="D"):
         ddt_str = ddt.strftime("%Y-%m-%d")
-        prefix = f"raw-data/app_details/store={store}/crawled_date={ddt_str}/country="
+        prefix = (
+            f"{APP_COUNTRY_DAILY_PREFIX}/store={store}/snapshot_date={ddt_str}/country="
+        )
         all_parquet_paths += get_parquet_paths_by_prefix(bucket, prefix)
-    agg_prefix = f"agg-data/app_country_metrics/weekly/store={store}/snapshot_date={snapshot_date_str}/"
+    agg_prefix = (
+        f"{APP_COUNTRY_WEEKLY_PREFIX}/store={store}/snapshot_date={snapshot_date_str}/"
+    )
     delete_s3_objects_by_prefix(
         bucket=bucket, prefix=agg_prefix, key_name=s3_config_key
     )
@@ -188,23 +229,13 @@ def make_s3_app_country_metrics_history_week(
             f"No app detail parquet files found for store={store} snapshot_date={snapshot_date_str}"
         )
         return
-    query = app_details_country_history_query(
+    query = copy_daily_agg_to_weekly(
         store=store,
         app_detail_parquets=all_parquet_paths,
         snapshot_date_str=snapshot_date_str,
     )
     duckdb_con = get_duckdb_connection(s3_config_key)
-    try:
-        duckdb_con.execute(query)
-    except duckdb.BinderException as e:
-        if """"trackId" not found""" in str(e):
-            logger.error(
-                f"trackId column not found in parquets for store={store}, skipping"
-            )
-            handle_missing_trackid_files(duckdb_con, all_parquet_paths, store)
-    except duckdb.IOException as e:
-        logger.error(f"IO error executing DuckDB query for store={store}: {e}")
-        handle_missing_trackid_files(duckdb_con, all_parquet_paths, store)
+    duckdb_con.execute(query)
     duckdb_con.close()
 
 
@@ -448,27 +479,50 @@ def manual_import_app_metrics_from_s3(
     start_date: datetime.date, end_date: datetime.date
 ) -> None:
     use_tunnel = False
-    rerun_s3_agg = True
     database_connection = get_db_connection(
         use_ssh_tunnel=use_tunnel, config_key="madrone"
     )
-    start_date = datetime.datetime.fromisoformat("2025-10-15").date()
+    stores = [1, 2]
+    start_date = datetime.datetime.fromisoformat("2023-01-01").date()
     # This run for OLD data and CLEAN
-    end_date = datetime.datetime.fromisoformat("2026-02-22").date()
+    end_date = datetime.datetime.fromisoformat("2026-01-22").date()
+    for store in stores:
+        last_history_df = pd.DataFrame()
+        for snapshot_date in pd.date_range(start_date, end_date, freq="D"):
+            logger.info(f"Raw to daily agg {store=} {snapshot_date.date()} start")
+            make_s3_app_country_metrics_history_daily(
+                store,
+                snapshot_date=snapshot_date,
+            )
+
     # end_date = datetime.datetime.today() - datetime.timedelta(days=1)
-    for store in [1]:
+    for store in stores:
         last_history_df = pd.DataFrame()
         for snapshot_date in pd.date_range(start_date, end_date, freq="W-MON"):
-            print(f"Processing store {store} snapshot date {snapshot_date.date()}")
+            logger.info(
+                f"Processing weekly agg for {store=} {snapshot_date.date()} start"
+            )
             # snapshot_date = datetime.datetime.fromisoformat(snapshot_date).date()
             snapshot_date = snapshot_date.date()  # Monday
             snapshot_end_date = snapshot_date + datetime.timedelta(days=6)  # Sunday
-            if rerun_s3_agg:
-                make_s3_app_country_metrics_history_week(
-                    store,
-                    snapshot_date=snapshot_date,
-                    snapshot_end_date=snapshot_end_date,
-                )
+            make_s3_app_country_metrics_history_week(
+                store,
+                snapshot_date=snapshot_date,
+                snapshot_end_date=snapshot_end_date,
+            )
+
+    for store in stores:
+        last_history_df = pd.DataFrame()
+        for snapshot_date in pd.date_range(start_date, end_date, freq="W-MON"):
+            logger.info(
+                f"Processing weekly agg for {store=} {snapshot_date.date()} start"
+            )
+            # snapshot_date = datetime.datetime.fromisoformat(snapshot_date).date()
+            snapshot_date = snapshot_date.date()  # Monday
+            snapshot_end_date = snapshot_date + datetime.timedelta(days=6)  # Sunday
+            snapshot_date_str = snapshot_date.strftime("%Y-%m-%d")
+            if snapshot_date_str == "2025-12-29":
+                break
             last_history_df = process_app_metrics_to_db(
                 database_connection,
                 store,
@@ -487,7 +541,9 @@ def import_app_metrics_from_s3(
             start_date, end_date, freq="W-SUN", inclusive="left"
         ):
             snapshot_date = snapshot_date.date()
-            make_s3_app_country_metrics_history_week(store, snapshot_date=snapshot_date)
+            make_s3_app_country_metrics_history_daily(
+                store, snapshot_date=snapshot_date
+            )
             try:
                 last_history_df = process_app_metrics_to_db(
                     database_connection, store, snapshot_date, last_history_df
@@ -620,6 +676,8 @@ def process_app_metrics_to_db(
         days_back = max_days_back
     else:
         days_back = 7
+    # last_history_df['crawled_date'].max()
+    last_history_df[last_history_df["store_app"] == 122556977]
     app_country_db_latest = get_latest_app_country_history(
         database_connection,
         snapshot_date=snapshot_date,
@@ -651,7 +709,54 @@ def process_app_metrics_to_db(
     return app_country_db_latest
 
 
-def app_details_country_history_query(
+def copy_daily_agg_to_weekly(
+    store: int,
+    app_detail_parquets: list[str],
+    snapshot_date_str: str,
+) -> str:
+    bucket = CONFIG["s3"]["bucket"]
+    if store == 2:
+        export_cols = """
+             store_id,
+             country,
+             crawled_date,
+             rating,
+             rating_count,
+             user_ratings,
+             store_last_updated,
+             crawled_at
+             """
+    elif store == 1:
+        export_cols = """
+                store_id,
+                country,
+                crawled_date,
+                installs,
+                rating,
+                rating_count,
+                review_count,
+                histogram,
+                store_last_updated,
+                crawled_at
+        """
+    query = f"""COPY (
+            SELECT 
+                {export_cols}
+            FROM read_parquet({app_detail_parquets}, union_by_name=false)
+            QUALIFY ROW_NUMBER() OVER (
+                PARTITION BY store_id, country 
+                ORDER BY crawled_at DESC
+            ) = 1
+        ) TO 's3://{bucket}/{APP_COUNTRY_WEEKLY_PREFIX}/store={store}/snapshot_date={snapshot_date_str}/'
+    (FORMAT PARQUET,
+     PARTITION_BY (country),
+     OVERWRITE_OR_IGNORE true,
+     COMPRESSION 'zstd');
+    """
+    return query
+
+
+def copy_raw_details_to_daily_agg(
     store: int,
     app_detail_parquets: list[str],
     snapshot_date_str: str,
@@ -717,7 +822,7 @@ def app_details_country_history_query(
         PARTITION BY store_id, country
         ORDER BY crawled_at DESC, {extra_sort_column}
       ) = 1
-    ) TO 's3://{bucket}/agg-data/app_country_metrics/weekly/store={store}/snapshot_date={snapshot_date_str}/'
+    ) TO 's3://{bucket}/{APP_COUNTRY_DAILY_PREFIX}/store={store}/snapshot_date={snapshot_date_str}/'
     (FORMAT PARQUET, 
     PARTITION_BY (country), 
     ROW_GROUP_SIZE 100000, 
