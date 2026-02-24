@@ -1,6 +1,7 @@
 import os
 import pathlib
 import shutil
+import time
 
 import boto3
 import duckdb
@@ -88,11 +89,13 @@ def delete_s3_objects_by_prefix(bucket: str, prefix: str, key_name: str = "s3") 
         Bucket=bucket,
         Prefix=prefix,
     )
+    time.sleep(0.5)
     if "Contents" in response:
         s3.delete_objects(
             Bucket=bucket,
             Delete={"Objects": [{"Key": obj["Key"]} for obj in response["Contents"]]},
         )
+    time.sleep(1)
 
 
 def upload_mitm_log_to_s3(
