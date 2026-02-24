@@ -482,10 +482,10 @@ def manual_import_app_metrics_from_s3(
     database_connection = get_db_connection(
         use_ssh_tunnel=use_tunnel, config_key="madrone"
     )
-    stores = [1, 2]
-    start_date = datetime.datetime.fromisoformat("2023-01-01").date()
-    # This run for OLD data and CLEAN
-    end_date = datetime.datetime.fromisoformat("2026-01-22").date()
+    stores = [1]
+    # start_date = datetime.datetime.fromisoformat("2023-02-14").date()
+    start_date = datetime.datetime.fromisoformat("2026-01-31").date()
+    end_date = datetime.datetime.fromisoformat("2026-02-23").date()
     for store in stores:
         last_history_df = pd.DataFrame()
         for snapshot_date in pd.date_range(start_date, end_date, freq="D"):
@@ -494,6 +494,7 @@ def manual_import_app_metrics_from_s3(
                 store,
                 snapshot_date=snapshot_date,
             )
+            time.sleep(1)
 
     # end_date = datetime.datetime.today() - datetime.timedelta(days=1)
     for store in stores:
@@ -511,6 +512,8 @@ def manual_import_app_metrics_from_s3(
                 snapshot_end_date=snapshot_end_date,
             )
 
+    start_date = datetime.datetime.fromisoformat("2025-12-01").date()
+    end_date = datetime.datetime.fromisoformat("2026-01-23").date()
     for store in stores:
         last_history_df = pd.DataFrame()
         for snapshot_date in pd.date_range(start_date, end_date, freq="W-MON"):
@@ -520,9 +523,6 @@ def manual_import_app_metrics_from_s3(
             # snapshot_date = datetime.datetime.fromisoformat(snapshot_date).date()
             snapshot_date = snapshot_date.date()  # Monday
             snapshot_end_date = snapshot_date + datetime.timedelta(days=6)  # Sunday
-            snapshot_date_str = snapshot_date.strftime("%Y-%m-%d")
-            if snapshot_date_str == "2025-12-29":
-                break
             last_history_df = process_app_metrics_to_db(
                 database_connection,
                 store,
@@ -672,28 +672,54 @@ def process_app_metrics_to_db(
             )
     df = merge_in_db_ids(df, store, database_connection)
     max_days_back = 180
+    rolling_days = 7
+    current_ids = df["store_app"].unique()
     if last_history_df.empty:
-        days_back = max_days_back
+        missing_app_ids = current_ids
+        current_existing_ids = []
     else:
-        days_back = 7
-    # last_history_df['crawled_date'].max()
-    last_history_df[last_history_df["store_app"] == 122556977]
-    app_country_db_latest = get_latest_app_country_history(
-        database_connection,
-        snapshot_date=snapshot_date,
-        days_back=days_back,
-        chunk_size=25000,
-        store_app_ids=df["store_app"].unique(),
-        store=store,
+        existing_ids = last_history_df["store_app"].unique()
+        missing_app_ids = np.setdiff1d(current_ids, existing_ids)
+        current_existing_ids = np.setdiff1d(current_ids, missing_app_ids)
+    # Fetch recent only for apps that we already pulled 180 days
+    if len(current_existing_ids) > 0:
+        recent_history = get_latest_app_country_history(
+            database_connection,
+            snapshot_date=snapshot_date,
+            days_back=rolling_days,
+            chunk_size=25000,
+            store_app_ids=current_existing_ids,
+            store=store,
+        )
+    else:
+        recent_history = pd.DataFrame()
+    # Deep fetch only for new apps
+    if len(missing_app_ids) > 0:
+        new_apps_history = get_latest_app_country_history(
+            database_connection,
+            snapshot_date=snapshot_date,
+            days_back=max_days_back,
+            chunk_size=25000,
+            store_app_ids=missing_app_ids,
+            store=store,
+        )
+    else:
+        new_apps_history = pd.DataFrame()
+    app_country_db_latest = pd.concat(
+        [last_history_df, new_apps_history, recent_history],
+        ignore_index=True,
     )
-    if days_back != max_days_back:
-        app_country_db_latest = pd.concat(
-            [last_history_df, app_country_db_latest], ignore_index=True
-        ).drop_duplicates(subset=["store_app", "country_id"], keep="last")
-        start_date = snapshot_date - datetime.timedelta(days=max_days_back)
-        app_country_db_latest = app_country_db_latest[
-            app_country_db_latest["crawled_date"] > pd.to_datetime(start_date)
-        ]
+    app_country_db_latest = app_country_db_latest.sort_values(
+        ["store_app", "country_id", "crawled_date"]
+    )
+    app_country_db_latest = app_country_db_latest.drop_duplicates(
+        subset=["store_app", "country_id"],
+        keep="last",
+    )
+    start_date = snapshot_date - datetime.timedelta(days=max_days_back)
+    app_country_db_latest = app_country_db_latest[
+        app_country_db_latest["crawled_date"] > pd.to_datetime(start_date)
+    ]
     country_df, global_df = process_store_metrics(
         store=store, app_country_db_latest=app_country_db_latest, df=df
     )
