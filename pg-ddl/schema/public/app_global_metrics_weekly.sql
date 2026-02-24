@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict BVYhTGTTXtgIsO6a03kIqaeMtrN23nORZoXJChEMTgHEMPw1doO3ZTQlJOJCTON
+\restrict yu8pvh3gPEmE1VRgCPy9uOKY2A5iOsmyVriCKelukNNyALZx7qPOE9BeC3EraaG
 
 -- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 -- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
@@ -59,16 +59,8 @@ ALTER TABLE ONLY public.app_global_metrics_weekly
 
 
 --
--- Name: app_global_metrics_weekly app_global_metrics_weekly_store_app_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.app_global_metrics_weekly
-    ADD CONSTRAINT app_global_metrics_weekly_store_app_id_fkey FOREIGN KEY (store_app) REFERENCES public.store_apps(id) DEFERRABLE INITIALLY DEFERRED;
-
-
---
 -- PostgreSQL database dump complete
 --
 
-\unrestrict BVYhTGTTXtgIsO6a03kIqaeMtrN23nORZoXJChEMTgHEMPw1doO3ZTQlJOJCTON
+\unrestrict yu8pvh3gPEmE1VRgCPy9uOKY2A5iOsmyVriCKelukNNyALZx7qPOE9BeC3EraaG
 

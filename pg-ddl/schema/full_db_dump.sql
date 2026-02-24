@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict ko4WWy6E6rrQ3fTw87XcSUrat2xs64d5fNWre2qGwgoSYDgxsplF1UwVUrEKRi6
+\restrict Rq4lIfBn4xGQ8JCgguBwBM5sNSGlUJALr8jiAn15cF35HkOaHPgpubJ8YqZsezj
 
 -- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 -- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
@@ -6502,13 +6502,6 @@ CREATE INDEX app_country_metrics_history_store_app_idx ON public.app_country_met
 
 
 --
--- Name: app_country_metrics_history_unique_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE UNIQUE INDEX app_country_metrics_history_unique_idx ON public.app_country_metrics_history USING btree (store_app, country_id, snapshot_date);
-
-
---
 -- Name: app_global_metrics_history_date_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -6520,13 +6513,6 @@ CREATE INDEX app_global_metrics_history_date_idx ON public.app_global_metrics_hi
 --
 
 CREATE INDEX app_global_metrics_history_store_app_idx ON public.app_global_metrics_history USING btree (store_app);
-
-
---
--- Name: app_global_metrics_history_unique_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE UNIQUE INDEX app_global_metrics_history_unique_idx ON public.app_global_metrics_history USING btree (store_app, snapshot_date);
 
 
 --
@@ -6583,13 +6569,6 @@ CREATE INDEX developers_developer_id_idx ON public.developers USING btree (devel
 --
 
 CREATE INDEX developers_name_idx ON public.developers USING gin (to_tsvector('simple'::regconfig, (name)::text));
-
-
---
--- Name: idx_agmh_store_app_snapshot_date; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX idx_agmh_store_app_snapshot_date ON public.app_global_metrics_history USING btree (store_app, snapshot_date DESC);
 
 
 --
@@ -7165,38 +7144,6 @@ ALTER TABLE ONLY public.app_ads_map
 
 
 --
--- Name: app_country_metrics_history app_country_metrics_history_country_id_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.app_country_metrics_history
-    ADD CONSTRAINT app_country_metrics_history_country_id_fk FOREIGN KEY (country_id) REFERENCES public.countries(id) DEFERRABLE INITIALLY DEFERRED;
-
-
---
--- Name: app_country_metrics_history app_country_metrics_history_store_app_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.app_country_metrics_history
-    ADD CONSTRAINT app_country_metrics_history_store_app_fk FOREIGN KEY (store_app) REFERENCES public.store_apps(id) DEFERRABLE INITIALLY DEFERRED;
-
-
---
--- Name: app_global_metrics_history app_global_metrics_history_store_app_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.app_global_metrics_history
-    ADD CONSTRAINT app_global_metrics_history_store_app_fk FOREIGN KEY (store_app) REFERENCES public.store_apps(id) DEFERRABLE INITIALLY DEFERRED;
-
-
---
--- Name: app_global_metrics_weekly app_global_metrics_weekly_store_app_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.app_global_metrics_weekly
-    ADD CONSTRAINT app_global_metrics_weekly_store_app_id_fkey FOREIGN KEY (store_app) REFERENCES public.store_apps(id) DEFERRABLE INITIALLY DEFERRED;
-
-
---
 -- Name: app_urls_map app_urls_fk; Type: FK CONSTRAINT; Schema: public; Owner: james
 --
 
@@ -7464,5 +7411,5 @@ GRANT ALL ON SCHEMA public TO PUBLIC;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict ko4WWy6E6rrQ3fTw87XcSUrat2xs64d5fNWre2qGwgoSYDgxsplF1UwVUrEKRi6
+\unrestrict Rq4lIfBn4xGQ8JCgguBwBM5sNSGlUJALr8jiAn15cF35HkOaHPgpubJ8YqZsezj
 

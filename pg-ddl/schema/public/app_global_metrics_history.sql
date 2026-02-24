@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict iyQrvOmmee7gBYmKqz8QricYfDT2wrzjETCWmZeKvW2FkNeZXof16HIgoULC3l8
+\restrict R1Wn04HDmggawqCBZj1Uyuz19qbkzPXUGFkFXpcYlwMoUyRlKHh9ZmXdQvNykgh
 
 -- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 -- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
@@ -63,30 +63,8 @@ CREATE INDEX app_global_metrics_history_store_app_idx ON public.app_global_metri
 
 
 --
--- Name: app_global_metrics_history_unique_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE UNIQUE INDEX app_global_metrics_history_unique_idx ON public.app_global_metrics_history USING btree (store_app, snapshot_date);
-
-
---
--- Name: idx_agmh_store_app_snapshot_date; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX idx_agmh_store_app_snapshot_date ON public.app_global_metrics_history USING btree (store_app, snapshot_date DESC);
-
-
---
--- Name: app_global_metrics_history app_global_metrics_history_store_app_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.app_global_metrics_history
-    ADD CONSTRAINT app_global_metrics_history_store_app_fk FOREIGN KEY (store_app) REFERENCES public.store_apps(id) DEFERRABLE INITIALLY DEFERRED;
-
-
---
 -- PostgreSQL database dump complete
 --
 
-\unrestrict iyQrvOmmee7gBYmKqz8QricYfDT2wrzjETCWmZeKvW2FkNeZXof16HIgoULC3l8
+\unrestrict R1Wn04HDmggawqCBZj1Uyuz19qbkzPXUGFkFXpcYlwMoUyRlKHh9ZmXdQvNykgh
 

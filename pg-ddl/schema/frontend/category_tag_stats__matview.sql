@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict Yyke1LtCiwdfWaJ5LX0aY7yGcI2yLkJwGixwx9R7m26HLcYT0uV1JtNhO6PLF0t
+\restrict 3P3QcD58Jh9Y1da9Txf6fszvEw0DgNTf1XH62ZATd1f4p3MTmY9FRAmQvagyHH2
 
 -- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 -- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
@@ -60,5 +60,5 @@ CREATE UNIQUE INDEX idx_category_tag_stats ON frontend.category_tag_stats USING 
 -- PostgreSQL database dump complete
 --
 
-\unrestrict Yyke1LtCiwdfWaJ5LX0aY7yGcI2yLkJwGixwx9R7m26HLcYT0uV1JtNhO6PLF0t
+\unrestrict 3P3QcD58Jh9Y1da9Txf6fszvEw0DgNTf1XH62ZATd1f4p3MTmY9FRAmQvagyHH2
 

@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict s1aHUGHPet4hERD50ul2UwGoIH8VnBazURp6YQG5FBd4Req704SYAqTr6mvjoDD
+\restrict UZJGAorXBqda1zHo11PhldyOsXO9jdCGb0BfhEO6bsqx7xskXr5cSNkCH7sOKTi
 
 -- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 -- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
@@ -87,5 +87,5 @@ CREATE UNIQUE INDEX api_call_countries_unique ON frontend.api_call_countries USI
 -- PostgreSQL database dump complete
 --
 
-\unrestrict s1aHUGHPet4hERD50ul2UwGoIH8VnBazURp6YQG5FBd4Req704SYAqTr6mvjoDD
+\unrestrict UZJGAorXBqda1zHo11PhldyOsXO9jdCGb0BfhEO6bsqx7xskXr5cSNkCH7sOKTi
 

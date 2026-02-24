@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict SgUXGTWhFlEmx1XGi6yLXmG3401VYnSQ1EyVORf4FwJzdFsqRjNPy4k1SfY5S9D
+\restrict UDKizgexO4dzI5pDiFujfCCtz1zxqtczsqBwv9yZL0oNDVJ6YhjflL4tItTJsw3
 
 -- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 -- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
@@ -78,5 +78,5 @@ ALTER MATERIALIZED VIEW frontend.mediation_adapter_app_counts OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict SgUXGTWhFlEmx1XGi6yLXmG3401VYnSQ1EyVORf4FwJzdFsqRjNPy4k1SfY5S9D
+\unrestrict UDKizgexO4dzI5pDiFujfCCtz1zxqtczsqBwv9yZL0oNDVJ6YhjflL4tItTJsw3
 
