@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict lfQeFWIbVoSruPQVVnQWO3hGavjjuubA5kiEwNoIHnqNk79aDJJmjvAQfFcid50
+\restrict TvLPvWnRgRKvmtLIqtab4f06xIVrHxyfjK6gg6Sb4awInebZnX0tG6tcc6mkKlC
 
 -- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 -- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
@@ -40,5 +40,5 @@ ALTER TABLE logging.store_app_no_creatives OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict lfQeFWIbVoSruPQVVnQWO3hGavjjuubA5kiEwNoIHnqNk79aDJJmjvAQfFcid50
+\unrestrict TvLPvWnRgRKvmtLIqtab4f06xIVrHxyfjK6gg6Sb4awInebZnX0tG6tcc6mkKlC
 

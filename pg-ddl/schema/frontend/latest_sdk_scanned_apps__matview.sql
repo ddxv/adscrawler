@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict pwu76wbmAdYVjnRzEakRku36pJpbuz8rVuDeZiC2tOblIoP5ElcCwU82mfozlGf
+\restrict mDw4icxjAXCdCuj6ZhASk3QBiXGn5Acja0aIfss6Ha7pczt9rACPnrEesNKhzRC
 
 -- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 -- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
@@ -77,5 +77,5 @@ CREATE UNIQUE INDEX latest_sdk_scanned_apps_unique_index ON frontend.latest_sdk_
 -- PostgreSQL database dump complete
 --
 
-\unrestrict pwu76wbmAdYVjnRzEakRku36pJpbuz8rVuDeZiC2tOblIoP5ElcCwU82mfozlGf
+\unrestrict mDw4icxjAXCdCuj6ZhASk3QBiXGn5Acja0aIfss6Ha7pczt9rACPnrEesNKhzRC
 
