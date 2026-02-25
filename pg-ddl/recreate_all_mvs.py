@@ -250,11 +250,106 @@ def run_all_mvs(mv_files: list[Path], stop_on_error: bool = False) -> None:
                     break
 
 
+def get_mv_index_files() -> list[Path]:
+    """Find all __matview_index.sql files in pg-ddl/schema/{public,frontend,adtech}/"""
+    schemas = ["public", "frontend", "adtech"]
+    all_index_files = []
+
+    for schema in schemas:
+        schema_dir = Path(f"pg-ddl/schema/{schema}")
+        if not schema_dir.exists():
+            logger.warning(f"Directory not found: {schema_dir}")
+            continue
+
+        index_files = list(schema_dir.glob("*__matview_index.sql"))
+        all_index_files.extend(index_files)
+
+    logger.info(f"Total: {len(all_index_files)} matview index files across all schemas")
+    return sorted(all_index_files)
+
+
+def get_existing_indexes() -> set:
+    """Get all existing index names from the database."""
+    query = """
+        SELECT indexname
+        FROM pg_indexes
+        WHERE schemaname IN ('public', 'frontend', 'adtech')
+    """
+    with database_connection.engine.connect() as conn:
+        result = conn.execute(text(query))
+        return {row[0] for row in result}
+
+
+def extract_index_statements_from_file(file_content: str) -> list[tuple[str, str]]:
+    content = re.sub(r"\\restrict.*\n?", "", file_content, flags=re.IGNORECASE)
+    content = re.sub(r"\\unrestrict.*\n?", "", content, flags=re.IGNORECASE)
+
+    results = []
+    # Match from CREATE INDEX/UNIQUE INDEX up to the next semicolon
+    pattern = re.compile(
+        r"(CREATE\s+(?:UNIQUE\s+)?INDEX\s+(?:IF\s+NOT\s+EXISTS\s+)?([a-zA-Z_][a-zA-Z0-9_]*)[^;]+;)",
+        re.IGNORECASE | re.DOTALL,
+    )
+    for match in pattern.finditer(content):
+        full_statement = match.group(1).strip()
+        index_name = match.group(2)
+        if index_name.upper() in ("IF", "ON", "UNIQUE", "INDEX"):
+            logger.warning(
+                f"Regex captured unexpected keyword '{index_name}' as index name in:\n{full_statement[:120]}"
+            )
+            continue
+        results.append((index_name, full_statement))
+
+    return results
+
+
+def create_all_mv_indexes(mv_files: list[Path], stop_on_error: bool = False) -> None:
+    """
+    For each matview SQL file, extract any CREATE INDEX statements and create
+    any that don't already exist in the database. Skips indexes that are already present.
+    """
+    query = """
+        SELECT indexname
+        FROM pg_indexes
+        WHERE schemaname IN ('public', 'frontend', 'adtech')
+    """
+    with database_connection.engine.connect() as conn:
+        result = conn.execute(text(query))
+        existing_indexes = {row[0] for row in result}
+    logger.info(f"Found {len(existing_indexes)} existing indexes in db")
+    all_missing: list[tuple[str, str, str]] = []  # (index_name, statement, source_file)
+    for mv_file in mv_files:
+        with open(mv_file) as f:
+            file_content = f.read()
+        for index_name, statement in extract_index_statements_from_file(file_content):
+            if index_name in existing_indexes:
+                logger.info(f"Index already exists, skipping: {index_name}")
+            else:
+                all_missing.append((index_name, statement, mv_file.name))
+    logger.info(f"Found {len(all_missing)} missing indexes to create")
+    with database_connection.engine.connect() as conn:
+        for index_name, statement, source_file in all_missing:
+            trans = conn.begin()
+            try:
+                conn.execute(text(statement))
+                trans.commit()
+                logger.info(f"✓ Created index: {index_name} (from {source_file})")
+            except Exception as e:
+                trans.rollback()
+                logger.exception(
+                    f"✗ Failed to create index {index_name} from {source_file}: {e}"
+                )
+                if stop_on_error:
+                    logger.error("Stopping further index creation due to error.")
+                    break
+
+
 def main(
     drop_all: bool,
     create_all: bool,
     run_all: bool,
     stop_on_error: bool,
+    create_indexes: bool = True,  # add this parameter
 ) -> None:
     mv_files = get_mv_files()
 
@@ -266,6 +361,9 @@ def main(
 
     if run_all:
         run_all_mvs(mv_files, stop_on_error=stop_on_error)
+
+    if create_indexes:  # add this
+        create_all_mv_indexes(mv_files, stop_on_error)
 
 
 if __name__ == "__main__":
