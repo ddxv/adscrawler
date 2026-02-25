@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict v0RGuutv2lyeKFhaeijXcexDpBv5ajhK0fdJSQSX3khpmA3gBlk4HgoTFaCUQay
+\restrict Yd6zsYTIMsTOuQgF2lhdKbVxLSS2k6ZcY2G0K80xSDEy48A4BOxjgzHEKwkAqhu
 
 -- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 -- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
@@ -45,8 +45,8 @@ CREATE MATERIALIZED VIEW frontend.companies_parent_category_stats AS
     dag.company_domain,
     dag.company_name,
     count(DISTINCT dag.store_app) AS app_count,
-    sum(sa.installs_sum_4w_est) AS installs_d30,
-    sum(sa.installs_est) AS installs_total
+    sum(sa.installs_sum_4w) AS installs_d30,
+    sum(sa.installs) AS installs_total
    FROM (distinct_apps_group dag
      LEFT JOIN frontend.store_apps_overview sa ON ((dag.store_app = sa.id)))
   GROUP BY sa.store, sa.category, dag.company_domain, dag.company_name
@@ -73,5 +73,5 @@ CREATE INDEX companies_parent_category_stats_query_idx ON frontend.companies_par
 -- PostgreSQL database dump complete
 --
 
-\unrestrict v0RGuutv2lyeKFhaeijXcexDpBv5ajhK0fdJSQSX3khpmA3gBlk4HgoTFaCUQay
+\unrestrict Yd6zsYTIMsTOuQgF2lhdKbVxLSS2k6ZcY2G0K80xSDEy48A4BOxjgzHEKwkAqhu
 

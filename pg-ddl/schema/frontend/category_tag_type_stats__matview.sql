@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict Nfm5Szd9ZiOxs8mLz7DTvwVE3zcyXXtPPM57yLnYGOItqIa9I0SWgA1oetGtllr
+\restrict Ps5PBhvkTD02qBXnEw1KwKaHtTJ8vRfJGOmQznXVG3cqwvVMjGhsLdpwPowgPwC
 
 -- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 -- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
@@ -39,18 +39,18 @@ CREATE MATERIALIZED VIEW frontend.category_tag_type_stats AS
             x.tag_source,
             x.type_url_slug,
             count(*) AS app_count,
-            sum(x.installs_sum_4w_est) AS installs_d30,
-            sum(x.installs_est) AS installs_total
+            sum(x.installs_sum_4w) AS installs_d30,
+            sum(x.installs) AS installs_total
            FROM ( SELECT DISTINCT csac.store_app,
                     sa.store,
                     csac.app_category,
                     tag.tag_source,
                         CASE
-                            WHEN (tag.tag_source ~~ 'app_ads%'::text) THEN 'ad-networks'::character varying
+                            WHEN (tag.tag_source ~~ 'app_ads%%'::text) THEN 'ad-networks'::character varying
                             ELSE cats.url_slug
                         END AS type_url_slug,
-                    sa.installs_sum_4w_est,
-                    sa.installs_est
+                    sa.installs_sum_4w,
+                    sa.installs
                    FROM ((((adtech.combined_store_apps_companies csac
                      LEFT JOIN frontend.store_apps_overview sa ON ((csac.store_app = sa.id)))
                      JOIN minimized_company_categories mcc ON ((csac.company_id = mcc.company_id)))
@@ -69,14 +69,14 @@ CREATE MATERIALIZED VIEW frontend.category_tag_type_stats AS
             'sdk'::text AS tag_source,
             x.type_url_slug,
             count(*) AS app_count,
-            sum(x.installs_sum_4w_est) AS installs_d30,
-            sum(x.installs_est) AS installs_total
+            sum(x.installs_sum_4w) AS installs_d30,
+            sum(x.installs) AS installs_total
            FROM ( SELECT DISTINCT sas.store_app,
                     sa.store,
                     sa.category AS app_category,
                     cats.url_slug AS type_url_slug,
-                    sa.installs_sum_4w_est,
-                    sa.installs_est
+                    sa.installs_sum_4w,
+                    sa.installs
                    FROM (((store_app_sdks sas
                      LEFT JOIN frontend.store_apps_overview sa ON ((sas.store_app = sa.id)))
                      LEFT JOIN adtech.sdk_categories sc ON ((sas.sdk_id = sc.sdk_id)))
@@ -110,5 +110,5 @@ ALTER MATERIALIZED VIEW frontend.category_tag_type_stats OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict Nfm5Szd9ZiOxs8mLz7DTvwVE3zcyXXtPPM57yLnYGOItqIa9I0SWgA1oetGtllr
+\unrestrict Ps5PBhvkTD02qBXnEw1KwKaHtTJ8vRfJGOmQznXVG3cqwvVMjGhsLdpwPowgPwC
 

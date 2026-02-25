@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict VEzIMAgEUJ47ZFeIUVMFt0UZAkLH6apubdaxPRbWqOGDkjUSUaNZqf4Miy0TasD
+\restrict yxpjXq3rj3eFu7J02jBxMf0jxMtgUJPOkjhPmc8IuzfzeZdyR2WKvXGBsnLQcgI
 
 -- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 -- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
@@ -41,7 +41,6 @@ CREATE MATERIALIZED VIEW frontend.apps_new_yearly AS
             sa_1.installs_sum_1w,
             sa_1.installs_sum_4w,
             sa_1.ratings_sum_1w,
-            sa_1.ratings_sum_4w,
             sa_1.store_last_updated,
             sa_1.ad_supported,
             sa_1.in_app_purchases,
@@ -73,7 +72,6 @@ CREATE MATERIALIZED VIEW frontend.apps_new_yearly AS
     installs_sum_1w,
     installs_sum_4w,
     ratings_sum_1w,
-    ratings_sum_4w,
     store_last_updated,
     ad_supported,
     in_app_purchases,
@@ -117,5 +115,5 @@ CREATE UNIQUE INDEX idx_apps_new_yearly ON frontend.apps_new_yearly USING btree 
 -- PostgreSQL database dump complete
 --
 
-\unrestrict VEzIMAgEUJ47ZFeIUVMFt0UZAkLH6apubdaxPRbWqOGDkjUSUaNZqf4Miy0TasD
+\unrestrict yxpjXq3rj3eFu7J02jBxMf0jxMtgUJPOkjhPmc8IuzfzeZdyR2WKvXGBsnLQcgI
 

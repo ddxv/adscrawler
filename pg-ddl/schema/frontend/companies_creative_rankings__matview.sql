@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict C0Y4sj8a8RVoNfG5EQM1bIcmRrigRmhE3F97mdfXiWnJ4u08WtkmKrtAOKNR8Mk
+\restrict 8n2PAH87SQb29yS1bAybZcYZbVmxXbXyPdMsJhhSzdxKozfN8yjQ4y6oT2QcVZj
 
 -- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 -- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
@@ -102,7 +102,6 @@ CREATE MATERIALIZED VIEW frontend.companies_creative_rankings AS
     saa.installs_sum_1w,
     saa.ratings_sum_1w,
     saa.installs_sum_4w,
-    saa.ratings_sum_4w,
     vd.last_seen,
         CASE
             WHEN (saa.icon_url_100 IS NOT NULL) THEN (concat('https://media.appgoblin.info/app-icons/', saa.store_id, '/', saa.icon_url_100))::character varying
@@ -130,5 +129,5 @@ ALTER MATERIALIZED VIEW frontend.companies_creative_rankings OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict C0Y4sj8a8RVoNfG5EQM1bIcmRrigRmhE3F97mdfXiWnJ4u08WtkmKrtAOKNR8Mk
+\unrestrict 8n2PAH87SQb29yS1bAybZcYZbVmxXbXyPdMsJhhSzdxKozfN8yjQ4y6oT2QcVZj
 

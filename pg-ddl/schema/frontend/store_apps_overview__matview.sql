@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict BwTQTKB6wgVREmEhahIZXJVSJv6rvZ4neca3sdS5defzgwEU1CdkJe52251TRRs
+\restrict 4Ek6bc1pIlErlcOfgdGzkd6R7NwbkxlomT4Yk46ZLUskOhhc0I8cjME4h0KQXll
 
 -- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 -- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
@@ -95,28 +95,42 @@ CREATE MATERIALIZED VIEW frontend.store_apps_overview AS
            FROM (public.creative_records cr
              LEFT JOIN public.api_calls ac ON ((cr.api_call_id = ac.id)))
         ), app_metrics AS (
-         SELECT app_global_metrics_latest.store_app,
-            app_global_metrics_latest.rating,
-            app_global_metrics_latest.rating_count,
-            app_global_metrics_latest.installs
-           FROM public.app_global_metrics_latest
+         SELECT agml_1.store_app,
+            agml_1.rating,
+            agml_1.total_ratings AS rating_count,
+            agml_1.total_installs AS installs,
+            agml_1.weekly_installs,
+            agml_1.weekly_ratings,
+            agml_1.monthly_installs,
+            agml_1.weekly_active_users,
+            agml_1.monthly_active_users,
+            agml_1.weekly_ad_revenue,
+            agml_1.weekly_iap_revenue,
+            agml_1.monthly_ad_revenue,
+            agml_1.monthly_iap_revenue,
+            agml_1.installs_z_score_2w,
+            agml_1.installs_z_score_4w
+           FROM public.app_global_metrics_latest agml_1
         )
  SELECT sa.id,
     sa.name,
     sa.store_id,
     sa.store,
     cm.mapped_category AS category,
-    am.rating,
-    am.rating_count,
-    am.installs,
-    saz.installs_sum_1w,
-    saz.ratings_sum_1w,
-    saz.installs_sum_4w,
-    saz.ratings_sum_4w,
-    saz.installs_z_score_2w,
-    saz.ratings_z_score_2w,
-    saz.installs_z_score_4w,
-    saz.ratings_z_score_4w,
+    agml.rating,
+    agml.rating_count,
+    agml.installs,
+    agml.weekly_installs AS installs_sum_1w,
+    agml.weekly_ratings AS ratings_sum_1w,
+    agml.monthly_installs AS installs_sum_4w,
+    agml.installs_z_score_2w,
+    agml.installs_z_score_4w,
+    agml.weekly_active_users,
+    agml.monthly_active_users,
+    agml.weekly_ad_revenue,
+    agml.weekly_iap_revenue,
+    agml.monthly_ad_revenue,
+    agml.monthly_iap_revenue,
     sa.ad_supported,
     sa.free,
     sa.in_app_purchases,
@@ -150,10 +164,8 @@ CREATE MATERIALIZED VIEW frontend.store_apps_overview AS
     lac.run_result,
     lsac.run_at AS api_successful_last_crawled,
     acr.ad_creative_count,
-    amc.ad_mon_creatives,
-    GREATEST(COALESCE(am.installs, (0)::bigint), (COALESCE(am.rating_count, (0)::bigint) * 50)) AS installs_est,
-    GREATEST(COALESCE(saz.installs_sum_4w, (0)::numeric), (COALESCE(saz.ratings_sum_4w, (0)::numeric) * (50)::numeric)) AS installs_sum_4w_est
-   FROM ((((((((((((((((public.store_apps sa
+    amc.ad_mon_creatives
+   FROM (((((((((((((((public.store_apps sa
      LEFT JOIN public.category_mapping cm ON (((sa.category)::text = (cm.original_category)::text)))
      LEFT JOIN public.developers d ON ((sa.developer = d.id)))
      LEFT JOIN public.app_urls_map aum ON ((sa.id = aum.store_app)))
@@ -164,12 +176,11 @@ CREATE MATERIALIZED VIEW frontend.store_apps_overview AS
      LEFT JOIN last_successful_sdk_scan lsss ON ((sa.id = lsss.store_app)))
      LEFT JOIN latest_successful_version_codes lsvc ON ((sa.id = lsvc.store_app)))
      LEFT JOIN latest_en_descriptions ld ON ((sa.id = ld.store_app)))
-     LEFT JOIN public.store_app_z_scores saz ON ((sa.id = saz.store_app)))
      LEFT JOIN latest_api_calls lac ON ((sa.id = lac.store_app)))
      LEFT JOIN latest_successful_api_calls lsac ON ((sa.id = lsac.store_app)))
      LEFT JOIN my_ad_creatives acr ON ((sa.id = acr.store_app)))
      LEFT JOIN my_mon_creatives amc ON ((sa.id = amc.store_app)))
-     LEFT JOIN app_metrics am ON ((sa.id = am.store_app)))
+     LEFT JOIN app_metrics agml ON ((sa.id = agml.store_app)))
   WITH NO DATA;
 
 
@@ -179,14 +190,14 @@ ALTER MATERIALIZED VIEW frontend.store_apps_overview OWNER TO postgres;
 -- Name: store_apps_overview_installs_est_idx; Type: INDEX; Schema: frontend; Owner: postgres
 --
 
-CREATE INDEX store_apps_overview_installs_est_idx ON frontend.store_apps_overview USING btree (installs_est DESC);
+CREATE INDEX store_apps_overview_installs_est_idx ON frontend.store_apps_overview USING btree (installs DESC);
 
 
 --
 -- Name: store_apps_overview_installs_sum_4w_est_idx; Type: INDEX; Schema: frontend; Owner: postgres
 --
 
-CREATE INDEX store_apps_overview_installs_sum_4w_est_idx ON frontend.store_apps_overview USING btree (installs_sum_4w_est DESC);
+CREATE INDEX store_apps_overview_installs_sum_4w_est_idx ON frontend.store_apps_overview USING btree (installs_sum_4w DESC);
 
 
 --
@@ -228,5 +239,5 @@ CREATE UNIQUE INDEX store_apps_overview_unique_store_id_idx ON frontend.store_ap
 -- PostgreSQL database dump complete
 --
 
-\unrestrict BwTQTKB6wgVREmEhahIZXJVSJv6rvZ4neca3sdS5defzgwEU1CdkJe52251TRRs
+\unrestrict 4Ek6bc1pIlErlcOfgdGzkd6R7NwbkxlomT4Yk46ZLUskOhhc0I8cjME4h0KQXll
 

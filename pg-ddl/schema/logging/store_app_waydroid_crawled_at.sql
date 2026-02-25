@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 3XelwQCkfdbgbSd0eyDnDPg8Gu396Ra0gmPoSwqAeIu9v7CWgtJRc1VQaXDstza
+\restrict Z0zcTORY7f4Z37knEXFMJhYt2yvzCcgtpmbAz680rG2Sji5tMlYb8802Jw8iapp
 
 -- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 -- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
@@ -63,5 +63,5 @@ ALTER TABLE ONLY logging.store_app_waydroid_crawled_at
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 3XelwQCkfdbgbSd0eyDnDPg8Gu396Ra0gmPoSwqAeIu9v7CWgtJRc1VQaXDstza
+\unrestrict Z0zcTORY7f4Z37knEXFMJhYt2yvzCcgtpmbAz680rG2Sji5tMlYb8802Jw8iapp
 

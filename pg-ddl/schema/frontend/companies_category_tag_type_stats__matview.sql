@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict rwiX5Ui4MdKmtVmjmg8yCFr7uCsiWULDAETwhDRholUjJq1XSLZKKq6NI1KNctK
+\restrict K3ntgdog3CoPeiJTlqsu7V9bRz0oq9F84pc2JPQ5ZF6nhcmhZGfgBsimvJFmeea
 
 -- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 -- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
@@ -40,12 +40,12 @@ CREATE MATERIALIZED VIEW frontend.companies_category_tag_type_stats AS
             csac.ad_domain AS company_domain,
             c.name AS company_name,
                 CASE
-                    WHEN (tag.tag_source ~~ 'app_ads%'::text) THEN 'ad-networks'::character varying
+                    WHEN (tag.tag_source ~~ 'app_ads%%'::text) THEN 'ad-networks'::character varying
                     ELSE cats.url_slug
                 END AS type_url_slug,
             count(DISTINCT csac.store_app) AS app_count,
-            sum(sa.installs_sum_4w_est) AS installs_d30,
-            sum(sa.installs_est) AS installs_total
+            sum(sa.installs_sum_4w) AS installs_d30,
+            sum(sa.installs) AS installs_total
            FROM (((((adtech.combined_store_apps_companies csac
              LEFT JOIN adtech.companies c ON ((csac.company_id = c.id)))
              LEFT JOIN frontend.store_apps_overview sa ON ((csac.store_app = sa.id)))
@@ -55,7 +55,7 @@ CREATE MATERIALIZED VIEW frontend.companies_category_tag_type_stats AS
           WHERE (tag.present IS TRUE)
           GROUP BY sa.store, csac.app_category, tag.tag_source, csac.ad_domain, c.name,
                 CASE
-                    WHEN (tag.tag_source ~~ 'app_ads%'::text) THEN 'ad-networks'::character varying
+                    WHEN (tag.tag_source ~~ 'app_ads%%'::text) THEN 'ad-networks'::character varying
                     ELSE cats.url_slug
                 END
         ), store_app_sdks AS (
@@ -71,8 +71,8 @@ CREATE MATERIALIZED VIEW frontend.companies_category_tag_type_stats AS
             c.name AS company_name,
             cats.url_slug AS type_url_slug,
             count(DISTINCT sas.store_app) AS app_count,
-            sum(sa.installs_sum_4w_est) AS installs_d30,
-            sum(sa.installs_est) AS installs_total
+            sum(sa.installs_sum_4w) AS installs_d30,
+            sum(sa.installs) AS installs_total
            FROM ((((((store_app_sdks sas
              LEFT JOIN adtech.sdks s ON ((sas.sdk_id = s.id)))
              LEFT JOIN adtech.companies c ON ((s.company_id = c.id)))
@@ -119,5 +119,5 @@ CREATE UNIQUE INDEX frontend_companies_category_tag_type_stats_unique ON fronten
 -- PostgreSQL database dump complete
 --
 
-\unrestrict rwiX5Ui4MdKmtVmjmg8yCFr7uCsiWULDAETwhDRholUjJq1XSLZKKq6NI1KNctK
+\unrestrict K3ntgdog3CoPeiJTlqsu7V9bRz0oq9F84pc2JPQ5ZF6nhcmhZGfgBsimvJFmeea
 

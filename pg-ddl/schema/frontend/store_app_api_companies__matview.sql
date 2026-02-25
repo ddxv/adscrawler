@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict eGghG7eoDjW9c5yU8n3bfbukpXK3abdbVJtjUY4plyJ7uPH46PF6eb1AkImf4wm
+\restrict uzi3Z17WzUPA7N4KSjBFhpKm6u0OLs7t04dHRAjyR3Dr6iQQhmafzieuGnUkZ73
 
 -- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 -- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
@@ -61,5 +61,5 @@ ALTER MATERIALIZED VIEW frontend.store_app_api_companies OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict eGghG7eoDjW9c5yU8n3bfbukpXK3abdbVJtjUY4plyJ7uPH46PF6eb1AkImf4wm
+\unrestrict uzi3Z17WzUPA7N4KSjBFhpKm6u0OLs7t04dHRAjyR3Dr6iQQhmafzieuGnUkZ73
 

@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict mb0YQ2wQdK1d7Us2dkcpsxAzeqB3sMvZk0jxe2Lawfa6CPYNpKywHNAOmBzybC3
+\restrict 2XViPR6JwOePqXYbLgMv9mW7QVEg96Ul7fusWWAxP0GmEpD4J0wjbB63shNVkbL
 
 -- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 -- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
@@ -47,11 +47,13 @@ CREATE MATERIALIZED VIEW frontend.keyword_scores AS
         ), keyword_competitors AS (
          SELECT ake.keyword_id,
             sa.store,
-            avg(COALESCE(NULLIF(agml.installs, 0), (agml.rating_count * 25))) AS avg_installs,
-            max(COALESCE(NULLIF(agml.installs, 0), (agml.rating_count * 25))) AS max_installs,
-            percentile_cont((0.5)::double precision) WITHIN GROUP (ORDER BY ((COALESCE(NULLIF(agml.installs, 0), (agml.rating_count * 25)))::double precision)) AS median_installs,
+            avg(NULLIF(agml.weekly_installs, 0)) AS avg_weekly_installs,
+            avg(NULLIF(agml.total_installs, 0)) AS avg_installs,
+            max(NULLIF(agml.total_installs, 0)) AS max_installs,
+            percentile_cont((0.5)::double precision) WITHIN GROUP (ORDER BY ((NULLIF(agml.total_installs, 0))::double precision)) AS median_installs,
             avg(agml.rating) AS avg_rating,
-            count(*) FILTER (WHERE (COALESCE(NULLIF(agml.installs, 0), (agml.rating_count * 25)) > 1000000)) AS apps_over_1m_installs,
+            avg(agml.installs_z_score_4w) AS avg_competitor_z_score,
+            count(*) FILTER (WHERE (NULLIF(agml.total_installs, 0) > 1000000)) AS apps_over_1m_installs,
             count(*) FILTER (WHERE ((sa.name)::text ~~* (('%'::text || (k.keyword_text)::text) || '%'::text))) AS title_matches
            FROM (((public.app_keywords_extracted ake
              LEFT JOIN public.store_apps sa ON ((ake.store_app = sa.id)))
@@ -64,6 +66,7 @@ CREATE MATERIALIZED VIEW frontend.keyword_scores AS
             kac.keyword_id,
             kac.app_count,
             round(kc.avg_installs, 0) AS avg_installs,
+            round(kc.avg_weekly_installs, 0) AS avg_weekly_installs,
             tac.total_apps,
             round(((100.0 * (kac.app_count)::numeric) / (NULLIF(tac.total_apps, 0))::numeric), 2) AS market_penetration_pct,
             round(((100)::numeric * (((1)::double precision - (ln(((tac.total_apps)::double precision / ((kac.app_count + 1))::double precision)) / ln((tac.total_apps)::double precision))))::numeric), 2) AS competitiveness_score,
@@ -78,6 +81,7 @@ CREATE MATERIALIZED VIEW frontend.keyword_scores AS
             COALESCE(kc.max_installs, (0)::bigint) AS top_competitor_installs,
             (COALESCE(kc.median_installs, (0)::double precision))::bigint AS median_competitor_installs,
             COALESCE(kc.avg_rating, (0)::double precision) AS avg_competitor_rating,
+            COALESCE((kc.avg_competitor_z_score)::double precision, (0)::double precision) AS avg_competitor_z_score,
             COALESCE(kc.apps_over_1m_installs, (0)::bigint) AS major_competitors,
             COALESCE(kc.title_matches, (0)::bigint) AS title_matches,
             round(((100.0 * (COALESCE(kc.title_matches, (0)::bigint))::numeric) / (NULLIF(kac.app_count, 0))::numeric), 2) AS title_relevance_pct
@@ -90,6 +94,7 @@ CREATE MATERIALIZED VIEW frontend.keyword_scores AS
     keyword_id,
     app_count,
     avg_installs,
+    avg_weekly_installs,
     total_apps,
     market_penetration_pct,
     competitiveness_score,
@@ -100,6 +105,7 @@ CREATE MATERIALIZED VIEW frontend.keyword_scores AS
     top_competitor_installs,
     median_competitor_installs,
     avg_competitor_rating,
+    avg_competitor_z_score,
     major_competitors,
     title_matches,
     title_relevance_pct,
@@ -144,5 +150,5 @@ CREATE UNIQUE INDEX keyword_scores_store_keyword_id_idx ON frontend.keyword_scor
 -- PostgreSQL database dump complete
 --
 
-\unrestrict mb0YQ2wQdK1d7Us2dkcpsxAzeqB3sMvZk0jxe2Lawfa6CPYNpKywHNAOmBzybC3
+\unrestrict 2XViPR6JwOePqXYbLgMv9mW7QVEg96Ul7fusWWAxP0GmEpD4J0wjbB63shNVkbL
 

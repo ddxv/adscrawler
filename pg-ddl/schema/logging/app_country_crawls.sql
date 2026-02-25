@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict cPHD8FgU7cgJrn9NWrXC8NSzBPorL9PlMs667kKsthgSv2m55UhfGWMfzvpqDRv
+\restrict rf1jOyb5xeYFSBfLhZ8ftS1l1o6ecWr8pQwN6cHMshwc1e9a9r3DWN65SQeEyLU
 
 -- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 -- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
@@ -48,5 +48,5 @@ CREATE INDEX idx_app_country_crawls_latest ON logging.app_country_crawls USING b
 -- PostgreSQL database dump complete
 --
 
-\unrestrict cPHD8FgU7cgJrn9NWrXC8NSzBPorL9PlMs667kKsthgSv2m55UhfGWMfzvpqDRv
+\unrestrict rf1jOyb5xeYFSBfLhZ8ftS1l1o6ecWr8pQwN6cHMshwc1e9a9r3DWN65SQeEyLU
 

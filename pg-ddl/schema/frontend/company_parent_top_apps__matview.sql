@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict vUikukE9LKRkfaYdkMUlhcnf9i8gytcJpnY9AgSlqFNxVqAcjPqUMg6z7PM1dXw
+\restrict D8d86tQ26nAzhgWsiWXC2WdGuwlN3JQ7hyDW8U9irhRemwhJXiqDJSutFTcaIER
 
 -- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 -- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
@@ -38,7 +38,6 @@ CREATE MATERIALIZED VIEW frontend.company_parent_top_apps AS
             sa.developer_name,
             sa.icon_url_100,
             sa.installs_sum_4w AS installs_d30,
-            sa.ratings_sum_4w AS rating_count_d30,
             csapc.sdk,
             csapc.api_call,
             csapc.app_ads_direct
@@ -56,12 +55,11 @@ CREATE MATERIALIZED VIEW frontend.company_parent_top_apps AS
             deduped_data.icon_url_100,
             deduped_data.app_category,
             deduped_data.installs_d30,
-            deduped_data.rating_count_d30,
             deduped_data.sdk,
             deduped_data.api_call,
             deduped_data.app_ads_direct,
-            row_number() OVER (PARTITION BY deduped_data.store, deduped_data.company_domain, deduped_data.company_name ORDER BY (COALESCE((deduped_data.sdk)::integer, 0) + COALESCE((deduped_data.api_call)::integer, 0)) DESC, GREATEST((COALESCE(deduped_data.rating_count_d30, (0)::numeric))::double precision, COALESCE((deduped_data.installs_d30)::double precision, (0)::double precision)) DESC) AS app_company_rank,
-            row_number() OVER (PARTITION BY deduped_data.store, deduped_data.app_category, deduped_data.company_domain, deduped_data.company_name ORDER BY (COALESCE((deduped_data.sdk)::integer, 0) + COALESCE((deduped_data.api_call)::integer, 0)) DESC, GREATEST((COALESCE(deduped_data.rating_count_d30, (0)::numeric))::double precision, COALESCE((deduped_data.installs_d30)::double precision, (0)::double precision)) DESC) AS app_company_category_rank
+            row_number() OVER (PARTITION BY deduped_data.store, deduped_data.company_domain, deduped_data.company_name ORDER BY (COALESCE((deduped_data.sdk)::integer, 0) + COALESCE((deduped_data.api_call)::integer, 0)) DESC, COALESCE((deduped_data.installs_d30)::double precision, (0)::double precision) DESC) AS app_company_rank,
+            row_number() OVER (PARTITION BY deduped_data.store, deduped_data.app_category, deduped_data.company_domain, deduped_data.company_name ORDER BY (COALESCE((deduped_data.sdk)::integer, 0) + COALESCE((deduped_data.api_call)::integer, 0)) DESC, COALESCE((deduped_data.installs_d30)::double precision, (0)::double precision) DESC) AS app_company_category_rank
            FROM deduped_data
         )
  SELECT company_domain,
@@ -73,7 +71,6 @@ CREATE MATERIALIZED VIEW frontend.company_parent_top_apps AS
     app_category,
     icon_url_100,
     installs_d30,
-    rating_count_d30,
     sdk,
     api_call,
     app_ads_direct,
@@ -111,5 +108,5 @@ CREATE UNIQUE INDEX idx_company_parent_top_apps_unique ON frontend.company_paren
 -- PostgreSQL database dump complete
 --
 
-\unrestrict vUikukE9LKRkfaYdkMUlhcnf9i8gytcJpnY9AgSlqFNxVqAcjPqUMg6z7PM1dXw
+\unrestrict D8d86tQ26nAzhgWsiWXC2WdGuwlN3JQ7hyDW8U9irhRemwhJXiqDJSutFTcaIER
 

@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict cLjej4vhWahvwTP7FouzblcaNWfD7GxaYRKnWoZPBE1G8LMAUbR9EaUnHMp9Txq
+\restrict obsLoM78NWWaGJKqThebMWtpp7gyTbo1YQ8gIomGiTiJfuSVfaJDnx2z1RwWeqh
 
 -- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 -- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
@@ -40,7 +40,6 @@ CREATE MATERIALIZED VIEW frontend.apps_new_monthly AS
             sa_1.installs_sum_1w,
             sa_1.installs_sum_4w,
             sa_1.ratings_sum_1w,
-            sa_1.ratings_sum_4w,
             sa_1.store_last_updated,
             sa_1.ad_supported,
             sa_1.in_app_purchases,
@@ -72,7 +71,6 @@ CREATE MATERIALIZED VIEW frontend.apps_new_monthly AS
     installs_sum_1w,
     installs_sum_4w,
     ratings_sum_1w,
-    ratings_sum_4w,
     store_last_updated,
     ad_supported,
     in_app_purchases,
@@ -116,5 +114,5 @@ CREATE UNIQUE INDEX idx_apps_new_monthly ON frontend.apps_new_monthly USING btre
 -- PostgreSQL database dump complete
 --
 
-\unrestrict cLjej4vhWahvwTP7FouzblcaNWfD7GxaYRKnWoZPBE1G8LMAUbR9EaUnHMp9Txq
+\unrestrict obsLoM78NWWaGJKqThebMWtpp7gyTbo1YQ8gIomGiTiJfuSVfaJDnx2z1RwWeqh
 

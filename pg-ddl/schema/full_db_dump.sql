@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict brUq3Gcd944rLrsIOo4ZIwu67TnnDVQkTmmgoVEWpYUgzQz3zJvRu03U5qUiNp3
+\restrict YDHUqLj4c09OOspU0TzA0Is4tunjNq53qk7Z8FhfmvYpdbeayFDAUlxOOGLYd3R
 
 -- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 -- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
@@ -699,53 +699,141 @@ CREATE TABLE public.api_calls (
 ALTER TABLE public.api_calls OWNER TO postgres;
 
 --
--- Name: app_global_metrics_history; Type: TABLE; Schema: public; Owner: postgres
+-- Name: app_global_metrics_weekly; Type: TABLE; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.app_global_metrics_history (
-    snapshot_date date NOT NULL,
+CREATE TABLE public.app_global_metrics_weekly (
     store_app integer NOT NULL,
-    installs bigint,
-    rating_count bigint,
-    review_count bigint,
+    week_start date NOT NULL,
+    weekly_installs bigint,
+    weekly_ratings bigint,
+    weekly_reviews bigint,
+    weekly_active_users bigint,
+    monthly_active_users bigint,
+    weekly_iap_revenue real,
+    weekly_ad_revenue real,
+    total_installs bigint,
+    total_ratings bigint,
     rating real,
     one_star bigint,
     two_star bigint,
     three_star bigint,
     four_star bigint,
-    five_star bigint,
-    store_last_updated date,
-    tier1_pct smallint,
-    tier2_pct smallint,
-    tier3_pct smallint
+    five_star bigint
 );
 
 
-ALTER TABLE public.app_global_metrics_history OWNER TO postgres;
+ALTER TABLE public.app_global_metrics_weekly OWNER TO postgres;
 
 --
 -- Name: app_global_metrics_latest; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
 --
 
 CREATE MATERIALIZED VIEW public.app_global_metrics_latest AS
- SELECT DISTINCT ON (store_app) snapshot_date,
-    store_app,
-    installs,
-    rating_count,
-    review_count,
+ WITH global_anchor AS (
+         SELECT app_global_metrics_weekly.store_app,
+            app_global_metrics_weekly.week_start,
+            app_global_metrics_weekly.weekly_iap_revenue,
+            app_global_metrics_weekly.weekly_ad_revenue,
+            app_global_metrics_weekly.weekly_installs,
+            app_global_metrics_weekly.weekly_ratings,
+            app_global_metrics_weekly.total_installs,
+            app_global_metrics_weekly.total_ratings,
+            app_global_metrics_weekly.weekly_active_users,
+            app_global_metrics_weekly.monthly_active_users,
+            app_global_metrics_weekly.rating,
+            app_global_metrics_weekly.one_star,
+            app_global_metrics_weekly.two_star,
+            app_global_metrics_weekly.three_star,
+            app_global_metrics_weekly.four_star,
+            app_global_metrics_weekly.five_star,
+            date_trunc('week'::text, (CURRENT_DATE - '2 days'::interval)) AS global_max_week
+           FROM public.app_global_metrics_weekly
+          WHERE (app_global_metrics_weekly.week_start >= (CURRENT_DATE - '100 days'::interval))
+        ), windowed_metrics AS (
+         SELECT ga.store_app,
+            ga.week_start,
+            ga.weekly_iap_revenue,
+            ga.weekly_ad_revenue,
+            ga.weekly_installs,
+            ga.weekly_ratings,
+            ga.total_installs,
+            ga.total_ratings,
+            ga.weekly_active_users,
+            ga.monthly_active_users,
+            ga.rating,
+            ga.one_star,
+            ga.two_star,
+            ga.three_star,
+            ga.four_star,
+            ga.five_star,
+            row_number() OVER w_ordered AS rn,
+            sum(ga.weekly_installs) OVER w_4w AS monthly_installs,
+            sum(ga.weekly_ad_revenue) OVER w_4w AS monthly_ad_revenue,
+            sum(ga.weekly_iap_revenue) OVER w_4w AS monthly_iap_revenue,
+            avg(ga.weekly_installs) OVER w_2w AS installs_avg_2w,
+            avg(ga.weekly_installs) OVER w_4w AS installs_avg_4w,
+            avg(
+                CASE
+                    WHEN ((ga.week_start >= (ga.global_max_week - '112 days'::interval)) AND (ga.week_start <= (ga.global_max_week - '28 days'::interval))) THEN ga.weekly_installs
+                    ELSE NULL::bigint
+                END) OVER w_ordered AS b_avg_installs,
+            stddev(
+                CASE
+                    WHEN ((ga.week_start >= (ga.global_max_week - '112 days'::interval)) AND (ga.week_start <= (ga.global_max_week - '28 days'::interval))) THEN ga.weekly_installs
+                    ELSE NULL::bigint
+                END) OVER w_ordered AS b_std_installs
+           FROM global_anchor ga
+          WINDOW w_ordered AS (PARTITION BY ga.store_app ORDER BY ga.week_start DESC ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING), w_4w AS (PARTITION BY ga.store_app ORDER BY ga.week_start DESC ROWS BETWEEN CURRENT ROW AND 3 FOLLOWING), w_2w AS (PARTITION BY ga.store_app ORDER BY ga.week_start DESC ROWS BETWEEN CURRENT ROW AND 1 FOLLOWING)
+        )
+ SELECT store_app,
+    week_start,
+    weekly_iap_revenue,
+    weekly_ad_revenue,
+    weekly_installs,
+    weekly_ratings,
+    total_installs,
+    total_ratings,
+    weekly_active_users,
+    monthly_active_users,
     rating,
     one_star,
     two_star,
     three_star,
     four_star,
     five_star,
-    store_last_updated
-   FROM public.app_global_metrics_history sacs
-  ORDER BY store_app, snapshot_date DESC
+    monthly_iap_revenue,
+    monthly_ad_revenue,
+    monthly_installs,
+    installs_avg_2w,
+    installs_avg_4w,
+    b_avg_installs,
+    b_std_installs,
+    ((installs_avg_2w - b_avg_installs) / NULLIF(b_std_installs, (0)::numeric)) AS installs_z_score_2w,
+    ((installs_avg_4w - b_avg_installs) / NULLIF(b_std_installs, (0)::numeric)) AS installs_z_score_4w,
+    ((installs_avg_2w - installs_avg_4w) / NULLIF(installs_avg_4w, (0)::numeric)) AS installs_acceleration,
+    ((b_std_installs IS NOT NULL) AND (b_avg_installs > (0)::numeric)) AS has_reliable_baseline
+   FROM windowed_metrics
+  WHERE (rn = 1)
   WITH NO DATA;
 
 
 ALTER MATERIALIZED VIEW public.app_global_metrics_latest OWNER TO postgres;
+
+--
+-- Name: app_urls_map; Type: TABLE; Schema: public; Owner: james
+--
+
+CREATE TABLE public.app_urls_map (
+    id integer NOT NULL,
+    store_app integer NOT NULL,
+    pub_domain integer NOT NULL,
+    created_at timestamp without time zone DEFAULT timezone('utc'::text, now()),
+    updated_at timestamp without time zone DEFAULT timezone('utc'::text, now())
+);
+
+
+ALTER TABLE public.app_urls_map OWNER TO james;
 
 --
 -- Name: store_apps; Type: TABLE; Schema: public; Owner: james
@@ -786,49 +874,6 @@ CREATE TABLE public.store_apps (
 
 
 ALTER TABLE public.store_apps OWNER TO james;
-
---
--- Name: app_global_metrics_weekly_diffs; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
---
-
-CREATE MATERIALIZED VIEW public.app_global_metrics_weekly_diffs AS
- WITH snapshot_diffs AS (
-         SELECT sach.store_app,
-            sach.snapshot_date,
-            (date_trunc('week'::text, (sach.snapshot_date)::timestamp with time zone))::date AS week_start,
-            (sach.installs - lag(sach.installs) OVER (PARTITION BY sach.store_app ORDER BY sach.snapshot_date)) AS installs_diff,
-            (sach.rating_count - lag(sach.rating_count) OVER (PARTITION BY sach.store_app ORDER BY sach.snapshot_date)) AS rating_count_diff
-           FROM public.app_global_metrics_history sach
-          WHERE ((sach.store_app IN ( SELECT store_apps.id
-                   FROM public.store_apps
-                  WHERE (store_apps.crawl_result = 1))) AND (sach.snapshot_date > (CURRENT_DATE - '375 days'::interval)))
-        )
- SELECT week_start,
-    store_app,
-    COALESCE(sum(installs_diff), (0)::numeric) AS installs_diff,
-    COALESCE(sum(rating_count_diff), (0)::numeric) AS rating_count_diff
-   FROM snapshot_diffs
-  GROUP BY week_start, store_app
-  ORDER BY week_start DESC, store_app
-  WITH NO DATA;
-
-
-ALTER MATERIALIZED VIEW public.app_global_metrics_weekly_diffs OWNER TO postgres;
-
---
--- Name: app_urls_map; Type: TABLE; Schema: public; Owner: james
---
-
-CREATE TABLE public.app_urls_map (
-    id integer NOT NULL,
-    store_app integer NOT NULL,
-    pub_domain integer NOT NULL,
-    created_at timestamp without time zone DEFAULT timezone('utc'::text, now()),
-    updated_at timestamp without time zone DEFAULT timezone('utc'::text, now())
-);
-
-
-ALTER TABLE public.app_urls_map OWNER TO james;
 
 --
 -- Name: category_mapping; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
@@ -917,134 +962,6 @@ CREATE TABLE public.domains (
 
 
 ALTER TABLE public.domains OWNER TO postgres;
-
---
--- Name: store_app_z_scores; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
---
-
-CREATE MATERIALIZED VIEW public.store_app_z_scores AS
- WITH latest_week AS (
-         SELECT max(app_global_metrics_weekly_diffs.week_start) AS max_week
-           FROM public.app_global_metrics_weekly_diffs
-        ), latest_week_per_app AS (
-         SELECT app_global_metrics_weekly_diffs.store_app,
-            max(app_global_metrics_weekly_diffs.week_start) AS app_max_week
-           FROM public.app_global_metrics_weekly_diffs
-          GROUP BY app_global_metrics_weekly_diffs.store_app
-        ), baseline_period AS (
-         SELECT app_global_metrics_weekly_diffs.store_app,
-            avg(app_global_metrics_weekly_diffs.installs_diff) AS avg_installs_diff,
-            stddev(app_global_metrics_weekly_diffs.installs_diff) AS stddev_installs_diff,
-            avg(app_global_metrics_weekly_diffs.rating_count_diff) AS avg_rating_diff,
-            stddev(app_global_metrics_weekly_diffs.rating_count_diff) AS stddev_rating_diff
-           FROM public.app_global_metrics_weekly_diffs,
-            latest_week
-          WHERE ((app_global_metrics_weekly_diffs.week_start >= (latest_week.max_week - '84 days'::interval)) AND (app_global_metrics_weekly_diffs.week_start <= (latest_week.max_week - '35 days'::interval)))
-          GROUP BY app_global_metrics_weekly_diffs.store_app
-        ), recent_data AS (
-         SELECT s.store_app,
-            lw.max_week,
-            s.week_start,
-            s.installs_diff,
-            s.rating_count_diff,
-                CASE
-                    WHEN (s.week_start = lwpa.app_max_week) THEN 1
-                    ELSE 0
-                END AS is_latest_week,
-                CASE
-                    WHEN (s.week_start >= (lwpa.app_max_week - '14 days'::interval)) THEN 1
-                    ELSE 0
-                END AS in_2w_period,
-                CASE
-                    WHEN (s.week_start >= (lwpa.app_max_week - '28 days'::interval)) THEN 1
-                    ELSE 0
-                END AS in_4w_period
-           FROM ((public.app_global_metrics_weekly_diffs s
-             CROSS JOIN latest_week lw)
-             JOIN latest_week_per_app lwpa ON ((s.store_app = lwpa.store_app)))
-          WHERE (s.week_start >= (lw.max_week - '28 days'::interval))
-        ), aggregated_metrics AS (
-         SELECT rd.store_app,
-            rd.max_week AS latest_week,
-            sum(
-                CASE
-                    WHEN (rd.is_latest_week = 1) THEN rd.installs_diff
-                    ELSE (0)::numeric
-                END) AS installs_sum_1w,
-            sum(
-                CASE
-                    WHEN (rd.is_latest_week = 1) THEN rd.rating_count_diff
-                    ELSE ((0)::bigint)::numeric
-                END) AS ratings_sum_1w,
-            (sum(
-                CASE
-                    WHEN (rd.in_2w_period = 1) THEN rd.installs_diff
-                    ELSE (0)::numeric
-                END) / (NULLIF(sum(
-                CASE
-                    WHEN (rd.in_2w_period = 1) THEN 1
-                    ELSE 0
-                END), 0))::numeric) AS installs_avg_2w,
-            (sum(
-                CASE
-                    WHEN (rd.in_2w_period = 1) THEN rd.rating_count_diff
-                    ELSE ((0)::bigint)::numeric
-                END) / (NULLIF(sum(
-                CASE
-                    WHEN (rd.in_2w_period = 1) THEN 1
-                    ELSE 0
-                END), 0))::numeric) AS ratings_avg_2w,
-            sum(
-                CASE
-                    WHEN (rd.in_4w_period = 1) THEN rd.installs_diff
-                    ELSE (0)::numeric
-                END) AS installs_sum_4w,
-            sum(
-                CASE
-                    WHEN (rd.in_4w_period = 1) THEN rd.rating_count_diff
-                    ELSE ((0)::bigint)::numeric
-                END) AS ratings_sum_4w,
-            (sum(
-                CASE
-                    WHEN (rd.in_4w_period = 1) THEN rd.installs_diff
-                    ELSE (0)::numeric
-                END) / (NULLIF(sum(
-                CASE
-                    WHEN (rd.in_4w_period = 1) THEN 1
-                    ELSE 0
-                END), 0))::numeric) AS installs_avg_4w,
-            (sum(
-                CASE
-                    WHEN (rd.in_4w_period = 1) THEN rd.rating_count_diff
-                    ELSE ((0)::bigint)::numeric
-                END) / (NULLIF(sum(
-                CASE
-                    WHEN (rd.in_4w_period = 1) THEN 1
-                    ELSE 0
-                END), 0))::numeric) AS ratings_avg_4w
-           FROM recent_data rd
-          GROUP BY rd.store_app, rd.max_week
-        )
- SELECT am.store_app,
-    am.latest_week,
-    am.installs_sum_1w,
-    am.ratings_sum_1w,
-    am.installs_avg_2w,
-    am.ratings_avg_2w,
-    am.installs_sum_4w,
-    am.ratings_sum_4w,
-    am.installs_avg_4w,
-    am.ratings_avg_4w,
-    ((am.installs_avg_2w - bp.avg_installs_diff) / NULLIF(bp.stddev_installs_diff, (0)::numeric)) AS installs_z_score_2w,
-    ((am.ratings_avg_2w - bp.avg_rating_diff) / NULLIF(bp.stddev_rating_diff, (0)::numeric)) AS ratings_z_score_2w,
-    ((am.installs_avg_4w - bp.avg_installs_diff) / NULLIF(bp.stddev_installs_diff, (0)::numeric)) AS installs_z_score_4w,
-    ((am.ratings_avg_4w - bp.avg_rating_diff) / NULLIF(bp.stddev_rating_diff, (0)::numeric)) AS ratings_z_score_4w
-   FROM (aggregated_metrics am
-     JOIN baseline_period bp ON ((am.store_app = bp.store_app)))
-  WITH NO DATA;
-
-
-ALTER MATERIALIZED VIEW public.store_app_z_scores OWNER TO postgres;
 
 --
 -- Name: store_apps_descriptions; Type: TABLE; Schema: public; Owner: postgres
@@ -1151,28 +1068,42 @@ CREATE MATERIALIZED VIEW frontend.store_apps_overview AS
            FROM (public.creative_records cr
              LEFT JOIN public.api_calls ac ON ((cr.api_call_id = ac.id)))
         ), app_metrics AS (
-         SELECT app_global_metrics_latest.store_app,
-            app_global_metrics_latest.rating,
-            app_global_metrics_latest.rating_count,
-            app_global_metrics_latest.installs
-           FROM public.app_global_metrics_latest
+         SELECT agml_1.store_app,
+            agml_1.rating,
+            agml_1.total_ratings AS rating_count,
+            agml_1.total_installs AS installs,
+            agml_1.weekly_installs,
+            agml_1.weekly_ratings,
+            agml_1.monthly_installs,
+            agml_1.weekly_active_users,
+            agml_1.monthly_active_users,
+            agml_1.weekly_ad_revenue,
+            agml_1.weekly_iap_revenue,
+            agml_1.monthly_ad_revenue,
+            agml_1.monthly_iap_revenue,
+            agml_1.installs_z_score_2w,
+            agml_1.installs_z_score_4w
+           FROM public.app_global_metrics_latest agml_1
         )
  SELECT sa.id,
     sa.name,
     sa.store_id,
     sa.store,
     cm.mapped_category AS category,
-    am.rating,
-    am.rating_count,
-    am.installs,
-    saz.installs_sum_1w,
-    saz.ratings_sum_1w,
-    saz.installs_sum_4w,
-    saz.ratings_sum_4w,
-    saz.installs_z_score_2w,
-    saz.ratings_z_score_2w,
-    saz.installs_z_score_4w,
-    saz.ratings_z_score_4w,
+    agml.rating,
+    agml.rating_count,
+    agml.installs,
+    agml.weekly_installs AS installs_sum_1w,
+    agml.weekly_ratings AS ratings_sum_1w,
+    agml.monthly_installs AS installs_sum_4w,
+    agml.installs_z_score_2w,
+    agml.installs_z_score_4w,
+    agml.weekly_active_users,
+    agml.monthly_active_users,
+    agml.weekly_ad_revenue,
+    agml.weekly_iap_revenue,
+    agml.monthly_ad_revenue,
+    agml.monthly_iap_revenue,
     sa.ad_supported,
     sa.free,
     sa.in_app_purchases,
@@ -1206,10 +1137,8 @@ CREATE MATERIALIZED VIEW frontend.store_apps_overview AS
     lac.run_result,
     lsac.run_at AS api_successful_last_crawled,
     acr.ad_creative_count,
-    amc.ad_mon_creatives,
-    GREATEST(COALESCE(am.installs, (0)::bigint), (COALESCE(am.rating_count, (0)::bigint) * 50)) AS installs_est,
-    GREATEST(COALESCE(saz.installs_sum_4w, (0)::numeric), (COALESCE(saz.ratings_sum_4w, (0)::numeric) * (50)::numeric)) AS installs_sum_4w_est
-   FROM ((((((((((((((((public.store_apps sa
+    amc.ad_mon_creatives
+   FROM (((((((((((((((public.store_apps sa
      LEFT JOIN public.category_mapping cm ON (((sa.category)::text = (cm.original_category)::text)))
      LEFT JOIN public.developers d ON ((sa.developer = d.id)))
      LEFT JOIN public.app_urls_map aum ON ((sa.id = aum.store_app)))
@@ -1220,12 +1149,11 @@ CREATE MATERIALIZED VIEW frontend.store_apps_overview AS
      LEFT JOIN last_successful_sdk_scan lsss ON ((sa.id = lsss.store_app)))
      LEFT JOIN latest_successful_version_codes lsvc ON ((sa.id = lsvc.store_app)))
      LEFT JOIN latest_en_descriptions ld ON ((sa.id = ld.store_app)))
-     LEFT JOIN public.store_app_z_scores saz ON ((sa.id = saz.store_app)))
      LEFT JOIN latest_api_calls lac ON ((sa.id = lac.store_app)))
      LEFT JOIN latest_successful_api_calls lsac ON ((sa.id = lsac.store_app)))
      LEFT JOIN my_ad_creatives acr ON ((sa.id = acr.store_app)))
      LEFT JOIN my_mon_creatives amc ON ((sa.id = amc.store_app)))
-     LEFT JOIN app_metrics am ON ((sa.id = am.store_app)))
+     LEFT JOIN app_metrics agml ON ((sa.id = agml.store_app)))
   WITH NO DATA;
 
 
@@ -2491,7 +2419,6 @@ CREATE MATERIALIZED VIEW frontend.apps_new_monthly AS
             sa_1.installs_sum_1w,
             sa_1.installs_sum_4w,
             sa_1.ratings_sum_1w,
-            sa_1.ratings_sum_4w,
             sa_1.store_last_updated,
             sa_1.ad_supported,
             sa_1.in_app_purchases,
@@ -2523,7 +2450,6 @@ CREATE MATERIALIZED VIEW frontend.apps_new_monthly AS
     installs_sum_1w,
     installs_sum_4w,
     ratings_sum_1w,
-    ratings_sum_4w,
     store_last_updated,
     ad_supported,
     in_app_purchases,
@@ -2566,7 +2492,6 @@ CREATE MATERIALIZED VIEW frontend.apps_new_weekly AS
             sa_1.installs_sum_1w,
             sa_1.installs_sum_4w,
             sa_1.ratings_sum_1w,
-            sa_1.ratings_sum_4w,
             sa_1.store_last_updated,
             sa_1.ad_supported,
             sa_1.in_app_purchases,
@@ -2598,7 +2523,6 @@ CREATE MATERIALIZED VIEW frontend.apps_new_weekly AS
     installs_sum_1w,
     installs_sum_4w,
     ratings_sum_1w,
-    ratings_sum_4w,
     store_last_updated,
     ad_supported,
     in_app_purchases,
@@ -2642,7 +2566,6 @@ CREATE MATERIALIZED VIEW frontend.apps_new_yearly AS
             sa_1.installs_sum_1w,
             sa_1.installs_sum_4w,
             sa_1.ratings_sum_1w,
-            sa_1.ratings_sum_4w,
             sa_1.store_last_updated,
             sa_1.ad_supported,
             sa_1.in_app_purchases,
@@ -2674,7 +2597,6 @@ CREATE MATERIALIZED VIEW frontend.apps_new_yearly AS
     installs_sum_1w,
     installs_sum_4w,
     ratings_sum_1w,
-    ratings_sum_4w,
     store_last_updated,
     ad_supported,
     in_app_purchases,
@@ -2716,8 +2638,8 @@ CREATE MATERIALIZED VIEW frontend.category_tag_stats AS
     sa.category AS app_category,
     dag.tag_source,
     count(DISTINCT dag.store_app) AS app_count,
-    sum(sa.installs_sum_4w_est) AS installs_d30,
-    sum(sa.installs_est) AS installs_total
+    sum(sa.installs_sum_4w) AS installs_d30,
+    sum(sa.installs) AS installs_total
    FROM (distinct_apps_group dag
      LEFT JOIN frontend.store_apps_overview sa ON ((dag.store_app = sa.id)))
   GROUP BY sa.store, sa.category, dag.tag_source
@@ -2742,18 +2664,18 @@ CREATE MATERIALIZED VIEW frontend.category_tag_type_stats AS
             x.tag_source,
             x.type_url_slug,
             count(*) AS app_count,
-            sum(x.installs_sum_4w_est) AS installs_d30,
-            sum(x.installs_est) AS installs_total
+            sum(x.installs_sum_4w) AS installs_d30,
+            sum(x.installs) AS installs_total
            FROM ( SELECT DISTINCT csac.store_app,
                     sa.store,
                     csac.app_category,
                     tag.tag_source,
                         CASE
-                            WHEN (tag.tag_source ~~ 'app_ads%'::text) THEN 'ad-networks'::character varying
+                            WHEN (tag.tag_source ~~ 'app_ads%%'::text) THEN 'ad-networks'::character varying
                             ELSE cats.url_slug
                         END AS type_url_slug,
-                    sa.installs_sum_4w_est,
-                    sa.installs_est
+                    sa.installs_sum_4w,
+                    sa.installs
                    FROM ((((adtech.combined_store_apps_companies csac
                      LEFT JOIN frontend.store_apps_overview sa ON ((csac.store_app = sa.id)))
                      JOIN minimized_company_categories mcc ON ((csac.company_id = mcc.company_id)))
@@ -2772,14 +2694,14 @@ CREATE MATERIALIZED VIEW frontend.category_tag_type_stats AS
             'sdk'::text AS tag_source,
             x.type_url_slug,
             count(*) AS app_count,
-            sum(x.installs_sum_4w_est) AS installs_d30,
-            sum(x.installs_est) AS installs_total
+            sum(x.installs_sum_4w) AS installs_d30,
+            sum(x.installs) AS installs_total
            FROM ( SELECT DISTINCT sas.store_app,
                     sa.store,
                     sa.category AS app_category,
                     cats.url_slug AS type_url_slug,
-                    sa.installs_sum_4w_est,
-                    sa.installs_est
+                    sa.installs_sum_4w,
+                    sa.installs
                    FROM (((store_app_sdks sas
                      LEFT JOIN frontend.store_apps_overview sa ON ((sas.store_app = sa.id)))
                      LEFT JOIN adtech.sdk_categories sc ON ((sas.sdk_id = sc.sdk_id)))
@@ -2848,8 +2770,8 @@ CREATE MATERIALIZED VIEW frontend.companies_category_stats AS
     csac.ad_domain AS company_domain,
     c.name AS company_name,
     count(DISTINCT csac.store_app) AS app_count,
-    sum(sa.installs_est) AS installs_total,
-    sum(sa.installs_sum_4w_est) AS installs_d30
+    sum(sa.installs) AS installs_total,
+    sum(sa.installs_sum_4w) AS installs_d30
    FROM ((adtech.combined_store_apps_companies csac
      LEFT JOIN adtech.companies c ON ((csac.company_id = c.id)))
      LEFT JOIN frontend.store_apps_overview sa ON ((csac.store_app = sa.id)))
@@ -2881,8 +2803,8 @@ CREATE MATERIALIZED VIEW frontend.companies_category_tag_stats AS
     dag.company_domain,
     dag.company_name,
     count(DISTINCT dag.store_app) AS app_count,
-    sum(sa.installs_sum_4w_est) AS installs_d30,
-    sum(sa.installs_est) AS installs_total
+    sum(sa.installs_sum_4w) AS installs_d30,
+    sum(sa.installs) AS installs_total
    FROM (distinct_apps_group dag
      LEFT JOIN frontend.store_apps_overview sa ON ((dag.store_app = sa.id)))
   GROUP BY sa.store, sa.category, dag.tag_source, dag.company_domain, dag.company_name
@@ -2908,12 +2830,12 @@ CREATE MATERIALIZED VIEW frontend.companies_category_tag_type_stats AS
             csac.ad_domain AS company_domain,
             c.name AS company_name,
                 CASE
-                    WHEN (tag.tag_source ~~ 'app_ads%'::text) THEN 'ad-networks'::character varying
+                    WHEN (tag.tag_source ~~ 'app_ads%%'::text) THEN 'ad-networks'::character varying
                     ELSE cats.url_slug
                 END AS type_url_slug,
             count(DISTINCT csac.store_app) AS app_count,
-            sum(sa.installs_sum_4w_est) AS installs_d30,
-            sum(sa.installs_est) AS installs_total
+            sum(sa.installs_sum_4w) AS installs_d30,
+            sum(sa.installs) AS installs_total
            FROM (((((adtech.combined_store_apps_companies csac
              LEFT JOIN adtech.companies c ON ((csac.company_id = c.id)))
              LEFT JOIN frontend.store_apps_overview sa ON ((csac.store_app = sa.id)))
@@ -2923,7 +2845,7 @@ CREATE MATERIALIZED VIEW frontend.companies_category_tag_type_stats AS
           WHERE (tag.present IS TRUE)
           GROUP BY sa.store, csac.app_category, tag.tag_source, csac.ad_domain, c.name,
                 CASE
-                    WHEN (tag.tag_source ~~ 'app_ads%'::text) THEN 'ad-networks'::character varying
+                    WHEN (tag.tag_source ~~ 'app_ads%%'::text) THEN 'ad-networks'::character varying
                     ELSE cats.url_slug
                 END
         ), store_app_sdks AS (
@@ -2939,8 +2861,8 @@ CREATE MATERIALIZED VIEW frontend.companies_category_tag_type_stats AS
             c.name AS company_name,
             cats.url_slug AS type_url_slug,
             count(DISTINCT sas.store_app) AS app_count,
-            sum(sa.installs_sum_4w_est) AS installs_d30,
-            sum(sa.installs_est) AS installs_total
+            sum(sa.installs_sum_4w) AS installs_d30,
+            sum(sa.installs) AS installs_total
            FROM ((((((store_app_sdks sas
              LEFT JOIN adtech.sdks s ON ((sas.sdk_id = s.id)))
              LEFT JOIN adtech.companies c ON ((s.company_id = c.id)))
@@ -3055,7 +2977,6 @@ CREATE MATERIALIZED VIEW frontend.companies_creative_rankings AS
     saa.installs_sum_1w,
     saa.ratings_sum_1w,
     saa.installs_sum_4w,
-    saa.ratings_sum_4w,
     vd.last_seen,
         CASE
             WHEN (saa.icon_url_100 IS NOT NULL) THEN (concat('https://media.appgoblin.info/app-icons/', saa.store_id, '/', saa.icon_url_100))::character varying
@@ -3121,8 +3042,8 @@ CREATE MATERIALIZED VIEW frontend.companies_parent_category_stats AS
     dag.company_domain,
     dag.company_name,
     count(DISTINCT dag.store_app) AS app_count,
-    sum(sa.installs_sum_4w_est) AS installs_d30,
-    sum(sa.installs_est) AS installs_total
+    sum(sa.installs_sum_4w) AS installs_d30,
+    sum(sa.installs) AS installs_total
    FROM (distinct_apps_group dag
      LEFT JOIN frontend.store_apps_overview sa ON ((dag.store_app = sa.id)))
   GROUP BY sa.store, sa.category, dag.company_domain, dag.company_name
@@ -3156,8 +3077,8 @@ CREATE MATERIALIZED VIEW frontend.companies_parent_category_tag_stats AS
     dag.company_domain,
     dag.company_name,
     count(DISTINCT dag.store_app) AS app_count,
-    sum(sa.installs_sum_4w_est) AS installs_d30,
-    sum(sa.installs_est) AS installs_total
+    sum(sa.installs_sum_4w) AS installs_d30,
+    sum(sa.installs) AS installs_total
    FROM (distinct_apps_group dag
      LEFT JOIN frontend.store_apps_overview sa ON ((dag.store_app = sa.id)))
   GROUP BY sa.store, sa.category, dag.tag_source, dag.company_domain, dag.company_name
@@ -3250,7 +3171,6 @@ CREATE MATERIALIZED VIEW frontend.company_domains_top_apps AS
             sa.store_id,
             cm.mapped_category AS app_category,
             sa.installs_sum_4w AS installs_d30,
-            sa.ratings_sum_4w AS rating_count_d30,
             false AS sdk,
             true AS api_call,
             false AS app_ads_direct
@@ -3269,12 +3189,11 @@ CREATE MATERIALIZED VIEW frontend.company_domains_top_apps AS
             deduped_data.store_id,
             deduped_data.app_category,
             deduped_data.installs_d30,
-            deduped_data.rating_count_d30,
             deduped_data.sdk,
             deduped_data.api_call,
             deduped_data.app_ads_direct,
-            row_number() OVER (PARTITION BY deduped_data.store, deduped_data.company_domain, deduped_data.company_name ORDER BY GREATEST((COALESCE(deduped_data.rating_count_d30, (0)::numeric))::double precision, COALESCE((deduped_data.installs_d30)::double precision, (0)::double precision)) DESC) AS app_company_rank,
-            row_number() OVER (PARTITION BY deduped_data.store, deduped_data.app_category, deduped_data.company_domain, deduped_data.company_name ORDER BY GREATEST((COALESCE(deduped_data.rating_count_d30, (0)::numeric))::double precision, COALESCE((deduped_data.installs_d30)::double precision, (0)::double precision)) DESC) AS app_company_category_rank
+            row_number() OVER (PARTITION BY deduped_data.store, deduped_data.company_domain, deduped_data.company_name ORDER BY COALESCE((deduped_data.installs_d30)::double precision, (0)::double precision) DESC) AS app_company_rank,
+            row_number() OVER (PARTITION BY deduped_data.store, deduped_data.app_category, deduped_data.company_domain, deduped_data.company_name ORDER BY COALESCE((deduped_data.installs_d30)::double precision, (0)::double precision) DESC) AS app_company_category_rank
            FROM deduped_data
         )
  SELECT company_domain,
@@ -3284,7 +3203,6 @@ CREATE MATERIALIZED VIEW frontend.company_domains_top_apps AS
     store_id,
     app_category,
     installs_d30,
-    rating_count_d30,
     sdk,
     api_call,
     app_ads_direct,
@@ -3312,7 +3230,6 @@ CREATE MATERIALIZED VIEW frontend.company_parent_top_apps AS
             sa.developer_name,
             sa.icon_url_100,
             sa.installs_sum_4w AS installs_d30,
-            sa.ratings_sum_4w AS rating_count_d30,
             csapc.sdk,
             csapc.api_call,
             csapc.app_ads_direct
@@ -3330,12 +3247,11 @@ CREATE MATERIALIZED VIEW frontend.company_parent_top_apps AS
             deduped_data.icon_url_100,
             deduped_data.app_category,
             deduped_data.installs_d30,
-            deduped_data.rating_count_d30,
             deduped_data.sdk,
             deduped_data.api_call,
             deduped_data.app_ads_direct,
-            row_number() OVER (PARTITION BY deduped_data.store, deduped_data.company_domain, deduped_data.company_name ORDER BY (COALESCE((deduped_data.sdk)::integer, 0) + COALESCE((deduped_data.api_call)::integer, 0)) DESC, GREATEST((COALESCE(deduped_data.rating_count_d30, (0)::numeric))::double precision, COALESCE((deduped_data.installs_d30)::double precision, (0)::double precision)) DESC) AS app_company_rank,
-            row_number() OVER (PARTITION BY deduped_data.store, deduped_data.app_category, deduped_data.company_domain, deduped_data.company_name ORDER BY (COALESCE((deduped_data.sdk)::integer, 0) + COALESCE((deduped_data.api_call)::integer, 0)) DESC, GREATEST((COALESCE(deduped_data.rating_count_d30, (0)::numeric))::double precision, COALESCE((deduped_data.installs_d30)::double precision, (0)::double precision)) DESC) AS app_company_category_rank
+            row_number() OVER (PARTITION BY deduped_data.store, deduped_data.company_domain, deduped_data.company_name ORDER BY (COALESCE((deduped_data.sdk)::integer, 0) + COALESCE((deduped_data.api_call)::integer, 0)) DESC, COALESCE((deduped_data.installs_d30)::double precision, (0)::double precision) DESC) AS app_company_rank,
+            row_number() OVER (PARTITION BY deduped_data.store, deduped_data.app_category, deduped_data.company_domain, deduped_data.company_name ORDER BY (COALESCE((deduped_data.sdk)::integer, 0) + COALESCE((deduped_data.api_call)::integer, 0)) DESC, COALESCE((deduped_data.installs_d30)::double precision, (0)::double precision) DESC) AS app_company_category_rank
            FROM deduped_data
         )
  SELECT company_domain,
@@ -3347,7 +3263,6 @@ CREATE MATERIALIZED VIEW frontend.company_parent_top_apps AS
     app_category,
     icon_url_100,
     installs_d30,
-    rating_count_d30,
     sdk,
     api_call,
     app_ads_direct,
@@ -3375,7 +3290,6 @@ CREATE MATERIALIZED VIEW frontend.company_top_apps AS
             sa.developer_name,
             sa.icon_url_100,
             sa.installs_sum_4w AS installs_d30,
-            sa.ratings_sum_4w AS rating_count_d30,
             cac.sdk,
             cac.api_call,
             cac.app_ads_direct
@@ -3393,12 +3307,11 @@ CREATE MATERIALIZED VIEW frontend.company_top_apps AS
             deduped_data.icon_url_100,
             deduped_data.app_category,
             deduped_data.installs_d30,
-            deduped_data.rating_count_d30,
             deduped_data.sdk,
             deduped_data.api_call,
             deduped_data.app_ads_direct,
-            row_number() OVER (PARTITION BY deduped_data.store, deduped_data.company_domain, deduped_data.company_name ORDER BY (COALESCE((deduped_data.sdk)::integer, 0) + COALESCE((deduped_data.api_call)::integer, 0)) DESC, GREATEST((COALESCE(deduped_data.rating_count_d30, (0)::numeric))::double precision, COALESCE((deduped_data.installs_d30)::double precision, (0)::double precision)) DESC) AS app_company_rank,
-            row_number() OVER (PARTITION BY deduped_data.store, deduped_data.app_category, deduped_data.company_domain, deduped_data.company_name ORDER BY (COALESCE((deduped_data.sdk)::integer, 0) + COALESCE((deduped_data.api_call)::integer, 0)) DESC, GREATEST((COALESCE(deduped_data.rating_count_d30, (0)::numeric))::double precision, COALESCE((deduped_data.installs_d30)::double precision, (0)::double precision)) DESC) AS app_company_category_rank
+            row_number() OVER (PARTITION BY deduped_data.store, deduped_data.company_domain, deduped_data.company_name ORDER BY (COALESCE((deduped_data.sdk)::integer, 0) + COALESCE((deduped_data.api_call)::integer, 0)) DESC, COALESCE((deduped_data.installs_d30)::double precision, (0)::double precision) DESC) AS app_company_rank,
+            row_number() OVER (PARTITION BY deduped_data.store, deduped_data.app_category, deduped_data.company_domain, deduped_data.company_name ORDER BY (COALESCE((deduped_data.sdk)::integer, 0) + COALESCE((deduped_data.api_call)::integer, 0)) DESC, COALESCE((deduped_data.installs_d30)::double precision, (0)::double precision) DESC) AS app_company_category_rank
            FROM deduped_data
         )
  SELECT company_domain,
@@ -3410,7 +3323,6 @@ CREATE MATERIALIZED VIEW frontend.company_top_apps AS
     icon_url_100,
     app_category,
     installs_d30,
-    rating_count_d30,
     sdk,
     api_call,
     app_ads_direct,
@@ -3473,11 +3385,13 @@ CREATE MATERIALIZED VIEW frontend.keyword_scores AS
         ), keyword_competitors AS (
          SELECT ake.keyword_id,
             sa.store,
-            avg(COALESCE(NULLIF(agml.installs, 0), (agml.rating_count * 25))) AS avg_installs,
-            max(COALESCE(NULLIF(agml.installs, 0), (agml.rating_count * 25))) AS max_installs,
-            percentile_cont((0.5)::double precision) WITHIN GROUP (ORDER BY ((COALESCE(NULLIF(agml.installs, 0), (agml.rating_count * 25)))::double precision)) AS median_installs,
+            avg(NULLIF(agml.weekly_installs, 0)) AS avg_weekly_installs,
+            avg(NULLIF(agml.total_installs, 0)) AS avg_installs,
+            max(NULLIF(agml.total_installs, 0)) AS max_installs,
+            percentile_cont((0.5)::double precision) WITHIN GROUP (ORDER BY ((NULLIF(agml.total_installs, 0))::double precision)) AS median_installs,
             avg(agml.rating) AS avg_rating,
-            count(*) FILTER (WHERE (COALESCE(NULLIF(agml.installs, 0), (agml.rating_count * 25)) > 1000000)) AS apps_over_1m_installs,
+            avg(agml.installs_z_score_4w) AS avg_competitor_z_score,
+            count(*) FILTER (WHERE (NULLIF(agml.total_installs, 0) > 1000000)) AS apps_over_1m_installs,
             count(*) FILTER (WHERE ((sa.name)::text ~~* (('%'::text || (k.keyword_text)::text) || '%'::text))) AS title_matches
            FROM (((public.app_keywords_extracted ake
              LEFT JOIN public.store_apps sa ON ((ake.store_app = sa.id)))
@@ -3490,6 +3404,7 @@ CREATE MATERIALIZED VIEW frontend.keyword_scores AS
             kac.keyword_id,
             kac.app_count,
             round(kc.avg_installs, 0) AS avg_installs,
+            round(kc.avg_weekly_installs, 0) AS avg_weekly_installs,
             tac.total_apps,
             round(((100.0 * (kac.app_count)::numeric) / (NULLIF(tac.total_apps, 0))::numeric), 2) AS market_penetration_pct,
             round(((100)::numeric * (((1)::double precision - (ln(((tac.total_apps)::double precision / ((kac.app_count + 1))::double precision)) / ln((tac.total_apps)::double precision))))::numeric), 2) AS competitiveness_score,
@@ -3504,6 +3419,7 @@ CREATE MATERIALIZED VIEW frontend.keyword_scores AS
             COALESCE(kc.max_installs, (0)::bigint) AS top_competitor_installs,
             (COALESCE(kc.median_installs, (0)::double precision))::bigint AS median_competitor_installs,
             COALESCE(kc.avg_rating, (0)::double precision) AS avg_competitor_rating,
+            COALESCE((kc.avg_competitor_z_score)::double precision, (0)::double precision) AS avg_competitor_z_score,
             COALESCE(kc.apps_over_1m_installs, (0)::bigint) AS major_competitors,
             COALESCE(kc.title_matches, (0)::bigint) AS title_matches,
             round(((100.0 * (COALESCE(kc.title_matches, (0)::bigint))::numeric) / (NULLIF(kac.app_count, 0))::numeric), 2) AS title_relevance_pct
@@ -3516,6 +3432,7 @@ CREATE MATERIALIZED VIEW frontend.keyword_scores AS
     keyword_id,
     app_count,
     avg_installs,
+    avg_weekly_installs,
     total_apps,
     market_penetration_pct,
     competitiveness_score,
@@ -3526,6 +3443,7 @@ CREATE MATERIALIZED VIEW frontend.keyword_scores AS
     top_competitor_installs,
     median_competitor_installs,
     avg_competitor_rating,
+    avg_competitor_z_score,
     major_competitors,
     title_matches,
     title_relevance_pct,
@@ -3783,7 +3701,6 @@ CREATE MATERIALIZED VIEW frontend.store_app_ranks_latest AS
     sa.installs_sum_1w,
     sa.installs_sum_4w,
     sa.ratings_sum_1w,
-    sa.ratings_sum_4w,
     sa.icon_url_100,
     ar.store_collection,
     ar.store_category,
@@ -3805,26 +3722,19 @@ ALTER MATERIALIZED VIEW frontend.store_app_ranks_latest OWNER TO postgres;
 
 CREATE MATERIALIZED VIEW frontend.z_scores_top_apps AS
  WITH app_metrics AS (
-         SELECT app_global_metrics_latest.store_app,
-            app_global_metrics_latest.rating,
-            app_global_metrics_latest.rating_count,
-            app_global_metrics_latest.installs
-           FROM public.app_global_metrics_latest
+         SELECT
         ), ranked_z_scores AS (
-         SELECT saz.store_app,
-            saz.latest_week,
-            saz.installs_sum_1w,
-            saz.ratings_sum_1w,
-            saz.installs_avg_2w,
-            saz.ratings_avg_2w,
-            saz.installs_z_score_2w,
-            saz.ratings_z_score_2w,
-            sa.installs_sum_4w_est AS installs_sum_4w,
-            saz.ratings_sum_4w,
-            saz.installs_avg_4w,
-            saz.ratings_avg_4w,
-            saz.installs_z_score_4w,
-            saz.ratings_z_score_4w,
+         SELECT agml.store_app,
+            agml.total_installs AS installs,
+            agml.weekly_installs AS installs_sum_1w,
+            agml.weekly_ratings AS ratings_sum_1w,
+            agml.installs_avg_2w,
+            agml.installs_z_score_2w,
+            agml.monthly_installs AS installs_sum_4w,
+            agml.installs_avg_4w,
+            agml.installs_z_score_4w,
+            agml.installs_acceleration,
+            agml.has_reliable_baseline,
             sa.id,
             sa.developer_id,
             sa.developer_name,
@@ -3832,7 +3742,6 @@ CREATE MATERIALIZED VIEW frontend.z_scores_top_apps AS
             sa.store_id,
             sa.store,
             sa.category AS app_category,
-            sa.installs_est AS installs,
             sa.free,
             sa.store_last_updated,
             sa.ad_supported,
@@ -3841,21 +3750,15 @@ CREATE MATERIALIZED VIEW frontend.z_scores_top_apps AS
             sa.updated_at,
             sa.crawl_result,
             sa.release_date,
-            am.rating_count,
+            agml.total_ratings AS rating_count,
             sa.icon_url_100,
             row_number() OVER (PARTITION BY sa.store, sa.category,
                 CASE
                     WHEN (sa.store = 2) THEN 'rating'::text
                     ELSE 'installs'::text
-                END ORDER BY
-                CASE
-                    WHEN (sa.store = 2) THEN saz.ratings_z_score_2w
-                    WHEN (sa.store = 1) THEN saz.installs_z_score_2w
-                    ELSE NULL::numeric
-                END DESC NULLS LAST) AS rn
-           FROM ((public.store_app_z_scores saz
-             LEFT JOIN frontend.store_apps_overview sa ON ((saz.store_app = sa.id)))
-             LEFT JOIN app_metrics am ON ((saz.store_app = am.store_app)))
+                END ORDER BY agml.installs_z_score_2w DESC NULLS LAST) AS rn
+           FROM (public.app_global_metrics_latest agml
+             LEFT JOIN frontend.store_apps_overview sa ON ((agml.store_app = sa.id)))
           WHERE (sa.store = ANY (ARRAY[1, 2]))
         )
  SELECT store,
@@ -3871,15 +3774,10 @@ CREATE MATERIALIZED VIEW frontend.z_scores_top_apps AS
     installs_sum_1w,
     ratings_sum_1w,
     installs_avg_2w,
-    ratings_avg_2w,
     installs_z_score_2w,
-    ratings_z_score_2w,
     installs_sum_4w,
-    ratings_sum_4w,
     installs_avg_4w,
-    ratings_avg_4w,
-    installs_z_score_4w,
-    ratings_z_score_4w
+    installs_z_score_4w
    FROM ranked_z_scores
   WHERE (rn <= 100)
   WITH NO DATA;
@@ -4226,31 +4124,29 @@ CREATE TABLE public.app_country_metrics_history (
 ALTER TABLE public.app_country_metrics_history OWNER TO postgres;
 
 --
--- Name: app_global_metrics_weekly; Type: TABLE; Schema: public; Owner: postgres
+-- Name: app_global_metrics_history; Type: TABLE; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.app_global_metrics_weekly (
+CREATE TABLE public.app_global_metrics_history (
+    snapshot_date date NOT NULL,
     store_app integer NOT NULL,
-    week_start date NOT NULL,
-    weekly_installs bigint,
-    weekly_ratings bigint,
-    weekly_reviews bigint,
-    weekly_active_users bigint,
-    monthly_active_users bigint,
-    weekly_iap_revenue real,
-    weekly_ad_revenue real,
-    total_installs bigint,
-    total_ratings bigint,
+    installs bigint,
+    rating_count bigint,
+    review_count bigint,
     rating real,
     one_star bigint,
     two_star bigint,
     three_star bigint,
     four_star bigint,
-    five_star bigint
+    five_star bigint,
+    store_last_updated date,
+    tier1_pct smallint,
+    tier2_pct smallint,
+    tier3_pct smallint
 );
 
 
-ALTER TABLE public.app_global_metrics_weekly OWNER TO postgres;
+ALTER TABLE public.app_global_metrics_history OWNER TO postgres;
 
 --
 -- Name: app_urls_map_id_seq; Type: SEQUENCE; Schema: public; Owner: james
@@ -4730,7 +4626,7 @@ CREATE MATERIALIZED VIEW public.store_apps_in_latest_rankings AS
            FROM (frontend.z_scores_top_apps saz
              LEFT JOIN frontend.store_apps_overview sa ON (((saz.store_id)::text = (sa.store_id)::text)))
           WHERE sa.free
-          ORDER BY COALESCE(saz.installs_z_score_2w, saz.ratings_z_score_2w) DESC
+          ORDER BY saz.installs_z_score_2w DESC
          LIMIT 500
         ), ranked_apps AS (
          SELECT DISTINCT ON (ar.store_app) ar.store_app,
@@ -6407,14 +6303,14 @@ CREATE UNIQUE INDEX store_app_ranks_best_monthly_uidx ON frontend.store_app_rank
 -- Name: store_apps_overview_installs_est_idx; Type: INDEX; Schema: frontend; Owner: postgres
 --
 
-CREATE INDEX store_apps_overview_installs_est_idx ON frontend.store_apps_overview USING btree (installs_est DESC);
+CREATE INDEX store_apps_overview_installs_est_idx ON frontend.store_apps_overview USING btree (installs DESC);
 
 
 --
 -- Name: store_apps_overview_installs_sum_4w_est_idx; Type: INDEX; Schema: frontend; Owner: postgres
 --
 
-CREATE INDEX store_apps_overview_installs_sum_4w_est_idx ON frontend.store_apps_overview USING btree (installs_sum_4w_est DESC);
+CREATE INDEX store_apps_overview_installs_sum_4w_est_idx ON frontend.store_apps_overview USING btree (installs_sum_4w DESC);
 
 
 --
@@ -6520,13 +6416,6 @@ CREATE INDEX app_global_metrics_history_store_app_idx ON public.app_global_metri
 --
 
 CREATE UNIQUE INDEX app_global_metrics_latest_idx ON public.app_global_metrics_latest USING btree (store_app);
-
-
---
--- Name: app_global_metrics_weekly_diffs_week_start_store_app_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE UNIQUE INDEX app_global_metrics_weekly_diffs_week_start_store_app_idx ON public.app_global_metrics_weekly_diffs USING btree (week_start, store_app);
 
 
 --
@@ -7411,5 +7300,5 @@ GRANT ALL ON SCHEMA public TO PUBLIC;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict brUq3Gcd944rLrsIOo4ZIwu67TnnDVQkTmmgoVEWpYUgzQz3zJvRu03U5qUiNp3
+\unrestrict YDHUqLj4c09OOspU0TzA0Is4tunjNq53qk7Z8FhfmvYpdbeayFDAUlxOOGLYd3R
 

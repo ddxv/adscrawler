@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict d6Y3ZzEfDGP9e0yrTgwGKvuBYcbd08BUXHmxmJpZNAz8wtxfRfWIF3u4rvd3W7b
+\restrict M3Sl8rtjmINDO6mp9qfOUTXSW5Vhp4n3zUZo6ywpJDVhnqMN8XnTDD5gUG6Yfv1
 
 -- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 -- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
@@ -39,7 +39,7 @@ CREATE MATERIALIZED VIEW public.store_apps_in_latest_rankings AS
            FROM (frontend.z_scores_top_apps saz
              LEFT JOIN frontend.store_apps_overview sa ON (((saz.store_id)::text = (sa.store_id)::text)))
           WHERE sa.free
-          ORDER BY COALESCE(saz.installs_z_score_2w, saz.ratings_z_score_2w) DESC
+          ORDER BY saz.installs_z_score_2w DESC
          LIMIT 500
         ), ranked_apps AS (
          SELECT DISTINCT ON (ar.store_app) ar.store_app,
@@ -80,5 +80,5 @@ ALTER MATERIALIZED VIEW public.store_apps_in_latest_rankings OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict d6Y3ZzEfDGP9e0yrTgwGKvuBYcbd08BUXHmxmJpZNAz8wtxfRfWIF3u4rvd3W7b
+\unrestrict M3Sl8rtjmINDO6mp9qfOUTXSW5Vhp4n3zUZo6ywpJDVhnqMN8XnTDD5gUG6Yfv1
 
