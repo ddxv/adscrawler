@@ -514,9 +514,9 @@ def manual_import_app_metrics_from_s3(
                 snapshot_end_date=snapshot_end_date,
             )
 
-    start_date = datetime.datetime.fromisoformat("2026-02-02").date()
+    start_date = datetime.datetime.fromisoformat("2026-02-09").date()
     end_date = datetime.datetime.fromisoformat("2026-02-24").date()
-    stores = [1, 2]
+    stores = [2]
     use_tunnel = False
     database_connection = get_db_connection(
         use_ssh_tunnel=use_tunnel, config_key="madrone"
@@ -999,18 +999,22 @@ def calculate_active_users(
         .reset_index()
     )
     cohorts = cohorts.rename(columns={"surviving_users": "wau", "surviving_mau": "mau"})
-    cols = [
+    dfcols = [
         "store_app",
         "in_app_purchases",
         "ad_supported",
         "snapshot_date",
         "installs_diff",
+        "weekly_ratings",
+        "weekly_reviews",
     ] + metrics
     df = pd.merge(
-        df[cols], cohorts, on=["store_app", "snapshot_date"], how="left", validate="1:1"
+        df[dfcols],
+        cohorts,
+        on=["store_app", "snapshot_date"],
+        how="left",
+        validate="1:1",
     )
-    logger.info("Finished calculating WAU")
-
     rename_map = {
         "snapshot_date": "week_start",
         "installs_diff": "weekly_installs",
@@ -1064,19 +1068,15 @@ def calculate_revenue_cols(
 
 
 def import_all_app_global_metrics_weekly(database_connection: PostgresCon) -> None:
-    i = 0
+    i = 1
     while True:
         logger.info(f"batch {i} of app global metrics weekly start")
         df = query_apps_to_process_global_metrics(
-            database_connection, batch_size=5000, days_back=2
+            database_connection, batch_size=10000, days_back=2
         )
         if df.empty:
             break
         log_apps = df["store_app"].unique().tolist()
-
-        odf = df.copy()
-        df = odf[odf["store_app"] == 48466790]
-
         # Fill in blank rows with default
         df["tier_pct_sum"] = df["tier1_pct"] + df["tier2_pct"] + df["tier3_pct"]
         incomplete_tier_pct = df["tier_pct_sum"] < 0.5
@@ -1086,9 +1086,12 @@ def import_all_app_global_metrics_weekly(database_connection: PostgresCon) -> No
         df.loc[tiers_to_fill, "tier1_pct"] = 0.34
         df.loc[tiers_to_fill, "tier2_pct"] = 0.33
         df.loc[tiers_to_fill, "tier3_pct"] = 0.33
+        logger.info("Start calculating WAU")
         df = calculate_active_users(database_connection, df)
+        logger.info("Finished calculating WAU")
+        logger.info("Start calculating revenue columns")
         df = calculate_revenue_cols(database_connection, df)
-        df
+        logger.info("Finished calculating revenue columns")
         final_cols = [
             "store_app",
             "week_start",
@@ -1109,6 +1112,7 @@ def import_all_app_global_metrics_weekly(database_connection: PostgresCon) -> No
             "five_star",
         ]
         df = df[final_cols]
+        logger.info(f"Start inserting batch {i} of size {df.shape[0]}")
         delete_and_insert(
             df=df,
             schema="public",
@@ -1117,6 +1121,8 @@ def import_all_app_global_metrics_weekly(database_connection: PostgresCon) -> No
             delete_by_keys=["store_app", "week_start"],
             insert_columns=df.columns.tolist(),
         )
+        logger.info(f"Finished inserting batch {i}")
+        logger.info(f"Logging batch {i}...")
         log_df = pd.DataFrame({"store_app": log_apps})
         log_df["updated_at"] = datetime.datetime.now()
         log_df.to_sql(
