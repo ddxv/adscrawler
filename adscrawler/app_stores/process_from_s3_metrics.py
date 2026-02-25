@@ -1072,7 +1072,7 @@ def import_all_app_global_metrics_weekly(database_connection: PostgresCon) -> No
     while True:
         logger.info(f"batch {i} of app global metrics weekly start")
         df = query_apps_to_process_global_metrics(
-            database_connection, batch_size=10000, days_back=2
+            database_connection, batch_size=10000, days_back=3
         )
         if df.empty:
             break
