@@ -382,9 +382,9 @@ def prep_app_google_metrics(
     country_df["global_installs"] = country_df["global_installs"].fillna(0).astype(int)
     # Db currently does not have a rating_count_est column just for country
     country_df["rating_count"] = country_df["rating_count_est"]
-    assert country_df["global_rating_count"].ge(country_df["rating_count"]).all(), (
-        "global_rating_count should be >= rating_count"
-    )
+    assert (
+        country_df["global_rating_count"].ge(country_df["rating_count"]).all()
+    ), "global_rating_count should be >= rating_count"
     global_df = country_df[country_df["country"] == "US"].copy()
     global_df = global_df.drop(columns=["rating_count", "review_count"]).rename(
         columns={
@@ -1072,7 +1072,7 @@ def import_all_app_global_metrics_weekly(database_connection: PostgresCon) -> No
     while True:
         logger.info(f"batch {i} of app global metrics weekly start")
         df = query_apps_to_process_global_metrics(
-            database_connection, batch_size=10000, days_back=3
+            database_connection, batch_size=10000, days_back=4
         )
         if df.empty:
             break
