@@ -382,9 +382,9 @@ def prep_app_google_metrics(
     country_df["global_installs"] = country_df["global_installs"].fillna(0).astype(int)
     # Db currently does not have a rating_count_est column just for country
     country_df["rating_count"] = country_df["rating_count_est"]
-    assert (
-        country_df["global_rating_count"].ge(country_df["rating_count"]).all()
-    ), "global_rating_count should be >= rating_count"
+    assert country_df["global_rating_count"].ge(country_df["rating_count"]).all(), (
+        "global_rating_count should be >= rating_count"
+    )
     global_df = country_df[country_df["country"] == "US"].copy()
     global_df = global_df.drop(columns=["rating_count", "review_count"]).rename(
         columns={
@@ -514,8 +514,13 @@ def manual_import_app_metrics_from_s3(
                 snapshot_end_date=snapshot_end_date,
             )
 
-    start_date = datetime.datetime.fromisoformat("2025-12-01").date()
-    end_date = datetime.datetime.fromisoformat("2026-01-23").date()
+    start_date = datetime.datetime.fromisoformat("2026-02-02").date()
+    end_date = datetime.datetime.fromisoformat("2026-02-24").date()
+    stores = [1, 2]
+    use_tunnel = False
+    database_connection = get_db_connection(
+        use_ssh_tunnel=use_tunnel, config_key="madrone"
+    )
     for store in stores:
         last_history_df = pd.DataFrame()
         for snapshot_date in pd.date_range(start_date, end_date, freq="W-MON"):
@@ -535,25 +540,47 @@ def manual_import_app_metrics_from_s3(
 
 
 def import_app_metrics_from_s3(
-    start_date: datetime.date, end_date: datetime.date, database_connection: PostgresCon
+    start_date: datetime.date, end_date: datetime.date
 ) -> None:
-    for store in [1, 2]:
+    use_tunnel = False
+    database_connection = get_db_connection(
+        use_ssh_tunnel=use_tunnel, config_key="madrone"
+    )
+    stores = [1, 2]
+    # Raw data to agg by DAY
+    for store in stores:
         last_history_df = pd.DataFrame()
-        for snapshot_date in pd.date_range(
-            start_date, end_date, freq="W-SUN", inclusive="left"
-        ):
-            snapshot_date = snapshot_date.date()
+        for snapshot_date in pd.date_range(start_date, end_date, freq="D"):
+            log_info = f"Raw app metrics for {store=} {snapshot_date.date()}"
+            logger.info(f"{log_info} start")
             make_s3_app_country_metrics_history_daily(
-                store, snapshot_date=snapshot_date
+                store,
+                snapshot_date=snapshot_date,
             )
-            try:
-                last_history_df = process_app_metrics_to_db(
-                    database_connection, store, snapshot_date, last_history_df
-                )
-            except Exception as e:
-                logger.error(
-                    f"Error processing S3 app metrics for {snapshot_date} {store}: {e}"
-                )
+            time.sleep(1)
+
+    # Agg data by WEEK
+    for store in stores:
+        last_history_df = pd.DataFrame()
+        for snapshot_date in pd.date_range(start_date, end_date, freq="W-MON"):
+            log_info = f"App metrics for {store=} {snapshot_date.date()}"
+            logger.info(f"{log_info} start")
+            # snapshot_date = datetime.datetime.fromisoformat(snapshot_date).date()
+            snapshot_date = snapshot_date.date()  # Monday
+            snapshot_end_date = snapshot_date + datetime.timedelta(days=6)  # Sunday
+            make_s3_app_country_metrics_history_week(
+                store,
+                snapshot_date=snapshot_date,
+                snapshot_end_date=snapshot_end_date,
+            )
+            logger.info(f"{log_info} import agg to db")
+            last_history_df = process_app_metrics_to_db(
+                database_connection,
+                store,
+                snapshot_date,
+                snapshot_end_date,
+                last_history_df,
+            )
     import_all_app_global_metrics_weekly(database_connection)
 
 
@@ -770,7 +797,7 @@ def copy_daily_agg_to_weekly(
     query = f"""COPY (
             SELECT 
                 {export_cols}
-            FROM read_parquet({app_detail_parquets}, union_by_name=false)
+            FROM read_parquet({app_detail_parquets}, union_by_name=true)
             QUALIFY ROW_NUMBER() OVER (
                 PARTITION BY store_id, country 
                 ORDER BY crawled_at DESC
@@ -900,6 +927,16 @@ def calculate_active_users(
     df["installs_diff"] = (
         df.groupby("store_app")["installs"].diff().fillna(df["installs"]).fillna(0)
     )
+    df["weekly_ratings"] = (
+        df.groupby("store_app")["rating_count"].diff().fillna(df["rating_count"])
+    )
+    df["weekly_reviews"] = (
+        df.groupby("store_app")["review_count"].diff().fillna(df["review_count"])
+    )
+    # This drops the earliest week, since the diff will count all metrics as weekly
+    # This is ok for apps which are new to the range, that week all those metrics are new
+    drop_rows = df["snapshot_date"] == df["snapshot_date"].min()
+    df = df[~drop_rows]
     # iOS data is very estimated and noisy, so we smooth
     mask = df["store"] == 2
     df.loc[mask, "installs_diff"] = (
@@ -910,52 +947,58 @@ def calculate_active_users(
         .reset_index(level=0, drop=True)
     )
     retention_benchmarks = get_retention_benchmarks(database_connection)
-    merged_df = df.merge(
+    cohorts = df.merge(
         retention_benchmarks, on=["app_category", "store"], how="left", validate="m:1"
     )
-    merged_df["k"] = np.log(
-        merged_df["d30"].replace(0, np.nan) / merged_df["d7"].replace(0, np.nan)
+    cohorts["k"] = np.log(
+        cohorts["d30"].replace(0, np.nan) / cohorts["d7"].replace(0, np.nan)
     ) / np.log(30.0 / 7.0)
-    cohorts = merged_df[
-        ["store_app", "snapshot_date", "installs_diff", "d1", "d7", "k"]
-    ].copy()
+    cohorts = cohorts[["store_app", "snapshot_date", "installs_diff", "d1", "d7", "k"]]
     logger.info("Historical merge, memory intensive step")
-    ddf = cohorts.merge(
+    cohorts = cohorts.merge(
         cohorts[["store_app", "snapshot_date", "installs_diff"]],
         on="store_app",
         suffixes=("", "_historical"),
     )
-    ddf = ddf[ddf["snapshot_date"] >= ddf["snapshot_date_historical"]]
-    ddf["weeks_passed"] = (
-        (ddf["snapshot_date"] - ddf["snapshot_date_historical"]).dt.days / 7
+    cohorts = cohorts[cohorts["snapshot_date"] >= cohorts["snapshot_date_historical"]]
+    cohorts["weeks_passed"] = (
+        (cohorts["snapshot_date"] - cohorts["snapshot_date_historical"]).dt.days / 7
     ).astype(int)
     wau_mult = 2.0
-    ddf["retention_rate"] = np.where(
-        ddf["weeks_passed"] == 0,
+    cohorts["retention_rate"] = np.where(
+        cohorts["weeks_passed"] == 0,
         1.0,
-        (ddf["d7"] * wau_mult * (ddf["weeks_passed"].replace(0, 1) ** ddf["k"])).clip(
-            upper=1.0
-        ),
+        (
+            cohorts["d7"]
+            * wau_mult
+            * (cohorts["weeks_passed"].replace(0, 1) ** cohorts["k"])
+        ).clip(upper=1.0),
     )
-    ddf["surviving_users"] = ddf["installs_diff_historical"] * ddf["retention_rate"]
+    cohorts["surviving_users"] = (
+        cohorts["installs_diff_historical"] * cohorts["retention_rate"]
+    )
     mau_mult = 3.5  # Standard estimate for Monthly Reach
     # Calculate MAU Retention Rate
-    ddf["retention_rate_mau"] = np.where(
-        ddf["weeks_passed"] == 0,
+    cohorts["retention_rate_mau"] = np.where(
+        cohorts["weeks_passed"] == 0,
         1.0,
-        (ddf["d7"] * mau_mult * (ddf["weeks_passed"].replace(0, 1) ** ddf["k"])).clip(
-            upper=1.0
-        ),
+        (
+            cohorts["d7"]
+            * mau_mult
+            * (cohorts["weeks_passed"].replace(0, 1) ** cohorts["k"])
+        ).clip(upper=1.0),
     )
-    ddf["surviving_mau"] = ddf["installs_diff_historical"] * ddf["retention_rate_mau"]
-    ddf = (
-        ddf.groupby(["store_app", "snapshot_date"])[
+    cohorts["surviving_mau"] = (
+        cohorts["installs_diff_historical"] * cohorts["retention_rate_mau"]
+    )
+    cohorts = (
+        cohorts.groupby(["store_app", "snapshot_date"])[
             ["surviving_users", "surviving_mau"]
         ]
         .sum()
         .reset_index()
     )
-    ddf = ddf.rename(columns={"surviving_users": "wau", "surviving_mau": "mau"})
+    cohorts = cohorts.rename(columns={"surviving_users": "wau", "surviving_mau": "mau"})
     cols = [
         "store_app",
         "in_app_purchases",
@@ -964,15 +1007,10 @@ def calculate_active_users(
         "installs_diff",
     ] + metrics
     df = pd.merge(
-        df[cols], ddf, on=["store_app", "snapshot_date"], how="left", validate="1:1"
+        df[cols], cohorts, on=["store_app", "snapshot_date"], how="left", validate="1:1"
     )
     logger.info("Finished calculating WAU")
-    df["weekly_ratings"] = (
-        df.groupby("store_app")["rating_count"].diff().fillna(df["rating_count"])
-    )
-    df["weekly_reviews"] = (
-        df.groupby("store_app")["review_count"].diff().fillna(df["review_count"])
-    )
+
     rename_map = {
         "snapshot_date": "week_start",
         "installs_diff": "weekly_installs",
@@ -989,11 +1027,7 @@ def calculate_revenue_cols(
     database_connection: PostgresCon, df: pd.DataFrame
 ) -> pd.DataFrame:
     ecpm_benchmarks = get_ecpm_benchmarks(database_connection)
-    # Fill in blank rows with default
-    df["tier_pct_sum"] = df["tier1_pct"] + df["tier2_pct"] + df["tier3_pct"]
-    df.loc[df["tier_pct_sum"] < 0.5, "tier1_pct"] = 0.33
-    df.loc[df["tier_pct_sum"] < 0.5, "tier2_pct"] = 0.33
-    df.loc[df["tier_pct_sum"] < 0.5, "tier3_pct"] = 0.34
+
     df["wau_tier1"] = df["weekly_active_users"] * df["tier1_pct"]
     df["wau_tier2"] = df["weekly_active_users"] * df["tier2_pct"]
     df["wau_tier3"] = df["weekly_active_users"] * df["tier3_pct"]
@@ -1039,6 +1073,19 @@ def import_all_app_global_metrics_weekly(database_connection: PostgresCon) -> No
         if df.empty:
             break
         log_apps = df["store_app"].unique().tolist()
+
+        odf = df.copy()
+        df = odf[odf["store_app"] == 48466790]
+
+        # Fill in blank rows with default
+        df["tier_pct_sum"] = df["tier1_pct"] + df["tier2_pct"] + df["tier3_pct"]
+        incomplete_tier_pct = df["tier_pct_sum"] < 0.5
+        # Because for US is default, many apps end up with 1.0 t1
+        all_t1 = df["tier1_pct"] == 1
+        tiers_to_fill = incomplete_tier_pct | all_t1
+        df.loc[tiers_to_fill, "tier1_pct"] = 0.34
+        df.loc[tiers_to_fill, "tier2_pct"] = 0.33
+        df.loc[tiers_to_fill, "tier3_pct"] = 0.33
         df = calculate_active_users(database_connection, df)
         df = calculate_revenue_cols(database_connection, df)
         df
