@@ -17,13 +17,13 @@ from adscrawler.dbcon.queries import (
     delete_and_insert,
     delete_app_metrics_by_date_and_store,
     get_ecpm_benchmarks,
-    get_ios_cached_future_country_ratios,
     get_latest_app_country_history,
     get_retention_benchmarks,
     insert_bulk,
     query_apps_to_process_global_metrics,
     query_countries,
     query_store_id_map_cached,
+    get_ios_cached_future_country_ratios,
 )
 from adscrawler.packages.storage import (
     delete_s3_objects_by_prefix,
@@ -382,9 +382,9 @@ def prep_app_google_metrics(
     country_df["global_installs"] = country_df["global_installs"].fillna(0).astype(int)
     # Db currently does not have a rating_count_est column just for country
     country_df["rating_count"] = country_df["rating_count_est"]
-    assert country_df["global_rating_count"].ge(country_df["rating_count"]).all(), (
-        "global_rating_count should be >= rating_count"
-    )
+    assert (
+        country_df["global_rating_count"].ge(country_df["rating_count"]).all()
+    ), "global_rating_count should be >= rating_count"
     global_df = country_df[country_df["country"] == "US"].copy()
     global_df = global_df.drop(columns=["rating_count", "review_count"]).rename(
         columns={
@@ -552,7 +552,7 @@ def manual_import_app_metrics_from_s3(
                 snapshot_end_date=snapshot_end_date,
             )
 
-    start_date = datetime.datetime.fromisoformat("2025-10-15").date()
+    start_date = datetime.datetime.fromisoformat("2026-01-26").date()
     end_date = datetime.datetime.fromisoformat("2026-02-25").date()
     stores = [2]
     use_tunnel = True

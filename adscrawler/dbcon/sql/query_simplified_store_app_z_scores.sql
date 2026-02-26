@@ -139,7 +139,7 @@ ranked_z_scores AS (
         sa.icon_url_100,
         sa.icon_url_512,
         sa.release_date,
-        agm.rating_count,
+        agm.total_ratings AS rating_count,
         sa.featured_image_url,
         sa.phone_image_url_1,
         sa.phone_image_url_2,

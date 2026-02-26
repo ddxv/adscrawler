@@ -1,3 +1,4 @@
+
 WITH latest_version_codes AS (
     SELECT DISTINCT ON
     (store_app)
@@ -17,7 +18,6 @@ WITH latest_version_codes AS (
         created_at DESC,
         string_to_array(version_code, '.')::bigint [] DESC
 ),
-
 last_scan AS (
     SELECT DISTINCT ON
     (vc.store_app)
@@ -32,7 +32,6 @@ last_scan AS (
         vc.store_app ASC,
         lsscr.scanned_at DESC
 ),
-
 last_scan_succeed AS (
     SELECT DISTINCT ON
     (vc.store_app)
@@ -52,7 +51,6 @@ last_scan_succeed AS (
         vcss.scanned_at DESC,
         string_to_array(vc.version_code, '.')::bigint [] DESC
 ),
-
 scheduled_apps_crawl AS (
     SELECT
         dc.store_app,
@@ -86,7 +84,6 @@ scheduled_apps_crawl AS (
                     lsvc.scan_result = 1
                     AND lsvc.scanned_at < current_date - interval '30 days'
                     AND ls.scanned_at < current_date - interval '3 days'
-
                 )
                 OR
                 (
@@ -112,14 +109,13 @@ scheduled_apps_crawl AS (
         )
         DESC NULLS LAST
 ),
-
 user_requested_apps_crawl AS (
     SELECT DISTINCT ON (sa.id)
         sa.id AS store_app,
         sa.store_id,
         sa.name,
         agm.total_installs AS installs,
-        agm.rating_count,
+        agm.total_ratings AS rating_count,
         'user' AS mysource,
         ls.scan_result AS last_analyzed_result,
         ls.scanned_at AS last_scanned_at,
@@ -152,7 +148,6 @@ user_requested_apps_crawl AS (
         AND sa.store = :store
     ORDER BY sa.id ASC, urs.created_at DESC
 )
-
 SELECT
     store_app,
     store_id,

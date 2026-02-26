@@ -1,3 +1,4 @@
+
 WITH countries_to_crawl AS (
     SELECT
         cc.country_id,
@@ -61,7 +62,7 @@ WHERE
         OR (
             (
                 agm.total_installs >= :short_update_installs
-                OR agm.rating_count >= :short_update_ratings
+                OR agm.total_ratings >= :short_update_ratings
                 OR (
                     sa.id IN (
                         SELECT sailr.store_app
@@ -96,7 +97,7 @@ ORDER BY
     (
         GREATEST(
             COALESCE(agm.total_installs, 0),
-            COALESCE(agm.rating_count::bigint, 0)
+            COALESCE(agm.total_ratings, 0)
         )
         * (10 * EXTRACT(DAY FROM (NOW() - sa.updated_at)))
     ) DESC

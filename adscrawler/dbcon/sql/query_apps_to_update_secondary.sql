@@ -7,7 +7,7 @@ WITH target_apps AS (
         sa.updated_at,
         sa.store_last_updated,
         agm.total_installs AS installs,
-        agm.rating_count
+        agm.total_ratings AS rating_count
     FROM
         store_apps AS sa
     LEFT JOIN app_global_metrics_latest AS agm
