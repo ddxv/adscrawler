@@ -60,7 +60,7 @@ WHERE
         -- Short update conditions
         OR (
             (
-                agm.installs >= :short_update_installs
+                agm.total_installs >= :short_update_installs
                 OR agm.rating_count >= :short_update_ratings
                 OR (
                     sa.id IN (
@@ -95,7 +95,7 @@ ORDER BY
     (CASE WHEN sa.crawl_result IS NULL THEN 1 ELSE 0 END) DESC, -- always crawl new ones first
     (
         GREATEST(
-            COALESCE(agm.installs, 0),
+            COALESCE(agm.total_installs, 0),
             COALESCE(agm.rating_count::bigint, 0)
         )
         * (10 * EXTRACT(DAY FROM (NOW() - sa.updated_at)))

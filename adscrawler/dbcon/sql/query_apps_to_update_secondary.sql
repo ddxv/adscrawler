@@ -6,7 +6,7 @@ WITH target_apps AS (
         sa.icon_url_100,
         sa.updated_at,
         sa.store_last_updated,
-        agm.installs,
+        agm.total_installs AS installs,
         agm.rating_count
     FROM
         store_apps AS sa

@@ -615,7 +615,7 @@ def query_developers(
     sel_query = f"""
     SELECT 
             d.*,
-            SUM(agm.installs) AS total_installs,
+            SUM(agm.total_installs) AS total_installs,
             dc.apps_crawled_at
         FROM
             developers d

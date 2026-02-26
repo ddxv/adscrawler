@@ -123,7 +123,7 @@ ranked_z_scores AS (
         sa.store_id,
         sa.store,
         sa.category,
-        agm.installs,
+        agm.total_installs AS installs,
         sa.free,
         sa.price,
         sa.size,

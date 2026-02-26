@@ -54,9 +54,7 @@ INNER JOIN app_global_metrics_latest AS agml ON b.store_app = agml.store_app
 ORDER BY
     (CASE WHEN b.app_keywords_extracted_at IS NULL THEN 1 ELSE 0 END) DESC, -- always crawl new ones first
     (
-        GREATEST(
-            COALESCE(agml.installs, 0),
-            COALESCE(agml.rating_count::BIGINT, 0)
+            COALESCE(agml.total_installs, 0),
         )
         * (
             10

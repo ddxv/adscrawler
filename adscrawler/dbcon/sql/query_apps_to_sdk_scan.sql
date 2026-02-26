@@ -118,7 +118,7 @@ user_requested_apps_crawl AS (
         sa.id AS store_app,
         sa.store_id,
         sa.name,
-        agm.installs,
+        agm.total_installs AS installs,
         agm.rating_count,
         'user' AS mysource,
         ls.scan_result AS last_analyzed_result,

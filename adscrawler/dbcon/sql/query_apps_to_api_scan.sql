@@ -63,7 +63,7 @@ all_scheduled_to_run AS (
         sa.name,
         sa.store_id,
         lvc.version_code AS version_string,
-        agm.installs,
+        agm.total_installs AS installs,
         ls.run_at AS last_run_at,
         fr.failed_attempts,
         ls.run_result AS last_run_result,
@@ -85,7 +85,7 @@ all_scheduled_to_run AS (
         (ls.run_at <= current_date - interval '120 days' OR ls.run_at IS NULL)
         AND sa.store = :store
         AND (fr.failed_attempts < 1 OR fr.failed_attempts IS NULL)
-    ORDER BY agm.installs DESC
+    ORDER BY agm.total_installs DESC NULLS LAST
 ),
 monthly_ads_scheduled_to_run AS (
     SELECT
@@ -93,7 +93,7 @@ monthly_ads_scheduled_to_run AS (
         sa.name,
         sa.store_id,
         lvc.version_code AS version_string,
-        agm.installs,
+        agm.total_installs AS installs,
         ls.run_at AS last_run_at,
         fr.failed_attempts,
         ls.run_result AS last_run_result,
@@ -122,7 +122,7 @@ monthly_ads_scheduled_to_run AS (
             FROM creative_records
             LEFT JOIN api_calls AS ac ON creative_records.api_call_id = ac.id
         )
-    ORDER BY agm.installs DESC
+    ORDER BY agm.total_installs DESC NULLS LAST
 ),
 user_requested_apps_crawl AS (
     SELECT DISTINCT ON (sa.id)
@@ -130,7 +130,7 @@ user_requested_apps_crawl AS (
         sa.store_id,
         sa.name,
         lsvc.version_code AS version_string,
-        agm.installs,
+        agm.total_installs AS installs,
         ls.run_at AS last_run_at,
         fr.failed_attempts,
         ls.run_result AS last_run_result,
