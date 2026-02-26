@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict YDHUqLj4c09OOspU0TzA0Is4tunjNq53qk7Z8FhfmvYpdbeayFDAUlxOOGLYd3R
+\restrict un9QzyXxNWNXTHUSsC5tG8rP41S3ErYi3IbPAg2JE9ZWL0P0EWnsmczw8fq9bKK
 
 -- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 -- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
@@ -3759,7 +3759,7 @@ CREATE MATERIALIZED VIEW frontend.z_scores_top_apps AS
                 END ORDER BY agml.installs_z_score_2w DESC NULLS LAST) AS rn
            FROM (public.app_global_metrics_latest agml
              LEFT JOIN frontend.store_apps_overview sa ON ((agml.store_app = sa.id)))
-          WHERE (sa.store = ANY (ARRAY[1, 2]))
+          WHERE ((sa.store = ANY (ARRAY[1, 2])) AND (agml.total_installs > 50000) AND (agml.weekly_installs > 1000))
         )
  SELECT store,
     store_id,
@@ -7300,5 +7300,5 @@ GRANT ALL ON SCHEMA public TO PUBLIC;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict YDHUqLj4c09OOspU0TzA0Is4tunjNq53qk7Z8FhfmvYpdbeayFDAUlxOOGLYd3R
+\unrestrict un9QzyXxNWNXTHUSsC5tG8rP41S3ErYi3IbPAg2JE9ZWL0P0EWnsmczw8fq9bKK
 

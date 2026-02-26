@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict XoTSPFeRIEeqXF0JnXheSBVFNCWkAVQLgHffeDOfPRcjYagDg23uqshnahkQPYG
+\restrict SJa5GI32pvNQWD5TzXklbDu3k74cs0IEJqVXNkbrVYCSQAbV2ipyqlpoiAFXzIP
 
 -- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 -- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
@@ -72,5 +72,5 @@ ALTER MATERIALIZED VIEW frontend.app_keyword_rank_stats OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict XoTSPFeRIEeqXF0JnXheSBVFNCWkAVQLgHffeDOfPRcjYagDg23uqshnahkQPYG
+\unrestrict SJa5GI32pvNQWD5TzXklbDu3k74cs0IEJqVXNkbrVYCSQAbV2ipyqlpoiAFXzIP
 

@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict SwzZgGMG3FecLymyMUbCSfxmZzaW7oGTatByJDxGYW0ynvWXaxyFP185XvgZSfg
+\restrict CHB0Ggubz60saMirENnDf8rg1spFHixbdYea3yhIKcI5rhLDaIIeqMmeKxHBS5w
 
 -- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 -- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
@@ -47,5 +47,5 @@ ALTER TABLE ONLY logging.app_global_metrics_weekly
 -- PostgreSQL database dump complete
 --
 
-\unrestrict SwzZgGMG3FecLymyMUbCSfxmZzaW7oGTatByJDxGYW0ynvWXaxyFP185XvgZSfg
+\unrestrict CHB0Ggubz60saMirENnDf8rg1spFHixbdYea3yhIKcI5rhLDaIIeqMmeKxHBS5w
 

@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict M3Sl8rtjmINDO6mp9qfOUTXSW5Vhp4n3zUZo6ywpJDVhnqMN8XnTDD5gUG6Yfv1
+\restrict Y7XYLXqD1tntD7TiJ8yqengmLJ71KDIoaRa9cH40BobqUJbF5i3tEx1U0HnlUMS
 
 -- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 -- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
@@ -80,5 +80,5 @@ ALTER MATERIALIZED VIEW public.store_apps_in_latest_rankings OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict M3Sl8rtjmINDO6mp9qfOUTXSW5Vhp4n3zUZo6ywpJDVhnqMN8XnTDD5gUG6Yfv1
+\unrestrict Y7XYLXqD1tntD7TiJ8yqengmLJ71KDIoaRa9cH40BobqUJbF5i3tEx1U0HnlUMS
 
