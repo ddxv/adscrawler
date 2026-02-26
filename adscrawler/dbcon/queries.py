@@ -1120,6 +1120,23 @@ def get_crawl_scenario_countries(
     return df
 
 
+def insert_any_user_requested_apps(database_connection: PostgresCon, last_ts):
+    insert_query = text(
+        """
+        INSERT INTO public.store_apps (store, store_id)
+        SELECT
+            1,
+            urs.store_id
+        FROM agadmin.user_requested_scan urs
+        WHERE urs.created_at > :last_ts
+        ON CONFLICT (store, store_id) DO NOTHING;
+    """
+    )
+
+    with database_connection.engine.begin() as conn:
+        conn.execute(insert_query, {"last_ts": last_ts})
+
+
 def query_store_apps_to_update(
     database_connection: PostgresCon,
     store: int,
@@ -1142,6 +1159,8 @@ def query_store_apps_to_update(
         days=max_recrawl_days
     )
     year_ago_ts = datetime.datetime.now(tz=datetime.UTC) - datetime.timedelta(days=365)
+    if country_priority_group == -1:
+        insert_any_user_requested_apps(database_connection, long_update_ts)
     params = {
         "store": store,
         "country_crawl_priority": country_priority_group,
@@ -1778,6 +1797,7 @@ def get_ios_cached_future_country_ratios(
         FROM
 	        app_country_metrics_history acmh
 	        INNER JOIN ios_apps ia ON acmh.store_app = ia.store_app
+        WHERE rating_count > 0 AND total_ratings > 0
         ORDER BY
 	        store_app,
 	        country_id,

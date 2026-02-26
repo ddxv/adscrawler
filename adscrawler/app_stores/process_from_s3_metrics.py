@@ -448,7 +448,9 @@ def prep_app_apple_metrics(
     future_ios_ratios = get_ios_cached_future_country_ratios(database_connection)
     cdf = pd.merge(
         cdf,
-        future_ios_ratios,
+        future_ios_ratios[
+            future_ios_ratios["store_app"].isin(df["store_app"].unique().tolist())
+        ],
         how="outer",
         on=["store_app", "country_id"],
     )
@@ -505,9 +507,10 @@ def prep_app_apple_metrics(
     global_df = global_df.reset_index()
     global_df["installs"] = global_df["installs"].astype("Int64")
     global_df["rating_count"] = global_df["rating_count"].astype("Int64")
-    global_df[global_df["store_app"] == 1868117][
-        ["snapshot_date", "installs", "rating_count", "rating"]
-    ]
+    global_df[STAR_COLS] = global_df[STAR_COLS].astype("Int64")
+    # global_df[global_df["store_app"] == 1868117][
+    #     ["snapshot_date", "installs", "rating_count", "rating", 'tier1_pct', 'tier2_pct', 'tier3_pct']
+    # ]
     # Note, we return the df which for iOS is the country level data
     return df, global_df
 
@@ -549,7 +552,7 @@ def manual_import_app_metrics_from_s3(
                 snapshot_end_date=snapshot_end_date,
             )
 
-    start_date = datetime.datetime.fromisoformat("2026-02-15").date()
+    start_date = datetime.datetime.fromisoformat("2025-10-15").date()
     end_date = datetime.datetime.fromisoformat("2026-02-25").date()
     stores = [2]
     use_tunnel = True
@@ -617,8 +620,6 @@ def import_app_metrics_from_s3(
                 last_history_df,
             )
     import_all_app_global_metrics_weekly(database_connection)
-
-    return df
 
 
 def process_store_metrics(
