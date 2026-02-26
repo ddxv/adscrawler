@@ -17,6 +17,7 @@ from adscrawler.dbcon.queries import (
     delete_and_insert,
     delete_app_metrics_by_date_and_store,
     get_ecpm_benchmarks,
+    get_ios_cached_future_country_ratios,
     get_latest_app_country_history,
     get_retention_benchmarks,
     insert_bulk,
@@ -279,8 +280,7 @@ def merge_in_db_ids(
 
 
 def prep_app_google_metrics(
-    df: pd.DataFrame,
-    app_country_db_latest: pd.DataFrame,
+    df: pd.DataFrame, app_country_db_latest: pd.DataFrame
 ) -> pd.DataFrame:
     df["store_last_updated"] = np.where(
         (df["store_last_updated"].isna() | df["store_last_updated"] < 0),
@@ -382,9 +382,9 @@ def prep_app_google_metrics(
     country_df["global_installs"] = country_df["global_installs"].fillna(0).astype(int)
     # Db currently does not have a rating_count_est column just for country
     country_df["rating_count"] = country_df["rating_count_est"]
-    assert (
-        country_df["global_rating_count"].ge(country_df["rating_count"]).all()
-    ), "global_rating_count should be >= rating_count"
+    assert country_df["global_rating_count"].ge(country_df["rating_count"]).all(), (
+        "global_rating_count should be >= rating_count"
+    )
     global_df = country_df[country_df["country"] == "US"].copy()
     global_df = global_df.drop(columns=["rating_count", "review_count"]).rename(
         columns={
@@ -417,8 +417,7 @@ def prep_app_google_metrics(
 
 
 def prep_app_apple_metrics(
-    df: pd.DataFrame,
-    app_country_db_latest: pd.DataFrame,
+    df: pd.DataFrame, app_country_db_latest: pd.DataFrame, database_connection
 ) -> pd.DataFrame:
     ratings_str = (
         df["user_ratings"]
@@ -442,12 +441,45 @@ def prep_app_apple_metrics(
         ignore_index=True,
         axis=0,
     ).drop_duplicates(subset=["store_app", "country_id"], keep="last")
+    # cdf = cdf.sort_values(by=["crawled_date"], ascending=True).drop_duplicates(
+    #     subset=["store_app", "country_id"], keep="last"
+    # )
+    cdf["rating_prod"] = cdf["rating"] * cdf["rating_count"]
+    future_ios_ratios = get_ios_cached_future_country_ratios(database_connection)
+    cdf = pd.merge(
+        cdf,
+        future_ios_ratios,
+        how="outer",
+        on=["store_app", "country_id"],
+    )
+    cdf["global_rating_count"] = cdf.groupby("store_app")["rating_count"].transform(
+        "sum"
+    )
+    # Here CDF is the latest row per country per app, some countries older
+    cdf["grc_future_est_a"] = cdf["rating_count"] / cdf["rating_ratio"]
+    # cdf[cdf["store_app"] == 1868117][
+    #     ["installs_est", "rating_count", "rating_ratio", "global_rating_count", 'grc_future_est_a']
+    # ]
+    cdf["grc_est_prod"] = cdf["rating_count"] * cdf["grc_future_est_a"]
+    cdf["grc_future_est"] = cdf.groupby("store_app")["grc_est_prod"].transform(
+        "sum"
+    ) / cdf.groupby("store_app")["rating_count"].transform("sum")
+    cdf["rating_count"] = (
+        cdf["rating_count"]
+        .fillna(cdf["grc_future_est"] * cdf["rating_ratio"])
+        .replace([np.inf, -np.inf], 0)
+        .fillna(0)
+        .round(0)
+        .astype(int)
+    )
+    app_mean_rating = cdf.groupby("store_app")["rating"].transform("mean")
+    cdf["rating"] = cdf["rating"].fillna(app_mean_rating)
+    cdf["rating_prod"] = cdf["rating"] * cdf["rating_count"]
+    # cdf[cdf["store_app"] == 1868117][
+    #     ["installs_est", "rating_count", "rating_count_est", "grc_future_est"]
+    # ]
     # overwrites installs_est from db, but quick fix for missing, same value
     cdf = estimate_ios_installs(cdf)
-    cdf = cdf.sort_values(by=["crawled_date"], ascending=True).drop_duplicates(
-        subset=["store_app", "country_id"], keep="last"
-    )
-    cdf["rating_prod"] = cdf["rating"] * cdf["rating_count"]
     global_df = cdf.groupby(["store_app"]).agg(
         rating_count=("rating_count", "sum"),
         rating_prod=("rating_prod", "sum"),
@@ -473,6 +505,9 @@ def prep_app_apple_metrics(
     global_df = global_df.reset_index()
     global_df["installs"] = global_df["installs"].astype("Int64")
     global_df["rating_count"] = global_df["rating_count"].astype("Int64")
+    global_df[global_df["store_app"] == 1868117][
+        ["snapshot_date", "installs", "rating_count", "rating"]
+    ]
     # Note, we return the df which for iOS is the country level data
     return df, global_df
 
@@ -514,10 +549,10 @@ def manual_import_app_metrics_from_s3(
                 snapshot_end_date=snapshot_end_date,
             )
 
-    start_date = datetime.datetime.fromisoformat("2026-02-09").date()
-    end_date = datetime.datetime.fromisoformat("2026-02-24").date()
+    start_date = datetime.datetime.fromisoformat("2026-02-15").date()
+    end_date = datetime.datetime.fromisoformat("2026-02-25").date()
     stores = [2]
-    use_tunnel = False
+    use_tunnel = True
     database_connection = get_db_connection(
         use_ssh_tunnel=use_tunnel, config_key="madrone"
     )
@@ -583,11 +618,14 @@ def import_app_metrics_from_s3(
             )
     import_all_app_global_metrics_weekly(database_connection)
 
+    return df
+
 
 def process_store_metrics(
     store: int,
     app_country_db_latest: pd.DataFrame,
     df: pd.DataFrame,
+    database_connection,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     log_info = f"process metrics for {df.shape[0]} rows for store={store}"
     logger.info(f"{log_info} start")
@@ -600,6 +638,7 @@ def process_store_metrics(
         country_df, global_df = prep_app_apple_metrics(
             df=df,
             app_country_db_latest=app_country_db_latest,
+            database_connection=database_connection,
         )
     country_df = country_df.convert_dtypes(dtype_backend="pyarrow")
     country_df = country_df.replace({pd.NA: None})
@@ -610,7 +649,7 @@ def process_store_metrics(
     for col in ["tier1_pct", "tier2_pct", "tier3_pct"]:
         if col not in global_df.columns:
             global_df[col] = 0.0
-        global_df[col] = (global_df[col] * 10000).round().astype("int16")
+        global_df[col] = (global_df[col] * 10000).round().fillna(0).astype("int16")
     check_for_duplicates(
         df=global_df,
         key_columns=GLOBAL_HISTORY_KEYS,
@@ -750,7 +789,10 @@ def process_app_metrics_to_db(
         app_country_db_latest["crawled_date"] > pd.to_datetime(start_date)
     ]
     country_df, global_df = process_store_metrics(
-        store=store, app_country_db_latest=app_country_db_latest, df=df
+        store=store,
+        app_country_db_latest=app_country_db_latest,
+        df=df,
+        database_connection=database_connection,
     )
     delete_and_insert_app_metrics(
         database_connection=database_connection,

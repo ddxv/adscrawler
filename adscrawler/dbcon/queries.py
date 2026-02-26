@@ -1754,3 +1754,35 @@ def delete_app_metrics_by_date_and_store(
         logger.info(
             f"{snapshot_start_date=} {snapshot_end_date=} {store=} deleted {result.rowcount} rows from {table_name}"
         )
+
+
+@lru_cache(maxsize=1)
+def get_ios_cached_future_country_ratios(
+    database_connection: PostgresCon,
+) -> pd.DataFrame:
+    """These require future data for calculation... means only show up on a second rerun."""
+    sel_query = """WITH ios_apps AS (
+	        SELECT
+		        store_app, total_ratings
+	        FROM
+		        app_global_metrics_latest agml
+	        LEFT JOIN store_apps sa ON agml.store_app = sa.id
+	        WHERE
+		        store = 2 and total_ratings > 2
+        )
+        SELECT
+	        DISTINCT ON
+	        (acmh.store_app, country_id) acmh.store_app,
+	        country_id,
+	        rating_count::float / ia.total_ratings::float AS rating_ratio
+        FROM
+	        app_country_metrics_history acmh
+	        INNER JOIN ios_apps ia ON acmh.store_app = ia.store_app
+        ORDER BY
+	        store_app,
+	        country_id,
+	        snapshot_date DESC
+            ;
+            """
+    df = pd.read_sql(sel_query, con=database_connection.engine)
+    return df
