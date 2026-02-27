@@ -1121,16 +1121,18 @@ def get_crawl_scenario_countries(
 
 
 def insert_any_user_requested_apps(database_connection: PostgresCon, last_ts):
+    """Insert new ids, usually from android app."""
     insert_query = text(
         """
-        INSERT INTO public.store_apps (store, store_id)
-        SELECT
-            1,
-            urs.store_id
-        FROM agadmin.user_requested_scan urs
-        WHERE urs.created_at > :last_ts
-        ON CONFLICT (store, store_id) DO NOTHING;
-    """
+          INSERT INTO public.store_apps (store, store_id)
+          SELECT
+              1,
+              urs.store_id
+          FROM agadmin.user_requested_scan urs
+          WHERE urs.created_at > :last_ts
+            AND urs.store_id ILIKE '%.%'
+          ON CONFLICT (store, store_id) DO NOTHING;
+        """
     )
 
     with database_connection.engine.begin() as conn:
