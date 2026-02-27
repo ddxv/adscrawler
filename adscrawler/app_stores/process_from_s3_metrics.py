@@ -17,13 +17,13 @@ from adscrawler.dbcon.queries import (
     delete_and_insert,
     delete_app_metrics_by_date_and_store,
     get_ecpm_benchmarks,
+    get_ios_cached_future_country_ratios,
     get_latest_app_country_history,
     get_retention_benchmarks,
     insert_bulk,
     query_apps_to_process_global_metrics,
     query_countries,
     query_store_id_map_cached,
-    get_ios_cached_future_country_ratios,
 )
 from adscrawler.packages.storage import (
     delete_s3_objects_by_prefix,
@@ -382,9 +382,9 @@ def prep_app_google_metrics(
     country_df["global_installs"] = country_df["global_installs"].fillna(0).astype(int)
     # Db currently does not have a rating_count_est column just for country
     country_df["rating_count"] = country_df["rating_count_est"]
-    assert (
-        country_df["global_rating_count"].ge(country_df["rating_count"]).all()
-    ), "global_rating_count should be >= rating_count"
+    assert country_df["global_rating_count"].ge(country_df["rating_count"]).all(), (
+        "global_rating_count should be >= rating_count"
+    )
     global_df = country_df[country_df["country"] == "US"].copy()
     global_df = global_df.drop(columns=["rating_count", "review_count"]).rename(
         columns={
@@ -1058,6 +1058,7 @@ def calculate_active_users(
         how="left",
         validate="1:1",
     )
+    df[["snapshot_date", "installs", "installs_diff", "wau"]]
     rename_map = {
         "snapshot_date": "week_start",
         "installs_diff": "weekly_installs",
@@ -1081,17 +1082,24 @@ def calculate_revenue_cols(
     df["mau_tier1"] = df["monthly_active_users"] * df["tier1_pct"]
     df["mau_tier2"] = df["monthly_active_users"] * df["tier2_pct"]
     df["mau_tier3"] = df["monthly_active_users"] * df["tier3_pct"]
-    # TODO: Placeholder ARPU.
-    paying_user_rate = 0.05
-    paying_user_arpu = 10.0
-    df["weekly_iap_revenue"] = df.apply(
-        lambda x: (
-            x["weekly_active_users"] * paying_user_rate * paying_user_arpu
-            if x["in_app_purchases"]
-            else 0.0
-        ),
-        axis=1,
-    )
+
+    # TODO: Replace with category and store benchmarks
+    NEW_USER_CONVERSION = 0.02  # 2% of new installs
+    RETENTION_CONVERSION = 0.002  # 0.2% of returning users (2 in 1,000)
+    AVG_TICKET = 5.0  # $5 average
+
+    def estimate_revenue(row):
+        if not row["in_app_purchases"]:
+            return 0.0
+        # Revenue from new users
+        new_rev = row["weekly_installs"] * NEW_USER_CONVERSION * AVG_TICKET
+        # Revenue from the "sticky" base (WAU minus the new installs)
+        returning_users = max(0, row["weekly_active_users"] - row["weekly_installs"])
+        base_rev = returning_users * RETENTION_CONVERSION * AVG_TICKET
+
+        return new_rev + base_rev
+
+    df["weekly_iap_revenue"] = df.apply(estimate_revenue, axis=1)
     # 2. Calculate Ad Revenue
     avg_ecpm = ecpm_benchmarks.groupby("tier_slug")["ecpm"].mean()
 

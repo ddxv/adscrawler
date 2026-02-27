@@ -37,7 +37,7 @@ FROM candidate_apps AS ca
 INNER JOIN app_global_metrics_history AS agmh
     ON ca.store_app = agmh.store_app
 WHERE
-    agmh.snapshot_date >= current_date - INTERVAL '500 days'
+    agmh.snapshot_date >= current_date - INTERVAL '730 days'
     AND NOT EXISTS (
         SELECT 1
         FROM logging.app_global_metrics_weekly AS lg

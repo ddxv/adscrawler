@@ -182,73 +182,65 @@ def process_ranks_from_s3(
         if "country=" in x
     ]
     countries_in_period = list(set(countries_in_period))
-    for country in countries_in_period:
-        country_parquet_paths = [
-            x for x in all_parquet_paths if f"country={country}" in x
-        ]
-        logger.info(
-            f"DuckDB {store=} period_start={period_date_str} {country=} files={len(country_parquet_paths)}"
-        )
-        wdf = query_store_collection_ranks(
-            country_parquet_paths=country_parquet_paths,
-            period=period,
-            s3_config_key=s3_config_key,
-        )
-        store_id_map = query_store_id_map_cached(
-            store=store, database_connection=database_connection
-        )
-        country_map = query_countries(database_connection)
-        collection_map = query_collections(database_connection)
-        category_map = query_categories(database_connection)
-        wdf["country"] = wdf["country"].map(
-            country_map.set_index("alpha2")["id"].to_dict()
-        )
-        wdf["store_collection"] = wdf["collection"].map(
-            collection_map.set_index("collection")["id"].to_dict()
-        )
-        wdf["store_category"] = wdf["category"].map(
-            category_map.set_index("category")["id"].to_dict()
-        )
-        new_ids = wdf[~wdf["store_id"].isin(store_id_map["store_id"])][
-            "store_id"
-        ].unique()
-        if len(new_ids) > 0:
-            logger.info(f"Found new store ids: {len(new_ids)}")
-            new_ids = [{"store": store, "store_id": store_id} for store_id in new_ids]
-            check_and_insert_new_apps(
-                database_connection=database_connection,
-                dicts=new_ids,
-                crawl_source="process_ranks_parquet",
-                store=store,
-            )
-            store_id_map = query_store_id_map(database_connection, store)
-        wdf["store_app"] = wdf["store_id"].map(
-            store_id_map.set_index("store_id")["id"].to_dict()
-        )
-        wdf = wdf.drop(columns=["store_id", "collection", "category"])
-        table_name = f"store_app_ranks_{table_suffix}"
-        upsert_df(
-            df=wdf,
-            table_name=table_name,
-            schema="frontend",
+    logger.info(
+        f"S3 Ranks {store=} {period_date_str=} {countries_in_period=} files={len(all_parquet_paths)}"
+    )
+    df = query_store_collection_ranks(
+        country_parquet_paths=all_parquet_paths,
+        period=period,
+        s3_config_key=s3_config_key,
+    )
+    store_id_map = query_store_id_map_cached(
+        store=store, database_connection=database_connection
+    )
+    country_map = query_countries(database_connection)
+    collection_map = query_collections(database_connection)
+    category_map = query_categories(database_connection)
+    df["country"] = df["country"].map(country_map.set_index("alpha2")["id"].to_dict())
+    df["store_collection"] = df["collection"].map(
+        collection_map.set_index("collection")["id"].to_dict()
+    )
+    df["store_category"] = df["category"].map(
+        category_map.set_index("category")["id"].to_dict()
+    )
+    new_ids = df[~df["store_id"].isin(store_id_map["store_id"])]["store_id"].unique()
+    if len(new_ids) > 0:
+        logger.info(f"Found new store ids: {len(new_ids)}")
+        new_ids = [{"store": store, "store_id": store_id} for store_id in new_ids]
+        check_and_insert_new_apps(
             database_connection=database_connection,
-            key_columns=[
-                "country",
-                "store_collection",
-                "store_category",
-                "crawled_date",
-                "rank",
-            ],
-            insert_columns=[
-                "country",
-                "store_collection",
-                "store_category",
-                "crawled_date",
-                "rank",
-                "store_app",
-                "best_rank",
-            ],
+            dicts=new_ids,
+            crawl_source="process_ranks_parquet",
+            store=store,
         )
+        store_id_map = query_store_id_map(database_connection, store)
+    df["store_app"] = df["store_id"].map(
+        store_id_map.set_index("store_id")["id"].to_dict()
+    )
+    df = df.drop(columns=["store_id", "collection", "category"])
+    table_name = f"store_app_ranks_{table_suffix}"
+    upsert_df(
+        df=df,
+        table_name=table_name,
+        schema="frontend",
+        database_connection=database_connection,
+        key_columns=[
+            "country",
+            "store_collection",
+            "store_category",
+            "crawled_date",
+            "rank",
+        ],
+        insert_columns=[
+            "country",
+            "store_collection",
+            "store_category",
+            "crawled_date",
+            "rank",
+            "store_app",
+            "best_rank",
+        ],
+    )
 
 
 def query_store_collection_ranks(
@@ -256,7 +248,7 @@ def query_store_collection_ranks(
     period: str,
     s3_config_key: str,
 ) -> pd.DataFrame:
-    """Process parquet files for a specific country and insert into the database."""
+    """Query parquet files fora app country ranks."""
     period_query = f"""WITH all_data AS (
                 SELECT * FROM read_parquet({country_parquet_paths})
                  ),
