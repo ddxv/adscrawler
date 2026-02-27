@@ -12,6 +12,7 @@ WITH candidate_apps AS (
             sa.crawl_result = 1
             OR sa.store_last_updated >= current_date - INTERVAL '365 days'
         )
+        AND total_installs >= 500
     LIMIT :batch_size
 )
 SELECT
