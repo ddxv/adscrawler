@@ -382,9 +382,9 @@ def prep_app_google_metrics(
     country_df["global_installs"] = country_df["global_installs"].fillna(0).astype(int)
     # Db currently does not have a rating_count_est column just for country
     country_df["rating_count"] = country_df["rating_count_est"]
-    assert (
-        country_df["global_rating_count"].ge(country_df["rating_count"]).all()
-    ), "global_rating_count should be >= rating_count"
+    assert country_df["global_rating_count"].ge(country_df["rating_count"]).all(), (
+        "global_rating_count should be >= rating_count"
+    )
     global_df = country_df[country_df["country"] == "US"].copy()
     global_df = global_df.drop(columns=["rating_count", "review_count"]).rename(
         columns={
@@ -578,12 +578,8 @@ def manual_import_app_metrics_from_s3(
 
 
 def import_app_metrics_from_s3(
-    start_date: datetime.date, end_date: datetime.date
+    database_connection: PostgresCon, start_date: datetime.date, end_date: datetime.date
 ) -> None:
-    use_tunnel = False
-    database_connection = get_db_connection(
-        use_ssh_tunnel=use_tunnel, config_key="madrone"
-    )
     stores = [1, 2]
     # Raw data to agg by DAY
     for store in stores:
