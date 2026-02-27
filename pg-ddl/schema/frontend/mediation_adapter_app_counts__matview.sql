@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict fgGLwC7BMnvvckDdlpjBeAt5pfobKAGLz2YvFc36ThrSu8LfoTaoCJo1ijEvfim
+\restrict 1NdMs6DYOOeCC3SnuvGzG4syoRgRiHQQr0UD27MwGBBe1t6vHJUJvnCfVVKSOaL
 
 -- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 -- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
@@ -75,8 +75,15 @@ CREATE MATERIALIZED VIEW frontend.mediation_adapter_app_counts AS
 ALTER MATERIALIZED VIEW frontend.mediation_adapter_app_counts OWNER TO postgres;
 
 --
+-- Name: mediation_adapter_app_counts_unique; Type: INDEX; Schema: frontend; Owner: postgres
+--
+
+CREATE UNIQUE INDEX mediation_adapter_app_counts_unique ON frontend.mediation_adapter_app_counts USING btree (mediation_domain, adapter_domain, adapter_string, app_category);
+
+
+--
 -- PostgreSQL database dump complete
 --
 
-\unrestrict fgGLwC7BMnvvckDdlpjBeAt5pfobKAGLz2YvFc36ThrSu8LfoTaoCJo1ijEvfim
+\unrestrict 1NdMs6DYOOeCC3SnuvGzG4syoRgRiHQQr0UD27MwGBBe1t6vHJUJvnCfVVKSOaL
 

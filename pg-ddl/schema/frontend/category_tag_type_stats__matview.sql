@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict GC3zx7mQbmfSxymq49mfwBMw7xjpCpcyuY5d2NBqmLh7egekaEZlUvljaycAR8h
+\restrict WwBxeBUfviVcAYwe2iXmTn3ffrtk9sIpHItdhgmweQV8IMq2WgTZrUuRxXPeuC4
 
 -- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 -- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
@@ -107,8 +107,15 @@ UNION ALL
 ALTER MATERIALIZED VIEW frontend.category_tag_type_stats OWNER TO postgres;
 
 --
+-- Name: frontend_category_tag_type_stats_unique; Type: INDEX; Schema: frontend; Owner: postgres
+--
+
+CREATE UNIQUE INDEX frontend_category_tag_type_stats_unique ON frontend.category_tag_type_stats USING btree (store, app_category, tag_source, type_url_slug);
+
+
+--
 -- PostgreSQL database dump complete
 --
 
-\unrestrict GC3zx7mQbmfSxymq49mfwBMw7xjpCpcyuY5d2NBqmLh7egekaEZlUvljaycAR8h
+\unrestrict WwBxeBUfviVcAYwe2iXmTn3ffrtk9sIpHItdhgmweQV8IMq2WgTZrUuRxXPeuC4
 

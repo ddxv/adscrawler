@@ -113,6 +113,66 @@ def has_data(conn: Connection, mv_name: str) -> bool:
         return False
 
 
+def check_mvs_in_crontab(mv_files: list[Path]) -> None:
+    """Check if the materialized views are in the crontab."""
+
+    # 1. Standardize file-based MV names: 'schema.viewname'
+    # Uses split("/")[-1] as per your updated logic
+    expected_mvs = {
+        f"{f.parent.as_posix().split('/')[-1]}.{f.name.replace('__matview.sql', '')}"
+        for f in mv_files
+    }
+
+    try:
+        with open("pg-ddl/schema/example_contab.txt") as f:
+            lines = f.readlines()
+    except FileNotFoundError:
+        logger.error("Crontab file not found at pg-ddl/schema/example_contab.txt")
+        return
+
+    # 2. Identify MVs currently in the crontab file
+    # We extract the actual name after 'REFRESH MATERIALIZED VIEW'
+    found_in_crontab = set()
+    raw_extra_lines = []
+
+    mv_pattern = re.compile(
+        r"REFRESH\s+MATERIALIZED\s+VIEW\s+(?:CONCURRENTLY\s+)?([\w\.]+)", re.IGNORECASE
+    )
+
+    for line in lines:
+        clean_line = line.strip()
+        if not clean_line or clean_line.startswith("#"):
+            continue
+
+        if "REFRESH MATERIALIZED VIEW" in clean_line:
+            match = mv_pattern.search(clean_line)
+            if match:
+                mv_name = match.group(1)
+                found_in_crontab.add(mv_name)
+                # If it's in the crontab but not in our file list, it's an extra MV
+                if mv_name not in expected_mvs:
+                    raw_extra_lines.append(mv_name)
+            else:
+                # Line has the command but regex failed (edge case)
+                raw_extra_lines.append(clean_line)
+
+    # 3. Calculate Missing
+    missing_mvs = expected_mvs - found_in_crontab
+
+    # 4. Logging results
+    logger.info(
+        f"Comparison complete: {len(missing_mvs)} missing, {len(raw_extra_lines)} extra."
+    )
+
+    for mv in sorted(missing_mvs):
+        logger.warning(f"example_crontab.txt Missing MV: {mv}")
+
+    for line in raw_extra_lines:
+        logger.info(f"example_crontab.txt Extra/Unknown Job: {line}")
+
+    return
+
+
 def create_all_mvs(mv_files: list[Path], stop_on_error: bool = False) -> None:
     """Create all missing materialized views."""
     existing_mvs = get_existing_mvs()
@@ -323,7 +383,7 @@ def create_all_mv_indexes(mv_files: list[Path], stop_on_error: bool = False) -> 
             file_content = f.read()
         for index_name, statement in extract_index_statements_from_file(file_content):
             if index_name in existing_indexes:
-                logger.info(f"Index already exists, skipping: {index_name}")
+                pass
             else:
                 all_missing.append((index_name, statement, mv_file.name))
     logger.info(f"Found {len(all_missing)} missing indexes to create")
@@ -349,7 +409,6 @@ def main(
     create_all: bool,
     run_all: bool,
     stop_on_error: bool,
-    create_indexes: bool = True,  # add this parameter
 ) -> None:
     mv_files = get_mv_files()
 
@@ -358,12 +417,11 @@ def main(
 
     if create_all:
         create_all_mvs(mv_files, stop_on_error=stop_on_error)
+        create_all_mv_indexes(mv_files, stop_on_error=stop_on_error)
+        check_mvs_in_crontab(mv_files)
 
     if run_all:
         run_all_mvs(mv_files, stop_on_error=stop_on_error)
-
-    if create_indexes:  # add this
-        create_all_mv_indexes(mv_files, stop_on_error)
 
 
 if __name__ == "__main__":

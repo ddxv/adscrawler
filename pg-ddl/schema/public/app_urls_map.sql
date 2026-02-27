@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict R7y9NmRzjPOoTP51SWM8YB8z2duanmqVvzYjkkGLb5owmRQOxSeJq8RnoeI6U70
+\restrict lvTMPcx2XGjpaMuNdDNahtt2QYSxIdDgDYIhFgkaGEo0OWELkom5R5Akwlr9XMi
 
 -- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 -- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
@@ -95,5 +95,5 @@ ALTER TABLE ONLY public.app_urls_map
 -- PostgreSQL database dump complete
 --
 
-\unrestrict R7y9NmRzjPOoTP51SWM8YB8z2duanmqVvzYjkkGLb5owmRQOxSeJq8RnoeI6U70
+\unrestrict lvTMPcx2XGjpaMuNdDNahtt2QYSxIdDgDYIhFgkaGEo0OWELkom5R5Akwlr9XMi
 

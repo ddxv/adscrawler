@@ -15,6 +15,8 @@ sudo -u postgres pg_dump -U postgres --schema-only --schema=public --schema=logg
 # List of schemas to dump
 SCHEMAS=("public" "logging" "adtech" "frontend")
 
+sudo cat /var/spool/cron/crontabs/postgres > "$OUTDIR/example_contab.txt"
+
 # For git diffs and comparison dump all tables/mvs/functions individual
 for schema in "${SCHEMAS[@]}"; do
   echo "Dumping schema: $schema"

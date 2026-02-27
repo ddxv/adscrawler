@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict WjmFxvPmdU7Fd38DCchuwJUXw6wUpi8C6ZfFv91GyIVBpea8N8k85UbHPOgfUhC
+\restrict pwUABTvTiCYTkwYG7nN0fJYhPHIRHPSkdPnwoKo2JsLC3Fq6gD8A91tABDNnAg8
 
 -- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 -- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
@@ -71,8 +71,15 @@ UNION
 ALTER MATERIALIZED VIEW frontend.company_domain_country OWNER TO postgres;
 
 --
+-- Name: frontend_company_domain_country_unique; Type: INDEX; Schema: frontend; Owner: postgres
+--
+
+CREATE UNIQUE INDEX frontend_company_domain_country_unique ON frontend.company_domain_country USING btree (company_domain, most_common_country);
+
+
+--
 -- PostgreSQL database dump complete
 --
 
-\unrestrict WjmFxvPmdU7Fd38DCchuwJUXw6wUpi8C6ZfFv91GyIVBpea8N8k85UbHPOgfUhC
+\unrestrict pwUABTvTiCYTkwYG7nN0fJYhPHIRHPSkdPnwoKo2JsLC3Fq6gD8A91tABDNnAg8
 

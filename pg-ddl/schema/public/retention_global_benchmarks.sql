@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict XRDuqh6x6o54oykvf8bs28LpLnGuPTM7Mh9etAgqKAedWsSqM4LoBZY86N4JZgD
+\restrict 6acF3BaDkTr0amQXdgLMHkjADUgtvdGBkahWSoHIuCbGr3gOqZHKfDGYcUwK0fG
 
 -- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 -- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
@@ -54,5 +54,5 @@ ALTER TABLE ONLY public.retention_global_benchmarks
 -- PostgreSQL database dump complete
 --
 
-\unrestrict XRDuqh6x6o54oykvf8bs28LpLnGuPTM7Mh9etAgqKAedWsSqM4LoBZY86N4JZgD
+\unrestrict 6acF3BaDkTr0amQXdgLMHkjADUgtvdGBkahWSoHIuCbGr3gOqZHKfDGYcUwK0fG
 

@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict SJa5GI32pvNQWD5TzXklbDu3k74cs0IEJqVXNkbrVYCSQAbV2ipyqlpoiAFXzIP
+\restrict a6d8mIELKDCok67siBspaaCro8ohMP30PuxvGb4tS5pV7x4Fbfn5VYXgKC7U1Qs
 
 -- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 -- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
@@ -42,12 +42,12 @@ CREATE MATERIALIZED VIEW frontend.app_keyword_rank_stats AS
           WHERE (akr.crawled_date >= (CURRENT_DATE - '30 days'::interval))
           GROUP BY akr.country, akr.store_app, akr.keyword_id
         ), latest_ranks AS (
-         SELECT kr.country,
+         SELECT DISTINCT ON (kr.country, kr.store_app, kr.keyword_id) kr.country,
             kr.store_app,
             kr.keyword_id,
             kr.app_rank AS latest_app_rank
-           FROM (frontend.app_keyword_ranks_daily kr
-             JOIN latest_per_country lpc ON (((kr.country = lpc.country) AND (kr.crawled_date = lpc.max_crawled_date))))
+           FROM frontend.app_keyword_ranks_daily kr
+          ORDER BY kr.country, kr.store_app, kr.keyword_id, kr.crawled_date DESC
         ), all_ranked_keywords AS (
          SELECT rk.country,
             rk.store_app,
@@ -69,8 +69,15 @@ CREATE MATERIALIZED VIEW frontend.app_keyword_rank_stats AS
 ALTER MATERIALIZED VIEW frontend.app_keyword_rank_stats OWNER TO postgres;
 
 --
+-- Name: frontend_app_keyword_rank_stats; Type: INDEX; Schema: frontend; Owner: postgres
+--
+
+CREATE UNIQUE INDEX frontend_app_keyword_rank_stats ON frontend.app_keyword_rank_stats USING btree (country, store_app, keyword_id);
+
+
+--
 -- PostgreSQL database dump complete
 --
 
-\unrestrict SJa5GI32pvNQWD5TzXklbDu3k74cs0IEJqVXNkbrVYCSQAbV2ipyqlpoiAFXzIP
+\unrestrict a6d8mIELKDCok67siBspaaCro8ohMP30PuxvGb4tS5pV7x4Fbfn5VYXgKC7U1Qs
 
