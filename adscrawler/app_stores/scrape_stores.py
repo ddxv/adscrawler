@@ -737,7 +737,7 @@ def scrape_from_store(
         if country == "us" and (
             html_last_scraped_at is None
             or html_last_scraped_at
-            < datetime.datetime.now(tz=datetime.UTC) - datetime.timedelta(days=30)
+            < datetime.datetime.now(tz=datetime.UTC) - datetime.timedelta(days=60)
         ):
             scrape_html = True
         result_dict = scrape_app_ios(

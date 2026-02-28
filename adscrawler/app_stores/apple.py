@@ -216,7 +216,10 @@ def get_urls_from_html(soup: BeautifulSoup) -> dict:
 
     # Find all links and look for relevant ones
     for link in soup.find_all("a", href=True):
-        text = link.get_text(strip=True).lower()
+        try:
+            text = link.get_text(strip=True).lower()
+        except Exception:
+            continue
         href = link["href"]
 
         if "app support" in text:
@@ -304,10 +307,15 @@ def scrape_itunes_additional_html(result: dict, store_id: str, country: str) -> 
         html_res = scrape_store_html(store_id=store_id, country=country)
         result["in_app_purchases"] = html_res["in_app_purchases"]
         result["ad_supported"] = html_res["ad_supported"]
-        result["sellerUrl"] = get_developer_url(result, html_res["urls"])
+        try:
+            result["sellerUrl"] = get_developer_url(result, html_res["urls"])
+        except Exception as e:
+            logger.warning(
+                f"Failed to get developer url for {store_id=} {country=} {e}"
+            )
         result["additional_html_scraped_at"] = datetime.datetime.now(tz=datetime.UTC)
     except Exception as e:
-        logger.warning(f"Failed to get developer url for {store_id=} {country=} {e}")
+        logger.warning(f"Failed to scrape itunes html for {store_id=} {country=} {e}")
     return result
 
 
