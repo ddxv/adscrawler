@@ -2,7 +2,7 @@ import json
 import os
 import subprocess
 
-import google_play_scraper
+import appgoblin_play_scraper
 import langdetect
 import pandas as pd
 
@@ -35,7 +35,7 @@ def scrape_app_gp(store_id: str, country: str, language: str = "en") -> dict:
     yt_us["description"] == yt_de["description"]
     yt_us["description"] == yt_de_en["description"]
     """
-    result_dict: dict = google_play_scraper.app(
+    result_dict: dict = appgoblin_play_scraper.app(
         store_id,
         lang=language,
         country=country,
@@ -105,7 +105,7 @@ def clean_google_play_app_df(apps_df: pd.DataFrame) -> pd.DataFrame:
         ).dt.date,
         store_last_updated=pd.to_datetime(
             apps_df["store_last_updated"], unit="s", errors="coerce"
-        ).fillna(apps_df["release_date"]),
+        ),
     )
     if "developer_name" in apps_df.columns:
         apps_df.loc[apps_df["developer_name"].notna(), "developer_name"] = apps_df.loc[

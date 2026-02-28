@@ -11,7 +11,7 @@ dependencies = [
     'pandas',
     'numpy',
     'sqlalchemy',
-    'google-play-scraper @ git+https://github.com/ddxv/google-play-scraper',
+    'appgoblin-play-scraper @ git+https://github.com/appgoblin-dev/appgoblin-play-scraper',
     'tldextract',
     'itunes-app-scraper-dmi @ git+https://github.com/ddxv/itunes-app-scraper.git',
     'asyncssh',

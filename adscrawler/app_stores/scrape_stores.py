@@ -8,7 +8,7 @@ from io import BytesIO
 from urllib.error import URLError
 from urllib.parse import unquote_plus
 
-import google_play_scraper
+import appgoblin_play_scraper
 import imagehash
 import pandas as pd
 import requests
@@ -782,7 +782,7 @@ def scrape_app(
             )
             crawl_result = 1
             break  # If successful, break out of the retry loop
-        except google_play_scraper.exceptions.NotFoundError:
+        except appgoblin_play_scraper.exceptions.NotFoundError:
             crawl_result = 3
             logger.warning(f"{scrape_info} failed to find app")
             break
