@@ -198,9 +198,12 @@ def scrape_store_html(store_id: str, country: str) -> dict:
     purpose_section = soup.find(
         "section", class_=lambda classes: classes and "purpose-section" in classes
     )
-    has_third_party_advertising = (
-        "third-party advertising" in purpose_section.get_text(strip=True).lower()
-    )
+    try:
+        has_third_party_advertising = (
+            "third-party advertising" in purpose_section.get_text(strip=True).lower()
+        )
+    except Exception:
+        has_third_party_advertising = False
 
     urls = get_urls_from_html(soup)
 
