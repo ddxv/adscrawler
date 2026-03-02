@@ -3,6 +3,7 @@ import hashlib
 import io
 import pathlib
 import time
+import uuid
 from functools import lru_cache
 
 import numpy as np
@@ -136,10 +137,9 @@ def prepare_for_psycopg(df: pd.DataFrame) -> pd.DataFrame:
         # Convert to object dtype first so it can hold None
         # Note: This may be breaking in pandas3.0
         df[col] = (
-            df[col].apply(
-                lambda x: x.to_pydatetime().astype(object) if pd.notna(x) else None
-            )
-            # .astype("object")
+            df[col]
+            .apply(lambda x: x.to_pydatetime() if pd.notna(x) else None)
+            .astype("object")
         )
     # Replace NaN (for floats, strings, etc.)
     df = df.astype(object).where(pd.notna(df), None)
