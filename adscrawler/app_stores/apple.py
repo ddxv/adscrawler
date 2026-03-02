@@ -317,8 +317,10 @@ def scrape_itunes_additional_html(result: dict, store_id: str, country: str) -> 
                 f"Failed to get developer url for {store_id=} {country=} {e}"
             )
         result["additional_html_scraped_at"] = datetime.datetime.now(tz=datetime.UTC)
+        result["additional_html_crawl_result"] = 1
     except Exception as e:
         logger.warning(f"Failed to scrape itunes html for {store_id=} {country=} {e}")
+        result["additional_html_crawl_result"] = 2
     return result
 
 

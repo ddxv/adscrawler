@@ -3,7 +3,6 @@ import hashlib
 import io
 import pathlib
 import time
-import uuid
 from functools import lru_cache
 
 import numpy as np
@@ -130,13 +129,17 @@ def insert_df(
 
 def prepare_for_psycopg(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
+    dt_cols = []
     for col in df.select_dtypes(include=["datetimetz", "datetime64[ns]"]):
+        print(col)
+        dt_cols.append(col)
         # Convert to object dtype first so it can hold None
         # Note: This may be breaking in pandas3.0
         df[col] = (
-            df[col]
-            .apply(lambda x: x.to_pydatetime() if pd.notna(x) else None)
-            .astype("object")
+            df[col].apply(
+                lambda x: x.to_pydatetime().astype(object) if pd.notna(x) else None
+            )
+            # .astype("object")
         )
     # Replace NaN (for floats, strings, etc.)
     df = df.astype(object).where(pd.notna(df), None)
@@ -263,56 +266,6 @@ def update_from_df(
     return return_df
 
 
-def _copy_df_to_temp_table(df, table_name, conn):
-    temp_table = f"temp_{table_name}_{uuid.uuid4().hex[:8]}"
-    conn.execute(
-        text(
-            f"CREATE TEMP TABLE {temp_table} "
-            f"(LIKE {table_name} INCLUDING DEFAULTS) ON COMMIT DROP"
-        )
-    )
-    raw = conn.connection.dbapi_connection
-
-    buffer = io.StringIO()
-    df.to_csv(buffer, index=False, header=False, sep="\t", na_rep="\\N")
-    buffer.seek(0)
-
-    with raw.cursor() as cur:
-        with cur.copy(
-            f"COPY {temp_table} ({', '.join(df.columns)}) FROM STDIN"
-        ) as copy:
-            # Write in chunks rather than all at once or row by row
-            while chunk := buffer.read(65536):  # 64KB chunks
-                copy.write(chunk)
-
-    return temp_table
-
-
-def upsert_bulk(
-    df: pd.DataFrame,
-    table_name: str,
-    database_connection: Connection,
-    key_columns: list[str],
-) -> None:
-    """Perform a bulk upsert on a PostgreSQL table from a DataFrame using COPY and ON CONFLICT."""
-    log_info = f"upsert_bulk table={table_name} rows={df.shape[0]}"
-    logger.info(f"{log_info} start")
-    all_cols = [f'"{c}"' for c in df.columns]
-    update_cols = [
-        f'"{c}" = EXCLUDED."{c}"' for c in df.columns if c not in key_columns
-    ]
-    query = f"""
-        INSERT INTO {table_name} ({", ".join(all_cols)})
-        SELECT {", ".join(all_cols)} FROM {{temp_table}}
-        ON CONFLICT ({", ".join(f'"{c}"' for c in key_columns)})
-        DO UPDATE SET {", ".join(update_cols)}
-    """
-    with database_connection.engine.begin() as conn:
-        temp_table = _copy_df_to_temp_table(df, table_name, conn)
-        conn.execute(text(query.format(temp_table=temp_table)))
-    logger.info(f"{log_info} finish")
-
-
 def _copy_chunk(chunk: pd.DataFrame, table_name: str, conn) -> None:
     raw_conn = conn.connection.dbapi_connection
     buffer = io.StringIO()
@@ -344,7 +297,7 @@ def _with_deadlock_retry(fn, max_retries: int = 3) -> None:
 def insert_bulk(
     df: pd.DataFrame,
     table_name: str,
-    database_connection,
+    database_connection: PostgresCon,
     chunk_size: int | None = None,
 ) -> None:
     total_rows = len(df)
@@ -357,7 +310,7 @@ def insert_bulk(
             f"insert_bulk table={table_name} chunk={chunk_num} rows={len(chunk)} start"
         )
 
-        def do_insert():
+        def do_insert() -> None:
             with database_connection.engine.begin() as conn:
                 _copy_chunk(chunk, table_name, conn)
 
@@ -1120,7 +1073,9 @@ def get_crawl_scenario_countries(
     return df
 
 
-def insert_any_user_requested_apps(database_connection: PostgresCon, last_ts):
+def insert_any_user_requested_apps(
+    database_connection: PostgresCon, last_ts: datetime.datetime
+) -> None:
     """Insert new ids, usually from android app."""
     insert_query = text(
         """
@@ -1783,27 +1738,27 @@ def get_ios_cached_future_country_ratios(
 ) -> pd.DataFrame:
     """These require future data for calculation... means only show up on a second rerun."""
     sel_query = """WITH ios_apps AS (
-	        SELECT
-		        store_app, total_ratings
-	        FROM
-		        app_global_metrics_latest agml
-	        LEFT JOIN store_apps sa ON agml.store_app = sa.id
-	        WHERE
-		        store = 2 and total_ratings > 2
+            SELECT
+                store_app, total_ratings
+            FROM
+                app_global_metrics_latest agml
+            LEFT JOIN store_apps sa ON agml.store_app = sa.id
+            WHERE
+                store = 2 and total_ratings > 2
         )
         SELECT
-	        DISTINCT ON
-	        (acmh.store_app, country_id) acmh.store_app,
-	        country_id,
-	        rating_count::float / ia.total_ratings::float AS rating_ratio
+            DISTINCT ON
+            (acmh.store_app, country_id) acmh.store_app,
+            country_id,
+            rating_count::float / ia.total_ratings::float AS rating_ratio
         FROM
-	        app_country_metrics_history acmh
-	        INNER JOIN ios_apps ia ON acmh.store_app = ia.store_app
+            app_country_metrics_history acmh
+            INNER JOIN ios_apps ia ON acmh.store_app = ia.store_app
         WHERE rating_count > 0 AND total_ratings > 0
         ORDER BY
-	        store_app,
-	        country_id,
-	        snapshot_date DESC
+            store_app,
+            country_id,
+            snapshot_date DESC
             ;
             """
     df = pd.read_sql(sel_query, con=database_connection.engine)

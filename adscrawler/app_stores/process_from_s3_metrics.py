@@ -669,7 +669,6 @@ def delete_and_insert_app_metrics(
     snapshot_date: datetime.date,
     snapshot_end_date: datetime.date,
 ) -> None:
-    start_time = time.time()
     table_name = "app_country_metrics_history"
     delete_app_metrics_by_date_and_store(
         database_connection=database_connection,
@@ -683,10 +682,6 @@ def delete_and_insert_app_metrics(
         table_name=table_name,
         database_connection=database_connection,
     )
-    # upsert_bulk(df=country_df, table_name=table_name, database_connection=database_connection, key_columns=TABLE_KEYS[table_name])
-    mytime: float = time.time() - start_time
-    logger.info(f"{table_name} insert {country_df.shape[0]} rows in {mytime:.2f}s")
-    start_time = time.time()
     table_name = "app_global_metrics_history"
     delete_app_metrics_by_date_and_store(
         database_connection=database_connection,
@@ -695,14 +690,11 @@ def delete_and_insert_app_metrics(
         store=store,
         table_name=table_name,
     )
-    # upsert_bulk(df=global_df, table_name=table_name, database_connection=database_connection, key_columns=TABLE_KEYS[table_name])
     insert_bulk(
         df=global_df,
         table_name=table_name,
         database_connection=database_connection,
     )
-    mytime: float = time.time() - start_time
-    logger.info(f"{table_name} insert {global_df.shape[0]} rows in {mytime:.2f}s")
 
 
 def process_app_metrics_to_db(

@@ -748,11 +748,26 @@ def scrape_from_store(
     return result_dict
 
 
-def clean_scraped_df(df: pd.DataFrame, store: int) -> pd.DataFrame:
+def clean_scraped_df(df: pd.DataFrame, store: int, process_icon: bool) -> pd.DataFrame:
     if store == 1:
         df = clean_google_play_app_df(df)
     if store == 2:
         df = clean_ios_app_df(df)
+    if "description_short" not in df.columns:
+        df["description_short"] = ""
+    df.loc[df["description_short"].isna(), "description_short"] = ""
+    if process_icon:
+        try:
+            no_icon = df["icon_url_100"].isna()
+            if df[no_icon].empty:
+                pass
+            else:
+                df.loc[no_icon, "icon_url_100"] = df.loc[no_icon].apply(
+                    lambda x: process_app_icon(x["store_id"], x["icon_url_512"]),
+                    axis=1,
+                )
+        except Exception:
+            logger.exception("failed to process app icon")
     return df
 
 
@@ -854,67 +869,58 @@ def process_live_app_details(
     database_connection: PostgresCon,
     process_icon: bool,
 ) -> None:
-    for crawl_result, apps_df in results_df.groupby("crawl_result"):
-        logger.info(f"{store=} {crawl_result=} processing {len(apps_df)} apps for db")
+    if store == 1:
+        results_df["additional_html_crawl_result"] = 0
+    for (crawl_result, additional_html_crawl_result), apps_df in results_df.groupby(
+        ["crawl_result", "additional_html_crawl_result"]
+    ):
+        logger.info(
+            f"{store=} {crawl_result=}, {additional_html_crawl_result=}, processing {len(apps_df)} apps for db"
+        )
         if crawl_result != 1:
             # If bad crawl result, only save minimal info to avoid overwriting good data, ie name
             apps_df = apps_df[["store_id", "store", "crawled_at", "crawl_result"]]
         else:
-            apps_df = clean_scraped_df(df=apps_df, store=store)
-            if "description_short" not in apps_df.columns:
-                apps_df["description_short"] = ""
-            apps_df.loc[apps_df["description_short"].isna(), "description_short"] = ""
-            if process_icon:
-                try:
-                    no_icon = apps_df["icon_url_100"].isna()
-                    if apps_df[no_icon].empty:
-                        pass
-                    else:
-                        apps_df.loc[no_icon, "icon_url_100"] = apps_df.loc[
-                            no_icon
-                        ].apply(
-                            lambda x: process_app_icon(
-                                x["store_id"], x["icon_url_512"]
-                            ),
-                            axis=1,
-                        )
-                except Exception:
-                    logger.exception("failed to process app icon")
-        apps_details_to_db(
+            apps_df = clean_scraped_df(
+                df=apps_df, store=store, process_icon=process_icon
+            )
+        if additional_html_crawl_result != 1:
+            # If additional html crawl failed, drop fields that rely on it to avoid overwriting good data with nulls
+            apps_df = apps_df.drop(
+                [
+                    "additional_html_crawled_at",
+                    "ad_supported",
+                    "in_app_purchases",
+                    "url",
+                ]
+            )
+        key_columns = ["store", "store_id"]
+        if (apps_df["crawl_result"] == 1).all() and apps_df[
+            "developer_id"
+        ].notna().all():
+            apps_df = save_developer_info(apps_df, database_connection)
+        insert_columns = [
+            x
+            for x in get_store_app_columns(database_connection)
+            if x in apps_df.columns
+        ]
+
+        apps_df = prepare_for_psycopg(apps_df)
+        logger.info(f"{crawl_result=} update store_apps table for {len(apps_df)} apps")
+        update_from_df(
+            table_name="store_apps",
+            df=apps_df,
+            update_columns=insert_columns,
+            key_columns=key_columns,
+            database_connection=database_connection,
+        )
+        if apps_df is None or apps_df.empty or crawl_result != 1:
+            continue
+        upsert_store_apps_descriptions(apps_df, database_connection)
+        save_app_domains(
             apps_df=apps_df,
             database_connection=database_connection,
-            crawl_result=crawl_result,
         )
-
-
-def apps_details_to_db(
-    apps_df: pd.DataFrame,
-    database_connection: PostgresCon,
-    crawl_result: int,
-) -> None:
-    key_columns = ["store", "store_id"]
-    if (apps_df["crawl_result"] == 1).all() and apps_df["developer_id"].notna().all():
-        apps_df = save_developer_info(apps_df, database_connection)
-    insert_columns = [
-        x for x in get_store_app_columns(database_connection) if x in apps_df.columns
-    ]
-    apps_df = prepare_for_psycopg(apps_df)
-    logger.info(f"{crawl_result=} update store_apps table for {len(apps_df)} apps")
-    update_from_df(
-        table_name="store_apps",
-        df=apps_df,
-        update_columns=insert_columns,
-        key_columns=key_columns,
-        database_connection=database_connection,
-    )
-    if apps_df is None or apps_df.empty or crawl_result != 1:
-        return
-    upsert_store_apps_descriptions(apps_df, database_connection)
-    save_app_domains(
-        apps_df=apps_df,
-        database_connection=database_connection,
-    )
-    return
 
 
 def upsert_store_apps_descriptions(
