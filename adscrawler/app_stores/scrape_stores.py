@@ -827,6 +827,8 @@ def scrape_app(
             break
     if crawl_result != 1:
         result_dict = {}
+        if store == 2:
+            result_dict["additional_html_crawl_result"] = 2
     if "kind" in result_dict.keys() and "mac" in result_dict["kind"].lower():
         logger.error(f"{scrape_info} Crawled app is Mac Software, not iOS!")
         crawl_result = 5
