@@ -894,7 +894,9 @@ def process_live_app_details(
                     "ad_supported",
                     "in_app_purchases",
                     "url",
-                ]
+                ],
+                axis=1,
+                errors="ignore",
             )
         key_columns = ["store", "store_id"]
         if (apps_df["crawl_result"] == 1).all() and apps_df[
