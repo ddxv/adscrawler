@@ -298,6 +298,8 @@ def scrape_app_ios(
     result_dict: dict = scraper.get_app_details(
         store_id, country=country, add_ratings=True, timeout=10, lang=language
     )
+    result_dict["trackId"] = str(result_dict["trackId"])
+    result_dict["artistId"] = str(result_dict["artistId"])
     if scrape_html:
         result_dict = scrape_itunes_additional_html(result_dict, store_id, country)
     logger.debug(f"store=2 {country=} {language=} {store_id=} ios store scraped")
