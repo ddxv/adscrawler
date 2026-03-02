@@ -84,7 +84,7 @@ def _scrape_single_app(
             store_id=row["store_id"],
             country=row["country_code"].lower(),
             language=row["language"].lower(),
-            html_last_scraped_at=row.get("html_last_scraped_at", None),
+            html_recently_scraped=row.get("html_recently_scraped", None),
         )
         result["store_app_db_id"] = row["store_app"]
         if process_icon:
@@ -728,16 +728,14 @@ def scrape_from_store(
     store_id: str,
     country: str,
     language: str,
-    html_last_scraped_at: datetime.datetime | None = None,
+    html_recently_scraped: bool | None = None,
 ) -> dict:
     if store == 1:
         result_dict = scrape_app_gp(store_id, country=country, language=language)
     elif store == 2:
         scrape_html = False
         # Watch for pd.NaT
-        if country == "us" and not html_last_scraped_at > datetime.datetime.now(
-            tz=datetime.UTC
-        ) - datetime.timedelta(days=60):
+        if country == "us" and not html_recently_scraped:
             scrape_html = True
         result_dict = scrape_app_ios(
             store_id, country=country, language=language, scrape_html=scrape_html
@@ -775,7 +773,7 @@ def scrape_app(
     store_id: str,
     country: str,
     language: str,
-    html_last_scraped_at: datetime.datetime | None = None,
+    html_recently_scraped: bool | None = None,
 ) -> dict:
     scrape_info = f"{store=}, {country=}, {language=}, {store_id=} scrape_app"
     max_retries = 2
@@ -792,7 +790,7 @@ def scrape_app(
                 store_id=store_id,
                 country=country,
                 language=language,
-                html_last_scraped_at=html_last_scraped_at,
+                html_recently_scraped=html_recently_scraped,
             )
             crawl_result = 1
             break  # If successful, break out of the retry loop
