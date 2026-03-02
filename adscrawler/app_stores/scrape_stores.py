@@ -688,14 +688,7 @@ def save_app_domains(
     apps_df: pd.DataFrame,
     database_connection: PostgresCon,
 ) -> None:
-    if "url" not in apps_df.columns or apps_df["url"].isna().all():
-        logger.warning("No app urls found, finished")
-        return
-    urls_na = apps_df["url"].isna()
-    app_urls = apps_df[~urls_na][["store_app", "url"]].drop_duplicates()
-    if app_urls.empty:
-        logger.warning("No app urls found")
-        return
+
     app_urls["url"] = app_urls["url"].apply(lambda x: extract_domains(x))
     all_domains_df = query_all_domains(database_connection=database_connection)
     all_domains_df = check_and_insert_domains(
@@ -764,7 +757,7 @@ def clean_scraped_df(df: pd.DataFrame, store: int, process_icon: bool) -> pd.Dat
                     axis=1,
                 )
         except Exception:
-            logger.exception("failed to process app icon")
+            logger.warning("failed to process app icon")
     return df
 
 
@@ -873,9 +866,8 @@ def process_live_app_details(
     for (crawl_result, additional_html_crawl_result), apps_df in results_df.groupby(
         ["crawl_result", "additional_html_crawl_result"]
     ):
-        logger.info(
-            f"{store=} {crawl_result=}, {additional_html_crawl_result=}, processing {len(apps_df)} apps for db"
-        )
+        log_info = f"{store=} crawl_result={crawl_result} additional_html_crawl_result={additional_html_crawl_result}"
+        logger.info(f"{log_info} processing {len(apps_df)} apps for db")
         if crawl_result != 1:
             # If bad crawl result, only save minimal info to avoid overwriting good data, ie name
             apps_df = apps_df[["store_id", "store", "crawled_at", "crawl_result"]]
@@ -907,7 +899,7 @@ def process_live_app_details(
         ]
 
         apps_df = prepare_for_psycopg(apps_df)
-        logger.info(f"{crawl_result=} update store_apps table for {len(apps_df)} apps")
+        logger.info(f"{log_info} update store_apps table for {len(apps_df)} apps")
         update_from_df(
             table_name="store_apps",
             df=apps_df,
@@ -918,6 +910,14 @@ def process_live_app_details(
         if apps_df is None or apps_df.empty or crawl_result != 1:
             continue
         upsert_store_apps_descriptions(apps_df, database_connection)
+        if "url" not in apps_df.columns or apps_df["url"].isna().all():
+            logger.warning(f"{log_info} No app urls found")
+            continue
+        urls_na = apps_df["url"].isna()
+        app_urls = apps_df[~urls_na][["store_app", "url"]].drop_duplicates()
+        if app_urls.empty:
+            logger.warning(f"{log_info} No app urls found")
+            continue
         save_app_domains(
             apps_df=apps_df,
             database_connection=database_connection,
