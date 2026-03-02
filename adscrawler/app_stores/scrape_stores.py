@@ -734,6 +734,7 @@ def scrape_from_store(
         result_dict = scrape_app_gp(store_id, country=country, language=language)
     elif store == 2:
         scrape_html = False
+        # Watch for pd.NaT
         if country == "us" and not html_last_scraped_at > datetime.datetime.now(
             tz=datetime.UTC
         ) - datetime.timedelta(days=60):
