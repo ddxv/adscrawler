@@ -302,6 +302,8 @@ def scrape_app_ios(
     result_dict["artistId"] = str(result_dict["artistId"])
     if scrape_html:
         result_dict = scrape_itunes_additional_html(result_dict, store_id, country)
+    else:
+        result_dict["additional_html_crawl_result"] = 0
     logger.debug(f"store=2 {country=} {language=} {store_id=} ios store scraped")
     return result_dict
 
