@@ -31,6 +31,12 @@ from adscrawler.packages.storage import (
 
 logger = get_logger(__name__, "scrape_stores")
 
+# TODO: Replace with category and store benchmarks
+NEW_USER_CONVERSION = 0.02  # 2% of new installs
+RETENTION_CONVERSION = 0.002  # 0.2% of returning users (2 in 1,000)
+AVG_TICKET = 5.0  # $5 average
+
+
 STAR_COLS = [
     "one_star",
     "two_star",
@@ -550,7 +556,7 @@ def import_app_metrics_from_s3(
                 snapshot_end_date,
                 last_history_df,
             )
-    logger.info("Rerun global weekly derived metrics start")
+    logger.info("Global weekly derived metrics start")
     import_all_app_global_metrics_weekly(database_connection)
 
 
@@ -1010,11 +1016,6 @@ def calculate_revenue_cols(
     df["mau_tier2"] = df["monthly_active_users"] * df["tier2_pct"]
     df["mau_tier3"] = df["monthly_active_users"] * df["tier3_pct"]
 
-    # TODO: Replace with category and store benchmarks
-    NEW_USER_CONVERSION = 0.02  # 2% of new installs
-    RETENTION_CONVERSION = 0.002  # 0.2% of returning users (2 in 1,000)
-    AVG_TICKET = 5.0  # $5 average
-
     def estimate_revenue(row):
         if not row["in_app_purchases"]:
             return 0.0
@@ -1048,7 +1049,8 @@ def calculate_revenue_cols(
 def import_all_app_global_metrics_weekly(database_connection: PostgresCon) -> None:
     i = 1
     while True:
-        logger.info(f"batch {i} of app global metrics weekly start")
+        log_info = f"Global weekly derived metrics batch={i}"
+        logger.info(f"{log_info} start")
         df = query_apps_to_process_global_metrics(
             database_connection, batch_size=10000, days_back=3
         )
@@ -1064,12 +1066,12 @@ def import_all_app_global_metrics_weekly(database_connection: PostgresCon) -> No
         df.loc[tiers_to_fill, "tier1_pct"] = 0.34
         df.loc[tiers_to_fill, "tier2_pct"] = 0.33
         df.loc[tiers_to_fill, "tier3_pct"] = 0.33
-        logger.info("Start calculating WAU")
+        logger.info(f"{log_info} start calculating WAU")
         df = calculate_active_users(database_connection, df)
-        logger.info("Finished calculating WAU")
-        logger.info("Start calculating revenue columns")
+        logger.info(f"{log_info} finished calculating WAU")
+        logger.info(f"{log_info} start calculating revenue columns")
         df = calculate_revenue_cols(database_connection, df)
-        logger.info("Finished calculating revenue columns")
+        logger.info(f"{log_info} finished calculating revenue columns")
         final_cols = [
             "store_app",
             "week_start",
@@ -1090,7 +1092,7 @@ def import_all_app_global_metrics_weekly(database_connection: PostgresCon) -> No
             "five_star",
         ]
         df = df[final_cols]
-        logger.info(f"Start inserting batch {i} of size {df.shape[0]}")
+        logger.info(f"{log_info} insert rows={df.shape[0]}")
         delete_and_insert(
             df=df,
             schema="public",
@@ -1099,8 +1101,8 @@ def import_all_app_global_metrics_weekly(database_connection: PostgresCon) -> No
             delete_by_keys=["store_app", "week_start"],
             insert_columns=df.columns.tolist(),
         )
-        logger.info(f"Finished inserting batch {i}")
-        logger.info(f"Logging batch {i}...")
+        logger.info(f"{log_info} finished inserting rows")
+        logger.info(f"{log_info} logging batch...")
         log_df = pd.DataFrame({"store_app": log_apps})
         log_df["updated_at"] = datetime.datetime.now()
         log_df.to_sql(
