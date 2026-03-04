@@ -1,4 +1,3 @@
-
 WITH latest_version_codes AS (
     SELECT DISTINCT ON
     (store_app)
