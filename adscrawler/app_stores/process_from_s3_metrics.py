@@ -167,6 +167,20 @@ def handle_missing_trackid_files(
         )
 
 
+def recreate_s3_daily_agg(
+    store: int, start_date: datetime.date, end_date: datetime.date
+) -> None:
+    # Raw data to agg by DAY
+    for snapshot_date in pd.date_range(start_date, end_date, freq="D"):
+        log_info = f"{store=} {snapshot_date.date()} S3 raw app details agg"
+        logger.info(f"{log_info} start")
+        make_s3_app_country_metrics_history_daily(
+            store,
+            snapshot_date=snapshot_date,
+        )
+        time.sleep(1)
+
+
 def make_s3_app_country_metrics_history_daily(
     store: int, snapshot_date: pd.DatetimeIndex
 ) -> None:
@@ -387,9 +401,9 @@ def prep_app_google_metrics(
     country_df["global_installs"] = country_df["global_installs"].fillna(0).astype(int)
     # Db currently does not have a rating_count_est column just for country
     country_df["rating_count"] = country_df["rating_count_est"]
-    assert (
-        country_df["global_rating_count"].ge(country_df["rating_count"]).all()
-    ), "global_rating_count should be >= rating_count"
+    assert country_df["global_rating_count"].ge(country_df["rating_count"]).all(), (
+        "global_rating_count should be >= rating_count"
+    )
     global_df = country_df[country_df["country"] == "US"].copy()
     global_df = global_df.drop(columns=["rating_count", "review_count"]).rename(
         columns={
@@ -530,14 +544,7 @@ def import_app_metrics_from_s3(
     for store in stores:
         last_history_df = pd.DataFrame()
         # Raw data to agg by DAY
-        for snapshot_date in pd.date_range(start_date, end_date, freq="D"):
-            log_info = f"{store=} {snapshot_date.date()} S3 raw app details agg"
-            logger.info(f"{log_info} start")
-            # make_s3_app_country_metrics_history_daily(
-            #     store,
-            #     snapshot_date=snapshot_date,
-            # )
-            # time.sleep(1)
+        # recreate_s3_daily_agg(store=store, start_date=start_date, end_date=end_date)
 
         # Agg data by WEEK
         for snapshot_date in pd.date_range(start_date, end_date, freq="W-MON"):
@@ -559,8 +566,22 @@ def import_app_metrics_from_s3(
                 snapshot_end_date,
                 last_history_df,
             )
+        # Rerun specifically apps that just changed
+        start_datetime = (
+            datetime.datetime.now() - datetime.timedelta(days=3)
+        ).strftime("%Y-%m-%d %H:%M:%S")
+        import_all_app_global_metrics_weekly(
+            database_connection,
+            start_datetime=start_datetime,
+            store_app_ids=last_history_df["store_app"].unique().tolist(),
+        )
+
     logger.info("Global weekly derived metrics start")
-    import_all_app_global_metrics_weekly(database_connection)
+    # Rerun catchall for any apps that haven't been run in the last 3 days
+    start_datetime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    import_all_app_global_metrics_weekly(
+        database_connection, start_datetime=start_datetime, store_app_ids=None
+    )
 
 
 def process_store_metrics(
@@ -1049,13 +1070,21 @@ def calculate_revenue_cols(
     return df
 
 
-def import_all_app_global_metrics_weekly(database_connection: PostgresCon) -> None:
+def import_all_app_global_metrics_weekly(
+    database_connection: PostgresCon,
+    start_datetime: str,
+    store_app_ids: list[int] | None,
+) -> None:
+
     i = 1
     while True:
         log_info = f"Global weekly derived metrics batch={i}"
         logger.info(f"{log_info} start")
         df = query_apps_to_process_global_metrics(
-            database_connection, batch_size=10000, days_back=3
+            database_connection,
+            batch_size=10000,
+            start_datetime=start_datetime,
+            store_app_ids=store_app_ids,
         )
         if df.empty:
             break
