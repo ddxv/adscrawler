@@ -4,6 +4,7 @@ import io
 import pathlib
 import time
 from functools import lru_cache
+from typing import Any, Callable
 
 import numpy as np
 import pandas as pd
@@ -265,7 +266,7 @@ def update_from_df(
     return return_df
 
 
-def _copy_chunk(chunk: pd.DataFrame, table_name: str, conn) -> None:
+def _copy_chunk(chunk: pd.DataFrame, table_name: str, conn: Any) -> None:
     raw_conn = conn.connection.dbapi_connection
     buffer = io.StringIO()
     chunk.to_csv(buffer, index=False, header=False, sep="\t", na_rep="\\N")
@@ -278,7 +279,7 @@ def _copy_chunk(chunk: pd.DataFrame, table_name: str, conn) -> None:
                 copy.write(data)
 
 
-def _with_deadlock_retry(fn, max_retries: int = 3) -> None:
+def _with_deadlock_retry(fn: Callable[[], None], max_retries: int = 3) -> None:
     for attempt in range(max_retries):
         try:
             fn()
