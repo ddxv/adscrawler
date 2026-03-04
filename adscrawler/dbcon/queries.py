@@ -1304,18 +1304,15 @@ def query_apps_to_process_global_metrics(
             params={
                 "batch_size": batch_size,
                 "start_date": start_datetime,
-                "store_app_ids": store_app_ids,
             },
         )
     else:
-        store_app_ids_str = ",".join([str(x) for x in store_app_ids])
         df = pd.read_sql(
             QUERY_APPS_TO_PROCESS_METRICS_WITH_IDS,
             con=database_connection.engine,
             params={
-                "batch_size": batch_size,
                 "start_date": start_datetime,
-                "store_app_ids": store_app_ids_str,
+                "store_app_ids": store_app_ids,
             },
         )
     tiers = ["tier1_pct", "tier2_pct", "tier3_pct"]

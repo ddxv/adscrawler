@@ -7,9 +7,7 @@ WITH candidate_apps AS (
         sa.category AS app_category
     FROM
         frontend.store_apps_overview AS sa
-    WHERE
-         sa.id in (:store_app_ids)
-    LIMIT :batch_size
+    WHERE sa.id IN :store_app_ids
 )
 SELECT
     agmh.snapshot_date,

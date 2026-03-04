@@ -1077,15 +1077,20 @@ def app_global_metrics_derive_latest_weekly(
     logged_last_at: str,
     store_app_ids: list[int] | None,
 ) -> None:
-    i = 1
+    i = 0
     while True:
         log_info = f"Global weekly derived metrics batch={i}"
         logger.info(f"{log_info} start")
+        query_apps = None
+        if store_app_ids is not None:
+            query_apps = store_app_ids[i * 10000 : (i + 1) * 10000]
+            if len(query_apps) == 0:
+                break
         df = query_apps_to_process_global_metrics(
             database_connection,
             batch_size=10000,
             start_datetime=logged_last_at,
-            store_app_ids=store_app_ids,
+            store_app_ids=query_apps,
         )
         if df.empty:
             break
