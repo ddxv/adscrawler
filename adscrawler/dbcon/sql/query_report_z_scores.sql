@@ -37,14 +37,14 @@ my_advs AS (
 baseline_period AS (
     SELECT
         s.store_app,
-        SUM(s.installs_diff) AS baseline_installs_2w,
-        SUM(s.rating_count_diff) AS baseline_ratings_2w,
-        AVG(s.installs_diff) AS avg_installs_diff,
-        STDDEV(s.installs_diff) AS stddev_installs_diff,
-        AVG(s.rating_count_diff) AS avg_ratings_diff,
-        STDDEV(s.rating_count_diff) AS stddev_ratings_diff
+        SUM(s.weekly_installs) AS baseline_installs_2w,
+        SUM(s.weekly_ratings) AS baseline_ratings_2w,
+        AVG(s.weekly_installs) AS avg_installs_diff,
+        STDDEV(s.weekly_installs) AS stddev_installs_diff,
+        AVG(s.weekly_ratings) AS avg_ratings_diff,
+        STDDEV(s.weekly_ratings) AS stddev_ratings_diff
     FROM
-        app_global_metrics_weekly_diffs AS s
+        app_global_metrics_weekly AS s
     INNER JOIN my_advs AS m
         ON
             s.store_app = m.advertiser_store_app_id
@@ -62,10 +62,10 @@ target_weeks_data AS (
     SELECT
         s.store_app,
         CAST(:target_week AS date) AS target_week,
-        SUM(s.installs_diff) AS target_week_installs,
-        SUM(s.rating_count_diff) AS target_week_rating_count
+        SUM(s.weekly_installs) AS target_week_installs,
+        SUM(s.weekly_ratings) AS target_week_rating_count
     FROM
-        app_global_metrics_weekly_diffs AS s
+        app_global_metrics_weekly AS s
     WHERE
         s.week_start >= CAST(:target_week AS date)
         AND
@@ -108,46 +108,25 @@ my_app_z_scores AS (
 ranked_z_scores AS (
     SELECT
         saz.target_week,
-        saz.store_app,
+        sa.store,
+        sa.id,
+        sa.name,
+        sa.store_id,
+        sa.developer,
+        sa.category,
+        sa.ad_supported,
+        sa.in_app_purchases,
         saz.target_week_installs,
         saz.target_week_rating_count,
+        agm.total_installs AS installs,
+        agm.total_ratings AS rating_count,
         saz.baseline_installs_2w,
         saz.baseline_ratings_2w,
         saz.installs_pct_increase,
         saz.ratings_pct_increase,
         saz.installs_z_score_1w,
         saz.ratings_z_score_1w,
-        sa.id,
-        sa.developer,
-        sa.name,
-        sa.store_id,
-        sa.store,
-        sa.category,
-        agm.total_installs AS installs,
-        sa.free,
-        sa.price,
-        sa.size,
-        sa.minimum_android,
-        sa.developer_email,
-        sa.store_last_updated,
-        sa.content_rating,
-        sa.ad_supported,
-        sa.in_app_purchases,
-        sa.created_at,
-        sa.updated_at,
-        sa.crawl_result,
         sa.icon_url_100,
-        sa.icon_url_512,
-        sa.release_date,
-        agm.total_ratings AS rating_count,
-        sa.featured_image_url,
-        sa.phone_image_url_1,
-        sa.phone_image_url_2,
-        sa.phone_image_url_3,
-        sa.tablet_image_url_1,
-        sa.tablet_image_url_2,
-        sa.tablet_image_url_3,
-        sa.textsearchable_index_col,
         cm.original_category,
         ROW_NUMBER() OVER (
             PARTITION BY
@@ -159,13 +138,8 @@ ranked_z_scores AS (
                     END
                 )
             ORDER BY
-                (
-                    CASE
-                        WHEN sa.store = 2 THEN saz.ratings_z_score_1w
-                        WHEN sa.store = 1 THEN saz.installs_z_score_1w
-                        ELSE NULL::numeric
-                    END
-                ) DESC NULLS LAST
+                saz.installs_z_score_1w
+                DESC NULLS LAST
         ) AS rn
     FROM
         my_app_z_scores AS saz
@@ -173,7 +147,8 @@ ranked_z_scores AS (
         ON
             saz.store_app = sa.id
     LEFT JOIN app_global_metrics_latest AS agm
-        ON sa.id = agm.store_app
+        ON
+            sa.id = agm.store_app
     LEFT JOIN category_mapping AS cm ON
         sa.category::text = cm.original_category::text
 )
