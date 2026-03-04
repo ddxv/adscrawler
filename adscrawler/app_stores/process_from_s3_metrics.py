@@ -530,9 +530,6 @@ def prep_app_apple_metrics(
     global_df["installs"] = global_df["installs"].astype("Int64")
     global_df["rating_count"] = global_df["rating_count"].astype("Int64")
     global_df[STAR_COLS] = global_df[STAR_COLS].astype("Int64")
-    # global_df[global_df["store_app"] == 1868117][
-    #     ["snapshot_date", "installs", "rating_count", "rating", 'tier1_pct', 'tier2_pct', 'tier3_pct']
-    # ]
     # Note, we return the df which for iOS is the country level data
     return df, global_df
 
@@ -544,7 +541,7 @@ def import_app_metrics_from_s3(
     for store in stores:
         last_history_df = pd.DataFrame()
         # Raw data to agg by DAY
-        # recreate_s3_daily_agg(store=store, start_date=start_date, end_date=end_date)
+        recreate_s3_daily_agg(store=store, start_date=start_date, end_date=end_date)
 
         # Agg data by WEEK
         for snapshot_date in pd.date_range(start_date, end_date, freq="W-MON"):
@@ -567,20 +564,25 @@ def import_app_metrics_from_s3(
                 last_history_df,
             )
         # Rerun specifically apps that just changed
-        start_datetime = (
-            datetime.datetime.now() - datetime.timedelta(days=3)
-        ).strftime("%Y-%m-%d %H:%M:%S")
-        import_all_app_global_metrics_weekly(
+        # Short list since this is basically reruning the weekly data daily, so only largest apps change
+        if store == 1:
+            short_list = last_history_df["review_count"] > 100
+        if store == 2:
+            short_list = last_history_df["rating_count"] > 100
+        store_app_ids = last_history_df[short_list]["store_app"].unique().tolist()
+        logged_last_at = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        app_global_metrics_derive_latest_weekly(
             database_connection,
-            start_datetime=start_datetime,
-            store_app_ids=last_history_df["store_app"].unique().tolist(),
+            logged_last_at=logged_last_at,
+            store_app_ids=store_app_ids,
         )
-
     logger.info("Global weekly derived metrics start")
-    # Rerun catchall for any apps that haven't been run in the last 3 days
-    start_datetime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    import_all_app_global_metrics_weekly(
-        database_connection, start_datetime=start_datetime, store_app_ids=None
+    # Rerun catchall for smaller or other apps
+    logged_last_at = (datetime.datetime.now() - datetime.timedelta(days=3)).strftime(
+        "%Y-%m-%d %H:%M:%S"
+    )
+    app_global_metrics_derive_latest_weekly(
+        database_connection, logged_last_at=logged_last_at, store_app_ids=None
     )
 
 
@@ -1044,10 +1046,10 @@ def calculate_revenue_cols(
         if not row["in_app_purchases"]:
             return 0.0
         # Revenue from new users
-        new_rev = row["weekly_installs"] * NEW_USER_CONVERSION * AVG_TICKET
+        new_rev: float = row["weekly_installs"] * NEW_USER_CONVERSION * AVG_TICKET
         # Revenue from the "sticky" base (WAU minus the new installs)
         returning_users = max(0, row["weekly_active_users"] - row["weekly_installs"])
-        base_rev = returning_users * RETENTION_CONVERSION * AVG_TICKET
+        base_rev: float = returning_users * RETENTION_CONVERSION * AVG_TICKET
 
         return new_rev + base_rev
 
@@ -1070,12 +1072,11 @@ def calculate_revenue_cols(
     return df
 
 
-def import_all_app_global_metrics_weekly(
+def app_global_metrics_derive_latest_weekly(
     database_connection: PostgresCon,
-    start_datetime: str,
+    logged_last_at: str,
     store_app_ids: list[int] | None,
 ) -> None:
-
     i = 1
     while True:
         log_info = f"Global weekly derived metrics batch={i}"
@@ -1083,7 +1084,7 @@ def import_all_app_global_metrics_weekly(
         df = query_apps_to_process_global_metrics(
             database_connection,
             batch_size=10000,
-            start_datetime=start_datetime,
+            start_datetime=logged_last_at,
             store_app_ids=store_app_ids,
         )
         if df.empty:
