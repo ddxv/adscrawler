@@ -426,6 +426,7 @@ def prep_app_apple_metrics(
     app_country_db_latest: pd.DataFrame,
     database_connection: PostgresCon,
 ) -> pd.DataFrame:
+    # TODO try replace unstack with .reset_index().pivot_table(index="level_0", columns="match", values=0, aggfunc="first")
     ratings_str = (
         df["user_ratings"]
         .str.extractall(r"(\d+)")
