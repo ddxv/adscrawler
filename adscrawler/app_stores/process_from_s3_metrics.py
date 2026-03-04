@@ -387,9 +387,9 @@ def prep_app_google_metrics(
     country_df["global_installs"] = country_df["global_installs"].fillna(0).astype(int)
     # Db currently does not have a rating_count_est column just for country
     country_df["rating_count"] = country_df["rating_count_est"]
-    assert country_df["global_rating_count"].ge(country_df["rating_count"]).all(), (
-        "global_rating_count should be >= rating_count"
-    )
+    assert (
+        country_df["global_rating_count"].ge(country_df["rating_count"]).all()
+    ), "global_rating_count should be >= rating_count"
     global_df = country_df[country_df["country"] == "US"].copy()
     global_df = global_df.drop(columns=["rating_count", "review_count"]).rename(
         columns={
@@ -422,7 +422,9 @@ def prep_app_google_metrics(
 
 
 def prep_app_apple_metrics(
-    df: pd.DataFrame, app_country_db_latest: pd.DataFrame, database_connection
+    df: pd.DataFrame,
+    app_country_db_latest: pd.DataFrame,
+    database_connection: PostgresCon,
 ) -> pd.DataFrame:
     ratings_str = (
         df["user_ratings"]
@@ -564,7 +566,7 @@ def process_store_metrics(
     store: int,
     app_country_db_latest: pd.DataFrame,
     df: pd.DataFrame,
-    database_connection,
+    database_connection: PostgresCon,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     log_info = f"{store=} process metrics for {df.shape[0]} rows"
     logger.info(f"{log_info} start")
@@ -1016,7 +1018,7 @@ def calculate_revenue_cols(
     df["mau_tier2"] = df["monthly_active_users"] * df["tier2_pct"]
     df["mau_tier3"] = df["monthly_active_users"] * df["tier3_pct"]
 
-    def estimate_revenue(row):
+    def estimate_revenue(row: pd.Series) -> float:
         if not row["in_app_purchases"]:
             return 0.0
         # Revenue from new users
