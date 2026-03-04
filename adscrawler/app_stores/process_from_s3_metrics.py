@@ -11,7 +11,6 @@ from adscrawler.app_stores.utils import (
 from adscrawler.config import CONFIG, get_logger
 from adscrawler.dbcon.connection import (
     PostgresCon,
-    get_db_connection,
 )
 from adscrawler.dbcon.queries import (
     delete_and_insert,
@@ -515,89 +514,25 @@ def prep_app_apple_metrics(
     return df, global_df
 
 
-def manual_import_app_metrics_from_s3(
-    start_date: datetime.date, end_date: datetime.date
-) -> None:
-    use_tunnel = False
-    database_connection = get_db_connection(
-        use_ssh_tunnel=use_tunnel, config_key="madrone"
-    )
-    stores = [1, 2]
-    start_date = datetime.datetime.fromisoformat("2023-02-14").date()
-    # start_date = datetime.datetime.fromisoformat("2026-01-05").date()
-    end_date = datetime.datetime.fromisoformat("2026-02-23").date()
-    for store in stores:
-        last_history_df = pd.DataFrame()
-        for snapshot_date in pd.date_range(start_date, end_date, freq="D"):
-            logger.info(f"Raw to daily agg {store=} {snapshot_date.date()} start")
-            make_s3_app_country_metrics_history_daily(
-                store,
-                snapshot_date=snapshot_date,
-            )
-            time.sleep(1)
-
-    # end_date = datetime.datetime.today() - datetime.timedelta(days=1)
-    for store in stores:
-        last_history_df = pd.DataFrame()
-        for snapshot_date in pd.date_range(start_date, end_date, freq="W-MON"):
-            logger.info(
-                f"Processing weekly agg for {store=} {snapshot_date.date()} start"
-            )
-            # snapshot_date = datetime.datetime.fromisoformat(snapshot_date).date()
-            snapshot_date = snapshot_date.date()  # Monday
-            snapshot_end_date = snapshot_date + datetime.timedelta(days=6)  # Sunday
-            make_s3_app_country_metrics_history_week(
-                store,
-                snapshot_date=snapshot_date,
-                snapshot_end_date=snapshot_end_date,
-            )
-
-    start_date = datetime.datetime.fromisoformat("2026-01-26").date()
-    end_date = datetime.datetime.fromisoformat("2026-02-25").date()
-    stores = [2]
-    use_tunnel = True
-    database_connection = get_db_connection(
-        use_ssh_tunnel=use_tunnel, config_key="madrone"
-    )
-    for store in stores:
-        last_history_df = pd.DataFrame()
-        for snapshot_date in pd.date_range(start_date, end_date, freq="W-MON"):
-            logger.info(
-                f"Processing weekly agg for {store=} {snapshot_date.date()} start"
-            )
-            # snapshot_date = datetime.datetime.fromisoformat(snapshot_date).date()
-            snapshot_date = snapshot_date.date()  # Monday
-            snapshot_end_date = snapshot_date + datetime.timedelta(days=6)  # Sunday
-            last_history_df = process_app_metrics_to_db(
-                database_connection,
-                store,
-                snapshot_date,
-                snapshot_end_date,
-                last_history_df,
-            )
-
-
 def import_app_metrics_from_s3(
     database_connection: PostgresCon, start_date: datetime.date, end_date: datetime.date
 ) -> None:
     stores = [1, 2]
-    # Raw data to agg by DAY
     for store in stores:
         last_history_df = pd.DataFrame()
+        # Raw data to agg by DAY
         for snapshot_date in pd.date_range(start_date, end_date, freq="D"):
-            log_info = f"Raw app metrics for {store=} {snapshot_date.date()}"
+            log_info = f"{store=} {snapshot_date.date()} S3 raw app details agg"
             logger.info(f"{log_info} start")
-            make_s3_app_country_metrics_history_daily(
-                store,
-                snapshot_date=snapshot_date,
-            )
-            time.sleep(1)
+            # make_s3_app_country_metrics_history_daily(
+            #     store,
+            #     snapshot_date=snapshot_date,
+            # )
+            # time.sleep(1)
 
-    # Agg data by WEEK
-    for store in stores:
-        last_history_df = pd.DataFrame()
+        # Agg data by WEEK
         for snapshot_date in pd.date_range(start_date, end_date, freq="W-MON"):
-            log_info = f"App metrics for {store=} {snapshot_date.date()}"
+            log_info = f"{store=} {snapshot_date.date()} S3 agg by week"
             logger.info(f"{log_info} start")
             # snapshot_date = datetime.datetime.fromisoformat(snapshot_date).date()
             snapshot_date = snapshot_date.date()  # Monday
@@ -607,7 +542,7 @@ def import_app_metrics_from_s3(
                 snapshot_date=snapshot_date,
                 snapshot_end_date=snapshot_end_date,
             )
-            logger.info(f"{log_info} import agg to db")
+            logger.info(f"{log_info} import S3 agg to db")
             last_history_df = process_app_metrics_to_db(
                 database_connection,
                 store,
@@ -615,6 +550,7 @@ def import_app_metrics_from_s3(
                 snapshot_end_date,
                 last_history_df,
             )
+    logger.info("Rerun global weekly derived metrics start")
     import_all_app_global_metrics_weekly(database_connection)
 
 
@@ -624,7 +560,7 @@ def process_store_metrics(
     df: pd.DataFrame,
     database_connection,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
-    log_info = f"process metrics for {df.shape[0]} rows for store={store}"
+    log_info = f"{store=} process metrics for {df.shape[0]} rows"
     logger.info(f"{log_info} start")
     if store == 1:
         country_df, global_df = prep_app_google_metrics(
@@ -669,7 +605,9 @@ def delete_and_insert_app_metrics(
     snapshot_date: datetime.date,
     snapshot_end_date: datetime.date,
 ) -> None:
+    log_info = f"{store=} {snapshot_date=} delete_and_insert_app_metrics"
     table_name = "app_country_metrics_history"
+    logger.info(f"{log_info} {table_name=} start")
     delete_app_metrics_by_date_and_store(
         database_connection=database_connection,
         snapshot_start_date=snapshot_date,
@@ -683,6 +621,7 @@ def delete_and_insert_app_metrics(
         database_connection=database_connection,
     )
     table_name = "app_global_metrics_history"
+    logger.info(f"{log_info} {table_name=} start")
     delete_app_metrics_by_date_and_store(
         database_connection=database_connection,
         snapshot_start_date=snapshot_date,

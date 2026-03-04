@@ -3,7 +3,6 @@ import hashlib
 import io
 import pathlib
 import time
-import uuid
 from functools import lru_cache
 
 import numpy as np
@@ -1582,7 +1581,7 @@ def get_latest_app_country_history(
         store_app_ids[i : i + chunk_size]
         for i in range(0, len(store_app_ids), chunk_size)
     ]
-    log_info = f"query app_country_metrics_history latest apps:{len(store_app_ids)}"
+    log_info = f"{store=} {snapshot_date=} query app_country_metrics_history apps len:{len(store_app_ids)}"
     logger.info(f"{log_info} start days:{days_back} chunks:{len(chunks)}")
     end_date = snapshot_date.strftime("%Y-%m-%d")
     results = []
