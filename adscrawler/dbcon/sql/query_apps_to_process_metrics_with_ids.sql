@@ -7,7 +7,7 @@ WITH candidate_apps AS (
         sa.category AS app_category
     FROM
         frontend.store_apps_overview AS sa
-    WHERE sa.id IN :store_app_ids
+    WHERE sa.id = ANY(sa.:store_app_ids)
 )
 SELECT
     agmh.snapshot_date,
@@ -32,7 +32,7 @@ FROM candidate_apps AS ca
 INNER JOIN app_global_metrics_history AS agmh
     ON ca.store_app = agmh.store_app
 WHERE
-    agmh.snapshot_date >= current_date - INTERVAL '730 days'
+    agmh.snapshot_date >= CURRENT_DATE - INTERVAL '730 days'
     AND NOT EXISTS (
         SELECT 1
         FROM logging.app_global_metrics_weekly AS lg
