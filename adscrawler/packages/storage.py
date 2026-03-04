@@ -484,12 +484,13 @@ def download_app_by_store_id(
     df = df[~(df["version_code"] == "failed")]
     if df.empty:
         logger.error(f"S3 only has failed apk for {store_id=}, no version_code")
+    final_version_str: str
     if version_str and version_str != "-1":
         df = df[df["version_code"] == version_str]
         final_version_str = version_str
     else:
         df = df.sort_values(by="version_code", ascending=False)
-        final_version_str: str = df["version_code"].to_numpy()[0]
+        final_version_str = str(df["version_code"].to_numpy()[0])
     key = df["key"].to_numpy()[0]
     filename = key.split("/")[-1]
     extension = filename.split(".")[-1]
