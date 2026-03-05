@@ -1308,7 +1308,7 @@ def query_apps_to_process_global_metrics(
         )
     else:
         df = pd.read_sql(
-            query,
+            QUERY_APPS_TO_PROCESS_METRICS_WITH_IDS,
             con=database_connection.engine,
             params={
                 "start_date": start_datetime,
