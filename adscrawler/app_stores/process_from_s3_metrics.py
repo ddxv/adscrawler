@@ -16,8 +16,6 @@ from adscrawler.dbcon.queries import (
     delete_and_insert,
     delete_app_metrics_by_date_and_store,
     get_ecpm_benchmarks,
-    get_ios_cached_future_country_ratios,
-    get_latest_app_country_history,
     get_retention_benchmarks,
     insert_bulk,
     query_apps_to_process_global_metrics,
@@ -158,10 +156,10 @@ def recreate_s3_daily_agg(
     for snapshot_date in pd.date_range(start_date, end_date, freq="D"):
         log_info = f"{store=} {snapshot_date.date()} S3 raw app details agg"
         logger.info(f"{log_info} start")
-        make_s3_app_country_metrics_history_daily(
-            store,
-            snapshot_date=snapshot_date,
-        )
+        # make_s3_app_country_metrics_history_daily(
+        #     store,
+        #     snapshot_date=snapshot_date,
+        # )
         make_s3_app_hash_metrics_history_daily(store=store, snapshot_date=snapshot_date)
 
 
@@ -254,7 +252,8 @@ def make_s3_app_hash_metrics_history_daily(
             )
             handle_missing_trackid_files(duckdb_con, all_parquet_paths, store)
         else:
-            raise
+            # raise
+            logger.warning(f"Unexpected BinderException: {e}, investigate data issue")
     duckdb_con.close()
 
 
@@ -325,9 +324,20 @@ def merge_in_db_ids(
     return df
 
 
-def prep_app_google_metrics(
-    df: pd.DataFrame, app_country_db_latest: pd.DataFrame
-) -> pd.DataFrame:
+def process_metrics_google(df: pd.DataFrame) -> pd.DataFrame:
+    # Take the US, crawled most, installs, rating_count are already global
+    # Review_count is a max or sum depending on global_fallback logic
+    # Stars should follow the global_fallback logic
+    # At the end, after the countries pct_of_global is calculated
+    # Merge the country tiers as sum of pct_of_global back to global_df
+    global_df = df[df["country_id"] == 840].copy()
+    global_df = global_df.rename(
+        columns={
+            "week_start": "snapshot_date",
+            "global_installs": "installs",
+            "global_rating_count": "rating_count",
+        }
+    )
     df["store_last_updated"] = np.where(
         (df["store_last_updated"].isna() | df["store_last_updated"] < 0),
         None,
@@ -337,110 +347,98 @@ def prep_app_google_metrics(
         df.loc[df["store_last_updated"].notna(), "store_last_updated"],
         unit="s",
     )
-    df = df.rename(
-        columns={
-            "installs": "global_installs",
-            "rating_count": "global_rating_count",
-        }
-    )
-    # If data is being rerun, prefer 'newer' data from S3
-    cdf = pd.concat(
-        [
-            app_country_db_latest[
-                app_country_db_latest["store_app"].isin(df["store_app"].unique())
-            ],
-            df,
-        ],
-        axis=0,
-        ignore_index=True,
-    ).drop_duplicates(subset=["store_app", "country_id"], keep="last")
-    cdf["review_count"] = pd.to_numeric(cdf["review_count"], errors="coerce").fillna(0)
-    cdf["global_installs"] = pd.to_numeric(
-        cdf["global_installs"], errors="coerce"
-    ).fillna(0)
-    cdf["global_rating_count"] = pd.to_numeric(
-        cdf["global_rating_count"], errors="coerce"
-    ).fillna(0)
-    cdf["max_reviews"] = cdf.groupby("store_app")["review_count"].transform("max")
-    cdf["global_installs"] = cdf.groupby("store_app")["global_installs"].transform(
-        "max"
-    )
-    cdf["global_rating_count"] = cdf.groupby("store_app")[
-        "global_rating_count"
+    # Calculate each pct of global based on review_count
+    # This is then used to estimate installs per country
+    # pct_of_global will also be used for tiers
+    df["max_reviews"] = df.groupby(["store_app", "week_start"])[
+        "review_count"
     ].transform("max")
-    cdf["is_max_candidate"] = (cdf["review_count"] >= cdf["max_reviews"] * 0.99) & (
-        cdf["max_reviews"] > 200
-    )
-    candidate_counts = cdf.groupby("store_app")["is_max_candidate"].transform("sum")
-    cdf["is_global_fallback"] = cdf["is_max_candidate"] & (candidate_counts > 1)
-    local_app_sums = (
-        cdf[~cdf["is_global_fallback"]].groupby("store_app")["review_count"].sum()
-    )
-    cdf["global_review_count"] = np.where(
-        candidate_counts > 1,
-        cdf["max_reviews"],
-        cdf["store_app"].map(local_app_sums),
-    )
-    # Remove review_count where is_global_fallback is VERY tempting, but deletes data
-    # cdf["review_count"] = np.where(
-    #     cdf["is_global_fallback"], 0, cdf["review_count"]
-    # )
-    cdf["pct_of_global"] = (
-        (
-            np.where(cdf["is_global_fallback"], np.nan, cdf["review_count"])
-            / cdf["global_review_count"]
-        )
-        .replace(0, np.nan)
+    df["global_installs"] = df.groupby(["store_app", "week_start"])[
+        "global_installs"
+    ].transform("max")
+    df["global_rating_count"] = (
+        df.groupby(["store_app", "week_start"])["global_rating_count"]
+        .transform("max")
         .fillna(0)
     )
-    cdf["installs_est"] = (
-        (cdf["global_installs"] * cdf["pct_of_global"]).round().astype(int)
+    df["is_max_candidate"] = (df["review_count"] >= df["max_reviews"] * 0.96) & (
+        df["max_reviews"] > 200
     )
-    cdf["rating_count_est"] = (
-        (cdf["global_rating_count"] * cdf["pct_of_global"]).round().astype(int)
+    candidate_counts = df.groupby(["store_app", "week_start"])[
+        "is_max_candidate"
+    ].transform("sum")
+    # Multiple countries all near the same large max → they're all receiving the global value
+    df["is_global_fallback"] = (
+        df["is_max_candidate"].notna() & df["is_max_candidate"] & (candidate_counts > 1)
     )
-    country_df = pd.merge(
-        df.drop(columns=["global_installs", "global_rating_count"]),
-        cdf[
-            [
-                "store_app",
-                "country_id",
-                "installs_est",
-                "rating_count_est",
-                "global_review_count",
-                "global_installs",
-                "global_rating_count",
-            ]
-        ],
-        on=["store_app", "country_id"],
-        how="left",
-        validate="1:1",
+    # For fallback rows: we don't know their true country split → set pct to 0
+    df["true_review_count"] = np.where(df["is_global_fallback"], 0, df["review_count"])
+    # Since the US has a long history of being queried
+    # Use country ratio of review_counts to backfill missing review_counts
+    # Found useful for musically
+    us_lookup = (
+        df[df["country_id"] == 840]
+        .groupby(["store_app", "week_start"])["true_review_count"]
+        .max()
     )
-    country_df["review_count"] = (
-        country_df["review_count"].replace(np.nan, 0).astype(int)
+    df["us_review_count"] = df.set_index(["store_app", "week_start"]).index.map(
+        us_lookup
     )
-    country_df["global_rating_count"] = (
-        country_df["global_rating_count"].fillna(0).astype(int)
+    df["pct_of_us_reviews"] = df["true_review_count"] / df["us_review_count"].replace(
+        0, np.nan
     )
-    country_df["global_review_count"] = (
-        country_df["global_review_count"].fillna(0).astype(int)
+    df["pct_of_us_reviews"] = df.groupby(["store_app", "country_id"])[
+        ["pct_of_us_reviews"]
+    ].bfill()
+    df["true_review_count"] = np.where(
+        df["true_review_count"].isna(),
+        df["us_review_count"] * df["pct_of_us_reviews"],
+        df["true_review_count"],
     )
-    country_df["global_installs"] = country_df["global_installs"].fillna(0).astype(int)
+    local_sums = (
+        df[~df["is_global_fallback"]]
+        .groupby(["store_app", "week_start"])["true_review_count"]
+        .sum()
+    )
+    # has_any_candidate = candidate_counts > 0
+    has_global_fallback = df.groupby(["store_app", "week_start"])[
+        "is_global_fallback"
+    ].transform("sum")
+    # Multiple countries all nea
+    df["global_review_count"] = np.where(
+        has_global_fallback,
+        df["max_reviews"],  # best single-source estimate of global
+        df.set_index(["store_app", "week_start"]).index.map(local_sums).values,
+    )
+    df["pct_of_global"] = (
+        (df["true_review_count"] / df["global_review_count"])
+        .replace([np.inf, -np.inf], np.nan)
+        .fillna(0)
+    )
+    df["installs_est"] = (
+        (df["global_installs"] * df["pct_of_global"]).round().astype(int)
+    )
+    df["rating_count_est"] = (
+        (df["global_rating_count"] * df["pct_of_global"]).round().astype(int)
+    )
+    df["true_review_count"] = pd.to_numeric(
+        df["true_review_count"], errors="coerce"
+    ).fillna(0)
+    # df["review_count"] = df["review_count"].replace(np.nan, 0).astype(int)
+    # df["global_rating_count"] = df["global_rating_count"].fillna(0).astype(int)
+    # df["global_review_count"] = df["global_review_count"].fillna(0).astype(int)
+    # df["global_installs"] = df["global_installs"].fillna(0).astype(int)
     # Db currently does not have a rating_count_est column just for country
-    country_df["rating_count"] = country_df["rating_count_est"]
-    assert country_df["global_rating_count"].ge(country_df["rating_count"]).all(), (
-        "global_rating_count should be >= rating_count"
-    )
-    global_df = country_df[country_df["country"] == "US"].copy()
-    global_df = global_df.drop(columns=["rating_count", "review_count"]).rename(
-        columns={
-            "global_installs": "installs",
-            "global_rating_count": "rating_count",
-            "global_review_count": "review_count",
-        }
-    )
+    # df["rating_count"] = df["rating_count_est"]
+    # assert (
+    #     df["global_rating_count"].ge(df["rating_count"]).all()
+    # ), "global_rating_count should be >= rating_count"
     global_df = global_df.set_index(GLOBAL_HISTORY_KEYS)
     # TODO: Stars need to be fixed per is_global_fallback logic
+    histo_nulls = global_df["histogram"].isna()
+    global_df.loc[histo_nulls, "histogram"] = pd.Series(
+        [[0, 0, 0, 0, 0]] * histo_nulls.sum(), index=global_df.index[histo_nulls]
+    )
     star_df = pd.DataFrame(global_df["histogram"].tolist(), index=global_df.index)
     try:
         star_df.columns = STAR_COLS
@@ -449,63 +447,105 @@ def prep_app_google_metrics(
             if col not in star_df.columns:
                 star_df[col] = 0
     global_df = pd.concat([global_df, star_df], axis=1)
-    tier_pct = cdf.pivot_table(
-        index=["store_app"],
-        columns="tier",
-        values="pct_of_global",
-        aggfunc="sum",
-        fill_value=0,
-        dropna=False,
-    ).rename(columns={"tier1": "tier1_pct", "tier2": "tier2_pct", "tier3": "tier3_pct"})
+    tier_pct = (
+        df.rename(columns={"week_start": "snapshot_date"})
+        .pivot_table(
+            index=GLOBAL_HISTORY_KEYS,
+            columns="tier",
+            values="pct_of_global",
+            aggfunc="sum",
+            fill_value=0,
+            dropna=False,
+        )
+        .rename(
+            columns={"tier1": "tier1_pct", "tier2": "tier2_pct", "tier3": "tier3_pct"}
+        )
+    )
     global_df = global_df.join(tier_pct)
+    df["rating"] = df["rating"].replace(0, np.nan)
+    df["rating_count_est"] = df["rating_count_est"].replace(0, np.nan)
+    df.loc[
+        (df["rating_count_est"] > 0) & (df["rating"] > 0), "rating_count_counter"
+    ] = df["rating_count_est"]
+    df["rating_prod"] = df["rating"] * df["rating_count_est"]
+    grouped = df.rename(columns={"week_start": "snapshot_date"}).groupby(
+        GLOBAL_HISTORY_KEYS
+    )
+    agg = grouped.agg(
+        total_prod=("rating_prod", "sum"), total_counts=("rating_count_counter", "sum")
+    )
+    agg["rating"] = agg["total_prod"] / agg["total_counts"].replace(0, np.nan)
+    global_df["rating"] = agg["rating"]
+    global_df[["tier1_pct", "tier2_pct", "tier3_pct"]]
+    tier_cols = ["tier1_pct", "tier2_pct", "tier3_pct"]
+    row_sums = global_df[tier_cols].sum(axis=1)
+    global_df[tier_cols] = global_df[tier_cols].div(row_sums.replace(0, np.nan), axis=0)
     global_df = global_df.reset_index()
-    return country_df, global_df
+    df = df.rename(
+        columns={
+            "week_start": "snapshot_date",
+            "true_review_count": "review_count",
+            "installs_est": "installs",
+            "rating_count_est": "rating_count",
+        }
+    )
+    return df, global_df
+
+    df["histogram"].head(12).str.extractall(r"(\d+)").reset_index().pivot_table(
+        index="level_0", columns="match", values=0, aggfunc="first"
+    )
 
 
-def prep_app_apple_metrics(
+def process_metrics_apple(
     df: pd.DataFrame,
     app_country_db_latest: pd.DataFrame,
     database_connection: PostgresCon,
 ) -> pd.DataFrame:
-    # TODO try replace unstack with .reset_index().pivot_table(index="level_0", columns="match", values=0, aggfunc="first")
+    # ratings_str = (
+    #     df["histogram"].head(20).str.extractall(r"(\d+)").unstack()
+    #     .astype("Int64")
+    #     .reindex(df.index, fill_value=0)
+    # )
     ratings_str = (
-        df["user_ratings"]
+        df["histogram"]
         .str.extractall(r"(\d+)")
-        .unstack()
+        .reset_index()
+        .pivot_table(index="level_0", columns="match", values=0, aggfunc="first")
         .astype("Int64")
         .reindex(df.index, fill_value=0)
     )
     df[STAR_COLS] = ratings_str.iloc[:, 1::2].astype(int).to_numpy()
+
     df["store_last_updated"] = pd.to_datetime(
         df["store_last_updated"], format="ISO8601", utc=True
     )
     df = estimate_ios_installs(df)
-    cdf = pd.concat(
-        [
-            app_country_db_latest[
-                app_country_db_latest["store_app"].isin(df["store_app"].unique())
-            ],
-            df,
-        ],
-        ignore_index=True,
-        axis=0,
-    ).drop_duplicates(subset=["store_app", "country_id"], keep="last")
-    # cdf = cdf.sort_values(by=["crawled_date"], ascending=True).drop_duplicates(
-    #     subset=["store_app", "country_id"], keep="last"
-    # )
-    cdf["rating_prod"] = cdf["rating"] * cdf["rating_count"]
-    future_ios_ratios = get_ios_cached_future_country_ratios(database_connection)
-    cdf = pd.merge(
-        cdf,
-        future_ios_ratios[
-            future_ios_ratios["store_app"].isin(df["store_app"].unique().tolist())
-        ],
-        how="outer",
+    df["rating_prod"] = df["rating"] * df["rating_count"]
+    # future_ios_ratios = get_ios_cached_future_country_ratios(database_connection)
+    total = (
+        df.groupby(["store_app", "country_id"])["rating_count"]
+        .sum()
+        .rename("total_ratings")
+    )
+    # Latest rating_count per store_app + country_id (by week_start)
+    latest = (
+        df.sort_values("week_start")
+        .groupby(["store_app", "country_id"])["rating_count"]
+        .last()
+        .rename("latest_rating_count")
+    )
+    result = pd.concat([latest, total], axis=1)
+    result = result[result["latest_rating_count"] > 0]
+    result = result[result["total_ratings"] > 0]
+    result["rating_ratio"] = result["latest_rating_count"] / result["total_ratings"]
+    future_ios_ratios = result.reset_index()
+    df = pd.merge(
+        df,
+        future_ios_ratios,
+        how="left",
         on=["store_app", "country_id"],
     )
-    cdf["global_rating_count"] = cdf.groupby("store_app")["rating_count"].transform(
-        "sum"
-    )
+    df["global_rating_count"] = df.groupby("store_app")["rating_count"].transform("sum")
     # Here CDF is the latest row per country per app, some countries older
     cdf["grc_future_est_a"] = cdf["rating_count"] / cdf["rating_ratio"]
     cdf["grc_est_prod"] = cdf["rating_count"] * cdf["grc_future_est_a"]
@@ -567,28 +607,29 @@ def import_app_metrics_from_s3(
         # Raw data to agg by DAY
         recreate_s3_daily_agg(store=store, start_date=start_date, end_date=end_date)
 
-        # Agg data by WEEK
-        # this snaps back to earliest monday
-        adjusted_start = start_date - pd.Timedelta(days=start_date.weekday())
-        for snapshot_date in pd.date_range(adjusted_start, end_date, freq="W-MON"):
-            log_info = f"{store=} {snapshot_date.date()} S3 agg by week"
-            logger.info(f"{log_info} start")
-            # snapshot_date = datetime.datetime.fromisoformat(snapshot_date).date()
-            snapshot_date = snapshot_date.date()  # Monday
-            snapshot_end_date = snapshot_date + datetime.timedelta(days=6)  # Sunday
-            make_s3_app_country_metrics_history_week(
-                store,
-                snapshot_date=snapshot_date,
-                snapshot_end_date=snapshot_end_date,
-            )
-            logger.info(f"{log_info} import S3 agg to db")
-            last_history_df = process_app_metrics_to_db(
-                database_connection,
-                store,
-                snapshot_date,
-                snapshot_end_date,
-                last_history_df,
-            )
+        # odf = get_raw_app_hash_buckets_from_s3(
+        #     start_date_mon=start_date, end_date=end_date, store=store, app_hash="50"
+        # )
+
+        # odf[
+        # (odf["store_id"] == "com.zhiliaoapp.musically") & (odf["country"] == "US")
+        # ].sort_values("snapshot_date")[["snapshot_date", "country", "installs"]]
+
+        start_date_mon = start_date - pd.Timedelta(days=start_date.weekday())
+        raw_df = get_app_hash_buckets_from_s3(
+            start_date_mon=start_date_mon, end_date=end_date, store=store, app_hash="06"
+        )
+
+        df = raw_df.copy()
+
+        process_app_metrics_to_db(
+            database_connection,
+            store,
+            snapshot_date,
+            snapshot_end_date,
+            last_history_df,
+        )
+
         # Rerun specifically apps that just changed
         # Short list since this is basically reruning the weekly data daily, so only largest apps change
         if store == 1:
@@ -612,23 +653,236 @@ def import_app_metrics_from_s3(
     )
 
 
-def process_store_metrics(
+def get_raw_app_hash_buckets_from_s3(
+    start_date_mon: datetime.date, end_date: datetime.date, store: int, app_hash: str
+) -> pd.DataFrame:
+    s3_config_key = "s3"
+    bucket = CONFIG[s3_config_key]["bucket"]
+    all_parquet_paths = []
+    for ddt in pd.date_range(start_date_mon, end_date, freq="D"):
+        ddt_str = ddt.strftime("%Y-%m-%d")
+        prefix = f"{AGG_APP_HASH_BUCKETS}/store={store}/hash_bucket={app_hash}/snapshot_date={ddt_str}/"
+        all_parquet_paths += get_parquet_paths_by_prefix(bucket, prefix)
+    if len(all_parquet_paths) == 0:
+        logger.warning(
+            f"No parquet paths found for agg app hash buckets {store=} {start_date_mon=} {end_date=}"
+        )
+        return pd.DataFrame()
+    if store == 1:
+        metrics = [
+            "installs",
+            "rating",
+            "rating_count",
+            "review_count",
+            "histogram",
+            "store_last_updated",
+        ]
+    query = f"""SELECT 
+       snapshot_date, store_id, country, {",".join(metrics)}
+      FROM read_parquet({all_parquet_paths}, union_by_name=true)
+    """
+    duckdb_con = get_duckdb_connection(s3_config_key)
+    df = duckdb_con.execute(query).df()
+    duckdb_con.close()
+    return df
+
+
+def get_app_hash_buckets_from_s3(
+    start_date_mon: datetime.date, end_date: datetime.date, store: int, app_hash: str
+) -> pd.DataFrame:
+    s3_config_key = "s3"
+    bucket = CONFIG[s3_config_key]["bucket"]
+    all_parquet_paths = []
+    for ddt in pd.date_range(start_date_mon, end_date, freq="D"):
+        ddt_str = ddt.strftime("%Y-%m-%d")
+        prefix = f"{AGG_APP_HASH_BUCKETS}/store={store}/hash_bucket={app_hash}/snapshot_date={ddt_str}/"
+        all_parquet_paths += get_parquet_paths_by_prefix(bucket, prefix)
+    if len(all_parquet_paths) == 0:
+        logger.warning(
+            f"No parquet paths found for agg app hash buckets {store=} {start_date_mon=} {end_date=}"
+        )
+        return pd.DataFrame()
+    if store == 1:
+        metrics = [
+            "installs",
+            "rating_count",
+            "review_count",
+        ]
+        interpolated_metrics = """
+                MAX_BY(installs,     snapshot_date) OVER w_past   AS installs_y1,
+                MIN_BY(installs,     snapshot_date) OVER w_future AS installs_y2,
+                MAX_BY(rating_count, snapshot_date) OVER w_past   AS rating_count_y1,
+                MIN_BY(rating_count, snapshot_date) OVER w_future AS rating_count_y2,
+                MAX_BY(review_count, snapshot_date) OVER w_past   AS review_count_y1,
+                MIN_BY(review_count, snapshot_date) OVER w_future AS review_count_y2,
+                """
+        coalesce_metrics = """
+                COALESCE(
+                    a_exact.installs,
+                    a_prev.installs_y1 +
+                        (m.snapshot_date - a_prev.x1) *
+                        (a_prev.installs_y2 - a_prev.installs_y1) /
+                        (a_prev.x2 - a_prev.x1)::DOUBLE
+                )::BIGINT AS installs,
+                COALESCE(
+                    a_exact.rating_count,
+                    a_prev.rating_count_y1 +
+                        (m.snapshot_date - a_prev.x1) *
+                        (a_prev.rating_count_y2 - a_prev.rating_count_y1) /
+                        (a_prev.x2 - a_prev.x1)::DOUBLE
+                )::BIGINT AS rating_count,
+                COALESCE(
+                    a_exact.review_count,
+                    a_prev.review_count_y1 +
+                        (m.snapshot_date - a_prev.x1) *
+                        (a_prev.review_count_y2 - a_prev.review_count_y1) /
+                        (a_prev.x2 - a_prev.x1)::DOUBLE
+                )::BIGINT AS review_count,
+                """
+        histogram = "histogram,"
+    if store == 2:
+        histogram = "user_ratings AS histogram,"
+        metrics = [
+            "rating_count",
+        ]
+        interpolated_metrics = """
+                MAX_BY(rating_count, snapshot_date) OVER w_past   AS rating_count_y1,
+                MIN_BY(rating_count, snapshot_date) OVER w_future AS rating_count_y2,
+                """
+        coalesce_metrics = """
+               COALESCE(
+                    a_exact.rating_count,
+                    a_prev.rating_count_y1 +
+                        (m.snapshot_date - a_prev.x1) *
+                        (a_prev.rating_count_y2 - a_prev.rating_count_y1) /
+                        (a_prev.x2 - a_prev.x1)::DOUBLE
+                )::BIGINT AS rating_count, 
+                """
+    start_date_mon_str = start_date_mon.strftime("%Y-%m-%d")
+    end_date_str = end_date.strftime("%Y-%m-%d")
+    msv_query = f"""WITH 
+        raw_data AS (
+            SELECT
+                store_id,
+                country,
+                CAST(snapshot_date AS DATE) AS snapshot_date,
+                {",".join(metrics)},
+                rating,
+                {histogram}
+                store_last_updated
+            FROM read_parquet({all_parquet_paths}, hive_partitioning = true, union_by_name = true)
+        ),
+        raw_deduped AS (
+            SELECT
+                store_id, country, snapshot_date,
+                {",".join(["MAX(" + metric + ") AS " + metric for metric in metrics])},
+                MAX(rating)            AS rating,
+                MAX(histogram)         AS histogram,
+                MAX(store_last_updated) AS store_last_updated
+            FROM raw_data
+            GROUP BY store_id, country, snapshot_date
+        ),
+
+        target_mondays AS (
+            SELECT CAST(range AS DATE) AS snapshot_date
+            FROM range(DATE '{start_date_mon_str}', DATE '{end_date_str}', INTERVAL 7 DAY)
+        ),
+
+        -- ============================================================
+        -- Anchors — window functions over real rows only
+        -- ============================================================
+        anchors AS (
+            SELECT
+                store_id,
+                country,
+                snapshot_date,
+                -- Actuals (used when a real crawl lands on a Monday)
+                {",".join(metrics)},
+                rating,
+                histogram,
+                store_last_updated,
+                -- Interpolation anchors
+               {interpolated_metrics} 
+                -- Shared x-axis
+                MAX(snapshot_date) OVER w_past   AS x1,
+                MIN(snapshot_date) OVER w_future AS x2,
+                -- Carry-forward
+                MAX_BY(rating,             snapshot_date) OVER w_past_inclusive AS rating_carry,
+                MAX_BY(histogram,          snapshot_date) OVER w_past_inclusive AS histogram_carry,
+                MAX_BY(store_last_updated, snapshot_date) OVER w_past_inclusive AS store_last_updated_carry
+            FROM raw_deduped
+            WINDOW
+                w_past AS (PARTITION BY store_id, country
+                           ORDER BY snapshot_date
+                           ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING),
+                w_future AS (PARTITION BY store_id, country
+                             ORDER BY snapshot_date
+                             ROWS BETWEEN 1 FOLLOWING AND UNBOUNDED FOLLOWING),
+                w_past_inclusive AS (PARTITION BY store_id, country
+                                     ORDER BY snapshot_date
+                                     ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)
+        ),
+
+        -- ============================================================
+        -- 4. Interpolate onto Mondays
+        -- ============================================================
+        interpolated AS (
+            SELECT
+                dims.store_id,
+                dims.country,
+                m.snapshot_date AS week_start,
+                {coalesce_metrics}
+                COALESCE(a_exact.rating,             a_prev.rating_carry)              AS rating,
+                COALESCE(a_exact.histogram,          a_prev.histogram_carry)           AS histogram,
+                COALESCE(a_exact.store_last_updated, a_prev.store_last_updated_carry)  AS store_last_updated
+
+            FROM (SELECT DISTINCT store_id, country FROM raw_deduped) dims
+            CROSS JOIN target_mondays m
+
+            -- Exact hit: real crawl on this Monday
+            LEFT JOIN anchors a_exact
+                   ON a_exact.store_id      = dims.store_id
+                  AND a_exact.country       = dims.country
+                  AND a_exact.snapshot_date = m.snapshot_date
+
+            -- Bracketing anchor: the real row whose gap contains this Monday
+            LEFT JOIN anchors a_prev
+               ON a_prev.store_id      = dims.store_id
+              AND a_prev.country       = dims.country
+              AND a_prev.snapshot_date = (
+                      SELECT MAX(snapshot_date) 
+                      FROM raw_deduped
+                      WHERE store_id      = dims.store_id
+                        AND country       = dims.country
+                        AND snapshot_date < m.snapshot_date
+                  )
+
+            WHERE a_exact.{metrics[0]} IS NOT NULL             -- exact hit, OR
+               OR (a_prev.x1 IS NOT NULL                  -- bracketed: drop leading/trailing
+                   AND a_prev.x2 IS NOT NULL)
+        )
+
+        SELECT * FROM interpolated
+        ORDER BY store_id, country, week_start;
+        """
+    duckdb_con = get_duckdb_connection(s3_config_key)
+    df = duckdb_con.execute(msv_query).df()
+    duckdb_con.close()
+    return df
+
+
+def process_metrics(
     store: int,
-    app_country_db_latest: pd.DataFrame,
     df: pd.DataFrame,
     database_connection: PostgresCon,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     log_info = f"{store=} process metrics for {df.shape[0]} rows"
     logger.info(f"{log_info} start")
     if store == 1:
-        country_df, global_df = prep_app_google_metrics(
-            df=df,
-            app_country_db_latest=app_country_db_latest,
-        )
+        country_df, global_df = process_metrics_google(df=df)
     elif store == 2:
-        country_df, global_df = prep_app_apple_metrics(
+        country_df, global_df = process_metrics_apple(
             df=df,
-            app_country_db_latest=app_country_db_latest,
             database_connection=database_connection,
         )
     country_df = country_df.convert_dtypes(dtype_backend="pyarrow")
@@ -703,7 +957,7 @@ def process_app_metrics_to_db(
 ) -> pd.DataFrame:
     log_info = f"date={snapshot_date} store={store}"
     logger.info(f"{log_info} start")
-    df = get_s3_agg_weekly_snapshots(snapshot_date, snapshot_end_date, store)
+    # df = get_s3_agg_weekly_snapshots(snapshot_date, snapshot_end_date, store)
     if df.empty:
         logger.warning(
             f"No data found for S3 agg app metrics {store=} {snapshot_date=}"
@@ -711,71 +965,69 @@ def process_app_metrics_to_db(
         return last_history_df
     if store == 2:
         # This is an issue and needs to be resolved in the way the iOS store_id is stored into S3
-        problem_rows = df["store_id"].str.contains(".0")
+        problem_rows = df["store_id"].str.contains(".0", regex=False)
         if problem_rows.any():
-            logger.warning(
-                f'Apple App IDs: Found {problem_rows.sum()}/{df.shape[0]} store_id with ".0" suffix, fixing'
+            raise ValueError(
+                f"Found {problem_rows.sum()} rows with .0 suffix in store_id for Apple"
             )
-            df.loc[problem_rows, "store_id"] = (
-                df.loc[problem_rows, "store_id"].str.split(".").str[0]
-            )
-            df["crawled_at"] = df["crawled_at"].sort_values(ascending=True)
-            df = df.drop_duplicates(
-                ["snapshot_date", "country", "store_id"], keep="last"
-            )
+            # logger.warning(
+            #     f'Apple App IDs: Found {problem_rows.sum()}/{df.shape[0]} store_id with ".0" suffix, fixing'
+            # )
+            # df.loc[problem_rows, "store_id"] = (
+            #     df.loc[problem_rows, "store_id"].str.split(".").str[0]
+            # )
+            # df["crawled_at"] = df["crawled_at"].sort_values(ascending=True)
+            # df = df.drop_duplicates(
+            #     ["snapshot_date", "country", "store_id"], keep="last"
+            # )
     df = merge_in_db_ids(df, store, database_connection)
-    max_days_back = 180
-    rolling_days = 7
-    current_ids = df["store_app"].unique()
-    if last_history_df.empty:
-        missing_app_ids = current_ids
-        current_existing_ids = []
-    else:
-        existing_ids = last_history_df["store_app"].unique()
-        missing_app_ids = np.setdiff1d(current_ids, existing_ids)
-        current_existing_ids = np.setdiff1d(current_ids, missing_app_ids)
-    # Fetch recent only for apps that we already pulled 180 days
-    if len(current_existing_ids) > 0:
-        recent_history = get_latest_app_country_history(
-            database_connection,
-            snapshot_date=snapshot_date,
-            days_back=rolling_days,
-            chunk_size=25000,
-            store_app_ids=current_existing_ids,
-            store=store,
+    df = df.drop(["store_id", "country"], axis=1)
+    # df = df[df["store_app"] == 776750].sort_values(["week_start", "country_id"])
+    if store == 1:
+        df = df.rename(
+            columns={
+                "installs": "global_installs",
+                "rating_count": "global_rating_count",
+            }
         )
-    else:
-        recent_history = pd.DataFrame()
-    # Deep fetch only for new apps
-    if len(missing_app_ids) > 0:
-        new_apps_history = get_latest_app_country_history(
-            database_connection,
-            snapshot_date=snapshot_date,
-            days_back=max_days_back,
-            chunk_size=25000,
-            store_app_ids=missing_app_ids,
-            store=store,
-        )
-    else:
-        new_apps_history = pd.DataFrame()
-    app_country_db_latest = pd.concat(
-        [last_history_df, new_apps_history, recent_history],
-        ignore_index=True,
-    )
-    app_country_db_latest = app_country_db_latest.sort_values(
-        ["store_app", "country_id", "crawled_date"]
-    )
-    app_country_db_latest = app_country_db_latest.drop_duplicates(
-        subset=["store_app", "country_id"],
-        keep="last",
-    )
-    start_date = snapshot_date - datetime.timedelta(days=max_days_back)
-    app_country_db_latest = app_country_db_latest[
-        app_country_db_latest["crawled_date"] > pd.to_datetime(start_date)
+    app_birth_dates = df.groupby("store_app")["week_start"].min()
+    observed_app_countries = df[["store_app", "country_id"]].drop_duplicates()
+    all_weeks = pd.DataFrame({"week_start": df["week_start"].unique()})
+    full_df = observed_app_countries.merge(all_weeks, how="cross")
+    full_df = full_df[
+        full_df["week_start"] >= full_df["store_app"].map(app_birth_dates)
     ]
-    country_df, global_df = process_store_metrics(
+    full_index = pd.MultiIndex.from_frame(
+        full_df[["store_app", "week_start", "country_id"]]
+    )
+    df = (
+        df.set_index(["store_app", "week_start", "country_id"])
+        .reindex(full_index)
+        .sort_index()
+        .reset_index()
+    )
+    if store == 1:
+        cols_to_ffill = [
+            "review_count",
+            "global_installs",
+            "global_rating_count",
+            "rating",
+            "store_last_updated",
+            "histogram",
+        ]
+    elif store == 2:
+        cols_to_ffill = [
+            "rating_count",
+            "rating",
+            "store_last_updated",
+            "histogram",
+        ]
+    df[cols_to_ffill] = df.groupby(["store_app", "country_id"])[cols_to_ffill].ffill()
+    df = df.reset_index()
+    country_map = query_countries(database_connection=database_connection)
+    df["tier"] = df["country_id"].map(country_map.set_index("id")["tier"])
+    country_df, global_df = process_metrics(
         store=store,
-        app_country_db_latest=app_country_db_latest,
         df=df,
         database_connection=database_connection,
     )
@@ -996,7 +1248,7 @@ def copy_raw_details_to_hash_buckets(
                   SELECT 
                       {data_cols},
                       -- Generate a 2-character hex hash bucket from the store_id
-                      printf('%02x', abs(hash(store_id)) % 256) AS hash_bucket,
+                      left(md5(store_id), 2) AS hash_bucket,
                       '{snapshot_date_str}' AS snapshot_date
                   FROM read_parquet({app_detail_parquets}, union_by_name=true)
                     {crawl_result_filter}
