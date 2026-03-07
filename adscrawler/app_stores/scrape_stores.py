@@ -321,7 +321,7 @@ def crawl_keyword_ranks(database_connection: PostgresCon) -> None:
     all_keywords = pd.DataFrame()
     for _id, row in kdf.iterrows():
         logger.info(
-            f"Crawling keywords: {_id}/{kdf.shape[0]} keyword={row.keyword_text}"
+            f"Crawling keywords: {_id}/{kdf.shape[0]:,} keyword={row.keyword_text}"
         )
         keyword = row.keyword_text
         try:
@@ -480,7 +480,7 @@ def scrape_keyword(
         logger.exception(f"{keyword=} apple failed")
     df = pd.concat([gdf, adf])
     logger.info(
-        f"{keyword=} apple_apps:{adf.shape[0]} google_apps:{gdf.shape[0]} finished"
+        f"{keyword=} apple_apps:{adf.shape[0]:,} google_apps:{gdf.shape[0]:,} finished"
     )
     df = df[["store", "store_id", "rank"]]
     return df
@@ -589,7 +589,7 @@ def crawl_developers_for_new_store_ids(
             key_columns=key_columns,
             database_connection=database_connection,
         )
-        logger.info(f"{store=} crawled, {apps_df.shape[0]} new store ids")
+        logger.info(f"{store=} crawled, {apps_df.shape[0]:,} new store ids")
     if store == 2:
         for _id, row in df.iterrows():
             developer_db_id = row["id"]
@@ -626,7 +626,7 @@ def crawl_developers_for_new_store_ids(
                     key_columns=key_columns,
                     database_connection=database_connection,
                 )
-                logger.info(f"{row_info=} crawled, {apps_df.shape[0]} new store ids")
+                logger.info(f"{row_info=} crawled, {apps_df.shape[0]:,} new store ids")
             except Exception:
                 logger.exception(f"{row_info=} failed!")
 

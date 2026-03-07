@@ -271,7 +271,7 @@ def upsert_urls(urls: list[str], database_connection: PostgresCon) -> pd.DataFra
     new_urls_df["url_hash"] = new_urls_df["url"].apply(
         lambda x: hashlib.md5(x.encode()).hexdigest()
     )
-    logger.info(f"Upserting {new_urls_df.shape[0]} new urls")
+    logger.info(f"Upserting {new_urls_df.shape[0]:,} new urls")
     new_urls_df: pd.DataFrame = upsert_df(
         df=new_urls_df,
         database_connection=database_connection,

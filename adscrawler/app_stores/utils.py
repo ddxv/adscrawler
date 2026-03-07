@@ -52,7 +52,7 @@ def check_and_insert_new_apps(
         logger.info(f"Scrape {store=} {crawl_source=} no new apps")
         return
     logger.info(
-        f"Scrape {store=} {crawl_source=} insert new apps to db {new_apps_df.shape[0]}",
+        f"Scrape {store=} {crawl_source=} insert new apps to db {new_apps_df.shape[0]:,}",
     )
     insert_columns = ["store", "store_id"]
     inserted_apps: pd.DataFrame = upsert_df(

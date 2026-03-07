@@ -28,7 +28,7 @@ def download_all_mitms(database_connection: PostgresCon) -> None:
         database_connection=database_connection
     )
     for i, app in apps_to_download.iterrows():
-        logger.info(f"{i}/{apps_to_download.shape[0]}: {app['store_id']} start")
+        logger.info(f"{i}/{apps_to_download.shape[0]:,}: {app['store_id']} start")
         pub_store_id = app["store_id"]
         # Check if any log files exist for this pub_store_id
         if list(pathlib.Path(MITM_DIR).glob(f"{pub_store_id}_*.log")):

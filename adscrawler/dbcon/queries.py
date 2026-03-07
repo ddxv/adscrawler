@@ -593,7 +593,7 @@ def query_developers(
         ;
         """
     df = pd.read_sql(sel_query, database_connection.engine)
-    logger.info(f"Query developers {store=} returning rows:{df.shape[0]}")
+    logger.info(f"Query developers {store=} returning rows:{df.shape[0]:,}")
     return df
 
 
@@ -744,7 +744,7 @@ def upsert_sdk_details_df(
         }
     )
     key_insert_columns = ["xml_path", "tag", "value_name"]
-    logger.info(f"{store_id=} insert {details_df.shape[0]} version_strings to db")
+    logger.info(f"{store_id=} insert {details_df.shape[0]:,} version_strings to db")
     details_df.loc[details_df["tag"].isna(), "tag"] = ""
     strings_df = details_df[key_insert_columns + ["version_code"]].drop_duplicates()
     version_strings_df = upsert_df(
@@ -1290,34 +1290,34 @@ def query_apps_to_process_keywords(
     return df
 
 
-def query_apps_to_process_global_metrics(
-    database_connection: PostgresCon,
-    batch_size: int,
-    start_datetime: str,
-    store_app_ids: list[int] | None = None,
-) -> pd.DataFrame:
-    """Query apps to process metrics."""
-    if store_app_ids is None:
-        df = pd.read_sql(
-            QUERY_APPS_TO_PROCESS_METRICS,
-            con=database_connection.engine,
-            params={
-                "batch_size": batch_size,
-                "start_date": start_datetime,
-            },
-        )
-    else:
-        df = pd.read_sql(
-            QUERY_APPS_TO_PROCESS_METRICS_WITH_IDS,
-            con=database_connection.engine,
-            params={
-                "start_date": start_datetime,
-                "store_app_ids": store_app_ids,
-            },
-        )
-    tiers = ["tier1_pct", "tier2_pct", "tier3_pct"]
-    df[tiers] = (df[tiers] / 10000).fillna(0)
-    return df
+# def query_apps_to_process_global_metrics(
+#     database_connection: PostgresCon,
+#     batch_size: int,
+#     start_datetime: str,
+#     store_app_ids: list[int] | None = None,
+# ) -> pd.DataFrame:
+#     """Query apps to process metrics."""
+#     if store_app_ids is None:
+#         df = pd.read_sql(
+#             QUERY_APPS_TO_PROCESS_METRICS,
+#             con=database_connection.engine,
+#             params={
+#                 "batch_size": batch_size,
+#                 "start_date": start_datetime,
+#             },
+#         )
+#     else:
+#         df = pd.read_sql(
+#             QUERY_APPS_TO_PROCESS_METRICS_WITH_IDS,
+#             con=database_connection.engine,
+#             params={
+#                 "start_date": start_datetime,
+#                 "store_app_ids": store_app_ids,
+#             },
+#         )
+#     tiers = ["tier1_pct", "tier2_pct", "tier3_pct"]
+#     df[tiers] = (df[tiers] / 10000).fillna(0)
+#     return df
 
 
 def query_apps_mitm_in_s3(database_connection: PostgresCon) -> pd.DataFrame:
@@ -1651,7 +1651,7 @@ def get_all_mmp_tlds(database_connection: PostgresCon) -> pd.DataFrame:
 #     )
 #     df["crawled_date"] = pd.to_datetime(df["snapshot_date"])
 #     df = df.drop(columns=["snapshot_date"])
-#     logger.info(f"{log_info} returning {df.shape[0]} rows")
+#     logger.info(f"{log_info} returning {df.shape[0]:,} rows")
 #     return df
 
 
@@ -1779,3 +1779,26 @@ def delete_app_metrics_by_date_and_apps(
 #             """
 #     df = pd.read_sql(sel_query, con=database_connection.engine)
 #     return df
+
+
+def query_store_app_categories(
+    database_connection: PostgresCon, store_apps: list[int]
+) -> pd.DataFrame:
+    """Get store app category map."""
+    store_apps_tuple = tuple(store_apps)
+    sel_query = text(
+        """SELECT 
+        id as store_app, 
+        category as app_category, 
+        ad_supported, 
+        in_app_purchases
+    FROM frontend.store_apps_overview 
+    WHERE id in :store_apps
+    """
+    ).bindparams(bindparam("store_apps", expanding=True))
+    df = pd.read_sql(
+        sel_query,
+        con=database_connection.engine,
+        params={"store_apps": store_apps_tuple},
+    )
+    return df

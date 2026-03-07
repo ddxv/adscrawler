@@ -34,7 +34,7 @@ logger = get_logger(__name__, "scrape_stores")
 def raw_keywords_to_s3(
     df: pd.DataFrame,
 ) -> None:
-    logger.info(f"S3 upload keywords rows={df.shape[0]} start")
+    logger.info(f"S3 upload keywords rows={df.shape[0]:,} start")
     s3_client = get_s3_client()
     bucket = CONFIG["s3"]["bucket"]
     df["store_id"] = df["store_id"].astype(str)
@@ -60,7 +60,7 @@ def app_details_to_s3(
     df: pd.DataFrame,
     store: int,
 ) -> None:
-    logger.info(f"S3 upload app_details {store=}, rows={df.shape[0]} start")
+    logger.info(f"S3 upload app_details {store=}, rows={df.shape[0]:,} start")
     if store is None:
         raise ValueError("store is required")
     s3_client = get_s3_client()
@@ -340,7 +340,7 @@ def import_keywords_from_s3(
                 )
             df["store"] = store
             logger.info(
-                f"Keywords from S3 insert {snapshot_date} {store=} {df.shape[0]} rows"
+                f"Keywords from S3 insert {snapshot_date} {store=} {df.shape[0]:,} rows"
             )
             delete_and_insert(
                 df=df,

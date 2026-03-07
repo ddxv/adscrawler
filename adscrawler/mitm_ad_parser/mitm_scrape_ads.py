@@ -543,7 +543,7 @@ def parse_store_id_mitm_log(
         ],
     )
     logger.info(
-        f"Upserted {creative_records_df.shape[0]} creative records for {pub_store_id} {assets_df.shape[0]} creatives"
+        f"Upserted {creative_records_df.shape[0]:,} creative records for {pub_store_id} {assets_df.shape[0]:,} creatives"
     )
     upload_creatives_to_s3(assets_df)
     return error_messages
@@ -649,7 +649,7 @@ def scan_all_apps(
         database_connection=database_connection, recent_months=recent_months
     )
     mitm_runs_to_scan = all_api_calls[["store_id", "run_id"]].drop_duplicates()
-    logger.info(f"MITM logs to scan: {mitm_runs_to_scan.shape[0]}")
+    logger.info(f"MITM logs to scan: {mitm_runs_to_scan.shape[0]:,}")
 
     if only_new_apps:
         creative_records = query_creative_records(
@@ -660,7 +660,9 @@ def scan_all_apps(
             .astype(str)
             .isin(creative_records["run_id"].astype(str))
         ]
-        logger.info(f"Apps to scan (limited to new apps): {mitm_runs_to_scan.shape[0]}")
+        logger.info(
+            f"Apps to scan (limited to new apps): {mitm_runs_to_scan.shape[0]:,}"
+        )
 
     mitms_count = mitm_runs_to_scan.shape[0]
     logger.info(f"Starting parallel processing with {max_workers} workers")

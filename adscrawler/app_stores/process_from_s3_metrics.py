@@ -17,8 +17,8 @@ from adscrawler.dbcon.queries import (
     get_ecpm_benchmarks,
     get_retention_benchmarks,
     insert_bulk,
-    query_apps_to_process_global_metrics,
     query_countries,
+    query_store_app_categories,
     query_store_id_map_cached,
 )
 from adscrawler.packages.storage import (
@@ -70,6 +70,29 @@ GLOBAL_HISTORY_COLS = (
     + ["store_last_updated", "tier1_pct", "tier2_pct", "tier3_pct"]
 )
 
+GLOBAL_FINAL_COLS = [
+    "store_app",
+    "week_start",
+    "weekly_installs",
+    "weekly_ratings",
+    "weekly_reviews",
+    "weekly_active_users",
+    "monthly_active_users",
+    "weekly_iap_revenue",
+    "weekly_ad_revenue",
+    "total_installs",
+    "total_ratings",
+    "rating",
+    "one_star",
+    "two_star",
+    "three_star",
+    "four_star",
+    "five_star",
+    "store_last_updated",
+    "tier1_pct",
+    "tier2_pct",
+    "tier3_pct",
+]
 # TABLE_KEYS = {
 #     "app_country_metrics_history": COUNTRY_HISTORY_KEYS,
 #     "app_global_metrics_history": GLOBAL_HISTORY_KEYS,
@@ -457,6 +480,11 @@ def process_metrics_google(df: pd.DataFrame) -> pd.DataFrame:
             columns={"tier1": "tier1_pct", "tier2": "tier2_pct", "tier3": "tier3_pct"}
         )
     )
+    tier_pct_cols = ["tier1_pct", "tier2_pct", "tier3_pct"]
+    if not all(col in tier_pct.columns for col in tier_pct_cols):
+        for col in tier_pct_cols:
+            if col not in tier_pct.columns:
+                tier_pct[col] = 0
     global_df = global_df.join(tier_pct)
     df["rating"] = df["rating"].replace(0, np.nan)
     df["rating_count_est"] = df["rating_count_est"].replace(0, np.nan)
@@ -562,9 +590,7 @@ def process_metrics_apple(
         "grc_est_prod"
     ].transform("sum") / df.groupby(["week_start", "store_app"])[
         "rating_count"
-    ].transform(
-        "sum"
-    )
+    ].transform("sum")
     df["rating_count"] = (
         df["rating_count"]
         .fillna(df["grc_future_est"] * df["rating_ratio"])
@@ -854,8 +880,9 @@ def get_app_hash_buckets_from_s3(
 def process_metrics(
     store: int,
     df: pd.DataFrame,
+    database_connection: PostgresCon,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
-    log_info = f"{store=} process metrics for {df.shape[0]} rows"
+    log_info = f"{store=} process metrics for {df.shape[0]:,} rows"
     logger.info(f"{log_info} start")
     if store == 1:
         country_df, global_df = process_metrics_google(df=df)
@@ -867,19 +894,37 @@ def process_metrics(
         df=country_df,
         key_columns=COUNTRY_HISTORY_KEYS,
     )
-    for col in ["tier1_pct", "tier2_pct", "tier3_pct"]:
+    tiers = ["tier1_pct", "tier2_pct", "tier3_pct"]
+    for col in tiers:
         if col not in global_df.columns:
             global_df[col] = 0.0
-        global_df[col] = (global_df[col] * 10000).round().fillna(0).astype("int16")
+    global_df = global_df[[x for x in GLOBAL_HISTORY_COLS if x in global_df.columns]]
+    app_cats = query_store_app_categories(
+        database_connection, store_apps=global_df["store_app"].unique().tolist()
+    )
+    global_df = global_df.merge(app_cats, on="store_app", how="left", validate="m:1")
+    # Fill in blank rows with default
+    global_df["tier_pct_sum"] = (
+        global_df["tier1_pct"] + global_df["tier2_pct"] + global_df["tier3_pct"]
+    )
+    incomplete_tier_pct = global_df["tier_pct_sum"] < 0.5
+    # Because for US is default, many apps end up with 1.0 t1
+    all_t1 = global_df["tier1_pct"] == 1
+    tiers_to_fill = incomplete_tier_pct | all_t1
+    global_df.loc[tiers_to_fill, "tier1_pct"] = 0.34
+    global_df.loc[tiers_to_fill, "tier2_pct"] = 0.33
+    global_df.loc[tiers_to_fill, "tier3_pct"] = 0.33
+    global_df = calculate_active_users(database_connection, global_df, store=store)
+    global_df = calculate_revenue_cols(database_connection, global_df)
     check_for_duplicates(
         df=global_df,
-        key_columns=GLOBAL_HISTORY_KEYS,
+        key_columns=["store_app", "week_start"],
     )
     global_df = global_df.replace({pd.NA: None, np.nan: None})
     country_df = country_df[
         [x for x in COUNTRY_HISTORY_COLS if x in country_df.columns]
     ]
-    global_df = global_df[[x for x in GLOBAL_HISTORY_COLS if x in global_df.columns]]
+    global_df = global_df[GLOBAL_FINAL_COLS]
     logger.info(f"{log_info} finished")
     return country_df, global_df
 
@@ -938,6 +983,7 @@ def process_app_metrics_to_db(
         store=store,
         app_hash=hash_bucket,
     )
+    logger.info(f"{log_info} got {df.shape[0]:,} interpolated rows from S3")
     if df.empty:
         logger.warning(f"{log_info} no data found for S3 agg app metrics, skipping")
         raise ValueError(f"{log_info} no data found for S3 agg app metrics")
@@ -951,6 +997,7 @@ def process_app_metrics_to_db(
     df = merge_in_db_ids(df, store, database_connection)
     df = df.drop(["store_id", "country"], axis=1)
     if store == 1:
+        df.loc[df["store_last_updated"] <= 0, "store_last_updated"] = None
         df = df.rename(
             columns={
                 "installs": "global_installs",
@@ -997,7 +1044,27 @@ def process_app_metrics_to_db(
     country_df, global_df = process_metrics(
         store=store,
         df=df,
+        database_connection=database_connection,
     )
+
+    delete_and_insert(
+        df=gdf,
+        schema="public",
+        table_name="test_app_global_metrics_weekly",
+        database_connection=database_connection,
+        delete_by_keys=["store_app", "week_start"],
+        insert_columns=gdf.columns.tolist(),
+    )
+    log_df = pd.DataFrame({"store_app": log_apps})
+    log_df["updated_at"] = datetime.datetime.now()
+    log_df.to_sql(
+        name="app_global_metrics_weekly",
+        con=database_connection.engine,
+        schema="logging",
+        if_exists="append",
+        index=False,
+    )
+
     delete_and_insert_app_metrics(
         database_connection=database_connection,
         country_df=country_df,
@@ -1245,7 +1312,7 @@ def copy_raw_details_to_hash_buckets(
 
 
 def calculate_active_users(
-    database_connection: PostgresCon, df: pd.DataFrame
+    database_connection: PostgresCon, df: pd.DataFrame, store: int
 ) -> pd.DataFrame:
     """Process app global metrics weekly."""
     star_cols = ["one_star", "two_star", "three_star", "four_star", "five_star"]
@@ -1267,7 +1334,6 @@ def calculate_active_users(
         .groupby(
             [
                 "store_app",
-                "store",
                 "app_category",
                 "ad_supported",
                 "in_app_purchases",
@@ -1294,18 +1360,18 @@ def calculate_active_users(
     # This is ok for apps which are new to the range, that week all those metrics are new
     drop_rows = df["snapshot_date"] == df["snapshot_date"].min()
     df = df[~drop_rows]
-    # iOS data is very estimated and noisy, so we smooth
-    mask = df["store"] == 2
-    df.loc[mask, "installs_diff"] = (
-        df[mask]
-        .groupby("store_app")["installs_diff"]
-        .rolling(window=3, min_periods=1)
-        .mean()
-        .reset_index(level=0, drop=True)
-    )
+    if store == 2:
+        # iOS data is very estimated and noisy, so we smooth
+        df["installs_diff"] = (
+            df.groupby("store_app")["installs_diff"]
+            .rolling(window=3, min_periods=1)
+            .mean()
+            .reset_index(level=0, drop=True)
+        )
     retention_benchmarks = get_retention_benchmarks(database_connection)
+    retention_benchmarks = retention_benchmarks[retention_benchmarks["store"] == store]
     cohorts = df.merge(
-        retention_benchmarks, on=["app_category", "store"], how="left", validate="m:1"
+        retention_benchmarks, on=["app_category"], how="left", validate="m:1"
     )
     cohorts["k"] = np.log(
         cohorts["d30"].replace(0, np.nan) / cohorts["d7"].replace(0, np.nan)
@@ -1389,7 +1455,6 @@ def calculate_revenue_cols(
     database_connection: PostgresCon, df: pd.DataFrame
 ) -> pd.DataFrame:
     ecpm_benchmarks = get_ecpm_benchmarks(database_connection)
-
     df["wau_tier1"] = df["weekly_active_users"] * df["tier1_pct"]
     df["wau_tier2"] = df["weekly_active_users"] * df["tier2_pct"]
     df["wau_tier3"] = df["weekly_active_users"] * df["tier3_pct"]
@@ -1405,7 +1470,6 @@ def calculate_revenue_cols(
         # Revenue from the "sticky" base (WAU minus the new installs)
         returning_users = max(0, row["weekly_active_users"] - row["weekly_installs"])
         base_rev: float = returning_users * RETENTION_CONVERSION * AVG_TICKET
-
         return new_rev + base_rev
 
     df["weekly_iap_revenue"] = df.apply(estimate_revenue, axis=1)
@@ -1425,84 +1489,3 @@ def calculate_revenue_cols(
 
     df["weekly_ad_revenue"] = df.apply(calculate_ad_rev, axis=1)
     return df
-
-
-def app_global_metrics_derive_latest_weekly(
-    database_connection: PostgresCon,
-    logged_last_at: str,
-    store_app_ids: list[int] | None,
-) -> None:
-    i = 0
-    while True:
-        log_info = f"Global weekly derived metrics batch={i}"
-        logger.info(f"{log_info} start")
-        query_apps = None
-        if store_app_ids is not None:
-            query_apps = store_app_ids[i * 10000 : (i + 1) * 10000]
-            if len(query_apps) == 0:
-                break
-        df = query_apps_to_process_global_metrics(
-            database_connection,
-            batch_size=10000,
-            start_datetime=logged_last_at,
-            store_app_ids=query_apps,
-        )
-        if df.empty:
-            break
-        log_apps = df["store_app"].unique().tolist()
-        # Fill in blank rows with default
-        df["tier_pct_sum"] = df["tier1_pct"] + df["tier2_pct"] + df["tier3_pct"]
-        incomplete_tier_pct = df["tier_pct_sum"] < 0.5
-        # Because for US is default, many apps end up with 1.0 t1
-        all_t1 = df["tier1_pct"] == 1
-        tiers_to_fill = incomplete_tier_pct | all_t1
-        df.loc[tiers_to_fill, "tier1_pct"] = 0.34
-        df.loc[tiers_to_fill, "tier2_pct"] = 0.33
-        df.loc[tiers_to_fill, "tier3_pct"] = 0.33
-        logger.info(f"{log_info} start calculating WAU")
-        df = calculate_active_users(database_connection, df)
-        logger.info(f"{log_info} finished calculating WAU")
-        logger.info(f"{log_info} start calculating revenue columns")
-        df = calculate_revenue_cols(database_connection, df)
-        logger.info(f"{log_info} finished calculating revenue columns")
-        final_cols = [
-            "store_app",
-            "week_start",
-            "weekly_installs",
-            "weekly_ratings",
-            "weekly_reviews",
-            "weekly_active_users",
-            "monthly_active_users",
-            "weekly_iap_revenue",
-            "weekly_ad_revenue",
-            "total_installs",
-            "total_ratings",
-            "rating",
-            "one_star",
-            "two_star",
-            "three_star",
-            "four_star",
-            "five_star",
-        ]
-        df = df[final_cols]
-        logger.info(f"{log_info} insert rows={df.shape[0]}")
-        delete_and_insert(
-            df=df,
-            schema="public",
-            table_name="app_global_metrics_weekly",
-            database_connection=database_connection,
-            delete_by_keys=["store_app", "week_start"],
-            insert_columns=df.columns.tolist(),
-        )
-        logger.info(f"{log_info} finished inserting rows")
-        logger.info(f"{log_info} logging batch...")
-        log_df = pd.DataFrame({"store_app": log_apps})
-        log_df["updated_at"] = datetime.datetime.now()
-        log_df.to_sql(
-            name="app_global_metrics_weekly",
-            con=database_connection.engine,
-            schema="logging",
-            if_exists="append",
-            index=False,
-        )
-        i += 1

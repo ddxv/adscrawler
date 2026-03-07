@@ -102,12 +102,12 @@ def run_app(
 
     if version_code_id is None:
         logger.error(
-            f"{function_info} failed: No version code id with {mdf.shape[0]} api calls"
+            f"{function_info} failed: No version code id with {mdf.shape[0]:,} api calls"
         )
         return
     if version_str is None:
         logger.error(
-            f"{function_info} failed: No version str with {mdf.shape[0]} api calls"
+            f"{function_info} failed: No version str with {mdf.shape[0]:,} api calls"
         )
         return
 
@@ -118,7 +118,7 @@ def run_app(
         if mdf.empty:
             logger.warning("MITM log is empty")
         else:
-            logger.info("MITM log has {mdf.shape[0]} rows")
+            logger.info("MITM log has {mdf.shape[0]:,} rows")
             mdf["url"] = mdf["url"].str[0:1000]
             mdf["store_app"] = store_app
     except Exception:
@@ -259,7 +259,7 @@ def insert_api_calls(
         database_connection=database_connection,
         insert_columns=insert_columns,
     )
-    logger.info(f"inserted {mdf.shape[0]} api calls")
+    logger.info(f"inserted {mdf.shape[0]:,} api calls")
 
 
 def get_version_via_apktool(
@@ -841,10 +841,12 @@ def process_apks_for_waydroid(
     database_connection: PostgresCon, num_apps: int = 20
 ) -> None:
     apps_df = query_apps_to_api_scan(database_connection=database_connection, store=1)
-    logger.info(f"Waydroid has {apps_df.shape[0]} apps to process, starting {num_apps}")
+    logger.info(
+        f"Waydroid has {apps_df.shape[0]:,} apps to process, starting {num_apps}"
+    )
     apps_df = apps_df.head(num_apps)
     for _, row in apps_df.iterrows():
-        logger.info(f"Start app {_}/{apps_df.shape[0]}: {row.store_id}")
+        logger.info(f"Start app {_}/{apps_df.shape[0]:,}: {row.store_id}")
         store_id = row.store_id
         store_app = row.store_app
         version_str = row.version_string

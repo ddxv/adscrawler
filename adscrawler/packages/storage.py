@@ -244,7 +244,7 @@ def get_downloaded_mitm_files(database_connection: PostgresCon) -> pd.DataFrame:
     df = query_latest_api_scan_by_store_id(store_ids, database_connection)
     missing_files = [x for x in store_ids if x not in df["store_id"].to_list()]
 
-    logger.info(f"S3 Uploadable: {df.shape[0]} missing: {len(missing_files)}")
+    logger.info(f"S3 Uploadable: {df.shape[0]:,} missing: {len(missing_files)}")
     return df
 
 
@@ -260,7 +260,7 @@ def move_local_mitm_files_to_s3(database_connection: PostgresCon) -> None:
 
     s3_client = get_s3_client()
     for _, row in df.iterrows():
-        logger.info(f"{_}/{df.shape[0]}")
+        logger.info(f"{_}/{df.shape[0]:,}")
         store_id = row.store_id
         run_id = row.run_id
         version_str = row.version_str
@@ -312,7 +312,7 @@ def move_local_apk_files_to_s3() -> None:
     missing_files = pd.DataFrame()
     failed_files = pd.DataFrame()
     for _, row in fdf.iterrows():
-        logger.info(f"{_}/{fdf.shape[0]}")
+        logger.info(f"{_}/{fdf.shape[0]:,}")
         df = pd.DataFrame()
         try:
             df = get_store_id_apk_s3_keys(
@@ -333,8 +333,8 @@ def move_local_apk_files_to_s3() -> None:
         else:
             continue
 
-    logger.info(f"Missing files: {missing_files.shape[0]}")
-    logger.info(f"Failed files: {failed_files.shape[0]}")
+    logger.info(f"Missing files: {missing_files.shape[0]:,}")
+    logger.info(f"Failed files: {failed_files.shape[0]:,}")
 
     for _, row in fdf.iterrows():
         logger.info(f"S3 processing {row['package_name']}")
@@ -420,7 +420,7 @@ def get_store_id_mitm_s3_keys(store_id: str) -> pd.DataFrame:
             }
         )
     df = pd.DataFrame(objects_data)
-    logger.debug(f"S3 found mitm logs: {store_id=} {df.shape[0]}")
+    logger.debug(f"S3 found mitm logs: {store_id=} {df.shape[0]:,}")
     return df
 
 
@@ -455,7 +455,7 @@ def get_store_id_apk_s3_keys(store: int, store_id: str) -> pd.DataFrame:
             }
         )
     df = pd.DataFrame(objects_data)
-    logger.info(f"S3 keys found {store_id=} {df.shape[0]}")
+    logger.info(f"S3 keys found {store_id=} {df.shape[0]:,}")
     return df
 
 

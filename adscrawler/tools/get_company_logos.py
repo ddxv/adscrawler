@@ -326,13 +326,13 @@ def update_company_logos() -> None:
     companies = companies[
         (companies["company_logo_url"].isna()) | (companies["company_logo_url"] == "")
     ]
-    logger.info(f"Processing {companies.shape[0]} companies")
+    logger.info(f"Processing {companies.shape[0]:,} companies")
     i = 0
     for _i, row in companies.iterrows():
         i += 1
         domain = row["company_domain"]
         official_linkedin_url = row["company_linkedin_url"]
-        logger.info(f"Start i={i}/{companies.shape[0]} {domain}")
+        logger.info(f"Start i={i}/{companies.shape[0]:,} {domain}")
         company_id = row["company_id"]
         filename = check_logo_exists_s3(domain)
         if filename and row["company_logo_url"]:

@@ -264,7 +264,7 @@ def crawl_app_ads(database_connection: PostgresCon, limit: int | None = 5000) ->
     df = query_pub_domains_to_crawl_ads_txt(
         database_connection=database_connection, limit=limit, exclude_recent_days=7
     )
-    logger.info(f"Start crawl app-ads from pub domains: {df.shape[0]}")
+    logger.info(f"Start crawl app-ads from pub domains: {df.shape[0]:,}")
     for _i, row in df.iterrows():
         url = row.url
         domain_id = row.id
