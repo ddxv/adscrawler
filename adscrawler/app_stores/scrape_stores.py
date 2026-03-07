@@ -688,15 +688,14 @@ def save_app_domains(
     apps_df: pd.DataFrame,
     database_connection: PostgresCon,
 ) -> None:
-
-    app_urls["url"] = app_urls["url"].apply(lambda x: extract_domains(x))
+    apps_df["url"] = apps_df["url"].apply(lambda x: extract_domains(x))
     all_domains_df = query_all_domains(database_connection=database_connection)
     all_domains_df = check_and_insert_domains(
         domains_df=all_domains_df,
-        app_urls=app_urls,
+        app_urls=apps_df,
         database_connection=database_connection,
     )
-    domain_ids_df = app_urls.merge(
+    domain_ids_df = apps_df.merge(
         all_domains_df.rename(columns={"id": "pub_domain"}),
         left_on="url",
         right_on="domain_name",
