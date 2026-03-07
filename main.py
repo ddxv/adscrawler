@@ -7,7 +7,10 @@ from adscrawler.app_stores.process_from_s3 import (
     import_keywords_from_s3,
     import_ranks_from_s3,
 )
-from adscrawler.app_stores.process_from_s3_metrics import import_app_metrics_from_s3
+from adscrawler.app_stores.process_from_s3_metrics import (
+    delete_and_aggregate_s3_agg,
+    import_app_metrics_from_s3,
+)
 from adscrawler.app_stores.process_keywords import process_app_keywords
 from adscrawler.app_stores.scrape_stores import (
     crawl_developers_for_new_store_ids,
@@ -362,10 +365,23 @@ class ProcessManager:
         try:
             start_date = datetime.date.today() - datetime.timedelta(days=3)
             end_date = datetime.date.today() - datetime.timedelta(days=1)
+            delete_and_aggregate_s3_agg(
+                store=1, start_date=start_date, end_date=end_date
+            )
+            delete_and_aggregate_s3_agg(
+                store=2, start_date=start_date, end_date=end_date
+            )
             import_app_metrics_from_s3(
                 database_connection=self.pgcon,
                 start_date=start_date,
                 end_date=end_date,
+                store=1,
+            )
+            import_app_metrics_from_s3(
+                database_connection=self.pgcon,
+                start_date=start_date,
+                end_date=end_date,
+                store=2,
             )
         except Exception:
             logger.exception("Importing app metrics from s3 for failed")

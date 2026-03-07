@@ -1,5 +1,4 @@
 import datetime
-import time
 
 import duckdb
 import numpy as np
@@ -14,7 +13,7 @@ from adscrawler.dbcon.connection import (
 )
 from adscrawler.dbcon.queries import (
     delete_and_insert,
-    delete_app_metrics_by_date_and_store,
+    delete_app_metrics_by_date_and_apps,
     get_ecpm_benchmarks,
     get_retention_benchmarks,
     insert_bulk,
@@ -23,7 +22,6 @@ from adscrawler.dbcon.queries import (
     query_store_id_map_cached,
 )
 from adscrawler.packages.storage import (
-    delete_s3_objects_by_prefix,
     get_duckdb_connection,
 )
 
@@ -72,44 +70,44 @@ GLOBAL_HISTORY_COLS = (
     + ["store_last_updated", "tier1_pct", "tier2_pct", "tier3_pct"]
 )
 
-TABLE_KEYS = {
-    "app_country_metrics_history": COUNTRY_HISTORY_KEYS,
-    "app_global_metrics_history": GLOBAL_HISTORY_KEYS,
-}
+# TABLE_KEYS = {
+#     "app_country_metrics_history": COUNTRY_HISTORY_KEYS,
+#     "app_global_metrics_history": GLOBAL_HISTORY_KEYS,
+# }
 
-AGG_APP_COUNTRY_WEEKLY_PREFIX = "agg-data/app_country_metrics/weekly"
-AGG_APP_COUNTRY_DAILY_PREFIX = "agg-data/app_country_metrics/daily"
+# AGG_APP_COUNTRY_WEEKLY_PREFIX = "agg-data/app_country_metrics/weekly"
+# AGG_APP_COUNTRY_DAILY_PREFIX = "agg-data/app_country_metrics/daily"
 RAW_DATA_PREFIX = "raw-data/app_details"
 AGG_APP_HASH_BUCKETS = "agg-data/app-hash"
 
 
-def get_s3_agg_weekly_snapshots(
-    start_date: datetime.date, end_date: datetime.date, store: int
-) -> pd.DataFrame:
-    s3_config_key = "s3"
-    bucket = CONFIG[s3_config_key]["bucket"]
-    week_parquets = []
-    for ddt in pd.date_range(start_date, end_date, freq="D"):
-        ddt_str = ddt.strftime("%Y-%m-%d")
-        prefix = f"{AGG_APP_COUNTRY_WEEKLY_PREFIX}/store={store}/snapshot_date={ddt_str}/country="
-        week_parquets += get_parquet_paths_by_prefix(bucket, prefix)
-    if len(week_parquets) == 0:
-        logger.warning(
-            f"No parquet paths found for agg app snapshots {store=} {start_date=} {end_date=}"
-        )
-        return pd.DataFrame()
-    query = f"""SELECT
-       * 
-      FROM read_parquet({week_parquets})
-      WHERE store_id IS NOT NULL
-    """
-    duckdb_con = get_duckdb_connection(s3_config_key)
-    df = duckdb_con.execute(query).df()
-    duckdb_con.close()
-    na_rows = df["store_id"].isna().sum()
-    if na_rows > 0:
-        logger.warning("Missing store_id values found")
-    return df
+# def get_s3_agg_weekly_snapshots(
+#     start_date: datetime.date, end_date: datetime.date, store: int
+# ) -> pd.DataFrame:
+#     s3_config_key = "s3"
+#     bucket = CONFIG[s3_config_key]["bucket"]
+#     week_parquets = []
+#     for ddt in pd.date_range(start_date, end_date, freq="D"):
+#         ddt_str = ddt.strftime("%Y-%m-%d")
+#         prefix = f"{AGG_APP_COUNTRY_WEEKLY_PREFIX}/store={store}/snapshot_date={ddt_str}/country="
+#         week_parquets += get_parquet_paths_by_prefix(bucket, prefix)
+#     if len(week_parquets) == 0:
+#         logger.warning(
+#             f"No parquet paths found for agg app snapshots {store=} {start_date=} {end_date=}"
+#         )
+#         return pd.DataFrame()
+#     query = f"""SELECT
+#        *
+#       FROM read_parquet({week_parquets})
+#       WHERE store_id IS NOT NULL
+#     """
+#     duckdb_con = get_duckdb_connection(s3_config_key)
+#     df = duckdb_con.execute(query).df()
+#     duckdb_con.close()
+#     na_rows = df["store_id"].isna().sum()
+#     if na_rows > 0:
+#         logger.warning("Missing store_id values found")
+#     return df
 
 
 def check_for_duplicates(df: pd.DataFrame, key_columns: list[str]) -> None:
@@ -149,7 +147,7 @@ def handle_missing_trackid_files(
         )
 
 
-def recreate_s3_daily_agg(
+def delete_and_aggregate_s3_agg(
     store: int, start_date: datetime.date, end_date: datetime.date
 ) -> None:
     # Raw data to agg by DAY
@@ -163,49 +161,49 @@ def recreate_s3_daily_agg(
         make_s3_app_hash_metrics_history_daily(store=store, snapshot_date=snapshot_date)
 
 
-def make_s3_app_country_metrics_history_daily(
-    store: int, snapshot_date: pd.DatetimeIndex
-) -> None:
-    s3_config_key = "s3"
-    bucket = CONFIG[s3_config_key]["bucket"]
-    snapshot_date_str = snapshot_date.strftime("%Y-%m-%d")
-    raw_prefix = (
-        f"{RAW_DATA_PREFIX}/store={store}/crawled_date={snapshot_date_str}/country="
-    )
-    raw_parquets = get_parquet_paths_by_prefix(bucket, raw_prefix)
-    agg_prefix = f"{AGG_APP_COUNTRY_DAILY_PREFIX}/store={store}/snapshot_date={snapshot_date_str}/"
-    time.sleep(1)
-    delete_s3_objects_by_prefix(
-        bucket=bucket, prefix=agg_prefix, key_name=s3_config_key
-    )
-    time.sleep(1)
-    if len(raw_parquets) == 0:
-        logger.error(
-            f"No app detail parquet files found for store={store} snapshot_date={snapshot_date_str}"
-        )
-        return
-    query = copy_raw_details_to_daily_agg(
-        store=store,
-        app_detail_parquets=raw_parquets,
-        snapshot_date_str=snapshot_date_str,
-    )
-    duckdb_con = get_duckdb_connection(s3_config_key)
-    try:
-        duckdb_con.execute(query)
-    except duckdb.BinderException as e:
-        if store == 2 and """"trackId" not found""" in str(e):
-            logger.error(
-                f"trackId column not found in parquets for store={store}, skipping"
-            )
-            handle_missing_trackid_files(duckdb_con, raw_parquets, store)
-        if store == 1 and """"appId" not found""" in str(e):
-            logger.error(
-                f"appId column not found in parquets for store={store}, skipping"
-            )
-            handle_missing_trackid_files(duckdb_con, raw_parquets, store)
-        else:
-            raise
-    duckdb_con.close()
+# def make_s3_app_country_metrics_history_daily(
+#     store: int, snapshot_date: pd.DatetimeIndex
+# ) -> None:
+#     s3_config_key = "s3"
+#     bucket = CONFIG[s3_config_key]["bucket"]
+#     snapshot_date_str = snapshot_date.strftime("%Y-%m-%d")
+#     raw_prefix = (
+#         f"{RAW_DATA_PREFIX}/store={store}/crawled_date={snapshot_date_str}/country="
+#     )
+#     raw_parquets = get_parquet_paths_by_prefix(bucket, raw_prefix)
+#     agg_prefix = f"{AGG_APP_COUNTRY_DAILY_PREFIX}/store={store}/snapshot_date={snapshot_date_str}/"
+#     time.sleep(1)
+#     delete_s3_objects_by_prefix(
+#         bucket=bucket, prefix=agg_prefix, key_name=s3_config_key
+#     )
+#     time.sleep(1)
+#     if len(raw_parquets) == 0:
+#         logger.error(
+#             f"No app detail parquet files found for store={store} snapshot_date={snapshot_date_str}"
+#         )
+#         return
+#     query = copy_raw_details_to_daily_agg(
+#         store=store,
+#         app_detail_parquets=raw_parquets,
+#         snapshot_date_str=snapshot_date_str,
+#     )
+#     duckdb_con = get_duckdb_connection(s3_config_key)
+#     try:
+#         duckdb_con.execute(query)
+#     except duckdb.BinderException as e:
+#         if store == 2 and """"trackId" not found""" in str(e):
+#             logger.error(
+#                 f"trackId column not found in parquets for store={store}, skipping"
+#             )
+#             handle_missing_trackid_files(duckdb_con, raw_parquets, store)
+#         if store == 1 and """"appId" not found""" in str(e):
+#             logger.error(
+#                 f"appId column not found in parquets for store={store}, skipping"
+#             )
+#             handle_missing_trackid_files(duckdb_con, raw_parquets, store)
+#         else:
+#             raise
+#     duckdb_con.close()
 
 
 def make_s3_app_hash_metrics_history_daily(
@@ -218,15 +216,12 @@ def make_s3_app_hash_metrics_history_daily(
         f"{RAW_DATA_PREFIX}/store={store}/crawled_date={snapshot_date_str}/country="
     )
     all_parquet_paths = get_parquet_paths_by_prefix(bucket, prefix)
-    # This will need to be run per bucket?
-    # agg_prefix = (
-    #     f"{AGG_APP_HASH_BUCKETS}/store={store}/app-hash=xx/snapshot_date={snapshot_date_str}/"
-    # )
-    # time.sleep(1)
-    # delete_s3_objects_by_prefix(
-    #     bucket=bucket, prefix=agg_prefix, key_name=s3_config_key
-    # )
-    # time.sleep(1)
+    # hex_values = [f"{i:02x}" for i in range(256)]
+    # for hex_val in hex_values:
+    #     agg_prefix = f"{AGG_APP_HASH_BUCKETS}/store={store}/app-hash={hex_val}/snapshot_date={snapshot_date_str}/"
+    #     delete_s3_objects_by_prefix(
+    #         bucket=bucket, prefix=agg_prefix, key_name=s3_config_key
+    #     )
     if len(all_parquet_paths) == 0:
         logger.error(
             f"No app detail parquet files found for store={store} snapshot_date={snapshot_date_str}"
@@ -257,34 +252,34 @@ def make_s3_app_hash_metrics_history_daily(
     duckdb_con.close()
 
 
-def make_s3_app_country_metrics_history_week(
-    store: int, snapshot_date: pd.DatetimeIndex, snapshot_end_date: pd.DatetimeIndex
-) -> None:
-    s3_config_key = "s3"
-    bucket = CONFIG[s3_config_key]["bucket"]
-    snapshot_date_str = snapshot_date.strftime("%Y-%m-%d")
-    all_parquet_paths = []
-    for ddt in pd.date_range(snapshot_date, snapshot_end_date, freq="D"):
-        ddt_str = ddt.strftime("%Y-%m-%d")
-        prefix = f"{AGG_APP_COUNTRY_DAILY_PREFIX}/store={store}/snapshot_date={ddt_str}/country="
-        all_parquet_paths += get_parquet_paths_by_prefix(bucket, prefix)
-    agg_prefix = f"{AGG_APP_COUNTRY_WEEKLY_PREFIX}/store={store}/snapshot_date={snapshot_date_str}/"
-    delete_s3_objects_by_prefix(
-        bucket=bucket, prefix=agg_prefix, key_name=s3_config_key
-    )
-    if len(all_parquet_paths) == 0:
-        logger.error(
-            f"No app detail parquet files found for store={store} snapshot_date={snapshot_date_str}"
-        )
-        return
-    query = copy_daily_agg_to_weekly(
-        store=store,
-        app_detail_parquets=all_parquet_paths,
-        snapshot_date_str=snapshot_date_str,
-    )
-    duckdb_con = get_duckdb_connection(s3_config_key)
-    duckdb_con.execute(query)
-    duckdb_con.close()
+# def make_s3_app_country_metrics_history_week(
+#     store: int, snapshot_date: pd.DatetimeIndex, snapshot_end_date: pd.DatetimeIndex
+# ) -> None:
+#     s3_config_key = "s3"
+#     bucket = CONFIG[s3_config_key]["bucket"]
+#     snapshot_date_str = snapshot_date.strftime("%Y-%m-%d")
+#     all_parquet_paths = []
+#     for ddt in pd.date_range(snapshot_date, snapshot_end_date, freq="D"):
+#         ddt_str = ddt.strftime("%Y-%m-%d")
+#         prefix = f"{AGG_APP_COUNTRY_DAILY_PREFIX}/store={store}/snapshot_date={ddt_str}/country="
+#         all_parquet_paths += get_parquet_paths_by_prefix(bucket, prefix)
+#     agg_prefix = f"{AGG_APP_COUNTRY_WEEKLY_PREFIX}/store={store}/snapshot_date={snapshot_date_str}/"
+#     delete_s3_objects_by_prefix(
+#         bucket=bucket, prefix=agg_prefix, key_name=s3_config_key
+#     )
+#     if len(all_parquet_paths) == 0:
+#         logger.error(
+#             f"No app detail parquet files found for store={store} snapshot_date={snapshot_date_str}"
+#         )
+#         return
+#     query = copy_daily_agg_to_weekly(
+#         store=store,
+#         app_detail_parquets=all_parquet_paths,
+#         snapshot_date_str=snapshot_date_str,
+#     )
+#     duckdb_con = get_duckdb_connection(s3_config_key)
+#     duckdb_con.execute(query)
+#     duckdb_con.close()
 
 
 def estimate_ios_installs(df: pd.DataFrame) -> pd.DataFrame:
@@ -387,6 +382,7 @@ def process_metrics_google(df: pd.DataFrame) -> pd.DataFrame:
     df["pct_of_us_reviews"] = df["true_review_count"] / df["us_review_count"].replace(
         0, np.nan
     )
+    df = df.sort_values("week_start")
     df["pct_of_us_reviews"] = df.groupby(["store_app", "country_id"])[
         ["pct_of_us_reviews"]
     ].bfill()
@@ -491,21 +487,33 @@ def process_metrics_google(df: pd.DataFrame) -> pd.DataFrame:
     )
     return df, global_df
 
-    df["histogram"].head(12).str.extractall(r"(\d+)").reset_index().pivot_table(
-        index="level_0", columns="match", values=0, aggfunc="first"
-    )
-
 
 def process_metrics_apple(
     df: pd.DataFrame,
-    app_country_db_latest: pd.DataFrame,
-    database_connection: PostgresCon,
 ) -> pd.DataFrame:
-    # ratings_str = (
-    #     df["histogram"].head(20).str.extractall(r"(\d+)").unstack()
-    #     .astype("Int64")
-    #     .reindex(df.index, fill_value=0)
-    # )
+    # Since the US has a long history of being queried
+    # Use country ratio of review_counts to backfill missing review_counts
+    # Found useful for musically
+    us_lookup = (
+        df[df["country_id"] == 840]
+        .groupby(["store_app", "week_start"])["rating_count"]
+        .max()
+    )
+    df["us_rating_count"] = df.set_index(["store_app", "week_start"]).index.map(
+        us_lookup
+    )
+    df["pct_of_us_ratings"] = df["rating_count"] / df["us_rating_count"].replace(
+        0, np.nan
+    )
+    df = df.sort_values("week_start")
+    df["pct_of_us_ratings"] = df.groupby(["store_app", "country_id"])[
+        ["pct_of_us_ratings"]
+    ].bfill()
+    df["true_review_count"] = np.where(
+        df["rating_count"].isna(),
+        df["us_rating_count"] * df["pct_of_us_ratings"],
+        df["rating_count"],
+    )
     ratings_str = (
         df["histogram"]
         .str.extractall(r"(\d+)")
@@ -515,72 +523,73 @@ def process_metrics_apple(
         .reindex(df.index, fill_value=0)
     )
     df[STAR_COLS] = ratings_str.iloc[:, 1::2].astype(int).to_numpy()
-
     df["store_last_updated"] = pd.to_datetime(
         df["store_last_updated"], format="ISO8601", utc=True
     )
     df = estimate_ios_installs(df)
     df["rating_prod"] = df["rating"] * df["rating_count"]
     # future_ios_ratios = get_ios_cached_future_country_ratios(database_connection)
-    total = (
-        df.groupby(["store_app", "country_id"])["rating_count"]
-        .sum()
-        .rename("total_ratings")
-    )
+    df["weekly_total_ratings"] = df.groupby(["week_start", "store_app"])[
+        "rating_count"
+    ].transform("sum")
     # Latest rating_count per store_app + country_id (by week_start)
-    latest = (
+    latest_ratio = (
         df.sort_values("week_start")
-        .groupby(["store_app", "country_id"])["rating_count"]
+        .groupby(["store_app", "country_id"])[["rating_count", "weekly_total_ratings"]]
         .last()
-        .rename("latest_rating_count")
     )
-    result = pd.concat([latest, total], axis=1)
-    result = result[result["latest_rating_count"] > 0]
-    result = result[result["total_ratings"] > 0]
-    result["rating_ratio"] = result["latest_rating_count"] / result["total_ratings"]
-    future_ios_ratios = result.reset_index()
+    latest_ratio["weekly_total_ratings"] = latest_ratio["weekly_total_ratings"].replace(
+        0, np.nan
+    )
+    latest_ratio["rating_ratio"] = (
+        latest_ratio["rating_count"] / latest_ratio["weekly_total_ratings"]
+    )
+    latest_ratio = latest_ratio.reset_index()
     df = pd.merge(
         df,
-        future_ios_ratios,
+        latest_ratio[["store_app", "country_id", "rating_ratio"]],
         how="left",
         on=["store_app", "country_id"],
+        validate="m:1",
     )
-    df["global_rating_count"] = df.groupby("store_app")["rating_count"].transform("sum")
+    df["global_rating_count"] = df.groupby(["week_start", "store_app"])[
+        "rating_count"
+    ].transform("sum")
     # Here CDF is the latest row per country per app, some countries older
-    cdf["grc_future_est_a"] = cdf["rating_count"] / cdf["rating_ratio"]
-    cdf["grc_est_prod"] = cdf["rating_count"] * cdf["grc_future_est_a"]
-    cdf["grc_future_est"] = cdf.groupby("store_app")["grc_est_prod"].transform(
-        "sum"
-    ) / cdf.groupby("store_app")["rating_count"].transform("sum")
-    cdf["rating_count"] = (
-        cdf["rating_count"]
-        .fillna(cdf["grc_future_est"] * cdf["rating_ratio"])
+    df["grc_future_est_a"] = df["rating_count"] / df["rating_ratio"]
+    df["grc_est_prod"] = df["rating_count"] * df["grc_future_est_a"]
+    df["grc_future_est"] = df.groupby(["week_start", "store_app"])[
+        "grc_est_prod"
+    ].transform("sum") / df.groupby(["week_start", "store_app"])[
+        "rating_count"
+    ].transform("sum")
+    df["rating_count"] = (
+        df["rating_count"]
+        .fillna(df["grc_future_est"] * df["rating_ratio"])
         .replace([np.inf, -np.inf], 0)
         .fillna(0)
         .round(0)
         .astype(int)
     )
-    app_mean_rating = cdf.groupby("store_app")["rating"].transform("mean")
-    cdf["rating"] = cdf["rating"].fillna(app_mean_rating)
-    cdf["rating_prod"] = cdf["rating"] * cdf["rating_count"]
-    # cdf[cdf["store_app"] == 1868117][
-    #     ["installs_est", "rating_count", "rating_count_est", "grc_future_est"]
-    # ]
+    app_mean_rating = df.groupby(["week_start", "store_app"])["rating"].transform(
+        "mean"
+    )
+    df["rating"] = df["rating"].fillna(app_mean_rating)
+    df["rating_prod"] = df["rating"] * df["rating_count"]
     # overwrites installs_est from db, but quick fix for missing, same value
-    cdf = estimate_ios_installs(cdf)
-    global_df = cdf.groupby(["store_app"]).agg(
+    df = estimate_ios_installs(df)
+    global_df = df.groupby(["week_start", "store_app"]).agg(
         rating_count=("rating_count", "sum"),
         rating_prod=("rating_prod", "sum"),
         installs=("installs_est", "sum"),
         store_last_updated=("store_last_updated", "max"),
         **{col: (col, "sum") for col in STAR_COLS},
     )
-    global_df["snapshot_date"] = df["snapshot_date"].iloc[0]
     global_df["rating"] = (
         global_df["rating_prod"] / global_df["rating_count"].replace(0, np.nan)
     ).astype("float64")
-    tier_installs = cdf.pivot_table(
-        index=["store_app"],
+    tier_installs = df.pivot_table(
+        index=["week_start", "store_app"],
         columns="tier",
         values="installs_est",
         aggfunc="sum",
@@ -594,63 +603,32 @@ def process_metrics_apple(
     global_df["installs"] = global_df["installs"].astype("Int64")
     global_df["rating_count"] = global_df["rating_count"].astype("Int64")
     global_df[STAR_COLS] = global_df[STAR_COLS].astype("Int64")
+    df = df.rename(columns={"week_start": "snapshot_date"})
+    global_df = global_df.rename(columns={"week_start": "snapshot_date"})
     # Note, we return the df which for iOS is the country level data
     return df, global_df
 
 
 def import_app_metrics_from_s3(
-    database_connection: PostgresCon, start_date: datetime.date, end_date: datetime.date
+    database_connection: PostgresCon,
+    start_date: datetime.date,
+    end_date: datetime.date,
+    store: int,
 ) -> None:
-    stores = [1, 2]
-    for store in stores:
-        last_history_df = pd.DataFrame()
-        # Raw data to agg by DAY
-        recreate_s3_daily_agg(store=store, start_date=start_date, end_date=end_date)
-
-        # odf = get_raw_app_hash_buckets_from_s3(
-        #     start_date_mon=start_date, end_date=end_date, store=store, app_hash="50"
-        # )
-
-        # odf[
-        # (odf["store_id"] == "com.zhiliaoapp.musically") & (odf["country"] == "US")
-        # ].sort_values("snapshot_date")[["snapshot_date", "country", "installs"]]
-
-        start_date_mon = start_date - pd.Timedelta(days=start_date.weekday())
-        raw_df = get_app_hash_buckets_from_s3(
-            start_date_mon=start_date_mon, end_date=end_date, store=store, app_hash="06"
-        )
-
-        df = raw_df.copy()
-
-        process_app_metrics_to_db(
-            database_connection,
-            store,
-            snapshot_date,
-            snapshot_end_date,
-            last_history_df,
-        )
-
-        # Rerun specifically apps that just changed
-        # Short list since this is basically reruning the weekly data daily, so only largest apps change
-        if store == 1:
-            short_list = last_history_df["review_count"] > 100
-        if store == 2:
-            short_list = last_history_df["rating_count"] > 100
-        store_app_ids = last_history_df[short_list]["store_app"].unique().tolist()
-        logged_last_at = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        app_global_metrics_derive_latest_weekly(
-            database_connection,
-            logged_last_at=logged_last_at,
-            store_app_ids=store_app_ids,
-        )
-    logger.info("Global weekly derived metrics start")
-    # Rerun catchall for smaller or other apps
-    logged_last_at = (datetime.datetime.now() - datetime.timedelta(days=3)).strftime(
-        "%Y-%m-%d %H:%M:%S"
-    )
-    app_global_metrics_derive_latest_weekly(
-        database_connection, logged_last_at=logged_last_at, store_app_ids=None
-    )
+    start_date_mon = start_date - pd.Timedelta(days=start_date.weekday())
+    for hash_bucket in [f"{i:02x}" for i in range(256)]:
+        log_info = f"{store=} {start_date_mon=} {end_date=} hash_bucket={hash_bucket}"
+        logger.info(f"{log_info} start")
+        try:
+            process_app_metrics_to_db(
+                hash_bucket=hash_bucket,
+                database_connection=database_connection,
+                store=store,
+                start_date=start_date_mon,
+                end_date=end_date,
+            )
+        except Exception as e:
+            logger.error(f"{log_info} error: {e}")
 
 
 def get_raw_app_hash_buckets_from_s3(
@@ -874,17 +852,13 @@ def get_app_hash_buckets_from_s3(
 def process_metrics(
     store: int,
     df: pd.DataFrame,
-    database_connection: PostgresCon,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     log_info = f"{store=} process metrics for {df.shape[0]} rows"
     logger.info(f"{log_info} start")
     if store == 1:
         country_df, global_df = process_metrics_google(df=df)
     elif store == 2:
-        country_df, global_df = process_metrics_apple(
-            df=df,
-            database_connection=database_connection,
-        )
+        country_df, global_df = process_metrics_apple(df=df)
     country_df = country_df.convert_dtypes(dtype_backend="pyarrow")
     country_df = country_df.replace({pd.NA: None})
     check_for_duplicates(
@@ -912,19 +886,18 @@ def delete_and_insert_app_metrics(
     database_connection: PostgresCon,
     country_df: pd.DataFrame,
     global_df: pd.DataFrame,
-    table_name: str,
     store: int,
     snapshot_date: datetime.date,
-    snapshot_end_date: datetime.date,
+    end_date: datetime.date,
 ) -> None:
     log_info = f"{store=} {snapshot_date=} delete_and_insert_app_metrics"
     table_name = "app_country_metrics_history"
     logger.info(f"{log_info} {table_name=} start")
-    delete_app_metrics_by_date_and_store(
+    delete_app_metrics_by_date_and_apps(
         database_connection=database_connection,
         snapshot_start_date=snapshot_date,
-        snapshot_end_date=snapshot_end_date,
-        store=store,
+        snapshot_end_date=end_date,
+        store_apps=country_df["store_app"].unique().tolist(),
         table_name=table_name,
     )
     insert_bulk(
@@ -934,11 +907,11 @@ def delete_and_insert_app_metrics(
     )
     table_name = "app_global_metrics_history"
     logger.info(f"{log_info} {table_name=} start")
-    delete_app_metrics_by_date_and_store(
+    delete_app_metrics_by_date_and_apps(
         database_connection=database_connection,
         snapshot_start_date=snapshot_date,
-        snapshot_end_date=snapshot_end_date,
-        store=store,
+        snapshot_end_date=end_date,
+        store_apps=global_df["store_app"].unique().tolist(),
         table_name=table_name,
     )
     insert_bulk(
@@ -948,21 +921,29 @@ def delete_and_insert_app_metrics(
     )
 
 
+df = get_raw_app_hash_buckets_from_s3(
+    start_date_mon=start_date_mon, end_date=end_date, store=store, app_hash=hex_val
+)
+
+
 def process_app_metrics_to_db(
+    hash_bucket: str,
     database_connection: PostgresCon,
     store: int,
-    snapshot_date: datetime.date,
-    snapshot_end_date: datetime.date,
-    last_history_df: pd.DataFrame,
-) -> pd.DataFrame:
-    log_info = f"date={snapshot_date} store={store}"
+    start_date_mon: datetime.date,
+    end_date: datetime.date,
+) -> None:
+    log_info = f"date={start_date_mon} store={store} hash_bucket={hash_bucket}"
     logger.info(f"{log_info} start")
-    # df = get_s3_agg_weekly_snapshots(snapshot_date, snapshot_end_date, store)
+    df = get_app_hash_buckets_from_s3(
+        start_date_mon=start_date_mon,
+        end_date=end_date,
+        store=store,
+        app_hash=hash_bucket,
+    )
     if df.empty:
-        logger.warning(
-            f"No data found for S3 agg app metrics {store=} {snapshot_date=}"
-        )
-        return last_history_df
+        logger.warning(f"{log_info} no data found for S3 agg app metrics, skipping")
+        raise ValueError(f"{log_info} no data found for S3 agg app metrics")
     if store == 2:
         # This is an issue and needs to be resolved in the way the iOS store_id is stored into S3
         problem_rows = df["store_id"].str.contains(".0", regex=False)
@@ -970,19 +951,8 @@ def process_app_metrics_to_db(
             raise ValueError(
                 f"Found {problem_rows.sum()} rows with .0 suffix in store_id for Apple"
             )
-            # logger.warning(
-            #     f'Apple App IDs: Found {problem_rows.sum()}/{df.shape[0]} store_id with ".0" suffix, fixing'
-            # )
-            # df.loc[problem_rows, "store_id"] = (
-            #     df.loc[problem_rows, "store_id"].str.split(".").str[0]
-            # )
-            # df["crawled_at"] = df["crawled_at"].sort_values(ascending=True)
-            # df = df.drop_duplicates(
-            #     ["snapshot_date", "country", "store_id"], keep="last"
-            # )
     df = merge_in_db_ids(df, store, database_connection)
     df = df.drop(["store_id", "country"], axis=1)
-    # df = df[df["store_app"] == 776750].sort_values(["week_start", "country_id"])
     if store == 1:
         df = df.rename(
             columns={
@@ -1022,6 +992,7 @@ def process_app_metrics_to_db(
             "store_last_updated",
             "histogram",
         ]
+    df = df.sort_values("week_start")
     df[cols_to_ffill] = df.groupby(["store_app", "country_id"])[cols_to_ffill].ffill()
     df = df.reset_index()
     country_map = query_countries(database_connection=database_connection)
@@ -1029,153 +1000,150 @@ def process_app_metrics_to_db(
     country_df, global_df = process_metrics(
         store=store,
         df=df,
-        database_connection=database_connection,
     )
     delete_and_insert_app_metrics(
         database_connection=database_connection,
         country_df=country_df,
         global_df=global_df,
-        table_name="app_country_metrics_history",
         store=store,
-        snapshot_date=snapshot_date,
-        snapshot_end_date=snapshot_end_date,
+        snapshot_date=start_date_mon,
+        end_date=end_date,
     )
-    return app_country_db_latest
 
 
-def copy_daily_agg_to_weekly(
-    store: int,
-    app_detail_parquets: list[str],
-    snapshot_date_str: str,
-) -> str:
-    bucket = CONFIG["s3"]["bucket"]
-    if store == 2:
-        export_cols = """
-             store_id,
-             country,
-             crawled_date,
-             rating,
-             rating_count,
-             user_ratings,
-             store_last_updated,
-             crawled_at
-             """
-    elif store == 1:
-        export_cols = """
-                store_id,
-                country,
-                crawled_date,
-                installs,
-                rating,
-                rating_count,
-                review_count,
-                histogram,
-                store_last_updated,
-                crawled_at
-        """
-    query = f"""COPY (
-            SELECT 
-                {export_cols}
-            FROM read_parquet({app_detail_parquets}, union_by_name=true)
-            QUALIFY ROW_NUMBER() OVER (
-                PARTITION BY store_id, country 
-                ORDER BY crawled_at DESC
-            ) = 1
-        ) TO 's3://{bucket}/{AGG_APP_COUNTRY_WEEKLY_PREFIX}/store={store}/snapshot_date={snapshot_date_str}/'
-    (FORMAT PARQUET,
-     PARTITION_BY (country),
-     OVERWRITE_OR_IGNORE true,
-     COMPRESSION 'zstd');
-    """
-    return query
+# def copy_daily_agg_to_weekly(
+#     store: int,
+#     app_detail_parquets: list[str],
+#     snapshot_date_str: str,
+# ) -> str:
+#     bucket = CONFIG["s3"]["bucket"]
+#     if store == 2:
+#         export_cols = """
+#              store_id,
+#              country,
+#              crawled_date,
+#              rating,
+#              rating_count,
+#              user_ratings,
+#              store_last_updated,
+#              crawled_at
+#              """
+#     elif store == 1:
+#         export_cols = """
+#                 store_id,
+#                 country,
+#                 crawled_date,
+#                 installs,
+#                 rating,
+#                 rating_count,
+#                 review_count,
+#                 histogram,
+#                 store_last_updated,
+#                 crawled_at
+#         """
+#     query = f"""COPY (
+#             SELECT
+#                 {export_cols}
+#             FROM read_parquet({app_detail_parquets}, union_by_name=true)
+#             QUALIFY ROW_NUMBER() OVER (
+#                 PARTITION BY store_id, country
+#                 ORDER BY crawled_at DESC
+#             ) = 1
+#         ) TO 's3://{bucket}/{AGG_APP_COUNTRY_WEEKLY_PREFIX}/store={store}/snapshot_date={snapshot_date_str}/'
+#     (FORMAT PARQUET,
+#      PARTITION_BY (country),
+#      OVERWRITE_OR_IGNORE true,
+#      COMPRESSION 'zstd');
+#     """
+#     return query
 
 
-def copy_raw_details_to_daily_agg(
-    store: int,
-    app_detail_parquets: list[str],
-    snapshot_date_str: str,
-) -> str:
-    bucket = CONFIG["s3"]["bucket"]
-    crawl_result_filter = "WHERE crawl_result = 1"
-    if snapshot_date_str < "2024-11-01":
-        crawl_result_filter = ""
-    if store == 2:
-        if snapshot_date_str < "2024-11-01":
-            store_id_col = "CAST(trackId AS VARCHAR)"
-        else:
-            store_id_col = "store_id"
-        data_cols = f"""
-             {store_id_col} AS store_id,
-             country,
-             crawled_date,
-             averageUserRating AS rating,
-             userRatingCount AS rating_count,
-             user_ratings,
-             currentVersionReleaseDate AS store_last_updated,
-             crawled_at
-        """
-        export_cols = """
-             store_id,
-             country,
-             crawled_date,
-             rating,
-             rating_count,
-             user_ratings,
-             store_last_updated,
-             crawled_at
-             """
-        extra_sort_column = "rating_count DESC"
-    elif store == 1:
-        if snapshot_date_str < "2025-11-01":
-            store_id_col = "CAST(appId AS VARCHAR)"
-        else:
-            store_id_col = "store_id"
-        data_cols = f"""
-             {store_id_col} AS store_id,
-             country,
-             crawled_date,
-             realInstalls as installs,
-             ratings as rating_count,
-             score AS rating,
-             reviews AS review_count,
-             histogram,
-             updated AS store_last_updated,
-             crawled_at
-             """
-        export_cols = """
-                store_id,
-                country,
-                crawled_date,
-                installs,
-                rating,
-                rating_count,
-                review_count,
-                histogram,
-                store_last_updated,
-                crawled_at
-        """
-        extra_sort_column = "review_count DESC"
-    query = f"""COPY (
-    with data  AS (
-    SELECT {data_cols}
-     FROM read_parquet({app_detail_parquets}, union_by_name=true)
-        {crawl_result_filter}
-     )
-      SELECT
-            {export_cols}
-      FROM data
-      QUALIFY ROW_NUMBER() OVER (
-        PARTITION BY store_id, country
-        ORDER BY crawled_at DESC, {extra_sort_column}
-      ) = 1
-    ) TO 's3://{bucket}/{AGG_APP_COUNTRY_DAILY_PREFIX}/store={store}/snapshot_date={snapshot_date_str}/'
-    (FORMAT PARQUET, 
-    PARTITION_BY (country), 
-    ROW_GROUP_SIZE 100000, 
-    COMPRESSION 'zstd',
-    OVERWRITE_OR_IGNORE true);
-    """
-    return query
+# def copy_raw_details_to_daily_agg(
+#     store: int,
+#     app_detail_parquets: list[str],
+#     snapshot_date_str: str,
+# ) -> str:
+#     bucket = CONFIG["s3"]["bucket"]
+#     crawl_result_filter = "WHERE crawl_result = 1"
+#     if snapshot_date_str < "2024-11-01":
+#         crawl_result_filter = ""
+#     if store == 2:
+#         if snapshot_date_str < "2024-11-01":
+#             store_id_col = "CAST(trackId AS VARCHAR)"
+#         else:
+#             store_id_col = "store_id"
+#         data_cols = f"""
+#              {store_id_col} AS store_id,
+#              country,
+#              crawled_date,
+#              averageUserRating AS rating,
+#              userRatingCount AS rating_count,
+#              user_ratings,
+#              currentVersionReleaseDate AS store_last_updated,
+#              crawled_at
+#         """
+#         export_cols = """
+#              store_id,
+#              country,
+#              crawled_date,
+#              rating,
+#              rating_count,
+#              user_ratings,
+#              store_last_updated,
+#              crawled_at
+#              """
+#         extra_sort_column = "rating_count DESC"
+#     elif store == 1:
+#         if snapshot_date_str < "2025-11-01":
+#             store_id_col = "CAST(appId AS VARCHAR)"
+#         else:
+#             store_id_col = "store_id"
+#         data_cols = f"""
+#              {store_id_col} AS store_id,
+#              country,
+#              crawled_date,
+#              realInstalls as installs,
+#              ratings as rating_count,
+#              score AS rating,
+#              reviews AS review_count,
+#              histogram,
+#              updated AS store_last_updated,
+#              crawled_at
+#              """
+#         export_cols = """
+#                 store_id,
+#                 country,
+#                 crawled_date,
+#                 installs,
+#                 rating,
+#                 rating_count,
+#                 review_count,
+#                 histogram,
+#                 store_last_updated,
+#                 crawled_at
+#         """
+#         extra_sort_column = "review_count DESC"
+#     query = f"""COPY (
+#     with data  AS (
+#     SELECT {data_cols}
+#      FROM read_parquet({app_detail_parquets}, union_by_name=true)
+#         {crawl_result_filter}
+#      )
+#       SELECT
+#             {export_cols}
+#       FROM data
+#       QUALIFY ROW_NUMBER() OVER (
+#         PARTITION BY store_id, country
+#         ORDER BY crawled_at DESC, {extra_sort_column}
+#       ) = 1
+#     ) TO 's3://{bucket}/{AGG_APP_COUNTRY_DAILY_PREFIX}/store={store}/snapshot_date={snapshot_date_str}/'
+#     (FORMAT PARQUET,
+#     PARTITION_BY (country),
+#     ROW_GROUP_SIZE 100000,
+#     COMPRESSION 'zstd',
+#     OVERWRITE_OR_IGNORE true);
+#     """
+#     return query
 
 
 def copy_raw_details_to_hash_buckets(
@@ -1185,10 +1153,10 @@ def copy_raw_details_to_hash_buckets(
 ) -> str:
     bucket = CONFIG["s3"]["bucket"]
     crawl_result_filter = "WHERE crawl_result = 1"
-    if snapshot_date_str < "2024-11-01":
+    if snapshot_date_str < "2025-11-01":
         crawl_result_filter = ""
     if store == 2:
-        if snapshot_date_str < "2024-11-01":
+        if snapshot_date_str < "2025-11-01":
             store_id_col = "CAST(trackId AS VARCHAR)"
         else:
             store_id_col = "store_id"
@@ -1216,6 +1184,7 @@ def copy_raw_details_to_hash_buckets(
     elif store == 1:
         if snapshot_date_str < "2025-11-01":
             store_id_col = "CAST(appId AS VARCHAR)"
+            crawl_result_filter = "WHERE installs > 0"
         else:
             store_id_col = "store_id"
         data_cols = f"""

@@ -95,7 +95,7 @@ def delete_s3_objects_by_prefix(bucket: str, prefix: str, key_name: str = "s3") 
             Bucket=bucket,
             Delete={"Objects": [{"Key": obj["Key"]} for obj in response["Contents"]]},
         )
-    time.sleep(1)
+    time.sleep(0.5)
 
 
 def upload_mitm_log_to_s3(

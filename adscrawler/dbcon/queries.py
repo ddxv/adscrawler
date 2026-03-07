@@ -1587,72 +1587,72 @@ def get_all_mmp_tlds(database_connection: PostgresCon) -> pd.DataFrame:
     return df
 
 
-def get_latest_app_country_history(
-    database_connection: PostgresCon,
-    snapshot_date: datetime.date,
-    store_app_ids: list,
-    days_back: int,
-    chunk_size: int,
-    store: int,
-) -> pd.DataFrame:
-    chunks = [
-        store_app_ids[i : i + chunk_size]
-        for i in range(0, len(store_app_ids), chunk_size)
-    ]
-    log_info = f"{store=} {snapshot_date=} query app_country_metrics_history apps len:{len(store_app_ids)}"
-    logger.info(f"{log_info} start days:{days_back} chunks:{len(chunks)}")
-    end_date = snapshot_date.strftime("%Y-%m-%d")
-    results = []
-    if store == 1:
-        metric_cols = "review_count"
-    elif store == 2:
-        metric_cols = "rating, rating_count, one_star, two_star, three_star, four_star, five_star, installs_est"
-    for _i, chunk_ids in enumerate(chunks):
-        id_list_str = ",".join(map(str, chunk_ids))
-        if days_back == 1:
-            sel_query = f"""
-            SELECT
-                acmh.store_app,
-                acmh.snapshot_date,
-                acmh.country_id,
-                {metric_cols}
-            FROM app_country_metrics_history acmh
-            WHERE acmh.store_app IN ({id_list_str})
-              AND acmh.snapshot_date = '{end_date}'
-            """
-        else:
-            start_date = (snapshot_date - datetime.timedelta(days=days_back)).strftime(
-                "%Y-%m-%d"
-            )
-            sel_query = f"""
-            SELECT DISTINCT ON (acmh.store_app, acmh.country_id)
-                acmh.store_app,
-                acmh.snapshot_date,
-                acmh.country_id,
-                {metric_cols}
-            FROM app_country_metrics_history acmh
-            WHERE acmh.store_app IN ({id_list_str})
-              AND acmh.snapshot_date >= '{start_date}'
-              AND acmh.snapshot_date <= '{end_date}'
-            ORDER BY
-                store_app,
-                country_id,
-                snapshot_date DESC
-        """
-        # Pull chunk and append to results list
-        chunk_df = pd.read_sql(sel_query, con=database_connection.engine)
-        results.append(chunk_df)
-    if not results:
-        return pd.DataFrame()
-    country_map = query_countries(database_connection)
-    df = pd.concat(results, ignore_index=True)
-    df = pd.merge(
-        df, country_map[["id", "tier"]], how="left", left_on="country_id", right_on="id"
-    )
-    df["crawled_date"] = pd.to_datetime(df["snapshot_date"])
-    df = df.drop(columns=["snapshot_date"])
-    logger.info(f"{log_info} returning {df.shape[0]} rows")
-    return df
+# def get_latest_app_country_history(
+#     database_connection: PostgresCon,
+#     snapshot_date: datetime.date,
+#     store_app_ids: list,
+#     days_back: int,
+#     chunk_size: int,
+#     store: int,
+# ) -> pd.DataFrame:
+#     chunks = [
+#         store_app_ids[i : i + chunk_size]
+#         for i in range(0, len(store_app_ids), chunk_size)
+#     ]
+#     log_info = f"{store=} {snapshot_date=} query app_country_metrics_history apps len:{len(store_app_ids)}"
+#     logger.info(f"{log_info} start days:{days_back} chunks:{len(chunks)}")
+#     end_date = snapshot_date.strftime("%Y-%m-%d")
+#     results = []
+#     if store == 1:
+#         metric_cols = "review_count"
+#     elif store == 2:
+#         metric_cols = "rating, rating_count, one_star, two_star, three_star, four_star, five_star, installs_est"
+#     for _i, chunk_ids in enumerate(chunks):
+#         id_list_str = ",".join(map(str, chunk_ids))
+#         if days_back == 1:
+#             sel_query = f"""
+#             SELECT
+#                 acmh.store_app,
+#                 acmh.snapshot_date,
+#                 acmh.country_id,
+#                 {metric_cols}
+#             FROM app_country_metrics_history acmh
+#             WHERE acmh.store_app IN ({id_list_str})
+#               AND acmh.snapshot_date = '{end_date}'
+#             """
+#         else:
+#             start_date = (snapshot_date - datetime.timedelta(days=days_back)).strftime(
+#                 "%Y-%m-%d"
+#             )
+#             sel_query = f"""
+#             SELECT DISTINCT ON (acmh.store_app, acmh.country_id)
+#                 acmh.store_app,
+#                 acmh.snapshot_date,
+#                 acmh.country_id,
+#                 {metric_cols}
+#             FROM app_country_metrics_history acmh
+#             WHERE acmh.store_app IN ({id_list_str})
+#               AND acmh.snapshot_date >= '{start_date}'
+#               AND acmh.snapshot_date <= '{end_date}'
+#             ORDER BY
+#                 store_app,
+#                 country_id,
+#                 snapshot_date DESC
+#         """
+#         # Pull chunk and append to results list
+#         chunk_df = pd.read_sql(sel_query, con=database_connection.engine)
+#         results.append(chunk_df)
+#     if not results:
+#         return pd.DataFrame()
+#     country_map = query_countries(database_connection)
+#     df = pd.concat(results, ignore_index=True)
+#     df = pd.merge(
+#         df, country_map[["id", "tier"]], how="left", left_on="country_id", right_on="id"
+#     )
+#     df["crawled_date"] = pd.to_datetime(df["snapshot_date"])
+#     df = df.drop(columns=["snapshot_date"])
+#     logger.info(f"{log_info} returning {df.shape[0]} rows")
+#     return df
 
 
 def get_retention_benchmarks(database_connection: PostgresCon) -> pd.DataFrame:
@@ -1715,11 +1715,11 @@ def get_ecpm_benchmarks(database_connection: PostgresCon) -> pd.DataFrame:
     return df
 
 
-def delete_app_metrics_by_date_and_store(
+def delete_app_metrics_by_date_and_apps(
     database_connection: PostgresCon,
     snapshot_start_date: datetime.date,
     snapshot_end_date: datetime.date,
-    store: int,
+    store_apps: list[int],
     table_name: str,
 ) -> None:
     assert table_name in [
@@ -1728,10 +1728,9 @@ def delete_app_metrics_by_date_and_store(
     ], "Invalid table name"
     del_query = f"""
         DELETE FROM public.{table_name} acmh
-        USING store_apps sa
-        WHERE acmh.store_app = sa.id
-        AND acmh.snapshot_date BETWEEN :snapshot_start_date AND :snapshot_end_date
-        AND sa.store = :store
+        WHERE 
+            acmh.snapshot_date BETWEEN :snapshot_start_date AND :snapshot_end_date
+            AND acmh.store_app = :store_apps
     """
     with database_connection.engine.connect().execution_options(
         isolation_level="AUTOCOMMIT"
@@ -1741,42 +1740,42 @@ def delete_app_metrics_by_date_and_store(
             {
                 "snapshot_start_date": snapshot_start_date,
                 "snapshot_end_date": snapshot_end_date,
-                "store": store,
+                "store_apps": store_apps,
             },
         )
         logger.info(
-            f"{snapshot_start_date=} {snapshot_end_date=} {store=} deleted {result.rowcount} rows from {table_name}"
+            f"{snapshot_start_date=} {snapshot_end_date=} deleted {result.rowcount} rows from {table_name}"
         )
 
 
-@lru_cache(maxsize=1)
-def get_ios_cached_future_country_ratios(
-    database_connection: PostgresCon,
-) -> pd.DataFrame:
-    """These require future data for calculation... means only show up on a second rerun."""
-    sel_query = """WITH ios_apps AS (
-            SELECT
-                store_app, total_ratings
-            FROM
-                app_global_metrics_latest agml
-            LEFT JOIN store_apps sa ON agml.store_app = sa.id
-            WHERE
-                store = 2 and total_ratings > 2
-        )
-        SELECT
-            DISTINCT ON
-            (acmh.store_app, country_id) acmh.store_app,
-            country_id,
-            rating_count::float / ia.total_ratings::float AS rating_ratio
-        FROM
-            app_country_metrics_history acmh
-            INNER JOIN ios_apps ia ON acmh.store_app = ia.store_app
-        WHERE rating_count > 0 AND total_ratings > 0
-        ORDER BY
-            store_app,
-            country_id,
-            snapshot_date DESC
-            ;
-            """
-    df = pd.read_sql(sel_query, con=database_connection.engine)
-    return df
+# @lru_cache(maxsize=1)
+# def get_ios_cached_future_country_ratios(
+#     database_connection: PostgresCon,
+# ) -> pd.DataFrame:
+#     """These require future data for calculation... means only show up on a second rerun."""
+#     sel_query = """WITH ios_apps AS (
+#             SELECT
+#                 store_app, total_ratings
+#             FROM
+#                 app_global_metrics_latest agml
+#             LEFT JOIN store_apps sa ON agml.store_app = sa.id
+#             WHERE
+#                 store = 2 and total_ratings > 2
+#         )
+#         SELECT
+#             DISTINCT ON
+#             (acmh.store_app, country_id) acmh.store_app,
+#             country_id,
+#             rating_count::float / ia.total_ratings::float AS rating_ratio
+#         FROM
+#             app_country_metrics_history acmh
+#             INNER JOIN ios_apps ia ON acmh.store_app = ia.store_app
+#         WHERE rating_count > 0 AND total_ratings > 0
+#         ORDER BY
+#             store_app,
+#             country_id,
+#             snapshot_date DESC
+#             ;
+#             """
+#     df = pd.read_sql(sel_query, con=database_connection.engine)
+#     return df
