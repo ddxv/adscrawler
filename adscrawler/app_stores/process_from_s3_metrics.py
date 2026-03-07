@@ -562,7 +562,9 @@ def process_metrics_apple(
         "grc_est_prod"
     ].transform("sum") / df.groupby(["week_start", "store_app"])[
         "rating_count"
-    ].transform("sum")
+    ].transform(
+        "sum"
+    )
     df["rating_count"] = (
         df["rating_count"]
         .fillna(df["grc_future_est"] * df["rating_ratio"])
@@ -919,11 +921,6 @@ def delete_and_insert_app_metrics(
         table_name=table_name,
         database_connection=database_connection,
     )
-
-
-df = get_raw_app_hash_buckets_from_s3(
-    start_date_mon=start_date_mon, end_date=end_date, store=store, app_hash=hex_val
-)
 
 
 def process_app_metrics_to_db(
