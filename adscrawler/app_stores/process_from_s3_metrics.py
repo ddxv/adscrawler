@@ -12,7 +12,6 @@ from adscrawler.dbcon.connection import (
     PostgresCon,
 )
 from adscrawler.dbcon.queries import (
-    delete_and_insert,
     delete_app_metrics_by_date_and_apps,
     get_ecpm_benchmarks,
     get_retention_benchmarks,
@@ -49,19 +48,17 @@ METRIC_COLS = [
 ] + STAR_COLS
 
 GLOBAL_HISTORY_KEYS = [
-    "snapshot_date",
+    "week_start",
     "store_app",
 ]
 COUNTRY_HISTORY_KEYS = [
-    "snapshot_date",
+    "week_start",
     "country_id",
     "store_app",
 ]
 
 COUNTRY_HISTORY_COLS = (
-    COUNTRY_HISTORY_KEYS
-    + [x for x in METRIC_COLS if x != "installs"]
-    + ["installs_est"]
+    COUNTRY_HISTORY_KEYS + [x for x in METRIC_COLS if x != "installs"] + ["installs"]
 )
 
 GLOBAL_HISTORY_COLS = (
@@ -75,7 +72,6 @@ GLOBAL_FINAL_COLS = [
     "week_start",
     "weekly_installs",
     "weekly_ratings",
-    "weekly_reviews",
     "weekly_active_users",
     "monthly_active_users",
     "weekly_iap_revenue",
@@ -351,7 +347,6 @@ def process_metrics_google(df: pd.DataFrame) -> pd.DataFrame:
     global_df = df[df["country_id"] == 840].copy()
     global_df = global_df.rename(
         columns={
-            "week_start": "snapshot_date",
             "global_installs": "installs",
             "global_rating_count": "rating_count",
         }
@@ -443,15 +438,8 @@ def process_metrics_google(df: pd.DataFrame) -> pd.DataFrame:
     df["true_review_count"] = pd.to_numeric(
         df["true_review_count"], errors="coerce"
     ).fillna(0)
-    # df["review_count"] = df["review_count"].replace(np.nan, 0).astype(int)
-    # df["global_rating_count"] = df["global_rating_count"].fillna(0).astype(int)
-    # df["global_review_count"] = df["global_review_count"].fillna(0).astype(int)
-    # df["global_installs"] = df["global_installs"].fillna(0).astype(int)
-    # Db currently does not have a rating_count_est column just for country
-    # df["rating_count"] = df["rating_count_est"]
-    # assert (
-    #     df["global_rating_count"].ge(df["rating_count"]).all()
-    # ), "global_rating_count should be >= rating_count"
+    df = df.rename(columns={"review_count": "original_review_count"})
+    df = df.rename(columns={"true_review_count": "review_count"})
     global_df = global_df.set_index(GLOBAL_HISTORY_KEYS)
     # TODO: Stars need to be fixed per is_global_fallback logic
     histo_nulls = global_df["histogram"].isna()
@@ -466,20 +454,14 @@ def process_metrics_google(df: pd.DataFrame) -> pd.DataFrame:
             if col not in star_df.columns:
                 star_df[col] = 0
     global_df = pd.concat([global_df, star_df], axis=1)
-    tier_pct = (
-        df.rename(columns={"week_start": "snapshot_date"})
-        .pivot_table(
-            index=GLOBAL_HISTORY_KEYS,
-            columns="tier",
-            values="pct_of_global",
-            aggfunc="sum",
-            fill_value=0,
-            dropna=False,
-        )
-        .rename(
-            columns={"tier1": "tier1_pct", "tier2": "tier2_pct", "tier3": "tier3_pct"}
-        )
-    )
+    tier_pct = df.pivot_table(
+        index=GLOBAL_HISTORY_KEYS,
+        columns="tier",
+        values="pct_of_global",
+        aggfunc="sum",
+        fill_value=0,
+        dropna=False,
+    ).rename(columns={"tier1": "tier1_pct", "tier2": "tier2_pct", "tier3": "tier3_pct"})
     tier_pct_cols = ["tier1_pct", "tier2_pct", "tier3_pct"]
     if not all(col in tier_pct.columns for col in tier_pct_cols):
         for col in tier_pct_cols:
@@ -492,9 +474,7 @@ def process_metrics_google(df: pd.DataFrame) -> pd.DataFrame:
         (df["rating_count_est"] > 0) & (df["rating"] > 0), "rating_count_counter"
     ] = df["rating_count_est"]
     df["rating_prod"] = df["rating"] * df["rating_count_est"]
-    grouped = df.rename(columns={"week_start": "snapshot_date"}).groupby(
-        GLOBAL_HISTORY_KEYS
-    )
+    grouped = df.groupby(GLOBAL_HISTORY_KEYS)
     agg = grouped.agg(
         total_prod=("rating_prod", "sum"), total_counts=("rating_count_counter", "sum")
     )
@@ -507,7 +487,6 @@ def process_metrics_google(df: pd.DataFrame) -> pd.DataFrame:
     global_df = global_df.reset_index()
     df = df.rename(
         columns={
-            "week_start": "snapshot_date",
             "true_review_count": "review_count",
             "installs_est": "installs",
             "rating_count_est": "rating_count",
@@ -631,9 +610,7 @@ def process_metrics_apple(
     global_df["installs"] = global_df["installs"].astype("Int64")
     global_df["rating_count"] = global_df["rating_count"].astype("Int64")
     global_df[STAR_COLS] = global_df[STAR_COLS].astype("Int64")
-    df = df.rename(columns={"week_start": "snapshot_date"})
-    global_df = global_df.rename(columns={"week_start": "snapshot_date"})
-    # Note, we return the df which for iOS is the country level data
+    df = df.rename(columns={"installs_est": "installs"})
     return df, global_df
 
 
@@ -644,19 +621,24 @@ def import_app_metrics_from_s3(
     store: int,
 ) -> None:
     start_date_mon = start_date - pd.Timedelta(days=start_date.weekday())
+    end_date_sun = end_date + pd.Timedelta(days=6 - end_date.weekday())
     for hash_bucket in [f"{i:02x}" for i in range(256)]:
         log_info = f"{store=} {start_date_mon=} {end_date=} hash_bucket={hash_bucket}"
         logger.info(f"{log_info} start")
+        if hash_bucket < "52":
+            logger.info(f"{log_info} skipping hash bucket 00 for testing")
+            continue
         try:
             process_app_metrics_to_db(
                 hash_bucket=hash_bucket,
                 database_connection=database_connection,
                 store=store,
-                start_date=start_date_mon,
-                end_date=end_date,
+                start_date_mon=start_date_mon,
+                end_date_sun=end_date_sun,
             )
         except Exception as e:
             logger.error(f"{log_info} error: {e}")
+            raise
 
 
 def get_raw_app_hash_buckets_from_s3(
@@ -725,6 +707,7 @@ def get_app_hash_buckets_from_s3(
         coalesce_metrics = """
                 COALESCE(
                     a_exact.installs,
+                    a_week.installs,
                     a_prev.installs_y1 +
                         (m.snapshot_date - a_prev.x1) *
                         (a_prev.installs_y2 - a_prev.installs_y1) /
@@ -732,6 +715,7 @@ def get_app_hash_buckets_from_s3(
                 )::BIGINT AS installs,
                 COALESCE(
                     a_exact.rating_count,
+                    a_week.rating_count,
                     a_prev.rating_count_y1 +
                         (m.snapshot_date - a_prev.x1) *
                         (a_prev.rating_count_y2 - a_prev.rating_count_y1) /
@@ -739,6 +723,7 @@ def get_app_hash_buckets_from_s3(
                 )::BIGINT AS rating_count,
                 COALESCE(
                     a_exact.review_count,
+                    a_week.review_count,
                     a_prev.review_count_y1 +
                         (m.snapshot_date - a_prev.x1) *
                         (a_prev.review_count_y2 - a_prev.review_count_y1) /
@@ -758,6 +743,7 @@ def get_app_hash_buckets_from_s3(
         coalesce_metrics = """
                COALESCE(
                     a_exact.rating_count,
+                    a_week.rating_count,
                     a_prev.rating_count_y1 +
                         (m.snapshot_date - a_prev.x1) *
                         (a_prev.rating_count_y2 - a_prev.rating_count_y1) /
@@ -830,42 +816,58 @@ def get_app_hash_buckets_from_s3(
         ),
 
         -- ============================================================
-        -- 4. Interpolate onto Mondays
+        -- 4. Interpolate onto Mondays, using real Mondays when available, otherwise using the bracketing anchors to interpolate, or carry forward if at start/end of series
         -- ============================================================
-        interpolated AS (
-            SELECT
-                dims.store_id,
-                dims.country,
-                m.snapshot_date AS week_start,
-                {coalesce_metrics}
-                COALESCE(a_exact.rating,             a_prev.rating_carry)              AS rating,
-                COALESCE(a_exact.histogram,          a_prev.histogram_carry)           AS histogram,
-                COALESCE(a_exact.store_last_updated, a_prev.store_last_updated_carry)  AS store_last_updated
+       interpolated AS (
+        SELECT
+            dims.store_id,
+            dims.country,
+            m.snapshot_date AS week_start,
+            {coalesce_metrics}  -- update Python strings to: COALESCE(a_exact.x, a_week.x, interpolation)
+            COALESCE(a_exact.rating,             a_week.rating,             a_prev.rating_carry)            AS rating,
+            COALESCE(a_exact.histogram,          a_week.histogram,          a_prev.histogram_carry)         AS histogram,
+            COALESCE(a_exact.store_last_updated, a_week.store_last_updated, a_prev.store_last_updated_carry) AS store_last_updated
 
-            FROM (SELECT DISTINCT store_id, country FROM raw_deduped) dims
-            CROSS JOIN target_mondays m
+        FROM (SELECT DISTINCT store_id, country FROM raw_deduped) dims
+        CROSS JOIN target_mondays m
 
-            -- Exact hit: real crawl on this Monday
-            LEFT JOIN anchors a_exact
-                   ON a_exact.store_id      = dims.store_id
-                  AND a_exact.country       = dims.country
-                  AND a_exact.snapshot_date = m.snapshot_date
+        -- Exact hit: crawl lands exactly on Monday
+        LEFT JOIN anchors a_exact
+                ON a_exact.store_id      = dims.store_id
+                AND a_exact.country       = dims.country
+                AND a_exact.snapshot_date = m.snapshot_date
 
-            -- Bracketing anchor: the real row whose gap contains this Monday
-            LEFT JOIN anchors a_prev
-               ON a_prev.store_id      = dims.store_id
-              AND a_prev.country       = dims.country
-              AND a_prev.snapshot_date = (
-                      SELECT MAX(snapshot_date) 
-                      FROM raw_deduped
-                      WHERE store_id      = dims.store_id
+        -- Intra-week hit: best crawl within Tue-Sun of this week
+        LEFT JOIN anchors a_week
+                ON a_week.store_id      = dims.store_id
+                AND a_week.country       = dims.country
+                AND a_week.snapshot_date = (
+                        SELECT MAX(snapshot_date)
+                        FROM raw_deduped
+                        WHERE store_id      = dims.store_id
+                        AND country       = dims.country
+                        AND snapshot_date >  m.snapshot_date
+                        AND snapshot_date <= m.snapshot_date + INTERVAL 6 DAY
+                    )
+
+        -- Bracketing anchor: last real crawl strictly before this Monday
+        -- (keeps window math valid — x1/x2/y1/y2 computed relative to this row)
+        LEFT JOIN anchors a_prev
+                ON a_prev.store_id      = dims.store_id
+                AND a_prev.country       = dims.country
+                AND a_prev.snapshot_date = (
+                        SELECT MAX(snapshot_date)
+                        FROM raw_deduped
+                        WHERE store_id      = dims.store_id
                         AND country       = dims.country
                         AND snapshot_date < m.snapshot_date
-                  )
+                    )
 
-            WHERE a_exact.{metrics[0]} IS NOT NULL             -- exact hit, OR
-               OR (a_prev.x1 IS NOT NULL                  -- bracketed: drop leading/trailing
-                   AND a_prev.x2 IS NOT NULL)
+        -- Only emit a week if there is real data somewhere to anchor it
+        WHERE a_exact.{metrics[0]} IS NOT NULL        -- crawl on Monday
+            OR a_week.{metrics[0]}  IS NOT NULL        -- crawl later in week
+            OR (a_prev.x1 IS NOT NULL                  -- interpolatable: both brackets exist
+                AND a_prev.x2 IS NOT NULL)
         )
 
         SELECT * FROM interpolated
@@ -898,6 +900,7 @@ def process_metrics(
     for col in tiers:
         if col not in global_df.columns:
             global_df[col] = 0.0
+        global_df[col] = global_df[col].fillna(0.0)
     global_df = global_df[[x for x in GLOBAL_HISTORY_COLS if x in global_df.columns]]
     app_cats = query_store_app_categories(
         database_connection, store_apps=global_df["store_app"].unique().tolist()
@@ -924,6 +927,33 @@ def process_metrics(
     country_df = country_df[
         [x for x in COUNTRY_HISTORY_COLS if x in country_df.columns]
     ]
+    cols_as_int = [
+        "weekly_installs",
+        "weekly_active_users",
+        "monthly_active_users",
+        "total_installs",
+        "total_ratings",
+        *STAR_COLS,
+        "installs",
+        "rating_count",
+        "review_count",
+    ]
+    for col in cols_as_int:
+        if col in country_df.columns:
+            country_df[col] = country_df[col].fillna(0).round().astype(int)
+        if col in global_df.columns:
+            global_df[col] = global_df[col].fillna(0).round().astype(int)
+    for col in tiers:
+        global_df[col] = (global_df[col] * 10000).round().fillna(0).astype("int16")
+    if store == 1:
+        global_df.loc[global_df["store_last_updated"].notna(), "store_last_updated"] = (
+            pd.to_datetime(
+                global_df.loc[
+                    global_df["store_last_updated"].notna(), "store_last_updated"
+                ],
+                unit="s",
+            )
+        )
     global_df = global_df[GLOBAL_FINAL_COLS]
     logger.info(f"{log_info} finished")
     return country_df, global_df
@@ -938,7 +968,7 @@ def delete_and_insert_app_metrics(
     end_date: datetime.date,
 ) -> None:
     log_info = f"{store=} {snapshot_date=} delete_and_insert_app_metrics"
-    table_name = "app_country_metrics_history"
+    table_name = "new_app_country_metrics_history"
     logger.info(f"{log_info} {table_name=} start")
     delete_app_metrics_by_date_and_apps(
         database_connection=database_connection,
@@ -952,7 +982,7 @@ def delete_and_insert_app_metrics(
         table_name=table_name,
         database_connection=database_connection,
     )
-    table_name = "app_global_metrics_history"
+    table_name = "new_app_global_metrics_weekly"
     logger.info(f"{log_info} {table_name=} start")
     delete_app_metrics_by_date_and_apps(
         database_connection=database_connection,
@@ -973,13 +1003,13 @@ def process_app_metrics_to_db(
     database_connection: PostgresCon,
     store: int,
     start_date_mon: datetime.date,
-    end_date: datetime.date,
+    end_date_sun: datetime.date,
 ) -> None:
     log_info = f"date={start_date_mon} store={store} hash_bucket={hash_bucket}"
     logger.info(f"{log_info} start")
     df = get_app_hash_buckets_from_s3(
         start_date_mon=start_date_mon,
-        end_date=end_date,
+        end_date=end_date_sun,
         store=store,
         app_hash=hash_bucket,
     )
@@ -991,9 +1021,13 @@ def process_app_metrics_to_db(
         # This is an issue and needs to be resolved in the way the iOS store_id is stored into S3
         problem_rows = df["store_id"].str.contains(".0", regex=False)
         if problem_rows.any():
-            raise ValueError(
-                f"Found {problem_rows.sum()} rows with .0 suffix in store_id for Apple"
+            df = df[~problem_rows]
+            logger.warning(
+                f"{log_info} found {problem_rows.sum()} rows with .0 suffix in store_id for Apple, removed them"
             )
+            # raise ValueError(
+            #     f"Found {problem_rows.sum()} rows with .0 suffix in store_id for Apple"
+            # )
     df = merge_in_db_ids(df, store, database_connection)
     df = df.drop(["store_id", "country"], axis=1)
     if store == 1:
@@ -1004,6 +1038,8 @@ def process_app_metrics_to_db(
                 "rating_count": "global_rating_count",
             }
         )
+        # very rare some chrome os apps got downloaded
+        df = df[~df["global_installs"].isna()]
     app_birth_dates = df.groupby("store_app")["week_start"].min()
     observed_app_countries = df[["store_app", "country_id"]].drop_duplicates()
     all_weeks = pd.DataFrame({"week_start": df["week_start"].unique()})
@@ -1046,32 +1082,42 @@ def process_app_metrics_to_db(
         df=df,
         database_connection=database_connection,
     )
-
-    delete_and_insert(
-        df=gdf,
-        schema="public",
-        table_name="test_app_global_metrics_weekly",
-        database_connection=database_connection,
-        delete_by_keys=["store_app", "week_start"],
-        insert_columns=gdf.columns.tolist(),
+    no_rating_count = (country_df["rating_count"].isna()) | (
+        country_df["rating_count"] == 0
     )
-    log_df = pd.DataFrame({"store_app": log_apps})
-    log_df["updated_at"] = datetime.datetime.now()
-    log_df.to_sql(
-        name="app_global_metrics_weekly",
-        con=database_connection.engine,
-        schema="logging",
-        if_exists="append",
-        index=False,
-    )
-
+    no_installs = (country_df["installs"].isna()) | (country_df["installs"] == 0)
+    if store == 1:
+        no_review_count = (country_df["review_count"].isna()) | (
+            country_df["review_count"] == 0
+        )
+    else:
+        no_review_count = pd.Series(False, index=country_df.index)
+    no_rating = (country_df["rating"].isna()) | (country_df["rating"] == 0)
+    all_null = no_rating_count & no_installs & no_review_count & no_rating
+    country_df = country_df[
+        (~all_null)
+        & (
+            country_df["week_start"]
+            >= pd.to_datetime(
+                datetime.datetime.now() - pd.Timedelta(days=365)
+            ).normalize()
+        )
+    ]
+    global_df = global_df[
+        (
+            global_df["week_start"]
+            >= pd.to_datetime(
+                datetime.datetime.now() - pd.Timedelta(days=400)
+            ).normalize()
+        )
+    ]
     delete_and_insert_app_metrics(
         database_connection=database_connection,
         country_df=country_df,
         global_df=global_df,
         store=store,
         snapshot_date=start_date_mon,
-        end_date=end_date,
+        end_date=end_date_sun,
     )
 
 
@@ -1312,80 +1358,82 @@ def copy_raw_details_to_hash_buckets(
 
 
 def calculate_active_users(
-    database_connection: PostgresCon, df: pd.DataFrame, store: int
+    database_connection: PostgresCon, global_df: pd.DataFrame, store: int
 ) -> pd.DataFrame:
     """Process app global metrics weekly."""
-    star_cols = ["one_star", "two_star", "three_star", "four_star", "five_star"]
     tier_pct_cols = ["tier1_pct", "tier2_pct", "tier3_pct"]
     metrics = [
         "installs",
         "rating",
-        "review_count",
         "rating_count",
-        *star_cols,
+        *STAR_COLS,
         *tier_pct_cols,
     ]
-    xaxis_col = "snapshot_date"
+    xaxis_col = "week_start"
     # Convert to date to datetime and sort by country and date, required
-    df[xaxis_col] = pd.to_datetime(df[xaxis_col])
-    df = df.sort_values(["store_app", xaxis_col])
-    df = (
-        df.set_index(xaxis_col)
-        .groupby(
-            [
-                "store_app",
-                "app_category",
-                "ad_supported",
-                "in_app_purchases",
-            ]
-        )[metrics]
-        .resample("W-MON")
-        .last()
-        .apply(pd.to_numeric, errors="coerce")
-        .interpolate(method="linear", limit_direction="forward")
+    global_df[xaxis_col] = pd.to_datetime(global_df[xaxis_col])
+    global_df = global_df.sort_values(["store_app", xaxis_col])
+    # xdf = (
+    #     global_df.set_index(xaxis_col)
+    #     .groupby(
+    #         [
+    #             "store_app",
+    #             "app_category",
+    #             "ad_supported",
+    #             "in_app_purchases",
+    #         ]
+    #     )[metrics]
+    #     .resample("W-MON")
+    #     .last()
+    #     .apply(pd.to_numeric, errors="coerce")
+    #     .interpolate(method="linear", limit_direction="forward")
+    #     .fillna(0)
+    #     .reset_index()
+    # )
+    global_df["installs_diff"] = (
+        global_df.groupby("store_app")["installs"].diff().fillna(0)
+    )
+    global_df["installs_diff"] = (
+        global_df.groupby("store_app")["installs"]
+        .diff()
+        .fillna(global_df["installs"])
         .fillna(0)
-        .reset_index()
     )
-    df["installs_diff"] = df.groupby("store_app")["installs"].diff().fillna(0)
-    df["installs_diff"] = (
-        df.groupby("store_app")["installs"].diff().fillna(df["installs"]).fillna(0)
-    )
-    df["weekly_ratings"] = (
-        df.groupby("store_app")["rating_count"].diff().fillna(df["rating_count"])
-    )
-    df["weekly_reviews"] = (
-        df.groupby("store_app")["review_count"].diff().fillna(df["review_count"])
+    global_df["weekly_ratings"] = (
+        global_df.groupby("store_app")["rating_count"]
+        .diff()
+        .fillna(global_df["rating_count"])
     )
     # This drops the earliest week, since the diff will count all metrics as weekly
     # This is ok for apps which are new to the range, that week all those metrics are new
-    drop_rows = df["snapshot_date"] == df["snapshot_date"].min()
-    df = df[~drop_rows]
+    drop_rows = global_df["week_start"] == global_df["week_start"].min()
+    global_df = global_df[~drop_rows]
     if store == 2:
         # iOS data is very estimated and noisy, so we smooth
-        df["installs_diff"] = (
-            df.groupby("store_app")["installs_diff"]
+        global_df["installs_diff"] = (
+            global_df.groupby("store_app")["installs_diff"]
             .rolling(window=3, min_periods=1)
             .mean()
             .reset_index(level=0, drop=True)
         )
     retention_benchmarks = get_retention_benchmarks(database_connection)
     retention_benchmarks = retention_benchmarks[retention_benchmarks["store"] == store]
-    cohorts = df.merge(
+    cohorts = global_df.merge(
         retention_benchmarks, on=["app_category"], how="left", validate="m:1"
     )
     cohorts["k"] = np.log(
         cohorts["d30"].replace(0, np.nan) / cohorts["d7"].replace(0, np.nan)
     ) / np.log(30.0 / 7.0)
-    cohorts = cohorts[["store_app", "snapshot_date", "installs_diff", "d1", "d7", "k"]]
+    cohorts = cohorts[["store_app", "week_start", "installs_diff", "d1", "d7", "k"]]
     logger.info("Historical merge, memory intensive step")
     cohorts = cohorts.merge(
-        cohorts[["store_app", "snapshot_date", "installs_diff"]],
+        cohorts[["store_app", "week_start", "installs_diff"]],
         on="store_app",
         suffixes=("", "_historical"),
     )
-    cohorts = cohorts[cohorts["snapshot_date"] >= cohorts["snapshot_date_historical"]]
+    cohorts = cohorts[cohorts["week_start"] >= cohorts["week_start_historical"]]
     cohorts["weeks_passed"] = (
-        (cohorts["snapshot_date"] - cohorts["snapshot_date_historical"]).dt.days / 7
+        (cohorts["week_start"] - cohorts["week_start_historical"]).dt.days / 7
     ).astype(int)
     wau_mult = 2.0
     cohorts["retention_rate"] = np.where(
@@ -1415,7 +1463,7 @@ def calculate_active_users(
         cohorts["installs_diff_historical"] * cohorts["retention_rate_mau"]
     )
     cohorts = (
-        cohorts.groupby(["store_app", "snapshot_date"])[
+        cohorts.groupby(["store_app", "week_start"])[
             ["surviving_users", "surviving_mau"]
         ]
         .sum()
@@ -1426,29 +1474,27 @@ def calculate_active_users(
         "store_app",
         "in_app_purchases",
         "ad_supported",
-        "snapshot_date",
+        "week_start",
         "installs_diff",
         "weekly_ratings",
-        "weekly_reviews",
+        "store_last_updated",
     ] + metrics
-    df = pd.merge(
-        df[dfcols],
+    global_df = pd.merge(
+        global_df[dfcols],
         cohorts,
-        on=["store_app", "snapshot_date"],
+        on=["store_app", "week_start"],
         how="left",
         validate="1:1",
     )
-    df[["snapshot_date", "installs", "installs_diff", "wau"]]
     rename_map = {
-        "snapshot_date": "week_start",
         "installs_diff": "weekly_installs",
         "wau": "weekly_active_users",
         "mau": "monthly_active_users",
         "installs": "total_installs",
         "rating_count": "total_ratings",
     }
-    df = df.rename(columns=rename_map)
-    return df
+    global_df = global_df.rename(columns=rename_map)
+    return global_df
 
 
 def calculate_revenue_cols(

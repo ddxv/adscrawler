@@ -1722,21 +1722,23 @@ def delete_app_metrics_by_date_and_apps(
     store_apps: list[int],
     table_name: str,
 ) -> None:
-    assert table_name in [
-        "app_country_metrics_history",
-        "app_global_metrics_history",
-    ], "Invalid table name"
-    del_query = f"""
+    # assert table_name in [
+    #     "app_country_metrics_history",
+    #     "app_global_metrics_history",
+    # ], "Invalid table name"
+    del_query = text(
+        f"""
         DELETE FROM public.{table_name} acmh
         WHERE 
-            acmh.snapshot_date BETWEEN :snapshot_start_date AND :snapshot_end_date
-            AND acmh.store_app = :store_apps
+            acmh.week_start BETWEEN :snapshot_start_date AND :snapshot_end_date
+            AND acmh.store_app = ANY(:store_apps)
     """
+    )
     with database_connection.engine.connect().execution_options(
         isolation_level="AUTOCOMMIT"
     ) as conn:
         result = conn.execute(
-            text(del_query),
+            del_query,
             {
                 "snapshot_start_date": snapshot_start_date,
                 "snapshot_end_date": snapshot_end_date,
