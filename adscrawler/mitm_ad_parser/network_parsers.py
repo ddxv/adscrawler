@@ -227,10 +227,10 @@ def check_and_upsert_new_domains(
 def upsert_urls(urls: list[str], database_connection: PostgresCon) -> pd.DataFrame:
     """Upserts the URLs into the database."""
     urls_df = pd.DataFrame({"url": urls})
-    url_hash_map = query_urls_hash_map_cached(database_connection=database_connection)
     urls_df["url_hash"] = urls_df["url"].apply(
         lambda x: hashlib.md5(x.encode()).hexdigest()
     )
+    url_hash_map = query_urls_hash_map_cached(database_connection=database_connection)
     existing_index = pd.Index(url_hash_map["url_hash"])
     new_hashes = pd.Index(urls_df["url_hash"]).difference(existing_index)
     if new_hashes.empty:
@@ -762,7 +762,9 @@ def parse_text_for_adinfo(
     click_urls = check_click_urls(all_urls, run_id, api_call_id, database_connection)
     all_urls = list(set(all_urls + click_urls))
     if len(all_urls) > 0:
+        logger.info("start")
         store_found_urls_in_db(all_urls, run_id, api_call_id, database_connection)
+        logger.info("start")
     else:
         logger.debug(f"No URLs found for {mitm_uuid}")
         error_msg = "No URLs found"
@@ -988,6 +990,7 @@ def parse_sent_video_df(
     found_ad_infos = []
     for sent_video_dict in sent_video_dicts:
         error_msg = None
+        parsed_text = False
         init_url = sent_video_dict["url"]
         init_tld = sent_video_dict["tld_url"]
         logger.debug(f"Parsing ad network {init_url=} for adv")
@@ -1020,12 +1023,13 @@ def parse_sent_video_df(
             ad_info, error_msg = parse_generic_adnetwork(
                 sent_video_dict, database_connection
             )
+            parsed_text = True
         if error_msg:
             row["error_msg"] = error_msg
             logger.error(f"{error_msg} for video {video_id[0:10]}")
             error_messages.append(row)
             continue
-        if ad_info["adv_store_id"] is None:
+        if ad_info["adv_store_id"] is None and not parsed_text:
             # This is doubling the time for the run as it is parsing the text again
             # but this does seem to could catch misses often enough to keep it
             ad_parts, _error_msg = parse_text_for_adinfo(

@@ -38,6 +38,7 @@ logger = get_logger(__name__, "mitm_scrape_ads")
 _worker_db_connection = None
 
 IGNORE_CREATIVE_IDS = ["privacy", "google_play_icon_grey_2022", "favicon"]
+IGNORE_CREATIVE_HOST_TLDS = ["digitaloceanspaces.com"]
 
 
 def find_sent_video_df(
@@ -127,7 +128,7 @@ def attribute_creatives(
             row["error_msg"] = error_msg
             error_messages.append(row)
         file_extension = row["file_extension"]
-        if video_id in IGNORE_CREATIVE_IDS:
+        if video_id in IGNORE_CREATIVE_IDS or host_ad_network_tld:
             logger.info(f"Ignoring video {video_id}.{file_extension}")
             continue
         if video_id in sent_video_cache:
