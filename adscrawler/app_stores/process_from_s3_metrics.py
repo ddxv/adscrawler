@@ -625,9 +625,6 @@ def import_app_metrics_from_s3(
     for hash_bucket in [f"{i:02x}" for i in range(256)]:
         log_info = f"{store=} {start_date_mon=} {end_date=} hash_bucket={hash_bucket}"
         logger.info(f"{log_info} start")
-        if hash_bucket < "52":
-            logger.info(f"{log_info} skipping hash bucket 00 for testing")
-            continue
         try:
             process_app_metrics_to_db(
                 hash_bucket=hash_bucket,
