@@ -206,15 +206,10 @@ def check_and_upsert_new_domains(
 ) -> pd.DataFrame:
     """Adds missing domains to the database and returns updated domain DataFrame."""
     col = "tld_url"
-    missing_domains = urls_df[
-        (~urls_df[col].isin(domains_df["domain_name"])) & (urls_df[col].notna())
-    ]
-    if not missing_domains.empty:
-        new_domains = (
-            missing_domains[[col]]
-            .drop_duplicates()
-            .rename(columns={col: "domain_name"})
-        )
+    existing_domains = pd.Index(domains_df["domain_name"])
+    new_domains = pd.Index(urls_df[col]).difference(existing_domains)
+    if not new_domains.empty:
+        new_domains = pd.DataFrame({"domain_name": list(new_domains)}).drop_duplicates()
         new_domains = upsert_df(
             table_name="domains",
             df=new_domains,
@@ -236,16 +231,16 @@ def upsert_urls(urls: list[str], database_connection: PostgresCon) -> pd.DataFra
     urls_df["url_hash"] = urls_df["url"].apply(
         lambda x: hashlib.md5(x.encode()).hexdigest()
     )
-    new_urls_df = urls_df[
-        ~urls_df["url_hash"].isin(url_hash_map["url_hash"].to_list())
-    ].copy()
-    if new_urls_df.empty:
+    existing_index = pd.Index(url_hash_map["url_hash"])
+    new_hashes = pd.Index(urls_df["url_hash"]).difference(existing_index)
+    if new_hashes.empty:
         urls_df = urls_df.merge(
             url_hash_map[["url_hash", "url_id"]],
             on="url_hash",
             how="left",
         )
         return urls_df
+    new_urls_df = urls_df[urls_df["url_hash"].isin(new_hashes)].copy()
     http_urls_df = new_urls_df[new_urls_df["url"].str.startswith("http")].copy()
     nonhttp_urls_df = new_urls_df[~new_urls_df["url"].str.startswith("http")].copy()
     http_urls_df["tld_url"] = http_urls_df["url"].apply(lambda x: get_tld(x))
@@ -268,9 +263,9 @@ def upsert_urls(urls: list[str], database_connection: PostgresCon) -> pd.DataFra
     new_urls_df["domain_id"] = np.where(
         pd.isna(new_urls_df["domain_id"]), None, new_urls_df["domain_id"]
     )
-    new_urls_df["url_hash"] = new_urls_df["url"].apply(
-        lambda x: hashlib.md5(x.encode()).hexdigest()
-    )
+    # new_urls_df["url_hash"] = new_urls_df["url"].apply(
+    #     lambda x: hashlib.md5(x.encode()).hexdigest()
+    # )
     logger.info(f"Upserting {new_urls_df.shape[0]:,} new urls")
     new_urls_df: pd.DataFrame = upsert_df(
         df=new_urls_df,
