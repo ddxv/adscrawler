@@ -62,7 +62,7 @@ def find_sent_video_df(
 
 def get_video_id(row: pd.Series) -> str:
     """Extracts video ID from URL based on the ad network domain."""
-    if not row["tld_url"]:
+    if not row["tld_url"] or not isinstance(row["tld_url"], str):
         # Likely IP address or other non-URL
         return ""
     if "2mdn" in row["tld_url"]:
@@ -106,7 +106,7 @@ def attribute_creatives(
     """Attributes creative content to advertisers by analyzing ad network responses."""
     error_messages = []
     adv_creatives = []
-    creatives = df[df["is_creative"]].copy()
+    creatives = df[(df["is_creative"]) & (df["tld_url"].notna())].copy()
     creatives["video_id"] = creatives.apply(lambda x: get_video_id(x), axis=1)
     creatives = creatives.drop_duplicates(subset=["video_id", "response_size_bytes"])
     row_count = creatives.shape[0]
@@ -132,7 +132,7 @@ def attribute_creatives(
             video_id in IGNORE_CREATIVE_IDS
             or host_ad_network_tld in IGNORE_CREATIVE_HOST_TLDS
         ):
-            logger.info(f"Ignoring video {video_id}.{file_extension}")
+            logger.info(f"Ignoring {host_ad_network_tld} {video_id[0:16]}...")
             continue
         if video_id in sent_video_cache:
             sent_video_df = sent_video_cache[video_id]
@@ -167,7 +167,6 @@ def attribute_creatives(
                 found_ad_infos, found_error_messages = parse_sent_video_df(
                     row, pub_store_id, sent_video_df, database_connection, video_id
                 )
-
             sent_video_cache[video_id] = sent_video_df
             parse_results_cache[video_id] = (found_ad_infos, found_error_messages)
         for found_error_message in found_error_messages:

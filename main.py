@@ -371,18 +371,19 @@ class ProcessManager:
             delete_and_aggregate_s3_agg(
                 store=2, start_date=start_date, end_date=end_date
             )
-            import_app_metrics_from_s3(
-                database_connection=self.pgcon,
-                start_date=start_date,
-                end_date=end_date,
-                store=1,
-            )
-            import_app_metrics_from_s3(
-                database_connection=self.pgcon,
-                start_date=start_date,
-                end_date=end_date,
-                store=2,
-            )
+            # start_date = datetime.date.today() - datetime.timedelta(days=180)
+            # import_app_metrics_from_s3(
+            #     database_connection=self.pgcon,
+            #     start_date=start_date,
+            #     end_date=end_date,
+            #     store=1,
+            # )
+            # import_app_metrics_from_s3(
+            #     database_connection=self.pgcon,
+            #     start_date=start_date,
+            #     end_date=end_date,
+            #     store=2,
+            # )
         except Exception:
             logger.exception("Importing app metrics from s3 for failed")
         try:

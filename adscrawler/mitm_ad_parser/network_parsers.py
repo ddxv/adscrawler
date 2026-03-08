@@ -142,7 +142,7 @@ def extract_and_decode_urls(text: str) -> list[str]:
     all_urls = list(set(vast_urls + urls))
     not_urls = [x for x in all_urls if "://" not in x[0:48]]
     all_urls = [x for x in all_urls if "://" in x[0:48]]
-    logger.info(f"Found {len(all_urls)} urls, dropping {len(not_urls)} not urls")
+    logger.info(f"Found {len(all_urls)} urls")
     return all_urls
 
 
@@ -762,9 +762,7 @@ def parse_text_for_adinfo(
     click_urls = check_click_urls(all_urls, run_id, api_call_id, database_connection)
     all_urls = list(set(all_urls + click_urls))
     if len(all_urls) > 0:
-        logger.info("start")
         store_found_urls_in_db(all_urls, run_id, api_call_id, database_connection)
-        logger.info("start")
     else:
         logger.debug(f"No URLs found for {mitm_uuid}")
         error_msg = "No URLs found"
