@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict FfLJ1HIwwyWYlADI8I7E0q5fsDyTaMq0kHHcAyYnegq6XIqKusUJ5dD02x64rzE
+\restrict MJkSSx7qVIoCKQZqWB0H4iMGeJsuWSDIzaCiZ0pwabfcfJoZZagesJokCXCtsqP
 
 -- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 -- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
@@ -104,5 +104,5 @@ ALTER TABLE ONLY frontend.app_keyword_ranks_daily
 -- PostgreSQL database dump complete
 --
 
-\unrestrict FfLJ1HIwwyWYlADI8I7E0q5fsDyTaMq0kHHcAyYnegq6XIqKusUJ5dD02x64rzE
+\unrestrict MJkSSx7qVIoCKQZqWB0H4iMGeJsuWSDIzaCiZ0pwabfcfJoZZagesJokCXCtsqP
 

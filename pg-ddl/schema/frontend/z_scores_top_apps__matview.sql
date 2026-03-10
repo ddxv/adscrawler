@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict AXT6m9bUH39ecG5gE66RbG4G7SbQArRUEdvVKhk7QuUGc5XHyXjqyDejkbW5LIg
+\restrict qQeDsaX5ZzdlaS4qPjfqa4u4KWWtDjS4IVaghiRfuxVrZPVSc3wApWKWNfZXzuF
 
 -- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 -- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
@@ -28,9 +28,7 @@ SET default_table_access_method = heap;
 --
 
 CREATE MATERIALIZED VIEW frontend.z_scores_top_apps AS
- WITH app_metrics AS (
-         SELECT
-        ), ranked_z_scores AS (
+ WITH ranked_z_scores AS (
          SELECT agml.store_app,
             agml.total_installs AS installs,
             agml.weekly_installs AS installs_sum_1w,
@@ -42,6 +40,9 @@ CREATE MATERIALIZED VIEW frontend.z_scores_top_apps AS
             agml.installs_z_score_4w,
             agml.installs_acceleration,
             agml.has_reliable_baseline,
+            agml.monthly_active_users,
+            agml.monthly_iap_revenue,
+            agml.monthly_ad_revenue,
             sa.id,
             sa.developer_id,
             sa.developer_name,
@@ -81,9 +82,14 @@ CREATE MATERIALIZED VIEW frontend.z_scores_top_apps AS
     installs_sum_1w,
     ratings_sum_1w,
     installs_avg_2w,
-    installs_z_score_2w,
     installs_sum_4w,
     installs_avg_4w,
+    installs_acceleration,
+    has_reliable_baseline,
+    monthly_active_users,
+    monthly_iap_revenue,
+    monthly_ad_revenue,
+    installs_z_score_2w,
     installs_z_score_4w
    FROM ranked_z_scores
   WHERE (rn <= 100)
@@ -103,5 +109,5 @@ CREATE UNIQUE INDEX frontend_z_scores_top_apps_unique ON frontend.z_scores_top_a
 -- PostgreSQL database dump complete
 --
 
-\unrestrict AXT6m9bUH39ecG5gE66RbG4G7SbQArRUEdvVKhk7QuUGc5XHyXjqyDejkbW5LIg
+\unrestrict qQeDsaX5ZzdlaS4qPjfqa4u4KWWtDjS4IVaghiRfuxVrZPVSc3wApWKWNfZXzuF
 

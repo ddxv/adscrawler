@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 4qHloP0gE2Z1IfFK2bbnydGGK0XC7E0w4mgSbipzFxApMOvZrFGMFzqqbhP0gJM
+\restrict lruRfDV9Eepoq3Y2e4wGX7t3YQdtgeAggxt8JGNnH7jVCGE9MBwo2E0tsgLwqGh
 
 -- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 -- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
@@ -699,15 +699,14 @@ CREATE TABLE public.api_calls (
 ALTER TABLE public.api_calls OWNER TO postgres;
 
 --
--- Name: app_global_metrics_weekly; Type: TABLE; Schema: public; Owner: postgres
+-- Name: app_global_metrics_history; Type: TABLE; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.app_global_metrics_weekly (
-    store_app integer NOT NULL,
-    week_start date NOT NULL,
+CREATE TABLE public.app_global_metrics_history (
+    store_app integer CONSTRAINT new_app_global_metrics_weekly_store_app_not_null NOT NULL,
+    week_start date CONSTRAINT new_app_global_metrics_weekly_week_start_not_null NOT NULL,
     weekly_installs bigint,
     weekly_ratings bigint,
-    weekly_reviews bigint,
     weekly_active_users bigint,
     monthly_active_users bigint,
     weekly_iap_revenue real,
@@ -719,11 +718,15 @@ CREATE TABLE public.app_global_metrics_weekly (
     two_star bigint,
     three_star bigint,
     four_star bigint,
-    five_star bigint
+    five_star bigint,
+    store_last_updated date,
+    tier1_pct smallint,
+    tier2_pct smallint,
+    tier3_pct smallint
 );
 
 
-ALTER TABLE public.app_global_metrics_weekly OWNER TO postgres;
+ALTER TABLE public.app_global_metrics_history OWNER TO postgres;
 
 --
 -- Name: app_global_metrics_latest; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
@@ -731,25 +734,25 @@ ALTER TABLE public.app_global_metrics_weekly OWNER TO postgres;
 
 CREATE MATERIALIZED VIEW public.app_global_metrics_latest AS
  WITH global_anchor AS (
-         SELECT app_global_metrics_weekly.store_app,
-            app_global_metrics_weekly.week_start,
-            app_global_metrics_weekly.weekly_iap_revenue,
-            app_global_metrics_weekly.weekly_ad_revenue,
-            app_global_metrics_weekly.weekly_installs,
-            app_global_metrics_weekly.weekly_ratings,
-            app_global_metrics_weekly.total_installs,
-            app_global_metrics_weekly.total_ratings,
-            app_global_metrics_weekly.weekly_active_users,
-            app_global_metrics_weekly.monthly_active_users,
-            app_global_metrics_weekly.rating,
-            app_global_metrics_weekly.one_star,
-            app_global_metrics_weekly.two_star,
-            app_global_metrics_weekly.three_star,
-            app_global_metrics_weekly.four_star,
-            app_global_metrics_weekly.five_star,
+         SELECT agmh.store_app,
+            agmh.week_start,
+            agmh.weekly_iap_revenue,
+            agmh.weekly_ad_revenue,
+            agmh.weekly_installs,
+            agmh.weekly_ratings,
+            agmh.total_installs,
+            agmh.total_ratings,
+            agmh.weekly_active_users,
+            agmh.monthly_active_users,
+            agmh.rating,
+            agmh.one_star,
+            agmh.two_star,
+            agmh.three_star,
+            agmh.four_star,
+            agmh.five_star,
             date_trunc('week'::text, (CURRENT_DATE - '2 days'::interval)) AS global_max_week
-           FROM public.app_global_metrics_weekly
-          WHERE (app_global_metrics_weekly.week_start >= (CURRENT_DATE - '100 days'::interval))
+           FROM public.app_global_metrics_history agmh
+          WHERE (agmh.week_start >= (CURRENT_DATE - '100 days'::interval))
         ), windowed_metrics AS (
          SELECT ga.store_app,
             ga.week_start,
@@ -3607,9 +3610,7 @@ ALTER MATERIALIZED VIEW frontend.store_app_ranks_latest OWNER TO postgres;
 --
 
 CREATE MATERIALIZED VIEW frontend.z_scores_top_apps AS
- WITH app_metrics AS (
-         SELECT
-        ), ranked_z_scores AS (
+ WITH ranked_z_scores AS (
          SELECT agml.store_app,
             agml.total_installs AS installs,
             agml.weekly_installs AS installs_sum_1w,
@@ -3621,6 +3622,9 @@ CREATE MATERIALIZED VIEW frontend.z_scores_top_apps AS
             agml.installs_z_score_4w,
             agml.installs_acceleration,
             agml.has_reliable_baseline,
+            agml.monthly_active_users,
+            agml.monthly_iap_revenue,
+            agml.monthly_ad_revenue,
             sa.id,
             sa.developer_id,
             sa.developer_name,
@@ -3660,9 +3664,14 @@ CREATE MATERIALIZED VIEW frontend.z_scores_top_apps AS
     installs_sum_1w,
     ratings_sum_1w,
     installs_avg_2w,
-    installs_z_score_2w,
     installs_sum_4w,
     installs_avg_4w,
+    installs_acceleration,
+    has_reliable_baseline,
+    monthly_active_users,
+    monthly_iap_revenue,
+    monthly_ad_revenue,
+    installs_z_score_2w,
     installs_z_score_4w
    FROM ranked_z_scores
   WHERE (rn <= 100)
@@ -3711,18 +3720,6 @@ CREATE TABLE logging.app_global_crawls (
 
 
 ALTER TABLE logging.app_global_crawls OWNER TO postgres;
-
---
--- Name: app_global_metrics_weekly; Type: TABLE; Schema: logging; Owner: postgres
---
-
-CREATE TABLE logging.app_global_metrics_weekly (
-    store_app integer NOT NULL,
-    updated_at timestamp without time zone DEFAULT timezone('utc'::text, now()) NOT NULL
-);
-
-
-ALTER TABLE logging.app_global_metrics_weekly OWNER TO postgres;
 
 --
 -- Name: creative_scan_results; Type: TABLE; Schema: logging; Owner: postgres
@@ -3992,47 +3989,22 @@ ALTER TABLE public.app_ads_map ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENT
 --
 
 CREATE TABLE public.app_country_metrics_history (
-    snapshot_date date NOT NULL,
-    store_app integer NOT NULL,
-    country_id smallint NOT NULL,
-    review_count integer,
+    week_start date CONSTRAINT new_app_country_metrics_history_week_start_not_null NOT NULL,
+    store_app integer CONSTRAINT new_app_country_metrics_history_store_app_not_null NOT NULL,
+    country_id smallint CONSTRAINT new_app_country_metrics_history_country_id_not_null NOT NULL,
     rating real,
+    installs bigint,
     rating_count integer,
+    review_count integer,
     one_star integer,
     two_star integer,
     three_star integer,
     four_star integer,
-    five_star integer,
-    installs_est bigint
+    five_star integer
 );
 
 
 ALTER TABLE public.app_country_metrics_history OWNER TO postgres;
-
---
--- Name: app_global_metrics_history; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE public.app_global_metrics_history (
-    snapshot_date date NOT NULL,
-    store_app integer NOT NULL,
-    installs bigint,
-    rating_count bigint,
-    review_count bigint,
-    rating real,
-    one_star bigint,
-    two_star bigint,
-    three_star bigint,
-    four_star bigint,
-    five_star bigint,
-    store_last_updated date,
-    tier1_pct smallint,
-    tier2_pct smallint,
-    tier3_pct smallint
-);
-
-
-ALTER TABLE public.app_global_metrics_history OWNER TO postgres;
 
 --
 -- Name: app_urls_map_id_seq; Type: SEQUENCE; Schema: public; Owner: james
@@ -5324,14 +5296,6 @@ ALTER TABLE ONLY public.app_ads_entrys
 
 
 --
--- Name: app_global_metrics_weekly app_global_metrics_weekly_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.app_global_metrics_weekly
-    ADD CONSTRAINT app_global_metrics_weekly_pkey PRIMARY KEY (store_app, week_start);
-
-
---
 -- Name: app_urls_map app_urls_map_pkey; Type: CONSTRAINT; Schema: public; Owner: james
 --
 
@@ -5625,6 +5589,14 @@ ALTER TABLE ONLY public.stores
 
 ALTER TABLE ONLY public.stores
     ADD CONSTRAINT stores_un UNIQUE (name);
+
+
+--
+-- Name: app_global_metrics_history test_app_global_metrics_weekly_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.app_global_metrics_history
+    ADD CONSTRAINT test_app_global_metrics_weekly_pkey PRIMARY KEY (store_app, week_start);
 
 
 --
@@ -6298,31 +6270,10 @@ CREATE INDEX ake_latest_idx ON public.app_keywords_extracted USING btree (store_
 
 
 --
--- Name: app_country_metrics_history_date_idx; Type: INDEX; Schema: public; Owner: postgres
+-- Name: app_country_metrics_history_app_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE INDEX app_country_metrics_history_date_idx ON public.app_country_metrics_history USING btree (snapshot_date);
-
-
---
--- Name: app_country_metrics_history_store_app_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX app_country_metrics_history_store_app_idx ON public.app_country_metrics_history USING btree (store_app);
-
-
---
--- Name: app_global_metrics_history_date_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX app_global_metrics_history_date_idx ON public.app_global_metrics_history USING btree (snapshot_date);
-
-
---
--- Name: app_global_metrics_history_store_app_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX app_global_metrics_history_store_app_idx ON public.app_global_metrics_history USING btree (store_app);
+CREATE INDEX app_country_metrics_history_app_idx ON public.app_country_metrics_history USING btree (store_app);
 
 
 --
@@ -6827,14 +6778,6 @@ ALTER TABLE ONLY frontend.app_keyword_ranks_daily
 
 
 --
--- Name: app_global_metrics_weekly app_global_metrics_weekly_store_app_fkey; Type: FK CONSTRAINT; Schema: logging; Owner: postgres
---
-
-ALTER TABLE ONLY logging.app_global_metrics_weekly
-    ADD CONSTRAINT app_global_metrics_weekly_store_app_fkey FOREIGN KEY (store_app) REFERENCES public.store_apps(id);
-
-
---
 -- Name: keywords_crawled_at keywords_crawled_at_fk; Type: FK CONSTRAINT; Schema: logging; Owner: postgres
 --
 
@@ -7214,5 +7157,5 @@ GRANT ALL ON SCHEMA public TO PUBLIC;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 4qHloP0gE2Z1IfFK2bbnydGGK0XC7E0w4mgSbipzFxApMOvZrFGMFzqqbhP0gJM
+\unrestrict lruRfDV9Eepoq3Y2e4wGX7t3YQdtgeAggxt8JGNnH7jVCGE9MBwo2E0tsgLwqGh
 

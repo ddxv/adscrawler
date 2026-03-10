@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict HGwtuFU9R3qz0c8RP5Ga1RMkrfOZ4mY7HbzAoB2uzeR8a0ZU6fFcNIS1JYD4ACH
+\restrict U90BmW9z1RSg1SWMQmbGk3JY63CeH9CuLDWpaBU7kA3WKvZP4rPbeFm2VWBkfS4
 
 -- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 -- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
@@ -28,40 +28,33 @@ SET default_table_access_method = heap;
 --
 
 CREATE TABLE public.app_country_metrics_history (
-    snapshot_date date NOT NULL,
-    store_app integer NOT NULL,
-    country_id smallint NOT NULL,
-    review_count integer,
+    week_start date CONSTRAINT new_app_country_metrics_history_week_start_not_null NOT NULL,
+    store_app integer CONSTRAINT new_app_country_metrics_history_store_app_not_null NOT NULL,
+    country_id smallint CONSTRAINT new_app_country_metrics_history_country_id_not_null NOT NULL,
     rating real,
+    installs bigint,
     rating_count integer,
+    review_count integer,
     one_star integer,
     two_star integer,
     three_star integer,
     four_star integer,
-    five_star integer,
-    installs_est bigint
+    five_star integer
 );
 
 
 ALTER TABLE public.app_country_metrics_history OWNER TO postgres;
 
 --
--- Name: app_country_metrics_history_date_idx; Type: INDEX; Schema: public; Owner: postgres
+-- Name: app_country_metrics_history_app_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE INDEX app_country_metrics_history_date_idx ON public.app_country_metrics_history USING btree (snapshot_date);
-
-
---
--- Name: app_country_metrics_history_store_app_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX app_country_metrics_history_store_app_idx ON public.app_country_metrics_history USING btree (store_app);
+CREATE INDEX app_country_metrics_history_app_idx ON public.app_country_metrics_history USING btree (store_app);
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict HGwtuFU9R3qz0c8RP5Ga1RMkrfOZ4mY7HbzAoB2uzeR8a0ZU6fFcNIS1JYD4ACH
+\unrestrict U90BmW9z1RSg1SWMQmbGk3JY63CeH9CuLDWpaBU7kA3WKvZP4rPbeFm2VWBkfS4
 

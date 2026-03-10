@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict YqL5W1A7Lba42AOLGEQvIyy6JeRyPMAOfcIao4MIe3qqLtK0zvH0fIaFM9vZ7e3
+\restrict nJv0LhNHbkvOvw2fKBDNYln9aYjmPN3gISMBBR2aVqEYG0aMEhGUcDhqPdXdIBl
 
 -- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 -- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
@@ -29,25 +29,25 @@ SET default_table_access_method = heap;
 
 CREATE MATERIALIZED VIEW public.app_global_metrics_latest AS
  WITH global_anchor AS (
-         SELECT app_global_metrics_weekly.store_app,
-            app_global_metrics_weekly.week_start,
-            app_global_metrics_weekly.weekly_iap_revenue,
-            app_global_metrics_weekly.weekly_ad_revenue,
-            app_global_metrics_weekly.weekly_installs,
-            app_global_metrics_weekly.weekly_ratings,
-            app_global_metrics_weekly.total_installs,
-            app_global_metrics_weekly.total_ratings,
-            app_global_metrics_weekly.weekly_active_users,
-            app_global_metrics_weekly.monthly_active_users,
-            app_global_metrics_weekly.rating,
-            app_global_metrics_weekly.one_star,
-            app_global_metrics_weekly.two_star,
-            app_global_metrics_weekly.three_star,
-            app_global_metrics_weekly.four_star,
-            app_global_metrics_weekly.five_star,
+         SELECT agmh.store_app,
+            agmh.week_start,
+            agmh.weekly_iap_revenue,
+            agmh.weekly_ad_revenue,
+            agmh.weekly_installs,
+            agmh.weekly_ratings,
+            agmh.total_installs,
+            agmh.total_ratings,
+            agmh.weekly_active_users,
+            agmh.monthly_active_users,
+            agmh.rating,
+            agmh.one_star,
+            agmh.two_star,
+            agmh.three_star,
+            agmh.four_star,
+            agmh.five_star,
             date_trunc('week'::text, (CURRENT_DATE - '2 days'::interval)) AS global_max_week
-           FROM public.app_global_metrics_weekly
-          WHERE (app_global_metrics_weekly.week_start >= (CURRENT_DATE - '100 days'::interval))
+           FROM public.app_global_metrics_history agmh
+          WHERE (agmh.week_start >= (CURRENT_DATE - '100 days'::interval))
         ), windowed_metrics AS (
          SELECT ga.store_app,
             ga.week_start,
@@ -129,5 +129,5 @@ CREATE UNIQUE INDEX app_global_metrics_latest_idx ON public.app_global_metrics_l
 -- PostgreSQL database dump complete
 --
 
-\unrestrict YqL5W1A7Lba42AOLGEQvIyy6JeRyPMAOfcIao4MIe3qqLtK0zvH0fIaFM9vZ7e3
+\unrestrict nJv0LhNHbkvOvw2fKBDNYln9aYjmPN3gISMBBR2aVqEYG0aMEhGUcDhqPdXdIBl
 

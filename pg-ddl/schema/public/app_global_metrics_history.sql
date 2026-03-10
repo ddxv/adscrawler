@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict OnvaLLOco1qPm7fjAxHYJWQ0dLXKjAH3g2zDQ1RVjQ46wZ6MrjjQWkr7arGFOBv
+\restrict 4wF2e5OQkBynMWvZmFwVKdtLN5frOlpbgZWy3PJnu8MuIHYAKqhGstr37RLPtOb
 
 -- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 -- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
@@ -28,11 +28,16 @@ SET default_table_access_method = heap;
 --
 
 CREATE TABLE public.app_global_metrics_history (
-    snapshot_date date NOT NULL,
-    store_app integer NOT NULL,
-    installs bigint,
-    rating_count bigint,
-    review_count bigint,
+    store_app integer CONSTRAINT new_app_global_metrics_weekly_store_app_not_null NOT NULL,
+    week_start date CONSTRAINT new_app_global_metrics_weekly_week_start_not_null NOT NULL,
+    weekly_installs bigint,
+    weekly_ratings bigint,
+    weekly_active_users bigint,
+    monthly_active_users bigint,
+    weekly_iap_revenue real,
+    weekly_ad_revenue real,
+    total_installs bigint,
+    total_ratings bigint,
     rating real,
     one_star bigint,
     two_star bigint,
@@ -49,22 +54,16 @@ CREATE TABLE public.app_global_metrics_history (
 ALTER TABLE public.app_global_metrics_history OWNER TO postgres;
 
 --
--- Name: app_global_metrics_history_date_idx; Type: INDEX; Schema: public; Owner: postgres
+-- Name: app_global_metrics_history test_app_global_metrics_weekly_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
-CREATE INDEX app_global_metrics_history_date_idx ON public.app_global_metrics_history USING btree (snapshot_date);
-
-
---
--- Name: app_global_metrics_history_store_app_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX app_global_metrics_history_store_app_idx ON public.app_global_metrics_history USING btree (store_app);
+ALTER TABLE ONLY public.app_global_metrics_history
+    ADD CONSTRAINT test_app_global_metrics_weekly_pkey PRIMARY KEY (store_app, week_start);
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict OnvaLLOco1qPm7fjAxHYJWQ0dLXKjAH3g2zDQ1RVjQ46wZ6MrjjQWkr7arGFOBv
+\unrestrict 4wF2e5OQkBynMWvZmFwVKdtLN5frOlpbgZWy3PJnu8MuIHYAKqhGstr37RLPtOb
 

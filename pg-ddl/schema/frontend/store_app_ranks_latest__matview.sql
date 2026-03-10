@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict vb1iOHdfjOYvRmxYO1uWu8ERX4z8cfuKRFpoUvKo2JQ1bbLUJmeHgWtBgLdg34r
+\restrict WcSV2xusyeH5c5yleOH7rDVtptL1jTSSo7cCjLowkLX4fRWb03JzWM528NiSPx2
 
 -- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
 -- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
@@ -72,5 +72,5 @@ CREATE UNIQUE INDEX idx_store_app_ranks_latest_filter_sort ON frontend.store_app
 -- PostgreSQL database dump complete
 --
 
-\unrestrict vb1iOHdfjOYvRmxYO1uWu8ERX4z8cfuKRFpoUvKo2JQ1bbLUJmeHgWtBgLdg34r
+\unrestrict WcSV2xusyeH5c5yleOH7rDVtptL1jTSSo7cCjLowkLX4fRWb03JzWM528NiSPx2
 
