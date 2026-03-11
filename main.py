@@ -9,7 +9,6 @@ from adscrawler.app_stores.process_from_s3 import (
 )
 from adscrawler.app_stores.process_from_s3_metrics import (
     delete_and_aggregate_s3_agg,
-    import_app_metrics_from_s3,
 )
 from adscrawler.app_stores.process_keywords import process_app_keywords
 from adscrawler.app_stores.scrape_stores import (
@@ -362,30 +361,11 @@ class ProcessManager:
             logger.exception(
                 f"Importing {self.args.ranks_period} ranks from s3 for failed"
             )
-        try:
-            start_date = datetime.date.today() - datetime.timedelta(days=3)
-            end_date = datetime.date.today() - datetime.timedelta(days=1)
-            delete_and_aggregate_s3_agg(
-                store=1, start_date=start_date, end_date=end_date
-            )
-            delete_and_aggregate_s3_agg(
-                store=2, start_date=start_date, end_date=end_date
-            )
-            # start_date = datetime.date.today() - datetime.timedelta(days=180)
-            # import_app_metrics_from_s3(
-            #     database_connection=self.pgcon,
-            #     start_date=start_date,
-            #     end_date=end_date,
-            #     store=1,
-            # )
-            # import_app_metrics_from_s3(
-            #     database_connection=self.pgcon,
-            #     start_date=start_date,
-            #     end_date=end_date,
-            #     store=2,
-            # )
-        except Exception:
-            logger.exception("Importing app metrics from s3 for failed")
+        for store in [1, 2]:
+            try:
+                delete_and_aggregate_s3_agg(store=store, database_connection=self.pgcon)
+            except Exception:
+                logger.exception(f"Importing {store=} app metrics from s3 for failed")
         try:
             start_date = datetime.date.today() - datetime.timedelta(days=3)
             end_date = datetime.date.today() - datetime.timedelta(days=1)

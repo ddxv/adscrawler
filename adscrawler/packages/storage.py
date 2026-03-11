@@ -1,3 +1,4 @@
+import datetime
 import os
 import pathlib
 import shutil
@@ -89,13 +90,54 @@ def delete_s3_objects_by_prefix(bucket: str, prefix: str, key_name: str = "s3") 
         Bucket=bucket,
         Prefix=prefix,
     )
-    time.sleep(0.5)
+    time.sleep(0.3)
     if "Contents" in response:
+        logger.info("found objects, deleting")
         s3.delete_objects(
             Bucket=bucket,
             Delete={"Objects": [{"Key": obj["Key"]} for obj in response["Contents"]]},
         )
-    time.sleep(0.5)
+    time.sleep(0.3)
+
+
+def delete_s3_objects_by_date_range(
+    bucket: str,
+    start_date_mon: datetime.date,
+    end_date: datetime.date,
+    prefix: str,
+    key_name: str = "s3",
+) -> None:
+    """
+    Delete only the week_start partitions within [start_date_mon, end_date]
+    """
+    s3 = get_s3_client(key_name)
+
+    # Build one prefix per weekly Monday in range
+    weekly_prefixes = [
+        f"{prefix}/week_start={ddt.strftime('%Y-%m-%d')}/"
+        for ddt in pd.date_range(start_date_mon, end_date, freq="W-MON")
+    ]
+
+    # Collect all keys across all prefixes (one list call each, but no delete yet)
+    keys_to_delete = []
+    for pprefix in weekly_prefixes:
+        paginator = s3.get_paginator("list_objects_v2")
+        for page in paginator.paginate(Bucket=bucket, Prefix=pprefix):
+            for obj in page.get("Contents", []):
+                keys_to_delete.append({"Key": obj["Key"]})
+
+    if not keys_to_delete:
+        logger.info("No objects to delete in date range.")
+        return
+
+    # Batch delete in chunks of 1000 (S3 API limit) — one sleep per chunk
+    chunk_size = 1000
+    for i in range(0, len(keys_to_delete), chunk_size):
+        chunk = keys_to_delete[i : i + chunk_size]
+        logger.info(f"Deleting {len(chunk)} objects (batch {i // chunk_size + 1})")
+        s3.delete_objects(Bucket=bucket, Delete={"Objects": chunk})
+        if i + chunk_size < len(keys_to_delete):
+            time.sleep(0.3)  # only sleep between chunks, not after the last one
 
 
 def upload_mitm_log_to_s3(
