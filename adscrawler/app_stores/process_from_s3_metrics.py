@@ -612,13 +612,18 @@ def process_metrics_apple(
     ].transform("sum") / df.groupby(["week_start", "store_app"])[
         "rating_count"
     ].transform("sum")
+    estimate_available = (df["grc_future_est"] > 0).fillna(False) & (
+        df["rating_ratio"] > 0
+    ).fillna(False)
+    needs_estimate = df["rating_count"].isna() | (df["rating_count"] == 0)
+    to_estimate = estimate_available & needs_estimate
+    df["rating_count"] = np.where(
+        to_estimate,
+        df["grc_future_est"] * df["rating_ratio"],
+        df["rating_count"].fillna(0),
+    )
     df["rating_count"] = (
-        df["rating_count"]
-        .fillna(df["grc_future_est"] * df["rating_ratio"])
-        .replace([np.inf, -np.inf], 0)
-        .fillna(0)
-        .round(0)
-        .astype(int)
+        df["rating_count"].replace([np.inf, -np.inf], 0).round(0).astype(int)
     )
     app_mean_rating = df.groupby(["week_start", "store_app"])["rating"].transform(
         "mean"

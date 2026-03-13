@@ -367,6 +367,7 @@ def query_keywords_from_s3(
     """Query keywords from S3 parquet files."""
     period_query = f"""WITH all_data AS (
                SELECT * FROM read_parquet({parquet_paths})
+               WHERE store_id IS NOT NULL
            ),
            latest_per_keyword AS (
                SELECT
