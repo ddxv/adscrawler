@@ -338,6 +338,7 @@ def import_keywords_from_s3(
                 df["store_app"] = df["store_id"].map(
                     store_id_map.set_index("store_id")["id"].to_dict()
                 )
+            assert not df["store_app"].isna().any(), "Missing store_app rows"
             df["store"] = store
             logger.info(
                 f"Keywords from S3 insert {snapshot_date} {store=} {df.shape[0]:,} rows"
