@@ -20,13 +20,11 @@ windowed_metrics AS (
         ga.weekly_installs,
         ga.weekly_ratings,
         CAST(:target_week AS date) AS target_week,
-        -- Current week performance
         ga.weekly_installs AS target_week_installs,
-        -- 2nd Week Average (Current + 1 Prior)
+        -- 2-Week and 4-Week Averages
         AVG(ga.weekly_installs) OVER w_2w AS installs_avg_2w,
-        -- 4th Week Average (Current + 3 Prior)
         AVG(ga.weekly_installs) OVER w_4w AS installs_avg_4w,
-        -- Baseline: 8-week window ending 4 weeks prior to target_week
+        -- Baseline Metrics
         AVG(
             CASE
                 WHEN
@@ -46,10 +44,34 @@ windowed_metrics AS (
                     <= CAST(:target_week AS date) - interval '28 days'
                     THEN ga.weekly_installs
             END
-        ) OVER w_all AS b_std_installs
-    FROM app_global_metrics_weekly AS ga
+        ) OVER w_all AS b_std_installs,
+        -- Lagged Installs (with explicit frame)
+        LAG(ga.weekly_installs, 1) OVER (
+            PARTITION BY ga.store_app
+            ORDER BY ga.week_start ASC
+            ROWS BETWEEN 1 PRECEDING AND 1 PRECEDING
+        ) AS installs_1w_ago,
+        LAG(ga.weekly_installs, 2) OVER (
+            PARTITION BY ga.store_app
+            ORDER BY ga.week_start ASC
+            ROWS BETWEEN 2 PRECEDING AND 2 PRECEDING
+        ) AS installs_2w_ago,
+        -- Non-overlapping Momentum Averages
+        AVG(CASE
+            WHEN ga.week_start > CAST(:target_week AS date) - interval '14 days'
+                THEN ga.weekly_installs
+        END)
+            OVER (PARTITION BY ga.store_app) AS recent_2w_avg,
+        AVG(CASE
+            WHEN
+                ga.week_start <= CAST(:target_week AS date) - interval '14 days'
+                AND ga.week_start
+                > CAST(:target_week AS date) - interval '28 days'
+                THEN ga.weekly_installs
+        END)
+            OVER (PARTITION BY ga.store_app) AS prior_2w_avg
+    FROM app_global_metrics_history AS ga
     INNER JOIN my_advs AS m ON ga.store_app = m.advertiser_store_app_id
-    -- Lookback range to populate the windows
     WHERE
         ga.week_start >= (CAST(:target_week AS date) - interval '130 days')
         AND ga.week_start <= CAST(:target_week AS date)
@@ -57,11 +79,13 @@ windowed_metrics AS (
         w_all AS (PARTITION BY ga.store_app),
         w_4w AS (
             PARTITION BY ga.store_app
-            ORDER BY ga.week_start DESC ROWS BETWEEN CURRENT ROW AND 3 FOLLOWING
+            ORDER BY ga.week_start DESC
+            ROWS BETWEEN CURRENT ROW AND 3 FOLLOWING
         ),
         w_2w AS (
             PARTITION BY ga.store_app
-            ORDER BY ga.week_start DESC ROWS BETWEEN CURRENT ROW AND 1 FOLLOWING
+            ORDER BY ga.week_start DESC
+            ROWS BETWEEN CURRENT ROW AND 1 FOLLOWING
         )
 ),
 final_calculation AS (
@@ -73,25 +97,54 @@ final_calculation AS (
         sa.icon_url_100,
         sa.ad_supported,
         sa.in_app_purchases,
-        -- Calculations for the three requested columns
+        -- Baseline Comparisons
         b_avg_installs AS baseline_installs,
-        ((installs_avg_2w - b_avg_installs) / NULLIF(b_avg_installs, 0))
+        (
+            (installs_avg_2w - b_avg_installs)::numeric
+            / NULLIF(b_avg_installs, 0)
+        )
         * 100 AS baseline_installs_pct,
-        ((weekly_installs - b_avg_installs) / NULLIF(b_avg_installs, 0))
+        (
+            (weekly_installs - b_avg_installs)::numeric
+            / NULLIF(b_avg_installs, 0)
+        )
         * 100 AS weekly_installs_pct,
-        -- Z-Scores and Acceleration
-        (installs_avg_2w - b_avg_installs)
+        -- Z-Scores
+        (installs_avg_2w - b_avg_installs)::numeric
         / NULLIF(b_std_installs, 0::numeric) AS installs_z_score_2w,
-        (installs_avg_4w - b_avg_installs)
+        (installs_avg_4w - b_avg_installs)::numeric
         / NULLIF(b_std_installs, 0::numeric) AS installs_z_score_4w,
-        (installs_avg_2w - installs_avg_4w)
+        -- Acceleration
+        (installs_avg_2w - installs_avg_4w)::numeric
         / NULLIF(installs_avg_4w, 0::numeric) AS installs_acceleration,
+        -- Growth Metrics (with numeric casting to avoid integer division)
+        CASE
+            WHEN installs_1w_ago IS NOT NULL AND installs_1w_ago > 0
+                THEN
+                    (weekly_installs - installs_1w_ago)::numeric
+                    / installs_1w_ago
+                    * 100
+        END AS wow_growth_pct,
+        CASE
+            WHEN installs_2w_ago IS NOT NULL AND installs_2w_ago > 0
+                THEN
+                    (weekly_installs - installs_2w_ago)::numeric
+                    / installs_2w_ago
+                    * 100
+        END AS two_week_growth_pct,
+        CASE
+            WHEN prior_2w_avg IS NOT NULL AND prior_2w_avg > 0
+                THEN
+                    (recent_2w_avg - prior_2w_avg)::numeric / prior_2w_avg * 100
+        END AS momentum_pct,
+        -- Reliability
         b_std_installs IS NOT NULL
         AND b_avg_installs > 0 AS has_reliable_baseline,
+        -- Ranking
         ROW_NUMBER() OVER (
             PARTITION BY sa.store
             ORDER BY
-                (installs_avg_2w - b_avg_installs)
+                (installs_avg_2w - b_avg_installs)::numeric
                 / NULLIF(b_std_installs, 0::numeric) DESC NULLS LAST
         ) AS rn
     FROM windowed_metrics AS wm
@@ -114,6 +167,9 @@ SELECT
     installs_z_score_2w,
     installs_z_score_4w,
     installs_acceleration,
+    wow_growth_pct,
+    two_week_growth_pct,
+    momentum_pct,
     has_reliable_baseline
 FROM final_calculation
 WHERE rn <= 50;

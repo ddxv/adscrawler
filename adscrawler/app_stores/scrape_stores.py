@@ -538,7 +538,10 @@ def save_app_ranks(
         )
 
 
-def extract_domains(x: str) -> str:
+def extract_domains(x: str | None) -> str | None:
+    if x is None or pd.isna(x):
+        return None
+
     ext = tldextract.extract(x)
     use_top_domain = any(
         [ext.subdomain == "m", "www" in ext.subdomain.split("."), ext.subdomain == ""],
@@ -689,6 +692,8 @@ def save_app_domains(
     database_connection: PostgresCon,
 ) -> None:
     apps_df["url"] = apps_df["url"].apply(lambda x: extract_domains(x))
+    # This would mean that urls are frozen if 'removed' but more likely they failed a crawl
+    apps_df = apps_df[~apps_df["url"].isna()]
     all_domains_df = query_all_domains(database_connection=database_connection)
     all_domains_df = check_and_insert_domains(
         domains_df=all_domains_df,
