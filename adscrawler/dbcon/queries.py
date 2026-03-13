@@ -39,10 +39,6 @@ QUERY_KEYWORDS_TO_CRAWL = load_sql_file("query_keywords_to_crawl.sql")
 QUERY_APPS_MITM_IN_S3 = load_sql_file("query_apps_mitm_in_s3.sql")
 QUERY_REPORT_ZSCORES = load_sql_file("query_report_z_scores.sql")
 QUERY_APPS_TO_PROCESS_KEYWORDS = load_sql_file("query_apps_to_process_keywords.sql")
-QUERY_APPS_TO_PROCESS_METRICS = load_sql_file("query_apps_to_process_metrics.sql")
-QUERY_APPS_TO_PROCESS_METRICS_WITH_IDS = load_sql_file(
-    "query_apps_to_process_metrics_with_ids.sql"
-)
 
 
 def insert_df(
@@ -1678,13 +1674,12 @@ def query_live_apps(database_connection: PostgresCon, store: int) -> pd.DataFram
     sel_query = f"""SELECT
             id, store, store_id
         FROM
-	        store_apps
+            store_apps
         WHERE
             store = {store}
-	        AND (store_last_updated >= current_date - INTERVAL '365 days'
-	        OR
-	        crawl_result = 1)
-	        
+            AND (store_last_updated >= current_date - INTERVAL '365 days'
+            OR
+            crawl_result = 1)
         ;"""
     df = pd.read_sql(sel_query, con=database_connection.engine)
     return df
