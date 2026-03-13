@@ -611,7 +611,9 @@ def process_metrics_apple(
         "grc_est_prod"
     ].transform("sum") / df.groupby(["week_start", "store_app"])[
         "rating_count"
-    ].transform("sum")
+    ].transform(
+        "sum"
+    )
     estimate_available = (df["grc_future_est"] > 0).fillna(False) & (
         df["rating_ratio"] > 0
     ).fillna(False)
@@ -689,7 +691,7 @@ def write_app_hash_buckets_interpolated_to_s3(
         logger.warning(
             f"No parquet paths found for agg app hash buckets {store=} {query_start_mon=} {end_date=}"
         )
-        return pd.DataFrame()
+        return
     if store == 1:
         metrics = [
             "installs",
