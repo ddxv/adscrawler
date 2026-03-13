@@ -420,7 +420,7 @@ def process_app_keywords(database_connection: PostgresCon, limit: int) -> None:
     the query input limiting which apps and when to run.
     This way apps can be processed in batches and only when really needed.
     """
-    logger.info(f"Extracting app keywords for {limit} apps")
+    logger.info(f"Extracting app keywords for {limit=} apps")
     extract_app_keywords_from_descriptions(database_connection, limit)
     logger.info("Extracted app keywords finished")
 
@@ -429,8 +429,10 @@ def extract_app_keywords_from_descriptions(
     database_connection: PostgresCon, limit: int
 ) -> None:
     """Process keywords for app descriptions."""
+    log_info = "Extracting keywords from app descriptions"
 
     description_df = query_apps_to_process_keywords(database_connection, limit=limit)
+    logger.info(f"{log_info} count={len(description_df)}")
 
     keywords_base = query_keywords_base(database_connection)
     keywords_base["keyword_text"] = (
@@ -447,7 +449,7 @@ def extract_app_keywords_from_descriptions(
         description_df["description_text"]
     )
     all_keywords_dfs = []
-    logger.info(f"Processing {len(description_df)} app descriptions")
+    logger.info(f"{log_info} count={len(description_df)} processing start...")
     for _i, row in description_df.iterrows():
         logger.debug(f"Processing app description: {_i}/{len(description_df)}")
         description_id = row["description_id"]
@@ -469,7 +471,7 @@ def extract_app_keywords_from_descriptions(
     main_keywords_df["extracted_at"] = datetime.datetime.now(tz=datetime.UTC)
     table_name = "app_keywords_extracted"
     insert_columns = ["store_app", "description_id", "keyword_id", "extracted_at"]
-    logger.info(f"Delete and insert {len(main_keywords_df)} app keywords")
+    logger.info(f"{log_info} delete and insert {len(main_keywords_df)} app keywords")
     delete_and_insert(
         df=main_keywords_df,
         table_name=table_name,
