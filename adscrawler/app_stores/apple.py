@@ -450,7 +450,7 @@ def search_app_store_for_ids(
     search_term: str, country: str = "us", language: str = "en"
 ) -> list[str]:
     """Search store for new apps or keyword rankings."""
-    logger.info("adscrawler apple search start")
+    logger.info(f"Apple search start {search_term=} {country=} {language=}")
     # Call the Node.js script that runs google-play-scraper
     scraper = AppStoreScraper()
     ids: list[str] = scraper.get_app_ids_for_query(

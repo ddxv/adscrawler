@@ -1054,7 +1054,8 @@ def drop_unwanted_rows(
     ].transform("max")
     installs_min = 200 if store == 1 else 100
     valid_pairs = country_df.loc[
-        (country_df["week_start"] == latest_week) & (country_df["installs"] > 100),
+        (country_df["week_start"] == latest_week)
+        & (country_df["installs"] > installs_min),
         ["store_app", "country_id"],
     ].drop_duplicates()
     country_df = country_df.merge(
@@ -1121,7 +1122,6 @@ def process_app_metrics_to_db(
         # very rare some chrome os apps got downloaded
         df = df[~df["global_installs"].isna()]
     df = ffill_app_metrics(df, store, database_connection)
-
     country_df, global_df = process_metrics(
         store=store,
         df=df,
@@ -1130,7 +1130,6 @@ def process_app_metrics_to_db(
     country_df, global_df = drop_unwanted_rows(
         country_df, global_df, store, db_delete_start
     )
-
     delete_and_insert_app_metrics(
         database_connection=database_connection,
         country_df=country_df,

@@ -212,16 +212,11 @@ def search_play_store(
     search_term: str, country: str = "us", language: str = "en"
 ) -> list[dict]:
     """Search store for new apps or keyword rankings."""
-    logger.info("adscrawler to call playstore search")
+    logger.info(f"Run Playstore search {search_term=} {country=} {language=}")
     # Call the Node.js script that runs google-play-scraper
-
     node_path = "node"
     if "local-dev" in CONFIG.keys():
         node_path = CONFIG["local-dev"].get("node_env")
-
-    logger.info(
-        f"Will try calling node with {node_path} {MODULE_DIR}/static/searchApps.js"
-    )
 
     process = subprocess.Popen(
         [
@@ -233,13 +228,23 @@ def search_play_store(
             language,
         ],
         stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
     )
-    output, error = process.communicate()
+    try:
+        output, error = process.communicate(timeout=60)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        try:
+            process.communicate(timeout=5)  # drain pipes safely
+        except subprocess.TimeoutExpired:
+            pass
+        raise Exception("Search process timed out")
 
     if error:
         logger.error(f"failed to search: {error!r}")
 
     results: list[dict] = json.loads(output)
+    logger.info(f"Playstore search finished with {len(results)} results")
 
     if len(results) > 0 and "appId" in results[0]:
         for result in results:
