@@ -59,9 +59,9 @@ COUNTRY_HISTORY_KEYS = [
     "store_app",
 ]
 
-COUNTRY_HISTORY_COLS = (
-    COUNTRY_HISTORY_KEYS + [x for x in METRIC_COLS if x != "installs"] + ["installs"]
-)
+COUNTRY_HISTORY_COLS = COUNTRY_HISTORY_KEYS + [
+    x for x in METRIC_COLS if x != "review_count"
+]
 
 GLOBAL_HISTORY_COLS = (
     GLOBAL_HISTORY_KEYS
@@ -87,9 +87,6 @@ GLOBAL_FINAL_COLS = [
     "four_star",
     "five_star",
     "store_last_updated",
-    "tier1_pct",
-    "tier2_pct",
-    "tier3_pct",
 ]
 
 
@@ -611,9 +608,7 @@ def process_metrics_apple(
         "grc_est_prod"
     ].transform("sum") / df.groupby(["week_start", "store_app"])[
         "rating_count"
-    ].transform(
-        "sum"
-    )
+    ].transform("sum")
     estimate_available = (df["grc_future_est"] > 0).fillna(False) & (
         df["rating_ratio"] > 0
     ).fillna(False)
@@ -932,7 +927,6 @@ def process_metrics(
         *STAR_COLS,
         "installs",
         "rating_count",
-        "review_count",
     ]
     for col in cols_as_int:
         if col in country_df.columns:
@@ -1039,21 +1033,14 @@ def ffill_app_metrics(
 def drop_unwanted_rows(
     country_df: pd.DataFrame,
     global_df: pd.DataFrame,
-    store: int,
     delete_from_date: datetime.date,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     no_rating_count = (country_df["rating_count"].isna()) | (
         country_df["rating_count"] == 0
     )
     no_installs = (country_df["installs"].isna()) | (country_df["installs"] == 0)
-    if store == 1:
-        no_review_count = (country_df["review_count"].isna()) | (
-            country_df["review_count"] == 0
-        )
-    else:
-        no_review_count = pd.Series(False, index=country_df.index)
     no_rating = (country_df["rating"].isna()) | (country_df["rating"] == 0)
-    all_null = no_rating_count & no_installs & no_review_count & no_rating
+    all_null = no_rating_count & no_installs & no_rating
     country_df = country_df[
         (~all_null)
         & (country_df["week_start"] >= pd.to_datetime(delete_from_date).normalize())
@@ -1128,9 +1115,7 @@ def process_app_metrics_to_db(
         df=df,
         database_connection=database_connection,
     )
-    country_df, global_df = drop_unwanted_rows(
-        country_df, global_df, store, db_delete_start
-    )
+    country_df, global_df = drop_unwanted_rows(country_df, global_df, db_delete_start)
 
     delete_and_insert_app_metrics(
         database_connection=database_connection,
