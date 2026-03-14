@@ -1033,6 +1033,7 @@ def ffill_app_metrics(
 def drop_unwanted_rows(
     country_df: pd.DataFrame,
     global_df: pd.DataFrame,
+    store: int,
     delete_from_date: datetime.date,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     no_rating_count = (country_df["rating_count"].isna()) | (
@@ -1048,6 +1049,17 @@ def drop_unwanted_rows(
     global_df = global_df[
         (global_df["week_start"] >= pd.to_datetime(delete_from_date).normalize())
     ]
+    latest_week = country_df.groupby(["store_app", "country_id"])[
+        "week_start"
+    ].transform("max")
+    installs_min = 200 if store == 1 else 100
+    valid_pairs = country_df.loc[
+        (country_df["week_start"] == latest_week) & (country_df["installs"] > 100),
+        ["store_app", "country_id"],
+    ].drop_duplicates()
+    country_df = country_df.merge(
+        valid_pairs, on=["store_app", "country_id"], how="inner"
+    )
     return country_df, global_df
 
 
@@ -1115,7 +1127,9 @@ def process_app_metrics_to_db(
         df=df,
         database_connection=database_connection,
     )
-    country_df, global_df = drop_unwanted_rows(country_df, global_df, db_delete_start)
+    country_df, global_df = drop_unwanted_rows(
+        country_df, global_df, store, db_delete_start
+    )
 
     delete_and_insert_app_metrics(
         database_connection=database_connection,
