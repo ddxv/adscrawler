@@ -402,23 +402,14 @@ def process_metrics_google(df: pd.DataFrame) -> pd.DataFrame:
     # Calculate each pct of global based on review_count
     # This is then used to estimate installs per country
     # pct_of_global will also be used for tiers
-    df["max_reviews"] = df.groupby(["store_app", "week_start"])[
-        "review_count"
-    ].transform("max")
-    df["global_installs"] = df.groupby(["store_app", "week_start"])[
-        "global_installs"
-    ].transform("max")
-    df["global_rating_count"] = (
-        df.groupby(["store_app", "week_start"])["global_rating_count"]
-        .transform("max")
-        .fillna(0)
-    )
+    gb = df.groupby(["store_app", "week_start"])
+    df["max_reviews"] = gb["review_count"].transform("max")
+    df["global_installs"] = gb["global_installs"].transform("max")
+    df["global_rating_count"] = gb["global_rating_count"].transform("max").fillna(0)
     df["is_max_candidate"] = (df["review_count"] >= df["max_reviews"] * 0.96) & (
         df["max_reviews"] > 200
     )
-    candidate_counts = df.groupby(["store_app", "week_start"])[
-        "is_max_candidate"
-    ].transform("sum")
+    candidate_counts = gb["is_max_candidate"].transform("sum")
     # Multiple countries all near the same large max → they're all receiving the global value
     df["is_global_fallback"] = (
         df["is_max_candidate"].notna() & df["is_max_candidate"] & (candidate_counts > 1)
@@ -432,10 +423,10 @@ def process_metrics_google(df: pd.DataFrame) -> pd.DataFrame:
         df[df["country_id"] == 840]
         .groupby(["store_app", "week_start"])["true_review_count"]
         .max()
+        .rename("us_review_count")
+        .reset_index()
     )
-    df["us_review_count"] = df.set_index(["store_app", "week_start"]).index.map(
-        us_lookup
-    )
+    df = df.merge(us_lookup, on=["store_app", "week_start"], how="left")
     df["pct_of_us_reviews"] = df["true_review_count"] / df["us_review_count"].replace(
         0, np.nan
     )
@@ -448,21 +439,21 @@ def process_metrics_google(df: pd.DataFrame) -> pd.DataFrame:
         df["us_review_count"] * df["pct_of_us_reviews"],
         df["true_review_count"],
     )
-    local_sums = (
+    local_sums_df = (
         df[~df["is_global_fallback"]]
         .groupby(["store_app", "week_start"])["true_review_count"]
         .sum()
+        .rename("local_sums")
+        .reset_index()
     )
-    # has_any_candidate = candidate_counts > 0
-    has_global_fallback = df.groupby(["store_app", "week_start"])[
-        "is_global_fallback"
-    ].transform("sum")
-    # Multiple countries all nea
+    df = df.merge(local_sums_df, on=["store_app", "week_start"], how="left")
+    has_global_fallback = gb["is_global_fallback"].transform("sum")
     df["global_review_count"] = np.where(
         has_global_fallback,
-        df["max_reviews"],  # best single-source estimate of global
-        df.set_index(["store_app", "week_start"]).index.map(local_sums).values,
+        df["max_reviews"],
+        df["local_sums"],
     )
+    df = df.drop(columns=["local_sums"])
     df["pct_of_global"] = (
         (df["true_review_count"] / df["global_review_count"])
         .replace([np.inf, -np.inf], np.nan)
