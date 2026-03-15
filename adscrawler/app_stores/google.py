@@ -145,6 +145,7 @@ def call_js_to_update_file(
     if is_developers:
         cmd += " --developers"
     logger.info("Js pull start")
+    # subprocess.run(cmd, shell=True, check=True)
     os.system(cmd)
     logger.info("Js pull finished")
 
@@ -211,9 +212,6 @@ def crawl_google_developers(
 def search_play_store(
     search_term: str, country: str = "us", language: str = "en"
 ) -> list[dict]:
-    search_term = "english"
-    country = "us"
-    language = "en"
     """Search store for new apps or keyword rankings."""
     logger.info(f"Run Playstore search {search_term=} {country=} {language=}")
     # Only returns 30
@@ -251,8 +249,6 @@ def search_play_store(
 
     if error:
         logger.error(f"failed to search: {error!r}")
-
-    error
 
     results: list[dict] = json.loads(output)
     logger.info(f"Playstore search finished with {len(results)} results")
