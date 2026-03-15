@@ -225,6 +225,8 @@ def search_play_store(
         node_path = CONFIG["local-dev"].get("node_env")
 
     # Call the Node.js script that runs google-play-scraper
+    # Depending how node is installed you may need
+    # a system link like sudo ln -sf /home/user/.nvm/versions/node/v24.14.0/bin/node /usr/local/bin/node
     process = subprocess.Popen(
         [
             node_path,
