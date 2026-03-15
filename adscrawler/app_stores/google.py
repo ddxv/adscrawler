@@ -211,13 +211,22 @@ def crawl_google_developers(
 def search_play_store(
     search_term: str, country: str = "us", language: str = "en"
 ) -> list[dict]:
+    search_term = "english"
+    country = "us"
+    language = "en"
     """Search store for new apps or keyword rankings."""
     logger.info(f"Run Playstore search {search_term=} {country=} {language=}")
-    # Call the Node.js script that runs google-play-scraper
+    # Only returns 30
+    # results = appgoblin_play_scraper.search(
+    #     search_term,
+    #     lang=language,
+    #     country=country,
+    # )
     node_path = "node"
     if "local-dev" in CONFIG.keys():
         node_path = CONFIG["local-dev"].get("node_env")
 
+    # Call the Node.js script that runs google-play-scraper
     process = subprocess.Popen(
         [
             node_path,
@@ -242,6 +251,8 @@ def search_play_store(
 
     if error:
         logger.error(f"failed to search: {error!r}")
+
+    error
 
     results: list[dict] = json.loads(output)
     logger.info(f"Playstore search finished with {len(results)} results")
