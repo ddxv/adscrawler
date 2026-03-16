@@ -19,6 +19,7 @@ from adscrawler.dbcon.queries import (
     query_countries,
     query_live_apps,
     query_store_app_categories,
+    upsert_df,
 )
 from adscrawler.packages.storage import (
     delete_s3_objects_by_date_range,
@@ -63,11 +64,9 @@ COUNTRY_HISTORY_COLS = COUNTRY_HISTORY_KEYS + [
     x for x in METRIC_COLS if x != "review_count"
 ]
 
-GLOBAL_HISTORY_COLS = (
-    GLOBAL_HISTORY_KEYS
-    + METRIC_COLS
-    + ["store_last_updated", "tier1_pct", "tier2_pct", "tier3_pct"]
-)
+TIER_PCT_COLS = ["tier1_pct", "tier2_pct", "tier3_pct"]
+
+GLOBAL_HISTORY_COLS = GLOBAL_HISTORY_KEYS + METRIC_COLS + TIER_PCT_COLS
 
 GLOBAL_FINAL_COLS = [
     "store_app",
@@ -86,7 +85,6 @@ GLOBAL_FINAL_COLS = [
     "three_star",
     "four_star",
     "five_star",
-    "store_last_updated",
 ]
 
 
@@ -384,20 +382,11 @@ def process_metrics_google(df: pd.DataFrame) -> pd.DataFrame:
     # At the end, after the countries pct_of_global is calculated
     # Merge the country tiers as sum of pct_of_global back to global_df
     global_df = df[df["country_id"] == 840].copy()
-    global_df = global_df.rename(
+    df = df.rename(
         columns={
-            "global_installs": "installs",
-            "global_rating_count": "rating_count",
+            "installs": "global_installs",
+            "rating_count": "global_rating_count",
         }
-    )
-    df["store_last_updated"] = np.where(
-        (df["store_last_updated"].isna() | df["store_last_updated"] < 0),
-        None,
-        df["store_last_updated"],
-    )
-    df.loc[df["store_last_updated"].notna(), "store_last_updated"] = pd.to_datetime(
-        df.loc[df["store_last_updated"].notna(), "store_last_updated"],
-        unit="s",
     )
     # Calculate each pct of global based on review_count
     # This is then used to estimate installs per country
@@ -492,9 +481,8 @@ def process_metrics_google(df: pd.DataFrame) -> pd.DataFrame:
         fill_value=0,
         dropna=False,
     ).rename(columns={"tier1": "tier1_pct", "tier2": "tier2_pct", "tier3": "tier3_pct"})
-    tier_pct_cols = ["tier1_pct", "tier2_pct", "tier3_pct"]
-    if not all(col in tier_pct.columns for col in tier_pct_cols):
-        for col in tier_pct_cols:
+    if not all(col in tier_pct.columns for col in TIER_PCT_COLS):
+        for col in TIER_PCT_COLS:
             if col not in tier_pct.columns:
                 tier_pct[col] = 0
     global_df = global_df.join(tier_pct)
@@ -510,8 +498,7 @@ def process_metrics_google(df: pd.DataFrame) -> pd.DataFrame:
     )
     agg["rating"] = agg["total_prod"] / agg["total_counts"].replace(0, np.nan)
     global_df["rating"] = agg["rating"]
-    global_df[["tier1_pct", "tier2_pct", "tier3_pct"]]
-    tier_cols = ["tier1_pct", "tier2_pct", "tier3_pct"]
+    tier_cols = TIER_PCT_COLS
     row_sums = global_df[tier_cols].sum(axis=1)
     global_df[tier_cols] = global_df[tier_cols].div(row_sums.replace(0, np.nan), axis=0)
     global_df = global_df.reset_index()
@@ -536,16 +523,17 @@ def process_metrics_apple(
         .groupby(["store_app", "week_start"])["rating_count"]
         .max()
     )
-    df["us_rating_count"] = df.set_index(["store_app", "week_start"]).index.map(
-        us_lookup
+    df = df.merge(
+        us_lookup.rename("us_rating_count").reset_index(),
+        on=["store_app", "week_start"],
+        how="left",
     )
     df["pct_of_us_ratings"] = df["rating_count"] / df["us_rating_count"].replace(
         0, np.nan
     )
     df = df.sort_values("week_start")
-    df["pct_of_us_ratings"] = df.groupby(["store_app", "country_id"])[
-        ["pct_of_us_ratings"]
-    ].bfill()
+    gbc = df.groupby(["store_app", "country_id"])
+    df["pct_of_us_ratings"] = gbc[["pct_of_us_ratings"]].bfill()
     df["true_review_count"] = np.where(
         df["rating_count"].isna(),
         df["us_rating_count"] * df["pct_of_us_ratings"],
@@ -560,9 +548,6 @@ def process_metrics_apple(
         .reindex(df.index, fill_value=0)
     )
     df[STAR_COLS] = ratings_str.iloc[:, 1::2].astype(int).to_numpy()
-    df["store_last_updated"] = pd.to_datetime(
-        df["store_last_updated"], format="ISO8601", utc=True
-    )
     df = estimate_ios_installs(df)
     df["rating_prod"] = df["rating"] * df["rating_count"]
     # future_ios_ratios = get_ios_cached_future_country_ratios(database_connection)
@@ -589,15 +574,12 @@ def process_metrics_apple(
         on=["store_app", "country_id"],
         validate="m:1",
     )
-    df["global_rating_count"] = df.groupby(["week_start", "store_app"])[
-        "rating_count"
-    ].transform("sum")
+    gbw = df.groupby(["week_start", "store_app"])
+    df["global_rating_count"] = gbw["rating_count"].transform("sum")
     # Here CDF is the latest row per country per app, some countries older
     df["grc_future_est_a"] = df["rating_count"] / df["rating_ratio"]
     df["grc_est_prod"] = df["rating_count"] * df["grc_future_est_a"]
-    df["grc_future_est"] = df.groupby(["week_start", "store_app"])[
-        "grc_est_prod"
-    ].transform("sum") / df.groupby(["week_start", "store_app"])[
+    df["grc_future_est"] = gbw["grc_est_prod"].transform("sum") / gbw[
         "rating_count"
     ].transform("sum")
     estimate_available = (df["grc_future_est"] > 0).fillna(False) & (
@@ -613,9 +595,7 @@ def process_metrics_apple(
     df["rating_count"] = (
         df["rating_count"].replace([np.inf, -np.inf], 0).round(0).astype(int)
     )
-    app_mean_rating = df.groupby(["week_start", "store_app"])["rating"].transform(
-        "mean"
-    )
+    app_mean_rating = gbw["rating"].transform("mean")
     df["rating"] = df["rating"].fillna(app_mean_rating)
     df["rating_prod"] = df["rating"] * df["rating_count"]
     # overwrites installs_est from db, but quick fix for missing, same value
@@ -624,7 +604,6 @@ def process_metrics_apple(
         rating_count=("rating_count", "sum"),
         rating_prod=("rating_prod", "sum"),
         installs=("installs_est", "sum"),
-        store_last_updated=("store_last_updated", "max"),
         **{col: (col, "sum") for col in STAR_COLS},
     )
     global_df["rating"] = (
@@ -878,16 +857,11 @@ def process_metrics(
         df=country_df,
         key_columns=COUNTRY_HISTORY_KEYS,
     )
-    tiers = ["tier1_pct", "tier2_pct", "tier3_pct"]
-    for col in tiers:
+    for col in TIER_PCT_COLS:
         if col not in global_df.columns:
             global_df[col] = 0.0
         global_df[col] = global_df[col].fillna(0.0)
     global_df = global_df[[x for x in GLOBAL_HISTORY_COLS if x in global_df.columns]]
-    app_cats = query_store_app_categories(
-        database_connection, store_apps=global_df["store_app"].unique().tolist()
-    )
-    global_df = global_df.merge(app_cats, on="store_app", how="left", validate="m:1")
     # Fill in blank rows with default
     global_df["tier_pct_sum"] = (
         global_df["tier1_pct"] + global_df["tier2_pct"] + global_df["tier3_pct"]
@@ -899,8 +873,7 @@ def process_metrics(
     global_df.loc[tiers_to_fill, "tier1_pct"] = 0.34
     global_df.loc[tiers_to_fill, "tier2_pct"] = 0.33
     global_df.loc[tiers_to_fill, "tier3_pct"] = 0.33
-    global_df = calculate_active_users(database_connection, global_df, store=store)
-    global_df = calculate_revenue_cols(database_connection, global_df)
+    global_df = calculate_derived_metrics(database_connection, global_df, store=store)
     check_for_duplicates(
         df=global_df,
         key_columns=["store_app", "week_start"],
@@ -924,17 +897,8 @@ def process_metrics(
             country_df[col] = country_df[col].fillna(0).round().astype(int)
         if col in global_df.columns:
             global_df[col] = global_df[col].fillna(0).round().astype(int)
-    for col in tiers:
+    for col in TIER_PCT_COLS:
         global_df[col] = (global_df[col] * 10000).round().fillna(0).astype("int16")
-    if store == 1:
-        global_df.loc[global_df["store_last_updated"].notna(), "store_last_updated"] = (
-            pd.to_datetime(
-                global_df.loc[
-                    global_df["store_last_updated"].notna(), "store_last_updated"
-                ],
-                unit="s",
-            )
-        )
     global_df = global_df[GLOBAL_FINAL_COLS]
     logger.info(f"{log_info} finished")
     return country_df, global_df
@@ -1000,17 +964,15 @@ def ffill_app_metrics(
     if store == 1:
         cols_to_ffill = [
             "review_count",
-            "global_installs",
-            "global_rating_count",
+            "installs",
+            "rating_count",
             "rating",
-            "store_last_updated",
             "histogram",
         ]
     elif store == 2:
         cols_to_ffill = [
             "rating_count",
             "rating",
-            "store_last_updated",
             "histogram",
         ]
     df = df.sort_values("week_start")
@@ -1074,6 +1036,36 @@ def get_app_hash_buckets_filled_from_s3(store: int, app_hash: str) -> pd.DataFra
     return df
 
 
+def store_app_updated_history(
+    df: pd.DataFrame, database_connection: PostgresCon, store: int
+) -> pd.DataFrame:
+    logger.info(f"store={store} store_app_updated_history start")
+    if store == 1:
+        df.loc[df["store_last_updated"] <= 0, "store_last_updated"] = None
+        df["store_last_updated"] = pd.to_datetime(df["store_last_updated"], unit="s")
+    elif store == 2:
+        df["store_last_updated"] = pd.to_datetime(
+            df["store_last_updated"], format="ISO8601", utc=True
+        )
+    udf = (
+        df[df["store_last_updated"].notna()]
+        .groupby(["store_app", "store_last_updated"])["week_start"]
+        .max()
+        .rename("latest_crawl_week")
+        .reset_index()
+    )
+    upsert_df(
+        df=udf,
+        table_name="app_updated_history",
+        database_connection=database_connection,
+        key_columns=["store_app", "store_last_updated"],
+        insert_columns=["latest_crawl_week"],
+    )
+    df = df.drop(columns=["store_last_updated"])
+    logger.info(f"store={store} store_app_updated_history finished")
+    return df
+
+
 def process_app_metrics_to_db(
     hash_bucket: str,
     database_connection: PostgresCon,
@@ -1092,26 +1084,20 @@ def process_app_metrics_to_db(
     if df.empty:
         logger.warning(f"{log_info} no data found for S3 agg app metrics, skipping")
         raise ValueError(f"{log_info} no data found for S3 agg app metrics")
-    if store == 2:
+    if store == 1:
+        # Should be rare, filters accidental ChromeOS apps
+        problem_rows = df["installs"].isna()
+    elif store == 2:
         # This is an issue and needs to be resolved in the way the iOS store_id is stored into S3
         problem_rows = df["store_id"].str.contains(".0", regex=False)
-        if problem_rows.any():
-            df = df[~problem_rows]
-            logger.warning(
-                f"{log_info} found {problem_rows.sum()} rows with .0 suffix in store_id for Apple, removed them"
-            )
+    if problem_rows.any():
+        df = df[~problem_rows]
+        logger.warning(
+            f"{log_info} found {problem_rows.sum()} rows with .0 suffix in store_id for Apple, removed them"
+        )
     df = merge_in_db_ids(df, store, database_connection)
     df = df.drop(["store_id", "country"], axis=1)
-    if store == 1:
-        df.loc[df["store_last_updated"] <= 0, "store_last_updated"] = None
-        df = df.rename(
-            columns={
-                "installs": "global_installs",
-                "rating_count": "global_rating_count",
-            }
-        )
-        # very rare some chrome os apps got downloaded
-        df = df[~df["global_installs"].isna()]
+    df = store_app_updated_history(df, database_connection, store)
     df = ffill_app_metrics(df, store, database_connection)
     country_df, global_df = process_metrics(
         store=store,
@@ -1231,25 +1217,21 @@ def copy_raw_details_to_hash_buckets(
     return query
 
 
-def calculate_active_users(
+def calculate_derived_metrics(
     database_connection: PostgresCon, global_df: pd.DataFrame, store: int
 ) -> pd.DataFrame:
     """Process app global metrics weekly."""
-    tier_pct_cols = ["tier1_pct", "tier2_pct", "tier3_pct"]
     metrics = [
         "installs",
         "rating",
         "rating_count",
         *STAR_COLS,
-        *tier_pct_cols,
+        *TIER_PCT_COLS,
     ]
     xaxis_col = "week_start"
     # Convert to date to datetime and sort by country and date, required
     global_df[xaxis_col] = pd.to_datetime(global_df[xaxis_col])
     global_df = global_df.sort_values(["store_app", xaxis_col])
-    global_df["installs_diff"] = (
-        global_df.groupby("store_app")["installs"].diff().fillna(0)
-    )
     global_df["installs_diff"] = (
         global_df.groupby("store_app")["installs"]
         .diff()
@@ -1273,6 +1255,10 @@ def calculate_active_users(
             .mean()
             .reset_index(level=0, drop=True)
         )
+    app_cats = query_store_app_categories(
+        database_connection, store_apps=global_df["store_app"].unique().tolist()
+    )
+    global_df = global_df.merge(app_cats, on="store_app", how="left", validate="m:1")
     retention_benchmarks = get_retention_benchmarks(database_connection)
     retention_benchmarks = retention_benchmarks[retention_benchmarks["store"] == store]
     cohorts = global_df.merge(
@@ -1334,7 +1320,6 @@ def calculate_active_users(
         "week_start",
         "installs_diff",
         "weekly_ratings",
-        "store_last_updated",
     ] + metrics
     global_df = pd.merge(
         global_df[dfcols],
@@ -1351,44 +1336,41 @@ def calculate_active_users(
         "rating_count": "total_ratings",
     }
     global_df = global_df.rename(columns=rename_map)
+    global_df = calculate_revenue_cols(database_connection, global_df)
     return global_df
 
 
 def calculate_revenue_cols(
-    database_connection: PostgresCon, df: pd.DataFrame
+    database_connection: PostgresCon, global_df: pd.DataFrame
 ) -> pd.DataFrame:
+    global_df["wau_tier1"] = global_df["weekly_active_users"] * global_df["tier1_pct"]
+    global_df["wau_tier2"] = global_df["weekly_active_users"] * global_df["tier2_pct"]
+    global_df["wau_tier3"] = global_df["weekly_active_users"] * global_df["tier3_pct"]
+    global_df["mau_tier1"] = global_df["monthly_active_users"] * global_df["tier1_pct"]
+    global_df["mau_tier2"] = global_df["monthly_active_users"] * global_df["tier2_pct"]
+    global_df["mau_tier3"] = global_df["monthly_active_users"] * global_df["tier3_pct"]
+    # IAP Revenue
+    new_rev = global_df["weekly_installs"] * NEW_USER_CONVERSION * AVG_TICKET
+    returning_users = (
+        global_df["weekly_active_users"] - global_df["weekly_installs"]
+    ).clip(lower=0)
+    base_rev = returning_users * RETENTION_CONVERSION * AVG_TICKET
+    global_df["weekly_iap_revenue"] = np.where(
+        global_df["in_app_purchases"], new_rev + base_rev, 0.0
+    )
+    # Ad Revenue
     ecpm_benchmarks = get_ecpm_benchmarks(database_connection)
-    df["wau_tier1"] = df["weekly_active_users"] * df["tier1_pct"]
-    df["wau_tier2"] = df["weekly_active_users"] * df["tier2_pct"]
-    df["wau_tier3"] = df["weekly_active_users"] * df["tier3_pct"]
-    df["mau_tier1"] = df["monthly_active_users"] * df["tier1_pct"]
-    df["mau_tier2"] = df["monthly_active_users"] * df["tier2_pct"]
-    df["mau_tier3"] = df["monthly_active_users"] * df["tier3_pct"]
-
-    def estimate_revenue(row: pd.Series) -> float:
-        if not row["in_app_purchases"]:
-            return 0.0
-        # Revenue from new users
-        new_rev: float = row["weekly_installs"] * NEW_USER_CONVERSION * AVG_TICKET
-        # Revenue from the "sticky" base (WAU minus the new installs)
-        returning_users = max(0, row["weekly_active_users"] - row["weekly_installs"])
-        base_rev: float = returning_users * RETENTION_CONVERSION * AVG_TICKET
-        return new_rev + base_rev
-
-    df["weekly_iap_revenue"] = df.apply(estimate_revenue, axis=1)
-    # 2. Calculate Ad Revenue
     avg_ecpm = ecpm_benchmarks.groupby("tier_slug")["ecpm"].mean()
-
-    def calculate_ad_rev(row: pd.Series) -> float:
-        if not row["ad_supported"]:
-            return 0.0
-        # Need benchmark for impressions per user
-        imps_per_user = 3
-        rev_t1 = (row["wau_tier1"] * imps_per_user * avg_ecpm.get("tier1", 0)) / 1000
-        rev_t2 = (row["wau_tier2"] * imps_per_user * avg_ecpm.get("tier2", 0)) / 1000
-        rev_t3 = (row["wau_tier3"] * imps_per_user * avg_ecpm.get("tier3", 0)) / 1000
-        rev: float = rev_t1 + rev_t2 + rev_t3
-        return rev
-
-    df["weekly_ad_revenue"] = df.apply(calculate_ad_rev, axis=1)
-    return df
+    # Needs category benchmarks
+    imps_per_user = 3
+    global_df["weekly_ad_revenue"] = np.where(
+        global_df["ad_supported"],
+        (
+            (global_df["wau_tier1"] * imps_per_user * avg_ecpm.get("tier1", 0))
+            + (global_df["wau_tier2"] * imps_per_user * avg_ecpm.get("tier2", 0))
+            + (global_df["wau_tier3"] * imps_per_user * avg_ecpm.get("tier3", 0))
+        )
+        / 1000,
+        0.0,
+    )
+    return global_df
