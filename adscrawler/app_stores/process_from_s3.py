@@ -278,8 +278,8 @@ def query_store_collection_ranks(
             SELECT par.rank, par.best_rank, par.country, par.collection, par.category, par.crawled_date, par.store_id FROM period_app_ranks par
               ORDER BY par.country, par.collection, par.category, par.crawled_date, par.rank
             """
-    duckdb_con = get_duckdb_connection(s3_config_key)
-    return duckdb_con.execute(period_query).df()
+    with get_duckdb_connection(s3_config_key) as duckdb_con:
+        return duckdb_con.execute(period_query).df()
 
 
 def manual_download_rankings(
@@ -395,5 +395,5 @@ def query_keywords_from_s3(
             AND ar.rank = lp.rank
             AND ar.crawled_at = lp.latest_crawled_at;
             """
-    duckdb_con = get_duckdb_connection(s3_config_key)
-    return duckdb_con.execute(period_query).df()
+    with get_duckdb_connection(s3_config_key) as duckdb_con:
+        return duckdb_con.execute(period_query).df()

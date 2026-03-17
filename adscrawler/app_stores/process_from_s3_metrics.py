@@ -290,9 +290,8 @@ def make_s3_app_hash_metrics_history_weekly(
         store=store,
         daily_parquet_paths=all_parquet_paths,
     )
-    duckdb_con = get_duckdb_connection(s3_config_key)
-    duckdb_con.execute(query)
-    duckdb_con.close()
+    with get_duckdb_connection(s3_config_key) as duckdb_con:
+        duckdb_con.execute(query)
 
 
 def make_s3_app_hash_metrics_history_daily(
@@ -321,24 +320,25 @@ def make_s3_app_hash_metrics_history_daily(
         app_detail_parquets=all_parquet_paths,
         snapshot_date_str=snapshot_date_str,
     )
-    duckdb_con = get_duckdb_connection(s3_config_key)
-    try:
-        duckdb_con.execute(query)
-    except duckdb.BinderException as e:
-        if store == 2 and """"trackId" not found""" in str(e):
-            logger.error(
-                f"trackId column not found in parquets for store={store}, skipping"
-            )
-            handle_missing_trackid_files(duckdb_con, all_parquet_paths, store)
-        elif store == 1 and """"appId" not found""" in str(e):
-            logger.error(
-                f"appId column not found in parquets for store={store}, skipping"
-            )
-            handle_missing_trackid_files(duckdb_con, all_parquet_paths, store)
-        else:
-            # raise
-            logger.warning(f"Unexpected BinderException: {e}, investigate data issue")
-    duckdb_con.close()
+    with get_duckdb_connection(s3_config_key) as duckdb_con:
+        try:
+            duckdb_con.execute(query)
+        except duckdb.BinderException as e:
+            if store == 2 and """"trackId" not found""" in str(e):
+                logger.error(
+                    f"trackId column not found in parquets for store={store}, skipping"
+                )
+                handle_missing_trackid_files(duckdb_con, all_parquet_paths, store)
+            elif store == 1 and """"appId" not found""" in str(e):
+                logger.error(
+                    f"appId column not found in parquets for store={store}, skipping"
+                )
+                handle_missing_trackid_files(duckdb_con, all_parquet_paths, store)
+            else:
+                # raise
+                logger.warning(
+                    f"Unexpected BinderException: {e}, investigate data issue"
+                )
 
 
 def estimate_ios_installs(df: pd.DataFrame) -> pd.DataFrame:
@@ -835,9 +835,9 @@ def write_app_hash_buckets_interpolated_to_s3(
         OVERWRITE_OR_IGNORE true
     );
         """
-    duckdb_con = get_duckdb_connection(s3_config_key)
-    duckdb_con.execute(msv_query)
-    duckdb_con.close()
+    with get_duckdb_connection(s3_config_key) as duckdb_con:
+        duckdb_con.execute(msv_query)
+    return
 
 
 def process_metrics(
@@ -1025,15 +1025,12 @@ def get_app_hash_buckets_filled_from_s3(store: int, app_hash: str) -> pd.DataFra
     if len(all_parquet_paths) == 0:
         logger.warning(f"No filled parquet paths found for {store=} {app_hash=}")
         return pd.DataFrame()
-    duckdb_con = get_duckdb_connection(s3_config_key)
-    df = duckdb_con.execute(
-        f"""
+    sel_query = f"""
         SELECT * FROM read_parquet({all_parquet_paths}, union_by_name=true)
         ORDER BY store_id, country, week_start
     """
-    ).df()
-    duckdb_con.close()
-    return df
+    with get_duckdb_connection(s3_config_key) as duckdb_con:
+        return duckdb_con.execute(sel_query).df()
 
 
 def store_app_updated_history(
