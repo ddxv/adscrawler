@@ -592,6 +592,16 @@ def download_s3_app_by_key(
 def download_app_to_local(
     store: int, store_id: str, version_str: str | None = None
 ) -> tuple[pathlib.Path, str | None]:
+    """Return a local app package path, downloading from S3 when needed.
+
+    If the app already exists locally, that path is returned immediately.
+    Otherwise, the app is downloaded for the requested store/store_id and moved
+    into the main local package directory.
+
+    Returns:
+        A tuple of (local_file_path, resolved_version_str). The version may be
+        None when an existing local file is reused and no version was provided.
+    """
     file_path = get_local_file_path(store, store_id)
     if file_path:
         logger.info(f"{store_id=} app already downloaded")
