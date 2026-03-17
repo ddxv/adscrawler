@@ -591,7 +591,7 @@ def download_s3_app_by_key(
 
 def download_app_to_local(
     store: int, store_id: str, version_str: str | None = None
-) -> tuple[pathlib.Path, str]:
+) -> tuple[pathlib.Path, str | None]:
     file_path = get_local_file_path(store, store_id)
     if file_path:
         logger.info(f"{store_id=} app already downloaded")
