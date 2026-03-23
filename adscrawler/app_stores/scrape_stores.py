@@ -61,7 +61,7 @@ from adscrawler.dbcon.queries import (
     update_from_df,
     upsert_df,
 )
-from adscrawler.packages.storage import get_s3_client
+from adscrawler.packages.storage import get_s3_client, rankings_parquet_exists_in_s3
 
 logger = get_logger(__name__, "scrape_stores")
 
@@ -357,13 +357,20 @@ def scrape_store_ranks(database_connection: PostgresCon, store: int) -> None:
     categories_map = query_categories(database_connection)
     collections_map = collections_map.rename(columns={"id": "store_collection"})
     categories_map = categories_map.rename(columns={"id": "store_category"})
-    ranks_country_list = get_crawl_scenario_countries(
+    all_countries = get_crawl_scenario_countries(
         database_connection=database_connection, scenario_name="app_ranks"
     )
-    country_codes = ranks_country_list["country_code"].str.lower().unique().tolist()
+    all_country_codes = all_countries["country_code"].str.lower().unique().tolist()
+    today = datetime.date.today().strftime("%Y-%m-%d")
+
     if store == 2:
         collection_keyword = "TOP"
-        for country in country_codes:
+        for country in all_country_codes:
+            if rankings_parquet_exists_in_s3(
+                store=store, crawled_date=today, country=country
+            ):
+                logger.info(f"Skipping iOS ranks {country=}, already uploaded today")
+                continue
             try:
                 ranked_dicts = scrape_ios_ranks(
                     collection_keyword=collection_keyword, country=country
@@ -382,7 +389,12 @@ def scrape_store_ranks(database_connection: PostgresCon, store: int) -> None:
                 )
 
     if store == 1:
-        for country in country_codes:
+        for country in all_country_codes:
+            if rankings_parquet_exists_in_s3(
+                store=store, crawled_date=today, country=country
+            ):
+                logger.info(f"Skipping Google ranks {country=}, already uploaded today")
+                continue
             try:
                 ranked_dicts = scrape_google_ranks(country=country)
                 if len(ranked_dicts) > 0:

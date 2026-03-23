@@ -83,6 +83,22 @@ def get_s3_client(key_name: str = "s3") -> boto3.client:
     return client
 
 
+def rankings_parquet_exists_in_s3(
+    store: int, crawled_date: str, country: str, key_name: str = "s3"
+) -> bool:
+    """Return True if a rankings.parquet already exists in S3 for the given store/date/country."""
+    s3 = get_s3_client(key_name)
+    bucket = CONFIG[key_name]["bucket"]
+    s3_key = f"raw-data/app_rankings/store={store}/crawled_date={crawled_date}/country={country.upper()}/rankings.parquet"
+    try:
+        s3.head_object(Bucket=bucket, Key=s3_key)
+        return True
+    except ClientError as e:
+        if e.response["Error"]["Code"] == "404":
+            return False
+        raise
+
+
 def delete_s3_objects_by_prefix(bucket: str, prefix: str, key_name: str = "s3") -> None:
     """Delete all S3 objects with the given prefix."""
     s3 = get_s3_client(key_name)
