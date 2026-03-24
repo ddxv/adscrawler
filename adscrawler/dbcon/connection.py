@@ -129,19 +129,18 @@ def start_ssh_tunnel(config_key: str) -> int:
     return ssh_local_port
 
 
-def get_db_connection(
-    use_ssh_tunnel: bool = False, config_key: str = "madrone"
-) -> PostgresCon:
+def get_db_connection(config_key: str = "madrone") -> PostgresCon:
     """
     Get a database connection, optionally using an SSH tunnel.
 
     Args:
-        use_ssh_tunnel (bool): Whether to use an SSH tunnel for the connection.
+        config_key (str): Key to identify which database configuration to use.
 
     Returns:
         PostgresCon: A PostgreSQL connection object.
     """
     host = CONFIG[config_key]["host"]
+    use_ssh_tunnel = CONFIG[config_key].get("use_ssh_tunnel", False)
 
     if use_ssh_tunnel:
         ssh_local_port = start_ssh_tunnel(config_key)

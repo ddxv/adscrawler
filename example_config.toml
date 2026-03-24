@@ -2,6 +2,7 @@
 host = "localhost"
 os_user = "root"
 db_user = "postgres"
+use_ssh_tunnel = False # Optional
 # leave password blank if you are using a passwordless database
 db_password = ""
 db = "madrone"

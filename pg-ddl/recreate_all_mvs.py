@@ -459,9 +459,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    database_connection = get_db_connection(
-        use_ssh_tunnel=args.use_tunnel, config_key=args.config_key
-    )
+    database_connection = get_db_connection(config_key=args.config_key)
 
     main(
         drop_all=args.drop_all_mvs,

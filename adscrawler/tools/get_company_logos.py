@@ -320,8 +320,7 @@ def upload_and_update(
 
 def update_company_logos() -> None:
     os.makedirs(OUTPUT_DIR, exist_ok=True)
-    use_ssh_tunnel = False
-    database_connection = get_db_connection(use_ssh_tunnel=use_ssh_tunnel)
+    database_connection = get_db_connection()
     companies = query_companies(database_connection=database_connection)
     companies = companies[
         (companies["company_logo_url"].isna()) | (companies["company_logo_url"] == "")

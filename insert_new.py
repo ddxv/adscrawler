@@ -4,8 +4,7 @@ import yaml
 
 from adscrawler.dbcon.connection import get_db_connection
 
-use_tunnel = True
-database_connection = get_db_connection(use_ssh_tunnel=use_tunnel)
+database_connection = get_db_connection()
 
 
 def load_yaml_file(file_path: str) -> dict:

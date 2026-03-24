@@ -41,6 +41,10 @@ IGNORE_CREATIVE_IDS = ["privacy", "google_play_icon_grey_2022", "favicon"]
 IGNORE_CREATIVE_HOST_TLDS = ["digitaloceanspaces.com"]
 
 
+class _WorkerContext:
+    db_connection = None
+
+
 def find_sent_video_df(
     df: pd.DataFrame, row: pd.Series, video_id: str
 ) -> pd.DataFrame | None:
@@ -107,7 +111,7 @@ def attribute_creatives(
     error_messages = []
     adv_creatives = []
     creatives = df[(df["is_creative"]) & (df["tld_url"].notna())].copy()
-    creatives["video_id"] = creatives.apply(lambda x: get_video_id(x), axis=1)
+    creatives["video_id"] = creatives.apply(get_video_id, axis=1)
     creatives = creatives.drop_duplicates(subset=["video_id", "response_size_bytes"])
     row_count = creatives.shape[0]
     sent_video_cache = {}
@@ -597,25 +601,20 @@ def parse_all_runs_for_store_id(
         log_creative_scan_results(error_msg_df, database_connection)
 
 
-def _init_worker(use_ssh_tunnel: bool):
+def _init_worker():
     """Initialize worker process with a database connection that will be reused."""
-    global _worker_db_connection
-    _worker_db_connection = get_db_connection(use_ssh_tunnel=use_ssh_tunnel)
-    logger.info(
-        f"Worker initialized with database connection (tunnel={use_ssh_tunnel})"
-    )
+    _WorkerContext.db_connection = get_db_connection()
+    logger.info("Worker initialized with database connection")
 
 
 def _process_single_mitm_log(row: pd.Series) -> dict:
     """Worker function to process a single MITM log in parallel."""
-    global _worker_db_connection
-
     pub_store_id = row["store_id"]
     run_id = row["run_id"]
 
     try:
         error_messages = parse_store_id_mitm_log(
-            pub_store_id, run_id, _worker_db_connection
+            pub_store_id, run_id, _WorkerContext.db_connection
         )
         return {
             "run_id": run_id,
@@ -644,7 +643,6 @@ def scan_all_apps(
     database_connection: PostgresCon,
     only_new_apps: bool = False,
     recent_months: bool = False,
-    use_ssh_tunnel: bool = False,
     max_workers: int = 1,
 ) -> None:
     """Scans all apps for creative content and uploads thumbnails to S3."""
@@ -673,7 +671,7 @@ def scan_all_apps(
     completed = 0
 
     with ProcessPoolExecutor(
-        max_workers=max_workers, initializer=_init_worker, initargs=(use_ssh_tunnel,)
+        max_workers=max_workers, initializer=_init_worker
     ) as executor:
         for result in executor.map(
             _process_single_mitm_log, [row for _, row in mitm_runs_to_scan.iterrows()]

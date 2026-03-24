@@ -3,9 +3,7 @@ import pandas as pd
 from adscrawler.dbcon.connection import get_db_connection
 from adscrawler.dbcon.queries import query_zscores
 
-use_tunnel = False
-database_connection = get_db_connection(use_ssh_tunnel=use_tunnel)
-
+database_connection = get_db_connection()
 
 start_date = "2026-02-01"
 end_date = "2026-02-28"

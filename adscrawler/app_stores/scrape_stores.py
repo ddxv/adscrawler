@@ -100,7 +100,6 @@ def _scrape_single_app(
 def process_scrape_apps_and_save(
     df_chunk: pd.DataFrame,
     store: int,
-    use_ssh_tunnel: bool,
     process_icon: bool,
     thread_workers: int,
     total_rows: int | None = None,
@@ -110,7 +109,6 @@ def process_scrape_apps_and_save(
     Args:
         df_chunk: DataFrame of apps to process, needs to have columns: store_id, country_code, language, icon_url_100
         store: Store ID
-        use_ssh_tunnel: Whether to use SSH tunnel
         process_icon: Whether to process app icons
         thread_workers: Number of threads to use for parallel scraping within this process
         total_rows: Total number of apps in the chunk, if None, will be calculated from df_chunk
@@ -128,7 +126,7 @@ def process_scrape_apps_and_save(
     else:
         logger.info(f"{chunk_info} start (sequential)")
 
-    database_connection = get_db_connection(use_ssh_tunnel=use_ssh_tunnel)
+    database_connection = get_db_connection()
     chunk_results = []
 
     try:
@@ -206,7 +204,6 @@ def process_scrape_apps_and_save(
 def update_app_details(
     database_connection: PostgresCon,
     store: int,
-    use_ssh_tunnel: bool,
     workers: int,
     process_icon: bool,
     limit: int,
@@ -217,7 +214,6 @@ def update_app_details(
     Args:
         database_connection: Database connection
         store: Store ID
-        use_ssh_tunnel: Whether to use SSH tunnel
         workers: Number of processes to use
         process_icon: Whether to process app icons
         limit: Limit on number of apps to process
@@ -289,7 +285,6 @@ def update_app_details(
                 process_scrape_apps_and_save,
                 df_chunk=df_chunk,
                 store=store,
-                use_ssh_tunnel=use_ssh_tunnel,
                 process_icon=process_icon,
                 total_rows=total_rows,
                 thread_workers=thread_workers,
@@ -703,7 +698,7 @@ def save_app_domains(
     apps_df: pd.DataFrame,
     database_connection: PostgresCon,
 ) -> None:
-    apps_df["url"] = apps_df["url"].apply(lambda x: extract_domains(x))
+    apps_df["url"] = apps_df["url"].apply(extract_domains)
     # This would mean that urls are frozen if 'removed' but more likely they failed a crawl
     apps_df = apps_df[~apps_df["url"].isna()]
     all_domains_df = query_all_domains(database_connection=database_connection)

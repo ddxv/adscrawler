@@ -293,7 +293,7 @@ class ProcessManager:
         return False
 
     def setup_database_connection(self) -> None:
-        self.pgcon = get_db_connection(use_ssh_tunnel=self.args.use_ssh_tunnel)
+        self.pgcon = get_db_connection()
 
     def main(self) -> None:
         logger.info(f"Main starting with args: {self.args}")
@@ -400,7 +400,6 @@ class ProcessManager:
         update_app_details(
             store=store,
             database_connection=self.pgcon,
-            use_ssh_tunnel=self.args.use_ssh_tunnel,
             workers=int(self.args.workers),
             process_icon=self.args.process_icons,
             country_priority_group=self.args.country_priority_group,
@@ -436,7 +435,6 @@ class ProcessManager:
             database_connection=self.pgcon,
             only_new_apps=self.args.creative_scan_new_apps,
             recent_months=self.args.creative_scan_recent_months,
-            use_ssh_tunnel=self.args.use_ssh_tunnel,
             max_workers=int(self.args.workers),
         )
 

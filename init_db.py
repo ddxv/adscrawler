@@ -18,8 +18,7 @@ from adscrawler.dbcon.connection import get_db_connection
 
 logger = get_logger(__name__)
 
-use_tunnel = False
-database_connection = get_db_connection(use_ssh_tunnel=use_tunnel)
+database_connection = get_db_connection()
 
 
 logger.info("Creating database")
