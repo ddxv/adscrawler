@@ -140,10 +140,13 @@ def delete_and_aggregate_s3_agg(
     raw_data_lookback_days = 3
     # Rerun this week daily and last week at least once
     raw_weekly_lookback_days = 8
+    raw_weekly_lookback_days = 500
     interpolate_query_lookback_days = 180
+    interpolate_query_lookback_days = 700
     # Delete window: only remove what we're confident we'll rewrite
-    interpolate_delete_lookback_days = 400
-    db_delete_lookback_days = 375
+    interpolate_delete_lookback_days = 90
+    interpolate_delete_lookback_days = 600
+    db_delete_lookback_days = 420
 
     # Raw data to agg by DAY
     # Purely additive, only needs to be run once for 'yesterday'
@@ -188,6 +191,7 @@ def delete_and_aggregate_s3_agg(
             hash_bucket=hash_bucket,
             end_date=end_date,
         )
+
         # This can run for last 30 days only
         db_delete_start = end_date - datetime.timedelta(days=db_delete_lookback_days)
         process_app_metrics_to_db(
@@ -206,12 +210,51 @@ def copy_daily_to_weekly_hash_buckets(
     if store == 1:
         sel_metrics = "installs, rating, rating_count, review_count, histogram, store_last_updated"
         fin_metrics = "installs, rating, rating_count, review_count, histogram, store_last_updated"
+        post_deduped_select = """
+              SELECT
+                  store_id,
+                  country,
+                  installs,
+                  rating,
+                  rating_count,
+                  review_count,
+                  COALESCE(TRY_CAST(list_extract(histogram, 1) AS BIGINT), 0) AS one_star,
+                  COALESCE(TRY_CAST(list_extract(histogram, 2) AS BIGINT), 0) AS two_star,
+                  COALESCE(TRY_CAST(list_extract(histogram, 3) AS BIGINT), 0) AS three_star,
+                  COALESCE(TRY_CAST(list_extract(histogram, 4) AS BIGINT), 0) AS four_star,
+                  COALESCE(TRY_CAST(list_extract(histogram, 5) AS BIGINT), 0) AS five_star,
+                  store_last_updated,
+                  week_start,
+                  days_since_monday,
+                  hash_bucket
+              FROM deduped
+        """
         extra_sort_column = "review_count DESC"
     elif store == 2:
-        sel_metrics = (
-            "rating_count, rating, user_ratings AS histogram, store_last_updated"
-        )
-        fin_metrics = "rating_count, rating, histogram, store_last_updated"
+        sel_metrics = "rating_count, rating, user_ratings, store_last_updated"
+        fin_metrics = "rating_count, rating, user_ratings, store_last_updated"
+        post_deduped_select = """
+              SELECT
+                  store_id,
+                  country,
+                  rating_count,
+                  rating,
+                  COALESCE(TRY_CAST(REPLACE(list_extract(star_vals, 1), ',', '') AS BIGINT), 0) AS one_star,
+                  COALESCE(TRY_CAST(REPLACE(list_extract(star_vals, 2), ',', '') AS BIGINT), 0) AS two_star,
+                  COALESCE(TRY_CAST(REPLACE(list_extract(star_vals, 3), ',', '') AS BIGINT), 0) AS three_star,
+                  COALESCE(TRY_CAST(REPLACE(list_extract(star_vals, 4), ',', '') AS BIGINT), 0) AS four_star,
+                  COALESCE(TRY_CAST(REPLACE(list_extract(star_vals, 5), ',', '') AS BIGINT), 0) AS five_star,
+                  store_last_updated,
+                  week_start,
+                  days_since_monday,
+                  hash_bucket
+              FROM (
+                  SELECT
+                      *,
+                      regexp_extract_all(COALESCE(user_ratings, ''), ':\\s*([0-9,]+)', 1) AS star_vals
+                  FROM deduped
+              ) parsed
+        """
         extra_sort_column = "rating_count DESC"
     query = f"""COPY (
               WITH raw_data AS (
@@ -239,7 +282,7 @@ def copy_daily_to_weekly_hash_buckets(
                       ORDER BY crawled_at DESC, {extra_sort_column}
                   ) = 1
               )
-              SELECT * FROM deduped
+              {post_deduped_select}
           ) TO 's3://{bucket}/{AGG_APP_HASH_BUCKETS_WEEKLY}/store={store}/'
           (
               FORMAT PARQUET,
@@ -430,17 +473,29 @@ def process_metrics_google(df: pd.DataFrame) -> pd.DataFrame:
         df[~df["is_global_fallback"]]
         .groupby(["store_app", "week_start"])["true_review_count"]
         .sum()
-        .rename("local_sums")
+        .rename("grc_summed")
         .reset_index()
     )
     df = df.merge(local_sums_df, on=["store_app", "week_start"], how="left")
-    has_global_fallback = gb["is_global_fallback"].transform("sum")
-    df["global_review_count"] = np.where(
-        has_global_fallback,
-        df["max_reviews"],
-        df["local_sums"],
+    df["has_global_fallback"] = (
+        df.groupby(["store_app", "week_start"])["is_global_fallback"].transform("sum")
+        > 0
     )
-    df = df.drop(columns=["local_sums"])
+    df["summed_to_global_fallback_multiplier"] = np.where(
+        df["has_global_fallback"], df["max_reviews"] / df["grc_summed"], np.nan
+    )
+    df["summed_to_global_fallback_multiplier"] = df.groupby(["store_app"])[
+        "summed_to_global_fallback_multiplier"
+    ].bfill()
+    df["global_review_count"] = np.where(
+        df["has_global_fallback"],
+        df["max_reviews"],
+        df["grc_summed"] * df["summed_to_global_fallback_multiplier"].fillna(1),
+    )
+    # cols = ['country_id','pct_of_global', 'dis', 'is_global_fallback', "review_count", "true_review_count", "grc_summed", "global_review_count", 'pct_of_us_reviews']
+    # df[(df['store_app'] == 765358) & (df['week_start'] == pd.to_datetime("2026-02-09"))][cols]
+    # df[(df['store_app'] == 765358) & (df['week_start'] == pd.to_datetime("2026-02-16"))][cols]
+    df = df.drop(columns=["grc_summed"])
     df["pct_of_global"] = (
         (df["true_review_count"] / df["global_review_count"])
         .replace([np.inf, -np.inf], np.nan)
@@ -458,19 +513,10 @@ def process_metrics_google(df: pd.DataFrame) -> pd.DataFrame:
     df = df.rename(columns={"review_count": "original_review_count"})
     df = df.rename(columns={"true_review_count": "review_count"})
     global_df = global_df.set_index(GLOBAL_HISTORY_KEYS)
-    # TODO: Stars need to be fixed per is_global_fallback logic
-    histo_nulls = global_df["histogram"].isna()
-    global_df.loc[histo_nulls, "histogram"] = pd.Series(
-        [[0, 0, 0, 0, 0]] * histo_nulls.sum(), index=global_df.index[histo_nulls]
-    )
-    star_df = pd.DataFrame(global_df["histogram"].tolist(), index=global_df.index)
-    try:
-        star_df.columns = STAR_COLS
-    except ValueError:
-        for col in STAR_COLS:
-            if col not in star_df.columns:
-                star_df[col] = 0
-    global_df = pd.concat([global_df, star_df], axis=1)
+    for col in STAR_COLS:
+        if col not in global_df.columns:
+            global_df[col] = 0
+        global_df[col] = pd.to_numeric(global_df[col], errors="coerce").fillna(0)
     tier_pct = df.pivot_table(
         index=GLOBAL_HISTORY_KEYS,
         columns="tier",
@@ -537,15 +583,21 @@ def process_metrics_apple(
         df["us_rating_count"] * df["pct_of_us_ratings"],
         df["rating_count"],
     )
-    ratings_str = (
-        df["histogram"]
-        .str.extractall(r"(\d+)")
-        .reset_index()
-        .pivot_table(index="level_0", columns="match", values=0, aggfunc="first")
-        .astype("Int64")
-        .reindex(df.index, fill_value=0)
-    )
-    df[STAR_COLS] = ratings_str.iloc[:, 1::2].astype(int).to_numpy()
+    # Backward compatibility for old weekly files that still have histogram.
+    # if "histogram" in df.columns and not all(col in df.columns for col in STAR_COLS):
+    #     ratings_str = (
+    #         df["histogram"]
+    #         .str.extractall(r"(\d+)")
+    #         .reset_index()
+    #         .pivot_table(index="level_0", columns="match", values=0, aggfunc="first")
+    #         .astype("Int64")
+    #         .reindex(df.index, fill_value=0)
+    #     )
+    #     df[STAR_COLS] = ratings_str.iloc[:, 1::2].astype(int).to_numpy()
+    for col in STAR_COLS:
+        if col not in df.columns:
+            df[col] = 0
+        df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0).astype(int)
     df = estimate_ios_installs(df)
     df["rating_prod"] = df["rating"] * df["rating_count"]
     # future_ios_ratios = get_ios_cached_future_country_ratios(pgdb)
@@ -626,6 +678,55 @@ def process_metrics_apple(
     return df, global_df
 
 
+def _build_interpolated_metrics_sql(metrics: list[str]) -> str:
+    """Build SQL for interpolation anchors using true observation dates."""
+    interpolated_lines = []
+    for metric in metrics:
+        interpolated_lines.append(
+            f"MIN_BY({metric}, observed_at) OVER w_future AS {metric}_y2,"
+        )
+    return "\n" + "\n".join(interpolated_lines)
+
+
+def _build_coalesce_metric_sql(metric: str) -> str:
+    """Build SQL for a single coalesce metric with linear interpolation logic."""
+    # Define which metrics are floats vs integers
+    float_metrics = {"rating"}
+    cast = "DOUBLE" if metric in float_metrics else "BIGINT"
+    return f"""COALESCE(
+                    a_exact.{metric},
+                    a_prev.{metric} +
+                        DATE_DIFF('day', a_prev.observed_at, m.week_start)::DOUBLE *
+                        (a_prev.{metric}_y2 - a_prev.{metric})::DOUBLE /
+                        NULLIF(DATE_DIFF('day', a_prev.observed_at, a_prev.x2)::DOUBLE, 0.0)
+                )::{cast} AS {metric},"""
+
+
+def _build_coalesce_metrics_sql(metrics: list[str]) -> str:
+    """Build complete coalesce metrics SQL block from list of metric names."""
+    coalesce_blocks = [_build_coalesce_metric_sql(m) for m in metrics]
+    return "\n                " + "\n                ".join(coalesce_blocks)
+
+
+def _get_store_metrics_config(store: int) -> dict:
+    """Get metric configuration for a given store.
+
+    Returns a dict with keys: metrics, interpolated_metrics, coalesce_metrics.
+    """
+    if store == 1:
+        metrics = ["installs", "rating", "rating_count", "review_count", *STAR_COLS]
+    elif store == 2:
+        metrics = ["rating_count", "rating", *STAR_COLS]
+    else:
+        raise ValueError(f"Unsupported store: {store}")
+
+    return {
+        "metrics": metrics,
+        "interpolated_metrics": _build_interpolated_metrics_sql(metrics),
+        "coalesce_metrics": _build_coalesce_metrics_sql(metrics),
+    }
+
+
 def write_app_hash_buckets_interpolated_to_s3(
     query_start_mon: datetime.date,
     delete_start_mon: datetime.date,
@@ -633,10 +734,8 @@ def write_app_hash_buckets_interpolated_to_s3(
     store: int,
     hash_bucket: str,
 ) -> None:
-
     s3_config_key = "s3"
     bucket = CONFIG[s3_config_key]["bucket"]
-
     delete_s3_objects_by_date_range(
         bucket=bucket,
         start_date_mon=delete_start_mon,
@@ -644,7 +743,6 @@ def write_app_hash_buckets_interpolated_to_s3(
         prefix=f"{AGG_APP_HASH_BUCKETS_FILLED}/store={store}/hash_bucket={hash_bucket}",
         key_name=s3_config_key,
     )
-
     all_parquet_paths = []
     for ddt in pd.date_range(query_start_mon, end_date, freq="W-MON"):
         ddt_str = ddt.strftime("%Y-%m-%d")
@@ -655,62 +753,11 @@ def write_app_hash_buckets_interpolated_to_s3(
             f"No parquet paths found for agg app hash buckets {store=} {query_start_mon=} {end_date=}"
         )
         return
-    if store == 1:
-        metrics = [
-            "installs",
-            "rating_count",
-            "review_count",
-        ]
-        interpolated_metrics = """
-                MIN_BY(installs,     week_start) OVER w_future AS installs_y2,
-                MIN_BY(rating_count, week_start) OVER w_future AS rating_count_y2,
-                MIN_BY(review_count, week_start) OVER w_future AS review_count_y2,
-                """
-        coalesce_metrics = """
-                COALESCE(
-                    a_exact.installs,
-                    a_week.installs,
-                    a_prev.installs +
-                        DATE_DIFF('day', a_prev.week_start, m.week_start)::DOUBLE *
-                        (a_prev.installs_y2 - a_prev.installs)::DOUBLE /
-                        NULLIF(DATE_DIFF('day', a_prev.week_start, a_prev.x2)::DOUBLE, 0.0)
-                )::BIGINT AS installs,
-                COALESCE(
-                    a_exact.rating_count,
-                    a_week.rating_count,
-                    a_prev.rating_count +
-                        DATE_DIFF('day', a_prev.week_start, m.week_start)::DOUBLE *
-                        (a_prev.rating_count_y2 - a_prev.rating_count)::DOUBLE /
-                        NULLIF(DATE_DIFF('day', a_prev.week_start, a_prev.x2)::DOUBLE, 0.0)
-                )::BIGINT AS rating_count,
-                COALESCE(
-                    a_exact.review_count,
-                    a_week.review_count,
-                    a_prev.review_count +
-                        DATE_DIFF('day', a_prev.week_start, m.week_start)::DOUBLE *
-                        (a_prev.review_count_y2 - a_prev.review_count)::DOUBLE /
-                        NULLIF(DATE_DIFF('day', a_prev.week_start, a_prev.x2)::DOUBLE, 0.0)
-                )::BIGINT AS review_count,
-                """
-    elif store == 2:
-        metrics = [
-            "rating_count",
-        ]
-        interpolated_metrics = """
-                MIN_BY(rating_count, week_start) OVER w_future AS rating_count_y2,
-                """
-        coalesce_metrics = """
-               COALESCE(
-                    a_exact.rating_count,
-                    a_week.rating_count,
-                    a_prev.rating_count +
-                        DATE_DIFF('day', a_prev.week_start, m.week_start)::DOUBLE *
-                        (a_prev.rating_count_y2 - a_prev.rating_count)::DOUBLE /
-                        NULLIF(DATE_DIFF('day', a_prev.week_start, a_prev.x2)::DOUBLE, 0.0)
-                )::BIGINT AS rating_count, 
-                """
-    else:
-        raise ValueError(f"Unsupported store: {store}")
+    # Get metric configuration for this store
+    config = _get_store_metrics_config(store)
+    metrics = config["metrics"]
+    interpolated_metrics = config["interpolated_metrics"]
+    coalesce_metrics = config["coalesce_metrics"]
     query_start_mon_str = query_start_mon.strftime("%Y-%m-%d")
     delete_start_mon_str = delete_start_mon.strftime("%Y-%m-%d")
     end_date_str = end_date.strftime("%Y-%m-%d")
@@ -722,13 +769,11 @@ def write_app_hash_buckets_interpolated_to_s3(
                 country,
                 week_start,
                 days_since_monday,
+                CAST(week_start + days_since_monday AS DATE) AS observed_at,
                 {",".join(metrics)},
-                rating,
-                histogram,
                 store_last_updated
             FROM read_parquet({all_parquet_paths}, union_by_name=true)
         ),
-
         target_mondays AS (
             SELECT CAST(range AS DATE) AS week_start
             FROM range(
@@ -737,7 +782,6 @@ def write_app_hash_buckets_interpolated_to_s3(
                 INTERVAL 7 DAY
             )
         ),
-
         -- ============================================================
         -- Anchors — window functions over real rows only
         -- ============================================================
@@ -747,31 +791,28 @@ def write_app_hash_buckets_interpolated_to_s3(
                 country,
                 week_start,
                 days_since_monday,
+                observed_at,
                 -- Actuals (used when a real crawl lands on a Monday)
                 {",".join(metrics)},
-                rating,
-                histogram,
                 store_last_updated,
                 -- Interpolation anchors
                {interpolated_metrics} 
                 -- Shared x-axis
-                MIN(week_start) OVER w_future AS x2,
+                MIN(observed_at) OVER w_future AS x2,
                 -- Carry-forward
-                MAX_BY(rating,             week_start) OVER w_past_inclusive AS rating_carry,
-                MAX_BY(histogram,          week_start) OVER w_past_inclusive AS histogram_carry,
-                MAX_BY(store_last_updated, week_start) OVER w_past_inclusive AS store_last_updated_carry
+                MAX_BY(store_last_updated, observed_at) OVER w_past_inclusive AS store_last_updated_carry
             FROM weekly_data
             WINDOW
                 w_future AS (PARTITION BY store_id, country
-                             ORDER BY week_start
+                             ORDER BY observed_at
                              ROWS BETWEEN 1 FOLLOWING AND UNBOUNDED FOLLOWING),
                 w_past_inclusive AS (PARTITION BY store_id, country
-                                     ORDER BY week_start
+                                     ORDER BY observed_at
                                      ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)
         ),
-
         -- ============================================================
-        -- 4. Interpolate onto Mondays, using real Mondays when available, otherwise using the bracketing anchors to interpolate, or carry forward if at start/end of series
+        -- 4. Interpolate onto Mondays using true crawl dates as anchors.
+        --    Tue-Sun crawls are future observations for that Monday, not same-day values.
         -- ============================================================
        interpolated AS (
         SELECT
@@ -780,50 +821,32 @@ def write_app_hash_buckets_interpolated_to_s3(
             dims.country,
             m.week_start,
             {coalesce_metrics} 
-            COALESCE(a_exact.rating,             a_week.rating,             a_prev.rating_carry)            AS rating,
-            COALESCE(a_exact.histogram,          a_week.histogram,          a_prev.histogram_carry)         AS histogram,
-            COALESCE(a_exact.store_last_updated, a_week.store_last_updated, a_prev.store_last_updated_carry) AS store_last_updated
-
+            COALESCE(a_exact.store_last_updated, a_prev.store_last_updated_carry) AS store_last_updated
         FROM (SELECT DISTINCT store_id, country FROM weekly_data) dims
         CROSS JOIN target_mondays m
-
         -- Exact hit: crawl lands exactly on Monday
         LEFT JOIN anchors a_exact
                 ON a_exact.store_id      = dims.store_id
                 AND a_exact.country       = dims.country
-                AND a_exact.week_start = m.week_start
-                AND a_exact.days_since_monday = 0
-
-        -- Intra-week hit: best crawl within Tue-Sun of this week
-        LEFT JOIN anchors a_week
-                ON a_week.store_id      = dims.store_id
-                AND a_week.country       = dims.country
-                AND a_week.week_start = m.week_start
-                AND a_week.days_since_monday BETWEEN 1 AND 6 
-
-        -- Bracketing anchor: finds the row where target Monday falls [anchor_week, next_anchor_week)
-        -- Interpolation uses: 
+                AND a_exact.observed_at = m.week_start
+        -- Bracketing anchor: finds the latest observation strictly before the target Monday.
         LEFT JOIN anchors a_prev
                 ON a_prev.store_id      = dims.store_id
                 AND a_prev.country       = dims.country
-                AND a_prev.week_start = (
-                        SELECT MAX(week_start)
+                AND a_prev.observed_at = (
+                        SELECT MAX(observed_at)
                         FROM weekly_data
                         WHERE store_id      = dims.store_id
                         AND country       = dims.country
-                        AND week_start < m.week_start
+                        AND observed_at < m.week_start
                     )
-
         -- Only emit a week if there is real data somewhere to anchor it
         WHERE a_exact.{metrics[0]} IS NOT NULL        -- crawl on Monday
-            OR a_week.{metrics[0]}  IS NOT NULL        -- crawl later in week
-            OR (a_prev.week_start IS NOT NULL AND a_prev.x2 IS NOT NULL) -- interpolatable: both brackets exist
+            OR (a_prev.observed_at IS NOT NULL AND a_prev.x2 IS NOT NULL) -- interpolatable: both brackets exist
         )
-
         SELECT * FROM interpolated
         WHERE week_start >= DATE '{delete_start_mon_str}'
         ORDER BY store_id, country, week_start
-
     ) TO 's3://{bucket}/{AGG_APP_HASH_BUCKETS_FILLED}/store={store}/'
     (
         FORMAT PARQUET,
@@ -851,6 +874,7 @@ def process_metrics(
         country_df, global_df = process_metrics_apple(df=df)
     country_df = country_df.convert_dtypes(dtype_backend="pyarrow")
     country_df = country_df.replace({pd.NA: None})
+    global_df[global_df["store_app"] == 1687435]
     check_for_duplicates(
         df=country_df,
         key_columns=COUNTRY_HISTORY_KEYS,
@@ -965,13 +989,13 @@ def ffill_app_metrics(
             "installs",
             "rating_count",
             "rating",
-            "histogram",
+            *STAR_COLS,
         ]
     elif store == 2:
         cols_to_ffill = [
             "rating_count",
             "rating",
-            "histogram",
+            *STAR_COLS,
         ]
     df = df.sort_values("week_start")
     df[cols_to_ffill] = df.groupby(["store_app", "country_id"])[cols_to_ffill].ffill()
@@ -1067,9 +1091,7 @@ def process_app_metrics_to_db(
     store: int,
     db_delete_start: datetime.date,
 ) -> None:
-    log_info = (
-        f"store={store} date={db_delete_start} hash_bucket={hash_bucket} process to DB"
-    )
+    log_info = f"{store=} date={db_delete_start} {hash_bucket=} process to DB"
     logger.info(f"{log_info} start")
     df = get_app_hash_buckets_filled_from_s3(
         store=store,
@@ -1087,9 +1109,7 @@ def process_app_metrics_to_db(
         problem_rows = df["store_id"].str.contains(".0", regex=False)
     if problem_rows.any():
         df = df[~problem_rows]
-        logger.warning(
-            f"{log_info} found {problem_rows.sum()} rows with .0 suffix in store_id for Apple, removed them"
-        )
+        logger.warning(f"{log_info} {problem_rows.sum()} bad rows! removed them")
     df = merge_in_db_ids(df, store, pgdb)
     df = df.drop(["store_id", "country"], axis=1)
     df = store_app_updated_history(df, pgdb, store)
@@ -1102,6 +1122,20 @@ def process_app_metrics_to_db(
     country_df, global_df = drop_unwanted_rows(
         country_df, global_df, store, db_delete_start
     )
+    df[
+        (df["store_app"] == 765358)
+        & (df["week_start"] == pd.to_datetime("2026-03-09"))
+        & (df["country_id"] == 840)
+    ]
+    country_df[
+        (country_df["store_app"] == 765358)
+        & (country_df["week_start"] == pd.to_datetime("2026-02-09"))
+        & (country_df["country_id"] == 840)
+    ][["rating_count"]]
+    global_df[
+        (global_df["store_app"] == 765358)
+        & (global_df["week_start"] == pd.to_datetime("2026-03-09"))
+    ]
     delete_and_insert_app_metrics(
         pgdb=pgdb,
         country_df=country_df,
