@@ -3,7 +3,7 @@
 import pandas as pd
 
 from adscrawler.config import get_logger
-from adscrawler.dbcon.connection import PostgresCon
+from adscrawler.dbcon.connection import PostgresEngine
 from adscrawler.dbcon.queries import query_store_id_map, upsert_df
 
 logger = get_logger(__name__, "scrape_stores")
@@ -26,7 +26,7 @@ def truncate_utf8_bytes(s: str, max_bytes: int = 2400) -> str:
 
 def check_and_insert_new_apps(
     dicts: list[dict],
-    database_connection: PostgresCon,
+    pgdb: PostgresEngine,
     crawl_source: str,
     store: int,
 ) -> None:
@@ -41,7 +41,7 @@ def check_and_insert_new_apps(
         raise ValueError("Found bad store_ids")
     all_scraped_ids = df["store_id"].unique().tolist()
     existing_ids_map = query_store_id_map(
-        database_connection,
+        pgdb,
         store_ids=all_scraped_ids,
     )
     existing_store_ids = existing_ids_map["store_id"].tolist()
@@ -60,7 +60,7 @@ def check_and_insert_new_apps(
         insert_columns=insert_columns,
         df=new_apps_df,
         key_columns=insert_columns,
-        database_connection=database_connection,
+        pgdb=pgdb,
         return_rows=True,
     )
     if inserted_apps is not None and not inserted_apps.empty:
@@ -72,7 +72,7 @@ def check_and_insert_new_apps(
             insert_columns=insert_columns + ["crawl_source"],
             df=inserted_apps,
             key_columns=insert_columns,
-            database_connection=database_connection,
+            pgdb=pgdb,
             schema="logging",
         )
     return None

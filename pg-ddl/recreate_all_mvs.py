@@ -24,7 +24,7 @@ def get_existing_mvs() -> set:
         FROM pg_matviews
         ORDER BY schemaname, matviewname
     """
-    with database_connection.engine.connect() as conn:
+    with pgdb.engine.connect() as conn:
         result = conn.execute(text(query))
         return {row[0] for row in result}
 
@@ -73,7 +73,7 @@ def extract_mv_name_from_file(file_content: str, file_path: str) -> str | None:
 def drop_mv(mv_name: str) -> None:
     """Drop a materialized view by name."""
     drop_statement = f"DROP MATERIALIZED VIEW IF EXISTS {mv_name} CASCADE;"
-    with database_connection.engine.connect() as conn:
+    with pgdb.engine.connect() as conn:
         try:
             conn.execute(text(drop_statement))
             conn.commit()
@@ -211,7 +211,7 @@ def create_all_mvs(mv_files: list[Path], stop_on_error: bool = False) -> None:
 
     logger.info(f"Found {len(mvs_missing_in_db)} missing MVs to create in db")
 
-    with database_connection.engine.connect() as conn:
+    with pgdb.engine.connect() as conn:
         for mv_name, create_statement, _file_name in mvs_missing_in_db:
             trans = conn.begin()
             try:
@@ -283,7 +283,7 @@ def run_all_mvs(mv_files: list[Path], stop_on_error: bool = False) -> None:
             continue
 
         # Check if already has data (use fresh connection for check)
-        with database_connection.engine.connect() as conn:
+        with pgdb.engine.connect() as conn:
             if has_data(conn, mv_name):
                 logger.info(f"{mv_name} already has data")
                 continue
@@ -294,7 +294,7 @@ def run_all_mvs(mv_files: list[Path], stop_on_error: bool = False) -> None:
             continue
 
         # Refresh the materialized view (use fresh connection for each refresh)
-        with database_connection.engine.connect() as conn:
+        with pgdb.engine.connect() as conn:
             trans = conn.begin()
             try:
                 query = f"REFRESH MATERIALIZED VIEW {mv_name};"
@@ -335,7 +335,7 @@ def get_existing_indexes() -> set:
         FROM pg_indexes
         WHERE schemaname IN ('public', 'frontend', 'adtech')
     """
-    with database_connection.engine.connect() as conn:
+    with pgdb.engine.connect() as conn:
         result = conn.execute(text(query))
         return {row[0] for row in result}
 
@@ -373,7 +373,7 @@ def create_all_mv_indexes(mv_files: list[Path], stop_on_error: bool = False) -> 
         FROM pg_indexes
         WHERE schemaname IN ('public', 'frontend', 'adtech')
     """
-    with database_connection.engine.connect() as conn:
+    with pgdb.engine.connect() as conn:
         result = conn.execute(text(query))
         existing_indexes = {row[0] for row in result}
     logger.info(f"Found {len(existing_indexes)} existing indexes in db")
@@ -387,7 +387,7 @@ def create_all_mv_indexes(mv_files: list[Path], stop_on_error: bool = False) -> 
             else:
                 all_missing.append((index_name, statement, mv_file.name))
     logger.info(f"Found {len(all_missing)} missing indexes to create")
-    with database_connection.engine.connect() as conn:
+    with pgdb.engine.connect() as conn:
         for index_name, statement, source_file in all_missing:
             trans = conn.begin()
             try:
@@ -459,7 +459,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    database_connection = get_db_connection(config_key=args.config_key)
+    pgdb = get_db_connection(config_key=args.config_key)
 
     main(
         drop_all=args.drop_all_mvs,

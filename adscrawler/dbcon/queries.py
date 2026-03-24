@@ -16,7 +16,7 @@ from sqlalchemy.exc import OperationalError
 from sqlalchemy.sql.elements import TextClause
 
 from adscrawler.config import CONFIG, SQL_DIR, get_logger
-from adscrawler.dbcon.connection import PostgresCon
+from adscrawler.dbcon.connection import PostgresEngine
 
 logger = get_logger(__name__)
 
@@ -44,7 +44,7 @@ QUERY_APPS_TO_PROCESS_KEYWORDS = load_sql_file("query_apps_to_process_keywords.s
 def insert_df(
     df: pd.DataFrame,
     table_name: str,
-    database_connection: Connection,
+    pgdb: Connection,
     insert_columns: list[str] | None = None,
     return_rows: bool = False,
     schema: str | None = None,
@@ -66,7 +66,7 @@ def insert_df(
         The name of the schema containing the target table.
     """
 
-    raw_conn = database_connection.engine.raw_connection()
+    raw_conn = pgdb.engine.raw_connection()
 
     if "crawled_date" in df.columns and df["crawled_date"].isna().all():
         df["crawled_date"] = pd.to_datetime(df["crawled_date"]).dt.date
@@ -149,7 +149,7 @@ def prepare_for_psycopg(df: pd.DataFrame) -> pd.DataFrame:
 def update_from_df(
     df: pd.DataFrame,
     table_name: str,
-    database_connection: Connection,
+    pgdb: Connection,
     key_columns: list[str],
     update_columns: list[str],
     return_rows: bool = False,
@@ -164,7 +164,7 @@ def update_from_df(
         The DataFrame containing update data.
     table_name : str
         The name of the target table.
-    database_connection : Connection
+    pgdb : Connection
         The database connection object.
     key_columns : list of str
         Column name(s) on which to match for the UPDATE.
@@ -183,7 +183,7 @@ def update_from_df(
     pd.DataFrame or None
         DataFrame of updated rows if return_rows=True, else None.
     """
-    raw_conn = database_connection.engine.raw_connection()
+    raw_conn = pgdb.engine.raw_connection()
     # Handle special date columns
     if "crawled_date" in df.columns and df["crawled_date"].isna().all():
         df["crawled_date"] = pd.to_datetime(df["crawled_date"]).dt.date
@@ -297,7 +297,7 @@ def _with_deadlock_retry(fn: Callable[[], None], max_retries: int = 3) -> None:
 def insert_bulk(
     df: pd.DataFrame,
     table_name: str,
-    database_connection: PostgresCon,
+    pgdb: PostgresEngine,
     chunk_size: int | None = None,
 ) -> None:
     total_rows = len(df)
@@ -311,7 +311,7 @@ def insert_bulk(
         )
 
         def do_insert() -> None:
-            with database_connection.engine.begin() as conn:
+            with pgdb.engine.begin() as conn:
                 _copy_chunk(chunk, table_name, conn)
 
         _with_deadlock_retry(do_insert)
@@ -323,7 +323,7 @@ def insert_bulk(
 def upsert_df(
     df: pd.DataFrame,
     table_name: str,
-    database_connection: Connection,
+    pgdb: Connection,
     key_columns: list[str],
     insert_columns: list[str],
     return_rows: bool = False,
@@ -342,7 +342,7 @@ def upsert_df(
         The DataFrame to be upserted.
     table_name : str
         The name of the target table.
-    database_connection : Connection
+    pgdb : Connection
         The SQLAlchemy Engine to use.
     schema : str, optional
         The name of the schema containing the target table.
@@ -368,7 +368,7 @@ def upsert_df(
             "because DO NOTHING doesn't guarantee the returned rows were actually inserted"
         )
 
-    raw_conn = database_connection.engine.raw_connection()
+    raw_conn = pgdb.engine.raw_connection()
 
     if "crawled_date" in df.columns and df["crawled_date"].isna().all():
         df["crawled_date"] = pd.to_datetime(df["crawled_date"]).dt.date
@@ -469,7 +469,7 @@ def upsert_df(
     return return_df
 
 
-def clean_app_ranks_weekly_table(database_connection: PostgresCon) -> None:
+def clean_app_ranks_weekly_table(pgdb: PostgresEngine) -> None:
     batch_size = 100000
     del_query = text(
         f"""
@@ -482,9 +482,7 @@ def clean_app_ranks_weekly_table(database_connection: PostgresCon) -> None:
         )
     """
     )
-    with database_connection.engine.connect().execution_options(
-        isolation_level="AUTOCOMMIT"
-    ) as conn:
+    with pgdb.engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
         while True:
             result = conn.execute(del_query)
             rows_affected = result.rowcount
@@ -497,7 +495,7 @@ def delete_and_insert(
     df: pd.DataFrame,
     table_name: str,
     schema: str | None,
-    database_connection: Connection,
+    pgdb: Connection,
     insert_columns: list[str],
     delete_by_keys: list[str],
     delete_keys_have_duplicates: bool = False,
@@ -512,7 +510,7 @@ def delete_and_insert(
 
     keys_df = prepare_for_psycopg(keys_df)
 
-    raw_conn = database_connection.engine.raw_connection()
+    raw_conn = pgdb.engine.raw_connection()
     table_identifier = Identifier(table_name)
     if schema:
         table_identifier = Composed([Identifier(schema), SQL("."), table_identifier])
@@ -539,25 +537,25 @@ def delete_and_insert(
         df=df,
         insert_columns=insert_columns,
         table_name=table_name,
-        database_connection=database_connection,
+        pgdb=pgdb,
         schema=schema,
     )
 
 
 @lru_cache(maxsize=1)
-def query_all_developers(database_connection: PostgresCon) -> pd.DataFrame:
+def query_all_developers(pgdb: PostgresEngine) -> pd.DataFrame:
     """Query all developers from the database."""
     sel_query = """SELECT 
      id, store, developer_id
      FROM developers
      ;
     """
-    df = pd.read_sql(sel_query, database_connection.engine)
+    df = pd.read_sql(sel_query, pgdb.engine)
     return df
 
 
 def query_developers(
-    database_connection: PostgresCon,
+    pgdb: PostgresEngine,
     store: int,
     limit: int = 1000,
 ) -> pd.DataFrame:
@@ -588,7 +586,7 @@ def query_developers(
         limit {limit}
         ;
         """
-    df = pd.read_sql(sel_query, database_connection.engine)
+    df = pd.read_sql(sel_query, pgdb.engine)
     logger.info(f"Query developers {store=} returning rows:{df.shape[0]:,}")
     return df
 
@@ -597,7 +595,7 @@ def insert_version_code(
     version_str: str,
     store_app: int,
     crawl_result: int,
-    database_connection: PostgresCon,
+    pgdb: PostgresEngine,
     apk_hash: str | None = None,
     return_rows: bool = False,
 ) -> pd.DataFrame | None:
@@ -612,7 +610,7 @@ def insert_version_code(
         ]
     )
     try:
-        log_download_crawl_results(version_code_df, database_connection)
+        log_download_crawl_results(version_code_df, pgdb)
     except Exception as e:
         logger.error(f"{store_app=} {version_str=} {crawl_result=} {apk_hash=} {e=}")
         raise e
@@ -620,7 +618,7 @@ def insert_version_code(
     upserted: pd.DataFrame = upsert_df(
         df=version_code_df,
         table_name="version_codes",
-        database_connection=database_connection,
+        pgdb=pgdb,
         key_columns=["store_app", "version_code"],
         return_rows=return_rows,
         insert_columns=["store_app", "version_code", "crawl_result", "apk_hash"],
@@ -634,24 +632,20 @@ def insert_version_code(
     return upserted
 
 
-def log_download_crawl_results(
-    df: pd.DataFrame, database_connection: PostgresCon
-) -> None:
+def log_download_crawl_results(df: pd.DataFrame, pgdb: PostgresEngine) -> None:
     insert_columns = ["store_app", "version_code", "crawl_result"]
     df["version_code"] = df["version_code"].fillna("-1")
     df = df[insert_columns]
     df.to_sql(
         name="store_app_downloads",
         schema="logging",
-        con=database_connection.engine,
+        con=pgdb.engine,
         if_exists="append",
         index=False,
     )
 
 
-def log_creative_scan_results(
-    df: pd.DataFrame, database_connection: PostgresCon
-) -> None:
+def log_creative_scan_results(df: pd.DataFrame, pgdb: PostgresEngine) -> None:
     my_columns = [
         "url",
         "tld_url",
@@ -668,7 +662,7 @@ def log_creative_scan_results(
     df.to_sql(
         name="creative_scan_results",
         schema="logging",
-        con=database_connection.engine,
+        con=pgdb.engine,
         if_exists="append",
         index=False,
     )
@@ -678,7 +672,7 @@ def log_version_code_scan_crawl_results(
     store_app: int,
     md5_hash: str,
     crawl_result: int,
-    database_connection: PostgresCon,
+    pgdb: PostgresEngine,
     version_code_id: int | None = None,
 ) -> None:
     df = pd.DataFrame(
@@ -692,7 +686,7 @@ def log_version_code_scan_crawl_results(
     df.to_sql(
         name="version_code_api_scan_results",
         schema="logging",
-        con=database_connection.engine,
+        con=pgdb.engine,
         if_exists="append",
         index=False,
     )
@@ -700,7 +694,7 @@ def log_version_code_scan_crawl_results(
 
 
 def query_latest_api_scan_by_store_id(
-    store_ids: list[str], database_connection: PostgresCon
+    store_ids: list[str], pgdb: PostgresEngine
 ) -> pd.DataFrame:
     store_ids_str = "'" + "','".join(store_ids) + "'"
     sel_query = text(
@@ -722,13 +716,13 @@ def query_latest_api_scan_by_store_id(
             ;
     """
     )
-    df = pd.read_sql(sel_query, database_connection.engine)
+    df = pd.read_sql(sel_query, pgdb.engine)
     return df
 
 
 def upsert_sdk_details_df(
     details_df: pd.DataFrame,
-    database_connection: PostgresCon,
+    pgdb: PostgresEngine,
     store_id: str,
     raw_txt_str: str,
 ) -> None:
@@ -746,7 +740,7 @@ def upsert_sdk_details_df(
     version_strings_df = upsert_df(
         df=strings_df,
         table_name="version_strings",
-        database_connection=database_connection,
+        pgdb=pgdb,
         key_columns=key_insert_columns,
         insert_columns=key_insert_columns,
         return_rows=True,
@@ -772,14 +766,14 @@ def upsert_sdk_details_df(
         insert_columns=insert_columns,
         df=strings_map_df,
         key_columns=insert_columns,
-        database_connection=database_connection,
+        pgdb=pgdb,
     )
     strings_map_df["manifest_string"] = raw_txt_str
     manifest_df = strings_map_df[["version_code", "manifest_string"]].drop_duplicates()
     upsert_df(
         df=manifest_df,
         table_name="version_manifests",
-        database_connection=database_connection,
+        pgdb=pgdb,
         key_columns=["version_code"],
         insert_columns=["version_code", "manifest_string"],
     )
@@ -788,7 +782,7 @@ def upsert_sdk_details_df(
 
 @lru_cache(maxsize=2)
 def query_store_id_map_cached(
-    database_connection: PostgresCon,
+    pgdb: PostgresEngine,
     store: int | None,
 ) -> pd.DataFrame:
     where_statement = ""
@@ -801,12 +795,12 @@ def query_store_id_map_cached(
         {where_statement}
         ;
         """
-    df = pd.read_sql(sel_query, database_connection.engine)
+    df = pd.read_sql(sel_query, pgdb.engine)
     return df
 
 
 def query_store_id_map(
-    database_connection: PostgresCon,
+    pgdb: PostgresEngine,
     store: int | None = None,
     store_ids: list[str] | None = None,
 ) -> pd.DataFrame:
@@ -827,34 +821,34 @@ def query_store_id_map(
         {where_statement}
         ;
         """
-    df = pd.read_sql(sel_query, database_connection.engine)
+    df = pd.read_sql(sel_query, pgdb.engine)
     return df
 
 
-def query_collections(database_connection: PostgresCon) -> pd.DataFrame:
+def query_collections(pgdb: PostgresEngine) -> pd.DataFrame:
     sel_query = """SELECT
         *
         FROM
         store_collections
         ;
         """
-    df = pd.read_sql(sel_query, database_connection.engine)
+    df = pd.read_sql(sel_query, pgdb.engine)
     return df
 
 
-def query_categories(database_connection: PostgresCon) -> pd.DataFrame:
+def query_categories(pgdb: PostgresEngine) -> pd.DataFrame:
     sel_query = """SELECT
         *
         FROM
         store_categories
         ;
         """
-    df = pd.read_sql(sel_query, database_connection.engine)
+    df = pd.read_sql(sel_query, pgdb.engine)
     return df
 
 
 @lru_cache(maxsize=1)
-def query_countries(database_connection: PostgresCon) -> pd.DataFrame:
+def query_countries(pgdb: PostgresEngine) -> pd.DataFrame:
     sel_query = """SELECT
         c.*, t.tier_slug as tier
         FROM
@@ -862,12 +856,12 @@ def query_countries(database_connection: PostgresCon) -> pd.DataFrame:
         LEFT JOIN public.tiers t on c.tier_id = t.id
         ;
         """
-    df = pd.read_sql(sel_query, database_connection.engine)
+    df = pd.read_sql(sel_query, pgdb.engine)
     return df
 
 
 @lru_cache(maxsize=1)
-def query_companies(database_connection: PostgresCon) -> pd.DataFrame:
+def query_companies(pgdb: PostgresEngine) -> pd.DataFrame:
     sel_query = """SELECT
         c.id as company_id,
         c.name as company_name,
@@ -882,37 +876,37 @@ def query_companies(database_connection: PostgresCon) -> pd.DataFrame:
         where c.id > 0
         ;
         """
-    df = pd.read_sql(sel_query, database_connection.engine)
+    df = pd.read_sql(sel_query, pgdb.engine)
     return df
 
 
 def update_company_logo_url(
-    company_id: int, logo_url: str, database_connection: PostgresCon
+    company_id: int, logo_url: str, pgdb: PostgresEngine
 ) -> None:
     update_query = """UPDATE adtech.companies SET logo_url = %s WHERE id = %s"""
-    with database_connection.get_cursor() as cur:
+    with pgdb.get_cursor() as cur:
         cur.execute(update_query, (logo_url, company_id))
 
 
 @lru_cache(maxsize=1)
-def query_languages(database_connection: PostgresCon) -> pd.DataFrame:
+def query_languages(pgdb: PostgresEngine) -> pd.DataFrame:
     sel_query = """SELECT
         *
         FROM
         languages
         ;
         """
-    df = pd.read_sql(sel_query, database_connection.engine)
+    df = pd.read_sql(sel_query, pgdb.engine)
     return df
 
 
 def query_store_ids(
-    database_connection: PostgresCon,
+    pgdb: PostgresEngine,
     store: int,
     store_ids: list[str] | None = None,
 ) -> list[str]:
     df = query_store_id_map(
-        database_connection=database_connection,
+        pgdb=pgdb,
         store=store,
         store_ids=store_ids,
     )
@@ -925,7 +919,7 @@ def query_store_ids(
 
 
 def query_pub_domains_to_crawl_ads_txt(
-    database_connection: PostgresCon,
+    pgdb: PostgresEngine,
     limit: None | int = 10000,
     exclude_recent_days: int = 2,
 ) -> pd.DataFrame:
@@ -962,46 +956,42 @@ def query_pub_domains_to_crawl_ads_txt(
         {limit_str}
         ; 
         """
-    df = pd.read_sql(sel_query, database_connection.engine)
+    df = pd.read_sql(sel_query, pgdb.engine)
     return df
 
 
 @lru_cache(maxsize=1)
-def query_urls_hash_map_cached(database_connection: PostgresCon) -> pd.DataFrame:
+def query_urls_hash_map_cached(pgdb: PostgresEngine) -> pd.DataFrame:
     """
     Get URL IDs and hashes from the urls table.
     Returns DataFrame with columns: url_id, url
     """
     sel_query = """SELECT id, url_hash FROM adtech.urls"""
-    df = pd.read_sql(sel_query, database_connection.engine)
+    df = pd.read_sql(sel_query, pgdb.engine)
     df = df.rename(columns={"id": "url_id"})
     return df
 
 
-def query_urls_by_hashes(
-    hashes: list[str], database_connection: PostgresCon
-) -> pd.DataFrame:
+def query_urls_by_hashes(hashes: list[str], pgdb: PostgresEngine) -> pd.DataFrame:
     hashes_tuple = tuple(hashes)
     if not hashes_tuple:
         return pd.DataFrame(columns=["id", "url_hash"])
-    return _query_urls_by_hashes_cached(hashes_tuple, database_connection)
+    return _query_urls_by_hashes_cached(hashes_tuple, pgdb)
 
 
 @lru_cache(maxsize=1000)
 def _query_urls_by_hashes_cached(
-    hashes: tuple[str, ...], database_connection: PostgresCon
+    hashes: tuple[str, ...], pgdb: PostgresEngine
 ) -> pd.DataFrame:
     sel_query = text(
         """SELECT id, url_hash FROM adtech.urls WHERE url_hash IN :hashes"""
     ).bindparams(bindparam("hashes", expanding=True))
-    df = pd.read_sql(sel_query, database_connection.engine, params={"hashes": hashes})
+    df = pd.read_sql(sel_query, pgdb.engine, params={"hashes": hashes})
     return df
 
 
 @lru_cache(maxsize=1000)
-def get_click_url_redirect_chains(
-    run_id: int, database_connection: PostgresCon
-) -> pd.DataFrame:
+def get_click_url_redirect_chains(run_id: int, pgdb: PostgresEngine) -> pd.DataFrame:
     sel_query = f"""SELECT
         urc.api_call_id,
         urc.hop_index,
@@ -1016,15 +1006,15 @@ def get_click_url_redirect_chains(
     WHERE
         urc.run_id = {run_id}
     """
-    df = pd.read_sql(sel_query, database_connection.engine)
+    df = pd.read_sql(sel_query, pgdb.engine)
     return df
 
 
-def delete_app_url_mapping(app_url_id: int, database_connection: PostgresCon) -> None:
+def delete_app_url_mapping(app_url_id: int, pgdb: PostgresEngine) -> None:
     del_query = "DELETE FROM app_urls_map WHERE id = %s"
     logger.info(f"{app_url_id=} delete app_urls_map start")
     try:
-        with database_connection.get_cursor() as cur:
+        with pgdb.get_cursor() as cur:
             cur.execute(del_query, (app_url_id,))
         logger.info(f"{app_url_id=} delete app_urls_map completed successfully")
     except Exception as e:
@@ -1033,9 +1023,9 @@ def delete_app_url_mapping(app_url_id: int, database_connection: PostgresCon) ->
 
 
 @lru_cache(maxsize=1)
-def get_store_app_columns(database_connection: PostgresCon) -> list[str]:
+def get_store_app_columns(pgdb: PostgresEngine) -> list[str]:
     sel_query = """SELECT * FROM store_apps LIMIT 1"""
-    df = pd.read_sql(sel_query, database_connection.engine)
+    df = pd.read_sql(sel_query, pgdb.engine)
     columns = df.columns.tolist()
     # Auto generated columns
     columns = [
@@ -1046,20 +1036,20 @@ def get_store_app_columns(database_connection: PostgresCon) -> list[str]:
     return columns
 
 
-def check_mv_exists(database_connection: PostgresCon, mv_name: str) -> bool:
+def check_mv_exists(pgdb: PostgresEngine, mv_name: str) -> bool:
     query = f"""
         SELECT relispopulated
         FROM pg_class
         WHERE relname = '{mv_name}';
     """
-    with database_connection.get_cursor() as cur:
+    with pgdb.get_cursor() as cur:
         cur.execute(query)
         row = cur.fetchone()
     return row[0] if row is not None else False
 
 
 def get_crawl_scenario_countries(
-    database_connection: PostgresCon, scenario_name: str
+    pgdb: PostgresEngine, scenario_name: str
 ) -> pd.DataFrame:
     query = f"""SELECT c.alpha2 as country_code, cc.priority
         FROM public.crawl_scenario_country_config cc
@@ -1069,12 +1059,12 @@ def get_crawl_scenario_countries(
           AND cc.enabled = true
         ORDER BY cc.priority;
     """
-    df = pd.read_sql(query, database_connection.engine)
+    df = pd.read_sql(query, pgdb.engine)
     return df
 
 
 def insert_any_user_requested_apps(
-    database_connection: PostgresCon, last_ts: datetime.datetime
+    pgdb: PostgresEngine, last_ts: datetime.datetime
 ) -> None:
     """Insert new ids, usually from android app."""
     insert_query = text(
@@ -1090,12 +1080,12 @@ def insert_any_user_requested_apps(
         """
     )
 
-    with database_connection.engine.begin() as conn:
+    with pgdb.engine.begin() as conn:
         conn.execute(insert_query, {"last_ts": last_ts})
 
 
 def query_store_apps_to_update(
-    database_connection: PostgresCon,
+    pgdb: PostgresEngine,
     store: int,
     country_priority_group: int,
     log_query: bool = False,
@@ -1117,7 +1107,7 @@ def query_store_apps_to_update(
     )
     year_ago_ts = datetime.datetime.now(tz=datetime.UTC) - datetime.timedelta(days=365)
     if country_priority_group == -1:
-        insert_any_user_requested_apps(database_connection, long_update_ts)
+        insert_any_user_requested_apps(pgdb, long_update_ts)
     params = {
         "store": store,
         "country_crawl_priority": country_priority_group,
@@ -1139,12 +1129,12 @@ def query_store_apps_to_update(
     if log_query:
         # Compile and print the query with parameters
         compiled_query = query.bindparams(**params).compile(
-            database_connection.engine, compile_kwargs={"literal_binds": True}
+            pgdb.engine, compile_kwargs={"literal_binds": True}
         )
         logger.info(f"Executing query:\n{compiled_query}")
     df = pd.read_sql(
         query,
-        con=database_connection.engine,
+        con=pgdb.engine,
         params=params,
         dtype={"store_app": int, "store": int, "store_id": str},
     )
@@ -1153,13 +1143,13 @@ def query_store_apps_to_update(
 
 
 def query_keywords_to_crawl(
-    database_connection: PostgresCon,
+    pgdb: PostgresEngine,
     limit: int,
 ) -> pd.DataFrame:
     df = pd.read_sql(
         QUERY_KEYWORDS_TO_CRAWL,
         params={"mylimit": limit},
-        con=database_connection.engine,
+        con=pgdb.engine,
     )
     return df
 
@@ -1168,7 +1158,7 @@ def query_all(
     table_name: str,
     key_cols: list[str] | str,
     df: pd.DataFrame,
-    database_connection: PostgresCon,
+    pgdb: PostgresEngine,
 ) -> pd.DataFrame:
     if isinstance(key_cols, str):
         key_cols = [key_cols]
@@ -1188,68 +1178,62 @@ def query_all(
     WHERE {where_str}
     """
     # logger.info(sel_query)
-    df = pd.read_sql(sel_query, database_connection.engine)
+    df = pd.read_sql(sel_query, pgdb.engine)
     return df
 
 
 def query_apps_to_download(
-    database_connection: PostgresCon,
+    pgdb: PostgresEngine,
     store: int,
 ) -> pd.DataFrame:
     df = pd.read_sql(
         QUERY_APPS_TO_DOWNLOAD,
-        con=database_connection.engine,
+        con=pgdb.engine,
         params={"store": store},
     )
     return df
 
 
-def query_zscores(database_connection: PostgresCon, target_week: str) -> pd.DataFrame:
+def query_zscores(pgdb: PostgresEngine, target_week: str) -> pd.DataFrame:
     df = pd.read_sql(
         QUERY_REPORT_ZSCORES,
-        con=database_connection.engine,
+        con=pgdb.engine,
         params={"target_week": target_week},
     )
     return df
 
 
 @lru_cache(maxsize=1)
-def query_sdk_keys(database_connection: PostgresCon) -> pd.DataFrame:
+def query_sdk_keys(pgdb: PostgresEngine) -> pd.DataFrame:
     sel_query = """SELECT * FROM ad_network_sdk_keys;"""
     df = pd.read_sql(
         sel_query,
-        con=database_connection.engine,
+        con=pgdb.engine,
     )
     return df
 
 
 def query_apps_to_sdk_scan(
-    database_connection: PostgresCon,
+    pgdb: PostgresEngine,
     store: int,
 ) -> pd.DataFrame:
     df = pd.read_sql(
         QUERY_APPS_TO_SDK_SCAN,
-        con=database_connection.engine,
+        con=pgdb.engine,
         params={"store": store},
     )
     return df
 
 
 def query_all_apps_to_process(
-    database_connection: PostgresCon,
+    pgdb: PostgresEngine,
 ) -> None:
-    download_df = query_apps_to_download(
-        database_connection=database_connection, store=1
-    )
-    sdk_df = query_apps_to_sdk_scan(database_connection=database_connection, store=1)
-    api_df = query_apps_to_api_scan(database_connection=database_connection, store=1)
+    download_df = query_apps_to_download(pgdb=pgdb, store=1)
+    sdk_df = query_apps_to_sdk_scan(pgdb=pgdb, store=1)
+    api_df = query_apps_to_api_scan(pgdb=pgdb, store=1)
 
-    ipa_download_df = query_apps_to_download(
-        database_connection=database_connection, store=2
-    )
-    ipa_sdk_df = query_apps_to_sdk_scan(
-        database_connection=database_connection, store=2
-    )
+    ipa_download_df = query_apps_to_download(pgdb=pgdb, store=2)
+    ipa_sdk_df = query_apps_to_sdk_scan(pgdb=pgdb, store=2)
 
     android_downloads = download_df.shape[0]
     android_sdks = sdk_df.shape[0]
@@ -1263,40 +1247,38 @@ def query_all_apps_to_process(
     return
 
 
-def query_apps_to_api_scan(
-    database_connection: PostgresCon, store: int
-) -> pd.DataFrame:
+def query_apps_to_api_scan(pgdb: PostgresEngine, store: int) -> pd.DataFrame:
     df = pd.read_sql(
         QUERY_APPS_TO_API_SCAN,
-        con=database_connection.engine,
+        con=pgdb.engine,
         params={"store": store},
     )
     return df
 
 
 def query_apps_to_process_keywords(
-    database_connection: PostgresCon, limit: int = 10000
+    pgdb: PostgresEngine, limit: int = 10000
 ) -> pd.DataFrame:
     """Query apps to process keywords."""
     df = pd.read_sql(
         QUERY_APPS_TO_PROCESS_KEYWORDS,
-        con=database_connection.engine,
+        con=pgdb.engine,
         params={"mylimit": limit},
     )
     return df
 
 
-def query_apps_mitm_in_s3(database_connection: PostgresCon) -> pd.DataFrame:
+def query_apps_mitm_in_s3(pgdb: PostgresEngine) -> pd.DataFrame:
     df = pd.read_sql(
         QUERY_APPS_MITM_IN_S3,
-        con=database_connection.engine,
+        con=pgdb.engine,
     )
     return df
 
 
 @lru_cache(maxsize=2)
 def query_api_calls_to_creative_scan(
-    database_connection: PostgresCon, recent_months: bool = False
+    pgdb: PostgresEngine, recent_months: bool = False
 ) -> pd.DataFrame:
     earliest_date = (datetime.datetime.now() - datetime.timedelta(days=365)).strftime(
         "%Y-%m-%d"
@@ -1307,39 +1289,39 @@ def query_api_calls_to_creative_scan(
         ).strftime("%Y-%m-%d")
     df = pd.read_sql(
         QUERY_API_CALLS_TO_CREATIVE_SCAN,
-        con=database_connection.engine,
+        con=pgdb.engine,
         params={"earliest_date": earliest_date},
     )
     return df
 
 
 @lru_cache(maxsize=1)
-def query_creative_assets(database_connection: PostgresCon) -> pd.DataFrame:
+def query_creative_assets(pgdb: PostgresEngine) -> pd.DataFrame:
     sel_query = """SELECT
         *
         FROM
         creative_assets
         ;
         """
-    df = pd.read_sql(sel_query, con=database_connection.engine)
+    df = pd.read_sql(sel_query, con=pgdb.engine)
     return df
 
 
-def query_creative_records(database_connection: PostgresCon) -> pd.DataFrame:
+def query_creative_records(pgdb: PostgresEngine) -> pd.DataFrame:
     df = pd.read_sql(
         """SELECT 
           DISTINCT 
           pub_store_id, csr.run_id 
         FROM 
         logging.creative_scan_results csr""",
-        con=database_connection.engine,
+        con=pgdb.engine,
     )
     return df
 
 
 def query_all_store_app_descriptions(
     language_slug: str,
-    database_connection: PostgresCon,
+    pgdb: PostgresEngine,
 ) -> pd.DataFrame:
     sel_query = f"""SELECT
     DISTINCT ON (store_app)
@@ -1351,24 +1333,24 @@ def query_all_store_app_descriptions(
         ORDER BY store_app, updated_at desc
     ;
     """
-    df = pd.read_sql(sel_query, con=database_connection.engine)
+    df = pd.read_sql(sel_query, con=pgdb.engine)
     return df
 
 
 @lru_cache(maxsize=1)
-def query_all_domains(database_connection: PostgresCon) -> pd.DataFrame:
+def query_all_domains(pgdb: PostgresEngine) -> pd.DataFrame:
     sel_query = """SELECT
         *
         FROM
         domains
         ;
         """
-    df = pd.read_sql(sel_query, con=database_connection.engine)
+    df = pd.read_sql(sel_query, con=pgdb.engine)
     return df
 
 
 @lru_cache(maxsize=1)
-def query_ad_domains(database_connection: PostgresCon) -> pd.DataFrame:
+def query_ad_domains(pgdb: PostgresEngine) -> pd.DataFrame:
     sel_query = """WITH all_ad_domains AS (
              SELECT DISTINCT d.id AS domain_id, ad_domain AS domain_name 
              FROM adtech.combined_store_apps_companies csac
@@ -1383,12 +1365,12 @@ def query_ad_domains(database_connection: PostgresCon) -> pd.DataFrame:
              SELECT domain_id, domain_name FROM all_ad_domains
              ;
              """
-    df = pd.read_sql(sel_query, con=database_connection.engine)
+    df = pd.read_sql(sel_query, con=pgdb.engine)
     return df
 
 
 @lru_cache(maxsize=1)
-def query_keywords_base(database_connection: PostgresCon) -> pd.DataFrame:
+def query_keywords_base(pgdb: PostgresEngine) -> pd.DataFrame:
     sel_query = """SELECT
     k.id as keyword_id, k.keyword_text
     FROM
@@ -1397,25 +1379,25 @@ def query_keywords_base(database_connection: PostgresCon) -> pd.DataFrame:
         k.id = kb.keyword_id
     ;
     """
-    df = pd.read_sql(sel_query, con=database_connection.engine)
+    df = pd.read_sql(sel_query, con=pgdb.engine)
     return df
 
 
 @lru_cache(maxsize=1000)
 def query_store_app_by_store_id_cached(
-    database_connection: PostgresCon,
+    pgdb: PostgresEngine,
     store_id: str,
     case_insensitive: bool = False,
 ) -> int:
     return query_store_app_by_store_id(
-        database_connection=database_connection,
+        pgdb=pgdb,
         store_id=store_id,
         case_insensitive=case_insensitive,
     )
 
 
 def query_store_app_by_store_id(
-    database_connection: PostgresCon,
+    pgdb: PostgresEngine,
     store_id: str,
     case_insensitive: bool = False,
 ) -> int:
@@ -1423,7 +1405,7 @@ def query_store_app_by_store_id(
         sel_query = f"""SELECT * FROM store_apps WHERE store_id ILIKE '{store_id}'"""
     else:
         sel_query = f"""SELECT * FROM store_apps WHERE store_id = '{store_id}'"""
-    df = pd.read_sql(sel_query, con=database_connection.engine)
+    df = pd.read_sql(sel_query, con=pgdb.engine)
     if df.empty:
         raise ValueError(f"Store id {store_id} not found")
     try:
@@ -1434,7 +1416,7 @@ def query_store_app_by_store_id(
 
 
 def get_version_codes_full_history(
-    database_connection: PostgresCon, store_ids: list[str]
+    pgdb: PostgresEngine, store_ids: list[str]
 ) -> pd.DataFrame:
     sel_query = """SELECT vc.*, sa.store_id, sa.name as app_name FROM version_codes vc
     LEFT JOIN store_apps sa ON
@@ -1442,21 +1424,21 @@ def get_version_codes_full_history(
     WHERE sa.store_id IN ({})""".format(
         ", ".join([f"'{store_id}'" for store_id in store_ids])
     )
-    df = pd.read_sql(sel_query, con=database_connection.engine)
+    df = pd.read_sql(sel_query, con=pgdb.engine)
     return df
 
 
 def get_version_code_dbid(
-    store_app: int, version_code: str, database_connection: PostgresCon
+    store_app: int, version_code: str, pgdb: PostgresEngine
 ) -> int | None:
     sel_query = f"""SELECT * FROM version_codes WHERE store_app = {store_app} AND version_code = '{version_code}'"""
-    df = pd.read_sql(sel_query, con=database_connection.engine)
+    df = pd.read_sql(sel_query, con=pgdb.engine)
     if df.empty:
         df = insert_version_code(
             version_str=version_code,
             store_app=store_app,
             crawl_result=4,
-            database_connection=database_connection,
+            pgdb=pgdb,
             return_rows=True,
         )
         return None
@@ -1469,7 +1451,7 @@ def get_version_code_dbid(
         raise
 
 
-def get_failed_mitm_logs(database_connection: PostgresCon) -> pd.DataFrame:
+def get_failed_mitm_logs(pgdb: PostgresEngine) -> pd.DataFrame:
     sel_query = """WITH last_run_result AS (SELECT DISTINCT ON (run_id)
       run_id, pub_store_id, error_msg, inserted_at
         FROM logging.creative_scan_results 
@@ -1480,12 +1462,12 @@ def get_failed_mitm_logs(database_connection: PostgresCon) -> pd.DataFrame:
           WHERE error_msg like 'CRITICAL %%'
         ;
     """
-    df = pd.read_sql(sel_query, con=database_connection.engine)
+    df = pd.read_sql(sel_query, con=pgdb.engine)
     return df
 
 
 def get_version_code_by_md5_hash(
-    database_connection: PostgresCon, md5_hash: str, store_id: str
+    pgdb: PostgresEngine, md5_hash: str, store_id: str
 ) -> int | None:
     sel_query = f"""SELECT * FROM version_codes vc
     LEFT JOIN store_apps sa ON
@@ -1494,7 +1476,7 @@ def get_version_code_by_md5_hash(
     AND vc.crawl_result = 1
     ;
     """
-    df = pd.read_sql(sel_query, con=database_connection.engine)
+    df = pd.read_sql(sel_query, con=pgdb.engine)
     if df.empty:
         return None
     try:
@@ -1505,8 +1487,8 @@ def get_version_code_by_md5_hash(
 
 
 @lru_cache(maxsize=1000)
-def query_api_call_id_for_uuid(mitm_uuid: str, database_connection: PostgresCon) -> int:
-    api_calls = query_api_calls_id_uuid_map(database_connection)
+def query_api_call_id_for_uuid(mitm_uuid: str, pgdb: PostgresEngine) -> int:
+    api_calls = query_api_calls_id_uuid_map(pgdb)
     filtered_df = api_calls[api_calls["mitm_uuid"] == mitm_uuid]
     assert filtered_df.shape[0] == 1, "Failed to find api_call_id for mitm_uuid"
     api_call_id: int = filtered_df["api_call_id"].to_numpy()[0]
@@ -1514,24 +1496,24 @@ def query_api_call_id_for_uuid(mitm_uuid: str, database_connection: PostgresCon)
 
 
 @lru_cache(maxsize=1)
-def query_api_calls_id_uuid_map(database_connection: PostgresCon) -> pd.DataFrame:
+def query_api_calls_id_uuid_map(pgdb: PostgresEngine) -> pd.DataFrame:
     sel_query = """SELECT id, mitm_uuid FROM api_calls"""
-    df = pd.read_sql(sel_query, con=database_connection.engine)
+    df = pd.read_sql(sel_query, con=pgdb.engine)
     df["mitm_uuid"] = df["mitm_uuid"].astype(str)
     df = df.rename(columns={"id": "api_call_id"})
     return df
 
 
 def query_api_calls_for_mitm_uuids(
-    database_connection: PostgresCon, mitm_uuids: list[str]
+    pgdb: PostgresEngine, mitm_uuids: list[str]
 ) -> pd.DataFrame:
-    api_calls = query_api_calls_id_uuid_map(database_connection)
+    api_calls = query_api_calls_id_uuid_map(pgdb)
     filtered_df = api_calls[api_calls["mitm_uuid"].isin(mitm_uuids)]
     return filtered_df
 
 
 @lru_cache(maxsize=1)
-def get_all_mmp_tlds(database_connection: PostgresCon) -> pd.DataFrame:
+def get_all_mmp_tlds(pgdb: PostgresEngine) -> pd.DataFrame:
     sel_query = """SELECT
                 c.id,
                 name,
@@ -1549,11 +1531,11 @@ def get_all_mmp_tlds(database_connection: PostgresCon) -> pd.DataFrame:
                 AND c.id != -2
             ;
             """
-    df = pd.read_sql(sel_query, con=database_connection.engine)
+    df = pd.read_sql(sel_query, con=pgdb.engine)
     return df
 
 
-def get_retention_benchmarks(database_connection: PostgresCon) -> pd.DataFrame:
+def get_retention_benchmarks(pgdb: PostgresEngine) -> pd.DataFrame:
     sel_query = """WITH 
          retention_benchmarks AS (
              SELECT
@@ -1597,11 +1579,11 @@ def get_retention_benchmarks(database_connection: PostgresCon) -> pd.DataFrame:
              retention_benchmarks
     ;
     """
-    df = pd.read_sql(sel_query, con=database_connection.engine)
+    df = pd.read_sql(sel_query, con=pgdb.engine)
     return df
 
 
-def get_ecpm_benchmarks(database_connection: PostgresCon) -> pd.DataFrame:
+def get_ecpm_benchmarks(pgdb: PostgresEngine) -> pd.DataFrame:
     sel_query = """SELECT 
         store, tier_slug, af."name" ad_format, ecpm 
     FROM public.ecpm_benchmarks eb
@@ -1609,12 +1591,12 @@ def get_ecpm_benchmarks(database_connection: PostgresCon) -> pd.DataFrame:
     LEFT JOIN adtech.ad_formats af ON eb.ad_format_id = af.id
         ;
     """
-    df = pd.read_sql(sel_query, con=database_connection.engine)
+    df = pd.read_sql(sel_query, con=pgdb.engine)
     return df
 
 
 def delete_app_metrics_by_date_and_apps(
-    database_connection: PostgresCon,
+    pgdb: PostgresEngine,
     delete_from_date: datetime.date,
     store_apps: list[int],
     table_name: str,
@@ -1631,9 +1613,7 @@ def delete_app_metrics_by_date_and_apps(
             AND acmh.store_app = ANY(:store_apps)
     """
     )
-    with database_connection.engine.connect().execution_options(
-        isolation_level="AUTOCOMMIT"
-    ) as conn:
+    with pgdb.engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
         result = conn.execute(
             del_query,
             {
@@ -1647,7 +1627,7 @@ def delete_app_metrics_by_date_and_apps(
 
 
 def query_store_app_categories(
-    database_connection: PostgresCon, store_apps: list[int]
+    pgdb: PostgresEngine, store_apps: list[int]
 ) -> pd.DataFrame:
     """Get store app category map."""
     store_apps_tuple = tuple(store_apps)
@@ -1663,14 +1643,14 @@ def query_store_app_categories(
     ).bindparams(bindparam("store_apps", expanding=True))
     df = pd.read_sql(
         sel_query,
-        con=database_connection.engine,
+        con=pgdb.engine,
         params={"store_apps": store_apps_tuple},
     )
     return df
 
 
 @lru_cache(maxsize=2)
-def query_live_apps(database_connection: PostgresCon, store: int) -> pd.DataFrame:
+def query_live_apps(pgdb: PostgresEngine, store: int) -> pd.DataFrame:
     sel_query = f"""SELECT
             id, store, store_id
         FROM
@@ -1681,5 +1661,5 @@ def query_live_apps(database_connection: PostgresCon, store: int) -> pd.DataFram
             OR
             crawl_result = 1)
         ;"""
-    df = pd.read_sql(sel_query, con=database_connection.engine)
+    df = pd.read_sql(sel_query, con=pgdb.engine)
     return df

@@ -8,7 +8,7 @@ import requests
 import tldextract
 
 from .config import DEVLEOPER_IGNORE_TLDS, get_logger
-from .dbcon.connection import PostgresCon
+from .dbcon.connection import PostgresEngine
 from .dbcon.queries import query_pub_domains_to_crawl_ads_txt, upsert_df
 
 """
@@ -260,17 +260,15 @@ def clean_raw_txt_df(txt_df: pd.DataFrame) -> pd.DataFrame:
     return txt_df
 
 
-def crawl_app_ads(database_connection: PostgresCon, limit: int | None = 5000) -> None:
+def crawl_app_ads(pgdb: PostgresEngine, limit: int | None = 5000) -> None:
     df = query_pub_domains_to_crawl_ads_txt(
-        database_connection=database_connection, limit=limit, exclude_recent_days=7
+        pgdb=pgdb, limit=limit, exclude_recent_days=7
     )
     logger.info(f"Start crawl app-ads from pub domains: {df.shape[0]:,}")
     for _i, row in df.iterrows():
         url = row.url
         domain_id = row.id
-        scrape_app_ads_url(
-            url=url, domain_id=domain_id, database_connection=database_connection
-        )
+        scrape_app_ads_url(url=url, domain_id=domain_id, pgdb=pgdb)
     logger.info("Crawl app-ads from pub domains finished")
 
 
@@ -279,9 +277,7 @@ class ResultDict(TypedDict):
     url: str
 
 
-def scrape_app_ads_url(
-    url: str, domain_id: int, database_connection: PostgresCon
-) -> None:
+def scrape_app_ads_url(url: str, domain_id: int, pgdb: PostgresEngine) -> None:
     info = f"{url=} scrape app-ads.txt"
     logger.info(f"{info} start")
     result_dict = ResultDict(url=url, crawl_result=4)
@@ -313,7 +309,7 @@ def scrape_app_ads_url(
         df=pub_domain_df,
         insert_columns=insert_columns,
         key_columns=["domain_id"],
-        database_connection=database_connection,
+        pgdb=pgdb,
         return_rows=True,
     )
     if result_dict["crawl_result"] != 1:
@@ -325,7 +321,7 @@ def scrape_app_ads_url(
         df=found_domains,
         insert_columns=insert_columns,
         key_columns=["domain_name"],
-        database_connection=database_connection,
+        pgdb=pgdb,
         return_rows=True,
     )
     app_df = pd.merge(
@@ -357,7 +353,7 @@ def scrape_app_ads_url(
         df=app_df,
         insert_columns=insert_columns,
         key_columns=key_cols,
-        database_connection=database_connection,
+        pgdb=pgdb,
         return_rows=True,
     )
     if entrys_df is not None and not entrys_df.empty:
@@ -378,6 +374,6 @@ def scrape_app_ads_url(
             insert_columns=insert_columns,
             df=app_df_final,
             key_columns=insert_columns,
-            database_connection=database_connection,
+            pgdb=pgdb,
         )
         logger.info(f"{info} finished")

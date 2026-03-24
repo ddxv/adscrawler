@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 
 from adscrawler.config import CREATIVE_THUMBS_DIR, get_logger
-from adscrawler.dbcon.connection import PostgresCon, get_db_connection
+from adscrawler.dbcon.connection import PostgresEngine, get_db_connection
 from adscrawler.dbcon.queries import (
     log_creative_scan_results,
     query_ad_domains,
@@ -105,7 +105,7 @@ def get_video_id(row: pd.Series) -> str:
 def attribute_creatives(
     df: pd.DataFrame,
     pub_store_id: str,
-    database_connection: PostgresCon,
+    pgdb: PostgresEngine,
 ) -> tuple[pd.DataFrame, list[dict[str, Any]]]:
     """Attributes creative content to advertisers by analyzing ad network responses."""
     error_messages = []
@@ -158,7 +158,7 @@ def attribute_creatives(
                 row["error_msg"] = error_msg
                 error_messages.append(row)
                 # Send the row itself to check for advertiser there
-                ad_info, error_msg = parse_creative_request(row, database_connection)
+                ad_info, error_msg = parse_creative_request(row, pgdb)
                 found_ad_infos = [ad_info]
                 if error_msg:
                     row_copy = row.copy()
@@ -169,7 +169,7 @@ def attribute_creatives(
             else:
                 sent_video_df["pub_store_id"] = pub_store_id
                 found_ad_infos, found_error_messages = parse_sent_video_df(
-                    row, pub_store_id, sent_video_df, database_connection, video_id
+                    row, pub_store_id, sent_video_df, pgdb, video_id
                 )
             sent_video_cache[video_id] = sent_video_df
             parse_results_cache[video_id] = (found_ad_infos, found_error_messages)
@@ -251,7 +251,7 @@ def attribute_creatives(
             phash = get_phash(
                 md5_hash=md5_hash,
                 file_extension=file_extension,
-                database_connection=database_connection,
+                pgdb=pgdb,
             )
         except Exception:
             error_msg = "Found potential creative but failed to compute phash"
@@ -326,7 +326,7 @@ def upload_creatives_to_s3(adv_creatives_df: pd.DataFrame) -> None:
 def append_missing_domains(
     ad_domains_df: pd.DataFrame,
     creative_records_df: pd.DataFrame,
-    database_connection: PostgresCon,
+    pgdb: PostgresEngine,
 ) -> pd.DataFrame:
     """Adds missing ad domains to the database and returns updated domain DataFrame."""
     check_cols = ["creative_initial_domain_tld", "host_ad_network_tld"]
@@ -346,7 +346,7 @@ def append_missing_domains(
                 df=new_ad_domains,
                 insert_columns=["domain_name"],
                 key_columns=["domain_name"],
-                database_connection=database_connection,
+                pgdb=pgdb,
                 return_rows=True,
             )
             ad_domains_df = pd.concat(
@@ -396,7 +396,7 @@ def add_additional_domain_id_column(
 def make_creative_records_df(
     adv_creatives_df: pd.DataFrame,
     assets_df: pd.DataFrame,
-    database_connection: PostgresCon,
+    pgdb: PostgresEngine,
 ) -> pd.DataFrame:
     """Creates creative records DataFrame with domain IDs and asset relationships."""
     creative_records_df = adv_creatives_df.merge(
@@ -406,7 +406,7 @@ def make_creative_records_df(
         validate="m:1",
     )
     api_calls_df = query_api_calls_for_mitm_uuids(
-        database_connection=database_connection,
+        pgdb=pgdb,
         mitm_uuids=adv_creatives_df["mitm_uuid"].astype(str).tolist(),
     )
     creative_records_df = creative_records_df.merge(
@@ -415,13 +415,11 @@ def make_creative_records_df(
         how="left",
         validate="1:1",
     )
-    ad_domains_df = query_ad_domains(database_connection=database_connection)
+    ad_domains_df = query_ad_domains(pgdb=pgdb)
     # For mapping we only want the mapped domains
     ad_domains_df = ad_domains_df[~ad_domains_df["domain_id"].isna()].copy()
     ad_domains_df["domain_id"] = ad_domains_df["domain_id"].astype(int)
-    ad_domains_df = append_missing_domains(
-        ad_domains_df, creative_records_df, database_connection
-    )
+    ad_domains_df = append_missing_domains(ad_domains_df, creative_records_df, pgdb)
     creative_records_df = add_additional_domain_id_column(
         creative_records_df, ad_domains_df
     )
@@ -475,10 +473,10 @@ def make_creative_records_df(
 def parse_store_id_mitm_log(
     pub_store_id: str,
     run_id: int,
-    database_connection: PostgresCon,
+    pgdb: PostgresEngine,
 ) -> list[dict[str, Any]]:
     """Parses MITM log for a specific store ID and processes creative content."""
-    df, error_message = get_mitm_df(pub_store_id, run_id, database_connection)
+    df, error_message = get_mitm_df(pub_store_id, run_id, pgdb)
     if error_message:
         logger.error(error_message)
         error_message_info = {
@@ -487,9 +485,7 @@ def parse_store_id_mitm_log(
             "error_msg": error_message,
         }
         return [error_message_info]
-    adv_creatives_df, error_messages = attribute_creatives(
-        df, pub_store_id, database_connection
-    )
+    adv_creatives_df, error_messages = attribute_creatives(df, pub_store_id, pgdb)
     if adv_creatives_df.empty:
         if len(error_messages) == 0:
             error_msg = "No creatives or errors"
@@ -517,7 +513,7 @@ def parse_store_id_mitm_log(
     assets_df = upsert_df(
         assets_df,
         table_name="creative_assets",
-        database_connection=database_connection,
+        pgdb=pgdb,
         key_columns=["md5_hash"],
         insert_columns=["md5_hash", "file_extension", "phash"],
         return_rows=True,
@@ -525,15 +521,13 @@ def parse_store_id_mitm_log(
     assets_df = assets_df.rename(columns={"id": "creative_asset_id"})
     # Future feature
     adv_creatives_df["advertiser_domain_id"] = None
-    creative_records_df = make_creative_records_df(
-        adv_creatives_df, assets_df, database_connection
-    )
+    creative_records_df = make_creative_records_df(adv_creatives_df, assets_df, pgdb)
     key_columns = ["api_call_id"]
     creative_records_df["updated_at"] = datetime.datetime.now(tz=datetime.UTC)
     upsert_df(
         creative_records_df,
         table_name="creative_records",
-        database_connection=database_connection,
+        pgdb=pgdb,
         key_columns=key_columns,
         insert_columns=key_columns
         + [
@@ -556,17 +550,13 @@ def parse_store_id_mitm_log(
     return error_messages
 
 
-def parse_all_runs_for_store_id(
-    pub_store_id: str, database_connection: PostgresCon
-) -> None:
+def parse_all_runs_for_store_id(pub_store_id: str, pgdb: PostgresEngine) -> None:
     """Parses all MITM runs for a store ID and logs results to database."""
     mitms = get_store_id_mitm_s3_keys(store_id=pub_store_id)
     for _i, mitm in mitms.iterrows():
         run_id = mitm["run_id"]
         try:
-            error_messages = parse_store_id_mitm_log(
-                pub_store_id, run_id, database_connection
-            )
+            error_messages = parse_store_id_mitm_log(pub_store_id, run_id, pgdb)
         except Exception:
             error_msg = "CRITICAL uncaught error"
             logger.exception(f"{error_msg}")
@@ -598,7 +588,7 @@ def parse_all_runs_for_store_id(
             ]
         ]
         error_msg_df = error_msg_df[mycols]
-        log_creative_scan_results(error_msg_df, database_connection)
+        log_creative_scan_results(error_msg_df, pgdb)
 
 
 def _init_worker():
@@ -640,22 +630,20 @@ def _process_single_mitm_log(row: pd.Series) -> dict:
 
 
 def scan_all_apps(
-    database_connection: PostgresCon,
+    pgdb: PostgresEngine,
     only_new_apps: bool = False,
     recent_months: bool = False,
     max_workers: int = 1,
 ) -> None:
     """Scans all apps for creative content and uploads thumbnails to S3."""
     all_api_calls = query_api_calls_to_creative_scan(
-        database_connection=database_connection, recent_months=recent_months
+        pgdb=pgdb, recent_months=recent_months
     )
     mitm_runs_to_scan = all_api_calls[["store_id", "run_id"]].drop_duplicates()
     logger.info(f"MITM logs to scan: {mitm_runs_to_scan.shape[0]:,}")
 
     if only_new_apps:
-        creative_records = query_creative_records(
-            database_connection=database_connection
-        )
+        creative_records = query_creative_records(pgdb=pgdb)
         mitm_runs_to_scan = mitm_runs_to_scan[
             ~mitm_runs_to_scan["run_id"]
             .astype(str)
@@ -711,7 +699,7 @@ def scan_all_apps(
                 ]
             ]
             error_msg_df = error_msg_df[mycols]
-            log_creative_scan_results(error_msg_df, database_connection)
+            log_creative_scan_results(error_msg_df, pgdb)
 
     logger.info("All MITM logs processed, syncing thumbs to S3...")
     subprocess.run(

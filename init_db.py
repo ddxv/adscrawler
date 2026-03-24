@@ -18,7 +18,7 @@ from adscrawler.dbcon.connection import get_db_connection
 
 logger = get_logger(__name__)
 
-database_connection = get_db_connection()
+pgdb = get_db_connection()
 
 
 logger.info("Creating database")
@@ -54,7 +54,7 @@ app_dict = get_appgoblin_data()
 
 logger.info("Insert ddxv/appgoblin-data apps into db")
 process_scraped(
-    database_connection=database_connection,
+    pgdb=pgdb,
     ranked_dicts=app_dict,
     crawl_source="appgoblin_initial_data",
 )
@@ -62,7 +62,7 @@ process_scraped(
 # Set all app updated_at to NULL to so they update at the next crawl
 set_app_updated_at = """UPDATE store_apps SET updated_at = NULL;"""
 
-with database_connection.engine.connect() as conn:
+with pgdb.engine.connect() as conn:
     conn.execute(text(set_app_updated_at))
 
 # Refresh all materialized views once to get the db in a good state
@@ -79,7 +79,7 @@ create_mv_statements = [
 
 for statement in create_mv_statements:
     mv_name = statement.split("CREATE MATERIALIZED VIEW")[1].split(" ")[1]
-    with database_connection.engine.connect() as conn:
+    with pgdb.engine.connect() as conn:
         trans = conn.begin()
         try:
             conn.execute(text(f"REFRESH MATERIALIZED VIEW {mv_name}"))

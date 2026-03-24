@@ -5,7 +5,7 @@ import zlib
 from functools import lru_cache
 
 from adscrawler.config import CONFIG, get_logger
-from adscrawler.dbcon.connection import PostgresCon
+from adscrawler.dbcon.connection import PostgresEngine
 from adscrawler.dbcon.queries import query_sdk_keys
 
 logger = get_logger(__name__)
@@ -48,8 +48,8 @@ def try_decompress(data: bytes):
 
 
 @lru_cache(maxsize=10000)
-def has_keys(sdk_postfix: bytes, database_connection: PostgresCon):
-    sdk_keys_df = query_sdk_keys(database_connection)
+def has_keys(sdk_postfix: bytes, pgdb: PostgresEngine):
+    sdk_keys_df = query_sdk_keys(pgdb)
     keys = (
         sdk_keys_df[
             sdk_keys_df["applovin_sdk_key"].str.contains(sdk_postfix.decode("utf-8"))
@@ -67,10 +67,10 @@ def has_keys(sdk_postfix: bytes, database_connection: PostgresCon):
     return sdk_prefix32
 
 
-def decode_from(blob: bytes, database_connection: PostgresCon) -> str | None:
+def decode_from(blob: bytes, pgdb: PostgresEngine) -> str | None:
     m = blob.split(b":")
     sdk_postfix = m[2]
-    sdk_prefix32 = has_keys(sdk_postfix, database_connection=database_connection)
+    sdk_prefix32 = has_keys(sdk_postfix, pgdb=pgdb)
 
     if sdk_prefix32 is None:
         return None

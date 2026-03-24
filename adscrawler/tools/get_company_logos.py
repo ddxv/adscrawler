@@ -300,9 +300,7 @@ def upload_company_logo_to_s3(
         logger.error(f"Failed to upload {domain} logo to S3")
 
 
-def upload_and_update(
-    company_id: int, domain: str, filename: str, database_connection
-) -> None:
+def upload_and_update(company_id: int, domain: str, filename: str, pgdb) -> None:
     upload_company_logo_to_s3(
         domain=domain,
         file_path=pathlib.Path(OUTPUT_DIR, domain, filename),
@@ -314,14 +312,14 @@ def upload_and_update(
     update_company_logo_url(
         company_id=company_id,
         logo_url=logo_url,
-        database_connection=database_connection,
+        pgdb=pgdb,
     )
 
 
 def update_company_logos() -> None:
     os.makedirs(OUTPUT_DIR, exist_ok=True)
-    database_connection = get_db_connection()
-    companies = query_companies(database_connection=database_connection)
+    pgdb = get_db_connection()
+    companies = query_companies(pgdb=pgdb)
     companies = companies[
         (companies["company_logo_url"].isna()) | (companies["company_logo_url"] == "")
     ]
@@ -342,7 +340,7 @@ def update_company_logos() -> None:
         #         company_id=company_id,
         #         domain=domain,
         #         filename=filename,
-        #         database_connection=database_connection,
+        #         pgdb=pgdb,
         #     )
         try_these = ["", "/about", "/company", "/about-us", "/about-company"]
         if "github.com" in domain:
@@ -365,5 +363,5 @@ def update_company_logos() -> None:
             company_id=company_id,
             domain=domain,
             filename=filename,
-            database_connection=database_connection,
+            pgdb=pgdb,
         )

@@ -11,7 +11,7 @@ from adscrawler.config import (
     XAPKS_INCOMING_DIR,
     get_logger,
 )
-from adscrawler.dbcon.connection import PostgresCon
+from adscrawler.dbcon.connection import PostgresEngine
 from adscrawler.dbcon.queries import (
     insert_version_code,
     query_store_app_by_store_id,
@@ -38,14 +38,12 @@ FAILED_VERSION_STR = "-1"
 
 
 def manual_process_download(
-    database_connection: PostgresCon,
+    pgdb: PostgresEngine,
     store_id: str,
     store: int,
 ) -> None:
     """Manual download of an apk file."""
-    store_app = query_store_app_by_store_id(
-        database_connection=database_connection, store_id=store_id
-    )
+    store_app = query_store_app_by_store_id(pgdb=pgdb, store_id=store_id)
     existing_local_file_path = get_local_file_path(store, store_id)
     if store == 1:
         download_result = manage_apk_download(
@@ -56,7 +54,7 @@ def manual_process_download(
         version_str=download_result.version_str,
         store_app=store_app,
         crawl_result=download_result.crawl_result,
-        database_connection=database_connection,
+        pgdb=pgdb,
         return_rows=False,
         apk_hash=download_result.md5_hash,
     )

@@ -14,7 +14,7 @@ from adscrawler.config import (
     CREATIVE_THUMBS_DIR,
     get_logger,
 )
-from adscrawler.dbcon.connection import PostgresCon
+from adscrawler.dbcon.connection import PostgresEngine
 from adscrawler.dbcon.queries import query_creative_assets
 
 logger = get_logger(__name__, "mitm_scrape_ads")
@@ -67,12 +67,10 @@ def compute_phash_multiple_frames(local_path: pathlib.Path, seconds: list[int]) 
     return str(phash)
 
 
-def get_phash(
-    md5_hash: str, file_extension: str, database_connection: PostgresCon
-) -> str:
+def get_phash(md5_hash: str, file_extension: str, pgdb: PostgresEngine) -> str:
     """Generates a perceptual hash for a creative file, using multiple frames for videos."""
     phash = None
-    cached_assets = query_creative_assets(database_connection)
+    cached_assets = query_creative_assets(pgdb)
     cached_row = cached_assets[cached_assets["md5_hash"] == md5_hash]
     if not cached_row.empty and pd.notna(cached_row.iloc[0]["phash"]):
         return cached_row.iloc[0]["phash"]

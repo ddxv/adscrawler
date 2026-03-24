@@ -22,7 +22,7 @@ from adscrawler.config import (
     XAPKS_INCOMING_DIR,
     get_logger,
 )
-from adscrawler.dbcon.connection import PostgresCon, start_ssh_tunnel
+from adscrawler.dbcon.connection import PostgresEngine, start_ssh_tunnel
 from adscrawler.dbcon.queries import query_latest_api_scan_by_store_id
 from adscrawler.packages.utils import (
     get_local_file_path,
@@ -39,13 +39,13 @@ logger = get_logger(__name__)
 def get_s3_endpoint(key_name: str) -> str:
     host = CONFIG[key_name]["host"]
     port = None
-    if CONFIG[key_name].get("use_ssh", False):
+    if CONFIG[key_name].get("use_ssh_tunnel", False):
         # Use SSH tunnel for remote self hosted S3
         port = start_ssh_tunnel(key_name)
         host = "http://127.0.0.1"
     elif CONFIG[key_name].get("remote_port"):
         # Self hosted S3 on same network
-        port = CONFIG["s3"]["remote_port"]
+        port = CONFIG[key_name]["remote_port"]
         # NOTE: Current self hosted S3 uses HTTP
         host = f"http://{host}"
     if port:
@@ -287,7 +287,7 @@ def get_downloaded_apk_files(extension: str) -> list[str]:
     return files
 
 
-def get_downloaded_mitm_files(database_connection: PostgresCon) -> pd.DataFrame:
+def get_downloaded_mitm_files(pgdb: PostgresEngine) -> pd.DataFrame:
     """Get all downloaded files of a given extension."""
 
     main_dir = pathlib.Path("/home/adscrawler/adscrawler/mitmlogs/")
@@ -299,20 +299,20 @@ def get_downloaded_mitm_files(database_connection: PostgresCon) -> pd.DataFrame:
         store_ids.append(store_id)
 
     missing_files = []
-    df = query_latest_api_scan_by_store_id(store_ids, database_connection)
+    df = query_latest_api_scan_by_store_id(store_ids, pgdb)
     missing_files = [x for x in store_ids if x not in df["store_id"].to_list()]
 
     logger.info(f"S3 Uploadable: {df.shape[0]:,} missing: {len(missing_files)}")
     return df
 
 
-def move_local_mitm_files_to_s3(database_connection: PostgresCon) -> None:
+def move_local_mitm_files_to_s3(pgdb: PostgresEngine) -> None:
     """Upload all local mitm files to s3.
 
     This is for occasional MANUAL PROCESSING.
     """
 
-    df = get_downloaded_mitm_files(database_connection)
+    df = get_downloaded_mitm_files(pgdb)
 
     df = df.rename(columns={"version_code": "version_str"})
 

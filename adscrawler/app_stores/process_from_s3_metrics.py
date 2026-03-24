@@ -9,7 +9,7 @@ from adscrawler.app_stores.utils import (
 )
 from adscrawler.config import CONFIG, get_logger
 from adscrawler.dbcon.connection import (
-    PostgresCon,
+    PostgresEngine,
 )
 from adscrawler.dbcon.queries import (
     delete_app_metrics_by_date_and_apps,
@@ -133,7 +133,7 @@ def handle_missing_trackid_files(
 
 def delete_and_aggregate_s3_agg(
     store: int,
-    database_connection: PostgresCon,
+    pgdb: PostgresEngine,
 ) -> None:
 
     end_date = datetime.date.today()
@@ -142,8 +142,8 @@ def delete_and_aggregate_s3_agg(
     raw_weekly_lookback_days = 8
     interpolate_query_lookback_days = 180
     # Delete window: only remove what we're confident we'll rewrite
-    interpolate_delete_lookback_days = 90
-    db_delete_lookback_days = 30
+    interpolate_delete_lookback_days = 400
+    db_delete_lookback_days = 375
 
     # Raw data to agg by DAY
     # Purely additive, only needs to be run once for 'yesterday'
@@ -192,7 +192,7 @@ def delete_and_aggregate_s3_agg(
         db_delete_start = end_date - datetime.timedelta(days=db_delete_lookback_days)
         process_app_metrics_to_db(
             hash_bucket=hash_bucket,
-            database_connection=database_connection,
+            pgdb=pgdb,
             store=store,
             db_delete_start=db_delete_start,
         )
@@ -349,10 +349,8 @@ def estimate_ios_installs(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def merge_in_db_ids(
-    df: pd.DataFrame, store: int, database_connection: PostgresCon
-) -> pd.DataFrame:
-    store_id_map = query_live_apps(store=store, database_connection=database_connection)
+def merge_in_db_ids(df: pd.DataFrame, store: int, pgdb: PostgresEngine) -> pd.DataFrame:
+    store_id_map = query_live_apps(store=store, pgdb=pgdb)
     df = pd.merge(
         df,
         store_id_map[["store_id", "id"]].rename(columns={"id": "store_app"}),
@@ -362,7 +360,7 @@ def merge_in_db_ids(
     if df["store_app"].isna().any():
         logger.warning(f"Found new store ids: {len(df[df['store_app'].isna()])}")
         raise ValueError("New store ids found in S3 app history data")
-    country_map = query_countries(database_connection)
+    country_map = query_countries(pgdb)
     df = pd.merge(
         df,
         country_map[["id", "alpha2", "tier"]].rename(
@@ -550,7 +548,7 @@ def process_metrics_apple(
     df[STAR_COLS] = ratings_str.iloc[:, 1::2].astype(int).to_numpy()
     df = estimate_ios_installs(df)
     df["rating_prod"] = df["rating"] * df["rating_count"]
-    # future_ios_ratios = get_ios_cached_future_country_ratios(database_connection)
+    # future_ios_ratios = get_ios_cached_future_country_ratios(pgdb)
     df["weekly_total_ratings"] = df.groupby(["week_start", "store_app"])[
         "rating_count"
     ].transform("sum")
@@ -843,7 +841,7 @@ def write_app_hash_buckets_interpolated_to_s3(
 def process_metrics(
     store: int,
     df: pd.DataFrame,
-    database_connection: PostgresCon,
+    pgdb: PostgresEngine,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     log_info = f"{store=} process metrics for {df.shape[0]:,} rows"
     logger.info(f"{log_info} start")
@@ -873,7 +871,7 @@ def process_metrics(
     global_df.loc[tiers_to_fill, "tier1_pct"] = 0.34
     global_df.loc[tiers_to_fill, "tier2_pct"] = 0.33
     global_df.loc[tiers_to_fill, "tier3_pct"] = 0.33
-    global_df = calculate_derived_metrics(database_connection, global_df, store=store)
+    global_df = calculate_derived_metrics(pgdb, global_df, store=store)
     check_for_duplicates(
         df=global_df,
         key_columns=["store_app", "week_start"],
@@ -905,7 +903,7 @@ def process_metrics(
 
 
 def delete_and_insert_app_metrics(
-    database_connection: PostgresCon,
+    pgdb: PostgresEngine,
     country_df: pd.DataFrame,
     global_df: pd.DataFrame,
     store: int,
@@ -915,7 +913,7 @@ def delete_and_insert_app_metrics(
     table_name = "app_country_metrics_history"
     logger.info(f"{log_info} {table_name=} start")
     delete_app_metrics_by_date_and_apps(
-        database_connection=database_connection,
+        pgdb=pgdb,
         delete_from_date=delete_from_date,
         store_apps=country_df["store_app"].unique().tolist(),
         table_name=table_name,
@@ -923,12 +921,12 @@ def delete_and_insert_app_metrics(
     insert_bulk(
         df=country_df,
         table_name=table_name,
-        database_connection=database_connection,
+        pgdb=pgdb,
     )
     table_name = "app_global_metrics_history"
     logger.info(f"{log_info} {table_name=} start")
     delete_app_metrics_by_date_and_apps(
-        database_connection=database_connection,
+        pgdb=pgdb,
         delete_from_date=delete_from_date,
         store_apps=global_df["store_app"].unique().tolist(),
         table_name=table_name,
@@ -936,12 +934,12 @@ def delete_and_insert_app_metrics(
     insert_bulk(
         df=global_df,
         table_name=table_name,
-        database_connection=database_connection,
+        pgdb=pgdb,
     )
 
 
 def ffill_app_metrics(
-    df: pd.DataFrame, store: int, database_connection: PostgresCon
+    df: pd.DataFrame, store: int, pgdb: PostgresEngine
 ) -> pd.DataFrame:
     app_birth_dates = df.groupby("store_app")["week_start"].min()
     app_end_dates = df.groupby("store_app")["week_start"].max()
@@ -978,7 +976,7 @@ def ffill_app_metrics(
     df = df.sort_values("week_start")
     df[cols_to_ffill] = df.groupby(["store_app", "country_id"])[cols_to_ffill].ffill()
     df = df.reset_index()
-    country_map = query_countries(database_connection=database_connection)
+    country_map = query_countries(pgdb=pgdb)
     df["tier"] = df["country_id"].map(country_map.set_index("id")["tier"])
     return df
 
@@ -1034,7 +1032,7 @@ def get_app_hash_buckets_filled_from_s3(store: int, app_hash: str) -> pd.DataFra
 
 
 def store_app_updated_history(
-    df: pd.DataFrame, database_connection: PostgresCon, store: int
+    df: pd.DataFrame, pgdb: PostgresEngine, store: int
 ) -> pd.DataFrame:
     logger.info(f"store={store} store_app_updated_history start")
     if store == 1:
@@ -1054,7 +1052,7 @@ def store_app_updated_history(
     upsert_df(
         df=udf,
         table_name="app_updated_history",
-        database_connection=database_connection,
+        pgdb=pgdb,
         key_columns=["store_app", "store_last_updated"],
         insert_columns=["latest_crawl_week"],
     )
@@ -1065,7 +1063,7 @@ def store_app_updated_history(
 
 def process_app_metrics_to_db(
     hash_bucket: str,
-    database_connection: PostgresCon,
+    pgdb: PostgresEngine,
     store: int,
     db_delete_start: datetime.date,
 ) -> None:
@@ -1092,20 +1090,20 @@ def process_app_metrics_to_db(
         logger.warning(
             f"{log_info} found {problem_rows.sum()} rows with .0 suffix in store_id for Apple, removed them"
         )
-    df = merge_in_db_ids(df, store, database_connection)
+    df = merge_in_db_ids(df, store, pgdb)
     df = df.drop(["store_id", "country"], axis=1)
-    df = store_app_updated_history(df, database_connection, store)
-    df = ffill_app_metrics(df, store, database_connection)
+    df = store_app_updated_history(df, pgdb, store)
+    df = ffill_app_metrics(df, store, pgdb)
     country_df, global_df = process_metrics(
         store=store,
         df=df,
-        database_connection=database_connection,
+        pgdb=pgdb,
     )
     country_df, global_df = drop_unwanted_rows(
         country_df, global_df, store, db_delete_start
     )
     delete_and_insert_app_metrics(
-        database_connection=database_connection,
+        pgdb=pgdb,
         country_df=country_df,
         global_df=global_df,
         store=store,
@@ -1215,7 +1213,7 @@ def copy_raw_details_to_hash_buckets(
 
 
 def calculate_derived_metrics(
-    database_connection: PostgresCon, global_df: pd.DataFrame, store: int
+    pgdb: PostgresEngine, global_df: pd.DataFrame, store: int
 ) -> pd.DataFrame:
     """Process app global metrics weekly."""
     metrics = [
@@ -1253,10 +1251,10 @@ def calculate_derived_metrics(
             .reset_index(level=0, drop=True)
         )
     app_cats = query_store_app_categories(
-        database_connection, store_apps=global_df["store_app"].unique().tolist()
+        pgdb, store_apps=global_df["store_app"].unique().tolist()
     )
     global_df = global_df.merge(app_cats, on="store_app", how="left", validate="m:1")
-    retention_benchmarks = get_retention_benchmarks(database_connection)
+    retention_benchmarks = get_retention_benchmarks(pgdb)
     retention_benchmarks = retention_benchmarks[retention_benchmarks["store"] == store]
     cohorts = global_df.merge(
         retention_benchmarks, on=["app_category"], how="left", validate="m:1"
@@ -1333,12 +1331,12 @@ def calculate_derived_metrics(
         "rating_count": "total_ratings",
     }
     global_df = global_df.rename(columns=rename_map)
-    global_df = calculate_revenue_cols(database_connection, global_df)
+    global_df = calculate_revenue_cols(pgdb, global_df)
     return global_df
 
 
 def calculate_revenue_cols(
-    database_connection: PostgresCon, global_df: pd.DataFrame
+    pgdb: PostgresEngine, global_df: pd.DataFrame
 ) -> pd.DataFrame:
     global_df["wau_tier1"] = global_df["weekly_active_users"] * global_df["tier1_pct"]
     global_df["wau_tier2"] = global_df["weekly_active_users"] * global_df["tier2_pct"]
@@ -1356,7 +1354,7 @@ def calculate_revenue_cols(
         global_df["in_app_purchases"], new_rev + base_rev, 0.0
     )
     # Ad Revenue
-    ecpm_benchmarks = get_ecpm_benchmarks(database_connection)
+    ecpm_benchmarks = get_ecpm_benchmarks(pgdb)
     avg_ecpm = ecpm_benchmarks.groupby("tier_slug")["ecpm"].mean()
     # Needs category benchmarks
     imps_per_user = 3

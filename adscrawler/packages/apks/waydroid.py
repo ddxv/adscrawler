@@ -17,7 +17,7 @@ from adscrawler.config import (
     XAPKS_TMP_UNZIP_DIR,
     get_logger,
 )
-from adscrawler.dbcon.connection import PostgresCon
+from adscrawler.dbcon.connection import PostgresEngine
 from adscrawler.dbcon.queries import (
     get_version_code_dbid,
     insert_df,
@@ -51,7 +51,7 @@ ANDROID_PERMISSION_ACTIVITY = (
 
 
 def run_app(
-    database_connection: PostgresCon,
+    pgdb: PostgresEngine,
     apk_path: pathlib.Path,
     store_id: str,
     store_app: int,
@@ -70,7 +70,7 @@ def run_app(
         version_str, version_code_id = launch_and_track_app(
             store_id,
             store_app,
-            database_connection,
+            pgdb,
             apk_path,
             timeout=timeout,
         )
@@ -81,7 +81,7 @@ def run_app(
     if version_code_id is None:
         try:
             version_str, version_code_id = get_version_via_apktool(
-                store_id, apk_path, store_app, database_connection
+                store_id, apk_path, store_app, pgdb
             )
         except Exception:
             logger.exception(f"{function_info} apktool failed to get version code")
@@ -97,7 +97,7 @@ def run_app(
         version_code_id=version_code_id,
         md5_hash=md5_hash,
         crawl_result=crawl_result,
-        database_connection=database_connection,
+        pgdb=pgdb,
     )
 
     if version_code_id is None:
@@ -112,9 +112,7 @@ def run_app(
         return
 
     try:
-        mdf = mitm_logs.parse_log(
-            store_id=store_id, run_id=None, database_connection=database_connection
-        )
+        mdf = mitm_logs.parse_log(store_id=store_id, run_id=None, pgdb=pgdb)
         if mdf.empty:
             logger.warning("MITM log is empty")
         else:
@@ -139,7 +137,7 @@ def run_app(
     run_df = insert_df(
         df=crawl_df,
         table_name="version_code_api_scan_results",
-        database_connection=database_connection,
+        pgdb=pgdb,
         return_rows=True,
     )
 
@@ -148,7 +146,7 @@ def run_app(
         record_mitm_to_db(
             run_id=run_id,
             mdf=mdf,
-            database_connection=database_connection,
+            pgdb=pgdb,
         )
         upload_mitm_log_to_s3(
             store=1,
@@ -162,9 +160,9 @@ def manual_reprocess_mitm(
     run_id: int,
     store_id: str,
     store_app: int,
-    database_connection: PostgresCon,
+    pgdb: PostgresEngine,
 ) -> None:
-    apps_df = query_apps_mitm_in_s3(database_connection=database_connection)
+    apps_df = query_apps_mitm_in_s3(pgdb=pgdb)
     rows = apps_df.shape[0]
     store_id_missing_mitm_logs = []
     # ndf = apps_df[_i:].copy()
@@ -177,7 +175,7 @@ def manual_reprocess_mitm(
             mdf = parse_log(
                 store_id=store_id,
                 run_id=run_id,
-                database_connection=database_connection,
+                pgdb=pgdb,
             )
         except FileNotFoundError:
             logger.error(f"MITM log not found for {store_id=} {run_id=}")
@@ -192,19 +190,19 @@ def manual_reprocess_mitm(
         record_mitm_to_db(
             run_id=run_id,
             mdf=mdf,
-            database_connection=database_connection,
+            pgdb=pgdb,
         )
 
 
 def record_mitm_to_db(
     run_id: int,
     mdf: pd.DataFrame,
-    database_connection: PostgresCon,
+    pgdb: PostgresEngine,
 ) -> None:
     mdf["run_id"] = run_id
     # mdf['mitm_uuid'] = mdf['mitm_uuid'].str[:-2] + '11'
     gdf = mitm_logs.make_ip_geo_snapshot_df(
-        mdf[["mitm_uuid", "ip_address"]].copy(), database_connection
+        mdf[["mitm_uuid", "ip_address"]].copy(), pgdb
     )
     gdf["country_id"] = np.where(np.isnan(gdf["country_id"]), None, gdf["country_id"])
     # WARNING: this shouldn't be used outside of tests, try insert instead
@@ -216,7 +214,7 @@ def record_mitm_to_db(
         table_name="ip_geo_snapshots",
         key_columns=["mitm_uuid"],
         insert_columns=cols,
-        database_connection=database_connection,
+        pgdb=pgdb,
         return_rows=True,
     ).rename(columns={"id": "ip_geo_snapshot_id"})
     gdf["mitm_uuid"] = gdf["mitm_uuid"].astype(str)
@@ -229,13 +227,13 @@ def record_mitm_to_db(
         validate="1:1",
     )
     insert_api_calls(
-        database_connection=database_connection,
+        pgdb=pgdb,
         mdf=mdf,
     )
 
 
 def insert_api_calls(
-    database_connection: PostgresCon,
+    pgdb: PostgresEngine,
     mdf: pd.DataFrame,
 ) -> int:
     insert_columns = [
@@ -256,7 +254,7 @@ def insert_api_calls(
     insert_df(
         df=mdf,
         table_name="api_calls",
-        database_connection=database_connection,
+        pgdb=pgdb,
         insert_columns=insert_columns,
     )
     logger.info(f"inserted {mdf.shape[0]:,} api calls")
@@ -266,17 +264,17 @@ def get_version_via_apktool(
     store_id: str,
     apk_path: pathlib.Path,
     store_app: int,
-    database_connection: PostgresCon,
+    pgdb: PostgresEngine,
 ) -> tuple[str, int | None]:
     apk_tmp_decoded_output_path = unzip_apk(store_id, apk_path)
     apktool_info_path = pathlib.Path(apk_tmp_decoded_output_path, "apktool.yml")
     version_str = get_version(apktool_info_path)
-    version_code_id = get_version_code_dbid(store_app, version_str, database_connection)
+    version_code_id = get_version_code_dbid(store_app, version_str, pgdb)
     return version_str, version_code_id
 
 
 def process_app_for_waydroid(
-    database_connection: PostgresCon,
+    pgdb: PostgresEngine,
     store_id: str,
     store_app: int,
     apk_path: pathlib.Path,
@@ -299,7 +297,7 @@ def process_app_for_waydroid(
 
     try:
         run_app(
-            database_connection,
+            pgdb,
             apk_path=apk_path,
             store_id=store_id,
             store_app=store_app,
@@ -506,7 +504,7 @@ def prep_xapk_splits(store_id: str, xapk_path: pathlib.Path) -> str:
 
 
 def get_installed_version_str(
-    store_id: str, store_app: int, database_connection: PostgresCon
+    store_id: str, store_app: int, pgdb: PostgresEngine
 ) -> tuple[str | None, int | None]:
     package_info = subprocess.run(
         ["sudo", "waydroid", "shell", "dumpsys", "package", store_id],
@@ -524,9 +522,7 @@ def get_installed_version_str(
     if match:
         version_str = match.group(1)
         logger.info(f"found versionCode: {version_str}")
-        version_code_id = get_version_code_dbid(
-            store_app, version_str, database_connection
-        )
+        version_code_id = get_version_code_dbid(store_app, version_str, pgdb)
 
     if version_code_id is None:
         logger.error(f"No version code id found for {store_id=}")
@@ -536,7 +532,7 @@ def get_installed_version_str(
 def launch_and_track_app(
     store_id: str,
     store_app: int,
-    database_connection: PostgresCon,
+    pgdb: PostgresEngine,
     apk_path: pathlib.Path,
     timeout: int = 60,
 ) -> tuple[str, int]:
@@ -570,9 +566,7 @@ def launch_and_track_app(
     time.sleep(timeout)
     logger.info(f"{function_info} stopping app & mitmdump")
     os.system(f"{mitm_script.as_posix()} -d")
-    version_str, version_code_id = get_installed_version_str(
-        store_id, store_app, database_connection
-    )
+    version_str, version_code_id = get_installed_version_str(store_id, store_app, pgdb)
     remove_app(store_id)
     if version_code_id is None:
         raise Exception(f"{function_info} failed to get version code")
@@ -806,7 +800,7 @@ def start_session() -> subprocess.Popen:
 
 
 def manual_waydroid_process(
-    database_connection: PostgresCon,
+    pgdb: PostgresEngine,
     store_id: str,
     timeout: int,
     run_name: str,
@@ -825,9 +819,9 @@ def manual_waydroid_process(
     if not apk_path or not apk_path.exists():
         raise FileNotFoundError(f"{store_id=} not found")
 
-    store_app = query_store_app_by_store_id(database_connection, store_id)
+    store_app = query_store_app_by_store_id(pgdb, store_id)
     process_app_for_waydroid(
-        database_connection=database_connection,
+        pgdb=pgdb,
         store_id=store_id,
         store_app=store_app,
         apk_path=apk_path,
@@ -837,10 +831,8 @@ def manual_waydroid_process(
     remove_all_third_party_apps()
 
 
-def process_apks_for_waydroid(
-    database_connection: PostgresCon, num_apps: int = 20
-) -> None:
-    apps_df = query_apps_to_api_scan(database_connection=database_connection, store=1)
+def process_apks_for_waydroid(pgdb: PostgresEngine, num_apps: int = 20) -> None:
+    apps_df = query_apps_to_api_scan(pgdb=pgdb, store=1)
     logger.info(
         f"Waydroid has {apps_df.shape[0]:,} apps to process, starting {num_apps}"
     )
@@ -860,7 +852,7 @@ def process_apks_for_waydroid(
             logger.error(f"Waydroid failed to download {store_id}")
             continue
         process_app_for_waydroid(
-            database_connection=database_connection,
+            pgdb=pgdb,
             apk_path=apk_path,
             store_id=store_id,
             store_app=store_app,

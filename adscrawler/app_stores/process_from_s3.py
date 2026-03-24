@@ -13,7 +13,7 @@ from adscrawler.app_stores.utils import (
 )
 from adscrawler.config import CONFIG, get_logger
 from adscrawler.dbcon.connection import (
-    PostgresCon,
+    PostgresEngine,
 )
 from adscrawler.dbcon.queries import (
     clean_app_ranks_weekly_table,
@@ -130,7 +130,7 @@ def get_s3_rank_parquet_paths(
 def import_ranks_from_s3(
     start_date: datetime.date,
     end_date: datetime.date,
-    database_connection: PostgresCon,
+    pgdb: PostgresEngine,
     period: str = "week",
 ) -> None:
     if period == "week":
@@ -148,17 +148,17 @@ def import_ranks_from_s3(
             process_ranks_from_s3(
                 store=store,
                 dt=dt,
-                database_connection=database_connection,
+                pgdb=pgdb,
                 period=period,
                 s3_config_key=s3_config_key,
             )
-    clean_app_ranks_weekly_table(database_connection)
+    clean_app_ranks_weekly_table(pgdb)
 
 
 def process_ranks_from_s3(
     store: int,
     dt: datetime.date,
-    database_connection: PostgresCon,
+    pgdb: PostgresEngine,
     period: str,
     s3_config_key: str,
 ) -> None:
@@ -190,12 +190,10 @@ def process_ranks_from_s3(
         period=period,
         s3_config_key=s3_config_key,
     )
-    store_id_map = query_store_id_map_cached(
-        store=store, database_connection=database_connection
-    )
-    country_map = query_countries(database_connection)
-    collection_map = query_collections(database_connection)
-    category_map = query_categories(database_connection)
+    store_id_map = query_store_id_map_cached(store=store, pgdb=pgdb)
+    country_map = query_countries(pgdb)
+    collection_map = query_collections(pgdb)
+    category_map = query_categories(pgdb)
     df["country"] = df["country"].map(country_map.set_index("alpha2")["id"].to_dict())
     df["store_collection"] = df["collection"].map(
         collection_map.set_index("collection")["id"].to_dict()
@@ -208,12 +206,12 @@ def process_ranks_from_s3(
         logger.info(f"Found new store ids: {len(new_ids)}")
         new_ids = [{"store": store, "store_id": store_id} for store_id in new_ids]
         check_and_insert_new_apps(
-            database_connection=database_connection,
+            pgdb=pgdb,
             dicts=new_ids,
             crawl_source="process_ranks_parquet",
             store=store,
         )
-        store_id_map = query_store_id_map(database_connection, store)
+        store_id_map = query_store_id_map(pgdb, store)
     df["store_app"] = df["store_id"].map(
         store_id_map.set_index("store_id")["id"].to_dict()
     )
@@ -223,7 +221,7 @@ def process_ranks_from_s3(
         df=df,
         table_name=table_name,
         schema="frontend",
-        database_connection=database_connection,
+        pgdb=pgdb,
         key_columns=[
             "country",
             "store_collection",
@@ -301,11 +299,13 @@ def manual_download_rankings(
 
 
 def import_keywords_from_s3(
-    start_date: datetime.date, end_date: datetime.date, database_connection: PostgresCon
+    start_date: datetime.date,
+    end_date: datetime.date,
+    pgdb: PostgresEngine,
 ) -> None:
     language = "en"
-    country_map = query_countries(database_connection)
-    languages_map = query_languages(database_connection)
+    country_map = query_countries(pgdb)
+    languages_map = query_languages(pgdb)
     language_dict = languages_map.set_index("language_slug")["id"].to_dict()
     _language_key = language_dict[language]
     s3_config_key = "s3"
@@ -320,7 +320,7 @@ def import_keywords_from_s3(
                 logger.warning(f"No parquet paths found for {s3_key}")
                 continue
             df = query_keywords_from_s3(parquet_paths, s3_config_key)
-            store_id_map = query_store_id_map_cached(database_connection, store)
+            store_id_map = query_store_id_map_cached(pgdb, store)
             df["store_app"] = df["store_id"].map(
                 store_id_map.set_index("store_id")["id"].to_dict()
             )
@@ -329,12 +329,12 @@ def import_keywords_from_s3(
             )
             if df["store_app"].isna().any():
                 check_and_insert_new_apps(
-                    database_connection=database_connection,
+                    pgdb=pgdb,
                     dicts=df.to_dict(orient="records"),
                     crawl_source="keywords",
                     store=store,
                 )
-                store_id_map = query_store_id_map(database_connection, store)
+                store_id_map = query_store_id_map(pgdb, store)
                 df["store_app"] = df["store_id"].map(
                     store_id_map.set_index("store_id")["id"].to_dict()
                 )
@@ -347,7 +347,7 @@ def import_keywords_from_s3(
                 df=df,
                 table_name="app_keyword_ranks_daily",
                 schema="frontend",
-                database_connection=database_connection,
+                pgdb=pgdb,
                 delete_by_keys=["crawled_date", "store"],
                 insert_columns=[
                     "country",

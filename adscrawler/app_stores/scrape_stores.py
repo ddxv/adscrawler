@@ -40,7 +40,7 @@ from adscrawler.app_stores.process_from_s3 import (
 from adscrawler.app_stores.utils import check_and_insert_new_apps
 from adscrawler.config import APP_ICONS_TMP_DIR, CONFIG, get_logger
 from adscrawler.dbcon.connection import (
-    PostgresCon,
+    PostgresEngine,
     get_db_connection,
 )
 from adscrawler.dbcon.queries import (
@@ -126,7 +126,7 @@ def process_scrape_apps_and_save(
     else:
         logger.info(f"{chunk_info} start (sequential)")
 
-    database_connection = get_db_connection()
+    pgdb = get_db_connection()
     chunk_results = []
 
     try:
@@ -186,23 +186,23 @@ def process_scrape_apps_and_save(
         results_df["crawled_date"] = results_df["crawled_at"].dt.date
         app_details_to_s3(results_df, store=store)
         results_df["store_app"] = results_df["store_app_db_id"].astype(int)
-        log_crawl_results(results_df, database_connection=database_connection)
+        log_crawl_results(results_df, pgdb=pgdb)
         results_df = results_df[(results_df["country"] == "US")]
         process_live_app_details(
             store=store,
             results_df=results_df,
-            database_connection=database_connection,
+            pgdb=pgdb,
             process_icon=process_icon,
         )
         logger.info(f"{chunk_info} finished")
     finally:
-        if database_connection and hasattr(database_connection, "engine"):
-            database_connection.engine.dispose()
+        if pgdb and hasattr(pgdb, "engine"):
+            pgdb.engine.dispose()
             logger.debug(f"{chunk_info} database connection disposed")
 
 
 def update_app_details(
-    database_connection: PostgresCon,
+    pgdb: PostgresEngine,
     store: int,
     workers: int,
     process_icon: bool,
@@ -212,7 +212,7 @@ def update_app_details(
     """Process apps with dynamic work queue
 
     Args:
-        database_connection: Database connection
+        pgdb: Database connection
         store: Store ID
         workers: Number of processes to use
         process_icon: Whether to process app icons
@@ -232,7 +232,7 @@ def update_app_details(
 
     df = query_store_apps_to_update(
         store=store,
-        database_connection=database_connection,
+        pgdb=pgdb,
         limit=limit,
         country_priority_group=country_priority_group,
     )
@@ -309,10 +309,10 @@ def update_app_details(
     logger.info(f"{log_info} completed={completed_count} failed={failed_count}")
 
 
-def crawl_keyword_ranks(database_connection: PostgresCon) -> None:
+def crawl_keyword_ranks(pgdb: PostgresEngine) -> None:
     country = "us"
     language = "en"
-    kdf = query_keywords_to_crawl(database_connection, limit=1000)
+    kdf = query_keywords_to_crawl(pgdb, limit=1000)
     all_keywords = pd.DataFrame()
     for _id, row in kdf.iterrows():
         logger.info(
@@ -343,18 +343,16 @@ def crawl_keyword_ranks(database_connection: PostgresCon) -> None:
         insert_columns=["keyword", "crawled_at"],
         df=all_keywords[["keyword", "crawled_at"]],
         key_columns=key_columns,
-        database_connection=database_connection,
+        pgdb=pgdb,
     )
 
 
-def scrape_store_ranks(database_connection: PostgresCon, store: int) -> None:
-    collections_map = query_collections(database_connection)
-    categories_map = query_categories(database_connection)
+def scrape_store_ranks(pgdb: PostgresEngine, store: int) -> None:
+    collections_map = query_collections(pgdb)
+    categories_map = query_categories(pgdb)
     collections_map = collections_map.rename(columns={"id": "store_collection"})
     categories_map = categories_map.rename(columns={"id": "store_category"})
-    all_countries = get_crawl_scenario_countries(
-        database_connection=database_connection, scenario_name="app_ranks"
-    )
+    all_countries = get_crawl_scenario_countries(pgdb=pgdb, scenario_name="app_ranks")
     all_country_codes = all_countries["country_code"].str.lower().unique().tolist()
     today = datetime.date.today().strftime("%Y-%m-%d")
 
@@ -371,7 +369,7 @@ def scrape_store_ranks(database_connection: PostgresCon, store: int) -> None:
                     collection_keyword=collection_keyword, country=country
                 )
                 process_scraped(
-                    database_connection=database_connection,
+                    pgdb=pgdb,
                     ranked_dicts=ranked_dicts,
                     crawl_source="scrape_frontpage_top",
                     collections_map=collections_map,
@@ -394,7 +392,7 @@ def scrape_store_ranks(database_connection: PostgresCon, store: int) -> None:
                 ranked_dicts = scrape_google_ranks(country=country)
                 if len(ranked_dicts) > 0:
                     process_scraped(
-                        database_connection=database_connection,
+                        pgdb=pgdb,
                         ranked_dicts=ranked_dicts,
                         crawl_source="scrape_frontpage_top",
                         collections_map=collections_map,
@@ -412,7 +410,7 @@ def scrape_store_ranks(database_connection: PostgresCon, store: int) -> None:
         try:
             dicts = get_apkcombo_android_apps()
             process_scraped(
-                database_connection=database_connection,
+                pgdb=pgdb,
                 ranked_dicts=dicts,
                 crawl_source="scrape_rss_apkcombo",
                 store=1,
@@ -422,7 +420,7 @@ def scrape_store_ranks(database_connection: PostgresCon, store: int) -> None:
         try:
             dicts = get_appbrain_android_apps()
             process_scraped(
-                database_connection=database_connection,
+                pgdb=pgdb,
                 ranked_dicts=dicts,
                 crawl_source="scrape_appbrain",
                 store=1,
@@ -494,7 +492,7 @@ def scrape_keyword(
 
 
 def process_scraped(
-    database_connection: PostgresCon,
+    pgdb: PostgresEngine,
     ranked_dicts: list[dict],
     crawl_source: str,
     store: int,
@@ -502,7 +500,7 @@ def process_scraped(
     categories_map: pd.DataFrame | None = None,
 ) -> None:
     check_and_insert_new_apps(
-        database_connection=database_connection,
+        pgdb=pgdb,
         dicts=ranked_dicts,
         crawl_source=crawl_source,
         store=store,
@@ -511,7 +509,7 @@ def process_scraped(
     if "rank" in df.columns:
         save_app_ranks(
             df,
-            database_connection,
+            pgdb,
             store,
             collections_map,
             categories_map,
@@ -520,14 +518,14 @@ def process_scraped(
 
 def save_app_ranks(
     df: pd.DataFrame,
-    database_connection: PostgresCon,
+    pgdb: PostgresEngine,
     store: int,
     collections_map: pd.DataFrame | None = None,
     categories_map: pd.DataFrame | None = None,
 ) -> None:
     all_scraped_ids = df["store_id"].unique().tolist()
     new_existing_ids_map = query_store_id_map(
-        database_connection,
+        pgdb,
         store_ids=all_scraped_ids,
     ).rename(columns={"id": "store_app"})
     df = pd.merge(
@@ -562,12 +560,12 @@ def extract_domains(x: str | None) -> str | None:
 
 
 def crawl_developers_for_new_store_ids(
-    database_connection: PostgresCon,
+    pgdb: PostgresEngine,
     store: int,
 ) -> None:
     logger.info(f"Crawl devevelopers for {store=} start")
-    store_ids = query_store_ids(database_connection, store=store)
-    df = query_developers(database_connection, store=store, limit=10000)
+    store_ids = query_store_ids(pgdb, store=store)
+    df = query_developers(pgdb, store=store, limit=10000)
 
     if store == 1:
         developer_ids = df["developer_id"].unique().tolist()
@@ -575,7 +573,7 @@ def crawl_developers_for_new_store_ids(
         apps_df = crawl_google_developers(developer_ids, store_ids)
         if not apps_df.empty:
             check_and_insert_new_apps(
-                database_connection=database_connection,
+                pgdb=pgdb,
                 dicts=apps_df.to_dict(orient="records"),
                 crawl_source="crawl_developers",
                 store=store,
@@ -597,7 +595,7 @@ def crawl_developers_for_new_store_ids(
             insert_columns=insert_columns,
             df=dev_df,
             key_columns=key_columns,
-            database_connection=database_connection,
+            pgdb=pgdb,
         )
         logger.info(f"{store=} crawled, {apps_df.shape[0]:,} new store ids")
     if store == 2:
@@ -611,7 +609,7 @@ def crawl_developers_for_new_store_ids(
 
                 if not apps_df.empty:
                     check_and_insert_new_apps(
-                        database_connection=database_connection,
+                        pgdb=pgdb,
                         dicts=apps_df[["store", "store_id"]].to_dict(orient="records"),
                         crawl_source="crawl_developers",
                         store=store,
@@ -634,7 +632,7 @@ def crawl_developers_for_new_store_ids(
                     insert_columns=insert_columns,
                     df=dev_df,
                     key_columns=key_columns,
-                    database_connection=database_connection,
+                    pgdb=pgdb,
                 )
                 logger.info(f"{row_info=} crawled, {apps_df.shape[0]:,} new store ids")
             except Exception:
@@ -644,7 +642,7 @@ def crawl_developers_for_new_store_ids(
 def check_and_insert_developers(
     developers_df: pd.DataFrame,
     apps_df: pd.DataFrame,
-    database_connection: PostgresCon,
+    pgdb: PostgresEngine,
 ) -> pd.DataFrame:
     """Adds missing developers to the database and returns updated developer DataFrame."""
     missing_devs = apps_df[
@@ -660,7 +658,7 @@ def check_and_insert_developers(
             df=new_devs.rename(columns={"developer_name": "name"}),
             insert_columns=["store", "developer_id", "name"],
             key_columns=["store", "developer_id"],
-            database_connection=database_connection,
+            pgdb=pgdb,
             return_rows=True,
         )
         developers_df = pd.concat([new_devs, developers_df])
@@ -670,7 +668,7 @@ def check_and_insert_developers(
 def check_and_insert_domains(
     domains_df: pd.DataFrame,
     app_urls: pd.DataFrame,
-    database_connection: PostgresCon,
+    pgdb: PostgresEngine,
 ) -> pd.DataFrame:
     """Adds missing ad domains to the database and returns updated domain DataFrame."""
     missing_ad_domains = app_urls[
@@ -687,7 +685,7 @@ def check_and_insert_domains(
             df=new_ad_domains,
             insert_columns=["domain_name"],
             key_columns=["domain_name"],
-            database_connection=database_connection,
+            pgdb=pgdb,
             return_rows=True,
         )
         domains_df = pd.concat([new_ad_domains, domains_df])
@@ -696,16 +694,16 @@ def check_and_insert_domains(
 
 def save_app_domains(
     apps_df: pd.DataFrame,
-    database_connection: PostgresCon,
+    pgdb: PostgresEngine,
 ) -> None:
     apps_df["url"] = apps_df["url"].apply(extract_domains)
     # This would mean that urls are frozen if 'removed' but more likely they failed a crawl
     apps_df = apps_df[~apps_df["url"].isna()]
-    all_domains_df = query_all_domains(database_connection=database_connection)
+    all_domains_df = query_all_domains(pgdb=pgdb)
     all_domains_df = check_and_insert_domains(
         domains_df=all_domains_df,
         app_urls=apps_df,
-        database_connection=database_connection,
+        pgdb=pgdb,
     )
     domain_ids_df = apps_df.merge(
         all_domains_df.rename(columns={"id": "pub_domain"}),
@@ -722,7 +720,7 @@ def save_app_domains(
             insert_columns=insert_columns,
             df=domain_ids_df[["store_app", "pub_domain"]],
             key_columns=key_columns,
-            database_connection=database_connection,
+            pgdb=pgdb,
         )
     logger.info("Finished inserting app domains")
 
@@ -845,13 +843,13 @@ def scrape_app(
 
 def save_developer_info(
     apps_df: pd.DataFrame,
-    database_connection: PostgresCon,
+    pgdb: PostgresEngine,
 ) -> pd.DataFrame:
-    all_developers_df = query_all_developers(database_connection=database_connection)
+    all_developers_df = query_all_developers(pgdb=pgdb)
     all_developers_df = check_and_insert_developers(
         developers_df=all_developers_df,
         apps_df=apps_df,
-        database_connection=database_connection,
+        pgdb=pgdb,
     )
     apps_df = pd.merge(
         apps_df,
@@ -869,7 +867,7 @@ def save_developer_info(
 def process_live_app_details(
     store: int,
     results_df: pd.DataFrame,
-    database_connection: PostgresCon,
+    pgdb: PostgresEngine,
     process_icon: bool,
 ) -> None:
     if store == 1:
@@ -902,11 +900,9 @@ def process_live_app_details(
         if (apps_df["crawl_result"] == 1).all() and apps_df[
             "developer_id"
         ].notna().all():
-            apps_df = save_developer_info(apps_df, database_connection)
+            apps_df = save_developer_info(apps_df, pgdb)
         insert_columns = [
-            x
-            for x in get_store_app_columns(database_connection)
-            if x in apps_df.columns
+            x for x in get_store_app_columns(pgdb) if x in apps_df.columns
         ]
 
         apps_df = prepare_for_psycopg(apps_df)
@@ -916,11 +912,11 @@ def process_live_app_details(
             df=apps_df,
             update_columns=insert_columns,
             key_columns=key_columns,
-            database_connection=database_connection,
+            pgdb=pgdb,
         )
         if apps_df is None or apps_df.empty or crawl_result != 1:
             continue
-        upsert_store_apps_descriptions(apps_df, database_connection)
+        upsert_store_apps_descriptions(apps_df, pgdb)
         if "url" not in apps_df.columns or apps_df["url"].isna().all():
             logger.warning(f"{log_info} No app urls found")
             continue
@@ -931,16 +927,16 @@ def process_live_app_details(
             continue
         save_app_domains(
             apps_df=apps_df,
-            database_connection=database_connection,
+            pgdb=pgdb,
         )
 
 
 def upsert_store_apps_descriptions(
     apps_df: pd.DataFrame,
-    database_connection: PostgresCon,
+    pgdb: PostgresEngine,
 ) -> None:
     table_name = "store_apps_descriptions"
-    languages_map = query_languages(database_connection)
+    languages_map = query_languages(pgdb)
     apps_df = pd.merge(
         apps_df,
         languages_map[["id", "language_slug"]],
@@ -968,13 +964,13 @@ def upsert_store_apps_descriptions(
         insert_columns=key_columns,
         key_columns=key_columns,
         md5_key_columns=["description", "description_short"],
-        database_connection=database_connection,
+        pgdb=pgdb,
         on_conflict_update=False,
     )
 
 
-def log_crawl_results(app_df: pd.DataFrame, database_connection: PostgresCon) -> None:
-    country_map = query_countries(database_connection)
+def log_crawl_results(app_df: pd.DataFrame, pgdb: PostgresEngine) -> None:
+    country_map = query_countries(pgdb)
     app_df["country_id"] = app_df["country"].map(
         country_map.set_index("alpha2")["id"].to_dict()
     )
@@ -988,7 +984,7 @@ def log_crawl_results(app_df: pd.DataFrame, database_connection: PostgresCon) ->
     app_df.to_sql(
         schema="logging",
         name="app_country_crawls",
-        con=database_connection.engine,
+        con=pgdb.engine,
         if_exists="append",
         index=False,
     )

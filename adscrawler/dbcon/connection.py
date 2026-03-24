@@ -15,7 +15,7 @@ from adscrawler.config import CONFIG, SSH_KNOWN_HOSTS, get_logger
 logger = get_logger(__name__)
 
 
-class PostgresCon:
+class PostgresEngine:
     """Class for managing the connection to PostgreSQL with extended database operations."""
 
     def __init__(self, config_key: str, db_ip: str, db_port: str) -> None:
@@ -129,7 +129,7 @@ def start_ssh_tunnel(config_key: str) -> int:
     return ssh_local_port
 
 
-def get_db_connection(config_key: str = "madrone") -> PostgresCon:
+def get_db_connection(config_key: str = "madrone") -> PostgresEngine:
     """
     Get a database connection, optionally using an SSH tunnel.
 
@@ -148,7 +148,7 @@ def get_db_connection(config_key: str = "madrone") -> PostgresCon:
         db_port = str(ssh_local_port)
     else:
         db_port = "5432"
-    conn = PostgresCon(config_key, host, db_port)
+    conn = PostgresEngine(config_key, host, db_port)
     conn.set_engine()
     return conn
 

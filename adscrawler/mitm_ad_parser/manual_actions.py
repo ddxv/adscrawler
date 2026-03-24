@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 
 from adscrawler.config import MITM_DIR, get_logger
-from adscrawler.dbcon.connection import PostgresCon
+from adscrawler.dbcon.connection import PostgresEngine
 from adscrawler.dbcon.queries import (
     get_store_id_mitm_s3_keys,
     query_api_calls_to_creative_scan,
@@ -22,11 +22,9 @@ from adscrawler.packages.storage import (
 logger = get_logger(__name__, "mitm_scrape_ads")
 
 
-def download_all_mitms(database_connection: PostgresCon) -> None:
+def download_all_mitms(pgdb: PostgresEngine) -> None:
     """Downloads all MITM log files from S3 for apps that need creative scanning."""
-    apps_to_download = query_api_calls_to_creative_scan(
-        database_connection=database_connection
-    )
+    apps_to_download = query_api_calls_to_creative_scan(pgdb=pgdb)
     for i, app in apps_to_download.iterrows():
         logger.info(f"{i}/{apps_to_download.shape[0]:,}: {app['store_id']} start")
         pub_store_id = app["store_id"]
@@ -49,7 +47,7 @@ def download_all_mitms(database_connection: PostgresCon) -> None:
                 pass
 
 
-def open_all_local_mitms(database_connection: PostgresCon) -> pd.DataFrame:
+def open_all_local_mitms(pgdb: PostgresEngine) -> pd.DataFrame:
     """Opens and processes all local MITM log files into a combined DataFrame."""
     all_mitms_df = pd.DataFrame()
     i = 0
@@ -60,7 +58,7 @@ def open_all_local_mitms(database_connection: PostgresCon) -> pd.DataFrame:
         logger.info(f"{i}/{num_files}: {mitm_log_path}")
         pub_store_id = mitm_log_path.name.split("_")[0]
         run_id = mitm_log_path.name.split("_")[1].replace(".log", "")
-        df = parse_log(pub_store_id, run_id, database_connection)
+        df = parse_log(pub_store_id, run_id, pgdb)
         if "response_mime_type" in df.columns:
             df = add_is_creative_content_column(df)
             df["response_text"] = np.where(

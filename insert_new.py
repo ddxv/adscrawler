@@ -4,7 +4,7 @@ import yaml
 
 from adscrawler.dbcon.connection import get_db_connection
 
-database_connection = get_db_connection()
+pgdb = get_db_connection()
 
 
 def load_yaml_file(file_path: str) -> dict:
@@ -24,7 +24,7 @@ def main():
     category_id = data["category_id"]
     sdk_package_patterns = data["sdk_package_patterns"]
     try:
-        with database_connection.get_cursor() as cur:
+        with pgdb.get_cursor() as cur:
             company_id = insert_company_with_domain(
                 cur, company_name, domain, company_linkedin
             )

@@ -3,7 +3,7 @@ import time
 import pandas as pd
 
 from adscrawler.config import get_logger
-from adscrawler.dbcon.connection import PostgresCon
+from adscrawler.dbcon.connection import PostgresEngine
 from adscrawler.dbcon.queries import (
     get_version_code_dbid,
     insert_version_code,
@@ -33,13 +33,13 @@ logger = get_logger(__name__)
 
 
 def manual_download_app(
-    database_connection: PostgresCon,
+    pgdb: PostgresEngine,
     store_id: str,
     store: int,
 ) -> None:
     if store == 1:
         manual_process_download(
-            database_connection=database_connection,
+            pgdb=pgdb,
             store_id=store_id,
             store=store,
         )
@@ -50,11 +50,11 @@ def manual_download_app(
 
 
 def download_apps(
-    store: int, database_connection: PostgresCon, number_of_apps_to_pull: int = 20
+    store: int, pgdb: PostgresEngine, number_of_apps_to_pull: int = 20
 ) -> None:
     total_errors = 0
     apps = query_apps_to_download(
-        database_connection=database_connection,
+        pgdb=pgdb,
         store=store,
     )
     logger.info(
@@ -128,7 +128,7 @@ def download_apps(
                 version_str=download_result.version_str,
                 store_app=row.store_app,
                 crawl_result=download_result.crawl_result,
-                database_connection=database_connection,
+                pgdb=pgdb,
                 return_rows=False,
                 apk_hash=download_result.md5_hash,
             )
@@ -163,7 +163,7 @@ def download_apps(
 
 
 def process_sdks(
-    store: int, database_connection: PostgresCon, number_of_apps_to_pull: int = 20
+    store: int, pgdb: PostgresEngine, number_of_apps_to_pull: int = 20
 ) -> None:
     """
     Decompile the app into its various files and directories.
@@ -171,7 +171,7 @@ def process_sdks(
     All results are saved to the database.
     """
     apps = query_apps_to_sdk_scan(
-        database_connection=database_connection,
+        pgdb=pgdb,
         store=store,
     )
     apps["store"] = store
@@ -201,7 +201,7 @@ def process_sdks(
         version_code_dbid = get_version_code_dbid(
             store_app=store_app,
             version_code=version_str,
-            database_connection=database_connection,
+            pgdb=pgdb,
         )
         if version_code_dbid is None:
             if row["latest_version_code_db_id"] is not None:
@@ -232,14 +232,14 @@ def process_sdks(
 
         version_code_df.to_sql(
             "version_code_sdk_scan_results",
-            database_connection.engine,
+            pgdb.engine,
             if_exists="append",
             index=False,
         )
         if crawl_result == 1:
             upsert_sdk_details_df(
                 details_df=details_df,
-                database_connection=database_connection,
+                pgdb=pgdb,
                 store_id=store_id,
                 raw_txt_str=raw_txt_str,
             )

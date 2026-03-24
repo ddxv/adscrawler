@@ -14,7 +14,7 @@ from adscrawler.config import (
     MITM_DIR,
     get_logger,
 )
-from adscrawler.dbcon.connection import PostgresCon
+from adscrawler.dbcon.connection import PostgresEngine
 from adscrawler.dbcon.queries import query_countries
 from adscrawler.mitm_ad_parser.utils import get_tld
 from adscrawler.packages.storage import (
@@ -44,15 +44,13 @@ IGNORE_URLS = [
 
 
 def get_content_text(
-    tld_url: str, flowpart: http.HTTPFlow, database_connection: PostgresCon
+    tld_url: str, flowpart: http.HTTPFlow, pgdb: PostgresEngine
 ) -> str:
     """Decodes request or response content, handling AppLovin-specific decoding when needed."""
 
     if tld_url and "applovin.com" == tld_url and decode_from:
         try:
-            text = decode_from(
-                blob=flowpart.content, database_connection=database_connection
-            )
+            text = decode_from(blob=flowpart.content, pgdb=pgdb)
         except Exception:
             text = None
         if text is None:
@@ -69,10 +67,10 @@ def get_content_text(
 
 
 def get_mitm_df(
-    store_id: str, run_id: int, database_connection: PostgresCon
+    store_id: str, run_id: int, pgdb: PostgresEngine
 ) -> tuple[pd.DataFrame, str | None]:
     """Retrieves and filters creative content from MITM log data."""
-    df = parse_log(store_id, run_id, database_connection, include_all=True)
+    df = parse_log(store_id, run_id, pgdb, include_all=True)
     error_msg = None
     if df.empty:
         error_msg = "No data in mitm df"
@@ -87,16 +85,14 @@ def get_mitm_df(
     return df, error_msg
 
 
-def make_ip_geo_snapshot_df(
-    df: pd.DataFrame, database_connection: PostgresCon
-) -> pd.DataFrame:
+def make_ip_geo_snapshot_df(df: pd.DataFrame, pgdb: PostgresEngine) -> pd.DataFrame:
     """Appends geographical information based on IP addresses to the DataFrame.
 
     NOTE: This should only be done once when the flows are first parsed.
 
     IP to geo location changes over time (days/weeks), so subsequent calls to this function could have incorrect values.
     """
-    country_map = query_countries(database_connection)
+    country_map = query_countries(pgdb)
     df[["country_iso", "state_iso", "city_name", "org"]] = df["ip_address"].apply(
         lambda x: pd.Series(get_geo(x))
     )
@@ -114,7 +110,7 @@ def make_ip_geo_snapshot_df(
 def parse_log(
     store_id: str,
     run_id: int | None,
-    database_connection: PostgresCon,
+    pgdb: PostgresEngine,
     include_all: bool = False,
 ) -> pd.DataFrame:
     """Parses MITM proxy log files and extracts HTTP request/response data into a DataFrame."""
@@ -141,7 +137,7 @@ def parse_log(
                 flow_data = process_flow(
                     flow,
                     include_all=include_all,
-                    database_connection=database_connection,
+                    pgdb=pgdb,
                 )
                 parsed_flows.append(flow_data)
         except FlowReadException:
@@ -169,7 +165,7 @@ def parse_log(
 def process_flow(
     flow: http.HTTPFlow | tcp.TCPFlow,
     include_all: bool,
-    database_connection: PostgresCon,
+    pgdb: PostgresEngine,
 ) -> dict:
     if not isinstance(flow, (http.HTTPFlow, tcp.TCPFlow)):
         # These should be inspected and added
@@ -226,7 +222,7 @@ def process_flow(
                 flow=flow,
                 flow_data=flow_data,
                 tld_url=tld_url,
-                database_connection=database_connection,
+                pgdb=pgdb,
             )
     elif isinstance(flow, tcp.TCPFlow):
         flow_data = {
@@ -253,12 +249,10 @@ def append_additional_mitm_data(
     flow: http.HTTPFlow,
     flow_data: dict,
     tld_url: str,
-    database_connection: PostgresCon,
+    pgdb: PostgresEngine,
 ) -> dict:
     """Appends additional data from the mitm flow to the flow_data dictionary."""
-    flow_data["request_text"] = get_content_text(
-        tld_url, flow.request, database_connection
-    )
+    flow_data["request_text"] = get_content_text(tld_url, flow.request, pgdb)
     try:
         flow_data["content"] = flow.request.content
     except Exception:
@@ -275,9 +269,7 @@ def append_additional_mitm_data(
             flow_data["response_headers"] = dict(flow.response.headers)
         except Exception:
             flow_data["response_headers"] = {}
-        flow_data["response_text"] = get_content_text(
-            tld_url, flow.response, database_connection
-        )
+        flow_data["response_text"] = get_content_text(tld_url, flow.response, pgdb)
         try:
             flow_data["response_content"] = flow.response.content
         except Exception:

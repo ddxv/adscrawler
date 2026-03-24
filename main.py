@@ -18,7 +18,7 @@ from adscrawler.app_stores.scrape_stores import (
     update_app_details,
 )
 from adscrawler.config import get_logger
-from adscrawler.dbcon.connection import PostgresCon, get_db_connection
+from adscrawler.dbcon.connection import PostgresEngine, get_db_connection
 from adscrawler.mitm_ad_parser.mitm_scrape_ads import (
     parse_store_id_mitm_log,
     scan_all_apps,
@@ -43,7 +43,7 @@ STORES_MAP = {"google": 1, "apple": 2}
 class ProcessManager:
     def __init__(self) -> None:
         self.args: argparse.Namespace = self.parse_arguments()
-        self.pgcon: PostgresCon
+        self.pgcon: PostgresEngine
 
     def parse_arguments(self) -> argparse.Namespace:
         parser = argparse.ArgumentParser()
@@ -292,7 +292,7 @@ class ProcessManager:
             return self.check_extract_app_keywords_processes()
         return False
 
-    def setup_database_connection(self) -> None:
+    def setup_pgdb(self) -> None:
         self.pgcon = get_db_connection()
 
     def main(self) -> None:
@@ -352,7 +352,7 @@ class ProcessManager:
             raise ValueError(f"Invalid period {period}")
         try:
             import_ranks_from_s3(
-                database_connection=self.pgcon,
+                pgdb=self.pgcon,
                 start_date=start_date,
                 end_date=end_date,
                 period=period,
@@ -363,14 +363,14 @@ class ProcessManager:
             )
         for store in [1, 2]:
             try:
-                delete_and_aggregate_s3_agg(store=store, database_connection=self.pgcon)
+                delete_and_aggregate_s3_agg(store=store, pgdb=self.pgcon)
             except Exception:
                 logger.exception(f"Importing {store=} app metrics from s3 for failed")
         try:
             start_date = datetime.date.today() - datetime.timedelta(days=3)
             end_date = datetime.date.today() - datetime.timedelta(days=1)
             import_keywords_from_s3(
-                database_connection=self.pgcon,
+                pgdb=self.pgcon,
                 start_date=start_date,
                 end_date=end_date,
             )
@@ -379,15 +379,13 @@ class ProcessManager:
 
     def scrape_new_apps(self, store: int) -> None:
         try:
-            scrape_store_ranks(database_connection=self.pgcon, store=store)
+            scrape_store_ranks(pgdb=self.pgcon, store=store)
         except Exception:
             logger.exception("Crawling front pages failed")
 
     def scrape_new_apps_devs(self, store: int) -> None:
         try:
-            crawl_developers_for_new_store_ids(
-                database_connection=self.pgcon, store=store
-            )
+            crawl_developers_for_new_store_ids(pgdb=self.pgcon, store=store)
         except Exception:
             logger.exception(f"Crawling developers for {store=} failed")
 
@@ -399,7 +397,7 @@ class ProcessManager:
             return
         update_app_details(
             store=store,
-            database_connection=self.pgcon,
+            pgdb=self.pgcon,
             workers=int(self.args.workers),
             process_icon=self.args.process_icons,
             country_priority_group=self.args.country_priority_group,
@@ -413,26 +411,22 @@ class ProcessManager:
         if self.args.store_id:
             # For manually processing a single app
             manual_download_app(
-                database_connection=self.pgcon,
+                pgdb=self.pgcon,
                 store_id=self.args.store_id,
                 store=1,
             )
             return
         try:
-            download_apps(
-                store=store, database_connection=self.pgcon, number_of_apps_to_pull=30
-            )
+            download_apps(store=store, pgdb=self.pgcon, number_of_apps_to_pull=30)
         except Exception:
             logger.exception(f"Download app/decompile failing {store=}")
 
     def process_sdks(self, store: int) -> None:
-        process_sdks(
-            store=store, database_connection=self.pgcon, number_of_apps_to_pull=20
-        )
+        process_sdks(store=store, pgdb=self.pgcon, number_of_apps_to_pull=20)
 
     def creative_scan_all_apps(self) -> None:
         scan_all_apps(
-            database_connection=self.pgcon,
+            pgdb=self.pgcon,
             only_new_apps=self.args.creative_scan_new_apps,
             recent_months=self.args.creative_scan_recent_months,
             max_workers=int(self.args.workers),
@@ -440,7 +434,7 @@ class ProcessManager:
 
     def creative_scan_single_app(self) -> None:
         error_messages = parse_store_id_mitm_log(
-            database_connection=self.pgcon,
+            pgdb=self.pgcon,
             pub_store_id=self.args.store_id,
             run_id=self.args.run_id,
         )
@@ -457,7 +451,7 @@ class ProcessManager:
             timeout = self.args.timeout_waydroid
             run_name = "manual"
             manual_waydroid_process(
-                database_connection=self.pgcon,
+                pgdb=self.pgcon,
                 store_id=store_id,
                 timeout=timeout,
                 run_name=run_name,
@@ -465,24 +459,22 @@ class ProcessManager:
         else:
             # Default processing of apk/xapk files that need to be processed
             try:
-                process_apks_for_waydroid(database_connection=self.pgcon)
+                process_apks_for_waydroid(pgdb=self.pgcon)
             except Exception:
                 logger.exception("Process APKs with Waydroid failed")
 
     def crawl_keywords(self) -> None:
-        crawl_keyword_ranks(database_connection=self.pgcon)
+        crawl_keyword_ranks(pgdb=self.pgcon)
 
     def extract_app_keywords(self) -> None:
-        process_app_keywords(
-            database_connection=self.pgcon, limit=self.args.limit_query_rows
-        )
+        process_app_keywords(pgdb=self.pgcon, limit=self.args.limit_query_rows)
 
     def run(self) -> None:
         if self.args.limit_processes and self.is_script_already_running():
             logger.info("Script already running, exiting")
             sys.exit()
 
-        self.setup_database_connection()
+        self.setup_pgdb()
         self.main()
 
 

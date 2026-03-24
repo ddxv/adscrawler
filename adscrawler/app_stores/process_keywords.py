@@ -7,7 +7,7 @@ from collections import Counter
 import pandas as pd
 
 from adscrawler.config import get_logger
-from adscrawler.dbcon.connection import PostgresCon
+from adscrawler.dbcon.connection import PostgresEngine
 from adscrawler.dbcon.queries import (
     delete_and_insert,
     query_all_store_app_descriptions,
@@ -289,7 +289,7 @@ def extract_unique_app_keywords_from_text(
     # Remove stopwords from filtered keywords
     filtered_keywords = [kw for kw in filtered_keywords if kw not in mystopwords]
 
-    # keywords_base = query_keywords_base(database_connection)
+    # keywords_base = query_keywords_base(pgdb)
     # matched_base_keywords = keywords_base[
     #         keywords_base["keyword_text"].apply(lambda x: x in description_text)
     #     ]
@@ -322,7 +322,7 @@ def pos_filter_descriptions(texts: pd.Series, batch_size=1000) -> list[str]:
     return processed_texts
 
 
-def get_global_keywords(database_connection: PostgresCon) -> list[str]:
+def get_global_keywords(pgdb: PostgresEngine) -> list[str]:
     """Get the global keywords from the database.
     NOTE: This takes about ~5-8GB of RAM for 50k keywords and 200k descriptions. For now run manually.
     """
@@ -333,9 +333,7 @@ def get_global_keywords(database_connection: PostgresCon) -> list[str]:
 
     mystopwords = get_stopwords()
 
-    df = query_all_store_app_descriptions(
-        language_slug="en", database_connection=database_connection
-    )
+    df = query_all_store_app_descriptions(language_slug="en", pgdb=pgdb)
 
     # df = pd.read_pickle("descriptions_df.pkl")
 
@@ -377,12 +375,12 @@ def get_global_keywords(database_connection: PostgresCon) -> list[str]:
     return df, global_keywords
 
 
-def insert_global_keywords(database_connection: PostgresCon) -> None:
+def insert_global_keywords(pgdb: PostgresEngine) -> None:
     """Insert global keywords into the database.
     NOTE: This takes about ~15-20GB of RAM for 50k keywords and 3.5m descriptions. For now run manually.
     """
 
-    global_keywords = get_global_keywords(database_connection)
+    global_keywords = get_global_keywords(pgdb)
     global_keywords_df = pd.DataFrame(global_keywords, columns=["keyword_text"])
     table_name = "keywords"
     insert_columns = ["keyword_text"]
@@ -392,7 +390,7 @@ def insert_global_keywords(database_connection: PostgresCon) -> None:
         df=global_keywords_df,
         insert_columns=insert_columns,
         key_columns=key_columns,
-        database_connection=database_connection,
+        pgdb=pgdb,
         return_rows=True,
     )
     keywords_df = keywords_df.rename(columns={"id": "keyword_id"})
@@ -406,14 +404,14 @@ def insert_global_keywords(database_connection: PostgresCon) -> None:
     # Replace old base keywords
     keywords_df.to_sql(
         name=table_name,
-        con=database_connection.engine,
+        con=pgdb.engine,
         if_exists="replace",
         index=False,
         schema="public",
     )
 
 
-def process_app_keywords(database_connection: PostgresCon, limit: int) -> None:
+def process_app_keywords(pgdb: PostgresEngine, limit: int) -> None:
     """Process app keywords.
 
     While Python might be less efficient than SQL it's more flexible for
@@ -421,20 +419,18 @@ def process_app_keywords(database_connection: PostgresCon, limit: int) -> None:
     This way apps can be processed in batches and only when really needed.
     """
     logger.info(f"Extracting app keywords for {limit=} apps")
-    extract_app_keywords_from_descriptions(database_connection, limit)
+    extract_app_keywords_from_descriptions(pgdb, limit)
     logger.info("Extracted app keywords finished")
 
 
-def extract_app_keywords_from_descriptions(
-    database_connection: PostgresCon, limit: int
-) -> None:
+def extract_app_keywords_from_descriptions(pgdb: PostgresEngine, limit: int) -> None:
     """Process keywords for app descriptions."""
     log_info = "Extracting keywords from app descriptions"
 
-    description_df = query_apps_to_process_keywords(database_connection, limit=limit)
+    description_df = query_apps_to_process_keywords(pgdb, limit=limit)
     logger.info(f"{log_info} count={len(description_df)}")
 
-    keywords_base = query_keywords_base(database_connection)
+    keywords_base = query_keywords_base(pgdb)
     keywords_base["keyword_text"] = (
         " " + keywords_base["keyword_text"].str.lower() + " "
     )
@@ -476,7 +472,7 @@ def extract_app_keywords_from_descriptions(
         df=main_keywords_df,
         table_name=table_name,
         schema="public",
-        database_connection=database_connection,
+        pgdb=pgdb,
         insert_columns=insert_columns,
         delete_by_keys=["store_app"],
         delete_keys_have_duplicates=True,
@@ -488,7 +484,7 @@ def extract_app_keywords_from_descriptions(
     apps_extracted_df["extracted_at"] = apps_extracted_df["extracted_at"]
     apps_extracted_df.to_sql(
         name=table_name,
-        con=database_connection.engine,
+        con=pgdb.engine,
         if_exists="append",
         index=False,
         schema="logging",
