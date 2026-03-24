@@ -53,7 +53,7 @@ def start_weston() -> subprocess.Popen | None:
 
     if is_weston_process_running():
         logger.info("Weston process already running, not starting again")
-        return
+        return None
 
     weston_process = subprocess.Popen(
         [
