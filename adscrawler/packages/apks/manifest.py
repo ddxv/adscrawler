@@ -160,7 +160,9 @@ def xml_to_dataframe(root: ElementTree.Element) -> pd.DataFrame:
     return df
 
 
-def process_manifest(store_id: str, store: int) -> tuple[pd.DataFrame, int, str, str]:
+def process_manifest(
+    store_id: str, store: int, specific_version_str: str | None = None
+) -> tuple[pd.DataFrame, int, str, str]:
     """Process an APKs manifest.
     Due to the original implementation, this still downloads, processes manifest and saves the version_details.
     """
@@ -171,7 +173,9 @@ def process_manifest(store_id: str, store: int) -> tuple[pd.DataFrame, int, str,
     manifest_str = ""
 
     try:
-        apk_path, version_str = download_app_to_local(store=store, store_id=store_id)
+        apk_path, version_str = download_app_to_local(
+            store=store, store_id=store_id, version_str=specific_version_str
+        )
         if apk_path is None:
             raise FileNotFoundError(f"APK file not found for {store_id=}")
 

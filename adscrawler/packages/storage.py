@@ -6,19 +6,15 @@ import time
 
 import boto3
 import duckdb
-import numpy as np
 import pandas as pd
 from botocore.exceptions import ClientError
 
 from adscrawler.config import (
-    APKS_DIR,
     APKS_INCOMING_DIR,
     CONFIG,
     CREATIVE_RAW_DIR,
-    IPAS_DIR,
     IPAS_INCOMING_DIR,
     MITM_DIR,
-    XAPKS_DIR,
     XAPKS_INCOMING_DIR,
     get_logger,
 )
@@ -26,11 +22,7 @@ from adscrawler.dbcon.connection import PostgresEngine, start_ssh_tunnel
 from adscrawler.dbcon.queries import query_latest_api_scan_by_store_id
 from adscrawler.packages.utils import (
     get_local_file_path,
-    get_md5_hash,
-    get_version,
     move_downloaded_app_to_main_dir,
-    remove_tmp_files,
-    unzip_apk,
 )
 
 logger = get_logger(__name__)
@@ -263,30 +255,6 @@ def upload_apk_to_s3(
         logger.error(f"S3 upload failed apk={store_id}")
 
 
-def get_downloaded_apk_files(extension: str) -> list[str]:
-    """Get all downloaded files of a given extension."""
-    if extension == "apk":
-        main_dir = APKS_DIR
-    elif extension == "xapk":
-        main_dir = XAPKS_DIR
-    elif extension == "ipa":
-        main_dir = IPAS_DIR
-    elif extension == "xapk-incoming":
-        main_dir = XAPKS_INCOMING_DIR
-        extension = "xapk"
-    else:
-        raise ValueError(f"Invalid extension: {extension}")
-    files = []
-    for file in pathlib.Path(main_dir).glob(f"*.{extension}"):
-        file_name = file.stem
-        # Check if the file has a 32-character MD5 hash at the end
-        if len(file_name) > 33 and file_name[-33] == "_" and file_name[-32:].isalnum():
-            # Remove the hash and any preceding underscore
-            file_name = file_name[:-33]  # Remove hash and underscore
-        files.append(file_name)
-    return files
-
-
 def get_downloaded_mitm_files(pgdb: PostgresEngine) -> pd.DataFrame:
     """Get all downloaded files of a given extension."""
 
@@ -340,107 +308,6 @@ def move_local_mitm_files_to_s3(pgdb: PostgresEngine) -> None:
         else:
             logger.error(f"S3 upload failed for mitm logs {store_id}")
         os.system(f"mv {file_path} /home/adscrawler/completed-mitm-logs/{store_id}.log")
-
-
-def move_local_apk_files_to_s3() -> None:
-    """Upload all local apk/ipa/xapk files to s3.
-
-    This is for occasional MANUAL PROCESSING.
-    """
-
-    apks = get_downloaded_apk_files(extension="apk")
-    xapks = get_downloaded_apk_files(extension="xapk")
-    xapks_incoming = get_downloaded_apk_files(extension="xapk-incoming")
-    ipas = get_downloaded_apk_files(extension="ipa")
-
-    files = (
-        [{"file_type": "apk", "package_name": apk} for apk in apks]
-        + [{"file_type": "xapk", "package_name": xapk} for xapk in xapks]
-        + [
-            {"file_type": "xapk", "package_name": xapk_incoming}
-            for xapk_incoming in xapks_incoming
-        ]
-        + [{"file_type": "ipa", "package_name": ipa} for ipa in ipas]
-    )
-    fdf = pd.DataFrame(files)
-
-    fdf["store"] = np.where(fdf["file_type"] == "ipa", 2, 1)
-
-    s3_client = get_s3_client()
-    missing_files = pd.DataFrame()
-    failed_files = pd.DataFrame()
-    for _, row in fdf.iterrows():
-        logger.info(f"{_}/{fdf.shape[0]:,}")
-        df = pd.DataFrame()
-        try:
-            df = get_store_id_apk_s3_keys(
-                store=row["store"], store_id=row["package_name"]
-            )
-        except Exception:
-            logger.exception(f"Failed to get {row['package_name']} s3 keys")
-            failed_files = pd.concat([failed_files, row])
-            continue
-        if df.empty:
-            logger.info(f"Not in S3: {row['package_name']}")
-            missing_files = pd.concat([missing_files, row])
-            continue
-        elif df[~(df["version_code"] == "failed")].empty:
-            logger.info(f"One Failed version_code found for {row['package_name']}")
-            failed_files = pd.concat([failed_files, row])
-            continue
-        else:
-            continue
-
-    logger.info(f"Missing files: {missing_files.shape[0]:,}")
-    logger.info(f"Failed files: {failed_files.shape[0]:,}")
-
-    for _, row in fdf.iterrows():
-        logger.info(f"S3 processing {row['package_name']}")
-        store_id = row.package_name
-        extension = row.file_type
-        if extension == "apk":
-            file_path = pathlib.Path(APKS_DIR, f"{row['package_name']}.{extension}")
-            store_name = "android"
-        elif extension == "xapk":
-            file_path = pathlib.Path(XAPKS_DIR, f"{row['package_name']}.{extension}")
-            store_name = "android"
-        elif extension == "ipa":
-            file_path = pathlib.Path(IPAS_DIR, f"{row['package_name']}.{extension}")
-            store_name = "ios"
-        else:
-            raise ValueError(f"Invalid extension: {extension}")
-        try:
-            apk_tmp_decoded_output_path = unzip_apk(
-                store_id=store_id, file_path=file_path
-            )
-            apktool_info_path = pathlib.Path(apk_tmp_decoded_output_path, "apktool.yml")
-            version_str = get_version(apktool_info_path)
-            md5_hash = get_md5_hash(file_path)
-            s3_key = f"apks/{store_name}/{store_id}/{version_str}/{store_id}_{md5_hash}.{extension}"
-            metadata = {
-                "store_id": store_id,
-                "version_code": version_str,
-                "md5": md5_hash,
-            }
-        except Exception:
-            logger.exception(f"S3 failed to process {store_id}")
-            s3_key = f"apks/{store_name}/{store_id}/failed/{store_id}.{extension}"
-            metadata = {"store_id": store_id, "version_code": "failed", "md5": "failed"}
-        s3_client = get_s3_client()
-        response = s3_client.put_object(
-            Bucket=CONFIG["s3"]["bucket"],
-            Key=s3_key,
-            Body=file_path.read_bytes(),
-            Metadata=metadata,
-        )
-        if response["ResponseMetadata"]["HTTPStatusCode"] == 200:
-            logger.info(f"S3 uploaded apk {store_id}")
-        else:
-            logger.error(f"S3 upload failed for {store_id}")
-        remove_tmp_files(store_id)
-        os.system(
-            f"mv {file_path} /home/james/apk-files/{extension}s-tmp/{store_id}.{extension}"
-        )
 
 
 def get_store_id_mitm_s3_keys(store_id: str) -> pd.DataFrame:

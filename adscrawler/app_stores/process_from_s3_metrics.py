@@ -140,13 +140,10 @@ def delete_and_aggregate_s3_agg(
     raw_data_lookback_days = 3
     # Rerun this week daily and last week at least once
     raw_weekly_lookback_days = 8
-    raw_weekly_lookback_days = 500
     interpolate_query_lookback_days = 180
-    interpolate_query_lookback_days = 700
     # Delete window: only remove what we're confident we'll rewrite
     interpolate_delete_lookback_days = 90
-    interpolate_delete_lookback_days = 600
-    db_delete_lookback_days = 420
+    db_delete_lookback_days = 30
 
     # Raw data to agg by DAY
     # Purely additive, only needs to be run once for 'yesterday'
@@ -191,7 +188,6 @@ def delete_and_aggregate_s3_agg(
             hash_bucket=hash_bucket,
             end_date=end_date,
         )
-
         # This can run for last 30 days only
         db_delete_start = end_date - datetime.timedelta(days=db_delete_lookback_days)
         process_app_metrics_to_db(
