@@ -234,8 +234,8 @@ combined AS (
     FROM
         scheduled_apps_crawl
     WHERE
-        failed_attempts_month < 2
-        AND failed_attempts_quarter < 4
+        failed_attempts_month < 3
+        AND failed_attempts_quarter < 6
         AND (
             last_downloaded_at IS NULL
             OR last_downloaded_at < current_date - interval '120 days'
