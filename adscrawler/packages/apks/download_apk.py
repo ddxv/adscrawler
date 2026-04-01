@@ -2,12 +2,15 @@
 """Download APK files from with Python."""
 
 import pathlib
+import shutil
 import subprocess
+import zipfile
 
 import requests
 
 from adscrawler.config import (
     APKS_INCOMING_DIR,
+    SPLITS_INCOMING_DIR,
     XAPKS_INCOMING_DIR,
     get_logger,
 )
@@ -29,7 +32,7 @@ from adscrawler.packages.utils import (
     unzip_apk,
 )
 
-APK_SOURCES = ["apkpure", "apkmirror"]
+APK_SOURCES = ["gplaydl", "apkpure", "apkmirror"]
 
 
 logger = get_logger(__name__, "download_apk")
@@ -154,34 +157,9 @@ def get_download_url(store_id: str, source: str) -> str:
         raise ValueError(f"Invalid source: {source}")
 
 
-def external_download(store_id: str) -> pathlib.Path:
-    """Download the apk file.
-
-    Downloaded APK or XAPK files are stored in the incoming directories while processing in this script.
-    After processing, they are moved to the main apk/xapk directory.
-
-    store_id: str the id of the android apk
-    do_redownload: bool if True, download the apk even if it already exists
-    source: str the source of the download
-    """
-
-    func_info = f"download {store_id=}"
-
-    for source in APK_SOURCES:
-        try:
-            download_url = get_download_url(store_id, source)
-            break
-        except Exception as e:
-            logger.error(f"{func_info} {source=}: {e}")
-            continue
-    if not download_url:
-        raise requests.exceptions.HTTPError(
-            f"{store_id=} no download URL found for any source."
-        )
-
-    func_info = f"download {store_id=} {source=}"
+def download_from_url(download_url: str, store_id: str) -> pathlib.Path:
+    func_info = f"download_from_url {store_id=}"
     logger.info(f"{func_info} start")
-
     r = requests.get(
         download_url,
         headers={
@@ -191,10 +169,6 @@ def external_download(store_id: str) -> pathlib.Path:
         timeout=10,
     )
     if r.status_code == 200:
-        # Try to get extension from Content-Type header
-        # content_type = r.headers.get("Content-Type", "")
-        # logger.info(f"Received file with Content-Type: {content_type}")
-
         # Try different methods to determine extension
         extension = ".apk"  # default fallback
 
@@ -224,4 +198,63 @@ def external_download(store_id: str) -> pathlib.Path:
         logger.error(f"{func_info} {r.status_code=} {r.text[:20]}")
         raise requests.exceptions.HTTPError
     logger.info(f"{func_info} finished")
+    return apk_filepath
+
+
+def gplaydl_download(store_id: str) -> pathlib.Path:
+    destination_dir = pathlib.Path(SPLITS_INCOMING_DIR, store_id)
+    subprocess.run(["gplaydl", "auth"], check=True)
+    subprocess.run(["gplaydl", "download", store_id, "-o", destination_dir], check=True)
+    # get the downloaded file path
+    downloaded_files = list(destination_dir.glob("*"))
+    if not downloaded_files:
+        raise FileNotFoundError(f"No file downloaded for {store_id=}")
+    # Rename downloaded file to {store_id}.apk from {store_id}-version.apk
+    found_base_apk = False
+    for file in downloaded_files:
+        if file.suffix in [".apk"]:
+            parts = file.name.split("-")
+            if len(parts) == 2:
+                shutil.move(
+                    file, pathlib.Path(destination_dir, f"{store_id}{file.suffix}")
+                )
+                found_base_apk = True
+    if not found_base_apk:
+        raise FileNotFoundError(f"No base apk found for {store_id=}")
+    # Zip the directory to create an xapk
+    xapk_path = pathlib.Path(XAPKS_INCOMING_DIR, f"{store_id}.xapk")
+    with zipfile.ZipFile(xapk_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        for file in sorted(destination_dir.iterdir()):
+            if file.is_file():
+                archive.write(file, arcname=file.name)
+    return xapk_path
+
+
+def external_download(store_id: str) -> pathlib.Path:
+    """Download the apk file.
+
+    Downloaded APK or XAPK files are stored in the incoming directories while processing in this script.
+    After processing, they are moved to the main apk/xapk directory.
+
+    store_id: str the id of the android apk
+    do_redownload: bool if True, download the apk even if it already exists
+    source: str the source of the download
+    """
+
+    for source in APK_SOURCES:
+        func_info = f"download {store_id=} {source=}"
+        try:
+            if source == "gplaydl":
+                apk_filepath = gplaydl_download(store_id)
+            else:
+                download_url = get_download_url(store_id, source)
+                apk_filepath = download_from_url(download_url, store_id)
+            break
+        except Exception as e:
+            logger.error(f"{func_info}: {e}")
+            continue
+    if not download_url:
+        raise requests.exceptions.HTTPError(
+            f"{store_id=} no download URL found for any source."
+        )
     return apk_filepath

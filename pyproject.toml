@@ -30,6 +30,7 @@ dependencies = [
     "imagehash",
     "protod",
     "pyarrow",
+    "gplaydl",
 ]
 
 

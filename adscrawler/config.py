@@ -34,6 +34,7 @@ INCOMING_DIR = pathlib.Path(APP_FILES_DIR, "incoming")
 APKS_INCOMING_DIR = pathlib.Path(INCOMING_DIR, "apks")
 XAPKS_INCOMING_DIR = pathlib.Path(INCOMING_DIR, "xapks")
 IPAS_INCOMING_DIR = pathlib.Path(INCOMING_DIR, "ipas")
+SPLITS_INCOMING_DIR = pathlib.Path(INCOMING_DIR, "splits")
 
 # Processed and ready for use
 APKS_DIR = pathlib.Path(APP_FILES_DIR, "apks")
@@ -112,6 +113,7 @@ def check_dirs() -> None:
         APKS_INCOMING_DIR,
         XAPKS_INCOMING_DIR,
         IPAS_INCOMING_DIR,
+        SPLITS_INCOMING_DIR,
         GEO_DATA_DIR,
         APP_ICONS_TMP_DIR,
     ]
