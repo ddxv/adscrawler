@@ -254,7 +254,8 @@ def external_download(store_id: str) -> pathlib.Path:
             else:
                 download_url = get_download_url(store_id, source)
                 apk_filepath = download_from_url(download_url, store_id)
-            break
+            if apk_filepath:
+                break
         except Exception as e:
             logger.error(f"{func_info}: {e}")
             continue
