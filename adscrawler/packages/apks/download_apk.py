@@ -53,8 +53,9 @@ def manual_process_download(
             store_id=store_id,
             existing_local_file_path=existing_local_file_path,
         )
+    version_str = download_result.version_str or FAILED_VERSION_STR
     insert_version_code(
-        version_str=download_result.version_str,
+        version_str=version_str,
         store_app=store_app,
         crawl_result=download_result.crawl_result,
         pgdb=pgdb,
@@ -71,7 +72,7 @@ def manual_process_download(
             store_id,
             download_result.downloaded_file_path.suffix.replace(".", ""),
             download_result.md5_hash,
-            download_result.version_str,
+            version_str,
             download_result.downloaded_file_path,
         )
         move_downloaded_app_to_main_dir(download_result.downloaded_file_path)
