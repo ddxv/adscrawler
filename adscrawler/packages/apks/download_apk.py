@@ -205,7 +205,7 @@ def download_from_url(download_url: str, store_id: str) -> pathlib.Path:
 
 def gplaydl_download(store_id: str) -> pathlib.Path:
     destination_dir = pathlib.Path(SPLITS_INCOMING_DIR, store_id)
-    gplaydl_path = pathlib.PATH(sys.prefix, "bin", "gplaydl")
+    gplaydl_path = pathlib.Path(sys.prefix, "bin", "gplaydl")
     subprocess.run([str(gplaydl_path), "auth"], check=True)
     subprocess.run(
         [str(gplaydl_path), "download", store_id, "-o", destination_dir], check=True
