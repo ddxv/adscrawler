@@ -242,25 +242,22 @@ def external_download(store_id: str) -> pathlib.Path:
     After processing, they are moved to the main apk/xapk directory.
 
     store_id: str the id of the android apk
-    do_redownload: bool if True, download the apk even if it already exists
-    source: str the source of the download
     """
-
     for source in APK_SOURCES:
         func_info = f"download {store_id=} {source=}"
         try:
             if source == "gplaydl":
                 apk_filepath = gplaydl_download(store_id)
+                if apk_filepath:
+                    return apk_filepath
             else:
                 download_url = get_download_url(store_id, source)
                 apk_filepath = download_from_url(download_url, store_id)
-            if apk_filepath:
-                break
+                if apk_filepath:
+                    return apk_filepath
         except Exception as e:
             logger.error(f"{func_info}: {e}")
             continue
-    if not download_url:
-        raise requests.exceptions.HTTPError(
-            f"{store_id=} no download URL found for any source."
-        )
-    return apk_filepath
+    raise requests.exceptions.HTTPError(
+        f"{store_id=} no download found for any source."
+    )
