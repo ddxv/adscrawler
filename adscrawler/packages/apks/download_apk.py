@@ -4,6 +4,7 @@
 import pathlib
 import shutil
 import subprocess
+import sys
 import zipfile
 
 import requests
@@ -204,8 +205,11 @@ def download_from_url(download_url: str, store_id: str) -> pathlib.Path:
 
 def gplaydl_download(store_id: str) -> pathlib.Path:
     destination_dir = pathlib.Path(SPLITS_INCOMING_DIR, store_id)
-    subprocess.run(["gplaydl", "auth"], check=True)
-    subprocess.run(["gplaydl", "download", store_id, "-o", destination_dir], check=True)
+    gplaydl_path = pathlib.PATH(sys.prefix, "bin", "gplaydl")
+    subprocess.run([str(gplaydl_path), "auth"], check=True)
+    subprocess.run(
+        [str(gplaydl_path), "download", store_id, "-o", destination_dir], check=True
+    )
     # get the downloaded file path
     downloaded_files = list(destination_dir.glob("*"))
     if not downloaded_files:

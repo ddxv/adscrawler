@@ -417,7 +417,7 @@ class ProcessManager:
             )
             return
         try:
-            download_apps(store=store, pgdb=self.pgcon, number_of_apps_to_pull=30)
+            download_apps(store=store, pgdb=self.pgcon, number_of_apps_to_pull=50)
         except Exception:
             logger.exception(f"Download app/decompile failing {store=}")
 
