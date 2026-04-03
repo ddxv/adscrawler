@@ -343,12 +343,12 @@ def make_s3_app_hash_metrics_history_daily(
         f"{RAW_DATA_PREFIX}/store={store}/crawled_date={snapshot_date_str}/country="
     )
     all_parquet_paths = get_parquet_paths_by_prefix(bucket, prefix)
-    # hex_values = [f"{i:02x}" for i in range(256)]
-    # for hex_val in hex_values:
-    #     agg_prefix = f"{AGG_APP_HASH_BUCKETS}/store={store}/hash_bucket={hex_val}/snapshot_date={snapshot_date_str}/"
-    #     delete_s3_objects_by_prefix(
-    #         bucket=bucket, prefix=agg_prefix, key_name=s3_config_key
-    #     )
+    hex_values = [f"{i:02x}" for i in range(256)]
+    for hex_val in hex_values:
+        agg_prefix = f"{AGG_APP_HASH_BUCKETS_DAILY}/store={store}/hash_bucket={hex_val}/snapshot_date={snapshot_date_str}/"
+        delete_s3_objects_by_prefix(
+            bucket=bucket, prefix=agg_prefix, key_name=s3_config_key
+        )
     if len(all_parquet_paths) == 0:
         logger.error(
             f"No app detail parquet files found for store={store} snapshot_date={snapshot_date_str}"
