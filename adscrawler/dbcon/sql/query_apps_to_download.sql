@@ -208,7 +208,7 @@ combined AS (
     FROM
         user_requested_apps_crawl
     WHERE
-        failed_attempts_month < 3
+        failed_attempts_month < 4
     UNION ALL
     SELECT
         store_app,
