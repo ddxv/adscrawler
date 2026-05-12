@@ -5,8 +5,8 @@ from adscrawler.dbcon.queries import query_zscores
 
 pgdb = get_db_connection()
 
-start_date = "2026-02-01"
-end_date = "2026-02-28"
+start_date = "2026-03-01"
+end_date = "2026-03-31"
 for week in pd.date_range(start=start_date, end=end_date, freq="W-MON"):
     df = query_zscores(pgdb, target_week=week)
     df.to_sql(

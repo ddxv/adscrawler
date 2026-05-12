@@ -413,10 +413,19 @@ def download_app_by_store_id(
     if version_str and version_str != "-1":
         df = df[df["version_code"] == version_str]
         final_version_str = version_str
+        try:
+            key = df["key"].to_numpy()[0]
+        except IndexError:
+            logger.error(
+                f"S3 no apk found for {store_id=} with version_code={version_str}"
+            )
+            raise FileNotFoundError(
+                f"S3 no apk found for {store_id=} with version_code={version_str}"
+            )
     else:
         df = df.sort_values(by="version_code", ascending=False)
         final_version_str = str(df["version_code"].to_numpy()[0])
-    key = df["key"].to_numpy()[0]
+        key = df["key"].to_numpy()[0]
     filename = key.split("/")[-1]
     extension = filename.split(".")[-1]
     if extension == "apk":
