@@ -15,7 +15,7 @@ WITH latest_version_codes AS (
         -- regardless if it that version was rescanned later it would have the same or better data
         AND vc_1.created_at
         >= '2025-01-01 00:00:00'::timestamp without time zone
-        AND vc_1.created_at < :first_date_of_next_period
+        AND vc_1.created_at < :start_of_next_period
     ORDER BY
         vc_1.store_app,
         (string_to_array(vc_1.version_code::text, '.'::text)::bigint []) DESC
@@ -52,7 +52,7 @@ api_based_companies AS (
     LEFT JOIN domains AS cad_1 ON c_1.domain_id = cad_1.id
     WHERE
         saac.called_at >= '2025-01-01 00:00:00'::timestamp without time zone
-        AND saac.called_at < :first_date_of_next_period
+        AND saac.called_at < :start_of_next_period
 ), sdk_based_companies AS (
     SELECT DISTINCT
         sasd.store_app,
