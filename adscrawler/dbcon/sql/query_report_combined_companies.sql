@@ -87,7 +87,7 @@ api_based_companies AS (
         sdk_based_companies.ad_domain,
         sdk_based_companies.tag_source
     FROM sdk_based_companies
-),
+)
 SELECT
     cs.ad_domain,
     cs.store_app,
