@@ -35,17 +35,12 @@ store_app_sdk_strings_2025_h2 AS (
 api_based_companies AS (
     SELECT DISTINCT
         saac.store_app,
-        cm.mapped_category AS app_category,
         cdm.company_id,
         c_1.parent_company_id AS parent_id,
         'api_call'::text AS tag_source,
         coalesce(cad_1.domain_name, saac.tld_url::character varying)
             AS ad_domain
     FROM api_calls AS saac
-    LEFT JOIN store_apps AS sa_1 ON saac.store_app = sa_1.id
-    LEFT JOIN
-        category_mapping AS cm
-        ON sa_1.category::text = cm.original_category::text
     LEFT JOIN domains AS ad_1 ON saac.tld_url = ad_1.domain_name::text
     LEFT JOIN adtech.company_domain_mapping AS cdm ON ad_1.id = cdm.domain_id
     LEFT JOIN adtech.companies AS c_1 ON cdm.company_id = c_1.id
@@ -56,7 +51,6 @@ api_based_companies AS (
 ), sdk_based_companies AS (
     SELECT DISTINCT
         sasd.store_app,
-        cm.mapped_category AS app_category,
         sac.company_id,
         ad_1.domain_name AS ad_domain,
         'sdk'::text AS tag_source,
@@ -65,14 +59,43 @@ api_based_companies AS (
     LEFT JOIN adtech.sdks AS sac ON sasd.sdk_id = sac.id
     LEFT JOIN adtech.companies AS c_1 ON sac.company_id = c_1.id
     LEFT JOIN domains AS ad_1 ON c_1.domain_id = ad_1.id
-    LEFT JOIN store_apps AS sa_1 ON sasd.store_app = sa_1.id
+),
+distinct_ad_and_pub_domains AS (
+    SELECT DISTINCT
+        pd.domain_name AS publisher_domain_url,
+        ad_1.domain_name AS ad_domain_url,
+        aae.relationship
+    FROM app_ads_entrys AS aae
+    LEFT JOIN domains AS ad_1 ON aae.ad_domain = ad_1.id
+    LEFT JOIN app_ads_map AS aam ON aae.id = aam.app_ads_entry
+    LEFT JOIN domains AS pd ON aam.pub_domain = pd.id
+    LEFT JOIN adstxt_crawl_results AS pdcr ON pd.id = pdcr.domain_id
+    -- Earliest data in adstxt_crawl_results is 2025-10-10
+    WHERE
+        pdcr.crawled_at < :start_of_next_period
+        AND (pdcr.crawled_at - aam.updated_at) < '01:00:00'::interval
+        AND aae.relationship = 'DIRECT'
+), adstxt_based_companies AS (
+    SELECT DISTINCT
+        aum.store_app,
+        c_1.id AS company_id,
+        pnv.ad_domain_url AS ad_domain,
+        'app_ads_direct'::text AS tag_source,
+        coalesce(c_1.parent_company_id, c_1.id) AS parent_id
+    FROM app_urls_map AS aum
+    LEFT JOIN domains AS pd ON aum.pub_domain = pd.id
     LEFT JOIN
-        category_mapping AS cm
-        ON sa_1.category::text = cm.original_category::text
-), combined_sources AS (
+        distinct_ad_and_pub_domains AS pnv
+        ON pd.domain_name::text = pnv.publisher_domain_url::text
+    LEFT JOIN
+        domains AS ad_1
+        ON pnv.ad_domain_url::text = ad_1.domain_name::text
+    LEFT JOIN adtech.companies AS c_1 ON ad_1.id = c_1.domain_id
+    WHERE (pnv.ad_domain_url IS NOT NULL OR c_1.id IS NOT NULL)
+),
+combined_sources AS (
     SELECT
         api_based_companies.store_app,
-        api_based_companies.app_category,
         api_based_companies.company_id,
         api_based_companies.parent_id,
         api_based_companies.ad_domain,
@@ -81,12 +104,19 @@ api_based_companies AS (
     UNION ALL
     SELECT
         sdk_based_companies.store_app,
-        sdk_based_companies.app_category,
         sdk_based_companies.company_id,
         sdk_based_companies.parent_id,
         sdk_based_companies.ad_domain,
         sdk_based_companies.tag_source
     FROM sdk_based_companies
+    UNION ALL
+    SELECT
+        adstxt_based_companies.store_app,
+        adstxt_based_companies.company_id,
+        adstxt_based_companies.parent_id,
+        adstxt_based_companies.ad_domain,
+        adstxt_based_companies.tag_source
+    FROM adstxt_based_companies
 )
 SELECT
     cs.ad_domain,
@@ -95,8 +125,7 @@ SELECT
     coalesce(c.parent_company_id, c.id) AS parent_id,
     bool_or(cs.tag_source = 'sdk'::text) AS sdk,
     bool_or(cs.tag_source = 'api_call'::text) AS api_call,
-    bool_or(cs.tag_source = 'app_ads_direct'::text) AS app_ads_direct,
-    bool_or(cs.tag_source = 'app_ads_reseller'::text) AS app_ads_reseller
+    bool_or(cs.tag_source = 'app_ads_direct'::text) AS app_ads_direct
 FROM combined_sources AS cs
 LEFT JOIN domains AS ad ON cs.ad_domain::text = ad.domain_name::text
 LEFT JOIN adtech.companies AS c ON ad.id = c.domain_id
