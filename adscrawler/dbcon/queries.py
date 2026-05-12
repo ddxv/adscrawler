@@ -38,6 +38,7 @@ QUERY_API_CALLS_TO_CREATIVE_SCAN = load_sql_file("query_apps_to_creative_scan.sq
 QUERY_KEYWORDS_TO_CRAWL = load_sql_file("query_keywords_to_crawl.sql")
 QUERY_APPS_MITM_IN_S3 = load_sql_file("query_apps_mitm_in_s3.sql")
 QUERY_REPORT_ZSCORES = load_sql_file("query_report_z_scores.sql")
+QUERY_REPORT_COMBINED_COMPANIES = load_sql_file("query_report_combined_companies.sql")
 QUERY_APPS_TO_PROCESS_KEYWORDS = load_sql_file("query_apps_to_process_keywords.sql")
 
 
@@ -89,13 +90,11 @@ def insert_df(
     else:
         returning_clause = SQL("")
 
-    insert_query = SQL(
-        """
+    insert_query = SQL("""
         INSERT INTO {table} ({columns})
         VALUES ({placeholders})
         {returning_clause}
-    """
-    ).format(
+    """).format(
         table=table_identifier,
         columns=columns,
         placeholders=placeholders,
@@ -213,26 +212,22 @@ def update_from_df(
             SQL("{col} = %s").format(col=Identifier(col)) for col in key_columns
         )
     if return_rows:
-        update_query = SQL(
-            """
+        update_query = SQL("""
             UPDATE {table}
             SET {update_set}
             WHERE {where_conditions}
             RETURNING *
-            """
-        ).format(
+            """).format(
             table=table_identifier,
             update_set=update_set,
             where_conditions=where_conditions,
         )
     else:
-        update_query = SQL(
-            """
+        update_query = SQL("""
             UPDATE {table}
             SET {update_set}
             WHERE {where_conditions}
-            """
-        ).format(
+            """).format(
             table=table_identifier,
             update_set=update_set,
             where_conditions=where_conditions,
@@ -401,14 +396,12 @@ def upsert_df(
         action_clause = SQL("DO NOTHING")
 
     # Upsert query without RETURNING clause
-    upsert_query = SQL(
-        """
+    upsert_query = SQL("""
         INSERT INTO {table} ({columns})
         VALUES ({placeholders})
         ON CONFLICT ({conflict_columns})
         {action_clause}
-    """
-    ).format(
+    """).format(
         table=table_identifier,
         columns=columns,
         placeholders=placeholders,
@@ -425,12 +418,10 @@ def upsert_df(
         for col in key_columns
     )
 
-    select_query = SQL(
-        """
+    select_query = SQL("""
         SELECT * FROM {table}
         WHERE {where_conditions}
-    """
-    ).format(table=table_identifier, where_conditions=sel_where_conditions)
+    """).format(table=table_identifier, where_conditions=sel_where_conditions)
     if log:
         logger.info(f"Upsert query: {upsert_query.as_string(raw_conn)}")
         logger.info(f"Select query: {select_query.as_string(raw_conn)}")
@@ -471,8 +462,7 @@ def upsert_df(
 
 def clean_app_ranks_weekly_table(pgdb: PostgresEngine) -> None:
     batch_size = 100000
-    del_query = text(
-        f"""
+    del_query = text(f"""
         DELETE FROM frontend.store_app_ranks_weekly
         WHERE ctid IN (
             SELECT ctid FROM frontend.store_app_ranks_weekly
@@ -480,8 +470,7 @@ def clean_app_ranks_weekly_table(pgdb: PostgresEngine) -> None:
               AND EXTRACT(DOW FROM crawled_date) != 1
             LIMIT {batch_size}
         )
-    """
-    )
+    """)
     with pgdb.engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
         while True:
             result = conn.execute(del_query)
@@ -518,12 +507,10 @@ def delete_and_insert(
     where_conditions = SQL(" AND ").join(
         SQL("{col} = %s").format(col=Identifier(col)) for col in delete_by_keys
     )
-    delete_query = SQL(
-        """
+    delete_query = SQL("""
         DELETE FROM {table}
         WHERE {where_conditions}
-        """
-    ).format(table=table_identifier, where_conditions=where_conditions)
+        """).format(table=table_identifier, where_conditions=where_conditions)
 
     delete_data = [tuple(row) for row in keys_df.itertuples(index=False, name=None)]
 
@@ -697,8 +684,7 @@ def query_latest_api_scan_by_store_id(
     store_ids: list[str], pgdb: PostgresEngine
 ) -> pd.DataFrame:
     store_ids_str = "'" + "','".join(store_ids) + "'"
-    sel_query = text(
-        f"""WITH last_successful_scanned AS (
+    sel_query = text(f"""WITH last_successful_scanned AS (
             SELECT DISTINCT ON
             (vc.store_app) vc.version_code, vc.store_app, vasr.id as run_id
             FROM
@@ -714,8 +700,7 @@ def query_latest_api_scan_by_store_id(
                 on lss.store_app = sa.id
             where sa.store_id IN ({store_ids_str})
             ;
-    """
-    )
+    """)
     df = pd.read_sql(sel_query, pgdb.engine)
     return df
 
@@ -1067,8 +1052,7 @@ def insert_any_user_requested_apps(
     pgdb: PostgresEngine, last_ts: datetime.datetime
 ) -> None:
     """Insert new ids, usually from android app."""
-    insert_query = text(
-        """
+    insert_query = text("""
           INSERT INTO public.store_apps (store, store_id)
           SELECT
               1,
@@ -1077,8 +1061,7 @@ def insert_any_user_requested_apps(
           WHERE urs.created_at > :last_ts
             AND urs.store_id ILIKE '%.%'
           ON CONFLICT (store, store_id) DO NOTHING;
-        """
-    )
+        """)
 
     with pgdb.engine.begin() as conn:
         conn.execute(insert_query, {"last_ts": last_ts})
@@ -1199,6 +1182,17 @@ def query_zscores(pgdb: PostgresEngine, target_week: str) -> pd.DataFrame:
         QUERY_REPORT_ZSCORES,
         con=pgdb.engine,
         params={"target_week": target_week},
+    )
+    return df
+
+
+def query_report_combined_companies(
+    pgdb: PostgresEngine, start_of_next_period: str
+) -> pd.DataFrame:
+    df = pd.read_sql(
+        QUERY_REPORT_COMBINED_COMPANIES,
+        con=pgdb.engine,
+        params={"start_of_next_period": start_of_next_period},
     )
     return df
 
@@ -1605,14 +1599,12 @@ def delete_app_metrics_by_date_and_apps(
         "app_country_metrics_history",
         "app_global_metrics_history",
     ], "Invalid table name"
-    del_query = text(
-        f"""
+    del_query = text(f"""
         DELETE FROM public.{table_name} acmh
         WHERE 
             acmh.week_start >= :delete_from_date
             AND acmh.store_app = ANY(:store_apps)
-    """
-    )
+    """)
     with pgdb.engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
         result = conn.execute(
             del_query,
@@ -1631,16 +1623,14 @@ def query_store_app_categories(
 ) -> pd.DataFrame:
     """Get store app category map."""
     store_apps_tuple = tuple(store_apps)
-    sel_query = text(
-        """SELECT 
+    sel_query = text("""SELECT 
         id as store_app, 
         category as app_category, 
         ad_supported, 
         in_app_purchases
     FROM frontend.store_apps_overview 
     WHERE id in :store_apps
-    """
-    ).bindparams(bindparam("store_apps", expanding=True))
+    """).bindparams(bindparam("store_apps", expanding=True))
     df = pd.read_sql(
         sel_query,
         con=pgdb.engine,
