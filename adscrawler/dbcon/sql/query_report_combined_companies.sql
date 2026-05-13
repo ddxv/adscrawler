@@ -72,7 +72,7 @@ distinct_ad_and_pub_domains AS (
     LEFT JOIN adstxt_crawl_results AS acc ON pd.id = acc.domain_id
     WHERE
         -- Earliest data in adstxt_crawl_results is 2025-10-10
-        acc.crawled_at >= :beginning_of_period
+        acc.crawled_at >= :start_of_period
         AND acc.created_at < :start_of_next_period
         AND (acc.crawled_at - aam.updated_at) < '01:00:00'::interval
         AND aae.relationship = 'DIRECT'
@@ -94,7 +94,7 @@ distinct_ad_and_pub_domains AS (
     LEFT JOIN adtech.companies AS c_1 ON ad_1.id = c_1.domain_id
     WHERE
         (pnv.ad_domain_url IS NOT NULL OR c_1.id IS NOT NULL)
-        AND aum.updated_at >= :beginning_of_period
+        AND aum.updated_at >= :start_of_period
         AND aum.created_at < :start_of_next_period
 ),
 combined_sources AS (

@@ -1187,12 +1187,15 @@ def query_zscores(pgdb: PostgresEngine, target_week: str) -> pd.DataFrame:
 
 
 def query_report_combined_companies(
-    pgdb: PostgresEngine, start_of_next_period: str
+    pgdb: PostgresEngine, start_date: str, start_of_next_period: str
 ) -> pd.DataFrame:
     df = pd.read_sql(
         QUERY_REPORT_COMBINED_COMPANIES,
         con=pgdb.engine,
-        params={"start_of_next_period": start_of_next_period},
+        params={
+            "start_of_period": start_date,
+            "start_of_next_period": start_of_next_period,
+        },
     )
     return df
 
