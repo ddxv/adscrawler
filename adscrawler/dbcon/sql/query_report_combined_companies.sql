@@ -20,7 +20,7 @@ WITH latest_version_codes AS (
         vc_1.store_app,
         (string_to_array(vc_1.version_code::text, '.'::text)::bigint []) DESC
 ),
-store_app_sdk_strings_2025_h2 AS (
+store_app_sdk_strings AS (
     SELECT
         vc.store_app,
         vdm.string_id AS version_string_id,
@@ -55,7 +55,7 @@ api_based_companies AS (
         ad_1.domain_name AS ad_domain,
         'sdk'::text AS tag_source,
         coalesce(c_1.parent_company_id, sac.company_id) AS parent_id
-    FROM store_app_sdk_strings_2025_h2 AS sasd
+    FROM store_app_sdk_strings AS sasd
     LEFT JOIN adtech.sdks AS sac ON sasd.sdk_id = sac.id
     LEFT JOIN adtech.companies AS c_1 ON sac.company_id = c_1.id
     LEFT JOIN domains AS ad_1 ON c_1.domain_id = ad_1.id
@@ -69,11 +69,12 @@ distinct_ad_and_pub_domains AS (
     LEFT JOIN domains AS ad_1 ON aae.ad_domain = ad_1.id
     LEFT JOIN app_ads_map AS aam ON aae.id = aam.app_ads_entry
     LEFT JOIN domains AS pd ON aam.pub_domain = pd.id
-    LEFT JOIN adstxt_crawl_results AS pdcr ON pd.id = pdcr.domain_id
-    -- Earliest data in adstxt_crawl_results is 2025-10-10
+    LEFT JOIN adstxt_crawl_results AS acc ON pd.id = acc.domain_id
     WHERE
-        pdcr.crawled_at < :start_of_next_period
-        AND (pdcr.crawled_at - aam.updated_at) < '01:00:00'::interval
+        -- Earliest data in adstxt_crawl_results is 2025-10-10
+        acc.crawled_at >= :beginning_of_period
+        AND acc.created_at < :start_of_next_period
+        AND (acc.crawled_at - aam.updated_at) < '01:00:00'::interval
         AND aae.relationship = 'DIRECT'
 ), adstxt_based_companies AS (
     SELECT DISTINCT
@@ -91,7 +92,10 @@ distinct_ad_and_pub_domains AS (
         domains AS ad_1
         ON pnv.ad_domain_url::text = ad_1.domain_name::text
     LEFT JOIN adtech.companies AS c_1 ON ad_1.id = c_1.domain_id
-    WHERE (pnv.ad_domain_url IS NOT NULL OR c_1.id IS NOT NULL)
+    WHERE
+        (pnv.ad_domain_url IS NOT NULL OR c_1.id IS NOT NULL)
+        AND aum.updated_at >= :beginning_of_period
+        AND aum.created_at < :start_of_next_period
 ),
 combined_sources AS (
     SELECT
