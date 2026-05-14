@@ -1,7 +1,14 @@
+import datetime
+
 import pandas as pd
 
 from adscrawler.dbcon.connection import get_db_connection
-from adscrawler.dbcon.queries import query_report_combined_companies, query_zscores
+from adscrawler.dbcon.queries import (
+    delete_combined_history_by_quarter,
+    insert_bulk,
+    query_report_combined_companies,
+    query_zscores,
+)
 
 pgdb = get_db_connection()
 
@@ -21,21 +28,31 @@ for week in pd.date_range(
 
 
 # Generate the start of every quarter in 2025
-quarters = pd.date_range(start="2026-01-01", end="2026-03-01", freq="QS")
+quarters = pd.date_range(start="2025-01-01", end=datetime.datetime.today(), freq="QS")
 
 for start_date in quarters:
     # end_date is the first day of the NEXT period
     start_of_next_period = start_date + pd.offsets.QuarterEnd() + pd.Timedelta(days=1)
-
     df = query_report_combined_companies(
-        pgdb, start_of_next_period=start_of_next_period
+        pgdb, start_date=start_date, start_of_next_period=start_of_next_period
     )
     df["year"] = start_date.year
     df["quarter"] = start_date.quarter
-
-    df.to_sql(
-        "combined_companies_history",
-        pgdb.engine,
-        if_exists="append",
-        index=False,
+    df["company_id"] = df["company_id"].astype(
+        "Int64"
+    )  # Convert to nullable integer type
+    df["parent_id"] = df["parent_id"].astype(
+        "Int64"
+    )  # Convert to nullable integer type
+    delete_combined_history_by_quarter(
+        pgdb=pgdb,
+        delete_year=start_date.year,
+        delete_quarter=start_date.quarter,
+    )
+    insert_bulk(
+        df=df,
+        schema="adtech",
+        table_name="combined_company_app_history",
+        pgdb=pgdb,
+        chunk_size=1000000,
     )

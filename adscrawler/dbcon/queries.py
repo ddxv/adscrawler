@@ -294,6 +294,7 @@ def insert_bulk(
     table_name: str,
     pgdb: PostgresEngine,
     chunk_size: int | None = None,
+    schema: str = "public",
 ) -> None:
     total_rows = len(df)
     chunk_size = chunk_size or total_rows
@@ -302,16 +303,16 @@ def insert_bulk(
         chunk = df.iloc[i : i + chunk_size]
         chunk_num = i // chunk_size + 1
         logger.info(
-            f"insert_bulk table={table_name} chunk={chunk_num} rows={len(chunk)} start"
+            f"insert_bulk table={schema}.{table_name} chunk={chunk_num} rows={len(chunk)} start"
         )
 
         def do_insert() -> None:
             with pgdb.engine.begin() as conn:
-                _copy_chunk(chunk, table_name, conn)
+                _copy_chunk(chunk, f"{schema}.{table_name}", conn)
 
         _with_deadlock_retry(do_insert)
         logger.info(
-            f"insert_bulk table={table_name} chunk={chunk_num} rows={len(chunk)} finish"
+            f"insert_bulk table={schema}.{table_name} chunk={chunk_num} rows={len(chunk)} finish"
         )
 
 
@@ -1590,6 +1591,31 @@ def get_ecpm_benchmarks(pgdb: PostgresEngine) -> pd.DataFrame:
     """
     df = pd.read_sql(sel_query, con=pgdb.engine)
     return df
+
+
+def delete_combined_history_by_quarter(
+    pgdb: PostgresEngine,
+    delete_year: int,
+    delete_quarter: int,
+) -> None:
+    table_name = "combined_company_app_history"
+    del_query = text(f"""
+        DELETE FROM adtech.{table_name} acmh 
+        WHERE 
+            acmh.year = :delete_year
+            AND acmh.quarter = :delete_quarter
+    """)
+    with pgdb.engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
+        result = conn.execute(
+            del_query,
+            {
+                "delete_year": delete_year,
+                "delete_quarter": delete_quarter,
+            },
+        )
+        logger.info(
+            f"{delete_year=} {delete_quarter=} deleted {result.rowcount} rows from {table_name}"
+        )
 
 
 def delete_app_metrics_by_date_and_apps(
