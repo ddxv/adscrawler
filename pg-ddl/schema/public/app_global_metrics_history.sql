@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict 4wF2e5OQkBynMWvZmFwVKdtLN5frOlpbgZWy3PJnu8MuIHYAKqhGstr37RLPtOb
+\restrict XdSgbtzAhicfSVDZYQl2PV59eGGxLeO8ZilSscYECUFDBbp2VBH4rGAZriCYBA8
 
--- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
--- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
+-- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
+-- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -43,11 +43,7 @@ CREATE TABLE public.app_global_metrics_history (
     two_star bigint,
     three_star bigint,
     four_star bigint,
-    five_star bigint,
-    store_last_updated date,
-    tier1_pct smallint,
-    tier2_pct smallint,
-    tier3_pct smallint
+    five_star bigint
 );
 
 
@@ -65,5 +61,5 @@ ALTER TABLE ONLY public.app_global_metrics_history
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 4wF2e5OQkBynMWvZmFwVKdtLN5frOlpbgZWy3PJnu8MuIHYAKqhGstr37RLPtOb
+\unrestrict XdSgbtzAhicfSVDZYQl2PV59eGGxLeO8ZilSscYECUFDBbp2VBH4rGAZriCYBA8
 

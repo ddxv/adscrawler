@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict MJkSSx7qVIoCKQZqWB0H4iMGeJsuWSDIzaCiZ0pwabfcfJoZZagesJokCXCtsqP
+\restrict Wzj9tsMVnn8NehDcJi2sEdvN5gsrWPB09mtO33mPkGE79PkM3U0qX8PcqZyGd0O
 
--- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
--- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
+-- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
+-- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -69,14 +69,6 @@ CREATE INDEX app_keywords_delete_and_insert_on ON frontend.app_keyword_ranks_dai
 
 
 --
--- Name: app_keyword_ranks_daily country_kr_fk; Type: FK CONSTRAINT; Schema: frontend; Owner: postgres
---
-
-ALTER TABLE ONLY frontend.app_keyword_ranks_daily
-    ADD CONSTRAINT country_kr_fk FOREIGN KEY (country) REFERENCES public.countries(id);
-
-
---
 -- Name: app_keyword_ranks_daily keyword_kr_fk; Type: FK CONSTRAINT; Schema: frontend; Owner: postgres
 --
 
@@ -85,24 +77,8 @@ ALTER TABLE ONLY frontend.app_keyword_ranks_daily
 
 
 --
--- Name: app_keyword_ranks_daily store_app_kr_fk; Type: FK CONSTRAINT; Schema: frontend; Owner: postgres
---
-
-ALTER TABLE ONLY frontend.app_keyword_ranks_daily
-    ADD CONSTRAINT store_app_kr_fk FOREIGN KEY (store_app) REFERENCES public.store_apps(id);
-
-
---
--- Name: app_keyword_ranks_daily store_kr_fk; Type: FK CONSTRAINT; Schema: frontend; Owner: postgres
---
-
-ALTER TABLE ONLY frontend.app_keyword_ranks_daily
-    ADD CONSTRAINT store_kr_fk FOREIGN KEY (store) REFERENCES public.stores(id);
-
-
---
 -- PostgreSQL database dump complete
 --
 
-\unrestrict MJkSSx7qVIoCKQZqWB0H4iMGeJsuWSDIzaCiZ0pwabfcfJoZZagesJokCXCtsqP
+\unrestrict Wzj9tsMVnn8NehDcJi2sEdvN5gsrWPB09mtO33mPkGE79PkM3U0qX8PcqZyGd0O
 

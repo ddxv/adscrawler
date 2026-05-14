@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict mrBE0s24l4zdv4FKCczpocFBgNv3YEkoijUv7Pttaf5BauR8KSOvt5nPdAjIdXv
+\restrict J0eyRU67G5u9SYFFnrdmZa90VSRNACFzWaHYdsDcW3Qd0fVBgKH9NRf5JbYoSgu
 
--- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
--- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
+-- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
+-- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -75,13 +75,6 @@ CREATE INDEX version_strings_value_name_lower_idx ON public.version_strings USIN
 
 
 --
--- Name: version_strings_value_name_lower_prefix_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX version_strings_value_name_lower_prefix_idx ON public.version_strings USING btree (lower(value_name) text_pattern_ops);
-
-
---
 -- Name: version_strings_value_name_trgm_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -96,15 +89,8 @@ CREATE INDEX version_strings_xml_path_lower_idx ON public.version_strings USING 
 
 
 --
--- Name: version_strings_xml_path_trgm_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX version_strings_xml_path_trgm_idx ON public.version_strings USING gin (lower(xml_path) public.gin_trgm_ops);
-
-
---
 -- PostgreSQL database dump complete
 --
 
-\unrestrict mrBE0s24l4zdv4FKCczpocFBgNv3YEkoijUv7Pttaf5BauR8KSOvt5nPdAjIdXv
+\unrestrict J0eyRU67G5u9SYFFnrdmZa90VSRNACFzWaHYdsDcW3Qd0fVBgKH9NRf5JbYoSgu
 

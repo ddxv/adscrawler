@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict JPBiEaDsE9jG2E4QK9u7uxDVa1Kdicau8MndnJVyFxTKe78OGw1rqOqgvcw9yog
+\restrict jWdqRknTJhKUCmhqVwntONe8CYBdQUTWHVy3iKgL9YfbRWWBoR0q1nN0Prpinq7
 
--- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
--- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
+-- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
+-- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -77,5 +77,5 @@ CREATE UNIQUE INDEX latest_sdk_scanned_apps_unique_index ON frontend.latest_sdk_
 -- PostgreSQL database dump complete
 --
 
-\unrestrict JPBiEaDsE9jG2E4QK9u7uxDVa1Kdicau8MndnJVyFxTKe78OGw1rqOqgvcw9yog
+\unrestrict jWdqRknTJhKUCmhqVwntONe8CYBdQUTWHVy3iKgL9YfbRWWBoR0q1nN0Prpinq7
 

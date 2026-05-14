@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict U90BmW9z1RSg1SWMQmbGk3JY63CeH9CuLDWpaBU7kA3WKvZP4rPbeFm2VWBkfS4
+\restrict WosEuXxHThQSq7eQpbfoU8tvamxL02agEubJlEhUkT2AJNviY3Fh8Fv6okAVdY3
 
--- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
--- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
+-- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
+-- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -34,7 +34,6 @@ CREATE TABLE public.app_country_metrics_history (
     rating real,
     installs bigint,
     rating_count integer,
-    review_count integer,
     one_star integer,
     two_star integer,
     three_star integer,
@@ -56,5 +55,5 @@ CREATE INDEX app_country_metrics_history_app_idx ON public.app_country_metrics_h
 -- PostgreSQL database dump complete
 --
 
-\unrestrict U90BmW9z1RSg1SWMQmbGk3JY63CeH9CuLDWpaBU7kA3WKvZP4rPbeFm2VWBkfS4
+\unrestrict WosEuXxHThQSq7eQpbfoU8tvamxL02agEubJlEhUkT2AJNviY3Fh8Fv6okAVdY3
 

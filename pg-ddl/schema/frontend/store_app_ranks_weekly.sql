@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict QDMhOnTDRUEIVM878fOKxcIthoRHV3AulwTv7WZVum25Q5HXycEgtyfDQpMXqW2
+\restrict JBSPajDHp1SOGgIB38MbiPuk54JKrex5VOo5hZraT3X5fcdAcaIvUShg6i9DII0
 
--- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
--- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
+-- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
+-- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -63,6 +63,15 @@ CREATE INDEX sarw_crawled_store_collection_category_country_idx ON frontend.stor
 
 
 --
+-- Name: store_app_ranks_weekly repack_trigger; Type: TRIGGER; Schema: frontend; Owner: postgres
+--
+
+CREATE TRIGGER repack_trigger AFTER INSERT OR DELETE OR UPDATE ON frontend.store_app_ranks_weekly FOR EACH ROW EXECUTE FUNCTION repack.repack_trigger('crawled_date', 'country', 'store_collection', 'store_category', 'rank');
+
+ALTER TABLE frontend.store_app_ranks_weekly ENABLE ALWAYS TRIGGER repack_trigger;
+
+
+--
 -- Name: store_app_ranks_weekly fk_country; Type: FK CONSTRAINT; Schema: frontend; Owner: postgres
 --
 
@@ -98,5 +107,5 @@ ALTER TABLE ONLY frontend.store_app_ranks_weekly
 -- PostgreSQL database dump complete
 --
 
-\unrestrict QDMhOnTDRUEIVM878fOKxcIthoRHV3AulwTv7WZVum25Q5HXycEgtyfDQpMXqW2
+\unrestrict JBSPajDHp1SOGgIB38MbiPuk54JKrex5VOo5hZraT3X5fcdAcaIvUShg6i9DII0
 

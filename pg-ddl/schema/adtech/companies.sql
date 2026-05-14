@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict PI8ZXa5c1TlSmskx5ARugNCvbb9IxeVEgbp9HmKVaS0G8P6plHjSbnGpUe24w7v
+\restrict LbFEuKoPbwDRMkbkXjisCNF3l64hsUeCsZ2DVlP8QgA4wbfY6a4o2SrdJ1rdL8U
 
--- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
--- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
+-- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
+-- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -98,5 +98,5 @@ ALTER TABLE ONLY adtech.companies
 -- PostgreSQL database dump complete
 --
 
-\unrestrict PI8ZXa5c1TlSmskx5ARugNCvbb9IxeVEgbp9HmKVaS0G8P6plHjSbnGpUe24w7v
+\unrestrict LbFEuKoPbwDRMkbkXjisCNF3l64hsUeCsZ2DVlP8QgA4wbfY6a4o2SrdJ1rdL8U
 

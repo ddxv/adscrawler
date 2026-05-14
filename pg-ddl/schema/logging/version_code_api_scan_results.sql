@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict wvaDn13t8OVqwADMTGmGUE0wNbT3b0K31irBoZpfSdll5JpkKgdxtTceyKnOugp
+\restrict N4nHV8Cjkgb22sdfoahEj1XzC0I6NKQw1w3J79OFn4VicRfUdpih58O2qpYuAVB
 
--- Dumped from database version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
--- Dumped by pg_dump version 18.1 (Ubuntu 18.1-1.pgdg24.04+2)
+-- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
+-- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -42,5 +42,5 @@ ALTER TABLE logging.version_code_api_scan_results OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict wvaDn13t8OVqwADMTGmGUE0wNbT3b0K31irBoZpfSdll5JpkKgdxtTceyKnOugp
+\unrestrict N4nHV8Cjkgb22sdfoahEj1XzC0I6NKQw1w3J79OFn4VicRfUdpih58O2qpYuAVB
 
