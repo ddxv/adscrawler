@@ -12,3 +12,8 @@
 3. Run pre-commit across all files. Problem: this is really too slow... 10min plus?
    `pre-commit run --all-files`
    `pre-commit run --files schema/*`
+
+4. Removing MVs? Delete MV files from schema directories.
+
+5. Rerunning MVs? 
+   `python pg-ddl/recreate_all_mvs.py --create-all-mvs --config-key madrone`

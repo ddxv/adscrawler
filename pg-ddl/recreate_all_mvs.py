@@ -443,11 +443,6 @@ if __name__ == "__main__":
         "--run-all-mvs", action="store_true", help="Refresh all materialized views"
     )
     parser.add_argument(
-        "--use-tunnel",
-        action="store_true",
-        help="Use SSH tunnel for database connection",
-    )
-    parser.add_argument(
         "--config-key",
         type=str,
         required=True,

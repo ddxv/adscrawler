@@ -47,7 +47,7 @@ class PostgresEngine:
             else:
                 db_login = f"postgresql+psycopg://{self.db_user}"
             db_uri = f"{db_login}@{self.db_ip}:{self.db_port}/{self.db_name}"
-            logger.info(f"Prep PostgreSQL: {self.config_key}/{self.db_name}")
+            logger.info(f"PostgreSQL: config_key:{self.config_key} db:{self.db_name}")
             self.engine = sqlalchemy.create_engine(
                 db_uri,
                 connect_args={"connect_timeout": 10, "application_name": "adscrawler"},
@@ -125,6 +125,9 @@ def start_ssh_tunnel(config_key: str) -> int:
     ssh_pkey_password = CONFIG[config_key].get("ssh_pkey_password")
     ssh_local_port = manage_tunnel_thread(
         host, os_user, ssh_port, remote_port, ssh_pkey, ssh_pkey_password
+    )
+    logger.info(
+        f"SSH tunnel established for {config_key} on local port {ssh_local_port}"
     )
     return ssh_local_port
 
