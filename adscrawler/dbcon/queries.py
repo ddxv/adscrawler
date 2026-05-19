@@ -1350,10 +1350,10 @@ def query_all_domains(pgdb: PostgresEngine) -> pd.DataFrame:
 @lru_cache(maxsize=1)
 def query_ad_domains(pgdb: PostgresEngine) -> pd.DataFrame:
     sel_query = """WITH all_ad_domains AS (
-             SELECT DISTINCT d.id AS domain_id, ad_domain AS domain_name 
-             FROM adtech.combined_store_apps_companies csac
-             LEFT JOIN domains d ON csac.ad_domain = d.domain_name
-             WHERE ad_domain IS NOT null
+             SELECT DISTINCT csac.domain_id, d.domain_name AS domain_name 
+             FROM adtech.combined_app_companies csac
+             LEFT JOIN domains d ON csac.domain_id = d.id
+             WHERE csac.domain_id IS NOT null
              UNION
              SELECT DISTINCT cdm.domain_id, d.domain_name FROM adtech.company_domain_mapping cdm
              LEFT JOIN domains d ON cdm.domain_id = d.id
