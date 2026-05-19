@@ -22,6 +22,7 @@ from adscrawler.dbcon.queries import (
     get_version_code_dbid,
     insert_df,
     log_version_code_scan_crawl_results,
+    query_ad_domains,
     query_apps_mitm_in_s3,
     query_apps_to_api_scan,
     query_store_app_by_store_id,
@@ -257,7 +258,50 @@ def insert_api_calls(
         pgdb=pgdb,
         insert_columns=insert_columns,
     )
+    try:
+        insert_missing_ad_domains(
+            api_calls_df=mdf,
+            pgdb=pgdb,
+        )
+    except Exception:
+        logger.exception("Failed to insert missing ad domains")
     logger.info(f"inserted {mdf.shape[0]:,} api calls")
+
+
+def insert_missing_ad_domains(
+    api_calls_df: pd.DataFrame,
+    pgdb: PostgresEngine,
+) -> pd.DataFrame:
+    """Adds missing ad domains to the database and returns updated domain DataFrame."""
+    ad_domains_df = query_ad_domains(pgdb=pgdb)
+    check_cols = ["tld_url"]
+    for col in check_cols:
+        missing_ad_domains = api_calls_df[
+            (~api_calls_df[col].isin(ad_domains_df["domain_name"]))
+            & (api_calls_df[col].notna())
+        ]
+        if not missing_ad_domains.empty:
+            new_ad_domains = (
+                missing_ad_domains[[col]]
+                .drop_duplicates()
+                .rename(columns={col: "domain_name"})
+            )
+            upsert_df(
+                table_name="domains",
+                df=new_ad_domains,
+                insert_columns=["domain_name"],
+                key_columns=["domain_name"],
+                pgdb=pgdb,
+            )
+            ad_domains_df = pd.concat(
+                [
+                    new_ad_domains[["id", "domain_name"]].rename(
+                        columns={"id": "domain_id"}
+                    ),
+                    ad_domains_df,
+                ]
+            )
+    return ad_domains_df
 
 
 def get_version_via_apktool(

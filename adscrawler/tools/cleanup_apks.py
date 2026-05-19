@@ -361,3 +361,9 @@ ios_db_files = query_all_version_codes(store=2, my_cutoff_date=one_week_ago_str)
 
 file_cleanup(sdf=android_s3_files, vcdf=android_db_files)
 file_cleanup(sdf=ios_s3_files, vcdf=ios_db_files)
+
+total_size_bytes = (
+    android_s3_files["size_bytes"].sum() + ios_s3_files["size_bytes"].sum()
+)
+bytes_in_gb = total_size_bytes / 1e9
+logger.info(f"Total size of remaining APKs in S3: {bytes_in_gb}")

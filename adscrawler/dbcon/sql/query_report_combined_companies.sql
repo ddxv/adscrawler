@@ -91,7 +91,8 @@ distinct_ad_and_pub_domains AS (
     LEFT JOIN
         domains AS ad_1
         ON pnv.ad_domain_url::text = ad_1.domain_name::text
-    LEFT JOIN adtech.companies AS c_1 ON ad_1.id = c_1.domain_id
+    LEFT JOIN adtech.company_domain_mapping AS cdm ON ad_1.id = cdm.company_id
+    LEFT JOIN adtech.companies AS c_1 ON cdm.company_id = c_1.id
     WHERE
         (pnv.ad_domain_url IS NOT NULL OR c_1.id IS NOT NULL)
         AND aum.updated_at >= :start_of_period
@@ -99,39 +100,37 @@ distinct_ad_and_pub_domains AS (
 ),
 combined_sources AS (
     SELECT
+        api_based_companies.ad_domain,
         api_based_companies.store_app,
         api_based_companies.company_id,
         api_based_companies.parent_id,
-        api_based_companies.ad_domain,
         api_based_companies.tag_source
     FROM api_based_companies
     UNION ALL
     SELECT
+        sdk_based_companies.ad_domain,
         sdk_based_companies.store_app,
         sdk_based_companies.company_id,
         sdk_based_companies.parent_id,
-        sdk_based_companies.ad_domain,
         sdk_based_companies.tag_source
     FROM sdk_based_companies
     UNION ALL
     SELECT
+        adstxt_based_companies.ad_domain,
         adstxt_based_companies.store_app,
         adstxt_based_companies.company_id,
         adstxt_based_companies.parent_id,
-        adstxt_based_companies.ad_domain,
         adstxt_based_companies.tag_source
     FROM adstxt_based_companies
 )
 SELECT
     cs.ad_domain,
     cs.store_app,
-    c.id AS company_id,
-    coalesce(c.parent_company_id, c.id) AS parent_id,
+    cs.company_id,
+    cs.parent_id,
     bool_or(cs.tag_source = 'sdk'::text) AS sdk,
     bool_or(cs.tag_source = 'api_call'::text) AS api_call,
     bool_or(cs.tag_source = 'app_ads_direct'::text) AS app_ads_direct
 FROM combined_sources AS cs
-LEFT JOIN domains AS ad ON cs.ad_domain::text = ad.domain_name::text
-LEFT JOIN adtech.companies AS c ON ad.id = c.domain_id
 GROUP BY
-    cs.ad_domain, cs.store_app, c.id, c.parent_company_id;
+    cs.ad_domain, cs.store_app, cs.company_id, cs.parent_id;
