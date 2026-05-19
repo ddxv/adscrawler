@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict BJbjsdJB4bEymXsNhFcaHxgIuVUNosJUQK6aabHVm0mutNU8Cm9FOcKiLa6iv0B
+\restrict 3gborAKf6YwoaNDQVALZJMycMVTZdkimhQ2lRh4q5dIzCFKFRvps3hJsONUDZ92
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -53,6 +53,14 @@ CREATE MATERIALIZED VIEW adtech.combined_companies_history AS
            FROM enriched_raw,
             LATERAL ( VALUES ('sdk_api'::text,(enriched_raw.sdk OR enriched_raw.api_call)), ('app_ads_direct'::text,enriched_raw.app_ads_direct)) t(tag_source, is_active)
           WHERE (t.is_active = true)
+        ), pre_agg AS (
+         SELECT enriched.year,
+            enriched.quarter,
+            enriched.store,
+            enriched.tag_source,
+            count(DISTINCT enriched.store_app) AS total_apps_in_quarter
+           FROM enriched
+          GROUP BY enriched.year, enriched.quarter, enriched.store, enriched.tag_source
         ), current_quarter AS (
          SELECT enriched.ad_domain,
             enriched.company_id,
@@ -62,9 +70,10 @@ CREATE MATERIALIZED VIEW adtech.combined_companies_history AS
             enriched.store,
             enriched.tag_source,
             count(enriched.store_app) AS total_apps,
-            sum(count(enriched.store_app)) OVER (PARTITION BY enriched.year, enriched.quarter, enriched.store, enriched.tag_source) AS total_apps_in_quarter
-           FROM enriched
-          GROUP BY enriched.ad_domain, enriched.company_id, enriched.parent_id, enriched.year, enriched.quarter, enriched.store, enriched.tag_source
+            pre_agg.total_apps_in_quarter
+           FROM (enriched
+             JOIN pre_agg ON (((pre_agg.year = enriched.year) AND (pre_agg.quarter = enriched.quarter) AND (pre_agg.store = enriched.store) AND (pre_agg.tag_source = enriched.tag_source))))
+          GROUP BY enriched.ad_domain, enriched.company_id, enriched.parent_id, enriched.year, enriched.quarter, enriched.store, enriched.tag_source, pre_agg.total_apps_in_quarter
         ), churned AS (
          SELECT p.ad_domain,
             p.company_id,
@@ -109,7 +118,7 @@ CREATE MATERIALIZED VIEW adtech.combined_companies_history AS
     cq.total_apps_in_quarter,
     COALESCE(ch.apps_lost, (0)::bigint) AS apps_lost,
     COALESCE(a.apps_added, (0)::bigint) AS apps_added,
-    round((((cq.total_apps)::numeric * 100.0) / NULLIF(cq.total_apps_in_quarter, (0)::numeric)), 5) AS pct_market_share,
+    round((((cq.total_apps)::numeric * 100.0) / NULLIF((cq.total_apps_in_quarter)::numeric, (0)::numeric)), 5) AS pct_market_share,
     round((((COALESCE(a.apps_added, (0)::bigint))::numeric * 100.0) / (NULLIF((cq.total_apps - COALESCE(a.apps_added, (0)::bigint)), 0))::numeric), 2) AS pct_apps_added,
     round((((COALESCE(ch.apps_lost, (0)::bigint))::numeric * 100.0) / (NULLIF((cq.total_apps + COALESCE(ch.apps_lost, (0)::bigint)), 0))::numeric), 2) AS pct_apps_lost
    FROM ((current_quarter cq
@@ -125,5 +134,5 @@ ALTER MATERIALIZED VIEW adtech.combined_companies_history OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict BJbjsdJB4bEymXsNhFcaHxgIuVUNosJUQK6aabHVm0mutNU8Cm9FOcKiLa6iv0B
+\unrestrict 3gborAKf6YwoaNDQVALZJMycMVTZdkimhQ2lRh4q5dIzCFKFRvps3hJsONUDZ92
 

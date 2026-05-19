@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 8MBcaIYqfAVJM27r0hiKa5AQtr2D2X3JtTcE2r8scYFHX541pLTcmhcukCDpDFP
+\restrict VODgzJcy8Vb4xSVLg0xN1UHJZvEqpiGPfluynq3Mxealmugzc3DQCWvdJin9rYc
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -35,9 +35,9 @@ CREATE MATERIALIZED VIEW frontend.companies_category_tag_type_stats AS
           GROUP BY company_categories.company_id
         ), api_and_app_ads AS (
          SELECT sa.store,
-            csac.app_category,
+            sa.category AS app_category,
             tag.tag_source,
-            csac.ad_domain AS company_domain,
+            ad.domain_name AS company_domain,
             c.name AS company_name,
                 CASE
                     WHEN (tag.tag_source ~~ 'app_ads%%'::text) THEN 'ad-networks'::character varying
@@ -46,14 +46,15 @@ CREATE MATERIALIZED VIEW frontend.companies_category_tag_type_stats AS
             count(DISTINCT csac.store_app) AS app_count,
             sum(sa.installs_sum_4w) AS installs_d30,
             sum(sa.installs) AS installs_total
-           FROM (((((adtech.combined_store_apps_companies csac
+           FROM ((((((adtech.combined_app_companies csac
              LEFT JOIN adtech.companies c ON ((csac.company_id = c.id)))
+             LEFT JOIN public.domains ad ON ((c.domain_id = ad.id)))
              LEFT JOIN frontend.store_apps_overview sa ON ((csac.store_app = sa.id)))
              LEFT JOIN minimized_company_categories mcc ON ((csac.company_id = mcc.company_id)))
              LEFT JOIN adtech.categories cats ON ((mcc.category_id = cats.id)))
-             CROSS JOIN LATERAL ( VALUES ('api_call'::text,csac.api_call), ('app_ads_direct'::text,csac.app_ads_direct), ('app_ads_reseller'::text,csac.app_ads_reseller)) tag(tag_source, present))
+             CROSS JOIN LATERAL ( VALUES ('api_call'::text,csac.api_call), ('publisher'::text,csac.publisher), ('app_ads_direct'::text,csac.app_ads_direct), ('app_ads_reseller'::text,csac.app_ads_reseller)) tag(tag_source, present))
           WHERE (tag.present IS TRUE)
-          GROUP BY sa.store, csac.app_category, tag.tag_source, csac.ad_domain, c.name,
+          GROUP BY sa.store, sa.category, tag.tag_source, ad.domain_name, c.name,
                 CASE
                     WHEN (tag.tag_source ~~ 'app_ads%%'::text) THEN 'ad-networks'::character varying
                     ELSE cats.url_slug
@@ -119,5 +120,5 @@ CREATE UNIQUE INDEX frontend_companies_category_tag_type_stats_unique ON fronten
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 8MBcaIYqfAVJM27r0hiKa5AQtr2D2X3JtTcE2r8scYFHX541pLTcmhcukCDpDFP
+\unrestrict VODgzJcy8Vb4xSVLg0xN1UHJZvEqpiGPfluynq3Mxealmugzc3DQCWvdJin9rYc
 

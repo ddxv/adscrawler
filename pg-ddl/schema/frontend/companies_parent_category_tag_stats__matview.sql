@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict MEsG92Zf17L6UfTA2i2G8HSTg8R4suRVaW5aJkFJH3KQ06Zf8IRp8jecBjGSMLO
+\restrict hDHnugNpGAZejcQNclkopYuNejnCy9PATz2l10rYlAYRlAM8twLVTZNIP66TNRb
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -29,18 +29,15 @@ SET default_table_access_method = heap;
 
 CREATE MATERIALIZED VIEW frontend.companies_parent_category_tag_stats AS
  WITH distinct_apps_group AS (
-         SELECT DISTINCT csac.store_app,
+         SELECT csac.store_app,
             tag.tag_source,
             c.name AS company_name,
-            COALESCE(ad.domain_name, csac.ad_domain) AS company_domain
-           FROM (((adtech.combined_store_apps_companies csac
-             LEFT JOIN adtech.companies c ON ((csac.parent_id = c.id)))
+            ad.domain_name AS company_domain
+           FROM (((adtech.combined_app_parent_companies csac
+             LEFT JOIN adtech.companies c ON ((csac.company_id = c.id)))
              LEFT JOIN public.domains ad ON ((c.domain_id = ad.id)))
-             CROSS JOIN LATERAL ( VALUES ('sdk'::text,csac.sdk), ('api_call'::text,csac.api_call), ('app_ads_direct'::text,csac.app_ads_direct), ('app_ads_reseller'::text,csac.app_ads_reseller)) tag(tag_source, present))
-          WHERE ((tag.present IS TRUE) AND (csac.parent_id IN ( SELECT DISTINCT pc.id
-                   FROM (adtech.companies pc
-                     LEFT JOIN adtech.companies c_1 ON ((pc.id = c_1.parent_company_id)))
-                  WHERE (c_1.id IS NOT NULL))))
+             CROSS JOIN LATERAL ( VALUES ('sdk'::text,csac.sdk), ('api_call'::text,csac.api_call), ('publisher'::text,csac.publisher), ('app_ads_direct'::text,csac.app_ads_direct), ('app_ads_reseller'::text,csac.app_ads_reseller)) tag(tag_source, present))
+          WHERE (tag.present IS TRUE)
         )
  SELECT sa.store,
     sa.category AS app_category,
@@ -76,5 +73,5 @@ CREATE INDEX companies_parent_category_tag_stats_query_idx ON frontend.companies
 -- PostgreSQL database dump complete
 --
 
-\unrestrict MEsG92Zf17L6UfTA2i2G8HSTg8R4suRVaW5aJkFJH3KQ06Zf8IRp8jecBjGSMLO
+\unrestrict hDHnugNpGAZejcQNclkopYuNejnCy9PATz2l10rYlAYRlAM8twLVTZNIP66TNRb
 

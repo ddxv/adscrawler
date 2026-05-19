@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict svpkEt1wBdsMYyJjHeSB18wAuI3BSXTM0ykqKyxlkperdvddMcpDdqZCTclCHmI
+\restrict 7yO4JO6LYZeQOjr9ifL7WoGmHefD7ceXJkcHrJEpZS8oUsq9ZfQZKWlhN4rrepj
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -28,27 +28,16 @@ SET default_table_access_method = heap;
 --
 
 CREATE MATERIALIZED VIEW frontend.adstxt_entries_store_apps AS
- WITH parent_companies AS (
-         SELECT c.id AS company_id,
-            c.name AS company_name,
-            COALESCE(c.parent_company_id, c.id) AS parent_company_id,
-            COALESCE(pc.name, c.name) AS parent_company_name,
-            COALESCE(pc.domain_id, c.domain_id) AS parent_company_domain_id
-           FROM (adtech.companies c
-             LEFT JOIN adtech.companies pc ON ((c.parent_company_id = pc.id)))
-        )
  SELECT DISTINCT ad.id AS ad_domain_id,
-    myc.parent_company_id AS company_id,
     aae.id AS app_ad_entry_id,
     sa.id AS store_app,
     pd.id AS pub_domain_id
-   FROM (((((((public.app_ads_entrys aae
+   FROM ((((((public.app_ads_entrys aae
      LEFT JOIN public.domains ad ON ((aae.ad_domain = ad.id)))
      LEFT JOIN public.app_ads_map aam ON ((aae.id = aam.app_ads_entry)))
      LEFT JOIN public.domains pd ON ((aam.pub_domain = pd.id)))
      LEFT JOIN public.app_urls_map aum ON ((pd.id = aum.pub_domain)))
      JOIN public.store_apps sa ON ((aum.store_app = sa.id)))
-     LEFT JOIN parent_companies myc ON ((ad.id = myc.parent_company_domain_id)))
      LEFT JOIN public.adstxt_crawl_results pdcr ON ((pd.id = pdcr.domain_id)))
   WHERE ((pdcr.crawled_at - aam.updated_at) < '01:00:00'::interval)
   WITH NO DATA;
@@ -81,5 +70,5 @@ CREATE UNIQUE INDEX adstxt_entries_store_apps_unique_idx ON frontend.adstxt_entr
 -- PostgreSQL database dump complete
 --
 
-\unrestrict svpkEt1wBdsMYyJjHeSB18wAuI3BSXTM0ykqKyxlkperdvddMcpDdqZCTclCHmI
+\unrestrict 7yO4JO6LYZeQOjr9ifL7WoGmHefD7ceXJkcHrJEpZS8oUsq9ZfQZKWlhN4rrepj
 

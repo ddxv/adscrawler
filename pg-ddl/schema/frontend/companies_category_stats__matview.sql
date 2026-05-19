@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict hTbHPVIEbm0AjbP3AdgoWsaHurKcPYmcf9SqGlbTpXzrvvWarPBI6aY4eTD3Yfk
+\restrict XYFEaLUIO9JP0LPP1LzHFEpceVmLLi8XioJKZiz0Sg17atSsJ3eNIRelgF5p2pB
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -30,15 +30,16 @@ SET default_table_access_method = heap;
 CREATE MATERIALIZED VIEW frontend.companies_category_stats AS
  SELECT sa.store,
     sa.category AS app_category,
-    csac.ad_domain AS company_domain,
+    ad.domain_name AS company_domain,
     c.name AS company_name,
     count(DISTINCT csac.store_app) AS app_count,
     sum(sa.installs) AS installs_total,
     sum(sa.installs_sum_4w) AS installs_d30
-   FROM ((adtech.combined_store_apps_companies csac
+   FROM (((adtech.combined_app_companies csac
      LEFT JOIN adtech.companies c ON ((csac.company_id = c.id)))
+     LEFT JOIN public.domains ad ON ((c.domain_id = ad.id)))
      LEFT JOIN frontend.store_apps_overview sa ON ((csac.store_app = sa.id)))
-  GROUP BY sa.store, sa.category, csac.ad_domain, c.name
+  GROUP BY sa.store, sa.category, ad.domain_name, c.name
   WITH NO DATA;
 
 
@@ -62,5 +63,5 @@ CREATE INDEX companies_category_stats_query_idx ON frontend.companies_category_s
 -- PostgreSQL database dump complete
 --
 
-\unrestrict hTbHPVIEbm0AjbP3AdgoWsaHurKcPYmcf9SqGlbTpXzrvvWarPBI6aY4eTD3Yfk
+\unrestrict XYFEaLUIO9JP0LPP1LzHFEpceVmLLi8XioJKZiz0Sg17atSsJ3eNIRelgF5p2pB
 

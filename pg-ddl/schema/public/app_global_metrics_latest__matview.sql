@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict lrvrcKQhEgboQdmHQSNb8kzYcsJ6PHJVNBfI8rUkc4t4D6fZJDTkpZjj4k8QIGi
+\restrict gfrGMeonPnhyPQa9EHQitMZasdeZPJYo4UmWVQmzDOAi6AfNig5dk1X2Iq8JLp7
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -66,11 +66,11 @@ CREATE MATERIALIZED VIEW public.app_global_metrics_latest AS
             ga.four_star,
             ga.five_star,
             row_number() OVER w_ordered AS rn,
-            sum(ga.weekly_installs) OVER w_4w AS monthly_installs,
+            COALESCE(sum(ga.weekly_installs) FILTER (WHERE (ga.weekly_installs > 0)) OVER w_4w, (0)::numeric) AS monthly_installs,
             sum(ga.weekly_ad_revenue) OVER w_4w AS monthly_ad_revenue,
             sum(ga.weekly_iap_revenue) OVER w_4w AS monthly_iap_revenue,
-            avg(ga.weekly_installs) OVER w_2w AS installs_avg_2w,
-            avg(ga.weekly_installs) OVER w_4w AS installs_avg_4w,
+            avg(ga.weekly_installs) FILTER (WHERE (ga.weekly_installs > 0)) OVER w_2w AS installs_avg_2w,
+            avg(ga.weekly_installs) FILTER (WHERE (ga.weekly_installs > 0)) OVER w_4w AS installs_avg_4w,
             avg(
                 CASE
                     WHEN ((ga.week_start >= (ga.global_max_week - '112 days'::interval)) AND (ga.week_start <= (ga.global_max_week - '28 days'::interval))) THEN ga.weekly_installs
@@ -105,8 +105,6 @@ CREATE MATERIALIZED VIEW public.app_global_metrics_latest AS
     monthly_installs,
     installs_avg_2w,
     installs_avg_4w,
-    b_avg_installs,
-    b_std_installs,
     ((installs_avg_2w - b_avg_installs) / NULLIF(b_std_installs, (0)::numeric)) AS installs_z_score_2w,
     ((installs_avg_4w - b_avg_installs) / NULLIF(b_std_installs, (0)::numeric)) AS installs_z_score_4w,
     ((installs_avg_2w - installs_avg_4w) / NULLIF(installs_avg_4w, (0)::numeric)) AS installs_acceleration,
@@ -129,5 +127,5 @@ CREATE UNIQUE INDEX app_global_metrics_latest_idx ON public.app_global_metrics_l
 -- PostgreSQL database dump complete
 --
 
-\unrestrict lrvrcKQhEgboQdmHQSNb8kzYcsJ6PHJVNBfI8rUkc4t4D6fZJDTkpZjj4k8QIGi
+\unrestrict gfrGMeonPnhyPQa9EHQitMZasdeZPJYo4UmWVQmzDOAi6AfNig5dk1X2Iq8JLp7
 

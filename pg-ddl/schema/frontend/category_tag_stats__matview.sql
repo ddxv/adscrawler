@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict ki2MH7RBmZk8P014C0WNctzcr3RuJnYvcLYWkLfw2Upfw7E8YI0rQPcl5yB5fjY
+\restrict mYHngtzOUfoBfuthWi3T2vHCpa7iMPOl7WIt1qjIGN1NU6NOXL9OkgwlxoAh0ZC
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -31,8 +31,8 @@ CREATE MATERIALIZED VIEW frontend.category_tag_stats AS
  WITH distinct_apps_group AS (
          SELECT DISTINCT csac.store_app,
             tag.tag_source
-           FROM (adtech.combined_store_apps_companies csac
-             CROSS JOIN LATERAL ( VALUES ('sdk'::text,csac.sdk), ('api_call'::text,csac.api_call), ('app_ads_direct'::text,csac.app_ads_direct), ('app_ads_reseller'::text,csac.app_ads_reseller)) tag(tag_source, present))
+           FROM (adtech.combined_app_companies csac
+             CROSS JOIN LATERAL ( VALUES ('sdk'::text,csac.sdk), ('api_call'::text,csac.api_call), ('publisher'::text,csac.publisher), ('app_ads_direct'::text,csac.app_ads_direct), ('app_ads_reseller'::text,csac.app_ads_reseller)) tag(tag_source, present))
           WHERE (tag.present IS TRUE)
         )
  SELECT sa.store,
@@ -60,5 +60,5 @@ CREATE UNIQUE INDEX idx_category_tag_stats ON frontend.category_tag_stats USING 
 -- PostgreSQL database dump complete
 --
 
-\unrestrict ki2MH7RBmZk8P014C0WNctzcr3RuJnYvcLYWkLfw2Upfw7E8YI0rQPcl5yB5fjY
+\unrestrict mYHngtzOUfoBfuthWi3T2vHCpa7iMPOl7WIt1qjIGN1NU6NOXL9OkgwlxoAh0ZC
 

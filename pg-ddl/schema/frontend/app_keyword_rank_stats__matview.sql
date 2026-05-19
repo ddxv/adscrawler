@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict KcZBS9ZZ1SCOYL41zcLHZ3SWdQqITTkJm6ZmvTFkD5RezkbzhZjZdxeYwRxiAQb
+\restrict 2iz6n0hPG937U7ynw0OIob48du6YI3ONjeUQPC34POU9fCHIT7AprTgfxxi7bK7
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -79,5 +79,5 @@ CREATE UNIQUE INDEX frontend_app_keyword_rank_stats ON frontend.app_keyword_rank
 -- PostgreSQL database dump complete
 --
 
-\unrestrict KcZBS9ZZ1SCOYL41zcLHZ3SWdQqITTkJm6ZmvTFkD5RezkbzhZjZdxeYwRxiAQb
+\unrestrict 2iz6n0hPG937U7ynw0OIob48du6YI3ONjeUQPC34POU9fCHIT7AprTgfxxi7bK7
 

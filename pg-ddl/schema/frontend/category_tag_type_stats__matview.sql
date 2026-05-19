@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict YMdJXmx2R21jOiN1xf1kt8Fg3Hy5nY0TO8haDomRXU9kjwfJ5QuHal2bENhnnKZ
+\restrict p55Xg5B8n8nok6XUJgyahijGKPdfcpF1cQi8Zfre78r93Y9NXp8HB0Rf6pWEB73
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -43,7 +43,7 @@ CREATE MATERIALIZED VIEW frontend.category_tag_type_stats AS
             sum(x.installs) AS installs_total
            FROM ( SELECT DISTINCT csac.store_app,
                     sa.store,
-                    csac.app_category,
+                    sa.category AS app_category,
                     tag.tag_source,
                         CASE
                             WHEN (tag.tag_source ~~ 'app_ads%%'::text) THEN 'ad-networks'::character varying
@@ -51,11 +51,11 @@ CREATE MATERIALIZED VIEW frontend.category_tag_type_stats AS
                         END AS type_url_slug,
                     sa.installs_sum_4w,
                     sa.installs
-                   FROM ((((adtech.combined_store_apps_companies csac
+                   FROM ((((adtech.combined_app_companies csac
                      LEFT JOIN frontend.store_apps_overview sa ON ((csac.store_app = sa.id)))
                      JOIN minimized_company_categories mcc ON ((csac.company_id = mcc.company_id)))
                      LEFT JOIN adtech.categories cats ON ((mcc.category_id = cats.id)))
-                     CROSS JOIN LATERAL ( VALUES ('api_call'::text,csac.api_call), ('app_ads_direct'::text,csac.app_ads_direct), ('app_ads_reseller'::text,csac.app_ads_reseller)) tag(tag_source, present))
+                     CROSS JOIN LATERAL ( VALUES ('api_call'::text,csac.api_call), ('publisher'::text,csac.publisher), ('app_ads_direct'::text,csac.app_ads_direct), ('app_ads_reseller'::text,csac.app_ads_reseller)) tag(tag_source, present))
                   WHERE ((tag.present IS TRUE) AND (sa.id IS NOT NULL))) x
           GROUP BY x.store, x.app_category, x.tag_source, x.type_url_slug
         ), store_app_sdks AS (
@@ -117,5 +117,5 @@ CREATE UNIQUE INDEX frontend_category_tag_type_stats_unique ON frontend.category
 -- PostgreSQL database dump complete
 --
 
-\unrestrict YMdJXmx2R21jOiN1xf1kt8Fg3Hy5nY0TO8haDomRXU9kjwfJ5QuHal2bENhnnKZ
+\unrestrict p55Xg5B8n8nok6XUJgyahijGKPdfcpF1cQi8Zfre78r93Y9NXp8HB0Rf6pWEB73
 

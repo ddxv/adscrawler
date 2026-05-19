@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict hTMddbAQ3orN3HjHG1nVT5xksR2YxLJREBrTnuyccpNIIReKPlJ03rHABO77cUq
+\restrict OD0sGWDPVECGxMWKDlyCa1eLsc9DCcsFWNMiAKBScRgRccGKqMBV1eZ1LeHkDcF
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -29,22 +29,24 @@ SET default_table_access_method = heap;
 
 CREATE MATERIALIZED VIEW frontend.company_parent_top_apps AS
  WITH deduped_data AS (
-         SELECT csapc.ad_domain AS company_domain,
+         SELECT ad.domain_name AS company_domain,
             c.name AS company_name,
             sa.store,
             sa.name,
             sa.store_id,
-            csapc.app_category,
+            sa.category AS app_category,
             sa.developer_name,
             sa.icon_url_100,
             sa.installs_sum_4w AS installs_d30,
             csapc.sdk,
             csapc.api_call,
+            csapc.publisher,
             csapc.app_ads_direct
-           FROM ((adtech.combined_store_apps_parent_companies csapc
+           FROM (((adtech.combined_app_parent_companies csapc
              LEFT JOIN frontend.store_apps_overview sa ON ((csapc.store_app = sa.id)))
              LEFT JOIN adtech.companies c ON ((csapc.company_id = c.id)))
-          WHERE (csapc.sdk OR csapc.api_call OR csapc.app_ads_direct)
+             LEFT JOIN public.domains ad ON ((c.domain_id = ad.id)))
+          WHERE (csapc.sdk OR csapc.api_call OR csapc.app_ads_direct OR csapc.publisher)
         ), ranked_apps AS (
          SELECT deduped_data.company_domain,
             deduped_data.company_name,
@@ -58,8 +60,8 @@ CREATE MATERIALIZED VIEW frontend.company_parent_top_apps AS
             deduped_data.sdk,
             deduped_data.api_call,
             deduped_data.app_ads_direct,
-            row_number() OVER (PARTITION BY deduped_data.store, deduped_data.company_domain, deduped_data.company_name ORDER BY (COALESCE((deduped_data.sdk)::integer, 0) + COALESCE((deduped_data.api_call)::integer, 0)) DESC, COALESCE((deduped_data.installs_d30)::double precision, (0)::double precision) DESC) AS app_company_rank,
-            row_number() OVER (PARTITION BY deduped_data.store, deduped_data.app_category, deduped_data.company_domain, deduped_data.company_name ORDER BY (COALESCE((deduped_data.sdk)::integer, 0) + COALESCE((deduped_data.api_call)::integer, 0)) DESC, COALESCE((deduped_data.installs_d30)::double precision, (0)::double precision) DESC) AS app_company_category_rank
+            row_number() OVER (PARTITION BY deduped_data.store, deduped_data.company_domain, deduped_data.company_name ORDER BY ((COALESCE((deduped_data.sdk)::integer, 0) + COALESCE((deduped_data.api_call)::integer, 0)) + COALESCE((deduped_data.publisher)::integer, 0)) DESC, COALESCE((deduped_data.installs_d30)::double precision, (0)::double precision) DESC) AS app_company_rank,
+            row_number() OVER (PARTITION BY deduped_data.store, deduped_data.app_category, deduped_data.company_domain, deduped_data.company_name ORDER BY ((COALESCE((deduped_data.sdk)::integer, 0) + COALESCE((deduped_data.api_call)::integer, 0)) + COALESCE((deduped_data.publisher)::integer, 0)) DESC, COALESCE((deduped_data.installs_d30)::double precision, (0)::double precision) DESC) AS app_company_category_rank
            FROM deduped_data
         )
  SELECT company_domain,
@@ -108,5 +110,5 @@ CREATE UNIQUE INDEX idx_company_parent_top_apps_unique ON frontend.company_paren
 -- PostgreSQL database dump complete
 --
 
-\unrestrict hTMddbAQ3orN3HjHG1nVT5xksR2YxLJREBrTnuyccpNIIReKPlJ03rHABO77cUq
+\unrestrict OD0sGWDPVECGxMWKDlyCa1eLsc9DCcsFWNMiAKBScRgRccGKqMBV1eZ1LeHkDcF
 

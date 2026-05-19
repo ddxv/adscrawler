@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict sSfR5oy8HEbQNFvK8CPMuCCVH45qUNdCt2iVR47iSwtbMwOu85IdmE1vTLogl3Z
+\restrict D4kDpqeLghSITD6B1nGWqtTyMG9hQcw08iQY64NFjEaAkKDSc3Zyy8x00S33J0B
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -29,21 +29,23 @@ SET default_table_access_method = heap;
 
 CREATE MATERIALIZED VIEW frontend.company_top_apps AS
  WITH deduped_data AS (
-         SELECT cac.ad_domain AS company_domain,
+         SELECT ad.domain_name AS company_domain,
             c.name AS company_name,
             sa.store,
             sa.name,
             sa.store_id,
-            cac.app_category,
+            sa.category AS app_category,
             sa.developer_name,
             sa.icon_url_100,
             sa.installs_sum_4w AS installs_d30,
             cac.sdk,
             cac.api_call,
+            cac.publisher,
             cac.app_ads_direct
-           FROM ((adtech.combined_store_apps_companies cac
+           FROM (((adtech.combined_app_companies cac
              LEFT JOIN frontend.store_apps_overview sa ON ((cac.store_app = sa.id)))
              LEFT JOIN adtech.companies c ON ((cac.company_id = c.id)))
+             LEFT JOIN public.domains ad ON ((cac.domain_id = ad.id)))
           WHERE (cac.app_ads_direct OR cac.sdk OR cac.api_call)
         ), ranked_apps AS (
          SELECT deduped_data.company_domain,
@@ -115,5 +117,5 @@ CREATE UNIQUE INDEX idx_unique_company_top_apps ON frontend.company_top_apps USI
 -- PostgreSQL database dump complete
 --
 
-\unrestrict sSfR5oy8HEbQNFvK8CPMuCCVH45qUNdCt2iVR47iSwtbMwOu85IdmE1vTLogl3Z
+\unrestrict D4kDpqeLghSITD6B1nGWqtTyMG9hQcw08iQY64NFjEaAkKDSc3Zyy8x00S33J0B
 

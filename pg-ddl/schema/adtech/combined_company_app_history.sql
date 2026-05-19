@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict jQ99OvVCAEIWEnRbPxZAgdf0K4yCao6mmijFCF4DutioBGYzNfcR7aQ3xdMdcI4
+\restrict t2tuuvIJlgtdCg7ycYKLadeUsoAFh8JB5ZaeJSz0RjE21W9dPZ4fwlvZNX8yUN1
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -46,5 +46,5 @@ ALTER TABLE adtech.combined_company_app_history OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict jQ99OvVCAEIWEnRbPxZAgdf0K4yCao6mmijFCF4DutioBGYzNfcR7aQ3xdMdcI4
+\unrestrict t2tuuvIJlgtdCg7ycYKLadeUsoAFh8JB5ZaeJSz0RjE21W9dPZ4fwlvZNX8yUN1
 

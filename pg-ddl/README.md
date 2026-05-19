@@ -9,8 +9,7 @@
 2. SCP to overwrite existing schema dir
    `scp -r ads-db:/home/ads-db/tmp-pg-ddl/* schema/`
 
-3. Run pre-commit across all files. Problem: this is really too slow... 10min plus?
-   `pre-commit run --all-files`
+3. Run pre-commit across all files.
    `pre-commit run --files schema/*`
 
 4. Removing MVs? Delete MV files from schema directories.

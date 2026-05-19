@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 5GEvl8Ac5si2112bdXaZGeTYXz9VV0VelkRkrLNEtjrqGwFtEgyi2giYOvwiwFu
+\restrict PCJKiIMXYchFxydbALwRJV08GvgdrT6bjQ8esgefw83rCievBhaVHVUWZXhCcdM
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -78,5 +78,5 @@ ALTER TABLE ONLY public.store_categories
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 5GEvl8Ac5si2112bdXaZGeTYXz9VV0VelkRkrLNEtjrqGwFtEgyi2giYOvwiwFu
+\unrestrict PCJKiIMXYchFxydbALwRJV08GvgdrT6bjQ8esgefw83rCievBhaVHVUWZXhCcdM
 
