@@ -98,6 +98,29 @@ distinct_ad_and_pub_domains AS (
         AND aum.updated_at >= :start_of_period
         AND aum.created_at < :start_of_next_period
 ),
+ developer_based_domains AS (
+         SELECT DISTINCT sa_1.id AS store_app,
+            d.id AS domain_id
+           FROM adtech.company_developers cd
+             LEFT JOIN store_apps sa_1 ON cd.developer_id = sa_1.developer
+             LEFT JOIN adtech.companies c_1 ON cd.company_id = c_1.id
+             LEFT JOIN domains d ON c_1.domain_id = d.id
+        ), store_urls AS (
+         SELECT dsa.store_app,
+            dsa.domain_id
+           FROM developer_store_apps dsa
+             LEFT JOIN domains d ON dsa.domain_id = d.id
+          WHERE dsa.domain_id IS NOT NULL AND NOT (dsa.domain_id IN ( SELECT domains_third_party.domain_id
+                   FROM domains_third_party))
+        ), app_domain_publishers AS (
+         SELECT store_urls.store_app,
+            store_urls.domain_id
+           FROM store_urls
+        UNION ALL
+         SELECT developer_based_domains.store_app,
+            developer_based_domains.domain_id
+           FROM developer_based_domains
+        ),
 combined_sources AS (
     SELECT
         api_based_companies.ad_domain,

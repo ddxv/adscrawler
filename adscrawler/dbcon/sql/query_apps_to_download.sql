@@ -96,6 +96,7 @@ scheduled_apps_crawl AS (
             dc.store_app = sa.id
     WHERE
         dc.store = :store
+        AND sa.free
         AND (
             vc.updated_at IS NULL
             OR
@@ -178,7 +179,7 @@ user_requested_apps_crawl AS (
             OR lvc.updated_at IS NULL
         )
         AND sa.store = :store
-        AND sa.free
+        AND (sa.free or sa.free is NULL)
         -- random apps requested directly BY users NOT FOUND ON store
         AND sa.name IS NOT NULL
     ORDER BY
