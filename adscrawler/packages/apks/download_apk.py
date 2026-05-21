@@ -2,6 +2,7 @@
 """Download APK files from with Python."""
 
 import pathlib
+import re
 import shutil
 import subprocess
 import sys
@@ -39,6 +40,48 @@ APK_SOURCES = ["gplaydl", "apkpure", "apkmirror"]
 logger = get_logger(__name__, "download_apk")
 
 FAILED_VERSION_STR = "-1"
+
+
+class ExistingOrOlderVersionError(RuntimeError):
+    def __init__(
+        self,
+        store_id: str,
+        available_version_code: int,
+        last_downloaded_version_code: int,
+    ) -> None:
+        self.available_version_code = available_version_code
+        self.last_downloaded_version_code = last_downloaded_version_code
+        super().__init__(
+            f"{store_id=} available_version_code={available_version_code} "
+            f"last_downloaded_version_code={last_downloaded_version_code}"
+        )
+
+
+def _coerce_version_code(version_code: str | None) -> int | None:
+    if version_code is None:
+        return None
+    version_code = version_code.strip()
+    if not version_code or not version_code.isdigit():
+        return None
+    return int(version_code)
+
+
+def _parse_gplaydl_version_code(output: str, store_id: str) -> int:
+    version_match = re.search(r"Version\s+│[^\n]*\((\d+)\)", output)
+    if version_match is None:
+        raise ValueError(f"Unable to parse gplaydl version code for {store_id=}")
+    return int(version_match.group(1))
+
+
+def get_gplaydl_version_code(store_id: str) -> int:
+    gplaydl_path = pathlib.Path(sys.prefix, "bin", "gplaydl")
+    result = subprocess.run(
+        [str(gplaydl_path), "info", store_id],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return _parse_gplaydl_version_code(result.stdout, store_id)
 
 
 def manual_process_download(
@@ -82,6 +125,7 @@ def manual_process_download(
 def manage_apk_download(
     store_id: str,
     existing_local_file_path: pathlib.Path | None,
+    last_downloaded_version_code: str | None = None,
 ) -> DownloadResult:
     """Manage the download of an apk or xapk file"""
     func_info = f"manage_download {store_id=}"
@@ -95,7 +139,9 @@ def manage_apk_download(
         if existing_local_file_path:
             downloaded_file_path = existing_local_file_path
         else:
-            downloaded_file_path = external_download(store_id)
+            downloaded_file_path = external_download(
+                store_id, last_downloaded_version_code
+            )
         if not downloaded_file_path:
             raise FileNotFoundError(f"Downloaded file path not found for {store_id=}")
         apk_tmp_decoded_output_path = unzip_apk(
@@ -106,6 +152,10 @@ def manage_apk_download(
         md5_hash = get_md5_hash(downloaded_file_path)
         crawl_result = 1
 
+    except ExistingOrOlderVersionError as e:
+        logger.info(f"{func_info} skipping download: {e}")
+        version_str = str(e.last_downloaded_version_code)
+        crawl_result = 1
     except requests.exceptions.HTTPError:
         crawl_result = 2  # 404, 403s etc
     except requests.exceptions.ConnectionError:
@@ -203,9 +253,20 @@ def download_from_url(download_url: str, store_id: str) -> pathlib.Path:
     return apk_filepath
 
 
-def gplaydl_download(store_id: str) -> pathlib.Path:
+def gplaydl_download(
+    store_id: str, last_downloaded_version_code: str | None = None
+) -> pathlib.Path:
     destination_dir = pathlib.Path(SPLITS_INCOMING_DIR, store_id)
     gplaydl_path = pathlib.Path(sys.prefix, "bin", "gplaydl")
+    last_version_code = _coerce_version_code(last_downloaded_version_code)
+    if last_version_code is not None:
+        available_version_code = get_gplaydl_version_code(store_id)
+        if available_version_code <= last_version_code:
+            raise ExistingOrOlderVersionError(
+                store_id=store_id,
+                available_version_code=available_version_code,
+                last_downloaded_version_code=last_version_code,
+            )
     subprocess.run([str(gplaydl_path), "auth"], check=True)
     subprocess.run(
         [str(gplaydl_path), "download", store_id, "-o", destination_dir], check=True
@@ -235,7 +296,9 @@ def gplaydl_download(store_id: str) -> pathlib.Path:
     return xapk_path
 
 
-def external_download(store_id: str) -> pathlib.Path:
+def external_download(
+    store_id: str, last_downloaded_version_code: str | None = None
+) -> pathlib.Path:
     """Download the apk file.
 
     Downloaded APK or XAPK files are stored in the incoming directories while processing in this script.
@@ -247,7 +310,7 @@ def external_download(store_id: str) -> pathlib.Path:
         func_info = f"download {store_id=} {source=}"
         try:
             if source == "gplaydl":
-                apk_filepath = gplaydl_download(store_id)
+                apk_filepath = gplaydl_download(store_id, last_downloaded_version_code)
                 if apk_filepath:
                     return apk_filepath
             else:
@@ -255,6 +318,8 @@ def external_download(store_id: str) -> pathlib.Path:
                 apk_filepath = download_from_url(download_url, store_id)
                 if apk_filepath:
                     return apk_filepath
+        except ExistingOrOlderVersionError:
+            raise
         except Exception as e:
             logger.error(f"{func_info}: {e}")
             continue

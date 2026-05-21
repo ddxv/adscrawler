@@ -74,6 +74,7 @@ scheduled_apps_crawl AS (
         vc.crawl_result AS last_crawl_result,
         vc.updated_at AS last_download_attempt,
         lsvc.created_at AS last_downloaded_at,
+        lsvc.version_code AS last_downloaded_version_code,
         coalesce(fd.attempt_count, 0) AS failed_attempts_month,
         coalesce(fdq.attempt_count, 0) AS failed_attempts_quarter
     FROM
@@ -144,6 +145,7 @@ user_requested_apps_crawl AS (
         lvc.crawl_result AS last_crawl_result,
         lvc.updated_at AS last_download_attempt,
         lsvc.created_at AS last_downloaded_at,
+        lsvc.version_code AS last_downloaded_version_code,
         coalesce(fd.attempt_count, 0) AS failed_attempts_month,
         coalesce(fdq.attempt_count, 0) AS failed_attempts_quarter
     FROM
@@ -168,20 +170,11 @@ user_requested_apps_crawl AS (
             sa.id = fdq.store_app
     WHERE
         (
-            (
-                lsvc.created_at < urs.created_at
-                AND (
-                    (
-                        sa.store_last_updated > lsvc.created_at
-                        AND lsvc.created_at > '2025-05-01'
-                    )
-                    OR lsvc.created_at < '2025-05-01'
-                )
-            )
+            lsvc.created_at < urs.created_at
             OR lsvc.created_at IS NULL
         )
         AND (
-            lvc.updated_at < current_date - interval '1 days'
+            lvc.updated_at < now() - interval '1 hour'
             OR lvc.updated_at IS NULL
         )
         AND sa.store = :store
@@ -204,7 +197,8 @@ combined AS (
         last_crawl_result,
         'user' AS mysource,
         last_download_attempt,
-        last_downloaded_at
+        last_downloaded_at,
+        last_downloaded_version_code
     FROM
         user_requested_apps_crawl
     WHERE
@@ -230,7 +224,8 @@ combined AS (
             ELSE 'scheduled'
         END AS mysource,
         last_download_attempt,
-        last_downloaded_at
+        last_downloaded_at,
+        last_downloaded_version_code
     FROM
         scheduled_apps_crawl
     WHERE
@@ -243,7 +238,18 @@ combined AS (
 ),
 final_selection AS (
     SELECT
-        *,
+        store_app,
+        store_id,
+        name,
+        installs,
+        rating_count,
+        failed_attempts_month,
+        failed_attempts_quarter,
+        last_crawl_result,
+        mysource,
+        last_download_attempt,
+        last_downloaded_at,
+        last_downloaded_version_code,
         (
             coalesce(
                 date_part('day', current_date - last_download_attempt), 10000
@@ -274,6 +280,19 @@ final_selection AS (
     FROM
         combined
 )
-SELECT *
+SELECT 
+    store_app,
+        store_id,
+        name,
+        installs,
+        rating_count,
+        failed_attempts_month,
+        failed_attempts_quarter,
+        last_crawl_result,
+        mysource,
+        last_download_attempt,
+        last_downloaded_at,
+        last_downloaded_version_code,
+        app_rank
 FROM
     final_selection;

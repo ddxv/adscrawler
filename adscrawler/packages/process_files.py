@@ -63,6 +63,7 @@ def download_apps(
     apps = apps.head(number_of_apps_to_pull)
     for _id, row in apps.iterrows():
         store_id = row.store_id
+        last_downloaded_version_code = row.last_downloaded_version_code
         existing_file_path = None
         is_already_in_s3 = False
         try:
@@ -103,6 +104,7 @@ def download_apps(
                 download_result = manage_apk_download(
                     store_id=store_id,
                     existing_local_file_path=existing_file_path,
+                    last_downloaded_version_code=last_downloaded_version_code,
                 )
             elif store == 2:
                 download_result = manage_ipa_download(
