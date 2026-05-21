@@ -585,39 +585,29 @@ def insert_version_code(
     crawl_result: int,
     pgdb: PostgresEngine,
     apk_hash: str | None = None,
-    return_rows: bool = False,
-) -> pd.DataFrame | None:
-    version_code_df = pd.DataFrame(
-        [
-            {
-                "store_app": store_app,
-                "version_code": version_str,
-                "apk_hash": apk_hash,
-                "crawl_result": crawl_result,
-            }
-        ]
-    )
+) -> None:
+    cols = {
+        "store_app": store_app,
+        "version_code": version_str,
+        "crawl_result": crawl_result,
+    }
+    if apk_hash is not None:
+        cols["apk_hash"] = apk_hash
+    version_code_df = pd.DataFrame([cols])
     try:
         log_download_crawl_results(version_code_df, pgdb)
     except Exception as e:
         logger.error(f"{store_app=} {version_str=} {crawl_result=} {apk_hash=} {e=}")
         raise e
-
-    upserted: pd.DataFrame = upsert_df(
+    insert_cols = version_code_df.columns.tolist()
+    upsert_df(
         df=version_code_df,
         table_name="version_codes",
         pgdb=pgdb,
         key_columns=["store_app", "version_code"],
-        return_rows=return_rows,
-        insert_columns=["store_app", "version_code", "crawl_result", "apk_hash"],
+        insert_columns=insert_cols,
     )
     logger.info(f"{store_app=} {version_str=} inserted to db")
-
-    if return_rows:
-        upserted = upserted.rename(
-            columns={"version_code": "original_version_code", "id": "version_code"}
-        ).drop("store_app", axis=1)
-    return upserted
 
 
 def log_download_crawl_results(df: pd.DataFrame, pgdb: PostgresEngine) -> None:
@@ -1432,12 +1422,11 @@ def get_version_code_dbid(
     sel_query = f"""SELECT * FROM version_codes WHERE store_app = {store_app} AND version_code = '{version_code}'"""
     df = pd.read_sql(sel_query, con=pgdb.engine)
     if df.empty:
-        df = insert_version_code(
+        insert_version_code(
             version_str=version_code,
             store_app=store_app,
             crawl_result=4,
             pgdb=pgdb,
-            return_rows=True,
         )
         return None
     try:

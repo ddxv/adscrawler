@@ -280,19 +280,19 @@ final_selection AS (
     FROM
         combined
 )
-SELECT 
+SELECT
     store_app,
-        store_id,
-        name,
-        installs,
-        rating_count,
-        failed_attempts_month,
-        failed_attempts_quarter,
-        last_crawl_result,
-        mysource,
-        last_download_attempt,
-        last_downloaded_at,
-        last_downloaded_version_code,
-        app_rank
+    store_id,
+    name,
+    installs,
+    rating_count,
+    failed_attempts_month,
+    failed_attempts_quarter,
+    last_crawl_result,
+    mysource,
+    last_download_attempt,
+    last_downloaded_at,
+    last_downloaded_version_code,
+    app_rank
 FROM
     final_selection;
