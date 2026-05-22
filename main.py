@@ -164,6 +164,12 @@ class ProcessManager:
             "--run-id",
             help="String of run id to scan for creatives",
         )
+        parser.add_argument(
+            "--run-name",
+            help="Run name to use for Waydroid processing",
+            type=str,
+            default="regular",
+        )
         ### OPTIONS FOR IMPORT RANKS FROM S3
         parser.add_argument(
             "--daily-s3-imports",
@@ -444,12 +450,12 @@ class ProcessManager:
         if self.args.redownload_geo_dbs:
             update_geo_dbs(redownload=self.args.redownload_geo_dbs)
             return
+        run_name = self.args.run_name
         if self.args.store_id:
             # Manual waydroid process, launches app for 5 minutes for user to interact
             store_id = self.args.store_id
             store_id = self.args.store_id if self.args.store_id else None
             timeout = self.args.timeout_waydroid
-            run_name = "manual"
             manual_waydroid_process(
                 pgdb=self.pgcon,
                 store_id=store_id,
@@ -459,7 +465,7 @@ class ProcessManager:
         else:
             # Default processing of apk/xapk files that need to be processed
             try:
-                process_apks_for_waydroid(pgdb=self.pgcon)
+                process_apks_for_waydroid(pgdb=self.pgcon, run_name=run_name)
             except Exception:
                 logger.exception("Process APKs with Waydroid failed")
 

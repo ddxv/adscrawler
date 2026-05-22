@@ -875,8 +875,10 @@ def manual_waydroid_process(
     remove_all_third_party_apps()
 
 
-def process_apks_for_waydroid(pgdb: PostgresEngine, num_apps: int = 20) -> None:
-    apps_df = query_apps_to_api_scan(pgdb=pgdb, store=1)
+def process_apks_for_waydroid(
+    pgdb: PostgresEngine, num_apps: int = 20, run_name: str = "regular"
+) -> None:
+    apps_df = query_apps_to_api_scan(pgdb=pgdb, store=1, run_name=run_name)
     logger.info(
         f"Waydroid has {apps_df.shape[0]:,} apps to process, starting {num_apps}"
     )
@@ -900,7 +902,7 @@ def process_apks_for_waydroid(pgdb: PostgresEngine, num_apps: int = 20) -> None:
             apk_path=apk_path,
             store_id=store_id,
             store_app=store_app,
-            run_name="regular",
+            run_name=run_name,
         )
         remove_tmp_files(store_id=store_id)
     remove_all_third_party_apps()

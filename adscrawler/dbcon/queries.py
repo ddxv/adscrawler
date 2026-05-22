@@ -34,6 +34,7 @@ QUERY_APPS_TO_UPDATE_ANY_NEW = load_sql_file("query_apps_to_update_any_new.sql")
 QUERY_APPS_TO_DOWNLOAD = load_sql_file("query_apps_to_download.sql")
 QUERY_APPS_TO_SDK_SCAN = load_sql_file("query_apps_to_sdk_scan.sql")
 QUERY_APPS_TO_API_SCAN = load_sql_file("query_apps_to_api_scan.sql")
+QUERY_APPS_TO_API_SCAN_ADS = load_sql_file("query_apps_to_api_scan_ads.sql")
 QUERY_API_CALLS_TO_CREATIVE_SCAN = load_sql_file("query_apps_to_creative_scan.sql")
 QUERY_KEYWORDS_TO_CRAWL = load_sql_file("query_keywords_to_crawl.sql")
 QUERY_APPS_MITM_IN_S3 = load_sql_file("query_apps_mitm_in_s3.sql")
@@ -1218,7 +1219,7 @@ def query_all_apps_to_process(
 ) -> None:
     download_df = query_apps_to_download(pgdb=pgdb, store=1)
     sdk_df = query_apps_to_sdk_scan(pgdb=pgdb, store=1)
-    api_df = query_apps_to_api_scan(pgdb=pgdb, store=1)
+    api_df = query_apps_to_api_scan(pgdb=pgdb, store=1, run_name="ads")
 
     ipa_download_df = query_apps_to_download(pgdb=pgdb, store=2)
     ipa_sdk_df = query_apps_to_sdk_scan(pgdb=pgdb, store=2)
@@ -1235,9 +1236,15 @@ def query_all_apps_to_process(
     return
 
 
-def query_apps_to_api_scan(pgdb: PostgresEngine, store: int) -> pd.DataFrame:
+def query_apps_to_api_scan(
+    pgdb: PostgresEngine, store: int, run_name: str
+) -> pd.DataFrame:
+    if run_name == "ads":
+        query = QUERY_APPS_TO_API_SCAN_ADS
+    else:
+        query = QUERY_APPS_TO_API_SCAN
     df = pd.read_sql(
-        QUERY_APPS_TO_API_SCAN,
+        query,
         con=pgdb.engine,
         params={"store": store},
     )

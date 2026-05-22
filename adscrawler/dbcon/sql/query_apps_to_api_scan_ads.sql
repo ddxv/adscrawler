@@ -54,7 +54,7 @@ failed_runs AS (
         AND updated_at >= current_date - interval '10 days'
     GROUP BY store_app
 ),
-all_scheduled_to_run AS (
+monthly_ads_scheduled_to_run AS (
     SELECT
         lvc.store_app,
         sa.name,
@@ -79,46 +79,17 @@ all_scheduled_to_run AS (
         ON sa.id = agm.store_app
     LEFT JOIN failed_runs AS fr ON sa.id = fr.store_app
     WHERE
-        (ls.run_at <= current_date - interval '120 days' OR ls.run_at IS NULL)
+        (ls.run_at <= current_date - interval '14 days' OR ls.run_at IS NULL)
         AND sa.store = :store
+        AND sa.ad_supported
+        AND sa.free
         AND (fr.failed_attempts < 1 OR fr.failed_attempts IS NULL)
+        AND sa.id IN (
+            SELECT ac.store_app
+            FROM creative_records
+            LEFT JOIN api_calls AS ac ON creative_records.api_call_id = ac.id
+        )
     ORDER BY agm.total_installs DESC NULLS LAST
-),
-user_requested_apps_crawl AS (
-    SELECT DISTINCT ON (sa.id)
-        sa.id AS store_app,
-        sa.store_id,
-        sa.name,
-        lsvc.version_code AS version_string,
-        agm.total_installs AS installs,
-        ls.run_at AS last_run_at,
-        fr.failed_attempts,
-        ls.run_result AS last_run_result,
-        lss.run_at AS last_succesful_run_at,
-        lsvc.last_downloaded_at,
-        urs.created_at AS user_requested_at
-    FROM
-        agadmin.user_requested_scan AS urs
-    LEFT JOIN store_apps AS sa
-        ON
-            urs.store_id = sa.store_id
-    LEFT JOIN app_global_metrics_latest AS agm
-        ON sa.id = agm.store_app
-    INNER JOIN latest_version_codes AS lsvc
-        ON
-            sa.id = lsvc.store_app
-    LEFT JOIN last_scanned AS ls ON lsvc.id = ls.version_code_id
-    LEFT JOIN last_successful_scanned AS lss ON lsvc.id = lss.version_code_id
-    LEFT JOIN failed_runs AS fr ON sa.id = fr.store_app
-    WHERE
-        (
-            ls.run_at < urs.created_at
-            OR ls.run_at IS NULL
-        )
-        AND sa.store = :store
-        AND (fr.failed_attempts < 1 OR fr.failed_attempts IS NULL
-        )
-    ORDER BY sa.id ASC, urs.created_at DESC
 )
 SELECT
     store_app,
@@ -131,22 +102,7 @@ SELECT
     last_run_result,
     last_succesful_run_at,
     last_downloaded_at,
-    user_requested_at,
-    'user' AS mysource
-FROM user_requested_apps_crawl
-UNION ALL
-SELECT
-    store_app,
-    store_id,
-    name,
-    version_string,
-    installs,
-    last_run_at,
-    failed_attempts,
-    last_run_result,
-    last_succesful_run_at,
-    last_downloaded_at,
     NULL AS user_requested_at,
-    'scheduled' AS mysource
-FROM all_scheduled_to_run
+    'scheduled_ads' AS mysource
+FROM monthly_ads_scheduled_to_run AS masr
 ;
