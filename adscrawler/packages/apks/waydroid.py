@@ -271,8 +271,8 @@ def insert_api_calls(
 def insert_missing_ad_domains(
     api_calls_df: pd.DataFrame,
     pgdb: PostgresEngine,
-) -> pd.DataFrame:
-    """Adds missing ad domains to the database and returns updated domain DataFrame."""
+) -> None:
+    """Adds missing ad domains to the database."""
     ad_domains_df = query_ad_domains(pgdb=pgdb)
     check_cols = ["tld_url"]
     for col in check_cols:
@@ -293,15 +293,8 @@ def insert_missing_ad_domains(
                 key_columns=["domain_name"],
                 pgdb=pgdb,
             )
-            ad_domains_df = pd.concat(
-                [
-                    new_ad_domains[["id", "domain_name"]].rename(
-                        columns={"id": "domain_id"}
-                    ),
-                    ad_domains_df,
-                ]
-            )
-    return ad_domains_df
+
+    return
 
 
 def get_version_via_apktool(

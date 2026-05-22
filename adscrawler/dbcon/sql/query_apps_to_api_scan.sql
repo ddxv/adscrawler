@@ -148,5 +148,4 @@ SELECT
     last_downloaded_at,
     NULL AS user_requested_at,
     'scheduled' AS mysource
-FROM all_scheduled_to_run
-;
+FROM all_scheduled_to_run;

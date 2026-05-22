@@ -104,5 +104,4 @@ SELECT
     last_downloaded_at,
     NULL AS user_requested_at,
     'scheduled_ads' AS mysource
-FROM monthly_ads_scheduled_to_run AS masr
-;
+FROM monthly_ads_scheduled_to_run;
