@@ -492,7 +492,7 @@ def remove_all_third_party_apps() -> None:
 THIRD_PARTY_APPS_TO_KEEP = ["org.mozilla.firefox", "io.github.huskydg.magisk"]
 
 
-def prep_xapk_splits(store_id: str, xapk_path: pathlib.Path) -> str:
+def prep_xapk_splits(store_id: str, xapk_path: pathlib.Path) -> list[str]:
     logger.info(f"Waydroid prep xapk splits for {store_id}")
     tmp_apk_dir = pathlib.Path(XAPKS_TMP_UNZIP_DIR, f"{store_id}")
     if not tmp_apk_dir.exists():
@@ -534,10 +534,10 @@ def prep_xapk_splits(store_id: str, xapk_path: pathlib.Path) -> str:
         if x != base_apk_name
     ]
 
-    split_install_command = (
-        f"pm install {base_apk_path.as_posix()} {' '.join(split_apk_paths)}"
-    )
-    return split_install_command
+    split_apk_paths = [base_apk_path.as_posix()] + [
+        p.as_posix() for p in split_apk_paths
+    ]
+    return split_apk_paths
 
 
 def get_installed_version_str(
@@ -717,14 +717,27 @@ def install_app(store_id: str, apk_path: pathlib.Path) -> None:
     time.sleep(2)
     extension = apk_path.suffix
     if extension == ".xapk":
-        split_install_command = prep_xapk_splits(store_id, apk_path)
+        split_apk_paths = prep_xapk_splits(store_id, apk_path)
         _install_output = subprocess.run(
-            ["sudo", "waydroid", "shell"] + split_install_command.split(),
+            ["sudo", "waydroid", "shell", "pm", "install"] + split_apk_paths,
             capture_output=True,
             text=True,
             check=False,
             timeout=120,
         )
+        if (
+            "Split null was defined multiple times"
+            in _install_output.stdout + _install_output.stderr
+        ):
+            logger.warning(f"{function_info} retrying without asset splits")
+            filtered_paths = [p for p in split_apk_paths if "-asset" not in p]
+            _install_output = subprocess.run(
+                ["sudo", "waydroid", "shell", "pm", "install"] + filtered_paths,
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=120,
+            )
     elif extension == ".apk":
         _install_output = subprocess.run(
             ["waydroid", "app", "install", apk_path.as_posix()],
