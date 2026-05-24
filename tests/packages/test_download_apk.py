@@ -67,7 +67,6 @@ class TestDownloadApk(unittest.TestCase):
         ):
             result = manage_apk_download(
                 "com.crazygames.crazygamesapp",
-                existing_local_file_path=None,
                 last_downloaded_version_code="33",
             )
 

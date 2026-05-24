@@ -28,7 +28,6 @@ FAILED_VERSION_STR = "-1"
 
 def manage_ipa_download(
     store_id: str,
-    existing_local_file_path: pathlib.Path | None,
 ) -> DownloadResult:
     func_info = f"manage_ipa_download {store_id=}"
     logger.info(f"{func_info} start")
@@ -40,14 +39,11 @@ def manage_ipa_download(
     downloaded_file_path = None
 
     try:
-        if existing_local_file_path:
-            downloaded_file_path = existing_local_file_path
-        else:
-            r = lookupby_id(app_id=store_id)
-            bundle_id: str = r["bundleId"]
-            downloaded_file_path = external_download(
-                store_id=store_id, bundle_id=bundle_id, do_redownload=False
-            )
+        r = lookupby_id(app_id=store_id)
+        bundle_id: str = r["bundleId"]
+        downloaded_file_path = external_download(
+            store_id=store_id, bundle_id=bundle_id, do_redownload=True
+        )
         tmp_decoded_output_path = unzip_ipa(
             ipa_path=downloaded_file_path, store_id=store_id
         )
@@ -74,9 +70,6 @@ def manage_ipa_download(
         error_count += 3
     if crawl_result in [2]:
         error_count += 1
-
-    if existing_local_file_path:
-        error_count = 0
 
     logger.info(f"{func_info} {crawl_result=} {md5_hash=} {version_str=}")
 

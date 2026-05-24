@@ -27,7 +27,6 @@ from adscrawler.packages.storage import (
     upload_apk_to_s3,
 )
 from adscrawler.packages.utils import (
-    get_local_file_path,
     get_md5_hash,
     get_version,
     move_downloaded_app_to_main_dir,
@@ -91,11 +90,9 @@ def manual_process_download(
 ) -> None:
     """Manual download of an apk file."""
     store_app = query_store_app_by_store_id(pgdb=pgdb, store_id=store_id)
-    existing_local_file_path = get_local_file_path(store, store_id)
     if store == 1:
         download_result = manage_apk_download(
             store_id=store_id,
-            existing_local_file_path=existing_local_file_path,
         )
     version_str = download_result.version_str or FAILED_VERSION_STR
     insert_version_code(
@@ -124,7 +121,6 @@ def manual_process_download(
 
 def manage_apk_download(
     store_id: str,
-    existing_local_file_path: pathlib.Path | None,
     last_downloaded_version_code: str | None = None,
 ) -> DownloadResult:
     """Manage the download of an apk or xapk file"""
@@ -136,12 +132,7 @@ def manage_apk_download(
     downloaded_file_path = None
 
     try:
-        if existing_local_file_path:
-            downloaded_file_path = existing_local_file_path
-        else:
-            downloaded_file_path = external_download(
-                store_id, last_downloaded_version_code
-            )
+        downloaded_file_path = external_download(store_id, last_downloaded_version_code)
         if not downloaded_file_path:
             raise FileNotFoundError(f"Downloaded file path not found for {store_id=}")
         apk_tmp_decoded_output_path = unzip_apk(
@@ -175,9 +166,6 @@ def manage_apk_download(
     elif crawl_result in [3, 4]:
         error_count = 1
     elif crawl_result in [1]:
-        error_count = 0
-
-    if existing_local_file_path:
         error_count = 0
 
     logger.info(f"{func_info} {crawl_result=} {md5_hash=} {version_str=}")
