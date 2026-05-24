@@ -534,9 +534,8 @@ def prep_xapk_splits(store_id: str, xapk_path: pathlib.Path) -> list[str]:
         if x != base_apk_name
     ]
 
-    split_apk_paths = [base_apk_path.as_posix()] + [
-        p.as_posix() for p in split_apk_paths
-    ]
+    split_apk_paths = [base_apk_path.as_posix()] + split_apk_paths
+
     return split_apk_paths
 
 
