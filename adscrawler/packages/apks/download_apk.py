@@ -100,7 +100,6 @@ def manual_process_download(
         store_app=store_app,
         crawl_result=download_result.crawl_result,
         pgdb=pgdb,
-        return_rows=False,
         apk_hash=download_result.md5_hash,
     )
     if (
@@ -257,7 +256,8 @@ def gplaydl_download(
             )
     subprocess.run([str(gplaydl_path), "auth"], check=True)
     subprocess.run(
-        [str(gplaydl_path), "download", store_id, "-o", destination_dir], check=True
+        [str(gplaydl_path), "download", store_id, "-o", str(destination_dir)],
+        check=True,
     )
     # get the downloaded file path
     downloaded_files = list(destination_dir.glob("*"))

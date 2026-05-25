@@ -105,7 +105,6 @@ def download_apps(
                 store_app=row.store_app,
                 crawl_result=download_result.crawl_result,
                 pgdb=pgdb,
-                return_rows=False,
                 apk_hash=download_result.md5_hash,
             )
         except Exception:
