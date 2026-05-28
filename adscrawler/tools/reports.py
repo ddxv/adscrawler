@@ -6,7 +6,7 @@ from adscrawler.dbcon.connection import get_db_connection
 from adscrawler.dbcon.queries import (
     delete_combined_history_by_quarter,
     insert_bulk,
-    query_report_combined_companies,
+    query_report_combined_domains,
     query_zscores,
 )
 
@@ -33,17 +33,11 @@ quarters = pd.date_range(start="2025-01-01", end=datetime.datetime.today(), freq
 for start_date in quarters:
     # end_date is the first day of the NEXT period
     start_of_next_period = start_date + pd.offsets.QuarterEnd() + pd.Timedelta(days=1)
-    df = query_report_combined_companies(
+    df = query_report_combined_domains(
         pgdb, start_date=start_date, start_of_next_period=start_of_next_period
     )
     df["year"] = start_date.year
     df["quarter"] = start_date.quarter
-    df["company_id"] = df["company_id"].astype(
-        "Int64"
-    )  # Convert to nullable integer type
-    df["parent_id"] = df["parent_id"].astype(
-        "Int64"
-    )  # Convert to nullable integer type
     delete_combined_history_by_quarter(
         pgdb=pgdb,
         delete_year=start_date.year,
@@ -52,7 +46,7 @@ for start_date in quarters:
     insert_bulk(
         df=df,
         schema="adtech",
-        table_name="combined_company_app_history",
+        table_name="combined_domain_app_history",
         pgdb=pgdb,
         chunk_size=1000000,
     )

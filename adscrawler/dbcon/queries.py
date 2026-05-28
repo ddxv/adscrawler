@@ -39,7 +39,7 @@ QUERY_API_CALLS_TO_CREATIVE_SCAN = load_sql_file("query_apps_to_creative_scan.sq
 QUERY_KEYWORDS_TO_CRAWL = load_sql_file("query_keywords_to_crawl.sql")
 QUERY_APPS_MITM_IN_S3 = load_sql_file("query_apps_mitm_in_s3.sql")
 QUERY_REPORT_ZSCORES = load_sql_file("query_report_z_scores.sql")
-QUERY_REPORT_COMBINED_COMPANIES = load_sql_file("query_report_combined_companies.sql")
+QUERY_REPORT_COMBINED_DOMAINS = load_sql_file("query_report_combined_domains.sql")
 QUERY_APPS_TO_PROCESS_KEYWORDS = load_sql_file("query_apps_to_process_keywords.sql")
 
 
@@ -1178,11 +1178,11 @@ def query_zscores(pgdb: PostgresEngine, target_week: str) -> pd.DataFrame:
     return df
 
 
-def query_report_combined_companies(
+def query_report_combined_domains(
     pgdb: PostgresEngine, start_date: str, start_of_next_period: str
 ) -> pd.DataFrame:
     df = pd.read_sql(
-        QUERY_REPORT_COMBINED_COMPANIES,
+        QUERY_REPORT_COMBINED_DOMAINS,
         con=pgdb.engine,
         params={
             "start_of_period": start_date,
@@ -1219,20 +1219,24 @@ def query_all_apps_to_process(
 ) -> None:
     download_df = query_apps_to_download(pgdb=pgdb, store=1)
     sdk_df = query_apps_to_sdk_scan(pgdb=pgdb, store=1)
-    api_df = query_apps_to_api_scan(pgdb=pgdb, store=1, run_name="ads")
+    api_reg_df = query_apps_to_api_scan(pgdb=pgdb, store=1, run_name="regular")
+    api_ads_df = query_apps_to_api_scan(pgdb=pgdb, store=1, run_name="ads")
 
     ipa_download_df = query_apps_to_download(pgdb=pgdb, store=2)
     ipa_sdk_df = query_apps_to_sdk_scan(pgdb=pgdb, store=2)
 
     android_downloads = download_df.shape[0]
     android_sdks = sdk_df.shape[0]
-    android_apis = api_df.shape[0]
+    android_apis = api_reg_df.shape[0]
+    android_ads = api_ads_df.shape[0]
 
     ipa_downloads = ipa_download_df.shape[0]
     ipa_sdks = ipa_sdk_df.shape[0]
 
-    logger.info(f"Android: {android_downloads} -> {android_sdks} -> {android_apis}")
-    logger.info(f"iOS: {ipa_downloads} -> {ipa_sdks}")
+    logger.info(
+        f"{android_downloads=}  {android_sdks=} -> {android_apis=} -> {android_ads=}"
+    )
+    logger.info(f"iOS: {ipa_downloads=} -> {ipa_sdks=}")
     return
 
 
@@ -1594,7 +1598,7 @@ def delete_combined_history_by_quarter(
     delete_year: int,
     delete_quarter: int,
 ) -> None:
-    table_name = "combined_company_app_history"
+    table_name = "combined_domain_app_history"
     del_query = text(f"""
         DELETE FROM adtech.{table_name} acmh 
         WHERE 
