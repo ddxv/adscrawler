@@ -10,8 +10,6 @@ WITH latest_version_codes AS (
         version_codes
     WHERE
         crawl_result = 1
-        -- HACKY FIX only try for apps that have successuflly been downloaded, but this table still is all history of version_codes in general
-        AND created_at >= '2025-05-01'
     ORDER BY
         store_app ASC,
         created_at DESC,

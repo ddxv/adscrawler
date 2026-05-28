@@ -26,8 +26,6 @@ last_scanned AS (
         version_code_api_scan_results AS vasr
     LEFT JOIN version_codes AS vc
         ON vasr.version_code_id = vc.id
-    WHERE
-        vc.updated_at >= '2025-05-01'
     ORDER BY vc.store_app ASC, vasr.run_at DESC
 ),
 last_successful_scanned AS (
@@ -41,7 +39,6 @@ last_successful_scanned AS (
         ON vasr.version_code_id = vc.id
     WHERE
         vc.crawl_result = 1
-        AND vc.updated_at >= '2025-05-01'
     ORDER BY vc.store_app ASC, vasr.run_at DESC
 ),
 failed_runs AS (
