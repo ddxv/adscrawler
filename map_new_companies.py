@@ -1,14 +1,16 @@
 import json
-import pandas as pd
 from itertools import zip_longest
 from pathlib import Path
+
+import pandas as pd
+
 from adscrawler.dbcon.connection import get_db_connection
 
 pgdb = get_db_connection()
 
 
 def query_company_tag_stats(pgdb) -> pd.DataFrame:
-    query = f"""
+    query = """
    SELECT company_domain, company_name, sum(app_count) FROM frontend.companies_category_tag_stats
        WHERE tag_source = 'api_call' OR tag_source = 'publisher'
        GROUP by company_domain, company_name;
@@ -17,7 +19,7 @@ def query_company_tag_stats(pgdb) -> pd.DataFrame:
 
 
 def query_company_domain_mapping(pgdb) -> pd.DataFrame:
-    query = f"""
+    query = """
     SELECT cdm.company_id, d.domain_name, c.parent_company_id 
     FROM adtech.company_domain_mapping cdm
     LEFT JOIN domains d ON
@@ -29,7 +31,7 @@ def query_company_domain_mapping(pgdb) -> pd.DataFrame:
 
 
 def query_sdk_package_patterns(pgdb) -> pd.DataFrame:
-    query = f"""
+    query = """
     SELECT
         sd.id AS sdk_id,
         sd.company_id,
