@@ -11,6 +11,46 @@ from adscrawler.config import CONFIG, MODULE_DIR, PACKAGE_DIR, get_logger
 logger = get_logger(__name__, "scrape_google")
 
 
+def normalize_google_search_results(
+    results: list[dict], country: str, language: str
+) -> list[dict]:
+    normalized_results = []
+    for result in results:
+        normalized_result = result.copy()
+        store_id = normalized_result.get("store_id") or normalized_result.get("appId")
+        if not store_id:
+            logger.debug(
+                "Skip Google search result without store_id "
+                f"{country=} {language=} {result.get('title')= }"
+            )
+            continue
+
+        normalized_result.pop("appId", None)
+        store_link = normalized_result.pop("url", None) or normalized_result.get(
+            "store_link"
+        )
+        normalized_result["store_id"] = store_id
+        normalized_result["id"] = store_id
+        normalized_result["store_link"] = (
+            store_link or f"https://play.google.com/store/apps/details?id={store_id}"
+        )
+        normalized_result["name"] = normalized_result.pop(
+            "title", normalized_result.get("name")
+        )
+        normalized_result["developer_name"] = normalized_result.pop(
+            "developer", normalized_result.get("developer_name")
+        )
+        normalized_result["icon_url_512"] = normalized_result.pop(
+            "icon", normalized_result.get("icon_url_512")
+        )
+        normalized_result["store"] = 1
+        normalized_result["country"] = country
+        normalized_result["language"] = language
+        normalized_results.append(normalized_result)
+
+    return normalized_results
+
+
 def scrape_app_gp(store_id: str, country: str, language: str = "en") -> dict:
     """
     yt_us = scrape_app_gp("com.google.android.youtube", "us", language="en")
@@ -214,57 +254,52 @@ def search_play_store(
 ) -> list[dict]:
     """Search store for new apps or keyword rankings."""
     logger.info(f"Run Playstore search {search_term=} {country=} {language=}")
-    # Only returns 30
-    # results = appgoblin_play_scraper.search(
-    #     search_term,
-    #     lang=language,
-    #     country=country,
-    # )
-    node_path = "node"
-    if "local-dev" in CONFIG.keys():
-        node_path = CONFIG["local-dev"].get("node_env")
-
-    # Call the Node.js script that runs google-play-scraper
-    # Depending how node is installed you may need
-    # a system link like sudo ln -sf /home/user/.nvm/versions/node/v24.14.0/bin/node /usr/local/bin/node
-    process = subprocess.Popen(
-        [
-            node_path,
-            f"{MODULE_DIR}/static/searchApps.js",
-            search_term,
-            "200",
-            country,
-            language,
-        ],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    )
+    results = []
+    # Returns few results
     try:
-        output, error = process.communicate(timeout=60)
-    except subprocess.TimeoutExpired:
-        process.kill()
+        results = appgoblin_play_scraper.search(
+            search_term,
+            lang=language,
+            country=country,
+        )
+    except Exception:
+        node_path = "node"
+        if "local-dev" in CONFIG.keys():
+            node_path = CONFIG["local-dev"].get("node_env")
+
+        # Call the Node.js script that runs google-play-scraper
+        # Depending how node is installed you may need
+        # a system link like sudo ln -sf /home/user/.nvm/versions/node/v24.14.0/bin/node /usr/local/bin/node
+        process = subprocess.Popen(
+            [
+                node_path,
+                f"{MODULE_DIR}/static/searchApps.js",
+                search_term,
+                "200",
+                country,
+                language,
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
         try:
-            process.communicate(timeout=5)  # drain pipes safely
+            output, error = process.communicate(timeout=60)
         except subprocess.TimeoutExpired:
-            pass
-        raise Exception("Search process timed out")
+            process.kill()
+            try:
+                process.communicate(timeout=5)  # drain pipes safely
+            except subprocess.TimeoutExpired:
+                pass
+            raise Exception("Search process timed out")
 
-    if error:
-        logger.error(f"failed to search: {error!r}")
+        if error:
+            logger.error(f"failed to search: {error!r}")
 
-    results: list[dict] = json.loads(output)
+        results: list[dict] = json.loads(output)
+    results = normalize_google_search_results(
+        results, country=country, language=language
+    )
+
     logger.info(f"Playstore search finished with {len(results)} results")
-
-    if len(results) > 0 and "appId" in results[0]:
-        for result in results:
-            result["store_id"] = result["appId"]
-            result["id"] = result.pop("appId")  # needed for response to frontend
-            result["store_link"] = result.pop("url")
-            result["name"] = result.pop("title")
-            result["developer_name"] = result.pop("developer")
-            result["icon_url_512"] = result.pop("icon")
-            result["store"] = 1
-            result["country"] = country
-            result["language"] = language
 
     return results
