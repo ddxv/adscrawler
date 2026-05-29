@@ -117,7 +117,7 @@ def run_app(
         if mdf.empty:
             logger.warning("MITM log is empty")
         else:
-            logger.info("MITM log has {mdf.shape[0]:,} rows")
+            logger.info(f"MITM log has {mdf.shape[0]:,} rows")
             mdf["url"] = mdf["url"].str[0:1000]
             mdf["store_app"] = store_app
     except Exception:
