@@ -689,13 +689,23 @@ def _build_coalesce_metric_sql(metric: str) -> str:
     # Define which metrics are floats vs integers
     float_metrics = {"rating"}
     cast = "DOUBLE" if metric in float_metrics else "BIGINT"
-    return f"""COALESCE(
+    if metric == "installs":
+        coalesce_string = f"""COALESCE(
+                    a_exact.{metric},
+                    a_prev.{metric} +
+                        DATE_DIFF('day', a_prev.observed_at, m.week_start)::DOUBLE *
+                        GREATEST((a_prev.{metric}_y2 - a_prev.{metric})::DOUBLE, 0.0) /
+                        NULLIF(DATE_DIFF('day', a_prev.observed_at, a_prev.x2)::DOUBLE, 0.0)
+                )::{cast} AS {metric},"""
+    else:
+        coalesce_string = f"""COALESCE(
                     a_exact.{metric},
                     a_prev.{metric} +
                         DATE_DIFF('day', a_prev.observed_at, m.week_start)::DOUBLE *
                         (a_prev.{metric}_y2 - a_prev.{metric})::DOUBLE /
                         NULLIF(DATE_DIFF('day', a_prev.observed_at, a_prev.x2)::DOUBLE, 0.0)
                 )::{cast} AS {metric},"""
+    return coalesce_string
 
 
 def _build_coalesce_metrics_sql(metrics: list[str]) -> str:
@@ -1118,20 +1128,6 @@ def process_app_metrics_to_db(
     country_df, global_df = drop_unwanted_rows(
         country_df, global_df, store, db_delete_start
     )
-    df[
-        (df["store_app"] == 765358)
-        & (df["week_start"] == pd.to_datetime("2026-03-09"))
-        & (df["country_id"] == 840)
-    ]
-    country_df[
-        (country_df["store_app"] == 765358)
-        & (country_df["week_start"] == pd.to_datetime("2026-02-09"))
-        & (country_df["country_id"] == 840)
-    ][["rating_count"]]
-    global_df[
-        (global_df["store_app"] == 765358)
-        & (global_df["week_start"] == pd.to_datetime("2026-03-09"))
-    ]
     delete_and_insert_app_metrics(
         pgdb=pgdb,
         country_df=country_df,
@@ -1263,6 +1259,7 @@ def calculate_derived_metrics(
         .fillna(global_df["installs"])
         .fillna(0)
     )
+    global_df["installs_diff"] = global_df["installs_diff"].clip(lower=0)
     global_df["weekly_ratings"] = (
         global_df.groupby("store_app")["rating_count"]
         .diff()
