@@ -670,7 +670,7 @@ def scan_all_apps(
             error_messages = result["error_messages"]
 
             logger.info(
-                f"{completed}/{mitms_count}: {pub_store_id} {run_id=} completed"
+                f"{completed}/{mitms_count}: {pub_store_id=} {run_id=} completed"
             )
 
             if len(error_messages) == 0:

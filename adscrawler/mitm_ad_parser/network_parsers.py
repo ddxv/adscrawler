@@ -211,6 +211,7 @@ def check_and_upsert_new_domains(
 ) -> pd.DataFrame:
     """Adds missing domains to the database and returns updated domain DataFrame."""
     col = "tld_url"
+    urls_df = urls_df[urls_df[col].notna()]
     existing_domains = pd.Index(domains_df["domain_name"])
     new_domains = pd.Index(urls_df[col]).difference(existing_domains)
     if not new_domains.empty:
