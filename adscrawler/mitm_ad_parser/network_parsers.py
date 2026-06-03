@@ -37,6 +37,9 @@ PLAYSTORE_URL_PARTS = ["play.google.com/store", "market://", "intent://"]
 
 ANDROID_USER_AGENT = "Mozilla/5.0 (Linux; Android 13; Pixel 7 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
 
+IGNORE_STORE_IDS = ["com.android.vending"]
+
+
 IGNORE_PRIVACY_URLS = [
     "/policy.html",
     "/legal",
@@ -436,7 +439,8 @@ def parse_urls_for_known_parts(
             found_ad_network_urls.append(url)
     found_mmp_urls = list(set(found_mmp_urls))
     found_adv_store_ids = list(set(found_adv_store_ids))
-    found_adv_store_ids = [x for x in found_adv_store_ids if x != pub_store_id]
+    ignore_adv_ids = IGNORE_STORE_IDS + [pub_store_id]
+    found_adv_store_ids = [x for x in found_adv_store_ids if x not in ignore_adv_ids]
     found_ad_network_urls = [x for x in found_ad_network_urls if x is not None]
     found_ad_network_tlds_list = [get_tld(url) for url in found_ad_network_urls]
     found_ad_network_tlds = list(
