@@ -18,9 +18,9 @@ from protod import Renderer
 from adscrawler.config import get_logger
 from adscrawler.dbcon.connection import PostgresEngine
 from adscrawler.dbcon.queries import (
-    get_all_mmp_tlds,
+    get_all_mmp_tlds_set,
     get_click_url_redirect_chains,
-    query_ad_domains,
+    query_ad_domains_set,
     query_all_domains,
     query_api_call_id_for_uuid,
     query_store_app_by_store_id_cached,
@@ -389,14 +389,15 @@ def parse_urls_for_known_parts(
     found_mmp_urls = []
     found_adv_store_ids = []
     found_ad_network_urls = []
-    ad_domains_df = query_ad_domains(pgdb=pgdb)
+    ad_domains_set = query_ad_domains_set(pgdb=pgdb)
+    mmps_set = get_all_mmp_tlds_set(pgdb)
     for url in all_urls:
         adv_store_id = None
         tld_url = get_tld(url)
         if not tld_url:
             # only for use here, likely url like "market://"
             tld_url = ""
-        if tld_url in get_all_mmp_tlds(pgdb)["mmp_tld"].to_list():
+        if tld_url in mmps_set:
             if any(
                 x in url.lower()
                 for x in [
@@ -436,8 +437,8 @@ def parse_urls_for_known_parts(
             if resp_adv_id:
                 found_adv_store_ids.append(resp_adv_id)
         if (
-            tld_url in ad_domains_df["domain_name"].to_list()
-            and tld_url not in get_all_mmp_tlds(pgdb)["mmp_tld"].to_list()
+            tld_url in ad_domains_set
+            and tld_url not in mmps_set
             and not any(ignore_url in url.lower() for ignore_url in IGNORE_PRIVACY_URLS)
         ):
             found_ad_network_urls.append(url)
@@ -815,11 +816,12 @@ def parse_vungle_ad(
         adv_store_id = response_dict["ads"][0]["ad_markup"]["ad_market_id"]
         check_urls = ["clickUrl", "checkpoint.0", "checkpoint.100"]
         urlkeys = response_dict["ads"][0]["ad_markup"]["tpat"]
+        mmps_set = get_all_mmp_tlds_set(pgdb)
         for x in check_urls:
             try:
                 these_urls = urlkeys[x]
                 for url in these_urls:
-                    if get_tld(url) in get_all_mmp_tlds(pgdb)["mmp_tld"].to_list():
+                    if get_tld(url) in mmps_set:
                         found_mmp_urls.append(url)
             except Exception:
                 pass

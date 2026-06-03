@@ -1369,6 +1369,12 @@ def query_ad_domains(pgdb: PostgresEngine) -> pd.DataFrame:
 
 
 @lru_cache(maxsize=1)
+def query_ad_domains_set(pgdb: PostgresEngine) -> set[str]:
+    df = query_ad_domains(pgdb)
+    return set(df["domain_name"].tolist())
+
+
+@lru_cache(maxsize=1)
 def query_keywords_base(pgdb: PostgresEngine) -> pd.DataFrame:
     sel_query = """SELECT
     k.id as keyword_id, k.keyword_text
@@ -1511,7 +1517,7 @@ def query_api_calls_for_mitm_uuids(
 
 
 @lru_cache(maxsize=1)
-def get_all_mmp_tlds(pgdb: PostgresEngine) -> pd.DataFrame:
+def get_all_mmp_tlds_set(pgdb: PostgresEngine) -> set[str]:
     sel_query = """SELECT
                 c.id,
                 name,
@@ -1530,7 +1536,7 @@ def get_all_mmp_tlds(pgdb: PostgresEngine) -> pd.DataFrame:
             ;
             """
     df = pd.read_sql(sel_query, con=pgdb.engine)
-    return df
+    return set(df["mmp_tld"].tolist())
 
 
 def get_retention_benchmarks(pgdb: PostgresEngine) -> pd.DataFrame:
