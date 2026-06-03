@@ -418,7 +418,11 @@ def parse_urls_for_known_parts(
                     found_adv_store_ids.append(adv_store_id)
         elif match := re.search(r"intent://details\?id=([a-zA-Z0-9._]+)", url):
             adv_store_id = match.group(1)
-            found_adv_store_ids.append(adv_store_id)
+            if adv_store_id.startswith("bidease.com_"):
+                found_ad_network_urls.append("bidease.com")
+                continue
+            else:
+                found_adv_store_ids.append(adv_store_id)
         elif match := re.search(r"intent://.*package=([a-zA-Z0-9._]+)", url):
             adv_store_id = match.group(1)
             found_adv_store_ids.append(adv_store_id)
