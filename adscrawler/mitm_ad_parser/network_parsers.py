@@ -179,7 +179,12 @@ def check_click_urls(
     click_urls = []
     for url in all_urls:
         redirect_urls = []
-        if "/click" in url or "/clk" in url or "onelink.me" in url:
+        if (
+            "/click" in url
+            or "/clk" in url
+            or "onelink.me" in url
+            or "yandex.ru/an/count/" in url
+        ):
             if "tpbid.com" in url:
                 url = url.replace("fybernativebrowser://navigate?url=", "")
             redirect_urls = follow_url_redirects(url, run_id, api_call_id, pgdb)
@@ -508,14 +513,13 @@ def parse_yandex_ad(
     sent_video_dict: dict[str, Any], pgdb: PostgresEngine, video_id: str
 ) -> AdInfo:
     """Parses Yandex ad response to extract advertiser information and URLs."""
-    json_text = json.loads(sent_video_dict["response_text"])
-
-    if "native" in json_text:
+    text_dict = json.loads(sent_video_dict["response_text"])
+    if "native" in text_dict:
         # ads = [x for x in json_text["native"]["ads"]]
         # ads[0]
         # video_id in str(ads[1])
         # "com.nomad" in str(ads[1])
-        matched_ads = [x for x in json_text["native"]["ads"] if video_id in str(x)]
+        matched_ads = [x for x in text_dict["native"]["ads"] if video_id in str(x)]
         if len(matched_ads) == 0:
             return AdInfo(
                 adv_store_id=None,
@@ -889,7 +893,7 @@ def parse_google_ad(
                         pass
                     all_html += ad_html
                     if video_id in ad_html:
-                        logger.info(f"Found video {video_id} in ad html")
+                        logger.info(f"Found {video_id=} in ad html")
                         good_html += ad_html
             ad_info, error_msg = parse_text_for_adinfo(
                 text=good_html,
