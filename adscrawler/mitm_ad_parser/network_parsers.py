@@ -35,6 +35,25 @@ logger = get_logger(__name__, "mitm_scrape_ads")
 
 PLAYSTORE_URL_PARTS = ["play.google.com/store", "market://", "intent://"]
 
+SUPPORTED_URL_SCHEMES = {"http", "https", "intent", "market", "fybernativebrowser"}
+MAX_URL_EXTRACTION_DEPTH = 4
+
+URL_PATTERN = re.compile(
+    r"""(?:
+    (?:https?|intent|market|fybernativebrowser):\/\/      # allowed schemes
+    [^\s'"<>\]\)\}]+?                                   # non-greedy match
+)
+(?=[\s"\\;'<>"]|[\]\)\}\{,]|$)                      # separator or end
+""",
+    re.VERBOSE,
+)
+
+URL_VALUE_HINT_RE = re.compile(r"(?i)(?:://|%3A%2F%2F)")
+ENCODED_SCHEME_RE = re.compile(
+    r"(?i)\b(https?|intent|market|fybernativebrowser)%3A%2F%2F"
+)
+DECODED_CONTEXT_DELIMITERS_RE = re.compile(r"[\[\]<>]")
+
 ANDROID_USER_AGENT = "Mozilla/5.0 (Linux; Android 13; Pixel 7 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
 
 IGNORE_STORE_IDS = ["com.android.vending"]
@@ -53,6 +72,188 @@ IGNORE_PRIVACY_URLS = [
     "data-protection",
     "/data-privacy",
 ]
+
+
+TRAILING_ENCODED_URL_DELIMITER_RE = re.compile(r"(?i)(%5D|%3E|%5B|%3C)$")
+
+
+def strip_trailing_encoded_url_delimiters(url: str) -> str:
+    """Remove only unmatched encoded wrapper delimiters from the end of a URL."""
+    delimiter_pairs = {
+        "%5d": ("[", "]"),
+        "%5b": ("[", "]"),
+        "%3e": ("<", ">"),
+        "%3c": ("<", ">"),
+    }
+    while True:
+        match = TRAILING_ENCODED_URL_DELIMITER_RE.search(url)
+        if match is None:
+            return url
+        token = match.group(1).lower()
+        open_char, close_char = delimiter_pairs[token]
+        decoded_url = urllib.parse.unquote(url)
+        open_count = decoded_url.count(open_char)
+        close_count = decoded_url.count(close_char)
+        should_strip = False
+        if token in {"%5d", "%3e"} and close_count > open_count:
+            should_strip = True
+        elif token in {"%5b", "%3c"} and open_count > close_count:
+            should_strip = True
+        if not should_strip:
+            return url
+        url = url[: -len(match.group(1))]
+
+
+def _has_balanced_delimiters(text: str, open_char: str, close_char: str) -> bool:
+    return text.count(open_char) == text.count(close_char)
+
+
+def _is_reasonable_decoded_url(url: str) -> bool:
+    if "<" in url or ">" in url:
+        return False
+    return _has_balanced_delimiters(url, "[", "]")
+
+
+def _is_valid_extracted_url(url: str) -> bool:
+    if not _has_balanced_delimiters(url, "[", "]"):
+        return False
+    try:
+        parsed = urllib.parse.urlsplit(url)
+    except Exception:
+        return False
+    try:
+        hostname = parsed.hostname
+    except ValueError:
+        return False
+    if not hostname or any(char in hostname for char in "%[]<>'\""):
+        return False
+    return parsed.scheme.lower() in SUPPORTED_URL_SCHEMES
+
+
+def _decode_scheme_markers(text: str) -> str:
+    return ENCODED_SCHEME_RE.sub(lambda match: f"{match.group(1)}://", text)
+
+
+def _scrub_decoded_context_delimiters(text: str) -> str:
+    return DECODED_CONTEXT_DELIMITERS_RE.sub(" ", text)
+
+
+def _normalize_extracted_url(url: str) -> str | None:
+    cleaned_url = strip_trailing_encoded_url_delimiters(url.replace("\x00", ""))
+    decoded_url = urllib.parse.unquote(cleaned_url)
+    if decoded_url != cleaned_url and _is_reasonable_decoded_url(decoded_url):
+        normalized_url = decoded_url
+    else:
+        normalized_url = cleaned_url
+    if _is_valid_extracted_url(normalized_url):
+        return normalized_url
+    return None
+
+
+def _extract_query_value_chunks(url: str) -> list[str]:
+    values = []
+    try:
+        parsed = urllib.parse.urlsplit(url)
+    except Exception:
+        return values
+    query_blobs = [parsed.query]
+    if parsed.fragment and "=" in parsed.fragment:
+        query_blobs.append(parsed.fragment)
+    for query_blob in query_blobs:
+        if not query_blob:
+            continue
+        for item in query_blob.split("&"):
+            if not item:
+                continue
+            _, _sep, value = item.partition("=")
+            if value and URL_VALUE_HINT_RE.search(value):
+                values.append(value)
+    return values
+
+
+def _derive_additional_search_chunks(url: str) -> list[tuple[str, bool]]:
+    next_chunks: list[tuple[str, bool]] = []
+    for value in _extract_query_value_chunks(url):
+        next_chunks.append((value, True))
+        scheme_decoded_value = _decode_scheme_markers(value)
+        if scheme_decoded_value != value:
+            next_chunks.append((scheme_decoded_value, True))
+        decoded_value = urllib.parse.unquote(value)
+        if decoded_value != value:
+            next_chunks.append((decoded_value, True))
+            scrubbed_decoded_value = _scrub_decoded_context_delimiters(decoded_value)
+            if scrubbed_decoded_value != decoded_value:
+                next_chunks.append((scrubbed_decoded_value, True))
+        unescaped_value = html.unescape(value)
+        if unescaped_value != value:
+            next_chunks.append((unescaped_value, True))
+        scrubbed_value = _scrub_decoded_context_delimiters(value)
+        if scrubbed_value != value:
+            next_chunks.append((scrubbed_value, True))
+    return next_chunks
+
+
+def _build_initial_search_chunks(
+    text: str, vast_urls: list[str]
+) -> list[tuple[str, bool]]:
+    search_chunks: list[tuple[str, bool]] = [(text, True)]
+    unescaped_text = html.unescape(text)
+    if unescaped_text != text:
+        search_chunks.append((unescaped_text, True))
+    try:
+        unicode_decoded_text = text.encode("utf-8").decode("unicode_escape")
+    except Exception:
+        unicode_decoded_text = None
+    if unicode_decoded_text and unicode_decoded_text != text:
+        search_chunks.append((unicode_decoded_text, True))
+    if "://" not in text:
+        scheme_decoded_text = _decode_scheme_markers(text)
+        if scheme_decoded_text != text:
+            search_chunks.append((scheme_decoded_text, True))
+        decoded_text = urllib.parse.unquote(text)
+        if decoded_text != text:
+            search_chunks.append((decoded_text, True))
+            scheme_decoded_decoded_text = _decode_scheme_markers(decoded_text)
+            if scheme_decoded_decoded_text != decoded_text:
+                search_chunks.append((scheme_decoded_decoded_text, True))
+    for url in vast_urls:
+        search_chunks.append((url, True))
+    return search_chunks
+
+
+def _extract_urls_from_chunks(search_chunks: list[tuple[str, bool]]) -> list[str]:
+    found_urls: set[str] = set()
+    seen_chunks: set[tuple[str, bool]] = set()
+    processed_candidates: set[str] = set()
+    current_chunks = search_chunks
+    for _depth in range(MAX_URL_EXTRACTION_DEPTH):
+        if not current_chunks:
+            break
+        next_chunks: list[tuple[str, bool]] = []
+        for chunk, allow_full_match in current_chunks:
+            chunk_key = (chunk, allow_full_match)
+            if not chunk or chunk_key in seen_chunks:
+                continue
+            seen_chunks.add(chunk_key)
+            for match in URL_PATTERN.finditer(chunk):
+                raw_candidate = strip_trailing_encoded_url_delimiters(
+                    match.group(0).replace("\x00", "")
+                )
+                if not raw_candidate:
+                    continue
+                should_emit = allow_full_match or match.start() > 0
+                if raw_candidate not in processed_candidates:
+                    processed_candidates.add(raw_candidate)
+                    normalized_url = _normalize_extracted_url(raw_candidate)
+                    if normalized_url is not None and should_emit:
+                        found_urls.add(normalized_url)
+                    next_chunks.extend(_derive_additional_search_chunks(raw_candidate))
+                elif should_emit:
+                    normalized_url = _normalize_extracted_url(raw_candidate)
+                    if normalized_url is not None:
+                        found_urls.add(normalized_url)
+        current_chunks = next_chunks
+    return list(found_urls)
 
 
 def extract_and_decode_urls(text: str) -> list[str]:
@@ -97,54 +298,8 @@ def extract_and_decode_urls(text: str) -> list[str]:
             vast_urls += re.findall(r"<!\[CDATA\[(.*?)\]\]>", vast_xml_string)
         if soup.find("vast"):
             vast_urls += re.findall(r"<!\[CDATA\[(.*?)\]\]>", text)
-    # 1. Broad regex for URLs (http, https, fybernativebrowser, etc.)
-    # This pattern is made more flexible to capture various URL formats
-    urls = []
-    unesc_text = html.unescape(text)
-    # Sometimes JSON decoded to string became //u0026, this is a workaround to fix it
-    url_pattern = re.compile(
-        r"""(?:
-        (?:https?|intent|market|fybernativebrowser):\/\/  # allowed schemes
-        [^\s'"<>\]\)\}]+?                                 # non-greedy match
-    )
-    (?=[\s"\\;'<>\]\)\}\{},]|$)                           # must be followed by separator or end
-    """,
-        re.VERBOSE,
-    )
-    try:
-        enc_text = text.encode("utf-8").decode("unicode_escape")
-        enc_found_urls = url_pattern.findall(enc_text)
-    except Exception:
-        enc_found_urls = []
-    unesc_found_urls = url_pattern.findall(unesc_text)
-    orig_found_urls = url_pattern.findall(text)
-    found_urls = list(
-        set(vast_urls + unesc_found_urls + enc_found_urls + orig_found_urls)
-    )
-    found_urls = [url.replace("\x00", "") for url in found_urls]
-    encoded_delimiters = [
-        "%5D",  # ]
-        "%3E",  # >
-        "%5B",  # [
-        "%3C",  # <
-    ]
-    for url in found_urls:
-        # print("--------------------------------")
-        # print("RAW:", url)
-        # Find the earliest encoded delimiter
-        cut_index = len(url)
-        for delim in encoded_delimiters:
-            idx = url.upper().find(delim)  # case-insensitive match
-            if idx != -1 and idx < cut_index:
-                cut_index = idx
-        if cut_index != len(url):
-            url = url[:cut_index]  # Trim at the first encoded delimiter
-        decoded_url = urllib.parse.unquote(url)
-        urls.append(decoded_url)
-        # print("DECODED:", decoded_url)
-    all_urls = list(set(vast_urls + urls))
-    not_urls = [x for x in all_urls if "://" not in x[0:48]]
-    all_urls = [x for x in all_urls if "://" in x[0:48]]
+    search_chunks = _build_initial_search_chunks(text=text, vast_urls=vast_urls)
+    all_urls = _extract_urls_from_chunks(search_chunks)
     logger.info(f"Found {len(all_urls)} urls")
     return all_urls
 
@@ -895,6 +1050,7 @@ def parse_google_ad(
                     if video_id in ad_html:
                         logger.info(f"Found {video_id=} in ad html")
                         good_html += ad_html
+                    good_html
             ad_info, error_msg = parse_text_for_adinfo(
                 text=good_html,
                 pub_store_id=sent_video_dict["pub_store_id"],
@@ -998,7 +1154,7 @@ def parse_sent_video_df(
         parsed_text = False
         init_url = sent_video_dict["url"]
         init_tld = sent_video_dict["tld_url"]
-        logger.debug(f"Parsing ad network {init_url=} for adv")
+        logger.debug(f"Parsing sent_video_dict {init_tld=}")
         if "vungle.com" == init_tld:
             ad_info, error_msg = parse_vungle_ad(sent_video_dict, pgdb)
         elif "bidmachine.io" == init_tld:
