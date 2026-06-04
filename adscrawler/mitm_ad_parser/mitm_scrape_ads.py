@@ -476,6 +476,7 @@ def parse_store_id_mitm_log(
     pgdb: PostgresEngine,
 ) -> list[dict[str, Any]]:
     """Parses MITM log for a specific store ID and processes creative content."""
+    logger.info(f"{pub_store_id=} {run_id=} start parse mitm log")
     df, error_message = get_mitm_df(pub_store_id, run_id, pgdb)
     if error_message:
         logger.error(error_message)
