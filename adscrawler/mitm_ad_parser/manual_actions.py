@@ -6,45 +6,15 @@ import pandas as pd
 
 from adscrawler.config import MITM_DIR, get_logger
 from adscrawler.dbcon.connection import PostgresEngine
-from adscrawler.dbcon.queries import (
-    get_store_id_mitm_s3_keys,
-    query_api_calls_to_creative_scan,
-)
 from adscrawler.mitm_ad_parser.mitm_scrape_ads import (
     add_is_creative_content_column,
     parse_log,
 )
 from adscrawler.packages.storage import (
-    download_mitm_log_by_key,
     get_s3_client,
 )
 
 logger = get_logger(__name__, "mitm_scrape_ads")
-
-
-def download_all_mitms(pgdb: PostgresEngine) -> None:
-    """Downloads all MITM log files from S3 for apps that need creative scanning."""
-    apps_to_download = query_api_calls_to_creative_scan(pgdb=pgdb)
-    for i, app in apps_to_download.iterrows():
-        logger.info(f"{i}/{apps_to_download.shape[0]:,}: {app['store_id']} start")
-        pub_store_id = app["store_id"]
-        # Check if any log files exist for this pub_store_id
-        if list(pathlib.Path(MITM_DIR).glob(f"{pub_store_id}_*.log")):
-            logger.info(f"{pub_store_id} a mitm log is already downloaded")
-            continue
-        try:
-            mitms = get_store_id_mitm_s3_keys(store_id=pub_store_id)
-        except FileNotFoundError:
-            logger.error(f"{pub_store_id} not found in s3")
-            continue
-        for _i, mitm in mitms.iterrows():
-            key = mitm["key"]
-            run_id = mitm["run_id"]
-            filename = f"{pub_store_id}_{run_id}.log"
-            if not pathlib.Path(MITM_DIR, filename).exists():
-                _mitm_log_path = download_mitm_log_by_key(key, filename)
-            else:
-                pass
 
 
 def open_all_local_mitms(pgdb: PostgresEngine) -> pd.DataFrame:

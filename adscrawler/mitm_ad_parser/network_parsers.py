@@ -1050,7 +1050,6 @@ def parse_google_ad(
                     if video_id in ad_html:
                         logger.info(f"Found {video_id=} in ad html")
                         good_html += ad_html
-                    good_html
             ad_info, error_msg = parse_text_for_adinfo(
                 text=good_html,
                 pub_store_id=sent_video_dict["pub_store_id"],

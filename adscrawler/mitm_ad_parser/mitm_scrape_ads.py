@@ -637,10 +637,10 @@ def scan_all_apps(
     max_workers: int = 1,
 ) -> None:
     """Scans all apps for creative content and uploads thumbnails to S3."""
-    all_api_calls = query_api_calls_to_creative_scan(
+    recent_months = True
+    mitm_runs_to_scan = query_api_calls_to_creative_scan(
         pgdb=pgdb, recent_months=recent_months
     )
-    mitm_runs_to_scan = all_api_calls[["store_id", "run_id"]].drop_duplicates()
     logger.info(f"MITM logs to scan: {mitm_runs_to_scan.shape[0]:,}")
 
     if only_new_apps:

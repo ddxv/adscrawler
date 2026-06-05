@@ -9,21 +9,35 @@ WITH has_creatives AS (
             OR
             response_mime_type
             ~* '(image|video)/(jpeg|jpg|png|gif|webp|webm|mp4|avi|quicktime)'
-        ) AND status_code = 200
+        )
+        AND status_code = 200
         AND response_size_bytes > 80000
+),
+all_api_calls AS (
+    SELECT
+        ac.store_app,
+        ac.run_id,
+        sa.store_id,
+        ac.id AS api_call_id,
+        ac.mitm_uuid
+    FROM
+        api_calls AS ac
+    LEFT JOIN store_apps AS sa
+        ON
+            ac.store_app = sa.id
+    WHERE
+        ac.id IN (
+            SELECT hc.id
+            FROM
+                has_creatives AS hc
+        )
+        AND ac.called_at >= :earliest_date
+        AND ac.called_at <= current_date - INTERVAL '1 hour'
 )
-SELECT
-    ac.store_app,
-    ac.run_id,
-    sa.store_id,
-    ac.id AS api_call_id,
-    ac.mitm_uuid
+SELECT DISTINCT
+    run_id,
+    store_id
 FROM
-    api_calls AS ac
-LEFT JOIN store_apps AS sa ON ac.store_app = sa.id
-WHERE
-    ac.id IN (
-        SELECT hc.id FROM has_creatives AS hc
-    )
-    AND ac.called_at >= :earliest_date
-    AND ac.called_at <= current_date - INTERVAL '1 hour';
+    all_api_calls
+ORDER BY
+    run_id ASC; -- Oldest first
