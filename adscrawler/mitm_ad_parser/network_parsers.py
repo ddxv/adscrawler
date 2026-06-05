@@ -18,6 +18,7 @@ from protod import Renderer
 from adscrawler.config import get_logger
 from adscrawler.dbcon.connection import PostgresEngine
 from adscrawler.dbcon.queries import (
+    clear_url_query_caches,
     get_all_mmp_tlds_set,
     get_click_url_redirect_chains,
     query_ad_domains_set,
@@ -25,7 +26,6 @@ from adscrawler.dbcon.queries import (
     query_api_call_id_for_uuid,
     query_store_app_by_store_id_cached,
     query_urls_by_hashes,
-    query_urls_hash_map_cached,
     upsert_df,
 )
 from adscrawler.mitm_ad_parser.models import AdInfo, MultipleAdvertiserIdError
@@ -396,17 +396,21 @@ def upsert_urls(urls: list[str], pgdb: PostgresEngine) -> pd.DataFrame:
     urls_df["url_hash"] = urls_df["url"].apply(
         lambda x: hashlib.md5(x.encode()).hexdigest()
     )
-    url_hash_map = query_urls_hash_map_cached(pgdb=pgdb)
-    existing_index = pd.Index(url_hash_map["url_hash"])
-    new_hashes = pd.Index(urls_df["url_hash"]).difference(existing_index)
-    if new_hashes.empty:
+    existing_urls_df = query_urls_by_hashes(urls_df["url_hash"].tolist(), pgdb=pgdb)
+    if existing_urls_df.empty:
+        existing_urls_df = pd.DataFrame(columns=["url_hash", "url_id"])
+    else:
+        existing_urls_df = existing_urls_df.rename(columns={"id": "url_id"})
+    existing_hashes = set(existing_urls_df["url_hash"].tolist())
+    new_urls_df = urls_df[~urls_df["url_hash"].isin(existing_hashes)].copy()
+    if new_urls_df.empty:
         urls_df = urls_df.merge(
-            url_hash_map[["url_hash", "url_id"]],
+            existing_urls_df[["url_hash", "url_id"]].drop_duplicates("url_hash"),
             on="url_hash",
             how="left",
+            validate="m:1",
         )
         return urls_df
-    new_urls_df = urls_df[urls_df["url_hash"].isin(new_hashes)].copy()
     http_urls_df = new_urls_df[new_urls_df["url"].str.startswith("http")].copy()
     nonhttp_urls_df = new_urls_df[~new_urls_df["url"].str.startswith("http")].copy()
     http_urls_df["tld_url"] = http_urls_df["url"].apply(lambda x: get_tld(x))
@@ -443,11 +447,19 @@ def upsert_urls(urls: list[str], pgdb: PostgresEngine) -> pd.DataFrame:
         return_rows=True,
     )
     new_urls_df = new_urls_df.rename(columns={"id": "url_id"})
-    url_hash_map = pd.concat([url_hash_map, new_urls_df[["url_hash", "url_id"]]])
+    clear_url_query_caches()
+    resolved_urls_df = pd.concat(
+        [
+            existing_urls_df[["url_hash", "url_id"]],
+            new_urls_df[["url_hash", "url_id"]],
+        ],
+        ignore_index=True,
+    ).drop_duplicates("url_hash", keep="last")
     urls_df = urls_df.merge(
-        url_hash_map[["url_hash", "url_id"]],
+        resolved_urls_df[["url_hash", "url_id"]],
         on="url_hash",
         how="left",
+        validate="m:1",
     )
     return urls_df
 

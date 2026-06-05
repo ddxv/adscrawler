@@ -637,7 +637,6 @@ def scan_all_apps(
     max_workers: int = 1,
 ) -> None:
     """Scans all apps for creative content and uploads thumbnails to S3."""
-    recent_months = True
     mitm_runs_to_scan = query_api_calls_to_creative_scan(
         pgdb=pgdb, recent_months=recent_months
     )

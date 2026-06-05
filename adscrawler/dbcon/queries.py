@@ -949,6 +949,11 @@ def query_urls_hash_map_cached(pgdb: PostgresEngine) -> pd.DataFrame:
     return df
 
 
+def clear_url_query_caches() -> None:
+    query_urls_hash_map_cached.cache_clear()
+    _query_urls_by_hashes_cached.cache_clear()
+
+
 def query_urls_by_hashes(hashes: list[str], pgdb: PostgresEngine) -> pd.DataFrame:
     hashes_tuple = tuple(hashes)
     if not hashes_tuple:
