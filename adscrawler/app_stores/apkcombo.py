@@ -19,13 +19,16 @@ def scrape_with_firefox() -> list[str]:
         executable_path="/snap/bin/geckodriver",
     )  # specify the path to your geckodriver
     driver = webdriver.Firefox(options=options, service=service)
-    driver.get("https://apkcombo.com/new-releases/feed/")
-    regex_str = '<guid isPermaLink="false">(.*?)</guid>'
-    new_apps = re.findall(regex_str, driver.page_source)
-    driver.get("https://apkcombo.com/latest-updates/feed/")
-    updated_apps = re.findall(regex_str, driver.page_source)
-    scraped_ids = list(set(updated_apps + new_apps))
-    return scraped_ids
+    try:
+        driver.get("https://apkcombo.com/new-releases/feed/")
+        regex_str = '<guid isPermaLink="false">(.*?)</guid>'
+        new_apps = re.findall(regex_str, driver.page_source)
+        driver.get("https://apkcombo.com/latest-updates/feed/")
+        updated_apps = re.findall(regex_str, driver.page_source)
+        scraped_ids = list(set(updated_apps + new_apps))
+        return scraped_ids
+    finally:
+        driver.quit()
 
 
 def get_apkcombo_android_apps() -> list[dict]:

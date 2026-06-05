@@ -1,11 +1,36 @@
 import os
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from adscrawler.app_stores import apkcombo
 
 
 class TestApkcombo(unittest.TestCase):
+    @patch("adscrawler.app_stores.apkcombo.webdriver.Firefox")
+    def test_scrape_with_firefox_quits_driver_after_success(
+        self,
+        mock_firefox: Mock,
+    ) -> None:
+        driver = mock_firefox.return_value
+        driver.page_source = '<guid isPermaLink="false">sample-app</guid>'
+
+        apkcombo.scrape_with_firefox()
+
+        driver.quit.assert_called_once()
+
+    @patch("adscrawler.app_stores.apkcombo.webdriver.Firefox")
+    def test_scrape_with_firefox_quits_driver_after_failure(
+        self,
+        mock_firefox: Mock,
+    ) -> None:
+        driver = mock_firefox.return_value
+        driver.get.side_effect = RuntimeError("fetch failed")
+
+        with self.assertRaises(RuntimeError):
+            apkcombo.scrape_with_firefox()
+
+        driver.quit.assert_called_once()
+
     def test_get_apkcombo_android_apps(self) -> None:
         use_mock = os.environ.get("USE_MOCK", "true").lower() == "true"
 
