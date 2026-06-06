@@ -242,6 +242,7 @@ def attribute_creatives(
             set([item for sublist in click_url_ids for item in sublist])
         )
         try:
+            logger.info(f"{log_info} store creatives")
             md5_hash = store_creative_and_thumb_to_local(
                 row,
                 file_extension=file_extension,
@@ -501,6 +502,8 @@ def parse_store_id_mitm_log(
     adv_creatives_df, error_messages = attribute_creatives(
         df, pub_store_id, run_id, pgdb
     )
+    elapsed_log = f"elapsed={time.perf_counter() - started_at:.2f}s"
+    logger.info(f"{log_info} {elapsed_log} attributed={adv_creatives_df.shape[0]}")
     if adv_creatives_df.empty:
         if len(error_messages) == 0:
             error_msg = "No creatives or errors"

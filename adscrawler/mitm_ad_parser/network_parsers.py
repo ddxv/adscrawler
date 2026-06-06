@@ -941,15 +941,12 @@ def parse_text_for_adinfo(
     ad_info = AdInfo(adv_store_id=None, found_ad_network_tlds=None, found_mmp_urls=None)
     error_msg = None
     all_urls = extract_and_decode_urls(text)
-    logger.info(f"{log_info} found urls={len(all_urls)}")
     api_call_id = query_api_call_id_for_uuid(mitm_uuid, pgdb)
     click_urls = check_click_urls(all_urls, run_id, api_call_id, pgdb)
     all_urls = list(set(all_urls + click_urls))
-    logger.info(f"{log_info} final urls={len(all_urls)}")
     if len(all_urls) > 0:
         store_found_urls_in_db(all_urls, run_id, api_call_id, pgdb)
         try:
-            logger.info(f"{log_info} urls start")
             ad_info = parse_urls_for_known_parts(all_urls, pgdb, pub_store_id)
         except MultipleAdvertiserIdError as e:
             error_msg = f"multiple adv_store_id found for: {e.found_adv_store_ids}"
@@ -957,7 +954,6 @@ def parse_text_for_adinfo(
     else:
         error_msg = "No URLs found"
         logger.debug(f"{log_info} {error_msg}")
-    logger.info(f"{log_info} urls end")
     if click_urls and len(click_urls) > 0:
         logger.info(f"{log_info} append clicks start")
         click_url_hashes = [hashlib.md5(url.encode()).hexdigest() for url in click_urls]
