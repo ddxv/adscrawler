@@ -1,5 +1,6 @@
 import datetime
 import subprocess
+import time
 import urllib
 from concurrent.futures import ProcessPoolExecutor
 from typing import Any
@@ -105,9 +106,11 @@ def get_video_id(row: pd.Series) -> str:
 def attribute_creatives(
     df: pd.DataFrame,
     pub_store_id: str,
+    run_id: int,
     pgdb: PostgresEngine,
 ) -> tuple[pd.DataFrame, list[dict[str, Any]]]:
     """Attributes creative content to advertisers by analyzing ad network responses."""
+    log_info = f"{pub_store_id=} {run_id=} attribute_creatives"
     error_messages = []
     adv_creatives = []
     creatives = df[(df["is_creative"]) & (df["tld_url"].notna())].copy()
@@ -128,7 +131,7 @@ def attribute_creatives(
         video_id = row["video_id"]
         if len(video_id) < 4:
             error_msg = "Bad creative parsing video ID is too short"
-            logger.info(f"{error_msg} for {row['tld_url']} {video_id=}")
+            logger.info(f"{log_info} {error_msg} for {row['tld_url']} {video_id=}")
             row["error_msg"] = error_msg
             error_messages.append(row)
         file_extension = row["file_extension"]
@@ -136,19 +139,21 @@ def attribute_creatives(
             video_id in IGNORE_CREATIVE_IDS
             or host_ad_network_tld in IGNORE_CREATIVE_HOST_TLDS
         ):
-            logger.info(f"Ignoring {host_ad_network_tld} {video_id[0:16]}...")
+            logger.info(
+                f"{log_info} Ignoring {host_ad_network_tld} {video_id[0:16]}..."
+            )
             continue
         if video_id in sent_video_cache:
             sent_video_df = sent_video_cache[video_id]
             found_ad_infos, found_error_messages = parse_results_cache[video_id]
-            logger.debug(f"Cache hit for {video_id}")
+            logger.debug(f"{log_info} Cache hit for {video_id}")
         else:
             if len(video_id) < 5:
                 # Too short video ids cause false positives and slow downs
                 sent_video_df = None
             else:
                 logger.info(
-                    f"Processing {i}/{row_count} {host_ad_network_tld} {video_id=}"
+                    f"{log_info} Processing {i}/{row_count} {host_ad_network_tld} {video_id=}"
                 )
                 sent_video_df = find_sent_video_df(df, row, video_id)
             if sent_video_df is None or sent_video_df.empty:
@@ -193,13 +198,13 @@ def attribute_creatives(
             mmp_tld = mmp_tlds[0]
             if len(mmp_tlds) > 1:
                 error_msg = "Multiple mmp_urls"
-                logger.error(f"{error_msg} for {row['tld_url']} {video_id}")
+                logger.error(f"{log_info} {error_msg} for {row['tld_url']} {video_id}")
                 row["error_msg"] = error_msg
                 error_messages.append(row)
         found_advs = list(set(found_advs))
         if len(found_advs) > 1:
             error_msg = "Found potential app! Multiple adv_store_id"
-            logger.error(f"{error_msg} for {row['tld_url']} {video_id}")
+            logger.error(f"{log_info} {error_msg} for {row['tld_url']} {video_id}")
             row["error_msg"] = error_msg
             error_messages.append(row)
             adv_store_id = None
@@ -243,7 +248,7 @@ def attribute_creatives(
             )
         except Exception:
             error_msg = "Found potential creative but failed to store!"
-            logger.error(error_msg)
+            logger.error(f"{log_info} {error_msg}")
             row["error_msg"] = error_msg
             error_messages.append(row)
             continue
@@ -255,13 +260,13 @@ def attribute_creatives(
             )
         except Exception:
             error_msg = "Found potential creative but failed to compute phash"
-            logger.error(f"{error_msg} for {row['tld_url']} {video_id}")
+            logger.error(f"{log_info} {error_msg} for {row['tld_url']} {video_id}")
             row["error_msg"] = error_msg
             error_messages.append(row)
             continue
         if phash is None:
             error_msg = "Found potential creative but failed to compute phash"
-            logger.error(f"{error_msg} for {row['tld_url']} {video_id}")
+            logger.error(f"{log_info} {error_msg} for {row['tld_url']} {video_id}")
             row["error_msg"] = error_msg
             error_messages.append(row)
             continue
@@ -273,7 +278,7 @@ def attribute_creatives(
             error_messages.append(row)
         elif len(init_tlds) > 1:
             error_msg = "Multiple initial domains found, perhaps log both?"
-            logger.error(f"{error_msg} for {row['tld_url']} {video_id}")
+            logger.error(f"{log_info} {error_msg} for {row['tld_url']} {video_id}")
             row["error_msg"] = error_msg
             error_messages.append(row)
             continue
@@ -297,14 +302,14 @@ def attribute_creatives(
             }
         )
         logger.debug(
-            f"{i}/{row_count}: {host_ad_network_tld} adv={adv_store_id} init_tld={init_tld}"
+            f"{log_info} {i}/{row_count}: {host_ad_network_tld} adv={adv_store_id} init_tld={init_tld}"
         )
     adv_creatives_df = pd.DataFrame(adv_creatives)
     if adv_creatives_df.empty:
         msg = (
             f"No matched for creatives {pub_store_id}, {len(error_messages)} unmatched"
         )
-        logger.warning(msg)
+        logger.warning(f"{log_info} {msg}")
     return adv_creatives_df, error_messages
 
 
@@ -476,23 +481,33 @@ def parse_store_id_mitm_log(
     pgdb: PostgresEngine,
 ) -> list[dict[str, Any]]:
     """Parses MITM log for a specific store ID and processes creative content."""
-    logger.info(f"{pub_store_id=} {run_id=} start parse mitm log")
+    log_info = f"{pub_store_id=} {run_id=} parse mitm"
+    started_at = time.perf_counter()
+    logger.info(f"{log_info} start")
     df, error_message = get_mitm_df(pub_store_id, run_id, pgdb)
+    elapsed_log = f"elapsed={time.perf_counter() - started_at:.2f}s"
     if error_message:
         logger.error(error_message)
+        elapsed_log = f"elapsed={time.perf_counter() - started_at:.2f}s"
+        logger.info(f"{log_info} end {elapsed_log} status=get_mitm_df_error")
         error_message_info = {
             "run_id": run_id,
             "pub_store_id": pub_store_id,
             "error_msg": error_message,
         }
         return [error_message_info]
-    adv_creatives_df, error_messages = attribute_creatives(df, pub_store_id, pgdb)
+    elapsed_log = f"elapsed={time.perf_counter() - started_at:.2f}s"
+    logger.info(f"{log_info} {elapsed_log} mitm api_calls={df.shape[0]}")
+    adv_creatives_df, error_messages = attribute_creatives(
+        df, pub_store_id, run_id, pgdb
+    )
     if adv_creatives_df.empty:
         if len(error_messages) == 0:
             error_msg = "No creatives or errors"
         else:
             error_msg = "No creatives found"
-        logger.info(f"{error_msg}")
+        elapsed_log = f"elapsed={time.perf_counter() - started_at:.2f}s"
+        logger.info(f"{log_info} end {elapsed_log} status={error_msg}")
         row = {
             "run_id": run_id,
             "pub_store_id": pub_store_id,
@@ -544,9 +559,12 @@ def parse_store_id_mitm_log(
             "updated_at",
         ],
     )
-    logger.info(
-        f"Upserted {creative_records_df.shape[0]:,} creative records for {pub_store_id} {assets_df.shape[0]:,} creatives"
+    elapsed_log = f"elapsed={time.perf_counter() - started_at:.2f}s"
+    final_log = (
+        f"creative_records={creative_records_df.shape[0]:,} "
+        f"assets={assets_df.shape[0]:,} errors={len(error_messages)}"
     )
+    logger.info(f"{log_info} end {elapsed_log} {final_log}")
     upload_creatives_to_s3(assets_df)
     return error_messages
 

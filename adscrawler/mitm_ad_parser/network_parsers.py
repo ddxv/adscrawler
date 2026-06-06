@@ -300,7 +300,6 @@ def extract_and_decode_urls(text: str) -> list[str]:
             vast_urls += re.findall(r"<!\[CDATA\[(.*?)\]\]>", text)
     search_chunks = _build_initial_search_chunks(text=text, vast_urls=vast_urls)
     all_urls = _extract_urls_from_chunks(search_chunks)
-    logger.info(f"Found {len(all_urls)} urls")
     return all_urls
 
 
@@ -935,29 +934,40 @@ def parse_text_for_adinfo(
     pgdb: PostgresEngine,
 ) -> tuple[AdInfo, str | None]:
     """Extract URL like strings and parse for app store_ids."""
+    log_info = (
+        f"pub_store_id={pub_store_id} run_id={run_id} mitm_uuid={mitm_uuid} parse_text"
+    )
+    logger.info(f"{log_info} start")
     ad_info = AdInfo(adv_store_id=None, found_ad_network_tlds=None, found_mmp_urls=None)
     error_msg = None
     all_urls = extract_and_decode_urls(text)
+    logger.info(f"{log_info} found urls={len(all_urls)}")
     api_call_id = query_api_call_id_for_uuid(mitm_uuid, pgdb)
     click_urls = check_click_urls(all_urls, run_id, api_call_id, pgdb)
     all_urls = list(set(all_urls + click_urls))
+    logger.info(f"{log_info} final urls={len(all_urls)}")
     if len(all_urls) > 0:
         store_found_urls_in_db(all_urls, run_id, api_call_id, pgdb)
+        try:
+            logger.info(f"{log_info} urls start")
+            ad_info = parse_urls_for_known_parts(all_urls, pgdb, pub_store_id)
+        except MultipleAdvertiserIdError as e:
+            error_msg = f"multiple adv_store_id found for: {e.found_adv_store_ids}"
+            logger.error(f"{log_info} {error_msg}")
     else:
-        logger.debug(f"No URLs found for {mitm_uuid}")
         error_msg = "No URLs found"
-    try:
-        ad_info = parse_urls_for_known_parts(all_urls, pgdb, pub_store_id)
-    except MultipleAdvertiserIdError as e:
-        error_msg = f"multiple adv_store_id found for: {e.found_adv_store_ids}"
-        logger.error(error_msg)
+        logger.debug(f"{log_info} {error_msg}")
+    logger.info(f"{log_info} urls end")
     if click_urls and len(click_urls) > 0:
+        logger.info(f"{log_info} append clicks start")
         click_url_hashes = [hashlib.md5(url.encode()).hexdigest() for url in click_urls]
         cdf = query_urls_by_hashes(click_url_hashes, pgdb)
         if not cdf.empty:
             ad_info.click_url_ids = cdf["id"].tolist()
         else:
-            logger.error("Click URLs found but no URL IDs in DB")
+            logger.error(f"{log_info} Click URLs found but no URL IDs in DB")
+        logger.info(f"{log_info} append clicks end")
+    logger.info(f"{log_info} end")
     return ad_info, error_msg
 
 
@@ -1158,6 +1168,7 @@ def parse_sent_video_df(
     """Parses video data to extract advertiser information from various ad networks."""
     error_messages = []
     run_id = row["run_id"]
+    log_info = f"pub_store_id={pub_store_id} run_id={run_id} parse_sent video_id={video_id[0:10]}"
     sent_video_dicts = sent_video_df.to_dict(orient="records")
     found_ad_infos = []
     for sent_video_dict in sent_video_dicts:
@@ -1165,7 +1176,7 @@ def parse_sent_video_df(
         parsed_text = False
         init_url = sent_video_dict["url"]
         init_tld = sent_video_dict["tld_url"]
-        logger.debug(f"Parsing sent_video_dict {init_tld=}")
+        logger.debug(f"{log_info} Parsing sent_video_dict {init_tld=}")
         if "vungle.com" == init_tld:
             ad_info, error_msg = parse_vungle_ad(sent_video_dict, pgdb)
         elif "bidmachine.io" == init_tld:
@@ -1194,7 +1205,7 @@ def parse_sent_video_df(
             parsed_text = True
         if error_msg:
             row["error_msg"] = error_msg
-            logger.error(f"{error_msg} for video {video_id[0:10]}")
+            logger.error(f"{log_info} {error_msg} for video {video_id[0:10]}")
             error_messages.append(row)
             continue
         if ad_info["adv_store_id"] is None and not parsed_text:
@@ -1217,14 +1228,14 @@ def parse_sent_video_df(
         if ad_info["adv_store_id"] == pub_store_id:
             error_msg = "Incorrect adv_store_id, identified pub ID as adv ID"
             logger.error(
-                f"Incorrect adv_store_id, identified pub ID as adv ID for video {video_id[0:10]}"
+                f"{log_info} Incorrect adv_store_id, identified pub ID as adv ID for video {video_id[0:10]}"
             )
             row["error_msg"] = error_msg
             error_messages.append(row)
             continue
         if ad_info["adv_store_id"] is None:
             error_msg = "No adv_store_id found"
-            logger.debug(error_msg)
+            logger.debug(f"{log_info} {error_msg}")
         try:
             if ad_info["adv_store_id"] is None:
                 adv_db_id = None
@@ -1239,7 +1250,7 @@ def parse_sent_video_df(
             error_msg = (
                 f"found potential app but failed to get db id {ad_info['adv_store_id']}"
             )
-            logger.error(error_msg)
+            logger.error(f"{log_info} {error_msg}")
             row["error_msg"] = error_msg
             error_messages.append(row)
             continue
