@@ -685,24 +685,26 @@ def scan_all_apps(
             completed += 1
             run_id = result["run_id"]
             pub_store_id = result["pub_store_id"]
-            error_messages = result["error_messages"]
+            log_messages = result["error_messages"]
 
-            logger.info(
-                f"{completed}/{mitms_count}: {pub_store_id=} {run_id=} completed"
-            )
-
-            if len(error_messages) == 0:
-                continue
-
-            # Log results to database
-            d = [x for x in error_messages if type(x) is dict]
-            s = [x for x in error_messages if type(x) is pd.Series]
-            error_msg_df = pd.concat(
-                [pd.DataFrame(d), pd.DataFrame(s)], ignore_index=True
-            )
+            if len(log_messages) > 0:
+                # Log results to database
+                d = [x for x in log_messages if type(x) is dict]
+                s = [x for x in log_messages if type(x) is pd.Series]
+                log_msg_df = pd.concat(
+                    [pd.DataFrame(d), pd.DataFrame(s)], ignore_index=True
+                )
+            else:
+                log_msg_df = pd.DataFrame(
+                    {
+                        "run_id": [run_id],
+                        "pub_store_id": [pub_store_id],
+                        "error_msg": ["No logs!"],
+                    }
+                )
             mycols = [
                 x
-                for x in error_msg_df.columns
+                for x in log_msg_df.columns
                 if x
                 in [
                     "url",
@@ -716,8 +718,11 @@ def scan_all_apps(
                     "error_msg",
                 ]
             ]
-            error_msg_df = error_msg_df[mycols]
-            log_creative_scan_results(error_msg_df, pgdb)
+            log_msg_df = log_msg_df[mycols]
+            log_creative_scan_results(log_msg_df, pgdb)
+            logger.info(
+                f"{completed}/{mitms_count}: {pub_store_id=} {run_id=} completed"
+            )
 
     logger.info("All MITM logs processed, syncing thumbs to S3...")
     subprocess.run(
