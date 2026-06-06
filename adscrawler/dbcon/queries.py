@@ -481,6 +481,21 @@ def clean_app_ranks_weekly_table(pgdb: PostgresEngine) -> None:
             logger.info(f"Deleted {rows_affected} rows...")
             if rows_affected == 0:
                 break
+    del_query = text(f"""
+        DELETE FROM frontend.store_app_ranks_weekly
+        WHERE ctid IN (
+            SELECT ctid FROM frontend.store_app_ranks_weekly
+            WHERE crawled_date < CURRENT_DATE - INTERVAL '200 days'
+            LIMIT {batch_size}
+        )
+    """)
+    with pgdb.engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
+        while True:
+            result = conn.execute(del_query)
+            rows_affected = result.rowcount
+            logger.info(f"Deleted {rows_affected} rows...")
+            if rows_affected == 0:
+                break
 
 
 def delete_and_insert(
