@@ -529,6 +529,7 @@ def parse_store_id_mitm_log(
     assets_df = adv_creatives_df[
         ["md5_hash", "file_extension", "phash"]
     ].drop_duplicates()
+    logger.info(f"{log_info} storing {assets_df.shape[0]} creative assets")
     assets_df = upsert_df(
         assets_df,
         table_name="creative_assets",
@@ -543,6 +544,7 @@ def parse_store_id_mitm_log(
     creative_records_df = make_creative_records_df(adv_creatives_df, assets_df, pgdb)
     key_columns = ["api_call_id"]
     creative_records_df["updated_at"] = datetime.datetime.now(tz=datetime.UTC)
+    logger.info(f"{log_info} storing {creative_records_df.shape[0]} creative records")
     upsert_df(
         creative_records_df,
         table_name="creative_records",
