@@ -40,7 +40,7 @@ last_runs AS (
         )
     GROUP BY
         csr.run_id
-),
+)
 SELECT
     mr.run_id,
     mr.store_id,
