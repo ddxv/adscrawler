@@ -120,7 +120,7 @@ def parse_log(
         mitm_log_path = pathlib.Path(MITM_DIR, f"{store_id}_{run_id}.log")
     if not mitm_log_path.exists() and run_id is not None:
         mitms = get_store_id_mitm_s3_keys(store_id=store_id)
-        mitms = mitms[mitms["run_id"] == str(run_id)]
+        mitms = mitms[mitms["run_id"] == run_id]
         if mitms.empty:
             logger.error(f"No mitm log found for {store_id} {run_id}")
             return pd.DataFrame()
@@ -155,9 +155,14 @@ def parse_log(
     if "response_text" in df.columns:
         df["response_text"] = df["response_text"].astype(str)
     df["status_code"] = df["status_code"].astype(int)
-    df["run_id"] = (
-        mitm_log_path.as_posix().split("/")[-1].split("_")[-1].replace(".log", "")
-    )
+    if run_id is None:
+        log_run_id = (
+            mitm_log_path.as_posix().split("/")[-1].split("_")[-1].replace(".log", "")
+        )
+        log_run_id = int(log_run_id) if log_run_id.isdigit() else -1
+    else:
+        log_run_id = run_id
+    df["run_id"] = log_run_id
     df["pub_store_id"] = store_id
     return df
 

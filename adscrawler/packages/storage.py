@@ -334,6 +334,7 @@ def get_store_id_mitm_s3_keys(store_id: str) -> pd.DataFrame:
         else:
             version_code = "unknown"
         run_id = key.split("/")[-1].replace(".log", "")
+        run_id = int(run_id) if run_id.isdigit() else -1
         objects_data.append(
             {
                 "key": key,
