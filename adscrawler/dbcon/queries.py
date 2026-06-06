@@ -35,6 +35,7 @@ QUERY_APPS_TO_DOWNLOAD = load_sql_file("query_apps_to_download.sql")
 QUERY_APPS_TO_SDK_SCAN = load_sql_file("query_apps_to_sdk_scan.sql")
 QUERY_APPS_TO_API_SCAN = load_sql_file("query_apps_to_api_scan.sql")
 QUERY_APPS_TO_API_SCAN_ADS = load_sql_file("query_apps_to_api_scan_ads.sql")
+QUERY_DEVS_TO_UPDATE = load_sql_file("query_devs_to_update.sql")
 QUERY_API_CALLS_TO_CREATIVE_SCAN = load_sql_file("query_apps_to_creative_scan.sql")
 QUERY_KEYWORDS_TO_CRAWL = load_sql_file("query_keywords_to_crawl.sql")
 QUERY_APPS_MITM_IN_S3 = load_sql_file("query_apps_mitm_in_s3.sql")
@@ -552,30 +553,11 @@ def query_developers(
     before_date = (datetime.datetime.today() - datetime.timedelta(days=15)).strftime(
         "%Y-%m-%d",
     )
-    sel_query = f"""
-    SELECT 
-            d.*,
-            SUM(agm.total_installs) AS total_installs,
-            dc.apps_crawled_at
-        FROM
-            developers d
-        LEFT JOIN logging.developers_crawled_at dc
-            ON d.id = dc.developer
-        LEFT JOIN store_apps sa 
-            ON d.id = sa.developer 
-        LEFT JOIN app_global_metrics_latest agm
-            ON sa.id = agm.store_app
-        WHERE d.store = {store} 
-            AND (apps_crawled_at <= '{before_date}' OR apps_crawled_at IS NULL)
-            AND sa.crawl_result = 1
-        GROUP BY
-            d.id, dc.apps_crawled_at
-        ORDER BY apps_crawled_at::date NULLS FIRST,
-        total_installs DESC NULLS LAST
-        limit {limit}
-        ;
-        """
-    df = pd.read_sql(sel_query, pgdb.engine)
+    df = pd.read_sql(
+        QUERY_DEVS_TO_UPDATE,
+        pgdb.engine,
+        params={"store": store, "before_date": before_date, "mylimit": limit},
+    )
     logger.info(f"Query developers {store=} returning rows:{df.shape[0]:,}")
     return df
 

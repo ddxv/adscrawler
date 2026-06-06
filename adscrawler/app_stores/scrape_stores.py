@@ -566,7 +566,6 @@ def crawl_developers_for_new_store_ids(
     logger.info(f"Crawl devevelopers for {store=} start")
     store_ids = query_store_ids(pgdb, store=store)
     df = query_developers(pgdb, store=store, limit=10000)
-
     if store == 1:
         developer_ids = df["developer_id"].unique().tolist()
         developer_ids = [unquote_plus(x) for x in developer_ids]
@@ -606,7 +605,6 @@ def crawl_developers_for_new_store_ids(
             logger.info(f"{row_info=} start")
             try:
                 apps_df = crawl_ios_developers(developer_db_id, developer_id, store_ids)
-
                 if not apps_df.empty:
                     check_and_insert_new_apps(
                         pgdb=pgdb,
