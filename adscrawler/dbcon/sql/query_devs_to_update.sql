@@ -18,7 +18,7 @@ WITH mydvs AS (
         d.id, dc.apps_crawled_at
     ORDER BY
         dc.apps_crawled_at::date NULLS FIRST,
-        sa.installs DESC NULLS LAST
+        total_installs DESC NULLS LAST
 )
 SELECT
     id,

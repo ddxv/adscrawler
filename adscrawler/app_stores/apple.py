@@ -147,29 +147,44 @@ def scrape_ios_ranks(
     return ranked_dicts
 
 
-def crawl_ios_developers(
-    developer_db_id: int,
-    developer_id: str,
+def crawl_apple_developers(
+    df: pd.DataFrame,
     store_ids: list[str],
-) -> pd.DataFrame:
+) -> tuple[pd.DataFrame, list[int]]:
     store = 2
     ios_scraper = AppStoreScraper()
-    apps = ios_scraper.get_apps_for_developer(developer_id=developer_id, timeout=10)
-    my_devices = ["iphone", "ipad"]
-    apps = [
-        x
-        for x in apps
-        if "supportedDevices" in x.keys()
-        and any(map("".join(x["supportedDevices"]).lower().__contains__, my_devices))
-    ]
-    apps_df = pd.DataFrame(apps).rename(columns={"trackId": "store_id"})
+    all_apps = []
+    db_ids_crawled = []
+    for _, row in df.iterrows():
+        developer_id = row["developer_id"]
+        developer_db_id = row["id"]
+        time.sleep(random.uniform(0.5, 1.5))
+        try:
+            apps = ios_scraper.get_apps_for_developer(
+                developer_id=developer_id, timeout=10
+            )
+            my_devices = ["iphone", "ipad"]
+            apps = [
+                x
+                for x in apps
+                if "supportedDevices" in x.keys()
+                and any(
+                    map("".join(x["supportedDevices"]).lower().__contains__, my_devices)
+                )
+            ]
+            all_apps.extend(apps)
+            db_ids_crawled.append(developer_db_id)
+            logger.info(f"{developer_id=}, found {len(apps)} apps")
+        except Exception as e:
+            logger.warning(f"Failed to get apps for developer {developer_id=} {e}")
+            continue
+    apps_df = pd.DataFrame(all_apps).rename(columns={"trackId": "store_id"})
     if not apps_df.empty:
         apps_df["store_id"] = apps_df["store_id"].astype(str)
         apps_df = apps_df[~apps_df["store_id"].isin(store_ids)]
         apps_df["crawl_result"] = 1
         apps_df["store"] = store
-        apps_df["developer"] = developer_db_id
-    return apps_df
+    return apps_df, db_ids_crawled
 
 
 def scrape_store_html(store_id: str, country: str) -> dict:

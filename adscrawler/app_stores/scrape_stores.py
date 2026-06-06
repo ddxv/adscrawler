@@ -20,7 +20,7 @@ from adscrawler.app_stores.apkcombo import get_apkcombo_android_apps
 from adscrawler.app_stores.appbrain import get_appbrain_android_apps
 from adscrawler.app_stores.apple import (
     clean_ios_app_df,
-    crawl_ios_developers,
+    crawl_apple_developers,
     scrape_app_ios,
     scrape_ios_ranks,
     search_app_store_for_ids,
@@ -570,71 +570,37 @@ def crawl_developers_for_new_store_ids(
         developer_ids = df["developer_id"].unique().tolist()
         developer_ids = [unquote_plus(x) for x in developer_ids]
         apps_df = crawl_google_developers(developer_ids, store_ids)
-        if not apps_df.empty:
-            check_and_insert_new_apps(
-                pgdb=pgdb,
-                dicts=apps_df.to_dict(orient="records"),
-                crawl_source="crawl_developers",
-                store=store,
-            )
-        dev_df = pd.DataFrame(
-            [
-                {
-                    "developer": _id,
-                    "apps_crawled_at": datetime.datetime.now(tz=datetime.UTC),
-                }
-                for _id in df["id"].tolist()
-            ],
-        )
-        insert_columns = dev_df.columns.tolist()
-        key_columns = ["developer"]
-        upsert_df(
-            table_name="developers_crawled_at",
-            schema="logging",
-            insert_columns=insert_columns,
-            df=dev_df,
-            key_columns=key_columns,
+        db_ids_crawled = df["id"].tolist()
+    elif store == 2:
+        apps_df, db_ids_crawled = crawl_apple_developers(df, store_ids)
+
+    if not apps_df.empty:
+        check_and_insert_new_apps(
             pgdb=pgdb,
+            dicts=apps_df.to_dict(orient="records"),
+            crawl_source="crawl_developers",
+            store=store,
         )
-        logger.info(f"{store=} crawled, {apps_df.shape[0]:,} new store ids")
-    if store == 2:
-        for _id, row in df.iterrows():
-            developer_db_id = row["id"]
-            developer_id = row["developer_id"]
-            row_info = f"{store=} {developer_id=}"
-            logger.info(f"{row_info=} start")
-            try:
-                apps_df = crawl_ios_developers(developer_db_id, developer_id, store_ids)
-                if not apps_df.empty:
-                    check_and_insert_new_apps(
-                        pgdb=pgdb,
-                        dicts=apps_df[["store", "store_id"]].to_dict(orient="records"),
-                        crawl_source="crawl_developers",
-                        store=store,
-                    )
-                dev_df = pd.DataFrame(
-                    [
-                        {
-                            "developer": developer_db_id,
-                            "apps_crawled_at": datetime.datetime.now(
-                                datetime.UTC,
-                            ),
-                        },
-                    ],
-                )
-                insert_columns = dev_df.columns.tolist()
-                key_columns = ["developer"]
-                upsert_df(
-                    table_name="developers_crawled_at",
-                    schema="logging",
-                    insert_columns=insert_columns,
-                    df=dev_df,
-                    key_columns=key_columns,
-                    pgdb=pgdb,
-                )
-                logger.info(f"{row_info=} crawled, {apps_df.shape[0]:,} new store ids")
-            except Exception:
-                logger.exception(f"{row_info=} failed!")
+    dev_df = pd.DataFrame(
+        [
+            {
+                "developer": _id,
+                "apps_crawled_at": datetime.datetime.now(tz=datetime.UTC),
+            }
+            for _id in db_ids_crawled
+        ],
+    )
+    insert_columns = dev_df.columns.tolist()
+    key_columns = ["developer"]
+    upsert_df(
+        table_name="developers_crawled_at",
+        schema="logging",
+        insert_columns=insert_columns,
+        df=dev_df,
+        key_columns=key_columns,
+        pgdb=pgdb,
+    )
+    logger.info(f"{store=} crawled, {apps_df.shape[0]:,} new store ids")
 
 
 def check_and_insert_developers(
