@@ -329,12 +329,15 @@ def upload_creatives_to_s3(adv_creatives_df: pd.DataFrame) -> None:
         logger.info(f"Uploaded {row['md5_hash']} to S3")
 
 
-def append_missing_domains(
-    ad_domains_df: pd.DataFrame,
+def get_ad_domains(
     creative_records_df: pd.DataFrame,
     pgdb: PostgresEngine,
 ) -> pd.DataFrame:
-    """Adds missing ad domains to the database and returns updated domain DataFrame."""
+    """Gets ad domains and then adds missing ad domains to the database and returns updated domain DataFrame."""
+    ad_domains_df = query_ad_domains(pgdb=pgdb)
+    # For mapping we only want the mapped domains
+    ad_domains_df = ad_domains_df[~ad_domains_df["domain_id"].isna()].copy()
+    ad_domains_df["domain_id"] = ad_domains_df["domain_id"].astype(int)
     check_cols = ["creative_initial_domain_tld", "host_ad_network_tld"]
     for col in check_cols:
         missing_ad_domains = creative_records_df[
@@ -421,11 +424,7 @@ def make_creative_records_df(
         how="left",
         validate="1:1",
     )
-    ad_domains_df = query_ad_domains(pgdb=pgdb)
-    # For mapping we only want the mapped domains
-    ad_domains_df = ad_domains_df[~ad_domains_df["domain_id"].isna()].copy()
-    ad_domains_df["domain_id"] = ad_domains_df["domain_id"].astype(int)
-    ad_domains_df = append_missing_domains(ad_domains_df, creative_records_df, pgdb)
+    ad_domains_df = get_ad_domains(creative_records_df, pgdb)
     creative_records_df = add_additional_domain_id_column(
         creative_records_df, ad_domains_df
     )
