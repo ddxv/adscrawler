@@ -12,7 +12,7 @@ from adscrawler.config import CREATIVE_THUMBS_DIR, get_logger
 from adscrawler.dbcon.connection import PostgresEngine, get_db_connection
 from adscrawler.dbcon.queries import (
     log_creative_scan_results,
-    query_ad_domains,
+    query_all_domains,
     query_api_calls_for_mitm_uuids,
     query_api_calls_to_creative_scan,
     query_creative_records,
@@ -329,19 +329,19 @@ def upload_creatives_to_s3(adv_creatives_df: pd.DataFrame) -> None:
         logger.info(f"Uploaded {row['md5_hash']} to S3")
 
 
-def get_ad_domains(
+def get_domains(
     creative_records_df: pd.DataFrame,
     pgdb: PostgresEngine,
 ) -> pd.DataFrame:
     """Gets ad domains and then adds missing ad domains to the database and returns updated domain DataFrame."""
-    ad_domains_df = query_ad_domains(pgdb=pgdb)
+    domains_df = query_all_domains(pgdb=pgdb).rename(columns={"id": "domain_id"})
     # For mapping we only want the mapped domains
-    ad_domains_df = ad_domains_df[~ad_domains_df["domain_id"].isna()].copy()
-    ad_domains_df["domain_id"] = ad_domains_df["domain_id"].astype(int)
+    domains_df = domains_df[~domains_df["domain_id"].isna()].copy()
+    domains_df["domain_id"] = domains_df["domain_id"].astype(int)
     check_cols = ["creative_initial_domain_tld", "host_ad_network_tld"]
     for col in check_cols:
         missing_ad_domains = creative_records_df[
-            (~creative_records_df[col].isin(ad_domains_df["domain_name"]))
+            (~creative_records_df[col].isin(domains_df["domain_name"]))
             & (creative_records_df[col].notna())
         ]
         if not missing_ad_domains.empty:
@@ -358,15 +358,15 @@ def get_ad_domains(
                 pgdb=pgdb,
                 return_rows=True,
             )
-            ad_domains_df = pd.concat(
+            domains_df = pd.concat(
                 [
                     new_ad_domains[["id", "domain_name"]].rename(
                         columns={"id": "domain_id"}
                     ),
-                    ad_domains_df,
+                    domains_df,
                 ]
             )
-    return ad_domains_df
+    return domains_df
 
 
 def add_additional_domain_id_column(
@@ -424,24 +424,24 @@ def make_creative_records_df(
         how="left",
         validate="1:1",
     )
-    ad_domains_df = get_ad_domains(creative_records_df, pgdb)
+    domains_df = get_domains(creative_records_df, pgdb)
     creative_records_df = add_additional_domain_id_column(
-        creative_records_df, ad_domains_df
+        creative_records_df, domains_df
     )
     creative_records_df = creative_records_df.merge(
-        ad_domains_df.rename(columns={"domain_id": "creative_host_domain_id"}),
+        domains_df.rename(columns={"domain_id": "creative_host_domain_id"}),
         left_on="host_ad_network_tld",
         right_on="domain_name",
         how="left",
     )
     creative_records_df = creative_records_df.merge(
-        ad_domains_df.rename(columns={"domain_id": "creative_initial_domain_id"}),
+        domains_df.rename(columns={"domain_id": "creative_initial_domain_id"}),
         left_on="creative_initial_domain_tld",
         right_on="domain_name",
         how="left",
     )
     creative_records_df = creative_records_df.merge(
-        ad_domains_df.rename(columns={"domain_id": "mmp_domain_id"}),
+        domains_df.rename(columns={"domain_id": "mmp_domain_id"}),
         left_on="mmp_tld",
         right_on="domain_name",
         how="left",

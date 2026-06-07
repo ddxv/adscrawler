@@ -1341,7 +1341,7 @@ def query_all_store_app_descriptions(
 @lru_cache(maxsize=1)
 def query_all_domains(pgdb: PostgresEngine) -> pd.DataFrame:
     sel_query = """SELECT
-        *
+        id, domain_name
         FROM
         domains
         ;
@@ -1351,28 +1351,8 @@ def query_all_domains(pgdb: PostgresEngine) -> pd.DataFrame:
 
 
 @lru_cache(maxsize=1)
-def query_ad_domains(pgdb: PostgresEngine) -> pd.DataFrame:
-    sel_query = """WITH all_ad_domains AS (
-             SELECT DISTINCT csac.domain_id, d.domain_name AS domain_name 
-             FROM adtech.combined_app_companies csac
-             LEFT JOIN domains d ON csac.domain_id = d.id
-             WHERE csac.domain_id IS NOT null
-             UNION
-             SELECT DISTINCT cdm.domain_id, d.domain_name FROM adtech.company_domain_mapping cdm
-             LEFT JOIN domains d ON cdm.domain_id = d.id
-             --avoid including special company 'domains'
-             WHERE cdm.company_id > 0
-             )
-             SELECT domain_id, domain_name FROM all_ad_domains
-             ;
-             """
-    df = pd.read_sql(sel_query, con=pgdb.engine)
-    return df
-
-
-@lru_cache(maxsize=1)
-def query_ad_domains_set(pgdb: PostgresEngine) -> set[str]:
-    df = query_ad_domains(pgdb)
+def query_domains_set(pgdb: PostgresEngine) -> set[str]:
+    df = query_all_domains(pgdb)
     return set(df["domain_name"].tolist())
 
 

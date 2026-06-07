@@ -22,7 +22,7 @@ from adscrawler.dbcon.queries import (
     get_version_code_dbid,
     insert_df,
     log_version_code_scan_crawl_results,
-    query_ad_domains,
+    query_all_domains,
     query_apps_mitm_in_s3,
     query_apps_to_api_scan,
     query_store_app_by_store_id,
@@ -273,11 +273,11 @@ def insert_missing_ad_domains(
     pgdb: PostgresEngine,
 ) -> None:
     """Adds missing ad domains to the database."""
-    ad_domains_df = query_ad_domains(pgdb=pgdb)
+    domains_df = query_all_domains(pgdb=pgdb).rename(columns={"id": "domain_id"})
     check_cols = ["tld_url"]
     for col in check_cols:
         missing_ad_domains = api_calls_df[
-            (~api_calls_df[col].isin(ad_domains_df["domain_name"]))
+            (~api_calls_df[col].isin(domains_df["domain_name"]))
             & (api_calls_df[col].notna())
         ]
         if not missing_ad_domains.empty:

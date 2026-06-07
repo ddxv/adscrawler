@@ -21,9 +21,9 @@ from adscrawler.dbcon.queries import (
     clear_url_query_caches,
     get_all_mmp_tlds_set,
     get_click_url_redirect_chains,
-    query_ad_domains_set,
     query_all_domains,
     query_api_call_id_for_uuid,
+    query_domains_set,
     query_store_app_by_store_id_cached,
     query_urls_by_hashes,
     upsert_df,
@@ -561,7 +561,7 @@ def parse_urls_for_known_parts(
     found_mmp_urls = []
     found_adv_store_ids = []
     found_ad_network_urls = []
-    ad_domains_set = query_ad_domains_set(pgdb=pgdb)
+    ad_domains_set = query_domains_set(pgdb=pgdb)
     mmps_set = get_all_mmp_tlds_set(pgdb)
     for url in all_urls:
         adv_store_id = None
