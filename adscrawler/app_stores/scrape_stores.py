@@ -848,18 +848,19 @@ def process_live_app_details(
             apps_df = clean_scraped_df(
                 df=apps_df, store=store, process_icon=process_icon
             )
+        
         if additional_html_crawl_result != 1:
             # If additional html crawl failed, drop fields that rely on it to avoid overwriting good data with nulls
+            if store == 2:
+                cols_to_drop = ["additional_html_crawled_at", "ad_supported", "in_app_purchases", "url"]
+            else:
+                cols_to_drop = ["additional_html_crawled_at"]
+
             apps_df = apps_df.drop(
-                [
-                    "additional_html_crawled_at",
-                    "ad_supported",
-                    "in_app_purchases",
-                    "url",
-                ],
-                axis=1,
-                errors="ignore",
-            )
+                    cols_to_drop,
+                    axis=1,
+                    errors="ignore",
+                )   
         key_columns = ["store", "store_id"]
         if (apps_df["crawl_result"] == 1).all() and apps_df[
             "developer_id"
