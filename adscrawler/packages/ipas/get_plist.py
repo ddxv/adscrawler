@@ -123,7 +123,7 @@ def get_parsed_plist(
     ddf = ddf[["path", "value"]]
     version_id = data["CFBundleVersion"]
     version_str = data["CFBundleShortVersionString"]
-    if version_id == "0" and version_str:
+    if (version_id == "0" or version_id == "1") and version_str:
         version_id = version_str
     frameworks_df = ipa_frameworks(tmp_decoded_output_path)
     bundles_df = ipa_bundles(tmp_decoded_output_path)

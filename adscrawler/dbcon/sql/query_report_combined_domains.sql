@@ -41,8 +41,8 @@ api_based_companies AS (
     WHERE
         ac.called_at >= '2025-01-01 00:00:00'::timestamp without time zone
         AND ac.called_at < :start_of_next_period
-        and ad_1.id IS NOT NULL
-), 
+        AND ad_1.id IS NOT NULL
+),
 sdk_based_companies AS (
     SELECT DISTINCT
         sasd.store_app,
@@ -65,12 +65,19 @@ distinct_ad_and_pub_domains AS (
         acc.crawled_at >= :start_of_period
         AND acc.created_at < :start_of_next_period
         AND (acc.crawled_at - aam.updated_at) < '01:00:00'::interval
-        AND aae.relationship = 'DIRECT'
+        AND aae.updated_at >= :start_of_period
+        AND aae.created_at < :start_of_next_period
 ),
 adstxt_based_companies AS (
     SELECT DISTINCT
         aum.store_app,
-        pnv.ad_domain_id AS domain_id
+        pnv.ad_domain_id AS domain_id,
+        CASE
+            WHEN
+                pnv.relationship::text = 'DIRECT'::text
+                THEN 'app_ads_direct'::text
+            ELSE 'app_ads_reseller'::text
+        END AS tag_source
     FROM app_urls_map AS aum
     LEFT JOIN domains AS pd ON aum.pub_domain = pd.id
     LEFT JOIN
@@ -86,25 +93,26 @@ combined_sources AS (
         abc.domain_id,
         abc.store_app,
         'api_call' AS tag_source
-        FROM api_based_companies abc
+    FROM api_based_companies AS abc
     UNION ALL
     SELECT
         sbc.domain_id,
         sbc.store_app,
-		'sdk' AS tag_source
-    FROM sdk_based_companies sbc
+        'sdk' AS tag_source
+    FROM sdk_based_companies AS sbc
     UNION ALL
     SELECT
         atbc.domain_id,
         atbc.store_app,
-        'app_ads_direct' AS tag_source
-    FROM adstxt_based_companies atbc
+        atbc.tag_source
+    FROM adstxt_based_companies AS atbc
 )
-SELECT cs.domain_id,
-            cs.store_app,    
-            bool_or(cs.tag_source = 'sdk'::text) AS sdk,
-            bool_or(cs.tag_source = 'api_call'::text) AS api_call,
-            bool_or(cs.tag_source = 'app_ads_direct'::text) AS app_ads_direct
-FROM combined_sources cs
-GROUP BY cs.domain_id, cs.store_app
-;
+SELECT
+    cs.domain_id,
+    cs.store_app,
+    bool_or(cs.tag_source = 'sdk'::text) AS sdk,
+    bool_or(cs.tag_source = 'api_call'::text) AS api_call,
+    bool_or(cs.tag_source = 'app_ads_direct'::text) AS app_ads_direct,
+    bool_or(cs.tag_source = 'app_ads_reseller'::text) AS app_ads_reseller
+FROM combined_sources AS cs
+GROUP BY cs.domain_id, cs.store_app;

@@ -13,7 +13,7 @@ from adscrawler.dbcon.queries import (
 pgdb = get_db_connection()
 
 start_date = "2026-05-01"
-start_date_of_next_period = "2026-05-30"
+start_date_of_next_period = "2026-05-31"
 for week in pd.date_range(
     start=start_date, end=start_date_of_next_period, freq="W-MON"
 ):
