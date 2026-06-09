@@ -8,6 +8,7 @@ from adscrawler.app_stores.process_from_s3 import (
     import_ranks_from_s3,
 )
 from adscrawler.app_stores.process_from_s3_metrics import (
+    clean_history_tables,
     delete_and_aggregate_s3_agg,
 )
 from adscrawler.app_stores.process_keywords import process_app_keywords
@@ -372,6 +373,10 @@ class ProcessManager:
                 delete_and_aggregate_s3_agg(store=store, pgdb=self.pgcon)
             except Exception:
                 logger.exception(f"Importing {store=} app metrics from s3 for failed")
+        try:
+            clean_history_tables(pgdb=self.pgcon)
+        except Exception:
+            logger.exception("Cleaning history tables failed")
         try:
             start_date = datetime.date.today() - datetime.timedelta(days=3)
             end_date = datetime.date.today() - datetime.timedelta(days=1)

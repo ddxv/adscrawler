@@ -498,6 +498,25 @@ def clean_app_ranks_weekly_table(pgdb: PostgresEngine) -> None:
                 break
 
 
+def clean_app_metrics_history_table(pgdb: PostgresEngine, table_name: str) -> None:
+    batch_size = 100000
+    del_query = text(f"""
+        DELETE FROM {table_name}
+        WHERE ctid IN (
+            SELECT ctid FROM {table_name}
+            WHERE week_start < CURRENT_DATE - INTERVAL '400 days'
+            LIMIT {batch_size}
+        )
+    """)
+    with pgdb.engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
+        while True:
+            result = conn.execute(del_query)
+            rows_affected = result.rowcount
+            logger.info(f"Deleted {rows_affected} rows...")
+            if rows_affected == 0:
+                break
+
+
 def delete_and_insert(
     df: pd.DataFrame,
     table_name: str,

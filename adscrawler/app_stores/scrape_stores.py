@@ -848,19 +848,23 @@ def process_live_app_details(
             apps_df = clean_scraped_df(
                 df=apps_df, store=store, process_icon=process_icon
             )
-        
+
         if additional_html_crawl_result != 1:
             # If additional html crawl failed, drop fields that rely on it to avoid overwriting good data with nulls
             if store == 2:
-                cols_to_drop = ["additional_html_crawled_at", "ad_supported", "in_app_purchases", "url"]
+                cols_to_drop = [
+                    "additional_html_crawled_at",
+                    "ad_supported",
+                    "in_app_purchases",
+                    "url",
+                ]
             else:
                 cols_to_drop = ["additional_html_crawled_at"]
-
             apps_df = apps_df.drop(
-                    cols_to_drop,
-                    axis=1,
-                    errors="ignore",
-                )   
+                cols_to_drop,
+                axis=1,
+                errors="ignore",
+            )
         key_columns = ["store", "store_id"]
         if (apps_df["crawl_result"] == 1).all() and apps_df[
             "developer_id"
@@ -869,7 +873,6 @@ def process_live_app_details(
         insert_columns = [
             x for x in get_store_app_columns(pgdb) if x in apps_df.columns
         ]
-
         apps_df = prepare_for_psycopg(apps_df)
         logger.info(f"{log_info} update store_apps table for {len(apps_df)} apps")
         update_from_df(

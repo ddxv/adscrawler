@@ -33,6 +33,9 @@ quarters = pd.date_range(start="2025-01-01", end=datetime.datetime.today(), freq
 for start_date in quarters:
     # end_date is the gfirst day of the NEXT period
     start_of_next_period = start_date + pd.offsets.QuarterEnd() + pd.Timedelta(days=1)
+    print(
+        f"Processing combined domain report for {start_date.date()} to {start_of_next_period.date()}"
+    )
     df = query_report_combined_domains(
         pgdb, start_date=start_date, start_of_next_period=start_of_next_period
     )

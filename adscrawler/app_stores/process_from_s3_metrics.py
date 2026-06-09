@@ -12,6 +12,7 @@ from adscrawler.dbcon.connection import (
     PostgresEngine,
 )
 from adscrawler.dbcon.queries import (
+    clean_app_metrics_history_table,
     delete_app_metrics_by_date_and_apps,
     get_ecpm_benchmarks,
     get_retention_benchmarks,
@@ -129,6 +130,13 @@ def handle_missing_trackid_files(
         logger.error(
             "trackId column missing but store is not Apple, investigate data issue"
         )
+
+
+def clean_history_tables(pgdb: PostgresEngine) -> None:
+    table_name = "app_global_metrics_history"
+    clean_app_metrics_history_table(pgdb=pgdb, table_name=table_name)
+    table_name = "app_country_metrics_history"
+    clean_app_metrics_history_table(pgdb=pgdb, table_name=table_name)
 
 
 def delete_and_aggregate_s3_agg(
