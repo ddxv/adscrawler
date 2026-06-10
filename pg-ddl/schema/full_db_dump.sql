@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict w80UZTPlOwXGobAfdyetZaJD6HXJQfyhvEAZm9wu373FjQUizuSAI20uahUfvIw
+\restrict QUMeXpBDEhC5jVJoyBDft4qcxwblUhP43fiE8XItaGcW6KJkMbRFYjb17SnLWB8
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -61,6 +61,19 @@ ALTER SCHEMA public OWNER TO postgres;
 
 COMMENT ON SCHEMA public IS 'standard public schema';
 
+
+--
+-- Name: change_status_enum; Type: TYPE; Schema: adtech; Owner: postgres
+--
+
+CREATE TYPE adtech.change_status_enum AS ENUM (
+    'added',
+    'added_initial',
+    'removed'
+);
+
+
+ALTER TYPE adtech.change_status_enum OWNER TO postgres;
 
 --
 -- Name: extract_scheme(text); Type: FUNCTION; Schema: public; Owner: postgres
@@ -1400,130 +1413,22 @@ CREATE MATERIALIZED VIEW adtech.combined_app_parent_companies AS
 ALTER MATERIALIZED VIEW adtech.combined_app_parent_companies OWNER TO postgres;
 
 --
--- Name: combined_company_app_history; Type: TABLE; Schema: adtech; Owner: postgres
+-- Name: combined_domain_app_history; Type: TABLE; Schema: adtech; Owner: postgres
 --
 
-CREATE TABLE adtech.combined_company_app_history (
-    ad_domain text,
-    store_app bigint,
-    company_id bigint,
-    parent_id bigint,
-    sdk boolean,
-    api_call boolean,
-    app_ads_direct boolean,
-    year bigint,
-    quarter bigint
+CREATE TABLE adtech.combined_domain_app_history (
+    domain_id bigint NOT NULL,
+    store_app bigint NOT NULL,
+    sdk boolean NOT NULL,
+    api_call boolean NOT NULL,
+    app_ads_direct boolean NOT NULL,
+    year smallint NOT NULL,
+    quarter smallint NOT NULL,
+    app_ads_reseller boolean DEFAULT false NOT NULL
 );
 
 
-ALTER TABLE adtech.combined_company_app_history OWNER TO postgres;
-
---
--- Name: combined_companies_history; Type: MATERIALIZED VIEW; Schema: adtech; Owner: postgres
---
-
-CREATE MATERIALIZED VIEW adtech.combined_companies_history AS
- WITH enriched_raw AS (
-         SELECT h.ad_domain,
-            h.store_app,
-            h.company_id,
-            h.parent_id,
-            h.sdk,
-            h.api_call,
-            h.app_ads_direct,
-            h.year,
-            h.quarter,
-            sa.store
-           FROM (adtech.combined_company_app_history h
-             LEFT JOIN public.store_apps sa ON ((sa.id = h.store_app)))
-        ), enriched AS (
-         SELECT enriched_raw.ad_domain,
-            enriched_raw.store_app,
-            enriched_raw.company_id,
-            enriched_raw.parent_id,
-            enriched_raw.year,
-            enriched_raw.quarter,
-            enriched_raw.store,
-            t.tag_source
-           FROM enriched_raw,
-            LATERAL ( VALUES ('sdk_api'::text,(enriched_raw.sdk OR enriched_raw.api_call)), ('app_ads_direct'::text,enriched_raw.app_ads_direct)) t(tag_source, is_active)
-          WHERE (t.is_active = true)
-        ), pre_agg AS (
-         SELECT enriched.year,
-            enriched.quarter,
-            enriched.store,
-            enriched.tag_source,
-            count(DISTINCT enriched.store_app) AS total_apps_in_quarter
-           FROM enriched
-          GROUP BY enriched.year, enriched.quarter, enriched.store, enriched.tag_source
-        ), current_quarter AS (
-         SELECT enriched.ad_domain,
-            enriched.company_id,
-            enriched.parent_id,
-            enriched.year,
-            enriched.quarter,
-            enriched.store,
-            enriched.tag_source,
-            count(enriched.store_app) AS total_apps,
-            pre_agg.total_apps_in_quarter
-           FROM (enriched
-             JOIN pre_agg ON (((pre_agg.year = enriched.year) AND (pre_agg.quarter = enriched.quarter) AND (pre_agg.store = enriched.store) AND (pre_agg.tag_source = enriched.tag_source))))
-          GROUP BY enriched.ad_domain, enriched.company_id, enriched.parent_id, enriched.year, enriched.quarter, enriched.store, enriched.tag_source, pre_agg.total_apps_in_quarter
-        ), churned AS (
-         SELECT p.ad_domain,
-            p.company_id,
-            p.parent_id,
-            p.store,
-            p.tag_source,
-                CASE
-                    WHEN (p.quarter = 4) THEN (p.year + 1)
-                    ELSE p.year
-                END AS year,
-                CASE
-                    WHEN (p.quarter = 4) THEN (1)::bigint
-                    ELSE (p.quarter + 1)
-                END AS quarter,
-            count(p.store_app) AS apps_lost
-           FROM (enriched p
-             LEFT JOIN enriched c ON (((p.ad_domain = c.ad_domain) AND (p.company_id = c.company_id) AND (p.parent_id = c.parent_id) AND (p.store_app = c.store_app) AND (p.store = c.store) AND (p.tag_source = c.tag_source) AND (((p.quarter = 4) AND (c.year = (p.year + 1)) AND (c.quarter = 1)) OR ((p.quarter < 4) AND (c.year = p.year) AND (c.quarter = (p.quarter + 1)))))))
-          WHERE (c.store_app IS NULL)
-          GROUP BY p.ad_domain, p.company_id, p.parent_id, p.year, p.quarter, p.store, p.tag_source
-        ), added AS (
-         SELECT c.ad_domain,
-            c.company_id,
-            c.parent_id,
-            c.store,
-            c.tag_source,
-            c.year,
-            c.quarter,
-            count(c.store_app) AS apps_added
-           FROM (enriched c
-             LEFT JOIN enriched p ON (((c.ad_domain = p.ad_domain) AND (c.company_id = p.company_id) AND (c.parent_id = p.parent_id) AND (c.store_app = p.store_app) AND (c.store = p.store) AND (c.tag_source = p.tag_source) AND (((c.quarter = 1) AND (p.year = (c.year - 1)) AND (p.quarter = 4)) OR ((c.quarter > 1) AND (p.year = c.year) AND (p.quarter = (c.quarter - 1)))))))
-          WHERE (p.store_app IS NULL)
-          GROUP BY c.ad_domain, c.company_id, c.parent_id, c.year, c.quarter, c.store, c.tag_source
-        )
- SELECT cq.ad_domain,
-    cq.company_id,
-    cq.parent_id,
-    cq.year,
-    cq.quarter,
-    cq.store,
-    cq.tag_source,
-    cq.total_apps,
-    cq.total_apps_in_quarter,
-    COALESCE(ch.apps_lost, (0)::bigint) AS apps_lost,
-    COALESCE(a.apps_added, (0)::bigint) AS apps_added,
-    round((((cq.total_apps)::numeric * 100.0) / NULLIF((cq.total_apps_in_quarter)::numeric, (0)::numeric)), 5) AS pct_market_share,
-    round((((COALESCE(a.apps_added, (0)::bigint))::numeric * 100.0) / (NULLIF((cq.total_apps - COALESCE(a.apps_added, (0)::bigint)), 0))::numeric), 2) AS pct_apps_added,
-    round((((COALESCE(ch.apps_lost, (0)::bigint))::numeric * 100.0) / (NULLIF((cq.total_apps + COALESCE(ch.apps_lost, (0)::bigint)), 0))::numeric), 2) AS pct_apps_lost
-   FROM ((current_quarter cq
-     LEFT JOIN churned ch ON (((cq.ad_domain = ch.ad_domain) AND (cq.company_id = ch.company_id) AND (cq.parent_id = ch.parent_id) AND (cq.year = ch.year) AND (cq.quarter = ch.quarter) AND (cq.store = ch.store) AND (cq.tag_source = ch.tag_source))))
-     LEFT JOIN added a ON (((cq.ad_domain = a.ad_domain) AND (cq.company_id = a.company_id) AND (cq.parent_id = a.parent_id) AND (cq.year = a.year) AND (cq.quarter = a.quarter) AND (cq.store = a.store) AND (cq.tag_source = a.tag_source))))
-  ORDER BY cq.year, cq.quarter, cq.tag_source, cq.total_apps DESC
-  WITH NO DATA;
-
-
-ALTER MATERIALIZED VIEW adtech.combined_companies_history OWNER TO postgres;
+ALTER TABLE adtech.combined_domain_app_history OWNER TO postgres;
 
 --
 -- Name: companies_id_seq; Type: SEQUENCE; Schema: adtech; Owner: postgres
@@ -1579,6 +1484,102 @@ CREATE TABLE adtech.company_mediation_adapters (
 ALTER TABLE adtech.company_mediation_adapters OWNER TO postgres;
 
 --
+-- Name: domain_app_changes_quarterly; Type: MATERIALIZED VIEW; Schema: adtech; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW adtech.domain_app_changes_quarterly AS
+ WITH enriched_raw AS (
+         SELECT h.domain_id,
+            h.store_app,
+            h.sdk,
+            h.api_call,
+            h.app_ads_direct,
+            h.year,
+            h.quarter,
+            sa.release_date
+           FROM (adtech.combined_domain_app_history h
+             LEFT JOIN public.store_apps sa ON ((sa.id = h.store_app)))
+        ), enriched AS (
+         SELECT enriched_raw.domain_id,
+            enriched_raw.store_app,
+            enriched_raw.year,
+            enriched_raw.quarter,
+            enriched_raw.release_date,
+            t.tag_source
+           FROM enriched_raw,
+            LATERAL ( VALUES ('sdk'::text,enriched_raw.sdk), ('api_call'::text,enriched_raw.api_call), ('app_ads_direct'::text,enriched_raw.app_ads_direct)) t(tag_source, is_active)
+          WHERE (t.is_active = true)
+        ), max_period AS (
+         SELECT max(((enriched.year * 10) + enriched.quarter)) AS max_yq
+           FROM enriched
+        ), app_tag_first_seen AS (
+         SELECT enriched.store_app,
+            enriched.tag_source,
+            min(((enriched.year * 10) + enriched.quarter)) AS first_seen_key
+           FROM enriched
+          GROUP BY enriched.store_app, enriched.tag_source
+        ), added AS (
+         SELECT c.domain_id,
+            c.store_app,
+            c.tag_source,
+            c.year,
+            c.quarter,
+                CASE
+                    WHEN ((((c.year * 10) + c.quarter) = af.first_seen_key) AND (NOT ((c.release_date >= make_date((c.year)::integer, (((c.quarter - 1) * 3) + 1), 1)) AND (c.release_date < (make_date((c.year)::integer, (((c.quarter - 1) * 3) + 1), 1) + '3 mons'::interval))))) THEN 'added_initial'::adtech.change_status_enum
+                    ELSE 'added'::adtech.change_status_enum
+                END AS status
+           FROM ((enriched c
+             LEFT JOIN enriched p ON (((c.domain_id = p.domain_id) AND (c.store_app = p.store_app) AND (c.tag_source = p.tag_source) AND (((c.quarter = 1) AND (p.year = (c.year - 1)) AND (p.quarter = 4)) OR ((c.quarter > 1) AND (p.year = c.year) AND (p.quarter = (c.quarter - 1)))))))
+             JOIN app_tag_first_seen af ON (((c.store_app = af.store_app) AND (c.tag_source = af.tag_source))))
+          WHERE (p.store_app IS NULL)
+        ), removed AS (
+         SELECT p.domain_id,
+            p.store_app,
+            p.tag_source,
+                CASE
+                    WHEN (p.quarter = 4) THEN (p.year + 1)
+                    ELSE (p.year)::integer
+                END AS year,
+                CASE
+                    WHEN (p.quarter = 4) THEN 1
+                    ELSE (p.quarter + 1)
+                END AS quarter,
+            'removed'::adtech.change_status_enum AS status
+           FROM ((enriched p
+             CROSS JOIN max_period mp)
+             LEFT JOIN enriched c ON (((p.domain_id = c.domain_id) AND (p.store_app = c.store_app) AND (p.tag_source = c.tag_source) AND (((p.quarter = 4) AND (c.year = (p.year + 1)) AND (c.quarter = 1)) OR ((p.quarter < 4) AND (c.year = p.year) AND (c.quarter = (p.quarter + 1)))))))
+          WHERE ((c.store_app IS NULL) AND (((
+                CASE
+                    WHEN (p.quarter = 4) THEN (p.year + 1)
+                    ELSE (p.year)::integer
+                END * 10) +
+                CASE
+                    WHEN (p.quarter = 4) THEN 1
+                    ELSE (p.quarter + 1)
+                END) <= mp.max_yq))
+        )
+ SELECT added.domain_id,
+    added.store_app,
+    added.tag_source,
+    added.year,
+    added.quarter,
+    added.status
+   FROM added
+UNION ALL
+ SELECT removed.domain_id,
+    removed.store_app,
+    removed.tag_source,
+    removed.year,
+    removed.quarter,
+    removed.status
+   FROM removed
+  ORDER BY 4, 5, 1, 3, 6
+  WITH NO DATA;
+
+
+ALTER MATERIALIZED VIEW adtech.domain_app_changes_quarterly OWNER TO postgres;
+
+--
 -- Name: sdk_packages_id_seq; Type: SEQUENCE; Schema: adtech; Owner: postgres
 --
 
@@ -1619,6 +1620,341 @@ ALTER TABLE adtech.sdks ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
     CACHE 1
 );
 
+
+--
+-- Name: tag_totals; Type: MATERIALIZED VIEW; Schema: adtech; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW adtech.tag_totals AS
+ WITH distinct_apps_group AS (
+         SELECT DISTINCT csac.store_app,
+            tag.tag_source
+           FROM (adtech.combined_app_companies csac
+             CROSS JOIN LATERAL ( VALUES ('sdk'::text,csac.sdk), ('api_call'::text,csac.api_call), ('publisher'::text,csac.publisher), ('app_ads_direct'::text,csac.app_ads_direct), ('app_ads_reseller'::text,csac.app_ads_reseller)) tag(tag_source, present))
+          WHERE (tag.present IS TRUE)
+        ), store_category_universes AS (
+         SELECT store_apps_overview.store,
+            store_apps_overview.category AS app_category,
+            count(store_apps_overview.id) AS active_apps_universe,
+            sum(store_apps_overview.installs) AS universe_installs_total,
+            sum(store_apps_overview.installs_sum_4w) AS universe_installs_d30
+           FROM frontend.store_apps_overview
+          WHERE (store_apps_overview.id IS NOT NULL)
+          GROUP BY store_apps_overview.store, store_apps_overview.category
+        )
+ SELECT sa.store,
+    sa.category AS app_category,
+    dag.tag_source,
+    count(DISTINCT dag.store_app) AS total_active_scanned_apps_with_tag,
+    sum(sa.installs) AS total_scanned_installs_with_tag,
+    sum(sa.installs_sum_4w) AS total_scanned_installs_d30_with_tag,
+    max(su.active_apps_universe) AS active_apps_universe,
+    max(su.universe_installs_total) AS universe_installs_total,
+    max(su.universe_installs_d30) AS universe_installs_d30
+   FROM ((distinct_apps_group dag
+     LEFT JOIN frontend.store_apps_overview sa ON ((dag.store_app = sa.id)))
+     LEFT JOIN store_category_universes su ON (((sa.store = su.store) AND (sa.category = su.app_category))))
+  WHERE (sa.id IS NOT NULL)
+  GROUP BY sa.store, sa.category, dag.tag_source
+  WITH NO DATA;
+
+
+ALTER MATERIALIZED VIEW adtech.tag_totals OWNER TO postgres;
+
+--
+-- Name: trend_companies; Type: MATERIALIZED VIEW; Schema: adtech; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW adtech.trend_companies AS
+ WITH enriched_raw AS (
+         SELECT cdm.company_id,
+            h.store_app,
+            bool_or(h.sdk) AS sdk,
+            bool_or(h.api_call) AS api_call,
+            bool_or(h.app_ads_direct) AS app_ads_direct,
+            h.year,
+            h.quarter,
+            sa.store
+           FROM ((adtech.combined_domain_app_history h
+             LEFT JOIN public.store_apps sa ON ((sa.id = h.store_app)))
+             LEFT JOIN adtech.company_domain_mapping cdm ON ((h.domain_id = cdm.domain_id)))
+          GROUP BY cdm.company_id, h.store_app, h.year, h.quarter, sa.store
+        ), enriched AS (
+         SELECT enriched_raw.company_id,
+            enriched_raw.store_app,
+            enriched_raw.year,
+            enriched_raw.quarter,
+            enriched_raw.store,
+            t.tag_source
+           FROM enriched_raw,
+            LATERAL ( VALUES ('sdk'::text,enriched_raw.sdk), ('api_call'::text,enriched_raw.api_call), ('app_ads_direct'::text,enriched_raw.app_ads_direct)) t(tag_source, is_active)
+          WHERE (t.is_active = true)
+        ), pre_agg AS (
+         SELECT enriched.year,
+            enriched.quarter,
+            enriched.store,
+            enriched.tag_source,
+            count(DISTINCT enriched.store_app) AS total_apps_in_quarter
+           FROM enriched
+          GROUP BY enriched.year, enriched.quarter, enriched.store, enriched.tag_source
+        ), current_quarter AS (
+         SELECT enriched.company_id,
+            enriched.year,
+            enriched.quarter,
+            enriched.store,
+            enriched.tag_source,
+            count(enriched.store_app) AS total_apps,
+            pre_agg.total_apps_in_quarter
+           FROM (enriched
+             JOIN pre_agg ON (((pre_agg.year = enriched.year) AND (pre_agg.quarter = enriched.quarter) AND (pre_agg.store = enriched.store) AND (pre_agg.tag_source = enriched.tag_source))))
+          GROUP BY enriched.company_id, enriched.year, enriched.quarter, enriched.store, enriched.tag_source, pre_agg.total_apps_in_quarter
+        ), churned AS (
+         SELECT p.company_id,
+            p.store,
+            p.tag_source,
+                CASE
+                    WHEN (p.quarter = 4) THEN (p.year + 1)
+                    ELSE (p.year)::integer
+                END AS year,
+                CASE
+                    WHEN (p.quarter = 4) THEN (1)::bigint
+                    ELSE ((p.quarter + 1))::bigint
+                END AS quarter,
+            count(p.store_app) AS apps_lost
+           FROM (enriched p
+             LEFT JOIN enriched c ON (((p.company_id = c.company_id) AND (p.store_app = c.store_app) AND (p.store = c.store) AND (p.tag_source = c.tag_source) AND (((p.quarter = 4) AND (c.year = (p.year + 1)) AND (c.quarter = 1)) OR ((p.quarter < 4) AND (c.year = p.year) AND (c.quarter = (p.quarter + 1)))))))
+          WHERE (c.store_app IS NULL)
+          GROUP BY p.company_id, p.year, p.quarter, p.store, p.tag_source
+        ), added AS (
+         SELECT c.company_id,
+            c.store,
+            c.tag_source,
+            c.year,
+            c.quarter,
+            count(c.store_app) AS apps_added
+           FROM (enriched c
+             LEFT JOIN enriched p ON (((c.company_id = p.company_id) AND (c.store_app = p.store_app) AND (c.store = p.store) AND (c.tag_source = p.tag_source) AND (((c.quarter = 1) AND (p.year = (c.year - 1)) AND (p.quarter = 4)) OR ((c.quarter > 1) AND (p.year = c.year) AND (p.quarter = (c.quarter - 1)))))))
+          WHERE (p.store_app IS NULL)
+          GROUP BY c.company_id, c.year, c.quarter, c.store, c.tag_source
+        )
+ SELECT ad.domain_name AS company_domain,
+    cq.year,
+    cq.quarter,
+    cq.store,
+    cq.tag_source,
+    cq.total_apps,
+    cq.total_apps_in_quarter,
+    COALESCE(ch.apps_lost, (0)::bigint) AS apps_lost,
+    COALESCE(a.apps_added, (0)::bigint) AS apps_added,
+    round((((cq.total_apps)::numeric * 100.0) / NULLIF((cq.total_apps_in_quarter)::numeric, (0)::numeric)), 5) AS pct_market_share,
+    round((((COALESCE(a.apps_added, (0)::bigint))::numeric * 100.0) / (NULLIF((cq.total_apps - COALESCE(a.apps_added, (0)::bigint)), 0))::numeric), 2) AS pct_apps_added,
+    round((((COALESCE(ch.apps_lost, (0)::bigint))::numeric * 100.0) / (NULLIF((cq.total_apps + COALESCE(ch.apps_lost, (0)::bigint)), 0))::numeric), 2) AS pct_apps_lost
+   FROM ((((current_quarter cq
+     LEFT JOIN churned ch ON (((cq.company_id = ch.company_id) AND (cq.year = ch.year) AND (cq.quarter = ch.quarter) AND (cq.store = ch.store) AND (cq.tag_source = ch.tag_source))))
+     LEFT JOIN added a ON (((cq.company_id = a.company_id) AND (cq.year = a.year) AND (cq.quarter = a.quarter) AND (cq.store = a.store) AND (cq.tag_source = a.tag_source))))
+     LEFT JOIN adtech.companies co ON ((cq.company_id = co.id)))
+     LEFT JOIN public.domains ad ON ((co.domain_id = ad.id)))
+  ORDER BY cq.year, cq.quarter, cq.tag_source, cq.total_apps DESC
+  WITH NO DATA;
+
+
+ALTER MATERIALIZED VIEW adtech.trend_companies OWNER TO postgres;
+
+--
+-- Name: trend_domains; Type: MATERIALIZED VIEW; Schema: adtech; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW adtech.trend_domains AS
+ WITH enriched_raw AS (
+         SELECT h.domain_id,
+            h.store_app,
+            h.sdk,
+            h.api_call,
+            h.app_ads_direct,
+            h.year,
+            h.quarter,
+            sa.store
+           FROM (adtech.combined_domain_app_history h
+             LEFT JOIN public.store_apps sa ON ((sa.id = h.store_app)))
+        ), enriched AS (
+         SELECT enriched_raw.domain_id,
+            enriched_raw.store_app,
+            enriched_raw.year,
+            enriched_raw.quarter,
+            enriched_raw.store,
+            t.tag_source
+           FROM enriched_raw,
+            LATERAL ( VALUES ('sdk'::text,enriched_raw.sdk), ('api_call'::text,enriched_raw.api_call), ('app_ads_direct'::text,enriched_raw.app_ads_direct)) t(tag_source, is_active)
+          WHERE (t.is_active = true)
+        ), pre_agg AS (
+         SELECT enriched.year,
+            enriched.quarter,
+            enriched.store,
+            enriched.tag_source,
+            count(DISTINCT enriched.store_app) AS total_apps_in_quarter
+           FROM enriched
+          GROUP BY enriched.year, enriched.quarter, enriched.store, enriched.tag_source
+        ), current_quarter AS (
+         SELECT enriched.domain_id,
+            enriched.year,
+            enriched.quarter,
+            enriched.store,
+            enriched.tag_source,
+            count(enriched.store_app) AS total_apps,
+            pre_agg.total_apps_in_quarter
+           FROM (enriched
+             JOIN pre_agg ON (((pre_agg.year = enriched.year) AND (pre_agg.quarter = enriched.quarter) AND (pre_agg.store = enriched.store) AND (pre_agg.tag_source = enriched.tag_source))))
+          GROUP BY enriched.domain_id, enriched.year, enriched.quarter, enriched.store, enriched.tag_source, pre_agg.total_apps_in_quarter
+        ), churned AS (
+         SELECT p.domain_id,
+            p.store,
+            p.tag_source,
+                CASE
+                    WHEN (p.quarter = 4) THEN (p.year + 1)
+                    ELSE (p.year)::integer
+                END AS year,
+                CASE
+                    WHEN (p.quarter = 4) THEN (1)::bigint
+                    ELSE ((p.quarter + 1))::bigint
+                END AS quarter,
+            count(p.store_app) AS apps_lost
+           FROM (enriched p
+             LEFT JOIN enriched c ON (((p.domain_id = c.domain_id) AND (p.store_app = c.store_app) AND (p.store = c.store) AND (p.tag_source = c.tag_source) AND (((p.quarter = 4) AND (c.year = (p.year + 1)) AND (c.quarter = 1)) OR ((p.quarter < 4) AND (c.year = p.year) AND (c.quarter = (p.quarter + 1)))))))
+          WHERE (c.store_app IS NULL)
+          GROUP BY p.domain_id, p.year, p.quarter, p.store, p.tag_source
+        ), added AS (
+         SELECT c.domain_id,
+            c.store,
+            c.tag_source,
+            c.year,
+            c.quarter,
+            count(c.store_app) AS apps_added
+           FROM (enriched c
+             LEFT JOIN enriched p ON (((c.domain_id = p.domain_id) AND (c.store_app = p.store_app) AND (c.store = p.store) AND (c.tag_source = p.tag_source) AND (((c.quarter = 1) AND (p.year = (c.year - 1)) AND (p.quarter = 4)) OR ((c.quarter > 1) AND (p.year = c.year) AND (p.quarter = (c.quarter - 1)))))))
+          WHERE (p.store_app IS NULL)
+          GROUP BY c.domain_id, c.year, c.quarter, c.store, c.tag_source
+        )
+ SELECT ad.domain_name,
+    cq.year,
+    cq.quarter,
+    cq.store,
+    cq.tag_source,
+    cq.total_apps,
+    cq.total_apps_in_quarter,
+    COALESCE(ch.apps_lost, (0)::bigint) AS apps_lost,
+    COALESCE(a.apps_added, (0)::bigint) AS apps_added,
+    round((((cq.total_apps)::numeric * 100.0) / NULLIF((cq.total_apps_in_quarter)::numeric, (0)::numeric)), 5) AS pct_market_share,
+    round((((COALESCE(a.apps_added, (0)::bigint))::numeric * 100.0) / (NULLIF((cq.total_apps - COALESCE(a.apps_added, (0)::bigint)), 0))::numeric), 2) AS pct_apps_added,
+    round((((COALESCE(ch.apps_lost, (0)::bigint))::numeric * 100.0) / (NULLIF((cq.total_apps + COALESCE(ch.apps_lost, (0)::bigint)), 0))::numeric), 2) AS pct_apps_lost
+   FROM (((current_quarter cq
+     LEFT JOIN churned ch ON (((cq.domain_id = ch.domain_id) AND (cq.year = ch.year) AND (cq.quarter = ch.quarter) AND (cq.store = ch.store) AND (cq.tag_source = ch.tag_source))))
+     LEFT JOIN added a ON (((cq.domain_id = a.domain_id) AND (cq.year = a.year) AND (cq.quarter = a.quarter) AND (cq.store = a.store) AND (cq.tag_source = a.tag_source))))
+     LEFT JOIN public.domains ad ON ((cq.domain_id = ad.id)))
+  ORDER BY cq.year, cq.quarter, cq.tag_source, cq.total_apps DESC
+  WITH NO DATA;
+
+
+ALTER MATERIALIZED VIEW adtech.trend_domains OWNER TO postgres;
+
+--
+-- Name: trend_parent_companies; Type: MATERIALIZED VIEW; Schema: adtech; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW adtech.trend_parent_companies AS
+ WITH enriched_raw AS (
+         SELECT COALESCE(c.parent_company_id, cdm.company_id) AS parent_company_id,
+            h.store_app,
+            bool_or(h.sdk) AS sdk,
+            bool_or(h.api_call) AS api_call,
+            bool_or(h.app_ads_direct) AS app_ads_direct,
+            h.year,
+            h.quarter,
+            sa.store
+           FROM (((adtech.combined_domain_app_history h
+             LEFT JOIN public.store_apps sa ON ((sa.id = h.store_app)))
+             LEFT JOIN adtech.company_domain_mapping cdm ON ((h.domain_id = cdm.domain_id)))
+             LEFT JOIN adtech.companies c ON ((cdm.company_id = c.id)))
+          GROUP BY COALESCE(c.parent_company_id, cdm.company_id), h.store_app, h.year, h.quarter, sa.store
+        ), enriched AS (
+         SELECT enriched_raw.parent_company_id,
+            enriched_raw.store_app,
+            enriched_raw.year,
+            enriched_raw.quarter,
+            enriched_raw.store,
+            t.tag_source
+           FROM enriched_raw,
+            LATERAL ( VALUES ('sdk'::text,enriched_raw.sdk), ('api_call'::text,enriched_raw.api_call), ('app_ads_direct'::text,enriched_raw.app_ads_direct)) t(tag_source, is_active)
+          WHERE (t.is_active = true)
+        ), pre_agg AS (
+         SELECT enriched.year,
+            enriched.quarter,
+            enriched.store,
+            enriched.tag_source,
+            count(DISTINCT enriched.store_app) AS total_apps_in_quarter
+           FROM enriched
+          GROUP BY enriched.year, enriched.quarter, enriched.store, enriched.tag_source
+        ), current_quarter AS (
+         SELECT enriched.parent_company_id,
+            enriched.year,
+            enriched.quarter,
+            enriched.store,
+            enriched.tag_source,
+            count(enriched.store_app) AS total_apps,
+            pre_agg.total_apps_in_quarter
+           FROM (enriched
+             JOIN pre_agg ON (((pre_agg.year = enriched.year) AND (pre_agg.quarter = enriched.quarter) AND (pre_agg.store = enriched.store) AND (pre_agg.tag_source = enriched.tag_source))))
+          GROUP BY enriched.parent_company_id, enriched.year, enriched.quarter, enriched.store, enriched.tag_source, pre_agg.total_apps_in_quarter
+        ), churned AS (
+         SELECT p.parent_company_id,
+            p.store,
+            p.tag_source,
+                CASE
+                    WHEN (p.quarter = 4) THEN (p.year + 1)
+                    ELSE (p.year)::integer
+                END AS year,
+                CASE
+                    WHEN (p.quarter = 4) THEN (1)::bigint
+                    ELSE ((p.quarter + 1))::bigint
+                END AS quarter,
+            count(p.store_app) AS apps_lost
+           FROM (enriched p
+             LEFT JOIN enriched c ON (((p.parent_company_id = c.parent_company_id) AND (p.store_app = c.store_app) AND (p.store = c.store) AND (p.tag_source = c.tag_source) AND (((p.quarter = 4) AND (c.year = (p.year + 1)) AND (c.quarter = 1)) OR ((p.quarter < 4) AND (c.year = p.year) AND (c.quarter = (p.quarter + 1)))))))
+          WHERE (c.store_app IS NULL)
+          GROUP BY p.parent_company_id, p.year, p.quarter, p.store, p.tag_source
+        ), added AS (
+         SELECT c.parent_company_id,
+            c.store,
+            c.tag_source,
+            c.year,
+            c.quarter,
+            count(c.store_app) AS apps_added
+           FROM (enriched c
+             LEFT JOIN enriched p ON (((c.parent_company_id = p.parent_company_id) AND (c.store_app = p.store_app) AND (c.store = p.store) AND (c.tag_source = p.tag_source) AND (((c.quarter = 1) AND (p.year = (c.year - 1)) AND (p.quarter = 4)) OR ((c.quarter > 1) AND (p.year = c.year) AND (p.quarter = (c.quarter - 1)))))))
+          WHERE (p.store_app IS NULL)
+          GROUP BY c.parent_company_id, c.year, c.quarter, c.store, c.tag_source
+        )
+ SELECT ad.domain_name AS company_domain,
+    cq.year,
+    cq.quarter,
+    cq.store,
+    cq.tag_source,
+    cq.total_apps,
+    cq.total_apps_in_quarter,
+    COALESCE(ch.apps_lost, (0)::bigint) AS apps_lost,
+    COALESCE(a.apps_added, (0)::bigint) AS apps_added,
+    round((((cq.total_apps)::numeric * 100.0) / NULLIF((cq.total_apps_in_quarter)::numeric, (0)::numeric)), 5) AS pct_market_share,
+    round((((COALESCE(a.apps_added, (0)::bigint))::numeric * 100.0) / (NULLIF((cq.total_apps - COALESCE(a.apps_added, (0)::bigint)), 0))::numeric), 2) AS pct_apps_added,
+    round((((COALESCE(ch.apps_lost, (0)::bigint))::numeric * 100.0) / (NULLIF((cq.total_apps + COALESCE(ch.apps_lost, (0)::bigint)), 0))::numeric), 2) AS pct_apps_lost
+   FROM ((((current_quarter cq
+     LEFT JOIN churned ch ON (((cq.parent_company_id = ch.parent_company_id) AND (cq.year = ch.year) AND (cq.quarter = ch.quarter) AND (cq.store = ch.store) AND (cq.tag_source = ch.tag_source))))
+     LEFT JOIN added a ON (((cq.parent_company_id = a.parent_company_id) AND (cq.year = a.year) AND (cq.quarter = a.quarter) AND (cq.store = a.store) AND (cq.tag_source = a.tag_source))))
+     LEFT JOIN adtech.companies co ON ((cq.parent_company_id = co.id)))
+     LEFT JOIN public.domains ad ON ((co.domain_id = ad.id)))
+  ORDER BY cq.year, cq.quarter, cq.tag_source, cq.total_apps DESC
+  WITH NO DATA;
+
+
+ALTER MATERIALIZED VIEW adtech.trend_parent_companies OWNER TO postgres;
 
 --
 -- Name: url_redirect_chains; Type: TABLE; Schema: adtech; Owner: postgres
@@ -1745,6 +2081,70 @@ CREATE MATERIALIZED VIEW frontend.adstxt_ad_domain_overview AS
 ALTER MATERIALIZED VIEW frontend.adstxt_ad_domain_overview OWNER TO postgres;
 
 --
+-- Name: adstxt_ad_domain_parent_overview; Type: MATERIALIZED VIEW; Schema: frontend; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW frontend.adstxt_ad_domain_parent_overview AS
+ WITH child_companies AS (
+         SELECT pc_1.id AS parent_company_id,
+            aae.relationship,
+            sa.store,
+            aae.publisher_id,
+            sa.developer,
+            aesa.store_app
+           FROM (((((frontend.adstxt_entries_store_apps aesa
+             LEFT JOIN public.store_apps sa ON ((aesa.store_app = sa.id)))
+             LEFT JOIN public.app_ads_entrys aae ON ((aesa.app_ad_entry_id = aae.id)))
+             LEFT JOIN adtech.company_domain_mapping cdm ON ((aesa.ad_domain_id = cdm.domain_id)))
+             LEFT JOIN adtech.companies c ON ((cdm.company_id = c.id)))
+             JOIN adtech.companies pc_1 ON ((c.parent_company_id = pc_1.id)))
+          WHERE (c.parent_company_id IS NOT NULL)
+        ), parent_companies_direct AS (
+         SELECT c.id AS parent_company_id,
+            aae.relationship,
+            sa.store,
+            aae.publisher_id,
+            sa.developer,
+            aesa.store_app
+           FROM ((((frontend.adstxt_entries_store_apps aesa
+             LEFT JOIN public.store_apps sa ON ((aesa.store_app = sa.id)))
+             LEFT JOIN public.app_ads_entrys aae ON ((aesa.app_ad_entry_id = aae.id)))
+             LEFT JOIN adtech.company_domain_mapping cdm ON ((aesa.ad_domain_id = cdm.domain_id)))
+             JOIN adtech.companies c ON ((cdm.company_id = c.id)))
+          WHERE ((c.parent_company_id IS NULL) AND (EXISTS ( SELECT 1
+                   FROM adtech.companies child
+                  WHERE (child.parent_company_id = c.id))))
+        )
+ SELECT ad.domain_name AS ad_domain_url,
+    combined.relationship,
+    combined.store,
+    count(DISTINCT combined.publisher_id) AS publisher_id_count,
+    count(DISTINCT combined.developer) AS developer_count,
+    count(DISTINCT combined.store_app) AS app_count
+   FROM ((( SELECT child_companies.parent_company_id,
+            child_companies.relationship,
+            child_companies.store,
+            child_companies.publisher_id,
+            child_companies.developer,
+            child_companies.store_app
+           FROM child_companies
+        UNION ALL
+         SELECT parent_companies_direct.parent_company_id,
+            parent_companies_direct.relationship,
+            parent_companies_direct.store,
+            parent_companies_direct.publisher_id,
+            parent_companies_direct.developer,
+            parent_companies_direct.store_app
+           FROM parent_companies_direct) combined
+     LEFT JOIN adtech.companies pc ON ((combined.parent_company_id = pc.id)))
+     LEFT JOIN public.domains ad ON ((pc.domain_id = ad.id)))
+  GROUP BY ad.domain_name, combined.relationship, combined.store
+  WITH NO DATA;
+
+
+ALTER MATERIALIZED VIEW frontend.adstxt_ad_domain_parent_overview OWNER TO postgres;
+
+--
 -- Name: adstxt_publishers_overview; Type: MATERIALIZED VIEW; Schema: frontend; Owner: postgres
 --
 
@@ -1776,6 +2176,81 @@ CREATE MATERIALIZED VIEW frontend.adstxt_publishers_overview AS
 
 
 ALTER MATERIALIZED VIEW frontend.adstxt_publishers_overview OWNER TO postgres;
+
+--
+-- Name: adstxt_publishers_parent_overview; Type: MATERIALIZED VIEW; Schema: frontend; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW frontend.adstxt_publishers_parent_overview AS
+ WITH child_companies AS (
+         SELECT pc.id AS parent_company_id,
+            aae.relationship,
+            sa.store,
+            aae.publisher_id,
+            sa.developer,
+            aesa.store_app
+           FROM (((((frontend.adstxt_entries_store_apps aesa
+             JOIN public.store_apps sa ON ((aesa.store_app = sa.id)))
+             JOIN public.app_ads_entrys aae ON ((aesa.app_ad_entry_id = aae.id)))
+             JOIN adtech.company_domain_mapping cdm ON ((aesa.ad_domain_id = cdm.domain_id)))
+             JOIN adtech.companies c ON ((cdm.company_id = c.id)))
+             JOIN adtech.companies pc ON ((c.parent_company_id = pc.id)))
+          WHERE (c.parent_company_id IS NOT NULL)
+        ), parent_companies_direct AS (
+         SELECT c.id AS parent_company_id,
+            aae.relationship,
+            sa.store,
+            aae.publisher_id,
+            sa.developer,
+            aesa.store_app
+           FROM ((((frontend.adstxt_entries_store_apps aesa
+             JOIN public.store_apps sa ON ((aesa.store_app = sa.id)))
+             JOIN public.app_ads_entrys aae ON ((aesa.app_ad_entry_id = aae.id)))
+             JOIN adtech.company_domain_mapping cdm ON ((aesa.ad_domain_id = cdm.domain_id)))
+             JOIN adtech.companies c ON ((cdm.company_id = c.id)))
+          WHERE ((c.parent_company_id IS NULL) AND (EXISTS ( SELECT 1
+                   FROM adtech.companies child
+                  WHERE (child.parent_company_id = c.id))))
+        ), ranked_data AS (
+         SELECT ad.domain_name AS ad_domain_url,
+            combined.relationship,
+            combined.store,
+            combined.publisher_id,
+            count(DISTINCT combined.developer) AS developer_count,
+            count(DISTINCT combined.store_app) AS app_count,
+            row_number() OVER (PARTITION BY ad.domain_name, combined.relationship, combined.store ORDER BY (count(DISTINCT combined.store_app)) DESC) AS pubrank
+           FROM ((( SELECT child_companies.parent_company_id,
+                    child_companies.relationship,
+                    child_companies.store,
+                    child_companies.publisher_id,
+                    child_companies.developer,
+                    child_companies.store_app
+                   FROM child_companies
+                UNION ALL
+                 SELECT parent_companies_direct.parent_company_id,
+                    parent_companies_direct.relationship,
+                    parent_companies_direct.store,
+                    parent_companies_direct.publisher_id,
+                    parent_companies_direct.developer,
+                    parent_companies_direct.store_app
+                   FROM parent_companies_direct) combined
+             JOIN adtech.companies pc ON ((combined.parent_company_id = pc.id)))
+             JOIN public.domains ad ON ((pc.domain_id = ad.id)))
+          GROUP BY ad.domain_name, combined.relationship, combined.store, combined.publisher_id
+        )
+ SELECT ad_domain_url,
+    relationship,
+    store,
+    publisher_id,
+    developer_count,
+    app_count,
+    pubrank
+   FROM ranked_data
+  WHERE (pubrank <= 50)
+  WITH NO DATA;
+
+
+ALTER MATERIALIZED VIEW frontend.adstxt_publishers_parent_overview OWNER TO postgres;
 
 --
 -- Name: creative_assets; Type: TABLE; Schema: public; Owner: postgres
@@ -2450,16 +2925,17 @@ ALTER MATERIALIZED VIEW frontend.companies_apps_overview OWNER TO postgres;
 CREATE MATERIALIZED VIEW frontend.companies_category_stats AS
  SELECT sa.store,
     sa.category AS app_category,
-    ad.domain_name AS company_domain,
+    COALESCE(cd.domain_name, ad.domain_name) AS company_domain,
     c.name AS company_name,
     count(DISTINCT csac.store_app) AS app_count,
     sum(sa.installs) AS installs_total,
     sum(sa.installs_sum_4w) AS installs_d30
-   FROM (((adtech.combined_app_companies csac
+   FROM ((((adtech.combined_app_companies csac
+     LEFT JOIN public.domains ad ON ((csac.domain_id = ad.id)))
      LEFT JOIN adtech.companies c ON ((csac.company_id = c.id)))
-     LEFT JOIN public.domains ad ON ((c.domain_id = ad.id)))
+     LEFT JOIN public.domains cd ON ((c.domain_id = cd.id)))
      LEFT JOIN frontend.store_apps_overview sa ON ((csac.store_app = sa.id)))
-  GROUP BY sa.store, sa.category, ad.domain_name, c.name
+  GROUP BY sa.store, sa.category, COALESCE(cd.domain_name, ad.domain_name), c.name
   WITH NO DATA;
 
 
@@ -2473,11 +2949,12 @@ CREATE MATERIALIZED VIEW frontend.companies_category_tag_stats AS
  WITH distinct_apps_group AS (
          SELECT csac.store_app,
             tag.tag_source,
-            ad.domain_name AS company_domain,
+            COALESCE(cd.domain_name, ad.domain_name) AS company_domain,
             c.name AS company_name
-           FROM (((adtech.combined_app_companies csac
+           FROM ((((adtech.combined_app_companies csac
+             LEFT JOIN public.domains ad ON ((csac.domain_id = ad.id)))
              LEFT JOIN adtech.companies c ON ((csac.company_id = c.id)))
-             LEFT JOIN public.domains ad ON ((c.domain_id = ad.id)))
+             LEFT JOIN public.domains cd ON ((c.domain_id = cd.id)))
              CROSS JOIN LATERAL ( VALUES ('sdk'::text,csac.sdk), ('api_call'::text,csac.api_call), ('publisher'::text,csac.publisher), ('app_ads_direct'::text,csac.app_ads_direct), ('app_ads_reseller'::text,csac.app_ads_reseller)) tag(tag_source, present))
           WHERE (tag.present IS TRUE)
         )
@@ -2511,7 +2988,7 @@ CREATE MATERIALIZED VIEW frontend.companies_category_tag_type_stats AS
          SELECT sa.store,
             sa.category AS app_category,
             tag.tag_source,
-            ad.domain_name AS company_domain,
+            COALESCE(cd.domain_name, ad.domain_name) AS company_domain,
             c.name AS company_name,
                 CASE
                     WHEN (tag.tag_source ~~ 'app_ads%%'::text) THEN 'ad-networks'::character varying
@@ -2520,15 +2997,16 @@ CREATE MATERIALIZED VIEW frontend.companies_category_tag_type_stats AS
             count(DISTINCT csac.store_app) AS app_count,
             sum(sa.installs_sum_4w) AS installs_d30,
             sum(sa.installs) AS installs_total
-           FROM ((((((adtech.combined_app_companies csac
+           FROM (((((((adtech.combined_app_companies csac
+             LEFT JOIN public.domains ad ON ((csac.domain_id = ad.id)))
              LEFT JOIN adtech.companies c ON ((csac.company_id = c.id)))
-             LEFT JOIN public.domains ad ON ((c.domain_id = ad.id)))
+             LEFT JOIN public.domains cd ON ((c.domain_id = cd.id)))
              LEFT JOIN frontend.store_apps_overview sa ON ((csac.store_app = sa.id)))
              LEFT JOIN minimized_company_categories mcc ON ((csac.company_id = mcc.company_id)))
              LEFT JOIN adtech.categories cats ON ((mcc.category_id = cats.id)))
              CROSS JOIN LATERAL ( VALUES ('api_call'::text,csac.api_call), ('publisher'::text,csac.publisher), ('app_ads_direct'::text,csac.app_ads_direct), ('app_ads_reseller'::text,csac.app_ads_reseller)) tag(tag_source, present))
           WHERE (tag.present IS TRUE)
-          GROUP BY sa.store, sa.category, tag.tag_source, ad.domain_name, c.name,
+          GROUP BY sa.store, sa.category, tag.tag_source, COALESCE(cd.domain_name, ad.domain_name), c.name,
                 CASE
                     WHEN (tag.tag_source ~~ 'app_ads%%'::text) THEN 'ad-networks'::character varying
                     ELSE cats.url_slug
@@ -2706,6 +3184,207 @@ CREATE MATERIALIZED VIEW frontend.companies_open_source_percent AS
 ALTER MATERIALIZED VIEW frontend.companies_open_source_percent OWNER TO postgres;
 
 --
+-- Name: companies_sdks_overview; Type: MATERIALIZED VIEW; Schema: frontend; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW frontend.companies_sdks_overview AS
+ SELECT c.name AS company_name,
+    ad.domain_name AS company_domain,
+    parad.domain_name AS parent_company_domain,
+    sdk.sdk_name,
+    sp.package_pattern,
+    sp2.path_pattern,
+    COALESCE(cc.name, c.name) AS parent_company_name
+   FROM ((((((adtech.companies c
+     LEFT JOIN adtech.companies cc ON ((c.parent_company_id = cc.id)))
+     LEFT JOIN public.domains ad ON ((c.domain_id = ad.id)))
+     LEFT JOIN public.domains parad ON ((cc.domain_id = parad.id)))
+     LEFT JOIN adtech.sdks sdk ON ((c.id = sdk.company_id)))
+     LEFT JOIN adtech.sdk_packages sp ON ((sdk.id = sp.sdk_id)))
+     LEFT JOIN adtech.sdk_paths sp2 ON ((sdk.id = sp2.sdk_id)))
+  WITH NO DATA;
+
+
+ALTER MATERIALIZED VIEW frontend.companies_sdks_overview OWNER TO postgres;
+
+--
+-- Name: mediation_adapter_app_counts; Type: MATERIALIZED VIEW; Schema: frontend; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW frontend.mediation_adapter_app_counts AS
+ WITH filter_mediation_strings AS (
+         SELECT vs.id AS string_id,
+            sd.company_id AS mediation_company_id,
+            vs.value_name AS full_sdk,
+            regexp_replace(regexp_replace(vs.value_name, concat(cmp.mediation_pattern, '.'), ''::text), '\..*$'::text, ''::text) AS adapter_string
+           FROM ((public.version_strings vs
+             JOIN adtech.sdk_mediation_patterns cmp ON ((lower(vs.value_name) ~~ (lower(concat((cmp.mediation_pattern)::text, '.')) || '%'::text))))
+             JOIN adtech.sdks sd ON ((cmp.sdk_id = sd.id)))
+        ), mediation_strings AS (
+         SELECT fms.string_id,
+            fms.mediation_company_id,
+            cma.company_id AS adapter_company_id,
+            fms.adapter_string,
+            fms.full_sdk
+           FROM (filter_mediation_strings fms
+             LEFT JOIN adtech.company_mediation_adapters cma ON ((lower(fms.adapter_string) ~~ (lower((cma.adapter_pattern)::text) || '%'::text))))
+          WHERE (fms.mediation_company_id <> cma.company_id)
+        ), app_counts AS (
+         SELECT ms.mediation_company_id,
+            ms.adapter_string,
+            ms.adapter_company_id,
+            cm.mapped_category AS app_category,
+            count(DISTINCT sass.store_app) AS app_count
+           FROM (((adtech.store_app_sdk_strings sass
+             JOIN mediation_strings ms ON ((sass.version_string_id = ms.string_id)))
+             LEFT JOIN public.store_apps sa ON ((sass.store_app = sa.id)))
+             LEFT JOIN public.category_mapping cm ON (((sa.category)::text = (cm.original_category)::text)))
+          GROUP BY ms.mediation_company_id, ms.adapter_string, ms.adapter_company_id, cm.mapped_category
+        )
+ SELECT md.domain_name AS mediation_domain,
+    ac.adapter_string,
+    ad.domain_name AS adapter_domain,
+    adc.name AS adapter_company_name,
+    adc.logo_url AS adapter_logo_url,
+    ac.app_category,
+    ac.app_count
+   FROM ((((app_counts ac
+     LEFT JOIN adtech.companies mdc ON ((ac.mediation_company_id = mdc.id)))
+     LEFT JOIN public.domains md ON ((mdc.domain_id = md.id)))
+     LEFT JOIN adtech.companies adc ON ((ac.adapter_company_id = adc.id)))
+     LEFT JOIN public.domains ad ON ((adc.domain_id = ad.id)))
+  WITH NO DATA;
+
+
+ALTER MATERIALIZED VIEW frontend.mediation_adapter_app_counts OWNER TO postgres;
+
+--
+-- Name: companies_overview; Type: MATERIALIZED VIEW; Schema: frontend; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW frontend.companies_overview AS
+ WITH domain_base AS (
+         SELECT d.id AS domain_id,
+            d.domain_name AS company_domain,
+            cac.company_id,
+            c_1.name AS company_name,
+            c_1.logo_url,
+            c_1.parent_company_id,
+            pc_1.name AS parent_company_name,
+            pd.domain_name AS parent_domain,
+            pd.id AS parent_domain_id,
+            bool_or(cac.sdk) AS has_sdk_signal,
+            bool_or(cac.api_call) AS has_api_signal,
+            bool_or(cac.publisher) AS has_publisher_signal,
+            bool_or(cac.app_ads_direct) AS has_app_ads_direct,
+            bool_or(cac.app_ads_reseller) AS has_app_ads_reseller
+           FROM ((((adtech.combined_app_companies cac
+             JOIN public.domains d ON ((cac.domain_id = d.id)))
+             LEFT JOIN adtech.companies c_1 ON ((cac.company_id = c_1.id)))
+             LEFT JOIN adtech.companies pc_1 ON ((c_1.parent_company_id = pc_1.id)))
+             LEFT JOIN public.domains pd ON ((pc_1.domain_id = pd.id)))
+          GROUP BY d.id, d.domain_name, cac.company_id, c_1.name, c_1.logo_url, c_1.parent_company_id, pc_1.name, pd.domain_name, pd.id
+        ), creatives_agg AS (
+         SELECT companies_creative_rankings.company_domain,
+            (count(*))::integer AS creatives_app_count
+           FROM frontend.companies_creative_rankings
+          WHERE (companies_creative_rankings.last_seen < (now() - '1 day'::interval))
+          GROUP BY companies_creative_rankings.company_domain
+        ), trends_agg AS (
+         SELECT DISTINCT TRIM(BOTH FROM lower((sub.company_domain)::text)) AS company_domain,
+            1 AS has_trends
+           FROM ( SELECT trend_companies.company_domain
+                   FROM adtech.trend_companies
+                  WHERE ((trend_companies.year > 2025) OR ((trend_companies.year = 2025) AND (trend_companies.quarter >= 2)))
+                UNION
+                 SELECT trend_domains.domain_name
+                   FROM adtech.trend_domains
+                  WHERE ((trend_domains.year > 2025) OR ((trend_domains.year = 2025) AND (trend_domains.quarter >= 2)))
+                UNION
+                 SELECT trend_parent_companies.company_domain
+                   FROM adtech.trend_parent_companies
+                  WHERE ((trend_parent_companies.year > 2025) OR ((trend_parent_companies.year = 2025) AND (trend_parent_companies.quarter >= 2)))) sub
+        ), app_changes_agg AS (
+         SELECT d.domain_name AS company_domain,
+            (count(*) FILTER (WHERE (dacq.status = 'added'::adtech.change_status_enum)))::integer AS apps_added_count,
+            (count(*) FILTER (WHERE (dacq.status = 'removed'::adtech.change_status_enum)))::integer AS apps_lost_count
+           FROM (adtech.domain_app_changes_quarterly dacq
+             LEFT JOIN public.domains d ON ((dacq.domain_id = d.id)))
+          GROUP BY d.domain_name
+        ), sdks_agg AS (
+         SELECT sub.company_domain,
+            (max(sub.sdk_count))::integer AS sdk_count
+           FROM ( SELECT companies_sdks_overview.company_domain,
+                    count(DISTINCT companies_sdks_overview.sdk_name) AS sdk_count
+                   FROM frontend.companies_sdks_overview
+                  GROUP BY companies_sdks_overview.company_domain
+                UNION ALL
+                 SELECT companies_sdks_overview.parent_company_domain,
+                    count(DISTINCT companies_sdks_overview.sdk_name) AS sdk_count
+                   FROM frontend.companies_sdks_overview
+                  WHERE (companies_sdks_overview.parent_company_domain IS NOT NULL)
+                  GROUP BY companies_sdks_overview.parent_company_domain) sub
+          GROUP BY sub.company_domain
+        ), mediation_agg AS (
+         SELECT mediation_adapter_app_counts.mediation_domain AS company_domain,
+            (count(DISTINCT mediation_adapter_app_counts.adapter_domain))::integer AS mediation_adapter_count
+           FROM frontend.mediation_adapter_app_counts
+          GROUP BY mediation_adapter_app_counts.mediation_domain
+        ), adstxt_ad_domain_agg AS (
+         SELECT adstxt_ad_domain_overview.ad_domain_url,
+            sum(adstxt_ad_domain_overview.app_count) AS adstxt_direct_app_count
+           FROM frontend.adstxt_ad_domain_overview
+          WHERE ((adstxt_ad_domain_overview.relationship)::text = 'DIRECT'::text)
+          GROUP BY adstxt_ad_domain_overview.ad_domain_url
+        )
+ SELECT dom.company_domain,
+    dom.domain_id,
+    dom.company_id,
+    dom.company_name,
+    dom.logo_url,
+    dom.parent_company_id,
+    dom.parent_domain,
+    dom.parent_domain_id,
+    dom.has_sdk_signal,
+    dom.has_api_signal,
+    dom.has_publisher_signal,
+    dom.has_app_ads_direct,
+    dom.has_app_ads_reseller,
+    COALESCE(c.creatives_app_count, pc.creatives_app_count, 0) AS creatives_app_count,
+    COALESCE(t.has_trends, pt.has_trends, 0) AS has_trends,
+    COALESCE(a.apps_added_count, pa.apps_added_count, 0) AS apps_added_count,
+    COALESCE(a.apps_lost_count, pa.apps_lost_count, 0) AS apps_lost_count,
+    COALESCE(s.sdk_count, ps.sdk_count, 0) AS sdk_count,
+    COALESCE(m.mediation_adapter_count, pm.mediation_adapter_count, 0) AS mediation_adapter_count,
+    COALESCE(c.creatives_app_count, 0) AS creatives_app_count_direct,
+    COALESCE(t.has_trends, 0) AS has_trends_direct,
+    COALESCE(a.apps_added_count, 0) AS apps_added_count_direct,
+    COALESCE(a.apps_lost_count, 0) AS apps_lost_count_direct,
+    COALESCE(s.sdk_count, 0) AS sdk_count_direct,
+    COALESCE(m.mediation_adapter_count, 0) AS mediation_adapter_count_direct,
+    COALESCE(aa.adstxt_direct_app_count, (0)::numeric) AS adstxt_direct_app_count,
+    (((dom.company_id IS NOT NULL) AND (dom.company_id IN ( SELECT DISTINCT companies.parent_company_id
+           FROM adtech.companies
+          WHERE (companies.parent_company_id IS NOT NULL)))))::integer AS is_parent_domain
+   FROM ((((((((((((domain_base dom
+     LEFT JOIN creatives_agg c ON (((dom.company_domain)::text = (c.company_domain)::text)))
+     LEFT JOIN trends_agg t ON (((dom.company_domain)::text = t.company_domain)))
+     LEFT JOIN app_changes_agg a ON (((dom.company_domain)::text = (a.company_domain)::text)))
+     LEFT JOIN sdks_agg s ON (((dom.company_domain)::text = (s.company_domain)::text)))
+     LEFT JOIN mediation_agg m ON (((dom.company_domain)::text = (m.company_domain)::text)))
+     LEFT JOIN adstxt_ad_domain_agg aa ON (((dom.company_domain)::text = (aa.ad_domain_url)::text)))
+     LEFT JOIN creatives_agg pc ON (((dom.parent_domain)::text = (pc.company_domain)::text)))
+     LEFT JOIN trends_agg pt ON (((dom.parent_domain)::text = pt.company_domain)))
+     LEFT JOIN app_changes_agg pa ON (((dom.parent_domain)::text = (pa.company_domain)::text)))
+     LEFT JOIN sdks_agg ps ON (((dom.parent_domain)::text = (ps.company_domain)::text)))
+     LEFT JOIN mediation_agg pm ON (((dom.parent_domain)::text = (pm.company_domain)::text)))
+     LEFT JOIN adstxt_ad_domain_agg paa ON (((dom.parent_domain)::text = (paa.ad_domain_url)::text)))
+  WITH NO DATA;
+
+
+ALTER MATERIALIZED VIEW frontend.companies_overview OWNER TO postgres;
+
+--
 -- Name: companies_parent_category_stats; Type: MATERIALIZED VIEW; Schema: frontend; Owner: postgres
 --
 
@@ -2766,30 +3445,6 @@ CREATE MATERIALIZED VIEW frontend.companies_parent_category_tag_stats AS
 ALTER MATERIALIZED VIEW frontend.companies_parent_category_tag_stats OWNER TO postgres;
 
 --
--- Name: companies_sdks_overview; Type: MATERIALIZED VIEW; Schema: frontend; Owner: postgres
---
-
-CREATE MATERIALIZED VIEW frontend.companies_sdks_overview AS
- SELECT c.name AS company_name,
-    ad.domain_name AS company_domain,
-    parad.domain_name AS parent_company_domain,
-    sdk.sdk_name,
-    sp.package_pattern,
-    sp2.path_pattern,
-    COALESCE(cc.name, c.name) AS parent_company_name
-   FROM ((((((adtech.companies c
-     LEFT JOIN adtech.companies cc ON ((c.parent_company_id = cc.id)))
-     LEFT JOIN public.domains ad ON ((c.domain_id = ad.id)))
-     LEFT JOIN public.domains parad ON ((cc.domain_id = parad.id)))
-     LEFT JOIN adtech.sdks sdk ON ((c.id = sdk.company_id)))
-     LEFT JOIN adtech.sdk_packages sp ON ((sdk.id = sp.sdk_id)))
-     LEFT JOIN adtech.sdk_paths sp2 ON ((sdk.id = sp2.sdk_id)))
-  WITH NO DATA;
-
-
-ALTER MATERIALIZED VIEW frontend.companies_sdks_overview OWNER TO postgres;
-
---
 -- Name: company_domain_country; Type: MATERIALIZED VIEW; Schema: frontend; Owner: postgres
 --
 
@@ -2841,99 +3496,26 @@ ALTER MATERIALIZED VIEW frontend.company_domain_country OWNER TO postgres;
 --
 
 CREATE MATERIALIZED VIEW frontend.company_domains_top_apps AS
- WITH api_data AS (
-         SELECT DISTINCT saac.tld_url AS company_domain,
-            c_1.name AS company_name,
+ WITH ranked_apps AS (
+         SELECT d.domain_name AS company_domain,
+            c.name AS company_name,
             sa.store,
             sa.name,
             sa.store_id,
             sa.category AS app_category,
             sa.installs_sum_4w AS installs_d30,
             sa.icon_url_100,
-            'api_call'::text AS tag_source
-           FROM ((((public.api_calls saac
-             LEFT JOIN public.domains d ON ((saac.tld_url = (d.domain_name)::text)))
-             LEFT JOIN adtech.company_domain_mapping cdm ON ((d.id = cdm.domain_id)))
-             LEFT JOIN adtech.companies c_1 ON ((cdm.company_id = c_1.id)))
-             LEFT JOIN frontend.store_apps_overview sa ON ((saac.store_app = sa.id)))
-        ), distinct_ad_and_pub_domains AS (
-         SELECT DISTINCT pd.domain_name AS publisher_domain_url,
-            ad_1.domain_name AS ad_domain_url,
-            aae.relationship
-           FROM ((((public.app_ads_entrys aae
-             LEFT JOIN public.domains ad_1 ON ((aae.ad_domain = ad_1.id)))
-             LEFT JOIN public.app_ads_map aam ON ((aae.id = aam.app_ads_entry)))
-             LEFT JOIN public.domains pd ON ((aam.pub_domain = pd.id)))
-             LEFT JOIN public.adstxt_crawl_results pdcr ON ((pd.id = pdcr.domain_id)))
-          WHERE (((aae.relationship)::text = 'DIRECT'::text) AND ((pdcr.crawled_at - aam.updated_at) < '01:00:00'::interval))
-        ), adstxt_data AS (
-         SELECT DISTINCT pnv.ad_domain_url AS company_domain,
-            c_1.name AS company_name,
-            sa.store,
-            sa.name,
-            sa.store_id,
-            sa.category AS app_category,
-            sa.installs_sum_4w AS installs_d30,
-            sa.icon_url_100,
-            'app_ads_direct'::text AS tag_source
-           FROM (((((public.app_urls_map aum
-             LEFT JOIN public.domains pd ON ((aum.pub_domain = pd.id)))
-             LEFT JOIN distinct_ad_and_pub_domains pnv ON (((pd.domain_name)::text = (pnv.publisher_domain_url)::text)))
-             LEFT JOIN public.domains ad_1 ON (((pnv.ad_domain_url)::text = (ad_1.domain_name)::text)))
-             LEFT JOIN adtech.companies c_1 ON ((ad_1.id = c_1.domain_id)))
-             LEFT JOIN frontend.store_apps_overview sa ON ((aum.store_app = sa.id)))
-          WHERE ((sa.crawl_result = 1) AND ((pnv.ad_domain_url IS NOT NULL) OR (c_1.id IS NOT NULL)))
-        ), combined_sources AS (
-         SELECT api_data.company_domain,
-            api_data.company_name,
-            api_data.store,
-            api_data.name,
-            api_data.store_id,
-            api_data.app_category,
-            api_data.installs_d30,
-            api_data.icon_url_100,
-            api_data.tag_source
-           FROM api_data
-        UNION ALL
-         SELECT adstxt_data.company_domain,
-            adstxt_data.company_name,
-            adstxt_data.store,
-            adstxt_data.name,
-            adstxt_data.store_id,
-            adstxt_data.app_category,
-            adstxt_data.installs_d30,
-            adstxt_data.icon_url_100,
-            adstxt_data.tag_source
-           FROM adstxt_data
-        ), deduped_data AS (
-         SELECT combined_sources.company_domain,
-            combined_sources.company_name,
-            combined_sources.store,
-            combined_sources.name,
-            combined_sources.store_id,
-            combined_sources.app_category,
-            max(combined_sources.installs_d30) AS installs_d30,
-            max(combined_sources.icon_url_100) AS icon_url_100,
-            bool_or((combined_sources.tag_source = 'sdk'::text)) AS sdk,
-            bool_or((combined_sources.tag_source = 'api_call'::text)) AS api_call,
-            bool_or((combined_sources.tag_source = 'app_ads_direct'::text)) AS app_ads_direct
-           FROM combined_sources
-          GROUP BY combined_sources.company_domain, combined_sources.company_name, combined_sources.store, combined_sources.name, combined_sources.store_id, combined_sources.app_category
-        ), ranked_apps AS (
-         SELECT deduped_data.company_domain,
-            deduped_data.company_name,
-            deduped_data.store,
-            deduped_data.name,
-            deduped_data.store_id,
-            deduped_data.app_category,
-            deduped_data.installs_d30,
-            deduped_data.icon_url_100,
-            deduped_data.sdk,
-            deduped_data.api_call,
-            deduped_data.app_ads_direct,
-            row_number() OVER (PARTITION BY deduped_data.store, deduped_data.company_domain, deduped_data.company_name ORDER BY COALESCE((deduped_data.installs_d30)::double precision, (0)::double precision) DESC) AS app_company_rank,
-            row_number() OVER (PARTITION BY deduped_data.store, deduped_data.app_category, deduped_data.company_domain, deduped_data.company_name ORDER BY COALESCE((deduped_data.installs_d30)::double precision, (0)::double precision) DESC) AS app_company_category_rank
-           FROM deduped_data
+            cac.sdk,
+            cac.api_call,
+            cac.publisher,
+            cac.app_ads_direct,
+            row_number() OVER (PARTITION BY sa.store, d.domain_name ORDER BY COALESCE((sa.installs_sum_4w)::double precision, (0)::double precision) DESC) AS app_company_rank,
+            row_number() OVER (PARTITION BY sa.store, d.domain_name, sa.category ORDER BY COALESCE((sa.installs_sum_4w)::double precision, (0)::double precision) DESC) AS app_company_category_rank
+           FROM ((((adtech.combined_app_companies cac
+             LEFT JOIN public.domains d ON ((cac.domain_id = d.id)))
+             LEFT JOIN adtech.company_domain_mapping cdm ON ((cac.domain_id = cdm.domain_id)))
+             LEFT JOIN adtech.companies c ON ((cdm.company_id = c.id)))
+             LEFT JOIN frontend.store_apps_overview sa ON ((cac.store_app = sa.id)))
         )
  SELECT company_domain,
     company_name,
@@ -2945,6 +3527,7 @@ CREATE MATERIALIZED VIEW frontend.company_domains_top_apps AS
     icon_url_100,
     sdk,
     api_call,
+    publisher,
     app_ads_direct,
     app_company_rank,
     app_company_category_rank
@@ -2991,6 +3574,7 @@ CREATE MATERIALIZED VIEW frontend.company_parent_top_apps AS
             deduped_data.installs_d30,
             deduped_data.sdk,
             deduped_data.api_call,
+            deduped_data.publisher,
             deduped_data.app_ads_direct,
             row_number() OVER (PARTITION BY deduped_data.store, deduped_data.company_domain, deduped_data.company_name ORDER BY ((COALESCE((deduped_data.sdk)::integer, 0) + COALESCE((deduped_data.api_call)::integer, 0)) + COALESCE((deduped_data.publisher)::integer, 0)) DESC, COALESCE((deduped_data.installs_d30)::double precision, (0)::double precision) DESC) AS app_company_rank,
             row_number() OVER (PARTITION BY deduped_data.store, deduped_data.app_category, deduped_data.company_domain, deduped_data.company_name ORDER BY ((COALESCE((deduped_data.sdk)::integer, 0) + COALESCE((deduped_data.api_call)::integer, 0)) + COALESCE((deduped_data.publisher)::integer, 0)) DESC, COALESCE((deduped_data.installs_d30)::double precision, (0)::double precision) DESC) AS app_company_category_rank
@@ -3007,6 +3591,7 @@ CREATE MATERIALIZED VIEW frontend.company_parent_top_apps AS
     installs_d30,
     sdk,
     api_call,
+    publisher,
     app_ads_direct,
     app_company_rank,
     app_company_category_rank
@@ -3023,7 +3608,7 @@ ALTER MATERIALIZED VIEW frontend.company_parent_top_apps OWNER TO postgres;
 
 CREATE MATERIALIZED VIEW frontend.company_top_apps AS
  WITH deduped_data AS (
-         SELECT ad.domain_name AS company_domain,
+         SELECT COALESCE(cd.domain_name, ad.domain_name) AS company_domain,
             c.name AS company_name,
             sa.store,
             sa.name,
@@ -3032,15 +3617,17 @@ CREATE MATERIALIZED VIEW frontend.company_top_apps AS
             sa.developer_name,
             sa.icon_url_100,
             sa.installs_sum_4w AS installs_d30,
-            cac.sdk,
-            cac.api_call,
-            cac.publisher,
-            cac.app_ads_direct
-           FROM (((adtech.combined_app_companies cac
+            bool_or(cac.sdk) AS sdk,
+            bool_or(cac.api_call) AS api_call,
+            bool_or(cac.publisher) AS publisher,
+            bool_or(cac.app_ads_direct) AS app_ads_direct
+           FROM ((((adtech.combined_app_companies cac
              LEFT JOIN frontend.store_apps_overview sa ON ((cac.store_app = sa.id)))
-             LEFT JOIN adtech.companies c ON ((cac.company_id = c.id)))
              LEFT JOIN public.domains ad ON ((cac.domain_id = ad.id)))
-          WHERE (cac.app_ads_direct OR cac.sdk OR cac.api_call)
+             LEFT JOIN adtech.companies c ON ((cac.company_id = c.id)))
+             LEFT JOIN public.domains cd ON ((c.domain_id = cd.id)))
+          WHERE (cac.app_ads_direct OR cac.sdk OR cac.api_call OR cac.publisher)
+          GROUP BY COALESCE(cd.domain_name, ad.domain_name), c.name, sa.store, sa.name, sa.store_id, sa.category, sa.developer_name, sa.icon_url_100, sa.installs_sum_4w
         ), ranked_apps AS (
          SELECT deduped_data.company_domain,
             deduped_data.company_name,
@@ -3053,6 +3640,7 @@ CREATE MATERIALIZED VIEW frontend.company_top_apps AS
             deduped_data.installs_d30,
             deduped_data.sdk,
             deduped_data.api_call,
+            deduped_data.publisher,
             deduped_data.app_ads_direct,
             row_number() OVER (PARTITION BY deduped_data.store, deduped_data.company_domain, deduped_data.company_name ORDER BY (COALESCE((deduped_data.sdk)::integer, 0) + COALESCE((deduped_data.api_call)::integer, 0)) DESC, COALESCE((deduped_data.installs_d30)::double precision, (0)::double precision) DESC) AS app_company_rank,
             row_number() OVER (PARTITION BY deduped_data.store, deduped_data.app_category, deduped_data.company_domain, deduped_data.company_name ORDER BY (COALESCE((deduped_data.sdk)::integer, 0) + COALESCE((deduped_data.api_call)::integer, 0)) DESC, COALESCE((deduped_data.installs_d30)::double precision, (0)::double precision) DESC) AS app_company_category_rank
@@ -3069,6 +3657,7 @@ CREATE MATERIALIZED VIEW frontend.company_top_apps AS
     installs_d30,
     sdk,
     api_call,
+    publisher,
     app_ads_direct,
     app_company_rank,
     app_company_category_rank
@@ -3263,57 +3852,6 @@ CREATE MATERIALIZED VIEW frontend.latest_sdk_scanned_apps AS
 
 
 ALTER MATERIALIZED VIEW frontend.latest_sdk_scanned_apps OWNER TO postgres;
-
---
--- Name: mediation_adapter_app_counts; Type: MATERIALIZED VIEW; Schema: frontend; Owner: postgres
---
-
-CREATE MATERIALIZED VIEW frontend.mediation_adapter_app_counts AS
- WITH filter_mediation_strings AS (
-         SELECT vs.id AS string_id,
-            sd.company_id AS mediation_company_id,
-            vs.value_name AS full_sdk,
-            regexp_replace(regexp_replace(vs.value_name, concat(cmp.mediation_pattern, '.'), ''::text), '\..*$'::text, ''::text) AS adapter_string
-           FROM ((public.version_strings vs
-             JOIN adtech.sdk_mediation_patterns cmp ON ((lower(vs.value_name) ~~ (lower(concat((cmp.mediation_pattern)::text, '.')) || '%'::text))))
-             JOIN adtech.sdks sd ON ((cmp.sdk_id = sd.id)))
-        ), mediation_strings AS (
-         SELECT fms.string_id,
-            fms.mediation_company_id,
-            cma.company_id AS adapter_company_id,
-            fms.adapter_string,
-            fms.full_sdk
-           FROM (filter_mediation_strings fms
-             LEFT JOIN adtech.company_mediation_adapters cma ON ((lower(fms.adapter_string) ~~ (lower((cma.adapter_pattern)::text) || '%'::text))))
-          WHERE (fms.mediation_company_id <> cma.company_id)
-        ), app_counts AS (
-         SELECT ms.mediation_company_id,
-            ms.adapter_string,
-            ms.adapter_company_id,
-            cm.mapped_category AS app_category,
-            count(DISTINCT sass.store_app) AS app_count
-           FROM (((adtech.store_app_sdk_strings sass
-             JOIN mediation_strings ms ON ((sass.version_string_id = ms.string_id)))
-             LEFT JOIN public.store_apps sa ON ((sass.store_app = sa.id)))
-             LEFT JOIN public.category_mapping cm ON (((sa.category)::text = (cm.original_category)::text)))
-          GROUP BY ms.mediation_company_id, ms.adapter_string, ms.adapter_company_id, cm.mapped_category
-        )
- SELECT md.domain_name AS mediation_domain,
-    ac.adapter_string,
-    ad.domain_name AS adapter_domain,
-    adc.name AS adapter_company_name,
-    adc.logo_url AS adapter_logo_url,
-    ac.app_category,
-    ac.app_count
-   FROM ((((app_counts ac
-     LEFT JOIN adtech.companies mdc ON ((ac.mediation_company_id = mdc.id)))
-     LEFT JOIN public.domains md ON ((mdc.domain_id = md.id)))
-     LEFT JOIN adtech.companies adc ON ((ac.adapter_company_id = adc.id)))
-     LEFT JOIN public.domains ad ON ((adc.domain_id = ad.id)))
-  WITH NO DATA;
-
-
-ALTER MATERIALIZED VIEW frontend.mediation_adapter_app_counts OWNER TO postgres;
 
 --
 -- Name: store_app_ranks_weekly; Type: TABLE; Schema: frontend; Owner: postgres
@@ -3568,8 +4106,8 @@ CREATE TABLE logging.creative_scan_results (
     tld_url text,
     path text,
     content_type text,
-    run_id text,
-    pub_store_id text,
+    run_id integer NOT NULL,
+    pub_store_id text NOT NULL,
     file_extension text,
     creative_size bigint,
     error_msg text,
@@ -4348,7 +4886,7 @@ CREATE MATERIALIZED VIEW public.store_apps_in_latest_rankings AS
            FROM ((frontend.store_app_ranks_weekly ar
              LEFT JOIN frontend.store_apps_overview sa ON ((ar.store_app = sa.id)))
              LEFT JOIN public.countries c ON ((ar.country = c.id)))
-          WHERE (sa.free AND (ar.store_collection = ANY (ARRAY[1, 3, 4, 6])) AND (ar.crawled_date > (CURRENT_DATE - '15 days'::interval)) AND ((c.alpha2)::text = ANY (ARRAY[('US'::character varying)::text, ('GB'::character varying)::text, ('CA'::character varying)::text, ('AR'::character varying)::text, ('CN'::character varying)::text, ('DE'::character varying)::text, ('ID'::character varying)::text, ('IN'::character varying)::text, ('JP'::character varying)::text, ('FR'::character varying)::text, ('BR'::character varying)::text, ('MX'::character varying)::text, ('KR'::character varying)::text, ('RU'::character varying)::text])) AND (ar.rank < 150))
+          WHERE ((ar.store_collection = ANY (ARRAY[1, 3, 4, 6])) AND (ar.crawled_date > (CURRENT_DATE - '15 days'::interval)) AND ((c.alpha2)::text = ANY (ARRAY[('US'::character varying)::text, ('GB'::character varying)::text, ('CA'::character varying)::text, ('AR'::character varying)::text, ('CN'::character varying)::text, ('DE'::character varying)::text, ('ID'::character varying)::text, ('IN'::character varying)::text, ('JP'::character varying)::text, ('FR'::character varying)::text, ('BR'::character varying)::text, ('MX'::character varying)::text, ('KR'::character varying)::text, ('RU'::character varying)::text])) AND (ar.rank < 150))
         )
  SELECT growth_apps.store_app,
     growth_apps.store,
@@ -5541,6 +6079,13 @@ ALTER TABLE ONLY public.version_strings
 
 
 --
+-- Name: idx_cdah_active_domain_store_year_quarter; Type: INDEX; Schema: adtech; Owner: postgres
+--
+
+CREATE INDEX idx_cdah_active_domain_store_year_quarter ON adtech.combined_domain_app_history USING btree (domain_id, store_app, year, quarter);
+
+
+--
 -- Name: idx_combined_app_parent_companies_idx; Type: INDEX; Schema: adtech; Owner: postgres
 --
 
@@ -5548,10 +6093,45 @@ CREATE UNIQUE INDEX idx_combined_app_parent_companies_idx ON adtech.combined_app
 
 
 --
+-- Name: idx_domain_app_changes_quarterly_lookup; Type: INDEX; Schema: adtech; Owner: postgres
+--
+
+CREATE INDEX idx_domain_app_changes_quarterly_lookup ON adtech.domain_app_changes_quarterly USING btree (year, quarter, domain_id);
+
+
+--
+-- Name: idx_domain_app_changes_quarterly_pk; Type: INDEX; Schema: adtech; Owner: postgres
+--
+
+CREATE UNIQUE INDEX idx_domain_app_changes_quarterly_pk ON adtech.domain_app_changes_quarterly USING btree (domain_id, store_app, year, quarter, tag_source, status);
+
+
+--
 -- Name: idx_found_urls_run; Type: INDEX; Schema: adtech; Owner: postgres
 --
 
 CREATE INDEX idx_found_urls_run ON adtech.api_call_urls USING btree (run_id);
+
+
+--
+-- Name: idx_trend_companies_concurrent; Type: INDEX; Schema: adtech; Owner: postgres
+--
+
+CREATE UNIQUE INDEX idx_trend_companies_concurrent ON adtech.trend_companies USING btree (company_domain, year, quarter, store, tag_source);
+
+
+--
+-- Name: idx_trend_domains_concurrent; Type: INDEX; Schema: adtech; Owner: postgres
+--
+
+CREATE UNIQUE INDEX idx_trend_domains_concurrent ON adtech.trend_domains USING btree (domain_name, year, quarter, store, tag_source);
+
+
+--
+-- Name: idx_trend_parent_companies_concurrent; Type: INDEX; Schema: adtech; Owner: postgres
+--
+
+CREATE UNIQUE INDEX idx_trend_parent_companies_concurrent ON adtech.trend_parent_companies USING btree (company_domain, year, quarter, store, tag_source);
 
 
 --
@@ -5646,6 +6226,20 @@ CREATE UNIQUE INDEX adstxt_ad_domain_overview_unique_idx ON frontend.adstxt_ad_d
 
 
 --
+-- Name: adstxt_ad_domain_parent_overview_idx; Type: INDEX; Schema: frontend; Owner: postgres
+--
+
+CREATE INDEX adstxt_ad_domain_parent_overview_idx ON frontend.adstxt_ad_domain_parent_overview USING btree (ad_domain_url);
+
+
+--
+-- Name: adstxt_ad_domain_parent_overview_unique_idx; Type: INDEX; Schema: frontend; Owner: postgres
+--
+
+CREATE UNIQUE INDEX adstxt_ad_domain_parent_overview_unique_idx ON frontend.adstxt_ad_domain_parent_overview USING btree (ad_domain_url, relationship, store);
+
+
+--
 -- Name: adstxt_entries_store_apps_domain_pub_idx; Type: INDEX; Schema: frontend; Owner: postgres
 --
 
@@ -5678,6 +6272,20 @@ CREATE INDEX adstxt_publishers_overview_ad_domain_idx ON frontend.adstxt_publish
 --
 
 CREATE UNIQUE INDEX adstxt_publishers_overview_ad_domain_unique_idx ON frontend.adstxt_publishers_overview USING btree (ad_domain_url, relationship, store, publisher_id);
+
+
+--
+-- Name: adstxt_publishers_overview_parent_idx; Type: INDEX; Schema: frontend; Owner: postgres
+--
+
+CREATE INDEX adstxt_publishers_overview_parent_idx ON frontend.adstxt_publishers_parent_overview USING btree (ad_domain_url);
+
+
+--
+-- Name: adstxt_publishers_overview_parent_unique_idx; Type: INDEX; Schema: frontend; Owner: postgres
+--
+
+CREATE UNIQUE INDEX adstxt_publishers_overview_parent_unique_idx ON frontend.adstxt_publishers_parent_overview USING btree (ad_domain_url, relationship, store, publisher_id);
 
 
 --
@@ -5811,6 +6419,20 @@ CREATE UNIQUE INDEX frontend_category_tag_type_stats_unique ON frontend.category
 --
 
 CREATE UNIQUE INDEX frontend_companies_category_tag_type_stats_unique ON frontend.companies_category_tag_type_stats USING btree (store, app_category, tag_source, company_domain, type_url_slug);
+
+
+--
+-- Name: frontend_companies_overview; Type: INDEX; Schema: frontend; Owner: postgres
+--
+
+CREATE UNIQUE INDEX frontend_companies_overview ON frontend.companies_overview USING btree (domain_id);
+
+
+--
+-- Name: frontend_companies_overview_domain; Type: INDEX; Schema: frontend; Owner: postgres
+--
+
+CREATE UNIQUE INDEX frontend_companies_overview_domain ON frontend.companies_overview USING btree (company_domain);
 
 
 --
@@ -6290,15 +6912,6 @@ CREATE INDEX version_strings_xml_path_lower_idx ON public.version_strings USING 
 
 
 --
--- Name: store_app_ranks_weekly repack_trigger; Type: TRIGGER; Schema: frontend; Owner: postgres
---
-
-CREATE TRIGGER repack_trigger AFTER INSERT OR DELETE OR UPDATE ON frontend.store_app_ranks_weekly FOR EACH ROW EXECUTE FUNCTION repack.repack_trigger('crawled_date', 'country', 'store_collection', 'store_category', 'rank');
-
-ALTER TABLE frontend.store_app_ranks_weekly ENABLE ALWAYS TRIGGER repack_trigger;
-
-
---
 -- Name: app_ads_entrys app_ads_entrys_updated_at; Type: TRIGGER; Schema: public; Owner: james
 --
 
@@ -6324,6 +6937,15 @@ CREATE TRIGGER app_urls_map_updated_at BEFORE UPDATE ON public.app_urls_map FOR 
 --
 
 CREATE TRIGGER developers_updated_at BEFORE UPDATE ON public.developers FOR EACH ROW EXECUTE FUNCTION public.update_modified_column();
+
+
+--
+-- Name: app_ads_map repack_trigger; Type: TRIGGER; Schema: public; Owner: james
+--
+
+CREATE TRIGGER repack_trigger AFTER INSERT OR DELETE OR UPDATE ON public.app_ads_map FOR EACH ROW EXECUTE FUNCTION repack.repack_trigger('id');
+
+ALTER TABLE public.app_ads_map ENABLE ALWAYS TRIGGER repack_trigger;
 
 
 --
@@ -6960,5 +7582,5 @@ GRANT ALL ON SCHEMA public TO PUBLIC;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict w80UZTPlOwXGobAfdyetZaJD6HXJQfyhvEAZm9wu373FjQUizuSAI20uahUfvIw
+\unrestrict QUMeXpBDEhC5jVJoyBDft4qcxwblUhP43fiE8XItaGcW6KJkMbRFYjb17SnLWB8
 

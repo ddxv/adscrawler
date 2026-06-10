@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict RGbr1anaFSFClepZY1SCDOhnEIsE98Dd5We1tV2blbKRmd3tRrL70qH3FebhViZ
+\restrict V05hhlfBphdgvACgvPCjcVnJTTPgo1S07iRr9ePO7csodbEeWDViECDjMyaMPEg
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -31,11 +31,12 @@ CREATE MATERIALIZED VIEW frontend.companies_category_tag_stats AS
  WITH distinct_apps_group AS (
          SELECT csac.store_app,
             tag.tag_source,
-            ad.domain_name AS company_domain,
+            COALESCE(cd.domain_name, ad.domain_name) AS company_domain,
             c.name AS company_name
-           FROM (((adtech.combined_app_companies csac
+           FROM ((((adtech.combined_app_companies csac
+             LEFT JOIN public.domains ad ON ((csac.domain_id = ad.id)))
              LEFT JOIN adtech.companies c ON ((csac.company_id = c.id)))
-             LEFT JOIN public.domains ad ON ((c.domain_id = ad.id)))
+             LEFT JOIN public.domains cd ON ((c.domain_id = cd.id)))
              CROSS JOIN LATERAL ( VALUES ('sdk'::text,csac.sdk), ('api_call'::text,csac.api_call), ('publisher'::text,csac.publisher), ('app_ads_direct'::text,csac.app_ads_direct), ('app_ads_reseller'::text,csac.app_ads_reseller)) tag(tag_source, present))
           WHERE (tag.present IS TRUE)
         )
@@ -73,5 +74,5 @@ CREATE UNIQUE INDEX companies_category_tag_stats_idx ON frontend.companies_categ
 -- PostgreSQL database dump complete
 --
 
-\unrestrict RGbr1anaFSFClepZY1SCDOhnEIsE98Dd5We1tV2blbKRmd3tRrL70qH3FebhViZ
+\unrestrict V05hhlfBphdgvACgvPCjcVnJTTPgo1S07iRr9ePO7csodbEeWDViECDjMyaMPEg
 

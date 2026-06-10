@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict OD0sGWDPVECGxMWKDlyCa1eLsc9DCcsFWNMiAKBScRgRccGKqMBV1eZ1LeHkDcF
+\restrict Ak2b9k9wd1bZF8emklxyrfBaKPio9kLe7jWRRtEnFzuhDU1OBL46E46EeJPMeym
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -59,6 +59,7 @@ CREATE MATERIALIZED VIEW frontend.company_parent_top_apps AS
             deduped_data.installs_d30,
             deduped_data.sdk,
             deduped_data.api_call,
+            deduped_data.publisher,
             deduped_data.app_ads_direct,
             row_number() OVER (PARTITION BY deduped_data.store, deduped_data.company_domain, deduped_data.company_name ORDER BY ((COALESCE((deduped_data.sdk)::integer, 0) + COALESCE((deduped_data.api_call)::integer, 0)) + COALESCE((deduped_data.publisher)::integer, 0)) DESC, COALESCE((deduped_data.installs_d30)::double precision, (0)::double precision) DESC) AS app_company_rank,
             row_number() OVER (PARTITION BY deduped_data.store, deduped_data.app_category, deduped_data.company_domain, deduped_data.company_name ORDER BY ((COALESCE((deduped_data.sdk)::integer, 0) + COALESCE((deduped_data.api_call)::integer, 0)) + COALESCE((deduped_data.publisher)::integer, 0)) DESC, COALESCE((deduped_data.installs_d30)::double precision, (0)::double precision) DESC) AS app_company_category_rank
@@ -75,6 +76,7 @@ CREATE MATERIALIZED VIEW frontend.company_parent_top_apps AS
     installs_d30,
     sdk,
     api_call,
+    publisher,
     app_ads_direct,
     app_company_rank,
     app_company_category_rank
@@ -110,5 +112,5 @@ CREATE UNIQUE INDEX idx_company_parent_top_apps_unique ON frontend.company_paren
 -- PostgreSQL database dump complete
 --
 
-\unrestrict OD0sGWDPVECGxMWKDlyCa1eLsc9DCcsFWNMiAKBScRgRccGKqMBV1eZ1LeHkDcF
+\unrestrict Ak2b9k9wd1bZF8emklxyrfBaKPio9kLe7jWRRtEnFzuhDU1OBL46E46EeJPMeym
 

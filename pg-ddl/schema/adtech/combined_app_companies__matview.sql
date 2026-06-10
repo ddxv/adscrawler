@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict o2dP5Kwv0bAIZA2FdOIMxuOH05z3ccyNW5NaNLMeqz3s4hR67ocmR5L6uYEadkq
+\restrict 1LuB2IgTVl5PYJop7hMdQeVLf0yFBG2dhWPijrWZZ5o0aChYdalt5RggaqMPJxi
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -139,5 +139,5 @@ ALTER MATERIALIZED VIEW adtech.combined_app_companies OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict o2dP5Kwv0bAIZA2FdOIMxuOH05z3ccyNW5NaNLMeqz3s4hR67ocmR5L6uYEadkq
+\unrestrict 1LuB2IgTVl5PYJop7hMdQeVLf0yFBG2dhWPijrWZZ5o0aChYdalt5RggaqMPJxi
 

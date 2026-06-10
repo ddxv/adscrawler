@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict rcPGbnuWAbpKVa6X0WbrducZeMl3pDMiKAe9JLaHkpO5e45nZwUcMOgXcS5qePi
+\restrict Xx3vOYD4GunN3ZNdkQiQcwucxuRffKUdVvnkf3FRX9YuMw4vULMBQ47YnbeiWU5
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -111,5 +111,5 @@ ALTER TABLE ONLY adtech.urls
 -- PostgreSQL database dump complete
 --
 
-\unrestrict rcPGbnuWAbpKVa6X0WbrducZeMl3pDMiKAe9JLaHkpO5e45nZwUcMOgXcS5qePi
+\unrestrict Xx3vOYD4GunN3ZNdkQiQcwucxuRffKUdVvnkf3FRX9YuMw4vULMBQ47YnbeiWU5
 

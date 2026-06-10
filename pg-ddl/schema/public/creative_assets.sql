@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict v1vDgG91Xdi2zHuCfHKhyvgCAO1targONYOuTmU3j9anSKHbRs3drkPUZC8D0c6
+\restrict MCsaeUSwnHgVvKjtYBWRf3fgbrbqX4HQHi2A4hGlVuwFKRgMR6xBnZ2clXyuroQ
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -94,5 +94,5 @@ CREATE INDEX idx_creative_assets_phash ON public.creative_assets USING btree (ph
 -- PostgreSQL database dump complete
 --
 
-\unrestrict v1vDgG91Xdi2zHuCfHKhyvgCAO1targONYOuTmU3j9anSKHbRs3drkPUZC8D0c6
+\unrestrict MCsaeUSwnHgVvKjtYBWRf3fgbrbqX4HQHi2A4hGlVuwFKRgMR6xBnZ2clXyuroQ
 

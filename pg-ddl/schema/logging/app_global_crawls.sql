@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict u6id4aqMaaCrB9Yz62kCAiPDqZBRvLYMW06Mu9gap0UtOzL12UgBzZcs1ie0f4Y
+\restrict Yfga0h79MqRyDjgFk7vwfHjg2aaO0FfEyCP57ZpYcPBqbkK3ZdDJRwk3EeV3kcz
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -48,5 +48,5 @@ CREATE INDEX idx_app_global_crawls_latest ON logging.app_global_crawls USING btr
 -- PostgreSQL database dump complete
 --
 
-\unrestrict u6id4aqMaaCrB9Yz62kCAiPDqZBRvLYMW06Mu9gap0UtOzL12UgBzZcs1ie0f4Y
+\unrestrict Yfga0h79MqRyDjgFk7vwfHjg2aaO0FfEyCP57ZpYcPBqbkK3ZdDJRwk3EeV3kcz
 

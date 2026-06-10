@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict caE5a1b6EoMthkWZ9XiqDarYG0sN5p3sHWvz5j3obIvUj1DoeHaj1ZGDkeDJSv8
+\restrict TlFxRBGBJEjYxEpT0tup2hpA2bkxzqjpfFGgSxmuClpmOdWLqvOM9bLDYyyCs14
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -129,5 +129,5 @@ ALTER MATERIALIZED VIEW frontend.companies_creative_rankings OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict caE5a1b6EoMthkWZ9XiqDarYG0sN5p3sHWvz5j3obIvUj1DoeHaj1ZGDkeDJSv8
+\unrestrict TlFxRBGBJEjYxEpT0tup2hpA2bkxzqjpfFGgSxmuClpmOdWLqvOM9bLDYyyCs14
 

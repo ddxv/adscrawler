@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict jD8GjlxDPN9ngDO6w04J1VDZM7dJgGEWvzV9q3bphZESRtpDGM6cQDetIqbq84W
+\restrict 2pgazqElACeQHwE7mpFNsYbyhcCPmmDikN8jHn80fle2q24ghfuhQJeCneOircL
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -32,8 +32,8 @@ CREATE TABLE logging.creative_scan_results (
     tld_url text,
     path text,
     content_type text,
-    run_id text,
-    pub_store_id text,
+    run_id integer NOT NULL,
+    pub_store_id text NOT NULL,
     file_extension text,
     creative_size bigint,
     error_msg text,
@@ -47,5 +47,5 @@ ALTER TABLE logging.creative_scan_results OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict jD8GjlxDPN9ngDO6w04J1VDZM7dJgGEWvzV9q3bphZESRtpDGM6cQDetIqbq84W
+\unrestrict 2pgazqElACeQHwE7mpFNsYbyhcCPmmDikN8jHn80fle2q24ghfuhQJeCneOircL
 
