@@ -38,6 +38,7 @@ QUERY_APPS_TO_API_SCAN_ADS = load_sql_file("query_apps_to_api_scan_ads.sql")
 QUERY_DEVS_TO_UPDATE = load_sql_file("query_devs_to_update.sql")
 QUERY_API_CALLS_TO_CREATIVE_SCAN = load_sql_file("query_apps_to_creative_scan.sql")
 QUERY_KEYWORDS_TO_CRAWL = load_sql_file("query_keywords_to_crawl.sql")
+INSERT_NEW_KEYWORDS_FROM_SEARCH = load_sql_file("insert_new_keywords.sql")
 QUERY_APPS_MITM_IN_S3 = load_sql_file("query_apps_mitm_in_s3.sql")
 QUERY_REPORT_ZSCORES = load_sql_file("query_report_z_scores.sql")
 QUERY_REPORT_COMBINED_DOMAINS = load_sql_file("query_report_combined_domains.sql")
@@ -1142,11 +1143,13 @@ def query_keywords_to_crawl(
     pgdb: PostgresEngine,
     limit: int,
 ) -> pd.DataFrame:
+    with pgdb.engine.begin() as conn:
+        conn.execute(INSERT_NEW_KEYWORDS_FROM_SEARCH)
     df = pd.read_sql(
         QUERY_KEYWORDS_TO_CRAWL,
         params={"mylimit": limit},
         con=pgdb.engine,
-    )
+        )
     return df
 
 

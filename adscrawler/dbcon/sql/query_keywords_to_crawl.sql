@@ -56,6 +56,7 @@ LEFT JOIN keywords AS k
     ON
         sq.search_term = k.keyword_text
 WHERE
+    k.id IS NOT NULL AND 
     k.id NOT IN (
         SELECT lck.keyword
         FROM
