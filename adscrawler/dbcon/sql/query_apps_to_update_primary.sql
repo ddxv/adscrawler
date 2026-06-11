@@ -71,6 +71,7 @@ WHERE
                         FROM
                             store_apps_in_latest_rankings AS sailr
                     )
+                    OR release_date > NOW() - INTERVAL '30 days'
                 )
             )
             AND sa.updated_at <= :short_update_ts

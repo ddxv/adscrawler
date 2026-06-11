@@ -120,12 +120,12 @@ def download_apps(
         if download_result.error_count == 0:
             if total_errors > 0:
                 total_errors -= 1
-            sleep_time = total_errors + 30
+            sleep_time = total_errors + 10
             logger.info(f"Sleeping for default time: {sleep_time}")
             time.sleep(sleep_time)
         elif download_result.error_count > 0:
             total_errors += download_result.error_count
-            sleep_time = total_errors * total_errors * 10
+            sleep_time = total_errors * total_errors * 5
             logger.info(f"Sleeping for {sleep_time} seconds due to {total_errors=}")
             time.sleep(sleep_time)
         if total_errors > 11:
