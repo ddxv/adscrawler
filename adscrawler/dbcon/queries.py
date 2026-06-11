@@ -1149,7 +1149,7 @@ def query_keywords_to_crawl(
         QUERY_KEYWORDS_TO_CRAWL,
         params={"mylimit": limit},
         con=pgdb.engine,
-        )
+    )
     return df
 
 
