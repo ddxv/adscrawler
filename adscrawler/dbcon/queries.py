@@ -853,6 +853,36 @@ def query_countries(pgdb: PostgresEngine) -> pd.DataFrame:
     df = pd.read_sql(sel_query, pgdb.engine)
     return df
 
+def query_company_countries_resolved(pgdb: PostgresEngine) -> pd.DataFrame:
+    sel_query = """WITH country_resolved AS (
+     SELECT 
+        e.company_id,
+        c.alpha2 AS country
+     FROM (
+        SELECT 
+            company_id,
+            country_id,
+            ROW_NUMBER() OVER (
+                PARTITION BY company_id 
+                ORDER BY 
+                    CASE source
+                        WHEN 'manual'     THEN 1
+                        WHEN 'linkedin'   THEN 2
+                        WHEN 'domain_tld' THEN 3
+                        WHEN 'app_store'  THEN 4
+                        ELSE 5 
+                    END ASC,
+                    updated_at DESC
+            ) as priority_rank
+        FROM adtech.company_country_evidence
+        WHERE country_id IS NOT NULL
+     ) e
+     JOIN countries c ON e.country_id = c.id
+     WHERE e.priority_rank = 1
+    )
+    select * FROM country_resolved"""
+    df = pd.read_sql(sel_query, pgdb.engine)
+    return df
 
 @lru_cache(maxsize=1)
 def query_companies(pgdb: PostgresEngine) -> pd.DataFrame:
@@ -880,6 +910,15 @@ def update_company_logo_url(
     update_query = """UPDATE adtech.companies SET logo_url = %s WHERE id = %s"""
     with pgdb.get_cursor() as cur:
         cur.execute(update_query, (logo_url, company_id))
+
+
+def update_company_linkedin_url(
+    company_id: int, linkedin_url: str, pgdb: PostgresEngine
+) -> None:
+    """Update the linkedin_url for a company, but only if it's not already set."""
+    update_query = """UPDATE adtech.companies SET linkedin_url = %s WHERE id = %s AND (linkedin_url IS NULL OR linkedin_url = '')"""
+    with pgdb.get_cursor() as cur:
+        cur.execute(update_query, (linkedin_url, company_id))
 
 
 @lru_cache(maxsize=1)

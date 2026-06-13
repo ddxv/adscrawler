@@ -3,6 +3,7 @@
 import yaml
 
 from adscrawler.dbcon.connection import get_db_connection
+from adscrawler.tools.get_company_logos import process_new_company
 
 pgdb = get_db_connection()
 
@@ -39,6 +40,8 @@ def main():
             )
             insert_sdk_with_package_patterns(cur, sdk_id, sdk_package_patterns)
         print(f"Successfully inserted: {company_name} ({domain})")
+        print("Processing company logo and country evidence...")
+        process_new_company(company_name)
 
     except Exception as e:
         print("Error:", e)
