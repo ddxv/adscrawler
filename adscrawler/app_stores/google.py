@@ -123,6 +123,8 @@ def clean_google_play_app_df(apps_df: pd.DataFrame) -> pd.DataFrame:
             "url": "store_url",
             "icon": "icon_url_512",
             "developerWebsite": "url",
+            "developerAddress": "developer_address",
+            "developerLegalAddress": "developer_legal_address",
             "developerId": "developer_id",
             "developer": "developer_name",
             "developerEmail": "developer_email",

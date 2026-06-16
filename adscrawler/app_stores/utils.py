@@ -1,12 +1,117 @@
 """Shared utilities for app stores."""
 
+import re
+
 import pandas as pd
 
 from adscrawler.config import get_logger
 from adscrawler.dbcon.connection import PostgresEngine
-from adscrawler.dbcon.queries import query_store_id_map, upsert_df
+from adscrawler.dbcon.queries import query_countries, query_store_id_map, upsert_df
 
 logger = get_logger(__name__, "scrape_stores")
+
+# ---------------------------------------------------------------------------
+# Country guessing helpers (shared with tools/get_company_logos.py)
+# ---------------------------------------------------------------------------
+
+
+def build_name_to_alpha2(countries_df: pd.DataFrame) -> dict[str, str]:
+    """Build a lowercase-name -> alpha2 lookup from all language columns."""
+    lang_cols = [
+        c for c in countries_df.columns
+        if c.startswith("lang") and c != "langen"
+    ] + ["langen"]
+    name_map: dict[str, str] = {}
+    for _, row in countries_df.iterrows():
+        alpha2 = str(row["alpha2"]).strip().upper()
+        if not alpha2:
+            continue
+        name_map[alpha2] = alpha2
+        alpha3 = str(row.get("alpha3", "")).strip().upper()
+        if alpha3:
+            name_map[alpha3] = alpha2
+        for col in lang_cols:
+            val = row.get(col)
+            if val and isinstance(val, str) and val.strip():
+                key = val.strip().lower()
+                name_map[key] = alpha2
+    return name_map
+
+
+def guess_country_local(
+    address_string: str,
+    name_to_alpha2: dict[str, str] | None = None,
+) -> str | None:
+    """Guess the ISO alpha-2 country code from an address string.
+
+    Uses a pre-built name->alpha2 lookup (from build_name_to_alpha2)
+    for ISO lookups and falls back to common aliases.
+    """
+    if not address_string or not address_string.strip():
+        return None
+
+    normalized_address = address_string.lower()
+
+    # 1. Handle common edge-case aliases first
+    aliases = {
+        "korea, south": "KR",
+        "south korea": "KR",
+        "republic of korea": "KR",
+        "usa": "US",
+        "united states of america": "US",
+        "uk": "GB",
+        "united kingdom": "GB",
+    }
+    for alias, alpha2 in aliases.items():
+        if alias in normalized_address:
+            return alpha2
+
+    # 2. If we have a name map, check full names in all languages
+    if name_to_alpha2 is not None:
+        for name, alpha2 in sorted(
+            name_to_alpha2.items(), key=lambda x: -len(x[0])
+        ):
+            if name in normalized_address:
+                return alpha2
+
+    # 3. Check tokens from right to left (countries are usually at the end)
+    tokens = re.findall(r"\b\w+\b", address_string.upper())
+    for token in reversed(tokens):
+        if name_to_alpha2 is not None and token in name_to_alpha2:
+            return name_to_alpha2[token]
+        if len(token) == 2 and token.isalpha() and name_to_alpha2 is None:
+            return token
+
+    return None
+
+
+def build_country_map(pgdb: PostgresEngine) -> tuple[dict[str, int], dict[str, str]]:
+    """Build (alpha2 -> countries.id, name -> alpha2) mappings."""
+    countries_df = query_countries(pgdb=pgdb)
+    id_map: dict[str, int] = {}
+    for _, row in countries_df.iterrows():
+        alpha2 = str(row["alpha2"]).strip().upper()
+        if alpha2:
+            id_map[alpha2] = int(row["id"])
+    name_map = build_name_to_alpha2(countries_df)
+    return id_map, name_map
+
+
+def resolve_country_id(
+    address_string: str,
+    country_id_map: dict[str, int],
+    name_to_alpha2: dict[str, str],
+) -> int | None:
+    """Guess alpha-2 from an address, then map to countries.id."""
+    alpha2 = guess_country_local(address_string, name_to_alpha2)
+    if alpha2 and alpha2 in country_id_map:
+        return country_id_map[alpha2]
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Existing utilities below
+# ---------------------------------------------------------------------------
 
 
 def truncate_utf8_bytes(s: str, max_bytes: int = 2400) -> str:

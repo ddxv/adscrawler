@@ -37,7 +37,11 @@ from adscrawler.app_stores.process_from_s3 import (
     process_store_rankings,
     raw_keywords_to_s3,
 )
-from adscrawler.app_stores.utils import check_and_insert_new_apps
+from adscrawler.app_stores.utils import (
+    build_country_map,
+    check_and_insert_new_apps,
+    resolve_country_id,
+)
 from adscrawler.config import APP_ICONS_TMP_DIR, CONFIG, get_logger
 from adscrawler.dbcon.connection import (
     PostgresEngine,
@@ -885,6 +889,7 @@ def process_live_app_details(
         if apps_df is None or apps_df.empty or crawl_result != 1:
             continue
         upsert_store_apps_descriptions(apps_df, pgdb)
+        upsert_app_country_evidence(apps_df, pgdb)
         if "url" not in apps_df.columns or apps_df["url"].isna().all():
             logger.warning(f"{log_info} No app urls found")
             continue
@@ -934,6 +939,70 @@ def upsert_store_apps_descriptions(
         md5_key_columns=["description", "description_short"],
         pgdb=pgdb,
         on_conflict_update=False,
+    )
+
+
+def upsert_app_country_evidence(
+    apps_df: pd.DataFrame,
+    pgdb: PostgresEngine,
+) -> None:
+    """Guess country from developer_address / developer_legal_address and
+    upsert into app_country_evidence.
+
+    Prefers ``developer_address`` over ``developer_legal_address`` but takes
+    whichever resolves first.  Rows without any address are silently skipped.
+    """
+    if apps_df.empty:
+        return
+
+    # Build country maps once
+    country_id_map, name_to_alpha2 = build_country_map(pgdb)
+
+    rows = []
+    for _, row in apps_df.iterrows():
+        store_app = row.get("store_app")
+        if pd.isna(store_app):
+            continue
+
+        # Prefer developer_address, fall back to legal
+        raw_address: str | None = None
+        if pd.notna(row.get("developer_address")) and str(row["developer_address"]).strip():
+            raw_address = str(row["developer_address"]).strip()
+        elif pd.notna(row.get("developer_legal_address")) and str(row["developer_legal_address"]).strip():
+            raw_address = str(row["developer_legal_address"]).strip()
+
+        if not raw_address:
+            continue
+
+        country_id = resolve_country_id(
+            raw_address, country_id_map, name_to_alpha2
+        )
+        rows.append(
+            {
+                "store_app": int(store_app),
+                "raw_address": raw_address,
+                "country_id": country_id,
+            }
+        )
+
+    if not rows:
+        return
+
+    evidence_df = pd.DataFrame(rows)
+    key_columns = ["store_app"]
+    insert_columns = ["store_app", "raw_address", "country_id"]
+    evidence_df['country_id'] = evidence_df['country_id'].astype('Int64')
+    upsert_df(
+        table_name="app_country_evidence",
+        df=evidence_df,
+        insert_columns=insert_columns,
+        key_columns=key_columns,
+        pgdb=pgdb,
+        on_conflict_update=True,
+    )
+    logger.info(
+        f"Upserted {len(evidence_df)} app_country_evidence rows "
+        f"({evidence_df['country_id'].notna().sum()} resolved)"
     )
 
 
