@@ -365,5 +365,5 @@ file_cleanup(sdf=ios_s3_files, vcdf=ios_db_files)
 total_size_bytes = (
     android_s3_files["size_bytes"].sum() + ios_s3_files["size_bytes"].sum()
 )
-bytes_in_gb = total_size_bytes / 1e9
-logger.info(f"Total size of remaining APKs in S3: {bytes_in_gb}")
+bytes_in_tb = total_size_bytes / 1e12
+logger.info(f"Total size of remaining APKs in S3: {bytes_in_tb:.2f} TB")

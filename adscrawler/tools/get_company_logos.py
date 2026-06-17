@@ -21,12 +21,15 @@ import tldextract
 from bs4 import BeautifulSoup
 from PIL import Image
 
+from adscrawler.app_stores.utils import (
+    build_country_map,
+    resolve_country_id,
+)
 from adscrawler.config import CONFIG, get_logger
 from adscrawler.dbcon.connection import get_db_connection
 from adscrawler.dbcon.queries import (
     query_companies,
     query_company_countries_resolved,
-    query_countries,
     update_company_linkedin_url,
     update_company_logo_url,
     upsert_df,
@@ -100,11 +103,11 @@ def search_duckduckgo_for_linkedin(company_name: str) -> str | None:
     logger.info(f"Searching DuckDuckGo for '{query}' (Selenium Firefox)")
 
     from selenium import webdriver
+    from selenium.webdriver.common.by import By
     from selenium.webdriver.firefox.options import Options
     from selenium.webdriver.firefox.service import Service
-    from selenium.webdriver.common.by import By
-    from selenium.webdriver.support.ui import WebDriverWait
     from selenium.webdriver.support import expected_conditions as EC
+    from selenium.webdriver.support.ui import WebDriverWait
 
     options = Options()
     options.add_argument("--headless")
@@ -132,7 +135,9 @@ def search_duckduckgo_for_linkedin(company_name: str) -> str | None:
 
         # Fallback: scan all links
         for a in soup.find_all("a", href=True):
-            match = re.search(r"(?:www\.)?linkedin\.com/(company/[^/\?]+)", a["href"], re.I)
+            match = re.search(
+                r"(?:www\.)?linkedin\.com/(company/[^/\?]+)", a["href"], re.I
+            )
             if match:
                 path = match.group(1).rstrip("/")
                 logger.info(f"DuckDuckGo found LinkedIn: {path}")
@@ -395,10 +400,7 @@ def _resolve_country_id(
     name_to_alpha2: dict[str, str],
 ) -> int | None:
     """Guess alpha-2 from an address, then map to countries.id."""
-    alpha2 = guess_country_local(address_string, name_to_alpha2)
-    if alpha2 and alpha2 in country_id_map:
-        return country_id_map[alpha2]
-    return None
+    return resolve_country_id(address_string, country_id_map, name_to_alpha2)
 
 
 def _process_linkedin_country(
@@ -506,9 +508,15 @@ def scrape_linkedin_about(linkedin_path: str) -> dict:
     for section in soup.find_all("section"):
         h2 = section.find(["h2", "h3"])
         if h2 and h2.get_text(strip=True) == "Locations":
-            address_divs = section.find_all("div", id=lambda x: x and x.startswith("address-"))
+            address_divs = section.find_all(
+                "div", id=lambda x: x and x.startswith("address-")
+            )
             for addr in address_divs:
-                parts = [p.get_text(strip=True) for p in addr.find_all("p") if p.get_text(strip=True)]
+                parts = [
+                    p.get_text(strip=True)
+                    for p in addr.find_all("p")
+                    if p.get_text(strip=True)
+                ]
                 if parts:
                     locations.append("\n".join(parts))
             break
@@ -519,92 +527,9 @@ def scrape_linkedin_about(linkedin_path: str) -> dict:
     return result
 
 
-def _build_name_to_alpha2(countries_df: pd.DataFrame) -> dict[str, str]:
-    """Build a lowercase-name -> alpha2 lookup from all language columns."""
-    lang_cols = [
-        c for c in countries_df.columns
-        if c.startswith("lang") and c != "langen"  # langen is the primary
-    ] + ["langen"]
-    name_map: dict[str, str] = {}
-    for _, row in countries_df.iterrows():
-        alpha2 = str(row["alpha2"]).strip().upper()
-        if not alpha2:
-            continue
-        # Add alpha2 lookup
-        name_map[alpha2] = alpha2
-        # Add alpha3 lookup
-        alpha3 = str(row.get("alpha3", "")).strip().upper()
-        if alpha3:
-            name_map[alpha3] = alpha2
-        # Add all language names
-        for col in lang_cols:
-            val = row.get(col)
-            if val and isinstance(val, str) and val.strip():
-                key = val.strip().lower()
-                name_map[key] = alpha2
-    return name_map
-
-
-def guess_country_local(
-    address_string: str,
-    name_to_alpha2: dict[str, str] | None = None,
-) -> str | None:
-    """Guess the ISO alpha-2 country code from an address string.
-
-    Uses a pre-built name->alpha2 lookup (from _build_name_to_alpha2)
-    for ISO lookups and falls back to common aliases.
-    """
-    if not address_string or not address_string.strip():
-        return None
-
-    normalized_address = address_string.lower()
-
-    # 1. Handle common edge-case aliases first (catches phrases like
-    #    "korea, south", "usa" which aren't single tokens)
-    aliases = {
-        "korea, south": "KR",
-        "south korea": "KR",
-        "republic of korea": "KR",
-        "usa": "US",
-        "united states of america": "US",
-        "uk": "GB",
-        "united kingdom": "GB",
-    }
-    for alias, alpha2 in aliases.items():
-        if alias in normalized_address:
-            return alpha2
-
-    # 2. If we have a name map, check full names in all languages
-    #    (matches "South Korea" via langen, "Corea del Sur" via langes, etc.)
-    if name_to_alpha2 is not None:
-        for name, alpha2 in sorted(
-            name_to_alpha2.items(), key=lambda x: -len(x[0])
-        ):
-            if name in normalized_address:
-                return alpha2
-
-    # 3. Check tokens from right to left (countries are usually at the end)
-    tokens = re.findall(r"\b\w+\b", address_string.upper())
-    for token in reversed(tokens):
-        if name_to_alpha2 is not None and token in name_to_alpha2:
-            return name_to_alpha2[token]
-        # Without a name map, fall back to matching any 2-letter alpha code
-        if len(token) == 2 and token.isalpha() and name_to_alpha2 is None:
-            return token
-
-    return None
-
-
 def _build_country_map(pgdb) -> tuple[dict[str, int], dict[str, str]]:
     """Build (alpha2 -> countries.id, name -> alpha2) mappings."""
-    countries_df = query_countries(pgdb=pgdb)
-    id_map: dict[str, int] = {}
-    for _, row in countries_df.iterrows():
-        alpha2 = str(row["alpha2"]).strip().upper()
-        if alpha2:
-            id_map[alpha2] = int(row["id"])
-    name_map = _build_name_to_alpha2(countries_df)
-    return id_map, name_map
+    return build_country_map(pgdb)
 
 
 def insert_company_country_evidence(
@@ -648,6 +573,7 @@ def insert_company_country_evidence(
         schema="adtech",
     )
 
+
 def _process_single_company(
     row: pd.Series,
     country_id_map: dict[str, int],
@@ -673,9 +599,13 @@ def _process_single_company(
 
     domain = row["company_domain"]
     existing_linkedin_url = row["company_linkedin_url"]
-    existing_linkedin_url = existing_linkedin_url if type(existing_linkedin_url) == str else None
+    existing_linkedin_url = (
+        existing_linkedin_url if type(existing_linkedin_url) == str else None
+    )
     company_id = row["company_id"]
-    logger.info(f"Processing {domain} (id={company_id}) needs_logo={needs_logo} needs_country={needs_country}")
+    logger.info(
+        f"Processing {domain} (id={company_id}) needs_logo={needs_logo} needs_country={needs_country}"
+    )
 
     # --- Pass 0: If we have no LinkedIn URL, try DuckDuckGo once as a fallback ---
     linkedin_url = existing_linkedin_url
@@ -696,7 +626,7 @@ def _process_single_company(
     if needs_logo:
         official_linkedin_url = None
         if existing_linkedin_url:
-            official_linkedin_url = 'linkedin.com/' + existing_linkedin_url
+            official_linkedin_url = "linkedin.com/" + existing_linkedin_url
 
         filename = check_logo_exists_s3(domain)
         if filename and row["company_logo_url"]:
@@ -824,7 +754,9 @@ def refresh_missing_logos_and_countries() -> None:
     resolved = query_company_countries_resolved(pgdb)
     companies = companies.merge(resolved, on="company_id", how="left")
 
-    has_logo = companies["company_logo_url"].notna() & (companies["company_logo_url"] != "")
+    has_logo = companies["company_logo_url"].notna() & (
+        companies["company_logo_url"] != ""
+    )
     has_country = companies["country"].notna()
     companies["_needs_logo"] = ~has_logo
     companies["_needs_country"] = ~has_country
@@ -847,4 +779,3 @@ def refresh_missing_logos_and_countries() -> None:
             needs_logo=row["_needs_logo"],
             needs_country=row["_needs_country"],
         )
-
