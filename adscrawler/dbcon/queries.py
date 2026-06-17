@@ -43,6 +43,7 @@ QUERY_APPS_MITM_IN_S3 = load_sql_file("query_apps_mitm_in_s3.sql")
 QUERY_REPORT_ZSCORES = load_sql_file("query_report_z_scores.sql")
 QUERY_REPORT_COMBINED_DOMAINS = load_sql_file("query_report_combined_domains.sql")
 QUERY_APPS_TO_PROCESS_KEYWORDS = load_sql_file("query_apps_to_process_keywords.sql")
+QUERY_PUB_DOMAINS_TO_CRAWL_ADS_TXT = load_sql_file("query_pub_domains_to_crawl_ads_txt.sql")
 
 
 def insert_df(
@@ -960,36 +961,17 @@ def query_pub_domains_to_crawl_ads_txt(
     that have apps which are ad supported and still on store
     params: limit: int number of rows to return
     """
-    limit_str = ""
-    exclude_str = ""
-    if exclude_recent_days:
-        before_date = (
-            datetime.datetime.today() - datetime.timedelta(days=exclude_recent_days)
-        ).strftime("%Y-%m-%d")
-        exclude_str = (
-            f"AND (pdcr.crawled_at <= '{before_date}' OR pdcr.crawled_at IS NULL)"
-        )
-    if limit:
-        limit_str = f"LIMIT {limit}"
-    sel_query = f"""SELECT
-            DISTINCT pd.id, pd.domain_name as url, pdcr.crawled_at
-        FROM
-            app_urls_map aum
-        LEFT JOIN domains pd ON
-            pd.id = aum.pub_domain
-        LEFT JOIN adstxt_crawl_results pdcr on (pd.id = pdcr.domain_id)
-        LEFT JOIN store_apps sa ON
-            sa.id = aum.store_app
-        WHERE
-            sa.ad_supported
-            AND sa.crawl_result = 1
-            {exclude_str}
-        ORDER BY
-            pdcr.crawled_at NULLS FIRST
-        {limit_str}
-        ; 
-        """
-    df = pd.read_sql(sel_query, pgdb.engine)
+    before_date = (
+        datetime.datetime.today() - datetime.timedelta(days=exclude_recent_days)
+    ).strftime("%Y-%m-%d")
+    df = pd.read_sql(
+        QUERY_PUB_DOMAINS_TO_CRAWL_ADS_TXT,
+        pgdb.engine,
+        params={
+            "short_update_ts": before_date,
+            "mylimit": limit,
+        },
+    )
     return df
 
 
