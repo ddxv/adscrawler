@@ -43,7 +43,9 @@ QUERY_APPS_MITM_IN_S3 = load_sql_file("query_apps_mitm_in_s3.sql")
 QUERY_REPORT_ZSCORES = load_sql_file("query_report_z_scores.sql")
 QUERY_REPORT_COMBINED_DOMAINS = load_sql_file("query_report_combined_domains.sql")
 QUERY_APPS_TO_PROCESS_KEYWORDS = load_sql_file("query_apps_to_process_keywords.sql")
-QUERY_PUB_DOMAINS_TO_CRAWL_ADS_TXT = load_sql_file("query_pub_domains_to_crawl_ads_txt.sql")
+QUERY_PUB_DOMAINS_TO_CRAWL_ADS_TXT = load_sql_file(
+    "query_pub_domains_to_crawl_ads_txt.sql"
+)
 
 
 def insert_df(
@@ -854,6 +856,7 @@ def query_countries(pgdb: PostgresEngine) -> pd.DataFrame:
     df = pd.read_sql(sel_query, pgdb.engine)
     return df
 
+
 def query_company_countries_resolved(pgdb: PostgresEngine) -> pd.DataFrame:
     sel_query = """WITH country_resolved AS (
      SELECT 
@@ -884,6 +887,7 @@ def query_company_countries_resolved(pgdb: PostgresEngine) -> pd.DataFrame:
     select * FROM country_resolved"""
     df = pd.read_sql(sel_query, pgdb.engine)
     return df
+
 
 @lru_cache(maxsize=1)
 def query_companies(pgdb: PostgresEngine) -> pd.DataFrame:
