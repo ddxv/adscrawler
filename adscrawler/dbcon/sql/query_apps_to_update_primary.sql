@@ -32,42 +32,44 @@ target_apps AS (
         sa.release_date,
         sa.icon_url_100,
         sa.additional_html_scraped_at,
-        CASE WHEN sa.crawl_result IS NULL THEN 1 ELSE 0 END AS crawl_result_null,
+        CASE WHEN sa.crawl_result IS NULL THEN 1 ELSE 0 END
+            AS crawl_result_null,
         CASE WHEN ra.store_app IS NOT NULL THEN 1 ELSE 0 END AS ranked_app,
         -- carry agm values in so we don't need to join it again later
         COALESCE(agm.total_installs, 0) AS total_installs,
-        COALESCE(agm.total_ratings, 0)  AS total_ratings
-    FROM store_apps sa
-    LEFT JOIN ranked_apps ra ON ra.store_app = sa.id
-    LEFT JOIN app_global_metrics_latest agm ON agm.store_app = sa.id
-    WHERE sa.store = :store
-      AND (
-          sa.crawl_result IS NULL
-          OR (
-              (
-                  agm.total_installs >= :short_update_installs
-                  OR agm.total_ratings >= :short_update_ratings
-                  OR ra.store_app IS NOT NULL
-                  OR sa.release_date > NOW() - INTERVAL '30 days'
-              )
-              AND sa.updated_at <= :short_update_ts
-              AND (
-                  sa.crawl_result = 1
-                  OR sa.crawl_result IS NULL
-                  OR sa.created_at >= :long_update_ts
-                  OR sa.store_last_updated >= :year_ago_ts
-              )
-          )
-          OR (
-              sa.updated_at <= :long_update_ts
-              AND (
-                  sa.crawl_result = 1
-                  OR sa.crawl_result IS NULL
-                  OR sa.store_last_updated >= :year_ago_ts
-              )
-          )
-          OR sa.updated_at <= :max_recrawl_ts
-      )
+        COALESCE(agm.total_ratings, 0) AS total_ratings
+    FROM store_apps AS sa
+    LEFT JOIN ranked_apps AS ra ON sa.id = ra.store_app
+    LEFT JOIN app_global_metrics_latest AS agm ON sa.id = agm.store_app
+    WHERE
+        sa.store = :store
+        AND (
+            sa.crawl_result IS NULL
+            OR (
+                (
+                    agm.total_installs >= :short_update_installs
+                    OR agm.total_ratings >= :short_update_ratings
+                    OR ra.store_app IS NOT NULL
+                    OR sa.release_date > NOW() - INTERVAL '30 days'
+                )
+                AND sa.updated_at <= :short_update_ts
+                AND (
+                    sa.crawl_result = 1
+                    OR sa.crawl_result IS NULL
+                    OR sa.created_at >= :long_update_ts
+                    OR sa.store_last_updated >= :year_ago_ts
+                )
+            )
+            OR (
+                sa.updated_at <= :long_update_ts
+                AND (
+                    sa.crawl_result = 1
+                    OR sa.crawl_result IS NULL
+                    OR sa.store_last_updated >= :year_ago_ts
+                )
+            )
+            OR sa.updated_at <= :max_recrawl_ts
+        )
 ),
 latest_crawls AS (
     SELECT DISTINCT ON
@@ -79,9 +81,11 @@ latest_crawls AS (
         acc.country_id,
         acc.crawled_at
     FROM
-        logging.app_country_crawls acc
-    INNER JOIN target_apps sa ON sa.id = acc.store_app
-    WHERE crawled_at >= :max_recrawl_ts AND country_id IN (SELECT country_id FROM countries_to_crawl)
+        logging.app_country_crawls AS acc
+    INNER JOIN target_apps AS sa ON acc.store_app = sa.id
+    WHERE
+        crawled_at >= :max_recrawl_ts
+        AND country_id IN (SELECT country_id FROM countries_to_crawl)
     ORDER BY
         store_app ASC,
         country_id ASC,
@@ -111,7 +115,8 @@ ORDER BY
     crawl_result_null DESC,
     --always crawl apps in rankings, sometimes new apps get missed
     ranked_app DESC,
-    (GREATEST(total_installs, total_ratings)
-        * 10 * EXTRACT(DAY FROM (NOW() - sa.updated_at))) DESC
-LIMIT :mylimit
-;
+    (
+        GREATEST(total_installs, total_ratings)
+        * 10 * EXTRACT(DAY FROM (NOW() - sa.updated_at))
+    ) DESC
+LIMIT :mylimit;
