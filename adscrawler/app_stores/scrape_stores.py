@@ -39,9 +39,9 @@ from adscrawler.app_stores.process_from_s3 import (
 from adscrawler.app_stores.utils import (
     build_country_map,
     check_and_insert_new_apps,
-    resolve_country_id,
     extract_domains_with_sub,
-    extract_root_domain
+    extract_root_domain,
+    resolve_country_id,
 )
 from adscrawler.config import APP_ICONS_TMP_DIR, CONFIG, get_logger
 from adscrawler.dbcon.connection import (
@@ -636,9 +636,7 @@ def check_and_insert_domains(
     )
     root_urls = root_urls[root_urls["domain_name"].notna()]
 
-    missing_roots = root_urls[
-        ~root_urls["domain_name"].isin(domains_df["domain_name"])
-    ]
+    missing_roots = root_urls[~root_urls["domain_name"].isin(domains_df["domain_name"])]
     if not missing_roots.empty:
         new_roots = upsert_df(
             table_name="domains",
@@ -655,8 +653,7 @@ def check_and_insert_domains(
 
     # --- 3. Backfill root_domain_id on existing subdomain entries that lack it ---
     stale_subs = domains_df[
-        domains_df["root_domain_id"].isna()
-        & domains_df["domain_name"].notna()
+        domains_df["root_domain_id"].isna() & domains_df["domain_name"].notna()
     ].copy()
     if not stale_subs.empty:
         stale_subs["root_domain"] = stale_subs["domain_name"].apply(extract_root_domain)
@@ -696,9 +693,7 @@ def check_and_insert_domains(
             .drop_duplicates()
             .rename(columns={"url": "domain_name"})
         )
-        subs_to_insert["root_domain_id"] = (
-            subs_to_insert["root_url"].map(domain_id_map)
-        )
+        subs_to_insert["root_domain_id"] = subs_to_insert["root_url"].map(domain_id_map)
         subs_to_insert = subs_to_insert.drop(columns=["root_url"])
 
         new_subs = upsert_df(
@@ -1021,17 +1016,21 @@ def upsert_app_country_evidence(
 
         # Prefer developer_address, fall back to legal
         raw_address: str | None = None
-        if pd.notna(row.get("developer_address")) and str(row["developer_address"]).strip():
+        if (
+            pd.notna(row.get("developer_address"))
+            and str(row["developer_address"]).strip()
+        ):
             raw_address = str(row["developer_address"]).strip()
-        elif pd.notna(row.get("developer_legal_address")) and str(row["developer_legal_address"]).strip():
+        elif (
+            pd.notna(row.get("developer_legal_address"))
+            and str(row["developer_legal_address"]).strip()
+        ):
             raw_address = str(row["developer_legal_address"]).strip()
 
         if not raw_address:
             continue
 
-        country_id = resolve_country_id(
-            raw_address, country_id_map, name_to_alpha2
-        )
+        country_id = resolve_country_id(raw_address, country_id_map, name_to_alpha2)
         rows.append(
             {
                 "store_app": int(store_app),
@@ -1046,7 +1045,7 @@ def upsert_app_country_evidence(
     evidence_df = pd.DataFrame(rows)
     key_columns = ["store_app"]
     insert_columns = ["store_app", "raw_address", "country_id"]
-    evidence_df['country_id'] = evidence_df['country_id'].astype('Int64')
+    evidence_df["country_id"] = evidence_df["country_id"].astype("Int64")
     upsert_df(
         table_name="app_country_evidence",
         df=evidence_df,

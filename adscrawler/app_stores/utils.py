@@ -1,9 +1,9 @@
 """Shared utilities for app stores."""
 
 import re
-import tldextract
 
 import pandas as pd
+import tldextract
 
 from adscrawler.config import get_logger
 from adscrawler.dbcon.connection import PostgresEngine
@@ -19,8 +19,7 @@ logger = get_logger(__name__, "scrape_stores")
 def build_name_to_alpha2(countries_df: pd.DataFrame) -> dict[str, str]:
     """Build a lowercase-name -> alpha2 lookup from all language columns."""
     lang_cols = [
-        c for c in countries_df.columns
-        if c.startswith("lang") and c != "langen"
+        c for c in countries_df.columns if c.startswith("lang") and c != "langen"
     ] + ["langen"]
     name_map: dict[str, str] = {}
     for _, row in countries_df.iterrows():
@@ -69,9 +68,7 @@ def guess_country_local(
 
     # 2. If we have a name map, check full names in all languages
     if name_to_alpha2 is not None:
-        for name, alpha2 in sorted(
-            name_to_alpha2.items(), key=lambda x: -len(x[0])
-        ):
+        for name, alpha2 in sorted(name_to_alpha2.items(), key=lambda x: -len(x[0])):
             if name in normalized_address:
                 return alpha2
 
@@ -213,6 +210,7 @@ def get_parquet_paths_by_prefix(bucket: str, prefix: str) -> list[str]:
             break
     return all_parquet_paths
 
+
 def extract_root_domain(url: str) -> str | None:
     """Extracts the top-level domain from a URL."""
     tld = tldextract.extract(url)
@@ -222,6 +220,7 @@ def extract_root_domain(url: str) -> str | None:
     if tld_url == ".":
         return None
     return tld_url
+
 
 def extract_domains_with_sub(x: str | None) -> str | None:
     if x is None or pd.isna(x):
@@ -237,4 +236,3 @@ def extract_domains_with_sub(x: str | None) -> str | None:
         url = ".".join([ext.subdomain, ext.domain, ext.suffix])
     url = url.lower()
     return url
-
