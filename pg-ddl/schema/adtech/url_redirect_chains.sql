@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 2H9S4ewn8hOQl51Vpnz16pANxp4EULowrBdJonzLxLiMq0m23beFOjFnRd9XFzP
+\restrict qzsFAfsc0dxyYdVAEWhZeMRafIBNQlye3jcRTfkm7aJNrY8qZkgtYt6u3jga1rq
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -122,5 +122,5 @@ ALTER TABLE ONLY adtech.url_redirect_chains
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 2H9S4ewn8hOQl51Vpnz16pANxp4EULowrBdJonzLxLiMq0m23beFOjFnRd9XFzP
+\unrestrict qzsFAfsc0dxyYdVAEWhZeMRafIBNQlye3jcRTfkm7aJNrY8qZkgtYt6u3jga1rq
 

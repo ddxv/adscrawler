@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict pmKxlVqLG52Xp4kDq3JXzcx5C6HShMgQZn31TKJxVK22BWKSRnJgWkdK4HfjnHJ
+\restrict QzXaeyOYbbVN9dqCjKhRWz0e6hN2eIlCaiOhLfbsuvHw1yI81SYQIlAJFNTayoq
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -60,21 +60,24 @@ CREATE MATERIALIZED VIEW frontend.companies_overview AS
             1 AS has_trends
            FROM ( SELECT trend_companies.company_domain
                    FROM adtech.trend_companies
-                  WHERE ((trend_companies.year > 2025) OR ((trend_companies.year = 2025) AND (trend_companies.quarter >= 2)))
+                  WHERE (ROW(trend_companies.year, trend_companies.quarter) >= ROW((EXTRACT(year FROM (CURRENT_DATE - '3 mons'::interval)))::integer, (EXTRACT(quarter FROM (CURRENT_DATE - '3 mons'::interval)))::integer))
                 UNION
                  SELECT trend_domains.domain_name
                    FROM adtech.trend_domains
-                  WHERE ((trend_domains.year > 2025) OR ((trend_domains.year = 2025) AND (trend_domains.quarter >= 2)))
+                  WHERE (ROW(trend_domains.year, trend_domains.quarter) >= ROW((EXTRACT(year FROM (CURRENT_DATE - '3 mons'::interval)))::integer, (EXTRACT(quarter FROM (CURRENT_DATE - '3 mons'::interval)))::integer))
                 UNION
                  SELECT trend_parent_companies.company_domain
                    FROM adtech.trend_parent_companies
-                  WHERE ((trend_parent_companies.year > 2025) OR ((trend_parent_companies.year = 2025) AND (trend_parent_companies.quarter >= 2)))) sub
+                  WHERE (ROW(trend_parent_companies.year, trend_parent_companies.quarter) >= ROW((EXTRACT(year FROM (CURRENT_DATE - '3 mons'::interval)))::integer, (EXTRACT(quarter FROM (CURRENT_DATE - '3 mons'::interval)))::integer))) sub
         ), app_changes_agg AS (
          SELECT d.domain_name AS company_domain,
-            (count(*) FILTER (WHERE (dacq.status = 'added'::adtech.change_status_enum)))::integer AS apps_added_count,
-            (count(*) FILTER (WHERE (dacq.status = 'removed'::adtech.change_status_enum)))::integer AS apps_lost_count
+            (count(*) FILTER (WHERE ((dacq.status = 'added'::adtech.change_status_enum) AND (dacq.tag_source = 'sdk'::text))))::integer AS apps_sdk_added_count,
+            (count(*) FILTER (WHERE ((dacq.status = 'removed'::adtech.change_status_enum) AND (dacq.tag_source = 'sdk'::text))))::integer AS apps_sdk_lost_count,
+            (count(*) FILTER (WHERE ((dacq.status = 'added'::adtech.change_status_enum) AND (dacq.tag_source = 'app_ads_direct'::text))))::integer AS apps_adstxt_direct_added_count,
+            (count(*) FILTER (WHERE ((dacq.status = 'removed'::adtech.change_status_enum) AND (dacq.tag_source = 'app_ads_direct'::text))))::integer AS apps_adstxt_direct_lost_count
            FROM (adtech.domain_app_changes_quarterly dacq
              LEFT JOIN public.domains d ON ((dacq.domain_id = d.id)))
+          WHERE (ROW(dacq.year, dacq.quarter) >= ROW((EXTRACT(year FROM (CURRENT_DATE - '3 mons'::interval)))::integer, (EXTRACT(quarter FROM (CURRENT_DATE - '3 mons'::interval)))::integer))
           GROUP BY d.domain_name
         ), sdks_agg AS (
          SELECT sub.company_domain,
@@ -118,6 +121,37 @@ CREATE MATERIALIZED VIEW frontend.companies_overview AS
                   WHERE (company_country_evidence.country_id IS NOT NULL)) e
              JOIN public.countries c_1 ON ((e.country_id = c_1.id)))
           WHERE (e.priority_rank = 1)
+        ), parent_creatives_rollup AS (
+         SELECT db.parent_domain,
+            (sum(c_1.creatives_app_count))::integer AS total_count
+           FROM (domain_base db
+             JOIN creatives_agg c_1 ON (((db.company_domain)::text = (c_1.company_domain)::text)))
+          WHERE (db.parent_domain IS NOT NULL)
+          GROUP BY db.parent_domain
+        ), parent_changes_rollup AS (
+         SELECT db.parent_domain,
+            (sum(a_1.apps_sdk_added_count))::integer AS apps_sdk_added_count,
+            (sum(a_1.apps_sdk_lost_count))::integer AS apps_sdk_lost_count,
+            (sum(a_1.apps_adstxt_direct_added_count))::integer AS apps_adstxt_direct_added_count,
+            (sum(a_1.apps_adstxt_direct_lost_count))::integer AS apps_adstxt_direct_lost_count
+           FROM (domain_base db
+             JOIN app_changes_agg a_1 ON (((db.company_domain)::text = (a_1.company_domain)::text)))
+          WHERE (db.parent_domain IS NOT NULL)
+          GROUP BY db.parent_domain
+        ), parent_sdks_rollup AS (
+         SELECT db.parent_domain,
+            max(s_1.sdk_count) AS max_count
+           FROM (domain_base db
+             JOIN sdks_agg s_1 ON (((db.company_domain)::text = (s_1.company_domain)::text)))
+          WHERE (db.parent_domain IS NOT NULL)
+          GROUP BY db.parent_domain
+        ), parent_mediation_rollup AS (
+         SELECT db.parent_domain,
+            (sum(m_1.mediation_adapter_count))::integer AS total_count
+           FROM (domain_base db
+             JOIN mediation_agg m_1 ON (((db.company_domain)::text = (m_1.company_domain)::text)))
+          WHERE (db.parent_domain IS NOT NULL)
+          GROUP BY db.parent_domain
         )
  SELECT dom.company_domain,
     dom.domain_id,
@@ -134,35 +168,73 @@ CREATE MATERIALIZED VIEW frontend.companies_overview AS
     dom.has_app_ads_reseller,
     COALESCE(co.country, pco.country) AS country,
     co.country AS country_direct,
-    COALESCE(c.creatives_app_count, pc.creatives_app_count, 0) AS creatives_app_count,
+        CASE
+            WHEN ((dom.company_id IS NOT NULL) AND (dom.company_id IN ( SELECT DISTINCT companies.parent_company_id
+               FROM adtech.companies
+              WHERE (companies.parent_company_id IS NOT NULL)))) THEN (COALESCE(c.creatives_app_count, 0) + COALESCE(p_cr.total_count, 0))
+            ELSE COALESCE(c.creatives_app_count, 0)
+        END AS creatives_app_count,
     COALESCE(t.has_trends, pt.has_trends, 0) AS has_trends,
-    COALESCE(a.apps_added_count, pa.apps_added_count, 0) AS apps_added_count,
-    COALESCE(a.apps_lost_count, pa.apps_lost_count, 0) AS apps_lost_count,
-    COALESCE(s.sdk_count, ps.sdk_count, 0) AS sdk_count,
-    COALESCE(m.mediation_adapter_count, pm.mediation_adapter_count, 0) AS mediation_adapter_count,
+        CASE
+            WHEN ((dom.company_id IS NOT NULL) AND (dom.company_id IN ( SELECT DISTINCT companies.parent_company_id
+               FROM adtech.companies
+              WHERE (companies.parent_company_id IS NOT NULL)))) THEN (COALESCE(a.apps_sdk_added_count, 0) + COALESCE(p_ch.apps_sdk_added_count, 0))
+            ELSE COALESCE(a.apps_sdk_added_count, 0)
+        END AS apps_sdk_added_count,
+        CASE
+            WHEN ((dom.company_id IS NOT NULL) AND (dom.company_id IN ( SELECT DISTINCT companies.parent_company_id
+               FROM adtech.companies
+              WHERE (companies.parent_company_id IS NOT NULL)))) THEN (COALESCE(a.apps_sdk_lost_count, 0) + COALESCE(p_ch.apps_sdk_lost_count, 0))
+            ELSE COALESCE(a.apps_sdk_lost_count, 0)
+        END AS apps_sdk_lost_count,
+        CASE
+            WHEN ((dom.company_id IS NOT NULL) AND (dom.company_id IN ( SELECT DISTINCT companies.parent_company_id
+               FROM adtech.companies
+              WHERE (companies.parent_company_id IS NOT NULL)))) THEN (COALESCE(a.apps_adstxt_direct_added_count, 0) + COALESCE(p_ch.apps_adstxt_direct_added_count, 0))
+            ELSE COALESCE(a.apps_adstxt_direct_added_count, 0)
+        END AS apps_adstxt_direct_added_count,
+        CASE
+            WHEN ((dom.company_id IS NOT NULL) AND (dom.company_id IN ( SELECT DISTINCT companies.parent_company_id
+               FROM adtech.companies
+              WHERE (companies.parent_company_id IS NOT NULL)))) THEN (COALESCE(a.apps_adstxt_direct_lost_count, 0) + COALESCE(p_ch.apps_adstxt_direct_lost_count, 0))
+            ELSE COALESCE(a.apps_adstxt_direct_lost_count, 0)
+        END AS apps_adstxt_direct_lost_count,
+        CASE
+            WHEN ((dom.company_id IS NOT NULL) AND (dom.company_id IN ( SELECT DISTINCT companies.parent_company_id
+               FROM adtech.companies
+              WHERE (companies.parent_company_id IS NOT NULL)))) THEN GREATEST(COALESCE(s.sdk_count, 0), COALESCE(p_sd.max_count, 0))
+            ELSE COALESCE(s.sdk_count, 0)
+        END AS sdk_count,
+        CASE
+            WHEN ((dom.company_id IS NOT NULL) AND (dom.company_id IN ( SELECT DISTINCT companies.parent_company_id
+               FROM adtech.companies
+              WHERE (companies.parent_company_id IS NOT NULL)))) THEN (COALESCE(m.mediation_adapter_count, 0) + COALESCE(p_me.total_count, 0))
+            ELSE COALESCE(m.mediation_adapter_count, 0)
+        END AS mediation_adapter_count,
     COALESCE(c.creatives_app_count, 0) AS creatives_app_count_direct,
     COALESCE(t.has_trends, 0) AS has_trends_direct,
-    COALESCE(a.apps_added_count, 0) AS apps_added_count_direct,
-    COALESCE(a.apps_lost_count, 0) AS apps_lost_count_direct,
+    COALESCE(a.apps_sdk_added_count, 0) AS apps_sdk_added_count_direct,
+    COALESCE(a.apps_sdk_lost_count, 0) AS apps_sdk_lost_count_direct,
+    COALESCE(a.apps_adstxt_direct_added_count, 0) AS apps_adstxt_direct_added_count_direct,
+    COALESCE(a.apps_adstxt_direct_lost_count, 0) AS apps_adstxt_direct_lost_count_direct,
     COALESCE(s.sdk_count, 0) AS sdk_count_direct,
     COALESCE(m.mediation_adapter_count, 0) AS mediation_adapter_count_direct,
     COALESCE(aa.adstxt_direct_app_count, (0)::numeric) AS adstxt_direct_app_count,
     (((dom.company_id IS NOT NULL) AND (dom.company_id IN ( SELECT DISTINCT companies.parent_company_id
            FROM adtech.companies
           WHERE (companies.parent_company_id IS NOT NULL)))))::integer AS is_parent_domain
-   FROM ((((((((((((((domain_base dom
+   FROM (((((((((((((domain_base dom
      LEFT JOIN creatives_agg c ON (((dom.company_domain)::text = (c.company_domain)::text)))
      LEFT JOIN trends_agg t ON (((dom.company_domain)::text = t.company_domain)))
      LEFT JOIN app_changes_agg a ON (((dom.company_domain)::text = (a.company_domain)::text)))
      LEFT JOIN sdks_agg s ON (((dom.company_domain)::text = (s.company_domain)::text)))
      LEFT JOIN mediation_agg m ON (((dom.company_domain)::text = (m.company_domain)::text)))
      LEFT JOIN adstxt_ad_domain_agg aa ON (((dom.company_domain)::text = (aa.ad_domain_url)::text)))
-     LEFT JOIN creatives_agg pc ON (((dom.parent_domain)::text = (pc.company_domain)::text)))
+     LEFT JOIN parent_creatives_rollup p_cr ON (((dom.company_domain)::text = (p_cr.parent_domain)::text)))
+     LEFT JOIN parent_changes_rollup p_ch ON (((dom.company_domain)::text = (p_ch.parent_domain)::text)))
+     LEFT JOIN parent_sdks_rollup p_sd ON (((dom.company_domain)::text = (p_sd.parent_domain)::text)))
+     LEFT JOIN parent_mediation_rollup p_me ON (((dom.company_domain)::text = (p_me.parent_domain)::text)))
      LEFT JOIN trends_agg pt ON (((dom.parent_domain)::text = pt.company_domain)))
-     LEFT JOIN app_changes_agg pa ON (((dom.parent_domain)::text = (pa.company_domain)::text)))
-     LEFT JOIN sdks_agg ps ON (((dom.parent_domain)::text = (ps.company_domain)::text)))
-     LEFT JOIN mediation_agg pm ON (((dom.parent_domain)::text = (pm.company_domain)::text)))
-     LEFT JOIN adstxt_ad_domain_agg paa ON (((dom.parent_domain)::text = (paa.ad_domain_url)::text)))
      LEFT JOIN country_resolved co ON ((dom.company_id = co.company_id)))
      LEFT JOIN country_resolved pco ON ((dom.parent_company_id = pco.company_id)))
   WITH NO DATA;
@@ -188,5 +260,5 @@ CREATE UNIQUE INDEX frontend_companies_overview_domain ON frontend.companies_ove
 -- PostgreSQL database dump complete
 --
 
-\unrestrict pmKxlVqLG52Xp4kDq3JXzcx5C6HShMgQZn31TKJxVK22BWKSRnJgWkdK4HfjnHJ
+\unrestrict QzXaeyOYbbVN9dqCjKhRWz0e6hN2eIlCaiOhLfbsuvHw1yI81SYQIlAJFNTayoq
 
