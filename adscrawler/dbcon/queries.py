@@ -1388,7 +1388,7 @@ def query_all_store_app_descriptions(
 @lru_cache(maxsize=1)
 def query_all_domains(pgdb: PostgresEngine) -> pd.DataFrame:
     sel_query = """SELECT
-        id, domain_name
+        id, domain_name, root_domain_id
         FROM
         domains
         ;

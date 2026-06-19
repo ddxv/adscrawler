@@ -12,7 +12,6 @@ import appgoblin_play_scraper
 import imagehash
 import pandas as pd
 import requests
-import tldextract
 from itunes_app_scraper.util import AppStoreException
 from PIL import Image
 
@@ -41,6 +40,8 @@ from adscrawler.app_stores.utils import (
     build_country_map,
     check_and_insert_new_apps,
     resolve_country_id,
+    extract_domains_with_sub,
+    extract_root_domain
 )
 from adscrawler.config import APP_ICONS_TMP_DIR, CONFIG, get_logger
 from adscrawler.dbcon.connection import (
@@ -547,22 +548,6 @@ def save_app_ranks(
         )
 
 
-def extract_domains(x: str | None) -> str | None:
-    if x is None or pd.isna(x):
-        return None
-
-    ext = tldextract.extract(x)
-    use_top_domain = any(
-        [ext.subdomain == "m", "www" in ext.subdomain.split("."), ext.subdomain == ""],
-    )
-    if use_top_domain:
-        url = ".".join([ext.domain, ext.suffix])
-    else:
-        url = ".".join([ext.subdomain, ext.domain, ext.suffix])
-    url = url.lower()
-    return url
-
-
 def crawl_developers_for_new_store_ids(
     pgdb: PostgresEngine,
     store: int,
@@ -638,25 +623,94 @@ def check_and_insert_domains(
     app_urls: pd.DataFrame,
     pgdb: PostgresEngine,
 ) -> pd.DataFrame:
-    """Adds missing ad domains to the database and returns updated domain DataFrame."""
-    missing_ad_domains = app_urls[
-        (~app_urls["url"].isin(domains_df["domain_name"])) & (app_urls["url"].notna())
+    """Adds missing ad domains to the database and returns updated domain DataFrame.
+
+    For URLs with subdomains, ensures the root domain exists first and links
+    the subdomain entry to it via ``root_domain_id``.
+    """
+    # --- 1. Insert any missing root domains first ---
+    root_urls = (
+        app_urls[["root_url"]]
+        .drop_duplicates()
+        .rename(columns={"root_url": "domain_name"})
+    )
+    root_urls = root_urls[root_urls["domain_name"].notna()]
+
+    missing_roots = root_urls[
+        ~root_urls["domain_name"].isin(domains_df["domain_name"])
     ]
-    if not missing_ad_domains.empty:
-        new_ad_domains = (
-            missing_ad_domains[["url"]]
-            .drop_duplicates()
-            .rename(columns={"url": "domain_name"})
-        )
-        new_ad_domains = upsert_df(
+    if not missing_roots.empty:
+        new_roots = upsert_df(
             table_name="domains",
-            df=new_ad_domains,
+            df=missing_roots,
             insert_columns=["domain_name"],
             key_columns=["domain_name"],
             pgdb=pgdb,
             return_rows=True,
         )
-        domains_df = pd.concat([new_ad_domains, domains_df])
+        domains_df = pd.concat([new_roots, domains_df], ignore_index=True)
+
+    # --- 2. Build domain_name -> id lookup (now includes newly inserted roots) ---
+    domain_id_map = dict(zip(domains_df["domain_name"], domains_df["id"]))
+
+    # --- 3. Backfill root_domain_id on existing subdomain entries that lack it ---
+    stale_subs = domains_df[
+        domains_df["root_domain_id"].isna()
+        & domains_df["domain_name"].notna()
+    ].copy()
+    if not stale_subs.empty:
+        stale_subs["root_domain"] = stale_subs["domain_name"].apply(extract_root_domain)
+        stale_subs = stale_subs[
+            (stale_subs["root_domain"].notna())
+            & (stale_subs["root_domain"] != stale_subs["domain_name"])
+        ]
+        stale_subs["root_domain_id"] = stale_subs["root_domain"].map(domain_id_map)
+        to_update = stale_subs[stale_subs["root_domain_id"].notna()][
+            ["domain_name", "root_domain_id"]
+        ]
+        if not to_update.empty:
+            upsert_df(
+                table_name="domains",
+                df=to_update,
+                insert_columns=["domain_name", "root_domain_id"],
+                key_columns=["domain_name"],
+                pgdb=pgdb,
+                on_conflict_update=True,
+            )
+            # Refresh in-memory copy with updated root_domain_ids
+            domains_df = query_all_domains(pgdb=pgdb)
+            domain_id_map = dict(zip(domains_df["domain_name"], domains_df["id"]))
+            logger.info(
+                f"Backfilled root_domain_id for {len(to_update)} existing subdomain entries"
+            )
+
+    # --- 4. Insert subdomain URLs with root_domain_id ---
+    missing_subdomains = app_urls[
+        (~app_urls["url"].isin(domains_df["domain_name"]))
+        & (app_urls["url"].notna())
+        & (app_urls["url"] != app_urls["root_url"])
+    ]
+    if not missing_subdomains.empty:
+        subs_to_insert = (
+            missing_subdomains[["url", "root_url"]]
+            .drop_duplicates()
+            .rename(columns={"url": "domain_name"})
+        )
+        subs_to_insert["root_domain_id"] = (
+            subs_to_insert["root_url"].map(domain_id_map)
+        )
+        subs_to_insert = subs_to_insert.drop(columns=["root_url"])
+
+        new_subs = upsert_df(
+            table_name="domains",
+            df=subs_to_insert,
+            insert_columns=["domain_name", "root_domain_id"],
+            key_columns=["domain_name"],
+            pgdb=pgdb,
+            return_rows=True,
+        )
+        domains_df = pd.concat([new_subs, domains_df], ignore_index=True)
+
     return domains_df
 
 
@@ -664,7 +718,8 @@ def save_app_domains(
     apps_df: pd.DataFrame,
     pgdb: PostgresEngine,
 ) -> None:
-    apps_df["url"] = apps_df["url"].apply(extract_domains)
+    apps_df["url"] = apps_df["url"].apply(extract_domains_with_sub)
+    apps_df["root_url"] = apps_df["url"].apply(extract_root_domain)
     # This would mean that urls are frozen if 'removed' but more likely they failed a crawl
     apps_df = apps_df[~apps_df["url"].isna()]
     all_domains_df = query_all_domains(pgdb=pgdb)

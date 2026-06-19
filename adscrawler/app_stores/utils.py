@@ -1,6 +1,7 @@
 """Shared utilities for app stores."""
 
 import re
+import tldextract
 
 import pandas as pd
 
@@ -211,3 +212,29 @@ def get_parquet_paths_by_prefix(bucket: str, prefix: str) -> list[str]:
         else:
             break
     return all_parquet_paths
+
+def extract_root_domain(url: str) -> str | None:
+    """Extracts the top-level domain from a URL."""
+    tld = tldextract.extract(url)
+    if not tld.suffix:
+        return None
+    tld_url: str = tld.domain + "." + tld.suffix
+    if tld_url == ".":
+        return None
+    return tld_url
+
+def extract_domains_with_sub(x: str | None) -> str | None:
+    if x is None or pd.isna(x):
+        return None
+
+    ext = tldextract.extract(x)
+    use_top_domain = any(
+        [ext.subdomain == "m", "www" in ext.subdomain.split("."), ext.subdomain == ""],
+    )
+    if use_top_domain:
+        url = ".".join([ext.domain, ext.suffix])
+    else:
+        url = ".".join([ext.subdomain, ext.domain, ext.suffix])
+    url = url.lower()
+    return url
+
