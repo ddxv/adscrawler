@@ -1,6 +1,6 @@
 import unittest
 
-from adscrawler.app_stores.scrape_stores import extract_domains
+from adscrawler.app_stores.scrape_stores import extract_domains_with_sub
 
 
 class TestExtractDomains(unittest.TestCase):
@@ -30,7 +30,7 @@ class TestExtractDomains(unittest.TestCase):
 
         for value, expected in cases:
             with self.subTest(value=value):
-                result = extract_domains(value)
+                result = extract_domains_with_sub(value)
                 self.assertEqual(result, expected)
 
 
