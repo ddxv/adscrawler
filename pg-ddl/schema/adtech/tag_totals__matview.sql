@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 3Iyb6cdEVAwIqVEZUr71yUCdlhPfVFxJgvVQANg0NWoBptNd5jjV44VLjK4W5Fe
+\restrict YLNfyDFK6bd4IW6sxSR3GcotlbhqhwuP3AnFZ0yyH1VXjZcts9ho4H4rFSxwK3k
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -67,5 +67,5 @@ ALTER MATERIALIZED VIEW adtech.tag_totals OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 3Iyb6cdEVAwIqVEZUr71yUCdlhPfVFxJgvVQANg0NWoBptNd5jjV44VLjK4W5Fe
+\unrestrict YLNfyDFK6bd4IW6sxSR3GcotlbhqhwuP3AnFZ0yyH1VXjZcts9ho4H4rFSxwK3k
 

@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 34tJmRUbA7avtTPgUHqtkBowiRGwfoLIRT1yfj2JnuKscREyciizrKfoDe0VkGD
+\restrict zpj2TaMXJSKKe0h0bfvfjK0Kg6nsh4bdpMuJZix1uD6xXnNvmRUUyLewcfeXTQ4
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -30,7 +30,8 @@ SET default_table_access_method = heap;
 CREATE TABLE public.domains (
     id integer NOT NULL,
     domain_name character varying NOT NULL,
-    created_at timestamp without time zone DEFAULT timezone('utc'::text, now())
+    created_at timestamp without time zone DEFAULT timezone('utc'::text, now()),
+    root_domain_id integer
 );
 
 
@@ -82,8 +83,16 @@ ALTER TABLE ONLY public.domains
 
 
 --
+-- Name: domains domains_registrable_fk; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.domains
+    ADD CONSTRAINT domains_registrable_fk FOREIGN KEY (root_domain_id) REFERENCES public.domains(id);
+
+
+--
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 34tJmRUbA7avtTPgUHqtkBowiRGwfoLIRT1yfj2JnuKscREyciizrKfoDe0VkGD
+\unrestrict zpj2TaMXJSKKe0h0bfvfjK0Kg6nsh4bdpMuJZix1uD6xXnNvmRUUyLewcfeXTQ4
 

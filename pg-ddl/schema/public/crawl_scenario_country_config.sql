@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict bk85cIbec63B2rsxBE1l90ilzPNOvgJ7xYe3n2u435hZl64lYaP1idAP5aksExs
+\restrict A3swnlNRDMMftnkaOg3keaC6Z4seHe0r8m8Yb56wTguKCVw3gFSRdxGiV327ndX
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -112,5 +112,5 @@ ALTER TABLE ONLY public.crawl_scenario_country_config
 -- PostgreSQL database dump complete
 --
 
-\unrestrict bk85cIbec63B2rsxBE1l90ilzPNOvgJ7xYe3n2u435hZl64lYaP1idAP5aksExs
+\unrestrict A3swnlNRDMMftnkaOg3keaC6Z4seHe0r8m8Yb56wTguKCVw3gFSRdxGiV327ndX
 

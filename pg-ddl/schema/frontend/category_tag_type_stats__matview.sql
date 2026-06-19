@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict iw2gHPDMev1yPetC6qG2TEuDFYsOkBKsAjcuFLnzh1dgg9bLr0p32d2APrLGbF6
+\restrict VezORfQP40AhkeJtmGWvZVqvlZCous7fySer51eh06aaOyUPlXDelhdkXuF8HmU
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -47,6 +47,7 @@ CREATE MATERIALIZED VIEW frontend.category_tag_type_stats AS
                     tag.tag_source,
                         CASE
                             WHEN (tag.tag_source ~~ 'app_ads%%'::text) THEN 'ad-networks'::character varying
+                            WHEN (tag.tag_source = 'publisher'::text) THEN 'app-publishers'::character varying
                             ELSE cats.url_slug
                         END AS type_url_slug,
                     sa.installs_sum_4w,
@@ -117,5 +118,5 @@ CREATE UNIQUE INDEX frontend_category_tag_type_stats_unique ON frontend.category
 -- PostgreSQL database dump complete
 --
 
-\unrestrict iw2gHPDMev1yPetC6qG2TEuDFYsOkBKsAjcuFLnzh1dgg9bLr0p32d2APrLGbF6
+\unrestrict VezORfQP40AhkeJtmGWvZVqvlZCous7fySer51eh06aaOyUPlXDelhdkXuF8HmU
 

@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict uTr3hLZIlDBHeqjgCY5cu12C5fRnVRt6vG7AzXxQJipm0NnNEHDciM15H5j5kFT
+\restrict U0tkXK4uJaqneqtLZ4WB9qSAFpRcrcfvBnCR97WdlaA0wBeqRaR2S2xeRCr03s4
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -70,5 +70,5 @@ CREATE UNIQUE INDEX companies_apps_overview_unique_idx ON frontend.companies_app
 -- PostgreSQL database dump complete
 --
 
-\unrestrict uTr3hLZIlDBHeqjgCY5cu12C5fRnVRt6vG7AzXxQJipm0NnNEHDciM15H5j5kFT
+\unrestrict U0tkXK4uJaqneqtLZ4WB9qSAFpRcrcfvBnCR97WdlaA0wBeqRaR2S2xeRCr03s4
 

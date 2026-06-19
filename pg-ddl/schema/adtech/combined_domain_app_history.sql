@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 2JPAsZbIXe6TrBNJWIfjAr9ACggXdGAS5uHHM5SXNxLAQG71Y3s7T497E1Wdu8b
+\restrict TMkRkWPHdMGothwc88mOrYndwllEHSqseeaeLHPqe1pzEP5MAozP6IRcZbuqiyd
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -52,5 +52,5 @@ CREATE INDEX idx_cdah_active_domain_store_year_quarter ON adtech.combined_domain
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 2JPAsZbIXe6TrBNJWIfjAr9ACggXdGAS5uHHM5SXNxLAQG71Y3s7T497E1Wdu8b
+\unrestrict TMkRkWPHdMGothwc88mOrYndwllEHSqseeaeLHPqe1pzEP5MAozP6IRcZbuqiyd
 

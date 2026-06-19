@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict hwhtX6U4F61ccUzEK3MdUnLTd7SPOEs9iXf4zQx6mWcUby2f4P6XO9WM69F3mxu
+\restrict OwDLSZYgIUux2Jc6sa6ldbrIoEeS6e5IY3rQ8AISZ4qfBU7Hm1lYzwoVe7JYaih
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -33,14 +33,29 @@ CREATE MATERIALIZED VIEW adtech.company_categories AS
    FROM ((adtech.sdk_categories sc
      LEFT JOIN adtech.sdks sd ON ((sc.sdk_id = sd.id)))
      JOIN adtech.companies c ON ((sd.company_id = c.id)))
+UNION
+ SELECT cm.company_id,
+    cm.category_id
+   FROM adtech.company_categories_manual cm
+  WHERE (NOT (EXISTS ( SELECT 1
+           FROM (adtech.sdk_categories sc
+             JOIN adtech.sdks sd ON ((sc.sdk_id = sd.id)))
+          WHERE (sd.company_id = cm.company_id))))
   WITH NO DATA;
 
 
 ALTER MATERIALIZED VIEW adtech.company_categories OWNER TO postgres;
 
 --
+-- Name: adtech_company_category; Type: INDEX; Schema: adtech; Owner: postgres
+--
+
+CREATE INDEX adtech_company_category ON adtech.company_categories USING btree (company_id);
+
+
+--
 -- PostgreSQL database dump complete
 --
 
-\unrestrict hwhtX6U4F61ccUzEK3MdUnLTd7SPOEs9iXf4zQx6mWcUby2f4P6XO9WM69F3mxu
+\unrestrict OwDLSZYgIUux2Jc6sa6ldbrIoEeS6e5IY3rQ8AISZ4qfBU7Hm1lYzwoVe7JYaih
 

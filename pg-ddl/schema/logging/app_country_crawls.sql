@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict bGpIlrg3lmnK43Q47yakctzsrTbOzhIysJtjjew06HX6hcZNkNHidKNC96G6Yo6
+\restrict DvdUrMUNBDLdBRiDVCs7ZuU574LSgByQddUWLvIZz5SrnE4y4RwMPcyIiWYe9vk
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -28,10 +28,10 @@ SET default_table_access_method = heap;
 --
 
 CREATE TABLE logging.app_country_crawls (
-    crawl_result bigint,
-    store_app bigint,
-    country_id bigint,
-    crawled_at timestamp with time zone
+    crawl_result bigint NOT NULL,
+    store_app bigint NOT NULL,
+    country_id bigint NOT NULL,
+    crawled_at timestamp with time zone NOT NULL
 );
 
 
@@ -48,5 +48,5 @@ CREATE INDEX idx_app_country_crawls_latest ON logging.app_country_crawls USING b
 -- PostgreSQL database dump complete
 --
 
-\unrestrict bGpIlrg3lmnK43Q47yakctzsrTbOzhIysJtjjew06HX6hcZNkNHidKNC96G6Yo6
+\unrestrict DvdUrMUNBDLdBRiDVCs7ZuU574LSgByQddUWLvIZz5SrnE4y4RwMPcyIiWYe9vk
 

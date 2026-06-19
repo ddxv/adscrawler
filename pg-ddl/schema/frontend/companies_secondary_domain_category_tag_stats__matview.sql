@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict QBXZea8OuETRHdWhbuRTglTbqLkK9LMB4K7ybRYG0egbC8rWcAFxrE0A45Gi41V
+\restrict uaDxXVgMU6NyWcRQrGS8OLKCnuSuTHf9r3v60jMeOD5K1mXcMaP5GzpFdRFHyCx
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -24,55 +24,52 @@ SET default_tablespace = '';
 SET default_table_access_method = heap;
 
 --
--- Name: companies_category_tag_stats; Type: MATERIALIZED VIEW; Schema: frontend; Owner: postgres
+-- Name: companies_secondary_domain_category_tag_stats; Type: MATERIALIZED VIEW; Schema: frontend; Owner: postgres
 --
 
-CREATE MATERIALIZED VIEW frontend.companies_category_tag_stats AS
+CREATE MATERIALIZED VIEW frontend.companies_secondary_domain_category_tag_stats AS
  WITH distinct_apps_group AS (
          SELECT csac.store_app,
             tag.tag_source,
-            COALESCE(cd.domain_name, ad.domain_name) AS company_domain,
-            c.name AS company_name
-           FROM ((((adtech.combined_app_companies csac
-             LEFT JOIN public.domains ad ON ((csac.domain_id = ad.id)))
+            d.domain_name
+           FROM (((adtech.combined_app_companies csac
              LEFT JOIN adtech.companies c ON ((csac.company_id = c.id)))
-             LEFT JOIN public.domains cd ON ((c.domain_id = cd.id)))
+             LEFT JOIN public.domains d ON ((csac.domain_id = d.id)))
              CROSS JOIN LATERAL ( VALUES ('sdk'::text,csac.sdk), ('api_call'::text,csac.api_call), ('publisher'::text,csac.publisher), ('app_ads_direct'::text,csac.app_ads_direct), ('app_ads_reseller'::text,csac.app_ads_reseller)) tag(tag_source, present))
-          WHERE (tag.present IS TRUE)
+          WHERE (csac.domain_id <> c.domain_id)
         )
  SELECT sa.store,
     sa.category AS app_category,
+    dag.domain_name,
     dag.tag_source,
-    dag.company_domain,
-    dag.company_name,
     count(DISTINCT dag.store_app) AS app_count,
     sum(sa.installs_sum_4w) AS installs_d30,
     sum(sa.installs) AS installs_total
    FROM (distinct_apps_group dag
      LEFT JOIN frontend.store_apps_overview sa ON ((dag.store_app = sa.id)))
-  GROUP BY sa.store, sa.category, dag.tag_source, dag.company_domain, dag.company_name
+  GROUP BY sa.store, sa.category, dag.domain_name, dag.tag_source
   WITH NO DATA;
 
 
-ALTER MATERIALIZED VIEW frontend.companies_category_tag_stats OWNER TO postgres;
+ALTER MATERIALIZED VIEW frontend.companies_secondary_domain_category_tag_stats OWNER TO postgres;
 
 --
--- Name: companies_category_tag_stats__query_idx; Type: INDEX; Schema: frontend; Owner: postgres
+-- Name: companies_secondary_category_tag_stats_idx; Type: INDEX; Schema: frontend; Owner: postgres
 --
 
-CREATE INDEX companies_category_tag_stats__query_idx ON frontend.companies_category_tag_stats USING btree (company_domain);
+CREATE UNIQUE INDEX companies_secondary_category_tag_stats_idx ON frontend.companies_secondary_domain_category_tag_stats USING btree (store, domain_name, app_category, tag_source);
 
 
 --
--- Name: companies_category_tag_stats_idx; Type: INDEX; Schema: frontend; Owner: postgres
+-- Name: companies_secondary_category_tag_stats_query_idx; Type: INDEX; Schema: frontend; Owner: postgres
 --
 
-CREATE UNIQUE INDEX companies_category_tag_stats_idx ON frontend.companies_category_tag_stats USING btree (store, tag_source, app_category, company_domain);
+CREATE INDEX companies_secondary_category_tag_stats_query_idx ON frontend.companies_secondary_domain_category_tag_stats USING btree (domain_name);
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict QBXZea8OuETRHdWhbuRTglTbqLkK9LMB4K7ybRYG0egbC8rWcAFxrE0A45Gi41V
+\unrestrict uaDxXVgMU6NyWcRQrGS8OLKCnuSuTHf9r3v60jMeOD5K1mXcMaP5GzpFdRFHyCx
 

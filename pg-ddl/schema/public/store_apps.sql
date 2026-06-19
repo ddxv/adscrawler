@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict euGRvwgP2DdKvfQmK68CJR1JBwwALVDcbluI5g6vK33jDgNzEJuqbkM3h5W9ICP
+\restrict PVA1RDJXuUX3D1GRpOjCwxku2Er9mZJfhnhT68MFPfoO9Htx523lwJlkcaFsl7c
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -122,6 +122,13 @@ CREATE INDEX store_apps_store_id_idx ON public.store_apps USING btree (store_id)
 
 
 --
+-- Name: store_apps_store_updated_at_idx; Type: INDEX; Schema: public; Owner: james
+--
+
+CREATE INDEX store_apps_store_updated_at_idx ON public.store_apps USING btree (store, updated_at);
+
+
+--
 -- Name: store_apps_updated_at_idx; Type: INDEX; Schema: public; Owner: james
 --
 
@@ -170,5 +177,5 @@ ALTER TABLE ONLY public.store_apps
 -- PostgreSQL database dump complete
 --
 
-\unrestrict euGRvwgP2DdKvfQmK68CJR1JBwwALVDcbluI5g6vK33jDgNzEJuqbkM3h5W9ICP
+\unrestrict PVA1RDJXuUX3D1GRpOjCwxku2Er9mZJfhnhT68MFPfoO9Htx523lwJlkcaFsl7c
 

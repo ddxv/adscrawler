@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 6rfYRJBy8EWAvfvPqxJFdqcch7eLJlOMEUzym8hn242IsogeDKfANKUklCSqk1m
+\restrict 1IgLpO8u5XUqpKTFrR62z94iMvzMvOAjXuVtZZ7h02PN4zvPfrxBW3ArhNrJSy7
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -187,6 +187,20 @@ CREATE MATERIALIZED VIEW frontend.store_apps_overview AS
 ALTER MATERIALIZED VIEW frontend.store_apps_overview OWNER TO postgres;
 
 --
+-- Name: idx_store_apps_overview_updated_at; Type: INDEX; Schema: frontend; Owner: postgres
+--
+
+CREATE INDEX idx_store_apps_overview_updated_at ON frontend.store_apps_overview USING btree (updated_at DESC);
+
+
+--
+-- Name: idx_store_apps_overview_updated_at_brin; Type: INDEX; Schema: frontend; Owner: postgres
+--
+
+CREATE INDEX idx_store_apps_overview_updated_at_brin ON frontend.store_apps_overview USING brin (updated_at);
+
+
+--
 -- Name: store_apps_overview_installs_est_idx; Type: INDEX; Schema: frontend; Owner: postgres
 --
 
@@ -239,5 +253,5 @@ CREATE UNIQUE INDEX store_apps_overview_unique_store_id_idx ON frontend.store_ap
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 6rfYRJBy8EWAvfvPqxJFdqcch7eLJlOMEUzym8hn242IsogeDKfANKUklCSqk1m
+\unrestrict 1IgLpO8u5XUqpKTFrR62z94iMvzMvOAjXuVtZZ7h02PN4zvPfrxBW3ArhNrJSy7
 

@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict A8BpBhqLA7AYqvqt8VCeJMsZ36ZnqmN2wnzjPQc7DXYwRnLHWbgEipqYJFRpIz1
+\restrict anURvohh3Re4kEmMpTsJVAZMr9xPiJKn3KsUBedp0FoWhhGL8bW9B36ueiYDXNS
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -41,6 +41,7 @@ CREATE MATERIALIZED VIEW frontend.companies_category_tag_type_stats AS
             c.name AS company_name,
                 CASE
                     WHEN (tag.tag_source ~~ 'app_ads%%'::text) THEN 'ad-networks'::character varying
+                    WHEN (tag.tag_source = 'publisher'::text) THEN 'app-publishers'::character varying
                     ELSE cats.url_slug
                 END AS type_url_slug,
             count(DISTINCT csac.store_app) AS app_count,
@@ -58,6 +59,7 @@ CREATE MATERIALIZED VIEW frontend.companies_category_tag_type_stats AS
           GROUP BY sa.store, sa.category, tag.tag_source, COALESCE(cd.domain_name, ad.domain_name), c.name,
                 CASE
                     WHEN (tag.tag_source ~~ 'app_ads%%'::text) THEN 'ad-networks'::character varying
+                    WHEN (tag.tag_source = 'publisher'::text) THEN 'app-publishers'::character varying
                     ELSE cats.url_slug
                 END
         ), store_app_sdks AS (
@@ -121,5 +123,5 @@ CREATE UNIQUE INDEX frontend_companies_category_tag_type_stats_unique ON fronten
 -- PostgreSQL database dump complete
 --
 
-\unrestrict A8BpBhqLA7AYqvqt8VCeJMsZ36ZnqmN2wnzjPQc7DXYwRnLHWbgEipqYJFRpIz1
+\unrestrict anURvohh3Re4kEmMpTsJVAZMr9xPiJKn3KsUBedp0FoWhhGL8bW9B36ueiYDXNS
 

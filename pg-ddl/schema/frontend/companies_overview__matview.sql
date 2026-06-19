@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict Hg4gaLYbQEdCiJ2rahu8N8dbKODkCgg4PNKlsMMD79ESjRM3HEYFiroOnjLYcQ8
+\restrict pmKxlVqLG52Xp4kDq3JXzcx5C6HShMgQZn31TKJxVK22BWKSRnJgWkdK4HfjnHJ
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -101,6 +101,23 @@ CREATE MATERIALIZED VIEW frontend.companies_overview AS
            FROM frontend.adstxt_ad_domain_overview
           WHERE ((adstxt_ad_domain_overview.relationship)::text = 'DIRECT'::text)
           GROUP BY adstxt_ad_domain_overview.ad_domain_url
+        ), country_resolved AS (
+         SELECT e.company_id,
+            c_1.alpha2 AS country
+           FROM (( SELECT company_country_evidence.company_id,
+                    company_country_evidence.country_id,
+                    row_number() OVER (PARTITION BY company_country_evidence.company_id ORDER BY
+                        CASE company_country_evidence.source
+                            WHEN 'manual'::text THEN 1
+                            WHEN 'linkedin'::text THEN 2
+                            WHEN 'domain_tld'::text THEN 3
+                            WHEN 'app_store'::text THEN 4
+                            ELSE 5
+                        END, company_country_evidence.updated_at DESC) AS priority_rank
+                   FROM adtech.company_country_evidence
+                  WHERE (company_country_evidence.country_id IS NOT NULL)) e
+             JOIN public.countries c_1 ON ((e.country_id = c_1.id)))
+          WHERE (e.priority_rank = 1)
         )
  SELECT dom.company_domain,
     dom.domain_id,
@@ -115,6 +132,8 @@ CREATE MATERIALIZED VIEW frontend.companies_overview AS
     dom.has_publisher_signal,
     dom.has_app_ads_direct,
     dom.has_app_ads_reseller,
+    COALESCE(co.country, pco.country) AS country,
+    co.country AS country_direct,
     COALESCE(c.creatives_app_count, pc.creatives_app_count, 0) AS creatives_app_count,
     COALESCE(t.has_trends, pt.has_trends, 0) AS has_trends,
     COALESCE(a.apps_added_count, pa.apps_added_count, 0) AS apps_added_count,
@@ -131,7 +150,7 @@ CREATE MATERIALIZED VIEW frontend.companies_overview AS
     (((dom.company_id IS NOT NULL) AND (dom.company_id IN ( SELECT DISTINCT companies.parent_company_id
            FROM adtech.companies
           WHERE (companies.parent_company_id IS NOT NULL)))))::integer AS is_parent_domain
-   FROM ((((((((((((domain_base dom
+   FROM ((((((((((((((domain_base dom
      LEFT JOIN creatives_agg c ON (((dom.company_domain)::text = (c.company_domain)::text)))
      LEFT JOIN trends_agg t ON (((dom.company_domain)::text = t.company_domain)))
      LEFT JOIN app_changes_agg a ON (((dom.company_domain)::text = (a.company_domain)::text)))
@@ -144,6 +163,8 @@ CREATE MATERIALIZED VIEW frontend.companies_overview AS
      LEFT JOIN sdks_agg ps ON (((dom.parent_domain)::text = (ps.company_domain)::text)))
      LEFT JOIN mediation_agg pm ON (((dom.parent_domain)::text = (pm.company_domain)::text)))
      LEFT JOIN adstxt_ad_domain_agg paa ON (((dom.parent_domain)::text = (paa.ad_domain_url)::text)))
+     LEFT JOIN country_resolved co ON ((dom.company_id = co.company_id)))
+     LEFT JOIN country_resolved pco ON ((dom.parent_company_id = pco.company_id)))
   WITH NO DATA;
 
 
@@ -167,5 +188,5 @@ CREATE UNIQUE INDEX frontend_companies_overview_domain ON frontend.companies_ove
 -- PostgreSQL database dump complete
 --
 
-\unrestrict Hg4gaLYbQEdCiJ2rahu8N8dbKODkCgg4PNKlsMMD79ESjRM3HEYFiroOnjLYcQ8
+\unrestrict pmKxlVqLG52Xp4kDq3JXzcx5C6HShMgQZn31TKJxVK22BWKSRnJgWkdK4HfjnHJ
 

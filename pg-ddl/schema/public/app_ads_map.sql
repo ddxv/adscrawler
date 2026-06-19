@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict ygg368C3WrKpYVbdXXbgrCNhb0tkOXxGAdAg14oCiA1sjxnyR9XohCqhxBFGXk0
+\restrict ebttevOl5VDK0Yxuyif399fNprzBvF0XybOeBx1avI1ij0WePaeCGbULeyEwAmJ
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -76,15 +76,6 @@ CREATE TRIGGER app_ads_map_updated_at BEFORE UPDATE ON public.app_ads_map FOR EA
 
 
 --
--- Name: app_ads_map repack_trigger; Type: TRIGGER; Schema: public; Owner: james
---
-
-CREATE TRIGGER repack_trigger AFTER INSERT OR DELETE OR UPDATE ON public.app_ads_map FOR EACH ROW EXECUTE FUNCTION repack.repack_trigger('id');
-
-ALTER TABLE public.app_ads_map ENABLE ALWAYS TRIGGER repack_trigger;
-
-
---
 -- Name: app_ads_map app_ads_map_fk; Type: FK CONSTRAINT; Schema: public; Owner: james
 --
 
@@ -104,5 +95,5 @@ ALTER TABLE ONLY public.app_ads_map
 -- PostgreSQL database dump complete
 --
 
-\unrestrict ygg368C3WrKpYVbdXXbgrCNhb0tkOXxGAdAg14oCiA1sjxnyR9XohCqhxBFGXk0
+\unrestrict ebttevOl5VDK0Yxuyif399fNprzBvF0XybOeBx1avI1ij0WePaeCGbULeyEwAmJ
 
