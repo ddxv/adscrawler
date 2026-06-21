@@ -48,7 +48,7 @@ failed_runs AS (
     FROM logging.version_code_api_scan_results
     WHERE
         crawl_result != 1
-        AND updated_at >= current_date - interval '10 days'
+        AND updated_at >= current_date - interval '3 days'
     GROUP BY store_app
 ),
 monthly_ads_scheduled_to_run AS (
@@ -76,7 +76,7 @@ monthly_ads_scheduled_to_run AS (
         ON sa.id = agm.store_app
     LEFT JOIN failed_runs AS fr ON sa.id = fr.store_app
     WHERE
-        (ls.run_at <= current_date - interval '14 days' OR ls.run_at IS NULL)
+        (ls.run_at <= current_date - interval '10 days' OR ls.run_at IS NULL)
         AND sa.store = :store
         AND sa.ad_supported
         AND sa.free
