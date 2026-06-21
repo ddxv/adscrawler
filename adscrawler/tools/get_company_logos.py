@@ -725,6 +725,7 @@ def update_company_logos() -> None:
     logger.info(f"Processing {companies.shape[0]:,} companies (missing logo)")
     resolved = query_company_countries_resolved(pgdb)
     companies = companies.merge(resolved, on="company_id", how="left")
+    companies = companies.sample(frac=1.0)
     i = 0
     for _i, row in companies.iterrows():
         i += 1
@@ -767,6 +768,7 @@ def refresh_missing_logos_and_countries() -> None:
         f"(logo needed: {needed['_needs_logo'].sum()}, "
         f"country needed: {needed['_needs_country'].sum()})"
     )
+    needed = needed.sample(frac=1.0)
     i = 0
     for _i, row in needed.iterrows():
         i += 1
