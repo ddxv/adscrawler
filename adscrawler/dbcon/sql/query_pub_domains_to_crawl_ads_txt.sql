@@ -31,7 +31,7 @@ WITH myq AS (
             )
         -- crawl all apps domains occassionally
         -- OR (
-        -- 	pdcr.crawled_at <= CAST(:max_recrawl_ts AS timestamp)
+        -- 	pdcr.crawled_at <= CAST( max_recrawl_ts AS timestamp)
         -- 		OR pdcr.crawled_at IS NULL
         -- )
         )
