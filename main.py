@@ -35,6 +35,7 @@ from adscrawler.packages.process_files import (
 )
 from adscrawler.scrape import crawl_app_ads
 from adscrawler.tools.geo import update_geo_dbs
+from adscrawler.tools.get_company_logos import refresh_metadata
 
 logger = get_logger(__name__)
 
@@ -185,6 +186,16 @@ class ProcessManager:
         )
         ### OPTIONS FOR MANUAL/LOCAL WAYDROID PROCESSING
         parser.add_argument(
+            "--refresh-metadata",
+            help="Refresh company metadata (logos, LinkedIn, country, GitHub)",
+            action="store_true",
+        )
+        parser.add_argument(
+            "--refresh-metadata-all",
+            help="Refresh ALL company metadata (not just missing)",
+            action="store_true",
+        )
+        parser.add_argument(
             "--redownload-geo-dbs",
             help="Redownload geo dbs",
             action="store_true",
@@ -330,6 +341,12 @@ class ProcessManager:
         if self.args.process_sdks:
             self.process_sdks(store)
 
+        if self.args.refresh_metadata:
+            self.refresh_metadata()
+
+        if self.args.refresh_metadata_all:
+            self.refresh_metadata_all()
+
         if self.args.waydroid:
             self.waydroid_mitm()
 
@@ -450,6 +467,12 @@ class ProcessManager:
             run_id=self.args.run_id,
         )
         logger.info(f"Error messages: {error_messages}")
+
+    def refresh_metadata(self) -> None:
+        refresh_metadata(missing_only=True)
+
+    def refresh_metadata_all(self) -> None:
+        refresh_metadata(missing_only=False)
 
     def waydroid_mitm(self) -> None:
         if self.args.redownload_geo_dbs:

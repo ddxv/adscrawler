@@ -2,6 +2,8 @@
 # Remove .example from the file name and fill in the details.
 domain: example.com
 company_name: Example
+# linkedin_url: company/example
+# github_user: ExampleOrg
 sdk_name: Example
 sdk_slug: example-sdk
 is_open_source: false

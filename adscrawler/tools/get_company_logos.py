@@ -9,6 +9,7 @@ Outputs:
  - logos_mapping.csv with domain, chosen_path, chosen_url
 """
 
+import json
 import os
 import pathlib
 import re
@@ -30,6 +31,7 @@ from adscrawler.dbcon.connection import get_db_connection
 from adscrawler.dbcon.queries import (
     query_companies,
     query_company_countries_resolved,
+    update_company_github_user,
     update_company_linkedin_url,
     update_company_logo_url,
     upsert_df,
@@ -188,6 +190,16 @@ def pick_best(images: list[tuple[str, bytes]]) -> tuple[str, bytes] | None:
     return best
 
 
+def extract_github_user(url: str) -> str | None:
+    """Extract GitHub user/org name from a GitHub URL.
+    e.g. 'https://github.com/SomeOrg' or 'https://github.com/SomeOrg/repo' -> 'SomeOrg'
+    """
+    match = re.search(r"(?:www\.)?github\.com/([^/\?#]+)", url, re.I)
+    if match:
+        return match.group(1)
+    return None
+
+
 def find_other_domains(other_tld: str, html: str) -> list[str]:
     other_urls = []
     soup = BeautifulSoup(html, "html.parser")
@@ -234,16 +246,21 @@ def crawl_linked_in_urls(linkedin_urls: list[str]) -> list[str]:
 
 def process_site(
     domain: str, check_domain: str, official_linkedin_url: str | None = None
-) -> tuple[str | None, str | None]:
+) -> tuple[str | None, str | None, str | None]:
+    """Process a site to discover logo images, LinkedIn URL, and GitHub user.
+
+    Returns (filename, linkedin_url, github_user).
+    """
     candidates = []
     linkedin_url = None
+    github_user = None
     if official_linkedin_url:
         linkedin_urls = [official_linkedin_url]
         candidates += crawl_linked_in_urls(linkedin_urls=linkedin_urls)
         if candidates:
             file_name = process_candidates(candidates, domain)
             if file_name:
-                return file_name, extract_linkedin_path(official_linkedin_url)
+                return file_name, extract_linkedin_path(official_linkedin_url), None
     if "github.com-" in check_domain:
         check_domain = check_domain.replace("github.com-", "github.com/")
     try:
@@ -251,14 +268,16 @@ def process_site(
         r = requests.get(f"https://{check_domain}", headers=HEADERS, timeout=10)
         if r.status_code != 200:
             logger.error(f"Failed to get {check_domain}")
-            return None, None
+            return None, None, None
     except Exception:
         logger.error(f"Failed to get {check_domain}")
-        return None, None
+        return None, None, None
     html = r.text
     if "github.com" in check_domain:
         logger.info("Found github.com in domain")
         candidates = parse_github(html=html)
+        # Extract GitHub user from check_domain
+        github_user = extract_github_user(check_domain)
     linkedin_urls = find_other_domains(other_tld="linkedin.com", html=html)
     # Extract the first LinkedIn URL for saving
     for lu in linkedin_urls:
@@ -269,6 +288,10 @@ def process_site(
     github_urls = []
     if "github.com" not in check_domain:
         github_urls = find_other_domains(other_tld="github.com", html=html)
+        if github_urls:
+            extracted = extract_github_user(github_urls[0])
+            if extracted:
+                github_user = extracted
     candidates += crawl_linked_in_urls(linkedin_urls=linkedin_urls)
     if github_urls and len(github_urls) > 0:
         logger.info(f"Found {len(github_urls)} github urls")
@@ -284,8 +307,8 @@ def process_site(
     if candidates:
         file_name = process_candidates(candidates, domain)
         if file_name:
-            return file_name, linkedin_url
-    return None, linkedin_url
+            return file_name, linkedin_url, github_user
+    return None, linkedin_url, github_user
 
 
 def find_instagram_url(html: str) -> list[str]:
@@ -418,25 +441,71 @@ def _process_linkedin_country(
     if not about:
         return
 
-    # Try HQ first, then locations for country evidence
-    sources: list[tuple[str, str | None]] = []
+    # Prefer JSON-LD country code (authoritative, e.g. "US" not "CA" for "Mountain View, CA").
+    # Only fall back to guessing from the text if no structured data is available.
+    hq = about.get("headquarters")
+    ld_country_code = about.get("headquarters_country_code")
 
-    if about.get("headquarters"):
-        sources.append(("headquarters", about["headquarters"]))
-
-    if about.get("locations"):
-        for loc in about["locations"]:
-            sources.append(("location", loc))
-
-    for label, raw_value in sources:
-        if not raw_value:
-            continue
-        country_id = _resolve_country_id(raw_value, country_id_map, name_to_alpha2)
+    if ld_country_code:
+        country_id = country_id_map.get(ld_country_code)
         insert_company_country_evidence(
             company_id=company_id,
             source="linkedin",
-            raw_value=f"{label}: {raw_value}",
+            raw_value=f"headquarters: {hq or ld_country_code}",
             country_id=country_id,
+            pgdb=pgdb,
+        )
+        if country_id is not None:
+            logger.info(
+                f"Resolved country {country_id} from JSON-LD "
+                f"'{ld_country_code}' — skipping locations"
+            )
+            return
+
+    # Fallback: guess country from the text description
+    if hq:
+        country_id = _resolve_country_id(hq, country_id_map, name_to_alpha2)
+        insert_company_country_evidence(
+            company_id=company_id,
+            source="linkedin",
+            raw_value=f"headquarters: {hq}",
+            country_id=country_id,
+            pgdb=pgdb,
+        )
+        if country_id is not None:
+            logger.info(
+                f"Resolved country {country_id} from headquarters '{hq}' — skipping locations"
+            )
+            return
+
+    # Fallback: iterate locations until one resolves
+    locations = about.get("locations") or []
+    for loc in locations:
+        if not loc:
+            continue
+        country_id = _resolve_country_id(loc, country_id_map, name_to_alpha2)
+        insert_company_country_evidence(
+            company_id=company_id,
+            source="linkedin",
+            raw_value=f"location: {loc}",
+            country_id=country_id,
+            pgdb=pgdb,
+        )
+        if country_id is not None:
+            logger.info(
+                f"Resolved country {country_id} from location '{loc}' — stopping"
+            )
+            return
+
+    # Nothing resolved — save the last location attempt anyway so we
+    # don't re-scrape this company on the next pass
+    if locations:
+        last = locations[-1]
+        insert_company_country_evidence(
+            company_id=company_id,
+            source="linkedin",
+            raw_value=f"location: {last}",
+            country_id=None,
             pgdb=pgdb,
         )
 
@@ -456,7 +525,10 @@ def scrape_linkedin_about(linkedin_path: str) -> dict:
         A dictionary with keys:
         - 'description' (str or None): the "About us" description text
         - 'website' (str or None): the website URL
-        - 'headquarters' (str or None): the headquarters location
+        - 'headquarters' (str or None): the headquarters location string
+        - 'headquarters_country_code' (str or None): authoritative alpha-2 country
+          code extracted from JSON-LD (e.g. "US"), more reliable than guessing
+          from the text in 'headquarters'
         - 'locations' (list[str] or None): list of location address strings
     """
     path = linkedin_path.strip().rstrip("/")
@@ -465,6 +537,7 @@ def scrape_linkedin_about(linkedin_path: str) -> dict:
         "description": None,
         "website": None,
         "headquarters": None,
+        "headquarters_country_code": None,
         "locations": None,
     }
 
@@ -476,6 +549,27 @@ def scrape_linkedin_about(linkedin_path: str) -> dict:
     except requests.RequestException as e:
         logger.error(f"Failed to fetch LinkedIn page {url}: {e}")
         return result
+
+    # --- JSON-LD structured data (most reliable for country code) ---
+    ld_match = re.search(
+        r'<script type="application/ld\+json">(.*?)</script>', r.text, re.DOTALL
+    )
+    if ld_match:
+        try:
+            ld_data = json.loads(ld_match.group(1))
+            # The JSON-LD may be a @graph array or a single object
+            items = ld_data.get("@graph", [ld_data])
+            for item in items:
+                if item.get("@type") == "Organization":
+                    address = item.get("address") or {}
+                    if isinstance(address, dict):
+                        country_code = address.get("addressCountry")
+                        if country_code and len(str(country_code)) == 2:
+                            result["headquarters_country_code"] = str(
+                                country_code
+                            ).upper()
+        except (json.JSONDecodeError, ValueError):
+            pass
 
     soup = BeautifulSoup(r.text, "html.parser")
 
@@ -602,6 +696,10 @@ def _process_single_company(
     existing_linkedin_url = (
         existing_linkedin_url if type(existing_linkedin_url) == str else None
     )
+    existing_github_user = row.get("company_github_user")
+    existing_github_user = (
+        existing_github_user if type(existing_github_user) == str else None
+    )
     company_id = row["company_id"]
     logger.info(
         f"Processing {domain} (id={company_id}) needs_logo={needs_logo} needs_country={needs_country}"
@@ -622,7 +720,8 @@ def _process_single_company(
                 )
                 linkedin_url = ddg_url
 
-    # --- Pass 1: Logo discovery (also may discover a LinkedIn URL) ---
+    # --- Pass 1: Logo discovery (also may discover a LinkedIn URL and GitHub user) ---
+    github_user = existing_github_user
     if needs_logo:
         official_linkedin_url = None
         if existing_linkedin_url:
@@ -633,12 +732,13 @@ def _process_single_company(
             logger.info(f"{domain} logo already set")
         else:
             found_url: str | None = None
+            found_github_user: str | None = None
             try_these = ["", "/about", "/company", "/about-us", "/about-company"]
             if "github.com" in domain:
                 try_these = [""]
             for try_this in try_these:
                 check_domain = domain + try_this
-                filename, found_url = process_site(
+                filename, found_url, found_github_user = process_site(
                     domain=domain,
                     check_domain=check_domain,
                     official_linkedin_url=official_linkedin_url,
@@ -659,6 +759,15 @@ def _process_single_company(
                     pgdb=pgdb,
                 )
                 linkedin_url = found_url
+            # Save GitHub user if discovered and not already stored
+            if found_github_user and not existing_github_user:
+                logger.info(f"Saving github user for {domain}: {found_github_user}")
+                update_company_github_user(
+                    company_id=company_id,
+                    github_user=found_github_user,
+                    pgdb=pgdb,
+                )
+                github_user = found_github_user
             # Upload logo if found
             if filename:
                 upload_and_update(
@@ -711,41 +820,14 @@ def process_new_company(company_name: str) -> None:
     )
 
 
-def update_company_logos() -> None:
-    """Legacy wrapper — processes companies missing a logo.
-    Use refresh_missing_logos_and_countries() for broader coverage."""
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
-    pgdb = get_db_connection()
-    country_id_map, name_to_alpha2 = _build_country_map(pgdb)
+def refresh_metadata(missing_only: bool = True) -> None:
+    """Batch refresh company metadata (logos, LinkedIn URLs, country evidence, GitHub user).
 
-    companies = query_companies(pgdb=pgdb)
-    companies = companies[
-        (companies["company_logo_url"].isna()) | (companies["company_logo_url"] == "")
-    ]
-    logger.info(f"Processing {companies.shape[0]:,} companies (missing logo)")
-    resolved = query_company_countries_resolved(pgdb)
-    companies = companies.merge(resolved, on="company_id", how="left")
-    companies = companies.sample(frac=1.0)
-    i = 0
-    for _i, row in companies.iterrows():
-        i += 1
-        logger.info(f"--- i={i}/{companies.shape[0]:,} ---")
-        _process_single_company(
-            row=row,
-            country_id_map=country_id_map,
-            name_to_alpha2=name_to_alpha2,
-            pgdb=pgdb,
-            needs_logo=True,
-            needs_country=pd.isna(row.get("country")),
-        )
-
-
-def refresh_missing_logos_and_countries() -> None:
-    """Periodic batch function that finds companies missing a logo OR missing
-    a resolved country, and processes whichever is needed per company.
-
-    A company is fully skipped only when it already has both a logo AND a
-    resolved country in company_country_evidence.
+    Parameters
+    ----------
+    missing_only : bool
+        If True (default), only process companies that are missing a logo, a
+        resolved country, or a GitHub user.  If False, process *all* companies.
     """
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     pgdb = get_db_connection()
@@ -759,15 +841,28 @@ def refresh_missing_logos_and_countries() -> None:
         companies["company_logo_url"] != ""
     )
     has_country = companies["country"].notna()
+    has_github = companies["company_github_user"].notna() & (
+        companies["company_github_user"] != ""
+    )
     companies["_needs_logo"] = ~has_logo
     companies["_needs_country"] = ~has_country
 
-    needed = companies[companies["_needs_logo"] | companies["_needs_country"]]
-    logger.info(
-        f"Processing {needed.shape[0]:,} companies "
-        f"(logo needed: {needed['_needs_logo'].sum()}, "
-        f"country needed: {needed['_needs_country'].sum()})"
-    )
+    if missing_only:
+        needed = companies[
+            companies["_needs_logo"] | companies["_needs_country"] | ~has_github
+        ]
+        logger.info(
+            f"Processing {needed.shape[0]:,} companies (missing only: "
+            f"logo: {needed['_needs_logo'].sum()}, "
+            f"country: {needed['_needs_country'].sum()}, "
+            f"github: {(~has_github).sum()})"
+        )
+    else:
+        needed = companies.copy()
+        needed["_needs_logo"] = True
+        needed["_needs_country"] = True
+        logger.info(f"Processing {needed.shape[0]:,} companies (all)")
+
     needed = needed.sample(frac=1.0)
     i = 0
     for _i, row in needed.iterrows():

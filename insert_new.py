@@ -96,7 +96,8 @@ def _main_yaml() -> None:
     """Insert a single company from new_company.yml."""
     data = load_yaml_file("new_company.yml")
     company_name = data["company_name"]
-    company_linkedin = data["linkedin_url"]
+    company_linkedin = data.get("linkedin_url")
+    company_github_user = data.get("github_user")
     domain = data["domain"]
     sdk_name = data["sdk_name"]
     sdk_slug = data["sdk_slug"]
@@ -108,7 +109,7 @@ def _main_yaml() -> None:
     try:
         with pgdb.get_cursor() as cur:
             company_id = insert_company_with_domain(
-                cur, company_name, domain, company_linkedin
+                cur, company_name, domain, company_linkedin, company_github_user
             )
 
             if category_id == 7:
@@ -136,7 +137,11 @@ def _main_yaml() -> None:
 
 
 def insert_company_with_domain(
-    cur, company_name: str, domain: str, company_linkedin: str | None
+    cur,
+    company_name: str,
+    domain: str,
+    company_linkedin: str | None,
+    company_github_user: str | None = None,
 ) -> int:
     # Insert ad_domain if not exists and get its ID
     cur.execute(
@@ -159,12 +164,12 @@ def insert_company_with_domain(
     # Insert company if not exists and get its ID
     cur.execute(
         """
-            INSERT INTO adtech.companies (name, domain_id, linkedin_url) 
-            VALUES (%s, %s, %s) 
+            INSERT INTO adtech.companies (name, domain_id, linkedin_url, github_user) 
+            VALUES (%s, %s, %s, %s) 
             ON CONFLICT (name) DO NOTHING
             RETURNING id;
         """,
-        (company_name, ad_domain_id, company_linkedin),
+        (company_name, ad_domain_id, company_linkedin, company_github_user),
     )
     company_id = cur.fetchone()
 

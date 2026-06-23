@@ -897,6 +897,7 @@ def query_companies(pgdb: PostgresEngine) -> pd.DataFrame:
         c.parent_company_id as parent_company_id,
         c.logo_url as company_logo_url,
         c.linkedin_url as company_linkedin_url,
+        c.github_user as company_github_user,
         ad.id as company_domain_id,
         ad.domain_name as company_domain
         FROM
@@ -924,6 +925,15 @@ def update_company_linkedin_url(
     update_query = """UPDATE adtech.companies SET linkedin_url = %s WHERE id = %s AND (linkedin_url IS NULL OR linkedin_url = '')"""
     with pgdb.get_cursor() as cur:
         cur.execute(update_query, (linkedin_url, company_id))
+
+
+def update_company_github_user(
+    company_id: int, github_user: str, pgdb: PostgresEngine
+) -> None:
+    """Update the github_user for a company, but only if it's not already set."""
+    update_query = """UPDATE adtech.companies SET github_user = %s WHERE id = %s AND (github_user IS NULL OR github_user = '')"""
+    with pgdb.get_cursor() as cur:
+        cur.execute(update_query, (github_user, company_id))
 
 
 @lru_cache(maxsize=1)
