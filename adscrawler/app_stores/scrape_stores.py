@@ -319,6 +319,7 @@ def crawl_keyword_ranks(pgdb: PostgresEngine) -> None:
     language = "en"
     kdf = query_keywords_to_crawl(pgdb, limit=1000)
     all_keywords = pd.DataFrame()
+    crawl_log = []
     for _id, row in kdf.iterrows():
         logger.info(
             f"Crawling keywords: {_id}/{kdf.shape[0]:,} keyword={row.keyword_text}"
@@ -339,17 +340,26 @@ def crawl_keyword_ranks(pgdb: PostgresEngine) -> None:
             all_keywords = pd.concat([all_keywords, df], ignore_index=True)
         except Exception:
             logger.exception(f"Scrape keyword={keyword} hit error, skipping")
+        finally:
+            crawl_log.append(
+                {
+                    "keyword_id": row["keyword_id"],
+                    "crawled_at": datetime.datetime.now(tz=datetime.UTC),
+                }
+            )
     raw_keywords_to_s3(all_keywords)
-    all_keywords = all_keywords.rename(columns={"keyword_id": "keyword"})
-    key_columns = ["keyword"]
-    upsert_df(
-        table_name="keywords_crawled_at",
-        schema="logging",
-        insert_columns=["keyword", "crawled_at"],
-        df=all_keywords[["keyword", "crawled_at"]],
-        key_columns=key_columns,
-        pgdb=pgdb,
-    )
+    if crawl_log:
+        crawl_log_df = pd.DataFrame(crawl_log).rename(
+            columns={"keyword_id": "keyword"}
+        )
+        upsert_df(
+            table_name="keywords_crawled_at",
+            schema="logging",
+            insert_columns=["keyword", "crawled_at"],
+            df=crawl_log_df[["keyword", "crawled_at"]],
+            key_columns=["keyword"],
+            pgdb=pgdb,
+        )
 
 
 def scrape_store_ranks(pgdb: PostgresEngine, store: int) -> None:
@@ -492,6 +502,8 @@ def scrape_keyword(
     logger.info(
         f"{keyword=} apple_apps:{adf.shape[0]:,} google_apps:{gdf.shape[0]:,} finished"
     )
+    if df.empty:
+        return pd.DataFrame(columns=["store", "store_id", "rank"])
     df = df[["store", "store_id", "rank"]]
     return df
 
