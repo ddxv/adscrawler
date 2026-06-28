@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 4MIgfmVyXRatfLNjTgPgQjUiWfIU22u8KzQAwac5Ei2KZFVfZSfjWgxMA2isXaw
+\restrict kEhg9qlhLeDcAs6jEjVjN1cu6M5vb1ma9hmhnLmZwPjtqbx0AcVnWeR11Nkg5Ca
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -34,7 +34,8 @@ CREATE TABLE adtech.companies (
     description text,
     domain_id integer NOT NULL,
     logo_url text,
-    linkedin_url character varying
+    linkedin_url character varying,
+    github_user character varying
 );
 
 
@@ -98,5 +99,5 @@ ALTER TABLE ONLY adtech.companies
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 4MIgfmVyXRatfLNjTgPgQjUiWfIU22u8KzQAwac5Ei2KZFVfZSfjWgxMA2isXaw
+\unrestrict kEhg9qlhLeDcAs6jEjVjN1cu6M5vb1ma9hmhnLmZwPjtqbx0AcVnWeR11Nkg5Ca
 

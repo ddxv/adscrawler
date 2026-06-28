@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 936djcukfm1fJr0TbL7SLTKeVcH7vv9lU2Y0aaso5NhRqh9MLHQLYOHDH26HVri
+\restrict 9d0znP8MKUhgAZgNGHNy7LwFEWJvRUKi96sAorXcIu3UaODiBpl7iNcZXLH0fPg
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -457,7 +457,8 @@ CREATE TABLE adtech.companies (
     description text,
     domain_id integer NOT NULL,
     logo_url text,
-    linkedin_url character varying
+    linkedin_url character varying,
+    github_user character varying
 );
 
 
@@ -1203,34 +1204,6 @@ CREATE TABLE public.app_ads_map (
 ALTER TABLE public.app_ads_map OWNER TO james;
 
 --
--- Name: developer_store_apps; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
---
-
-CREATE MATERIALIZED VIEW public.developer_store_apps AS
- WITH developer_domain_ids AS (
-         SELECT DISTINCT pd_1.id AS domain_id
-           FROM (((public.app_urls_map aum_1
-             LEFT JOIN public.domains pd_1 ON ((aum_1.pub_domain = pd_1.id)))
-             LEFT JOIN public.store_apps sa_1 ON ((aum_1.store_app = sa_1.id)))
-             LEFT JOIN public.developers d_1 ON ((sa_1.developer = d_1.id)))
-        )
- SELECT sa.store,
-    sa.id AS store_app,
-    d.name AS developer_name,
-    pd.domain_name AS developer_url,
-    d.store AS developer_store,
-    pd.id AS domain_id,
-    d.developer_id
-   FROM (((public.store_apps sa
-     LEFT JOIN public.developers d ON ((sa.developer = d.id)))
-     LEFT JOIN public.app_urls_map aum ON ((sa.id = aum.store_app)))
-     LEFT JOIN public.domains pd ON ((aum.pub_domain = pd.id)))
-  WITH NO DATA;
-
-
-ALTER MATERIALIZED VIEW public.developer_store_apps OWNER TO postgres;
-
---
 -- Name: domains_third_party; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -1240,6 +1213,44 @@ CREATE TABLE public.domains_third_party (
 
 
 ALTER TABLE public.domains_third_party OWNER TO postgres;
+
+--
+-- Name: developer_store_apps; Type: MATERIALIZED VIEW; Schema: public; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW public.developer_store_apps AS
+ WITH cleaned_app_url_map AS (
+         SELECT aum_1.store_app,
+                CASE
+                    WHEN (NOT (EXISTS ( SELECT 1
+                       FROM public.domains_third_party dtp
+                      WHERE (dtp.domain_id = rd.id)))) THEN COALESCE(rd.domain_name, pd.domain_name)
+                    ELSE pd.domain_name
+                END AS developer_url,
+                CASE
+                    WHEN (NOT (EXISTS ( SELECT 1
+                       FROM public.domains_third_party dtp
+                      WHERE (dtp.domain_id = rd.id)))) THEN COALESCE(rd.id, pd.id)
+                    ELSE pd.id
+                END AS domain_id
+           FROM ((public.app_urls_map aum_1
+             LEFT JOIN public.domains pd ON ((aum_1.pub_domain = pd.id)))
+             LEFT JOIN public.domains rd ON ((pd.root_domain_id = rd.id)))
+        )
+ SELECT sa.store,
+    sa.id AS store_app,
+    d.name AS developer_name,
+    d.store AS developer_store,
+    d.developer_id,
+    aum.developer_url,
+    aum.domain_id
+   FROM ((public.store_apps sa
+     LEFT JOIN public.developers d ON ((sa.developer = d.id)))
+     LEFT JOIN cleaned_app_url_map aum ON ((sa.id = aum.store_app)))
+  WITH NO DATA;
+
+
+ALTER MATERIALIZED VIEW public.developer_store_apps OWNER TO postgres;
 
 --
 -- Name: combined_app_companies; Type: MATERIALIZED VIEW; Schema: adtech; Owner: postgres
@@ -1318,7 +1329,7 @@ CREATE MATERIALIZED VIEW adtech.combined_app_companies AS
         UNION ALL
          SELECT app_domain_publishers.store_app,
             app_domain_publishers.domain_id,
-            'publisher'::text
+            'publisher'::text AS text
            FROM app_domain_publishers
         ), all_bools AS (
          SELECT cs.domain_id,
@@ -3264,6 +3275,53 @@ CREATE MATERIALIZED VIEW frontend.companies_sdks_overview AS
 ALTER MATERIALIZED VIEW frontend.companies_sdks_overview OWNER TO postgres;
 
 --
+-- Name: company_domain_country; Type: MATERIALIZED VIEW; Schema: frontend; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW frontend.company_domain_country AS
+ WITH country_totals AS (
+         SELECT api_call_countries.company_domain,
+            api_call_countries.country,
+            sum(api_call_countries.store_app_count) AS total_app_count
+           FROM frontend.api_call_countries
+          GROUP BY api_call_countries.company_domain, api_call_countries.country
+        ), parent_country_totals AS (
+         SELECT api_call_countries.parent_company_domain,
+            api_call_countries.country,
+            sum(api_call_countries.store_app_count) AS total_app_count
+           FROM frontend.api_call_countries
+          GROUP BY api_call_countries.parent_company_domain, api_call_countries.country
+        ), parent_ranked_countries AS (
+         SELECT parent_country_totals.parent_company_domain,
+            parent_country_totals.country,
+            parent_country_totals.total_app_count,
+            row_number() OVER (PARTITION BY parent_country_totals.parent_company_domain ORDER BY parent_country_totals.total_app_count DESC) AS rn
+           FROM parent_country_totals
+        ), company_ranked_countries AS (
+         SELECT country_totals.company_domain,
+            country_totals.country,
+            country_totals.total_app_count,
+            row_number() OVER (PARTITION BY country_totals.company_domain ORDER BY country_totals.total_app_count DESC) AS rn
+           FROM country_totals
+        )
+ SELECT company_ranked_countries.company_domain,
+    company_ranked_countries.country AS most_common_country,
+    company_ranked_countries.total_app_count
+   FROM company_ranked_countries
+  WHERE ((NOT ((company_ranked_countries.company_domain)::text IN ( SELECT parent_ranked_countries.parent_company_domain
+           FROM parent_ranked_countries))) AND (company_ranked_countries.rn = 1))
+UNION
+ SELECT parent_ranked_countries.parent_company_domain AS company_domain,
+    parent_ranked_countries.country AS most_common_country,
+    parent_ranked_countries.total_app_count
+   FROM parent_ranked_countries
+  WHERE (parent_ranked_countries.rn = 1)
+  WITH NO DATA;
+
+
+ALTER MATERIALIZED VIEW frontend.company_domain_country OWNER TO postgres;
+
+--
 -- Name: mediation_adapter_app_counts; Type: MATERIALIZED VIEW; Schema: frontend; Owner: postgres
 --
 
@@ -3325,6 +3383,8 @@ CREATE MATERIALIZED VIEW frontend.companies_overview AS
             cac.company_id,
             c_1.name AS company_name,
             c_1.logo_url,
+            c_1.linkedin_url,
+            c_1.github_user,
             c_1.parent_company_id,
             pc_1.name AS parent_company_name,
             pd.domain_name AS parent_domain,
@@ -3339,7 +3399,7 @@ CREATE MATERIALIZED VIEW frontend.companies_overview AS
              LEFT JOIN adtech.companies c_1 ON ((cac.company_id = c_1.id)))
              LEFT JOIN adtech.companies pc_1 ON ((c_1.parent_company_id = pc_1.id)))
              LEFT JOIN public.domains pd ON ((pc_1.domain_id = pd.id)))
-          GROUP BY d.id, d.domain_name, cac.company_id, c_1.name, c_1.logo_url, c_1.parent_company_id, pc_1.name, pd.domain_name, pd.id
+          GROUP BY d.id, d.domain_name, cac.company_id, c_1.name, c_1.logo_url, c_1.linkedin_url, c_1.github_user, c_1.parent_company_id, pc_1.name, pd.domain_name, pd.id
         ), creatives_agg AS (
          SELECT companies_creative_rankings.company_domain,
             (count(*))::integer AS creatives_app_count
@@ -3395,6 +3455,14 @@ CREATE MATERIALIZED VIEW frontend.companies_overview AS
            FROM frontend.adstxt_ad_domain_overview
           WHERE ((adstxt_ad_domain_overview.relationship)::text = 'DIRECT'::text)
           GROUP BY adstxt_ad_domain_overview.ad_domain_url
+        ), ip_country_resolved AS (
+         SELECT company_domain_country.company_domain,
+            company_domain_country.most_common_country AS api_ip_resolved_country
+           FROM frontend.company_domain_country
+        ), percent_opensource AS (
+         SELECT companies_open_source_percent.company_domain,
+            companies_open_source_percent.percent_open_source
+           FROM frontend.companies_open_source_percent
         ), country_resolved AS (
          SELECT e.company_id,
             c_1.alpha2 AS country
@@ -3449,6 +3517,8 @@ CREATE MATERIALIZED VIEW frontend.companies_overview AS
     dom.company_id,
     dom.company_name,
     dom.logo_url,
+    dom.linkedin_url,
+    dom.github_user,
     dom.parent_company_id,
     dom.parent_domain,
     dom.parent_domain_id,
@@ -3459,6 +3529,10 @@ CREATE MATERIALIZED VIEW frontend.companies_overview AS
     dom.has_app_ads_reseller,
     COALESCE(co.country, pco.country) AS country,
     co.country AS country_direct,
+    COALESCE(ipco.api_ip_resolved_country, pipco.api_ip_resolved_country) AS api_ip_resolved_country,
+    ipco.api_ip_resolved_country AS api_ip_resolved_country_direct,
+    COALESCE(po.percent_open_source, ppo.percent_open_source) AS percent_open_source,
+    po.percent_open_source AS percent_open_source_direct,
         CASE
             WHEN ((dom.company_id IS NOT NULL) AND (dom.company_id IN ( SELECT DISTINCT companies.parent_company_id
                FROM adtech.companies
@@ -3514,7 +3588,7 @@ CREATE MATERIALIZED VIEW frontend.companies_overview AS
     (((dom.company_id IS NOT NULL) AND (dom.company_id IN ( SELECT DISTINCT companies.parent_company_id
            FROM adtech.companies
           WHERE (companies.parent_company_id IS NOT NULL)))))::integer AS is_parent_domain
-   FROM (((((((((((((domain_base dom
+   FROM (((((((((((((((((domain_base dom
      LEFT JOIN creatives_agg c ON (((dom.company_domain)::text = (c.company_domain)::text)))
      LEFT JOIN trends_agg t ON (((dom.company_domain)::text = t.company_domain)))
      LEFT JOIN app_changes_agg a ON (((dom.company_domain)::text = (a.company_domain)::text)))
@@ -3528,6 +3602,10 @@ CREATE MATERIALIZED VIEW frontend.companies_overview AS
      LEFT JOIN trends_agg pt ON (((dom.parent_domain)::text = pt.company_domain)))
      LEFT JOIN country_resolved co ON ((dom.company_id = co.company_id)))
      LEFT JOIN country_resolved pco ON ((dom.parent_company_id = pco.company_id)))
+     LEFT JOIN ip_country_resolved ipco ON (((dom.company_domain)::text = (ipco.company_domain)::text)))
+     LEFT JOIN ip_country_resolved pipco ON (((dom.parent_domain)::text = (pipco.company_domain)::text)))
+     LEFT JOIN percent_opensource po ON (((dom.company_domain)::text = (po.company_domain)::text)))
+     LEFT JOIN percent_opensource ppo ON (((dom.parent_domain)::text = (ppo.company_domain)::text)))
   WITH NO DATA;
 
 
@@ -3622,53 +3700,6 @@ CREATE MATERIALIZED VIEW frontend.companies_secondary_domain_category_tag_stats 
 
 
 ALTER MATERIALIZED VIEW frontend.companies_secondary_domain_category_tag_stats OWNER TO postgres;
-
---
--- Name: company_domain_country; Type: MATERIALIZED VIEW; Schema: frontend; Owner: postgres
---
-
-CREATE MATERIALIZED VIEW frontend.company_domain_country AS
- WITH country_totals AS (
-         SELECT api_call_countries.company_domain,
-            api_call_countries.country,
-            sum(api_call_countries.store_app_count) AS total_app_count
-           FROM frontend.api_call_countries
-          GROUP BY api_call_countries.company_domain, api_call_countries.country
-        ), parent_country_totals AS (
-         SELECT api_call_countries.parent_company_domain,
-            api_call_countries.country,
-            sum(api_call_countries.store_app_count) AS total_app_count
-           FROM frontend.api_call_countries
-          GROUP BY api_call_countries.parent_company_domain, api_call_countries.country
-        ), parent_ranked_countries AS (
-         SELECT parent_country_totals.parent_company_domain,
-            parent_country_totals.country,
-            parent_country_totals.total_app_count,
-            row_number() OVER (PARTITION BY parent_country_totals.parent_company_domain ORDER BY parent_country_totals.total_app_count DESC) AS rn
-           FROM parent_country_totals
-        ), company_ranked_countries AS (
-         SELECT country_totals.company_domain,
-            country_totals.country,
-            country_totals.total_app_count,
-            row_number() OVER (PARTITION BY country_totals.company_domain ORDER BY country_totals.total_app_count DESC) AS rn
-           FROM country_totals
-        )
- SELECT company_ranked_countries.company_domain,
-    company_ranked_countries.country AS most_common_country,
-    company_ranked_countries.total_app_count
-   FROM company_ranked_countries
-  WHERE ((NOT ((company_ranked_countries.company_domain)::text IN ( SELECT parent_ranked_countries.parent_company_domain
-           FROM parent_ranked_countries))) AND (company_ranked_countries.rn = 1))
-UNION
- SELECT parent_ranked_countries.parent_company_domain AS company_domain,
-    parent_ranked_countries.country AS most_common_country,
-    parent_ranked_countries.total_app_count
-   FROM parent_ranked_countries
-  WHERE (parent_ranked_countries.rn = 1)
-  WITH NO DATA;
-
-
-ALTER MATERIALIZED VIEW frontend.company_domain_country OWNER TO postgres;
 
 --
 -- Name: company_domains_top_apps; Type: MATERIALIZED VIEW; Schema: frontend; Owner: postgres
@@ -7919,5 +7950,5 @@ GRANT ALL ON SCHEMA public TO PUBLIC;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 936djcukfm1fJr0TbL7SLTKeVcH7vv9lU2Y0aaso5NhRqh9MLHQLYOHDH26HVri
+\unrestrict 9d0znP8MKUhgAZgNGHNy7LwFEWJvRUKi96sAorXcIu3UaODiBpl7iNcZXLH0fPg
 

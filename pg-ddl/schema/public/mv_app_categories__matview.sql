@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict qOReb5FMpO2r1Zaod2EgO4w2p7S7DNFcEl3k0KDDb3fAKtIbwQVjm4ukItwkVrM
+\restrict sXamGxpPr9RITYn34ipi2kbGmEnky3L6hlHRdmBqldhSgV7ksbXxrgwmLyE12U6
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -45,5 +45,5 @@ ALTER MATERIALIZED VIEW public.mv_app_categories OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict qOReb5FMpO2r1Zaod2EgO4w2p7S7DNFcEl3k0KDDb3fAKtIbwQVjm4ukItwkVrM
+\unrestrict sXamGxpPr9RITYn34ipi2kbGmEnky3L6hlHRdmBqldhSgV7ksbXxrgwmLyE12U6
 

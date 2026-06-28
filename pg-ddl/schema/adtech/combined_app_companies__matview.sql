@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict BQe8YkQZ8ptfxwRWk60uVOKBOvFR1AoWaj1K7YcM6duKfnguI3p1yKlL3E4lyCv
+\restrict CqbBqkFhWLhefRaQ1JPMPhS4rdn3dtf8W7352UszvVwSR3WdVZEMIcvfiY76ce8
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -100,7 +100,7 @@ CREATE MATERIALIZED VIEW adtech.combined_app_companies AS
         UNION ALL
          SELECT app_domain_publishers.store_app,
             app_domain_publishers.domain_id,
-            'publisher'::text
+            'publisher'::text AS text
            FROM app_domain_publishers
         ), all_bools AS (
          SELECT cs.domain_id,
@@ -139,5 +139,5 @@ ALTER MATERIALIZED VIEW adtech.combined_app_companies OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict BQe8YkQZ8ptfxwRWk60uVOKBOvFR1AoWaj1K7YcM6duKfnguI3p1yKlL3E4lyCv
+\unrestrict CqbBqkFhWLhefRaQ1JPMPhS4rdn3dtf8W7352UszvVwSR3WdVZEMIcvfiY76ce8
 

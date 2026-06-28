@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict GLgIOIU65Xa64Oju4FhXYnMW0W9RTgD9Fx5zyXxZc6dQdSPeuQnndgtVIqwzsGx
+\restrict D1QaepqtahGcMKTrIcSP2DeRoAD391O9d8izCAZpmYH3J6FAN62JgN8nthRagkm
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -28,24 +28,34 @@ SET default_table_access_method = heap;
 --
 
 CREATE MATERIALIZED VIEW public.developer_store_apps AS
- WITH developer_domain_ids AS (
-         SELECT DISTINCT pd_1.id AS domain_id
-           FROM (((public.app_urls_map aum_1
-             LEFT JOIN public.domains pd_1 ON ((aum_1.pub_domain = pd_1.id)))
-             LEFT JOIN public.store_apps sa_1 ON ((aum_1.store_app = sa_1.id)))
-             LEFT JOIN public.developers d_1 ON ((sa_1.developer = d_1.id)))
+ WITH cleaned_app_url_map AS (
+         SELECT aum_1.store_app,
+                CASE
+                    WHEN (NOT (EXISTS ( SELECT 1
+                       FROM public.domains_third_party dtp
+                      WHERE (dtp.domain_id = rd.id)))) THEN COALESCE(rd.domain_name, pd.domain_name)
+                    ELSE pd.domain_name
+                END AS developer_url,
+                CASE
+                    WHEN (NOT (EXISTS ( SELECT 1
+                       FROM public.domains_third_party dtp
+                      WHERE (dtp.domain_id = rd.id)))) THEN COALESCE(rd.id, pd.id)
+                    ELSE pd.id
+                END AS domain_id
+           FROM ((public.app_urls_map aum_1
+             LEFT JOIN public.domains pd ON ((aum_1.pub_domain = pd.id)))
+             LEFT JOIN public.domains rd ON ((pd.root_domain_id = rd.id)))
         )
  SELECT sa.store,
     sa.id AS store_app,
     d.name AS developer_name,
-    pd.domain_name AS developer_url,
     d.store AS developer_store,
-    pd.id AS domain_id,
-    d.developer_id
-   FROM (((public.store_apps sa
+    d.developer_id,
+    aum.developer_url,
+    aum.domain_id
+   FROM ((public.store_apps sa
      LEFT JOIN public.developers d ON ((sa.developer = d.id)))
-     LEFT JOIN public.app_urls_map aum ON ((sa.id = aum.store_app)))
-     LEFT JOIN public.domains pd ON ((aum.pub_domain = pd.id)))
+     LEFT JOIN cleaned_app_url_map aum ON ((sa.id = aum.store_app)))
   WITH NO DATA;
 
 
@@ -83,5 +93,5 @@ CREATE UNIQUE INDEX idx_developer_store_apps_unique ON public.developer_store_ap
 -- PostgreSQL database dump complete
 --
 
-\unrestrict GLgIOIU65Xa64Oju4FhXYnMW0W9RTgD9Fx5zyXxZc6dQdSPeuQnndgtVIqwzsGx
+\unrestrict D1QaepqtahGcMKTrIcSP2DeRoAD391O9d8izCAZpmYH3J6FAN62JgN8nthRagkm
 

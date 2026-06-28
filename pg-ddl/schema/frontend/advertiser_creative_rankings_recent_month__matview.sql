@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict sehVKwfhlJsIeyCvlFdNj1WKdOVa0CK6whJ7UfNFh17pxMURFy3M0AWBJPpblpb
+\restrict 6UEnjkiQ0GhQli0cvlhgVhcf7OJvBxVrdOY3Sf3jNQtfD8pJB4gV0M61Vu9OeWx
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -114,5 +114,5 @@ ALTER MATERIALIZED VIEW frontend.advertiser_creative_rankings_recent_month OWNER
 -- PostgreSQL database dump complete
 --
 
-\unrestrict sehVKwfhlJsIeyCvlFdNj1WKdOVa0CK6whJ7UfNFh17pxMURFy3M0AWBJPpblpb
+\unrestrict 6UEnjkiQ0GhQli0cvlhgVhcf7OJvBxVrdOY3Sf3jNQtfD8pJB4gV0M61Vu9OeWx
 

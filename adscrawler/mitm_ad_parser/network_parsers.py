@@ -854,7 +854,7 @@ def parse_bidmachine_ad(
             )
         except Exception:
             pass
-    if additional_ad_network_tld is not None and not ad_info.found_ad_network_tlds:
+    if isinstance(additional_ad_network_tld, str) and not ad_info.found_ad_network_tlds:
         ad_info.found_ad_network_tlds = [additional_ad_network_tld]
     return ad_info
 
@@ -870,15 +870,22 @@ def parse_everestop_ad(sent_video_dict: dict[str, Any]) -> AdInfo:
         renderer=JsonRenderer(),
         str_decoder=decode_utf8,
     )
+    adv_store_id = None
+    additional_ad_network_tld = None
     try:
         adv_store_id = ret[5][6][3][13][2][3]
         additional_ad_network_tld = ret[5][6][3][13][2][2]
     except Exception:
         pass
 
+    if not isinstance(additional_ad_network_tld, str):
+        additional_ad_network_tld = None
+
     ad_info = AdInfo(
         adv_store_id=adv_store_id,
-        found_ad_network_tlds=[additional_ad_network_tld],
+        found_ad_network_tlds=(
+            [additional_ad_network_tld] if additional_ad_network_tld else None
+        ),
     )
     return ad_info
 

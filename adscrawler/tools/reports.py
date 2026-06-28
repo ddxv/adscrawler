@@ -29,7 +29,6 @@ for week in pd.date_range(
 
 # Generate the start of every quarter in 2025
 DEFAULT_START_DATE = "2025-01-01"
-DEFAULT_START_DATE = "2026-04-01"
 today = pd.Timestamp(datetime.date.today())
 quarters = pd.date_range(start=DEFAULT_START_DATE, end=today, freq="QS")
 

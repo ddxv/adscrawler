@@ -6,6 +6,9 @@ Usage:
 
     # Insert multiple app publishers from CSV
     python insert_new.py --csv-app-publishers
+
+    # Insert third-party app publishers from CSV
+    python insert_new.py --csv-app-publishers-thirdparty
 """
 
 import argparse
@@ -50,29 +53,73 @@ def main():
         action="store_true",
         help="Load from app_pubs.csv instead of new_company.yml (inserts app publishers, no SDK)",
     )
+    parser.add_argument(
+        "--csv-app-publishers-thirdparty",
+        action="store_true",
+        help="Load from app_publishers_thirdparty.csv (category 5, no SDK)",
+    )
     args = parser.parse_args()
 
     if args.csv_app_publishers:
-        _main_csv()
+        _main_csv("app_pubs.csv", 7)
+    elif args.csv_app_publishers_thirdparty:
+        _main_csv("app_publishers_thirdparty.csv", 5)
     else:
         _main_yaml()
 
 
-def _main_csv() -> None:
-    """Insert multiple publishers from app_pubs.csv (all category_id=7)."""
-    rows = load_csv("app_pubs.csv")
-    print(f"Loaded {len(rows)} entries from app_pubs.csv")
+COMMIT_EVERY = 100
+
+
+def _main_csv(csv_path: str, category_id: int) -> None:
+    """Insert multiple publishers from a CSV file."""
+    rows = load_csv(csv_path)
+    print(f"Loaded {len(rows)} entries from {csv_path}")
 
     with pgdb.get_cursor() as cur:
+        # Load all existing domain mappings up front to skip already-mapped domains
+        cur.execute("SELECT domain_id FROM adtech.company_domain_mapping;")
+        mapped_domain_ids: set[int] = {row[0] for row in cur.fetchall()}
+        print(f"Found {len(mapped_domain_ids)} existing domain mappings")
+
+        inserted = 0
         for i, row in enumerate(rows, start=1):
             company_name = row["Company"].strip()
             domain = row["Domain"].strip()
+
+            # Check if this domain is already mapped to any company
+            cur.execute("SELECT id FROM domains WHERE domain_name = %s;", (domain,))
+            domain_row = cur.fetchone()
+            if domain_row and domain_row[0] in mapped_domain_ids:
+                print(
+                    f"[{i}/{len(rows)}] Skipping {company_name} ({domain}): "
+                    f"domain already mapped to another company"
+                )
+                continue
+
             try:
                 company_id = insert_company_with_domain(cur, company_name, domain, None)
-                insert_company_category_manual(cur, company_id, 7)
+                # Track domain_id for intra-batch dedup
+                if domain_row:
+                    mapped_domain_ids.add(domain_row[0])
+                else:
+                    cur.execute(
+                        "SELECT id FROM domains WHERE domain_name = %s;", (domain,)
+                    )
+                    new_row = cur.fetchone()
+                    if new_row:
+                        mapped_domain_ids.add(new_row[0])
+                insert_company_category_manual(cur, company_id, category_id)
+                inserted += 1
                 print(
                     f"[{i}/{len(rows)}] Inserted publisher: {company_name} ({domain})"
                 )
+
+                # Commit in batches to avoid losing progress on a crash
+                if inserted % COMMIT_EVERY == 0:
+                    cur.connection.commit()
+                    print(f"  --- Committed batch of {COMMIT_EVERY} ---")
+
             except Exception as e:
                 print(
                     f"[{i}/{len(rows)}] Error inserting {company_name} ({domain}): {e}"
@@ -108,6 +155,21 @@ def _main_yaml() -> None:
 
     try:
         with pgdb.get_cursor() as cur:
+            # Check if this domain is already mapped to another company
+            cur.execute("SELECT id FROM domains WHERE domain_name = %s;", (domain,))
+            domain_row = cur.fetchone()
+            if domain_row:
+                cur.execute(
+                    "SELECT domain_id FROM adtech.company_domain_mapping "
+                    "WHERE domain_id = %s LIMIT 1;",
+                    (domain_row[0],),
+                )
+                if cur.fetchone():
+                    print(
+                        f"Domain '{domain}' already mapped to another company. Skipping."
+                    )
+                    return
+
             company_id = insert_company_with_domain(
                 cur, company_name, domain, company_linkedin, company_github_user
             )

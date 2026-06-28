@@ -349,9 +349,7 @@ def crawl_keyword_ranks(pgdb: PostgresEngine) -> None:
             )
     raw_keywords_to_s3(all_keywords)
     if crawl_log:
-        crawl_log_df = pd.DataFrame(crawl_log).rename(
-            columns={"keyword_id": "keyword"}
-        )
+        crawl_log_df = pd.DataFrame(crawl_log).rename(columns={"keyword_id": "keyword"})
         upsert_df(
             table_name="keywords_crawled_at",
             schema="logging",
@@ -1057,6 +1055,7 @@ def upsert_app_country_evidence(
     evidence_df = pd.DataFrame(rows)
     key_columns = ["store_app"]
     insert_columns = ["store_app", "raw_address", "country_id"]
+    evidence_df = evidence_df[evidence_df["raw_address"].notna()]
     evidence_df["country_id"] = evidence_df["country_id"].astype("Int64")
     upsert_df(
         table_name="app_country_evidence",

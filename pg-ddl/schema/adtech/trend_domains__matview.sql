@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict hpLJQcRDSml6HQ4LopYRbOekBw3r5YcQqkMhn7DVN7sqTpHkAPwq9dyMGfd4Aga
+\restrict 4x0ctEODKEf4YUahPtFegdMFCgYqBlTXYcqPBus8GYE6teZmsI3yMeCUmpHCnpY
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -130,5 +130,5 @@ CREATE UNIQUE INDEX idx_trend_domains_concurrent ON adtech.trend_domains USING b
 -- PostgreSQL database dump complete
 --
 
-\unrestrict hpLJQcRDSml6HQ4LopYRbOekBw3r5YcQqkMhn7DVN7sqTpHkAPwq9dyMGfd4Aga
+\unrestrict 4x0ctEODKEf4YUahPtFegdMFCgYqBlTXYcqPBus8GYE6teZmsI3yMeCUmpHCnpY
 

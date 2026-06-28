@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict QzXaeyOYbbVN9dqCjKhRWz0e6hN2eIlCaiOhLfbsuvHw1yI81SYQIlAJFNTayoq
+\restrict UC00wW3nl3nuvuUWaVr1oZHMVFve95wcG2dgECmz5kyqZ5ogoAXzW3F22aetyTy
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -34,6 +34,8 @@ CREATE MATERIALIZED VIEW frontend.companies_overview AS
             cac.company_id,
             c_1.name AS company_name,
             c_1.logo_url,
+            c_1.linkedin_url,
+            c_1.github_user,
             c_1.parent_company_id,
             pc_1.name AS parent_company_name,
             pd.domain_name AS parent_domain,
@@ -48,7 +50,7 @@ CREATE MATERIALIZED VIEW frontend.companies_overview AS
              LEFT JOIN adtech.companies c_1 ON ((cac.company_id = c_1.id)))
              LEFT JOIN adtech.companies pc_1 ON ((c_1.parent_company_id = pc_1.id)))
              LEFT JOIN public.domains pd ON ((pc_1.domain_id = pd.id)))
-          GROUP BY d.id, d.domain_name, cac.company_id, c_1.name, c_1.logo_url, c_1.parent_company_id, pc_1.name, pd.domain_name, pd.id
+          GROUP BY d.id, d.domain_name, cac.company_id, c_1.name, c_1.logo_url, c_1.linkedin_url, c_1.github_user, c_1.parent_company_id, pc_1.name, pd.domain_name, pd.id
         ), creatives_agg AS (
          SELECT companies_creative_rankings.company_domain,
             (count(*))::integer AS creatives_app_count
@@ -104,6 +106,14 @@ CREATE MATERIALIZED VIEW frontend.companies_overview AS
            FROM frontend.adstxt_ad_domain_overview
           WHERE ((adstxt_ad_domain_overview.relationship)::text = 'DIRECT'::text)
           GROUP BY adstxt_ad_domain_overview.ad_domain_url
+        ), ip_country_resolved AS (
+         SELECT company_domain_country.company_domain,
+            company_domain_country.most_common_country AS api_ip_resolved_country
+           FROM frontend.company_domain_country
+        ), percent_opensource AS (
+         SELECT companies_open_source_percent.company_domain,
+            companies_open_source_percent.percent_open_source
+           FROM frontend.companies_open_source_percent
         ), country_resolved AS (
          SELECT e.company_id,
             c_1.alpha2 AS country
@@ -158,6 +168,8 @@ CREATE MATERIALIZED VIEW frontend.companies_overview AS
     dom.company_id,
     dom.company_name,
     dom.logo_url,
+    dom.linkedin_url,
+    dom.github_user,
     dom.parent_company_id,
     dom.parent_domain,
     dom.parent_domain_id,
@@ -168,6 +180,10 @@ CREATE MATERIALIZED VIEW frontend.companies_overview AS
     dom.has_app_ads_reseller,
     COALESCE(co.country, pco.country) AS country,
     co.country AS country_direct,
+    COALESCE(ipco.api_ip_resolved_country, pipco.api_ip_resolved_country) AS api_ip_resolved_country,
+    ipco.api_ip_resolved_country AS api_ip_resolved_country_direct,
+    COALESCE(po.percent_open_source, ppo.percent_open_source) AS percent_open_source,
+    po.percent_open_source AS percent_open_source_direct,
         CASE
             WHEN ((dom.company_id IS NOT NULL) AND (dom.company_id IN ( SELECT DISTINCT companies.parent_company_id
                FROM adtech.companies
@@ -223,7 +239,7 @@ CREATE MATERIALIZED VIEW frontend.companies_overview AS
     (((dom.company_id IS NOT NULL) AND (dom.company_id IN ( SELECT DISTINCT companies.parent_company_id
            FROM adtech.companies
           WHERE (companies.parent_company_id IS NOT NULL)))))::integer AS is_parent_domain
-   FROM (((((((((((((domain_base dom
+   FROM (((((((((((((((((domain_base dom
      LEFT JOIN creatives_agg c ON (((dom.company_domain)::text = (c.company_domain)::text)))
      LEFT JOIN trends_agg t ON (((dom.company_domain)::text = t.company_domain)))
      LEFT JOIN app_changes_agg a ON (((dom.company_domain)::text = (a.company_domain)::text)))
@@ -237,6 +253,10 @@ CREATE MATERIALIZED VIEW frontend.companies_overview AS
      LEFT JOIN trends_agg pt ON (((dom.parent_domain)::text = pt.company_domain)))
      LEFT JOIN country_resolved co ON ((dom.company_id = co.company_id)))
      LEFT JOIN country_resolved pco ON ((dom.parent_company_id = pco.company_id)))
+     LEFT JOIN ip_country_resolved ipco ON (((dom.company_domain)::text = (ipco.company_domain)::text)))
+     LEFT JOIN ip_country_resolved pipco ON (((dom.parent_domain)::text = (pipco.company_domain)::text)))
+     LEFT JOIN percent_opensource po ON (((dom.company_domain)::text = (po.company_domain)::text)))
+     LEFT JOIN percent_opensource ppo ON (((dom.parent_domain)::text = (ppo.company_domain)::text)))
   WITH NO DATA;
 
 
@@ -260,5 +280,5 @@ CREATE UNIQUE INDEX frontend_companies_overview_domain ON frontend.companies_ove
 -- PostgreSQL database dump complete
 --
 
-\unrestrict QzXaeyOYbbVN9dqCjKhRWz0e6hN2eIlCaiOhLfbsuvHw1yI81SYQIlAJFNTayoq
+\unrestrict UC00wW3nl3nuvuUWaVr1oZHMVFve95wcG2dgECmz5kyqZ5ogoAXzW3F22aetyTy
 
