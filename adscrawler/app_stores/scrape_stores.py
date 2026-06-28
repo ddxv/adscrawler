@@ -1057,6 +1057,9 @@ def upsert_app_country_evidence(
     insert_columns = ["store_app", "raw_address", "country_id"]
     evidence_df = evidence_df[evidence_df["raw_address"].notna()]
     evidence_df["country_id"] = evidence_df["country_id"].astype("Int64")
+    evidence_df["country_id"] = evidence_df["country_id"].where(
+        evidence_df["country_id"].notna(), None
+    )
     upsert_df(
         table_name="app_country_evidence",
         df=evidence_df,
