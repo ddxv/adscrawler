@@ -143,8 +143,12 @@ def clean_google_play_app_df(apps_df: pd.DataFrame) -> pd.DataFrame:
     apps_df = apps_df.assign(
         category=apps_df["category"].str.lower(),
         release_date=pd.to_datetime(
-            apps_df["release_date"], format="%b %d, %Y"
-        ).dt.date,
+            apps_df["release_date"], format="%b %d, %Y", errors="coerce"
+        )
+        .fillna(
+            pd.to_datetime(apps_df["release_date"], format="%d %b %Y", errors="coerce")
+        )
+        .dt.date,
         store_last_updated=pd.to_datetime(
             apps_df["store_last_updated"], unit="s", errors="coerce"
         ),
