@@ -24,17 +24,12 @@ from adscrawler.mitm_ad_parser.mitm_scrape_ads import (
     parse_store_id_mitm_log,
     scan_all_apps,
 )
-from adscrawler.packages.apks.waydroid import (
-    manual_waydroid_process,
-    process_apks_for_waydroid,
-)
 from adscrawler.packages.process_files import (
     download_apps,
     manual_download_app,
     process_sdks,
 )
 from adscrawler.scrape import crawl_app_ads
-from adscrawler.tools.geo import update_geo_dbs
 from adscrawler.tools.get_company_logos import refresh_metadata
 
 logger = get_logger(__name__)
@@ -500,6 +495,12 @@ class ProcessManager:
         refresh_metadata(missing_only=False)
 
     def waydroid_mitm(self) -> None:
+        from adscrawler.packages.apks.waydroid import (
+            manual_waydroid_process,
+            process_apks_for_waydroid,
+        )  # noqa: PLC0415
+        from adscrawler.tools.geo import update_geo_dbs  # noqa: PLC0415
+
         if self.args.redownload_geo_dbs:
             update_geo_dbs(redownload=self.args.redownload_geo_dbs)
             return
