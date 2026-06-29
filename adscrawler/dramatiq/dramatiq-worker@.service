@@ -1,0 +1,41 @@
+# systemd template unit for a Dramatiq worker.
+#
+# Instantiate per queue.  The queue name is passed via %i.
+# Examples:
+#
+#   /etc/systemd/system/dramatiq-worker@store_crawls_google_1.service
+#   → sudo systemctl enable --now dramatiq-worker@store_crawls_google_1
+#
+#   /etc/systemd/system/dramatiq-worker@store_crawls_apple_1.service
+#   → sudo systemctl enable --now dramatiq-worker@store_crawls_apple_1
+#
+# The %i placeholder is expanded to the instance name (e.g.
+# "store_crawls_google_1").
+
+[Unit]
+Description=Dramatiq Worker – %i
+After=network.target redis.service
+Wants=redis.service
+
+[Service]
+Type=simple
+Environment=PYTHONUNBUFFERED=1
+
+# ── Adjust these to your VPS ──────────────────────────────────────
+User=adscrawler
+WorkingDirectory=/home/adscrawler/adscrawler
+ExecStart=/home/adscrawler/venvs/adscrawler-env/bin/python \
+    -m dramatiq \
+    adscrawler.dramatiq.app_stores.worker \
+    -p 2 \
+    -Q %i
+# ──────────────────────────────────────────────────────────────────
+
+Restart=always
+RestartSec=10
+
+# Hard and soft limits — tune if needed
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target
