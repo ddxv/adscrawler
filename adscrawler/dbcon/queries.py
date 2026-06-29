@@ -1123,11 +1123,21 @@ def query_store_apps_to_update(
     log_query: bool = False,
     limit: int = 1000,
 ) -> pd.DataFrame:
-    short_update_days = CONFIG["crawl-settings"].get("short_update_days", 1)
-    short_update_installs = CONFIG["crawl-settings"].get("short_update_installs", 1000)
-    short_update_ratings = CONFIG["crawl-settings"].get("short_update_ratings", 100)
-    long_update_days = CONFIG["crawl-settings"].get("long_update_days", 2)
-    max_recrawl_days = CONFIG["crawl-settings"].get("max_recrawl_days", 15)
+    short_update_days = CONFIG["crawl-settings"].get(
+        "short_update_days_{country_priority_group}", 1
+    )
+    short_update_installs = CONFIG["crawl-settings"].get(
+        "short_update_installs_{country_priority_group}", 1000
+    )
+    short_update_ratings = CONFIG["crawl-settings"].get(
+        "short_update_ratings_{country_priority_group}", 100
+    )
+    long_update_days = CONFIG["crawl-settings"].get(
+        "long_update_days_{country_priority_group}", 2
+    )
+    max_recrawl_days = CONFIG["crawl-settings"].get(
+        "max_recrawl_days_{country_priority_group}", 15
+    )
     short_update_ts = datetime.datetime.now(tz=datetime.UTC) - datetime.timedelta(
         days=short_update_days
     )
