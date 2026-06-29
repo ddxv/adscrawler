@@ -1,8 +1,6 @@
 import re
 
-from selenium import webdriver
-from selenium.webdriver.firefox.options import Options
-from selenium.webdriver.firefox.service import Service
+
 
 from adscrawler.config import get_logger
 
@@ -12,6 +10,9 @@ logger = get_logger(__name__)
 def scrape_with_firefox() -> list[str]:
     """Open Firefox and navigate to apkcombo.com."""
     logger.info("Pull RSS feed using Selenium Firefox")
+    from selenium import webdriver
+    from selenium.webdriver.firefox.options import Options
+    from selenium.webdriver.firefox.service import Service
     options = Options()
     options.add_argument("--headless")
 
