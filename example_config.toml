@@ -35,6 +35,12 @@ region_name = "us-west-01"
 # region_name = "garage"
 
 
+[redis]
+# URL for the Dramatiq Redis broker.
+# On the Controller VPS (dispatcher): use localhost
+# On worker VPS nodes: set to the Controller VPS IP, e.g. redis://10.0.0.5:6379/0
+url = "redis://127.0.0.1:6379/0"
+
 [crawl-settings]
 short_update_days = 1
 short_update_installs = 1000

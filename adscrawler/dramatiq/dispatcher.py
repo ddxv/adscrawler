@@ -45,7 +45,7 @@ Run one process per queue (or all 4 from a single script)::
 
 Usage (from code)::
 
-    from adscrawler.app_stores.dispatcher import dispatch_app_details_jobs
+    from adscrawler.dramatiq.dispatcher import dispatch_app_details_jobs
     from adscrawler.dbcon.connection import get_db_connection
 
     pgdb = get_db_connection()
@@ -58,10 +58,7 @@ Usage (from code)::
     )
 """
 
-
-import dramatiq
 import pandas as pd
-from dramatiq.brokers.redis import RedisBroker
 
 from adscrawler.config import get_logger
 from adscrawler.dbcon.connection import PostgresEngine
@@ -72,16 +69,22 @@ logger = get_logger(__name__, "dispatcher")
 # ---------------------------------------------------------------------------
 # Broker — connect to Redis.  The URL is read from config.toml so it works
 # both locally (for testing) and across the VPS cluster.
+#
+# These are module-level imports and will fail if dramatiq/redis are not
+# installed.  That's OK — this module is the **controller** entry point and
+# only runs on machines that need to dispatch work.  main.py imports this
+# lazily inside ``update_app_details()`` when ``--dispatch`` is used.
 # ---------------------------------------------------------------------------
+import dramatiq  # noqa: E402
+import redis as redis_module  # noqa: E402
+from dramatiq.brokers.redis import RedisBroker  # noqa: E402
+
 from adscrawler.config import CONFIG  # noqa: E402
 
 _redis_url = CONFIG.get("redis", {}).get("url", "redis://127.0.0.1:6379/0")
 logger.info("Dispatcher connecting to Redis at %s", _redis_url)
 dramatiq.set_broker(RedisBroker(url=_redis_url))
 
-# Import the actor so we can call .send() on it.
-# The actor is defined in actor_defs.py (no broker setup there).
-# We import *after* setting the broker so it binds to our local Redis.
 from adscrawler.dramatiq.app_stores.actor_defs import (  # noqa: E402
     queue_for,
     scrape_chunk_apple_1,
@@ -90,11 +93,6 @@ from adscrawler.dramatiq.app_stores.actor_defs import (  # noqa: E402
     scrape_chunk_google_2,
 )
 
-# ---------------------------------------------------------------------------
-# Direct Redis client for distributed locks (not the Dramatiq broker).
-# ---------------------------------------------------------------------------
-import redis as redis_module  # noqa: E402
-
 _lock_ttl_seconds = 86400  # 24 hours — safety net for crashed workers
 
 # Extract host/port/db from the configured URL so we always talk to the
@@ -102,7 +100,9 @@ _lock_ttl_seconds = 86400  # 24 hours — safety net for crashed workers
 _redis_url_parts = _redis_url.split("redis://", 1)[-1]
 _redis_host = _redis_url_parts.split(":", 1)[0]
 _redis_rest = _redis_url_parts.split(":", 1)[1] if ":" in _redis_url_parts else "6379/0"
-_redis_port_str, _redis_db_str = (_redis_rest.split("/", 1) if "/" in _redis_rest else (_redis_rest, "0"))
+_redis_port_str, _redis_db_str = (
+    _redis_rest.split("/", 1) if "/" in _redis_rest else (_redis_rest, "0")
+)
 _redis_port = int(_redis_port_str)
 _redis_db = int(_redis_db_str) if _redis_db_str else 0
 
@@ -140,9 +140,7 @@ def _count_pending_chunks(store: int, group: int) -> int:
         return 0
 
 
-def _acquire_locks(
-    store_app_ids: list[int], store: int, group: int
-) -> list[int]:
+def _acquire_locks(store_app_ids: list[int], store: int, group: int) -> list[int]:
     """Atomically claim locks for a list of ``store_app`` IDs on a specific queue.
 
     Returns only the IDs that were *not* already locked.
@@ -158,9 +156,7 @@ def _acquire_locks(
         )
     results = pipe.execute()
     acquired = [
-        app_id
-        for app_id, success in zip(store_app_ids, results)
-        if success is True
+        app_id for app_id, success in zip(store_app_ids, results) if success is True
     ]
     return acquired
 
@@ -188,9 +184,9 @@ def _serialize_chunk(df: pd.DataFrame) -> list[dict]:
             records[col] = None
 
     # html_recently_scraped comes in as nullable bool — convert to native types
-    records["html_recently_scraped"] = records[
-        "html_recently_scraped"
-    ].apply(lambda x: bool(x) if pd.notna(x) else None)
+    records["html_recently_scraped"] = records["html_recently_scraped"].apply(
+        lambda x: bool(x) if pd.notna(x) else None
+    )
 
     return records.to_dict(orient="records")
 

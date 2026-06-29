@@ -119,6 +119,13 @@ class ProcessManager:
             help="Country priority group to use when updating app store details",
             type=int,
         )
+        (
+            parser.add_argument(
+                "--dispatch",
+                help="Use Dramatiq dispatcher (instead of local ProcessPoolExecutor) for app store details",
+                action="store_true",
+            ),
+        )
         parser.add_argument(
             "-a",
             "--app-ads-txt-scrape",
@@ -423,6 +430,24 @@ class ProcessManager:
                 "No country priority group provided, ie --country-priority-group=1"
             )
             return
+
+        if self.args.dispatch:
+            from adscrawler.dramatiq.dispatcher import (
+                dispatch_app_details_jobs,  # noqa: PLC0415
+            )
+
+            logger.info(
+                f"Using Dramatiq dispatcher for {store=} group={country_priority_group}"
+            )
+            dispatch_app_details_jobs(
+                pgdb=self.pgcon,
+                store=store,
+                process_icon=self.args.process_icons,
+                limit=self.args.limit_query_rows,
+                country_priority_group=country_priority_group,
+            )
+            return
+
         update_app_details(
             store=store,
             pgdb=self.pgcon,
