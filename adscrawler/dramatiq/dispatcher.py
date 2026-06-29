@@ -265,7 +265,7 @@ def dispatch_app_details_jobs(
         return
 
     # --- Keep the same highly-optimised chunking as update_app_details ---
-    max_chunk_size = 500
+    max_chunk_size = 50
     chunks: list[pd.DataFrame] = []
     for _country, country_df in df.groupby("country_code"):
         country_size = len(country_df)
@@ -344,7 +344,7 @@ def dispatch_app_details_jobs(
 def dispatch_all_queues(
     pgdb: PostgresEngine,
     process_icon: bool,
-    limit: int = 200_000,
+    limit: int = 20_000,
 ) -> None:
     """Dispatch all 4 store×group combinations in a single call.
 
