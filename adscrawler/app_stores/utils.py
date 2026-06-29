@@ -182,7 +182,7 @@ def check_and_insert_new_apps(
 
 
 def get_parquet_paths_by_prefix(bucket: str, prefix: str) -> list[str]:
-    from adscrawler.packages.storage import get_s3_client
+    from adscrawler.packages.storage import get_s3_client  # noqa: PLC0415
 
     s3 = get_s3_client()
     continuation_token = None

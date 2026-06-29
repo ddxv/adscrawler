@@ -181,7 +181,7 @@ def manage_apk_download(
 def get_download_url(store_id: str, source: str) -> str:
     """Get the download URL for the apk."""
     if source == "apkmirror":
-        from adscrawler.packages.apks import apkmirror
+        from adscrawler.packages.apks import apkmirror  # noqa: PLC0415
         try:
             download_url = apkmirror.get_download_url(store_id)
             return download_url

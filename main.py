@@ -111,13 +111,16 @@ class ProcessManager:
             help="Country priority group to use when updating app store details",
             type=int,
         )
-        (
-            parser.add_argument(
-                "--dispatch",
-                help="Use Dramatiq dispatcher (instead of local ProcessPoolExecutor) for app store details",
-                action="store_true",
-            ),
-        )
+        parser.add_argument(
+            "--dispatch",
+            help="Use Dramatiq dispatcher (instead of local ProcessPoolExecutor) for app store details",
+            action="store_true",
+        ),
+        parser.add_argument(
+            "--dispatch-all",
+            help="Dispatch all 4 queue combinations (google/apple × group 1/2) in a single run",
+            action="store_true",
+        ),
         parser.add_argument(
             "-a",
             "--app-ads-txt-scrape",
@@ -417,9 +420,22 @@ class ProcessManager:
             logger.exception(f"Crawling developers for {store=} failed")
 
     def update_app_details(self, store: int, country_priority_group: int) -> None:
-        if not country_priority_group:
+        if not country_priority_group and not self.args.dispatch_all:
             logger.error(
                 "No country priority group provided, ie --country-priority-group=1"
+            )
+            return
+
+        if self.args.dispatch_all:
+            from adscrawler.dramatiq.dispatcher import (
+                dispatch_all_queues,  # noqa: PLC0415
+            )
+
+            logger.info("Using Dramatiq dispatcher for ALL queues")
+            dispatch_all_queues(
+                pgdb=self.pgcon,
+                process_icon=self.args.process_icons,
+                limit=self.args.limit_query_rows,
             )
             return
 
@@ -470,7 +486,7 @@ class ProcessManager:
         process_sdks(store=store, pgdb=self.pgcon, number_of_apps_to_pull=20)
 
     def creative_scan_all_apps(self) -> None:
-        from adscrawler.mitm_ad_parser.mitm_scrape_ads import (
+        from adscrawler.mitm_ad_parser.mitm_scrape_ads import (  # noqa: PLC0415
     scan_all_apps,
 )
         scan_all_apps(
@@ -481,7 +497,7 @@ class ProcessManager:
         )
 
     def creative_scan_single_app(self) -> None:
-        from adscrawler.mitm_ad_parser.mitm_scrape_ads import (
+        from adscrawler.mitm_ad_parser.mitm_scrape_ads import (  # noqa: PLC0415
     parse_store_id_mitm_log
         )
         error_messages = parse_store_id_mitm_log(
@@ -498,10 +514,10 @@ class ProcessManager:
         refresh_metadata(missing_only=False)
 
     def waydroid_mitm(self) -> None:
-        from adscrawler.packages.apks.waydroid import (
+        from adscrawler.packages.apks.waydroid import (  # noqa: PLC0415
             manual_waydroid_process,
             process_apks_for_waydroid,
-        )  # noqa: PLC0415
+        )
         from adscrawler.tools.geo import update_geo_dbs  # noqa: PLC0415
 
         if self.args.redownload_geo_dbs:
