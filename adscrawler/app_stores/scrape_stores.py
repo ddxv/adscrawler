@@ -903,8 +903,8 @@ def process_live_app_details(
     for (crawl_result, additional_html_crawl_result), apps_df in results_df.groupby(
         ["crawl_result", "additional_html_crawl_result"]
     ):
-        log_info = f"{store=} crawl_result={crawl_result} additional_html_crawl_result={additional_html_crawl_result}"
-        logger.info(f"{log_info} processing {len(apps_df)} apps for db")
+        log_info = f"{store=} {crawl_result=} {additional_html_crawl_result=}"
+        logger.info(f"{log_info} processing {apps_df.shape[0]} apps for db")
         if crawl_result != 1:
             # If bad crawl result, only save minimal info to avoid overwriting good data, ie name
             apps_df = apps_df[["store_id", "store", "crawled_at", "crawl_result"]]
