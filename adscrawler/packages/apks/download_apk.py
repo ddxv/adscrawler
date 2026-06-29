@@ -21,7 +21,7 @@ from adscrawler.dbcon.queries import (
     insert_version_code,
     query_store_app_by_store_id,
 )
-from adscrawler.packages.apks import apkmirror, apkpure
+from adscrawler.packages.apks import apkpure
 from adscrawler.packages.models import DownloadResult
 from adscrawler.packages.storage import (
     upload_apk_to_s3,
@@ -181,6 +181,7 @@ def manage_apk_download(
 def get_download_url(store_id: str, source: str) -> str:
     """Get the download URL for the apk."""
     if source == "apkmirror":
+        from adscrawler.packages.apks import apkmirror
         try:
             download_url = apkmirror.get_download_url(store_id)
             return download_url
