@@ -20,10 +20,7 @@ from adscrawler.app_stores.scrape_stores import (
 )
 from adscrawler.config import get_logger
 from adscrawler.dbcon.connection import PostgresEngine, get_db_connection
-from adscrawler.mitm_ad_parser.mitm_scrape_ads import (
-    parse_store_id_mitm_log,
-    scan_all_apps,
-)
+
 from adscrawler.packages.process_files import (
     download_apps,
     manual_download_app,
@@ -473,6 +470,9 @@ class ProcessManager:
         process_sdks(store=store, pgdb=self.pgcon, number_of_apps_to_pull=20)
 
     def creative_scan_all_apps(self) -> None:
+        from adscrawler.mitm_ad_parser.mitm_scrape_ads import (
+    scan_all_apps,
+)
         scan_all_apps(
             pgdb=self.pgcon,
             only_new_apps=self.args.creative_scan_new_apps,
@@ -481,6 +481,9 @@ class ProcessManager:
         )
 
     def creative_scan_single_app(self) -> None:
+        from adscrawler.mitm_ad_parser.mitm_scrape_ads import (
+    parse_store_id_mitm_log
+        )
         error_messages = parse_store_id_mitm_log(
             pgdb=self.pgcon,
             pub_store_id=self.args.store_id,
