@@ -348,17 +348,21 @@ def dispatch_all_queues(
     """Dispatch all 4 store×group combinations in a single call.
 
     Calls ``dispatch_app_details_jobs`` for each of the four
-    ``(store, country_priority_group)`` pairs.  Each queue has its own
-    throttle and lock namespace, so one being full won't skip the others.
+    ``(store, country_priority_group)`` pairs.  Group 2 queues (international)
+    are limited to 5,000 apps per cycle since they have fewer worker resources.
+
+    Each queue has its own throttle and lock namespace, so one being full
+    won't skip the others.
 
     This is the recommended entry point for cron — a single ``* * * * *``
     invocation replaces four separate cron jobs.
     """
     for store, group in ((1, 1), (2, 1), (1, 2), (2, 2)):
+        group_limit = 5_000 if group == 2 else limit
         dispatch_app_details_jobs(
             pgdb=pgdb,
             store=store,
             process_icon=process_icon,
-            limit=limit,
+            limit=group_limit,
             country_priority_group=group,
         )
