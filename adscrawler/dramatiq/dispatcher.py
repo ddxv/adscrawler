@@ -182,20 +182,24 @@ SERIALIZABLE_COLUMNS = [
 
 def _serialize_chunk(df: pd.DataFrame) -> list[dict]:
     """Turn a DataFrame slice into a JSON-safe list of dicts for Redis transport."""
-    records = df[SERIALIZABLE_COLUMNS].copy()
+    # Only select columns that exist in the DataFrame; the rest get filled below.
+    present = [c for c in SERIALIZABLE_COLUMNS if c in df.columns]
+    records = df[present].copy()
 
     # Cast store_app to native int so JSON serialization works
     records["store_app"] = records["store_app"].astype(int)
 
-    # Fill optional columns with None where missing
+    # Fill optional columns with None where missing (e.g. group-2 queries
+    # don't return html_recently_scraped).
     for col in ("icon_url_100", "html_recently_scraped"):
         if col not in records.columns:
             records[col] = None
 
     # html_recently_scraped comes in as nullable bool — convert to native types
-    records["html_recently_scraped"] = records[
-        "html_recently_scraped"
-    ].apply(lambda x: bool(x) if pd.notna(x) else None)
+    if "html_recently_scraped" in records.columns:
+        records["html_recently_scraped"] = records[
+            "html_recently_scraped"
+        ].apply(lambda x: bool(x) if pd.notna(x) else None)
 
     return records.to_dict(orient="records")
 
