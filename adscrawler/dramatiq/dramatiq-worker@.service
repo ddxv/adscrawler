@@ -14,14 +14,13 @@
 
 [Unit]
 Description=Dramatiq Worker – %i
-After=network.target redis.service
-Wants=redis.service
+After=network.target
 
 [Service]
 Type=simple
 Environment=PYTHONUNBUFFERED=1
 
-# ── Adjust these to your VPS ──────────────────────────────────────
+# ── Adjust these to VPS ──────────────────────────────────────
 User=adscrawler
 WorkingDirectory=/home/adscrawler/adscrawler
 ExecStart=/home/adscrawler/venvs/adscrawler-env/bin/python \
