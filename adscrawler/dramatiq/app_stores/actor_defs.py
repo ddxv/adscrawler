@@ -52,12 +52,9 @@ _worker_pgdb: PostgresEngine | None = None
 
 _redis_url = CONFIG.get("redis", {}).get("url", "redis://127.0.0.1:6379/0")
 _redis_lock = threading.Lock()
-_worker_redis: Any = None  # redis.Redis client — type-erased to avoid import at module level
-
-def _lock_prefix(store: int, group: int) -> str:
-    """Return the Redis lock key prefix for a given queue."""
-    prefix = "google" if store == 1 else "apple"
-    return f"store_crawls_{prefix}_{group}:lock:"
+_worker_redis: Any = (
+    None  # redis.Redis client — type-erased to avoid import at module level
+)
 
 
 def _get_pgdb() -> PostgresEngine | None:
@@ -116,7 +113,7 @@ def _release_locks(store_app_ids: list[int], store: int, group: int) -> None:
     """Remove distributed locks for a list of ``store_app`` IDs on a given queue."""
     if not store_app_ids:
         return
-    prefix = _lock_prefix(store, group)
+    prefix = f"{queue_for(store, group)}:lock:"
     try:
         client = _get_lock_client()
         pipe = client.pipeline()
@@ -183,13 +180,9 @@ def _actor_body(
             thread_workers=thread_workers,
             pgdb=pgdb,
         )
-        logger.info(
-            "Actor finished chunk: store=%s apps=%d", store, len(app_data)
-        )
+        logger.info("Actor finished chunk: store=%s apps=%d", store, len(app_data))
     except Exception:
-        logger.exception(
-            "Fatal error processing chunk for store=%s", store
-        )
+        logger.exception("Fatal error processing chunk for store=%s", store)
         raise
     finally:
         _release_locks(store_app_ids, store, group)
@@ -200,6 +193,7 @@ def _actor_body(
 # Each actor shares the same body but lives on a separate Dramatiq queue so
 # workers can subscribe to only the queues they care about.
 # ---------------------------------------------------------------------------
+
 
 @dramatiq.actor(queue_name=QUEUE_GOOGLE_1, max_retries=3, min_backoff=15_000)
 def scrape_chunk_google_1(
