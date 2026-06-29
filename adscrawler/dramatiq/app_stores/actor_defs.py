@@ -52,10 +52,7 @@ _worker_pgdb: PostgresEngine | None = None
 
 _redis_url = CONFIG.get("redis", {}).get("url", "redis://127.0.0.1:6379/0")
 _redis_lock = threading.Lock()
-_worker_redis: Any = (
-    None  # redis.Redis client — type-erased to avoid import at module level
-)
-
+_worker_redis: Any = None  # redis.Redis client — type-erased to avoid import at module level
 
 def _get_pgdb() -> PostgresEngine | None:
     """Return (or create) the per-process Postgres connection.
@@ -64,7 +61,7 @@ def _get_pgdb() -> PostgresEngine | None:
     back to per-chunk connections (``process_scrape_apps_and_save`` opens its
     own when ``pgdb=None``).
     """
-    global _worker_pgdb  # noqa: PLW0603
+    global _worker_pgdb  # noqa: PLW0604
     if _worker_pgdb is None:
         with _pgdb_lock:
             if _worker_pgdb is None:
@@ -180,9 +177,13 @@ def _actor_body(
             thread_workers=thread_workers,
             pgdb=pgdb,
         )
-        logger.info("Actor finished chunk: store=%s apps=%d", store, len(app_data))
+        logger.info(
+            "Actor finished chunk: store=%s apps=%d", store, len(app_data)
+        )
     except Exception:
-        logger.exception("Fatal error processing chunk for store=%s", store)
+        logger.exception(
+            "Fatal error processing chunk for store=%s", store
+        )
         raise
     finally:
         _release_locks(store_app_ids, store, group)
@@ -194,8 +195,7 @@ def _actor_body(
 # workers can subscribe to only the queues they care about.
 # ---------------------------------------------------------------------------
 
-
-@dramatiq.actor(queue_name=QUEUE_GOOGLE_1, max_retries=3, min_backoff=15_000)
+@dramatiq.actor(queue_name=QUEUE_GOOGLE_1, max_retries=3, min_backoff=15_000, time_limit=1_200_000)
 def scrape_chunk_google_1(
     app_data: list[dict[str, Any]],
     store: int,
@@ -206,7 +206,7 @@ def scrape_chunk_google_1(
     _actor_body(app_data, store, process_icon, thread_workers, group=1)
 
 
-@dramatiq.actor(queue_name=QUEUE_APPLE_1, max_retries=3, min_backoff=15_000)
+@dramatiq.actor(queue_name=QUEUE_APPLE_1, max_retries=3, min_backoff=15_000, time_limit=1_200_000)
 def scrape_chunk_apple_1(
     app_data: list[dict[str, Any]],
     store: int,
@@ -217,7 +217,7 @@ def scrape_chunk_apple_1(
     _actor_body(app_data, store, process_icon, thread_workers, group=1)
 
 
-@dramatiq.actor(queue_name=QUEUE_GOOGLE_2, max_retries=3, min_backoff=15_000)
+@dramatiq.actor(queue_name=QUEUE_GOOGLE_2, max_retries=3, min_backoff=15_000, time_limit=1_200_000)
 def scrape_chunk_google_2(
     app_data: list[dict[str, Any]],
     store: int,
@@ -228,7 +228,7 @@ def scrape_chunk_google_2(
     _actor_body(app_data, store, process_icon, thread_workers, group=2)
 
 
-@dramatiq.actor(queue_name=QUEUE_APPLE_2, max_retries=3, min_backoff=15_000)
+@dramatiq.actor(queue_name=QUEUE_APPLE_2, max_retries=3, min_backoff=15_000, time_limit=1_200_000)
 def scrape_chunk_apple_2(
     app_data: list[dict[str, Any]],
     store: int,
