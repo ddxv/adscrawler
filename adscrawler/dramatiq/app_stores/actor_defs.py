@@ -19,13 +19,16 @@ Because the worker and dispatcher run in **separate Python processes**, each
 has its own module cache — ``actor_defs`` will be imported once per process,
 binding the actors to whichever broker that process configured first.
 
-Fork safety
------------
-Dramatiq can fork worker processes after module import.  To avoid sharing
-file descriptors (SSH tunnels, DB sockets, Redis connections) across fork
-boundaries, all connection state is initialised **lazily** — inside the actor
-function body, not at module level.  ``threading.Lock`` guards against
-concurrent first-access within a single process.
+Fork safety + connection hygiene
+---------------------------------
+Dramatiq can fork worker processes after module import.  The Postgres
+connection is **not** shared — ``process_scrape_apps_and_save`` creates a
+fresh connection per chunk and disposes it in its ``finally`` block (via the
+``pgdb=None`` default).  This prevents dead SSH tunnels from hanging workers.
+
+The Redis lock client is initialised **lazily** inside the actor body (fork-
+safe, guarded by ``threading.Lock``), since it doesn't hold long-lived state
+across chunks.
 """
 
 import threading
@@ -36,43 +39,20 @@ import pandas as pd
 
 from adscrawler.app_stores.scrape_stores import process_scrape_apps_and_save
 from adscrawler.config import CONFIG, get_logger
-from adscrawler.dbcon.connection import PostgresEngine, get_db_connection
 
 logger = get_logger(__name__, "actor_defs")
 
 # ---------------------------------------------------------------------------
-# Fork-safe lazy-per-process connections.
+# Lazy Redis lock client — created once per process on first use.
+# Postgres connections are created per-chunk (inside the actor body) and
+# disposed in the finally block, so no persistent DB state is shared.
 # ---------------------------------------------------------------------------
-# Each Dramatiq worker process (whether forked or threaded) will see its own
-# copy of these module-level globals.  We initialise them on first use inside
-# the actor body so that pre-fork state is never shared.
-
-_pgdb_lock = threading.Lock()
-_worker_pgdb: PostgresEngine | None = None
 
 _redis_url = CONFIG.get("redis", {}).get("url", "redis://127.0.0.1:6379/0")
 _redis_lock = threading.Lock()
-_worker_redis: Any = None  # redis.Redis client — type-erased to avoid import at module level
-
-def _get_pgdb() -> PostgresEngine | None:
-    """Return (or create) the per-process Postgres connection.
-
-    Returns ``None`` if the initial connection fails — the caller will fall
-    back to per-chunk connections (``process_scrape_apps_and_save`` opens its
-    own when ``pgdb=None``).
-    """
-    global _worker_pgdb  # noqa: PLW0604
-    if _worker_pgdb is None:
-        with _pgdb_lock:
-            if _worker_pgdb is None:
-                try:
-                    _worker_pgdb = get_db_connection()
-                    logger.info("Lazy DB connection established")
-                except Exception:
-                    logger.exception(
-                        "Lazy DB connection FAILED, falling back to per-chunk"
-                    )
-    return _worker_pgdb
+_worker_redis: Any = (
+    None  # redis.Redis client — type-erased to avoid import at module level
+)
 
 
 def _get_lock_client() -> Any:  # noqa: ANN401
@@ -167,23 +147,16 @@ def _actor_body(
     df_chunk["store_app"] = df_chunk["store_app"].astype(int)
     store_app_ids = df_chunk["store_app"].tolist()
 
-    pgdb = _get_pgdb()
-
     try:
         process_scrape_apps_and_save(
             df_chunk=df_chunk,
             store=store,
             process_icon=process_icon,
             thread_workers=thread_workers,
-            pgdb=pgdb,
         )
-        logger.info(
-            "Actor finished chunk: store=%s apps=%d", store, len(app_data)
-        )
+        logger.info("Actor finished chunk: store=%s apps=%d", store, len(app_data))
     except Exception:
-        logger.exception(
-            "Fatal error processing chunk for store=%s", store
-        )
+        logger.exception("Fatal error processing chunk for store=%s", store)
         raise
     finally:
         _release_locks(store_app_ids, store, group)
@@ -195,7 +168,10 @@ def _actor_body(
 # workers can subscribe to only the queues they care about.
 # ---------------------------------------------------------------------------
 
-@dramatiq.actor(queue_name=QUEUE_GOOGLE_1, max_retries=3, min_backoff=15_000, time_limit=1_200_000)
+
+@dramatiq.actor(
+    queue_name=QUEUE_GOOGLE_1, max_retries=3, min_backoff=15_000, time_limit=1_200_000
+)
 def scrape_chunk_google_1(
     app_data: list[dict[str, Any]],
     store: int,
@@ -206,7 +182,9 @@ def scrape_chunk_google_1(
     _actor_body(app_data, store, process_icon, thread_workers, group=1)
 
 
-@dramatiq.actor(queue_name=QUEUE_APPLE_1, max_retries=3, min_backoff=15_000, time_limit=1_200_000)
+@dramatiq.actor(
+    queue_name=QUEUE_APPLE_1, max_retries=3, min_backoff=15_000, time_limit=1_200_000
+)
 def scrape_chunk_apple_1(
     app_data: list[dict[str, Any]],
     store: int,
@@ -217,7 +195,9 @@ def scrape_chunk_apple_1(
     _actor_body(app_data, store, process_icon, thread_workers, group=1)
 
 
-@dramatiq.actor(queue_name=QUEUE_GOOGLE_2, max_retries=3, min_backoff=15_000, time_limit=1_200_000)
+@dramatiq.actor(
+    queue_name=QUEUE_GOOGLE_2, max_retries=3, min_backoff=15_000, time_limit=1_200_000
+)
 def scrape_chunk_google_2(
     app_data: list[dict[str, Any]],
     store: int,
@@ -228,7 +208,9 @@ def scrape_chunk_google_2(
     _actor_body(app_data, store, process_icon, thread_workers, group=2)
 
 
-@dramatiq.actor(queue_name=QUEUE_APPLE_2, max_retries=3, min_backoff=15_000, time_limit=1_200_000)
+@dramatiq.actor(
+    queue_name=QUEUE_APPLE_2, max_retries=3, min_backoff=15_000, time_limit=1_200_000
+)
 def scrape_chunk_apple_2(
     app_data: list[dict[str, Any]],
     store: int,

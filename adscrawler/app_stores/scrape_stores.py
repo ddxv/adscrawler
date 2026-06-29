@@ -108,7 +108,6 @@ def process_scrape_apps_and_save(
     process_icon: bool,
     thread_workers: int,
     total_rows: int | None = None,
-    pgdb: PostgresEngine | None = None,
 ) -> None:
     """Process a chunk of apps, scrape app, store to S3 and if country === US store app details to db store_apps table.
 
@@ -118,10 +117,6 @@ def process_scrape_apps_and_save(
         process_icon: Whether to process app icons
         thread_workers: Number of threads to use for parallel scraping within this process
         total_rows: Total number of apps in the chunk, if None, will be calculated from df_chunk
-        pgdb: Optional pre-existing database connection.  If omitted a new one is
-            opened (and disposed on return).  Pass one in when the caller wants
-            to reuse a persistent connection across many chunks to avoid SSH
-            tunnel connection storms.
     """
     if total_rows is None:
         total_rows = len(df_chunk)
@@ -136,10 +131,7 @@ def process_scrape_apps_and_save(
     else:
         logger.info(f"{chunk_info} start (sequential)")
 
-    # Use caller-supplied connection, or open a new one
-    owns_pgdb = pgdb is None
-    if pgdb is None:
-        pgdb = get_db_connection()
+    pgdb = get_db_connection()
     chunk_results = []
 
     try:
@@ -209,7 +201,7 @@ def process_scrape_apps_and_save(
         )
         logger.info(f"{chunk_info} finished")
     finally:
-        if owns_pgdb and pgdb and hasattr(pgdb, "engine"):
+        if pgdb and hasattr(pgdb, "engine"):
             pgdb.engine.dispose()
             logger.debug(f"{chunk_info} database connection disposed")
 
