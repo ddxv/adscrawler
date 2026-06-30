@@ -1248,17 +1248,25 @@ def query_zscores(pgdb: PostgresEngine, target_week: str) -> pd.DataFrame:
 
 
 def query_report_combined_domains(
-    pgdb: PostgresEngine, start_date: str, start_of_next_period: str
-) -> pd.DataFrame:
-    df = pd.read_sql(
+    pgdb: PostgresEngine,
+    start_date: str,
+    start_of_next_period: str,
+    chunksize: int | None = None,
+) -> pd.DataFrame | pd.io.sql.SQLTable:
+    """Query combined domain-app history.
+
+    If chunksize is set, returns an iterator of DataFrames (for streaming
+    large results without loading everything into memory).
+    """
+    return pd.read_sql(
         QUERY_REPORT_COMBINED_DOMAINS,
         con=pgdb.engine,
         params={
             "start_of_period": start_date,
             "start_of_next_period": start_of_next_period,
         },
+        chunksize=chunksize,
     )
-    return df
 
 
 @lru_cache(maxsize=1)
@@ -1646,31 +1654,6 @@ def get_ecpm_benchmarks(pgdb: PostgresEngine) -> pd.DataFrame:
     """
     df = pd.read_sql(sel_query, con=pgdb.engine)
     return df
-
-
-def delete_combined_history_by_quarter(
-    pgdb: PostgresEngine,
-    delete_year: int,
-    delete_quarter: int,
-) -> None:
-    table_name = "combined_domain_app_history"
-    del_query = text(f"""
-        DELETE FROM adtech.{table_name} acmh 
-        WHERE 
-            acmh.year = :delete_year
-            AND acmh.quarter = :delete_quarter
-    """)
-    with pgdb.engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
-        result = conn.execute(
-            del_query,
-            {
-                "delete_year": delete_year,
-                "delete_quarter": delete_quarter,
-            },
-        )
-        logger.info(
-            f"{delete_year=} {delete_quarter=} deleted {result.rowcount} rows from {table_name}"
-        )
 
 
 def delete_app_metrics_by_date_and_apps(

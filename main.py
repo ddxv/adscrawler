@@ -3,7 +3,10 @@ import datetime
 import os
 import sys
 
+import pandas as pd
+
 from adscrawler.app_stores.process_from_s3 import (
+    combined_domain_history_to_s3,
     import_keywords_from_s3,
     import_ranks_from_s3,
 )
@@ -20,7 +23,6 @@ from adscrawler.app_stores.scrape_stores import (
 )
 from adscrawler.config import get_logger
 from adscrawler.dbcon.connection import PostgresEngine, get_db_connection
-
 from adscrawler.packages.process_files import (
     download_apps,
     manual_download_app,
@@ -111,16 +113,20 @@ class ProcessManager:
             help="Country priority group to use when updating app store details",
             type=int,
         )
-        parser.add_argument(
-            "--dispatch",
-            help="Use Dramatiq dispatcher (instead of local ProcessPoolExecutor) for app store details",
-            action="store_true",
-        ),
-        parser.add_argument(
-            "--dispatch-all",
-            help="Dispatch all 4 queue combinations (google/apple × group 1/2) in a single run",
-            action="store_true",
-        ),
+        (
+            parser.add_argument(
+                "--dispatch",
+                help="Use Dramatiq dispatcher (instead of local ProcessPoolExecutor) for app store details",
+                action="store_true",
+            ),
+        )
+        (
+            parser.add_argument(
+                "--dispatch-all",
+                help="Dispatch all 4 queue combinations (google/apple × group 1/2) in a single run",
+                action="store_true",
+            ),
+        )
         parser.add_argument(
             "-a",
             "--app-ads-txt-scrape",
@@ -406,6 +412,22 @@ class ProcessManager:
             )
         except Exception:
             logger.exception("Importing keywords from s3 for failed")
+        try:
+            today = datetime.date.today()
+            quarters = pd.date_range(start="2025-01-01", end=today, freq="QS")
+            for start_date in quarters:
+                start_of_next_period = (
+                    start_date + pd.offsets.QuarterEnd() + datetime.timedelta(days=1)
+                )
+                combined_domain_history_to_s3(
+                    pgdb=self.pgcon,
+                    start_date=str(start_date.date()),
+                    start_of_next_period=str(start_of_next_period.date()),
+                    year=start_date.year,
+                    quarter=start_date.quarter,
+                )
+        except Exception:
+            logger.exception("Exporting combined domain history to s3 failed")
 
     def scrape_new_apps(self, store: int) -> None:
         try:
@@ -487,8 +509,9 @@ class ProcessManager:
 
     def creative_scan_all_apps(self) -> None:
         from adscrawler.mitm_ad_parser.mitm_scrape_ads import (  # noqa: PLC0415
-    scan_all_apps,
-)
+            scan_all_apps,
+        )
+
         scan_all_apps(
             pgdb=self.pgcon,
             only_new_apps=self.args.creative_scan_new_apps,
@@ -498,8 +521,9 @@ class ProcessManager:
 
     def creative_scan_single_app(self) -> None:
         from adscrawler.mitm_ad_parser.mitm_scrape_ads import (  # noqa: PLC0415
-    parse_store_id_mitm_log
+            parse_store_id_mitm_log,
         )
+
         error_messages = parse_store_id_mitm_log(
             pgdb=self.pgcon,
             pub_store_id=self.args.store_id,

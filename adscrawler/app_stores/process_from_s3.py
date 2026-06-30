@@ -22,6 +22,7 @@ from adscrawler.dbcon.queries import (
     query_collections,
     query_countries,
     query_languages,
+    query_report_combined_domains,
     query_store_id_map,
     query_store_id_map_cached,
     upsert_df,
@@ -278,6 +279,63 @@ def query_store_collection_ranks(
             """
     with get_duckdb_connection(s3_config_key) as duckdb_con:
         return duckdb_con.execute(period_query).df()
+
+
+def combined_domain_history_to_s3(
+    pgdb: PostgresEngine,
+    start_date: str,
+    start_of_next_period: str,
+    year: int,
+    quarter: int,
+    chunk_size: int = 1_000_000,
+) -> None:
+    """Stream combined domain app history data from Postgres to S3 as parquet.
+
+    The query_report_combined_domains query can return 100M+ rows (GB+ of data).
+    This function streams it in chunks to avoid loading everything into memory,
+    writing each chunk as a separate parquet file to:
+      s3://bucket/report-data/combined-domain-app-history-quarter/year={year}/quarter={quarter}/
+    """
+    s3_client = get_s3_client()
+    bucket = CONFIG["s3"]["bucket"]
+    prefix = (
+        f"report-data/combined-domain-app-history-quarter/year={year}/quarter={quarter}"
+    )
+
+    logger.info(
+        "Streaming combined domain history to "
+        f"s3://{bucket}/{prefix}/  "
+        f"start={start_date} next={start_of_next_period}"
+    )
+
+    chunk_iter = query_report_combined_domains(
+        pgdb=pgdb,
+        start_date=start_date,
+        start_of_next_period=start_of_next_period,
+        chunksize=chunk_size,
+    )
+
+    part = 0
+    for chunk in chunk_iter:
+        chunk["year"] = year
+        chunk["quarter"] = quarter
+
+        epoch_ms = int(time.time() * 1000)
+        suffix = uuid.uuid4().hex[:8]
+        file_name = f"history_{epoch_ms}_{suffix}.parquet"
+        s3_key = f"{prefix}/{file_name}"
+
+        buffer = BytesIO()
+        chunk.to_parquet(buffer, index=False)
+        buffer.seek(0)
+        s3_client.upload_fileobj(buffer, bucket, s3_key)
+
+        part += 1
+        logger.info(
+            f"Uploaded part {part} ({len(chunk):,} rows) to s3://{bucket}/{s3_key}"
+        )
+
+    logger.info(f"Finished {part=} written to s3://{bucket}/{prefix}/")
 
 
 def manual_download_rankings(
