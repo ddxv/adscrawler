@@ -120,7 +120,6 @@ def _actor_body(
     app_data: list[dict[str, Any]],
     store: int,
     process_icon: bool,
-    thread_workers: int,
     *,
     group: int,
 ) -> None:
@@ -136,11 +135,10 @@ def _actor_body(
         this queue so lock release targets the correct keys.
     """
     logger.info(
-        "Actor received chunk: store=%s group=%s apps=%d thread_workers=%d",
+        "Actor received chunk: store=%s group=%s apps=%d",
         store,
         group,
         len(app_data),
-        thread_workers,
     )
 
     df_chunk = pd.DataFrame(app_data)
@@ -152,7 +150,6 @@ def _actor_body(
             df_chunk=df_chunk,
             store=store,
             process_icon=process_icon,
-            thread_workers=thread_workers,
         )
         logger.info("Actor finished chunk: store=%s apps=%d", store, len(app_data))
     except Exception:
@@ -176,10 +173,9 @@ def scrape_chunk_google_1(
     app_data: list[dict[str, Any]],
     store: int,
     process_icon: bool,
-    thread_workers: int,
 ) -> None:
     """Scrape Google Play apps (country priority group 1, e.g. US)."""
-    _actor_body(app_data, store, process_icon, thread_workers, group=1)
+    _actor_body(app_data, store, process_icon, group=1)
 
 
 @dramatiq.actor(
@@ -189,10 +185,9 @@ def scrape_chunk_apple_1(
     app_data: list[dict[str, Any]],
     store: int,
     process_icon: bool,
-    thread_workers: int,
 ) -> None:
     """Scrape Apple App Store apps (country priority group 1, e.g. US)."""
-    _actor_body(app_data, store, process_icon, thread_workers, group=1)
+    _actor_body(app_data, store, process_icon, group=1)
 
 
 @dramatiq.actor(
@@ -202,10 +197,9 @@ def scrape_chunk_google_2(
     app_data: list[dict[str, Any]],
     store: int,
     process_icon: bool,
-    thread_workers: int,
 ) -> None:
     """Scrape Google Play apps (country priority group 2, e.g. international)."""
-    _actor_body(app_data, store, process_icon, thread_workers, group=2)
+    _actor_body(app_data, store, process_icon, group=2)
 
 
 @dramatiq.actor(
@@ -215,7 +209,6 @@ def scrape_chunk_apple_2(
     app_data: list[dict[str, Any]],
     store: int,
     process_icon: bool,
-    thread_workers: int,
 ) -> None:
     """Scrape Apple App Store apps (country priority group 2, e.g. international)."""
-    _actor_body(app_data, store, process_icon, thread_workers, group=2)
+    _actor_body(app_data, store, process_icon, group=2)

@@ -245,13 +245,6 @@ def dispatch_app_details_jobs(
         return
     logger.info(f"{log_info} {pending} chunks currently pending")
 
-    if store == 1:
-        thread_workers = 1
-    elif store == 2:
-        thread_workers = 2
-    else:
-        thread_workers = 1
-
     df = query_store_apps_to_update(
         store=store,
         pgdb=pgdb,
@@ -323,7 +316,6 @@ def dispatch_app_details_jobs(
             app_data=app_data,
             store=store,
             process_icon=process_icon,
-            thread_workers=thread_workers,
         )
 
         total_dispatched += len(acquired_ids)

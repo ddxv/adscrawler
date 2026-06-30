@@ -3,7 +3,7 @@ import pathlib
 import random
 import ssl
 import time
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from io import BytesIO
 from urllib.error import URLError
 from urllib.parse import unquote_plus
@@ -71,42 +71,10 @@ from adscrawler.packages.storage import get_s3_client, rankings_parquet_exists_i
 logger = get_logger(__name__, "scrape_stores")
 
 
-def _scrape_single_app(
-    row: pd.Series,
-    store: int,
-    process_icon: bool,
-    chunk_info: str,
-    use_thread_jitter: bool,
-) -> dict | None:
-    """Helper function to scrape a single app - used by ThreadPoolExecutor."""
-    if use_thread_jitter:
-        # Add small random jitter to avoid SSL connection conflicts
-        time.sleep(random.uniform(0.05, 0.2))
-
-    try:
-        result = scrape_app(
-            store=store,
-            store_id=row["store_id"],
-            country=row["country_code"].lower(),
-            language=row["language"].lower(),
-            html_recently_scraped=row.get("html_recently_scraped", None),
-        )
-        result["store_app_db_id"] = row["store_app"]
-        if process_icon:
-            result["icon_url_100"] = row.get("icon_url_100", None)
-        return result
-    except Exception as e:
-        logger.exception(
-            f"{chunk_info} store_id={row['store_id']} scrape_app failed: {e}"
-        )
-        return None
-
-
 def process_scrape_apps_and_save(
     df_chunk: pd.DataFrame,
     store: int,
     process_icon: bool,
-    thread_workers: int,
     total_rows: int | None = None,
 ) -> None:
     """Process a chunk of apps, scrape app, store to S3 and if country === US store app details to db store_apps table.
@@ -115,74 +83,31 @@ def process_scrape_apps_and_save(
         df_chunk: DataFrame of apps to process, needs to have columns: store_id, country_code, language, icon_url_100
         store: Store ID
         process_icon: Whether to process app icons
-        thread_workers: Number of threads to use for parallel scraping within this process
         total_rows: Total number of apps in the chunk, if None, will be calculated from df_chunk
     """
     if total_rows is None:
         total_rows = len(df_chunk)
     chunk_info = f"{store=} process_scrape_apps_and_save chunk={df_chunk.index[0]}-{df_chunk.index[-1]}/{total_rows}"
-
-    # Store 1 (Google Play) uses sequential processing to avoid SSL issues
-    # Store 2 (Apple) can use threading
-    use_threading = store == 2 and thread_workers > 1
-
-    if use_threading:
-        logger.info(f"{chunk_info} start with {thread_workers} threads")
-    else:
-        logger.info(f"{chunk_info} start (sequential)")
-
+    logger.info(f"{chunk_info} start")
     pgdb = get_db_connection()
     chunk_results = []
-
     try:
-        if use_threading:
-            # Threading approach for Apple App Store
-            use_thread_jitter = True
-            with ThreadPoolExecutor(max_workers=thread_workers) as executor:
-                # Submit all scraping tasks
-                future_to_row = {
-                    executor.submit(
-                        _scrape_single_app,
-                        row,
-                        store,
-                        process_icon,
-                        chunk_info,
-                        use_thread_jitter,
-                    ): idx
-                    for idx, row in df_chunk.iterrows()
-                }
-
-                # Collect results as they complete
-                for future in as_completed(future_to_row):
-                    try:
-                        result = future.result()
-                        if result is not None:
-                            chunk_results.append(result)
-                        # Add slight jitter so threads don't pick up next task simultaneously
-                        time.sleep(random.uniform(0.01, 0.05))
-                    except Exception as e:
-                        row_idx = future_to_row[future]
-                        logger.exception(
-                            f"{chunk_info} row_idx={row_idx} thread processing failed: {e}"
-                        )
-        else:
-            # Sequential approach for Google Play Store (avoids SSL EOF errors)
-            for _, row in df_chunk.iterrows():
-                try:
-                    result = scrape_app(
-                        store=store,
-                        store_id=row["store_id"],
-                        country=row["country_code"].lower(),
-                        language=row["language"].lower(),
-                    )
-                    result["store_app_db_id"] = row["store_app"]
-                    if process_icon:
-                        result["icon_url_100"] = row.get("icon_url_100", None)
-                    chunk_results.append(result)
-                except Exception as e:
-                    logger.exception(
-                        f"{chunk_info} store_id={row['store_id']} scrape_app failed: {e}"
-                    )
+        for _, row in df_chunk.iterrows():
+            try:
+                result = scrape_app(
+                    store=store,
+                    store_id=row["store_id"],
+                    country=row["country_code"].lower(),
+                    language=row["language"].lower(),
+                )
+                result["store_app_db_id"] = row["store_app"]
+                if process_icon:
+                    result["icon_url_100"] = row.get("icon_url_100", None)
+                chunk_results.append(result)
+            except Exception as e:
+                logger.exception(
+                    f"{chunk_info} store_id={row['store_id']} scrape_app failed: {e}"
+                )
 
         if not chunk_results:
             logger.warning(f"{chunk_info} produced no results.")
@@ -226,15 +151,6 @@ def update_app_details(
     """
     log_info = f"{store=} group={country_priority_group} update_app_details"
 
-    # Store 1 (Google Play): No threading due to urllib SSL issues
-    # Store 2 (Apple): Use threading as it has slower response times
-    if store == 1:
-        thread_workers = 1
-    elif store == 2:
-        thread_workers = 3
-    else:
-        thread_workers = 1
-
     df = query_store_apps_to_update(
         store=store,
         pgdb=pgdb,
@@ -268,22 +184,15 @@ def update_app_details(
     total_chunks = len(chunks)
     total_rows = len(df)
 
-    if thread_workers > 1:
-        logger.info(
-            f"{log_info} processing {total_rows} apps in {total_chunks} chunks "
-            f"({workers} processes × {thread_workers} threads = {workers * thread_workers} concurrent)"
-        )
-    else:
-        logger.info(
-            f"{log_info} processing {total_rows} apps in {total_chunks} chunks "
-            f"({workers} processes, sequential per process)"
-        )
+    logger.info(
+        f"{log_info} processing {total_rows} apps in {total_chunks} chunks "
+        f"({workers} processes, sequential per process)"
+    )
 
     completed_count = 0
     failed_count = 0
 
     with ProcessPoolExecutor(max_workers=workers) as executor:
-        # Submit all chunks, but stagger the first wave to avoid API bursts
         future_to_idx = {}
         for idx, df_chunk in enumerate(chunks):
             future = executor.submit(
@@ -292,7 +201,6 @@ def update_app_details(
                 store=store,
                 process_icon=process_icon,
                 total_rows=total_rows,
-                thread_workers=thread_workers,
             )
             future_to_idx[future] = idx
             # Only stagger the initial batch to avoid simultaneous API burst
