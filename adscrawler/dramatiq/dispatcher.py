@@ -1,66 +1,11 @@
 """Dispatcher: lightweight message producer that replaces ``update_app_details``.
 
-Instead of using a ``ProcessPoolExecutor`` to scrape apps locally, this module
-queries Postgres, splits the returned apps into chunks, and sends each chunk as
-a Dramatiq message.  Messages are routed to one of **4 queues** based on
-``(store, country_priority_group)``:
-
-+-----------------------+-------+-------+
-| Queue                 | Store | Group |
-+-----------------------+-------+-------+
-| ``store_crawls_google_1`` | 1  | 1     |
-| ``store_crawls_apple_1``  | 2  | 1     |
-| ``store_crawls_google_2`` | 1  | 2     |
-| ``store_crawls_apple_2``  | 2  | 2     |
-+-----------------------+-------+-------+
-
-Each queue has its own lock namespace and throttle counter so one slow queue
+Queries Postgres, splits the returned apps into chunks, and sends each chunk
+as a Dramatiq message to one of 4 queues (google/apple × group 1/2).  Each
+queue has its own lock namespace and throttle counter so one slow queue
 doesn't block the others.
 
-The Redis broker URL is read from ``config.toml`` (``[redis]`` section).
-
-Queue throttling
-----------------
-Before querying Postgres, the dispatcher uses ``LLEN`` (O(1)) on the target
-queue to see how many messages (chunks) are pending.  If **≥34** chunks
-(≈100k apps at 3000 apps/chunk) are already queued, the dispatch cycle for
-that queue is skipped entirely.  This lets you run the dispatcher on a
-frequent cron interval without overflowing Redis.
-
-Deduplication
--------------
-Before enqueuing each chunk, the dispatcher uses a **Redis pipeline with
-SET NX** to atomically claim a lock for each ``store_app`` (key:
-``<queue_name>:lock:<store_app>``, 24-hour TTL).  Apps already in-flight are
-silently skipped.  Workers release the locks in a ``finally`` block.
-
-Usage (Controller VPS)
-----------------------
-Dispatch all 4 queues in a single invocation (recommended)::
-
-    python main.py -u --dispatch-all
-
-Or target a single queue::
-
-    python main.py -u --dispatch --platform google --country-priority-group=1
-
-Usage (from code)::
-
-    from adscrawler.dramatiq.dispatcher import dispatch_all_queues
-    from adscrawler.dbcon.connection import get_db_connection
-
-    pgdb = get_db_connection()
-    dispatch_all_queues(pgdb=pgdb, process_icon=False)
-
-    # or a single queue:
-    from adscrawler.dramatiq.dispatcher import dispatch_app_details_jobs
-    dispatch_app_details_jobs(
-        pgdb=pgdb,
-        store=1,
-        process_icon=False,
-        limit=200_000,
-        country_priority_group=1,
-    )
+See ``adscrawler/dramatiq/README.md`` for usage instructions.
 """
 
 import dramatiq
@@ -300,11 +245,6 @@ def dispatch_app_details_jobs(
         # 3. If every app in this chunk is already in-flight, skip entirely
         if not acquired_ids:
             total_skipped += len(store_app_ids)
-            if (i + 1) % 10 == 0 or (i + 1) == len(chunks):
-                logger.info(
-                    f"{log_info} chunk {i + 1}/{len(chunks)}: all "
-                    f"{len(store_app_ids)} apps already in-flight, skipped"
-                )
             continue
 
         # 4. Filter the DataFrame down to only the newly-acquired apps
@@ -321,15 +261,9 @@ def dispatch_app_details_jobs(
         total_dispatched += len(acquired_ids)
         total_skipped += len(store_app_ids) - len(acquired_ids)
 
-        if (i + 1) % 10 == 0 or (i + 1) == len(chunks):
-            logger.info(
-                f"{log_info} dispatched {i + 1}/{len(chunks)} chunks "
-                f"(dispatched={total_dispatched} skipped={total_skipped})"
-            )
-
     logger.info(
-        f"{log_info} finished: {total_dispatched} apps enqueued "
-        f"({total_skipped} already in-flight)"
+        f"{log_info} finished: {total_dispatched} apps enqueued across "
+        f"{len(chunks)} chunks ({total_skipped} already in-flight)"
     )
 
 

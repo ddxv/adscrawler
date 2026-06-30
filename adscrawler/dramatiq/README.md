@@ -1,68 +1,75 @@
 # systemd units for Dramatiq workers
 
-There are two template files — one per store — because Google and Apple
-need different ``-p`` / ``-t`` values:
+All service files follow the pattern ``crawl-<category>-<store>@.service``
+so they sort together and are easy to manage.  ``%i`` is the country-priority
+group number (``1`` or ``2``).
 
-| Template file                         | Store  | `-p` | `-t` | Reasoning                                     |
+## Templates
+
+| Template                              | Store  | `-p` | `-t` | Reasoning                                     |
 |---------------------------------------|--------|------|------|-----------------------------------------------|
-| ``dramatiq-worker-google@.service``   | Google | 4    | 2    | Sequential scrapers benefit from more processes |
-| ``dramatiq-worker-apple@.service``    | Apple  | 2    | 4    | Slower HTTP responses benefit from more threads per process |
+| ``crawl-store-apps-google@.service``  | Google | 4    | 2    | Sequential scrapers benefit from more processes |
+| ``crawl-store-apps-apple@.service``   | Apple  | 2    | 4    | Slower HTTP responses benefit from more threads per process |
 
 ## Quick start
 
 ### Usage (Controller VPS)
-----------------------
+
 Dispatch all 4 queues in a single invocation (recommended)::
-```
-python main.py -u --dispatch-all
-```
+
+    python main.py -u --dispatch-all
+
+### Setting up workers
 
 ```bash
 # 1. Copy the templates to systemd directory
-sudo cp dramatiq-worker-google@.service /etc/systemd/system/
-sudo cp dramatiq-worker-apple@.service  /etc/systemd/system/
+sudo cp crawl-store-apps-google@.service /etc/systemd/system/
+sudo cp crawl-store-apps-apple@.service  /etc/systemd/system/
 
 # 2. Optionally adjust paths and -p / -t in the templates first:
-#    vim dramatiq-worker-google@.service
+#    vim crawl-store-apps-google@.service
 #    Then copy after editing
 
 # 3. Reload systemd
 sudo systemctl daemon-reload
 
-# 4. Enable + start workers for the queues you need
-#    ── Google workers (4 processes × 2 threads = 8 concurrent) ──
-sudo systemctl enable --now dramatiq-worker-google@store_crawls_google_1
-sudo systemctl enable --now dramatiq-worker-google@store_crawls_google_2
+# 4. Enable + start workers
+#    ── Google (4 processes × 2 threads = 8 concurrent) ──
+sudo systemctl enable --now crawl-store-apps-google@1
+sudo systemctl enable --now crawl-store-apps-google@2
 
-#    ── Apple workers (2 processes × 4 threads = 8 concurrent) ──
-sudo systemctl enable --now dramatiq-worker-apple@store_crawls_apple_1
-sudo systemctl enable --now dramatiq-worker-apple@store_crawls_apple_2
+#    ── Apple (2 processes × 4 threads = 8 concurrent) ──
+sudo systemctl enable --now crawl-store-apps-apple@1
+sudo systemctl enable --now crawl-store-apps-apple@2
 ```
-
-The `@` in the filename is a systemd template — `%i` expands to whatever
-comes after the `@`.  All four queue names are:
-
-| Instance name               | Queue                   |
-|-----------------------------|-------------------------|
-| `store_crawls_google_1`    | Google Play, group 1    |
-| `store_crawls_apple_1`     | Apple App Store, group 1|
-| `store_crawls_google_2`    | Google Play, group 2    |
-| `store_crawls_apple_2`     | Apple App Store, group 2 |
 
 ## Managing workers
 
 ```bash
 # View status
-systemctl status dramatiq-worker-google@store_crawls_google_1
+systemctl status crawl-store-apps-google@1
 
 # Tail logs
-journalctl -u dramatiq-worker-google@store_crawls_google_1 -f
+journalctl -u crawl-store-apps-google@1 -f
 
 # Restart
-sudo systemctl restart dramatiq-worker-google@store_crawls_google_1
+sudo systemctl restart crawl-store-apps-google@1
 
 # Stop + disable on boot
-sudo systemctl disable --now dramatiq-worker-google@store_crawls_google_1
+sudo systemctl disable --now crawl-store-apps-google@1
+
+# Stop all app-crawl workers
+sudo systemctl stop 'crawl-store-apps-*'
+```
+
+## Adding new worker types
+
+This naming scheme scales cleanly.  Future workers would get their own
+template and use the same store × group pattern:
+
+```bash
+sudo systemctl enable --now crawl-store-keywords-google@1
+sudo systemctl enable --now crawl-ads-txt-sites@1
 ```
 
 ## Tuning per VPS
@@ -83,7 +90,7 @@ everything cleanly:
 
 ```bash
 # 1. Stop all workers (no in-flight state to lose — locks release in finally)
-sudo systemctl stop 'dramatiq-worker-*'
+sudo systemctl stop 'crawl-store-apps-*'
 
 # 2. Clear Redis — wipes queues AND distributed locks
 redis-cli FLUSHDB
@@ -92,7 +99,7 @@ redis-cli FLUSHDB
 python main.py -u --dispatch-all
 
 # 4. Start workers back up
-sudo systemctl start 'dramatiq-worker-*'
+sudo systemctl start 'crawl-store-apps-*'
 ```
 
 The stop → flush → dispatch → start order matters: you must drain workers
