@@ -69,7 +69,7 @@ template and use the same store × group pattern:
 
 ```bash
 sudo systemctl enable --now crawl-store-keywords-google@1
-sudo systemctl enable --now crawl-ads-txt-sites@1
+sudo systemctl enable --now crawl-store-keywords-apple@1
 ```
 
 ## Tuning per VPS
