@@ -26,7 +26,7 @@ WorkingDirectory=/home/adscrawler/adscrawler
 ExecStart=/home/adscrawler/venvs/adscrawler-env/bin/python \
     -m dramatiq \
     adscrawler.dramatiq.app_stores.worker \
-    -p 2 \
+    -p 2 -t 2 \
     -Q %i
 # ──────────────────────────────────────────────────────────────────
 
