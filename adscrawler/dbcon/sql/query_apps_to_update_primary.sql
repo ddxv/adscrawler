@@ -110,6 +110,10 @@ LEFT JOIN latest_crawls AS lc
     ON
         sa.id = lc.store_app
         AND ctc.country_id = lc.country_id
+WHERE
+    lc.crawled_at IS NULL
+    -- prevent double crawling while waiting for daily S3 files to process
+    OR lc.crawled_at < :short_update_ts
 ORDER BY
     -- always crawl new ones first
     crawl_result_null DESC,

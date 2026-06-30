@@ -205,7 +205,7 @@ def dispatch_app_details_jobs(
     pgdb: PostgresEngine,
     store: int,
     process_icon: bool,
-    limit: int,
+    app_limit: int,
     country_priority_group: int,
 ) -> None:
     """Query Postgres, chunk the results, and fire each chunk over Redis.
@@ -248,7 +248,7 @@ def dispatch_app_details_jobs(
     df = query_store_apps_to_update(
         store=store,
         pgdb=pgdb,
-        limit=limit,
+        limit=app_limit,
         country_priority_group=group,
     )
 
@@ -258,7 +258,7 @@ def dispatch_app_details_jobs(
         return
 
     # --- Keep the same highly-optimised chunking as update_app_details ---
-    max_chunk_size = 500
+    max_chunk_size = 100
     chunks: list[pd.DataFrame] = []
     for _country, country_df in df.groupby("country_code"):
         country_size = len(country_df)
@@ -351,11 +351,11 @@ def dispatch_all_queues(
     invocation replaces four separate cron jobs.
     """
     for store, group in ((1, 1), (2, 1), (1, 2), (2, 2)):
-        group_limit = 5_000 if group == 2 else limit
+        app_limit = 5_000 if group == 2 else limit
         dispatch_app_details_jobs(
             pgdb=pgdb,
             store=store,
             process_icon=process_icon,
-            limit=group_limit,
+            app_limit=app_limit,
             country_priority_group=group,
         )

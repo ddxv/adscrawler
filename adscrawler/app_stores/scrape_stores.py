@@ -76,6 +76,7 @@ def process_scrape_apps_and_save(
     store: int,
     process_icon: bool,
     total_rows: int | None = None,
+    do_pg_update: bool = False
 ) -> None:
     """Process a chunk of apps, scrape app, store to S3 and if country === US store app details to db store_apps table.
 
@@ -117,13 +118,14 @@ def process_scrape_apps_and_save(
         app_details_to_s3(results_df, store=store)
         results_df["store_app"] = results_df["store_app_db_id"].astype(int)
         log_crawl_results(results_df, pgdb=pgdb)
-        results_df = results_df[(results_df["country"] == "US")]
-        process_live_app_details(
-            store=store,
-            results_df=results_df,
-            pgdb=pgdb,
-            process_icon=process_icon,
-        )
+        if do_pg_update:
+            results_df = results_df[(results_df["country"] == "US")]
+            process_live_app_details(
+                store=store,
+                results_df=results_df,
+                pgdb=pgdb,
+                process_icon=process_icon,
+            )
         logger.info(f"{chunk_info} finished")
     finally:
         if pgdb and hasattr(pgdb, "engine"):

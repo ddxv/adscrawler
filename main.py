@@ -451,7 +451,7 @@ class ProcessManager:
                 pgdb=self.pgcon,
                 store=store,
                 process_icon=self.args.process_icons,
-                limit=self.args.limit_query_rows,
+                app_limit=self.args.limit_query_rows,
                 country_priority_group=country_priority_group,
             )
             return
