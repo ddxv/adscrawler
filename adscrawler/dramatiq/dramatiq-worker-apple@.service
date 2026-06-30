@@ -1,0 +1,44 @@
+# systemd template unit for an Apple App Store Dramatiq worker.
+#
+# Instantiate per queue.  The queue name is passed via %i.
+# Examples:
+#
+#   /etc/systemd/system/dramatiq-worker-apple@store_crawls_apple_1.service
+#   → sudo systemctl enable --now dramatiq-worker-apple@store_crawls_apple_1
+#
+#   /etc/systemd/system/dramatiq-worker-apple@store_crawls_apple_2.service
+#   → sudo systemctl enable --now dramatiq-worker-apple@store_crawls_apple_2
+#
+# Apple scraping is network-heavy (slower API responses), so more threads
+# per process (-t 4) allow concurrent HTTP requests.  Fewer processes (-p 2)
+# keep the overall concurrency reasonable.
+#
+# The %i placeholder is expanded to the instance name (e.g.
+# "store_crawls_apple_1").
+
+[Unit]
+Description=Dramatiq Worker – %i
+After=network.target
+
+[Service]
+Type=simple
+Environment=PYTHONUNBUFFERED=1
+
+# ── Adjust these to VPS ──────────────────────────────────────
+User=adscrawler
+WorkingDirectory=/home/adscrawler/adscrawler
+ExecStart=/home/adscrawler/venvs/adscrawler-env/bin/python \
+    -m dramatiq \
+    adscrawler.dramatiq.app_stores.worker \
+    -p 2 -t 4 \
+    -Q %i
+# ──────────────────────────────────────────────────────────────────
+
+Restart=always
+RestartSec=10
+
+# Hard and soft limits — tune if needed
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

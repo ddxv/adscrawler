@@ -1,13 +1,17 @@
-# systemd template unit for a Dramatiq worker.
+# systemd template unit for a Google Play Dramatiq worker.
 #
 # Instantiate per queue.  The queue name is passed via %i.
 # Examples:
 #
-#   /etc/systemd/system/dramatiq-worker@store_crawls_google_1.service
-#   → sudo systemctl enable --now dramatiq-worker@store_crawls_google_1
+#   /etc/systemd/system/dramatiq-worker-google@store_crawls_google_1.service
+#   → sudo systemctl enable --now dramatiq-worker-google@store_crawls_google_1
 #
-#   /etc/systemd/system/dramatiq-worker@store_crawls_apple_1.service
-#   → sudo systemctl enable --now dramatiq-worker@store_crawls_apple_1
+#   /etc/systemd/system/dramatiq-worker-google@store_crawls_google_2.service
+#   → sudo systemctl enable --now dramatiq-worker-google@store_crawls_google_2
+#
+# Google Play scraping is sequential per chunk, so more processes (-p 4)
+# provide parallelism.  The -t 2 gives two Dramatiq worker threads per
+# process, each pulling its own chunk from Redis.
 #
 # The %i placeholder is expanded to the instance name (e.g.
 # "store_crawls_google_1").
@@ -26,7 +30,7 @@ WorkingDirectory=/home/adscrawler/adscrawler
 ExecStart=/home/adscrawler/venvs/adscrawler-env/bin/python \
     -m dramatiq \
     adscrawler.dramatiq.app_stores.worker \
-    -p 2 -t 2 \
+    -p 4 -t 2 \
     -Q %i
 # ──────────────────────────────────────────────────────────────────
 
