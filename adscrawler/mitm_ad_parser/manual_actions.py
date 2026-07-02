@@ -10,7 +10,7 @@ from adscrawler.mitm_ad_parser.mitm_scrape_ads import (
     add_is_creative_content_column,
     parse_log,
 )
-from adscrawler.packages.storage import (
+from adscrawler.process.storage import (
     get_s3_client,
 )
 

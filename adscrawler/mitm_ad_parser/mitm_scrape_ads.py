@@ -27,7 +27,7 @@ from adscrawler.mitm_ad_parser.network_parsers import (
     parse_creative_request,
     parse_sent_video_df,
 )
-from adscrawler.packages.storage import (
+from adscrawler.process.storage import (
     creative_exists_in_s3,
     get_store_id_mitm_s3_keys,
     upload_ad_creative_to_s3,

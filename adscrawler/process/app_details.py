@@ -1,3 +1,5 @@
+"""Raw app details, rankings, and keywords – upload to & import from S3 parquet."""
+
 import datetime
 import os
 import pathlib
@@ -12,9 +14,7 @@ from adscrawler.app_stores.utils import (
     get_parquet_paths_by_prefix,
 )
 from adscrawler.config import CONFIG, get_logger
-from adscrawler.dbcon.connection import (
-    PostgresEngine,
-)
+from adscrawler.dbcon.connection import PostgresEngine
 from adscrawler.dbcon.queries import (
     clean_app_ranks_weekly_table,
     delete_and_insert,
@@ -22,25 +22,35 @@ from adscrawler.dbcon.queries import (
     query_collections,
     query_countries,
     query_languages,
-    query_report_combined_domains,
     query_store_id_map,
     query_store_id_map_cached,
     upsert_df,
 )
-from adscrawler.packages.storage import get_duckdb_connection, get_s3_client
+from adscrawler.process import (
+    RAW_DATA_APP_DETAILS,
+    RAW_DATA_APP_RANKINGS,
+    RAW_DATA_KEYWORDS,
+)
+from adscrawler.process.storage import (
+    get_duckdb_connection,
+    get_s3_client,
+)
 
 logger = get_logger(__name__, "scrape_stores")
 
 
-def raw_keywords_to_s3(
-    df: pd.DataFrame,
-) -> None:
+# ---------------------------------------------------------------------------
+# Upload helpers
+# ---------------------------------------------------------------------------
+
+
+def raw_keywords_to_s3(df: pd.DataFrame) -> None:
+    """Upload keyword-rank data to ``raw-data/keywords/`` on S3."""
     logger.info(f"S3 upload keywords rows={df.shape[0]:,} start")
     s3_client = get_s3_client()
     bucket = CONFIG["s3"]["bucket"]
     df["store_id"] = df["store_id"].astype(str)
     for store, store_df in df.groupby("store"):
-        # handles edge case of a crawl spanning a date change
         for crawled_date, date_df in store_df.groupby("crawled_date"):
             if isinstance(crawled_date, datetime.date):
                 crawled_date = crawled_date.strftime("%Y-%m-%d")
@@ -48,8 +58,7 @@ def raw_keywords_to_s3(
                 epoch_ms = int(time.time() * 1000)
                 suffix = uuid.uuid4().hex[:8]
                 file_name = f"keywords_{epoch_ms}_{suffix}.parquet"
-                s3_loc = "raw-data/keywords"
-                s3_key = f"{s3_loc}/store={store}/crawled_date={crawled_date}/country={country}/{file_name}"
+                s3_key = f"{RAW_DATA_KEYWORDS}/store={store}/crawled_date={crawled_date}/country={country}/{file_name}"
                 buffer = BytesIO()
                 country_df.to_parquet(buffer, index=False)
                 buffer.seek(0)
@@ -57,16 +66,13 @@ def raw_keywords_to_s3(
     logger.info(f"S3 upload keywords {store=} finished")
 
 
-def app_details_to_s3(
-    df: pd.DataFrame,
-    store: int,
-) -> None:
+def app_details_to_s3(df: pd.DataFrame, store: int) -> None:
+    """Upload app-detail scrapes to ``raw-data/app_details/`` on S3."""
     logger.info(f"S3 upload app_details {store=}, rows={df.shape[0]:,} start")
     if store is None:
         raise ValueError("store is required")
     s3_client = get_s3_client()
     bucket = CONFIG["s3"]["bucket"]
-    # handles edge case of a crawl spanning a date change
     df["store_id"] = df["store_id"].astype(str)
     for crawled_date, date_df in df.groupby("crawled_date"):
         if isinstance(crawled_date, datetime.date):
@@ -75,8 +81,7 @@ def app_details_to_s3(
             epoch_ms = int(time.time() * 1000)
             suffix = uuid.uuid4().hex[:8]
             file_name = f"app_details_{epoch_ms}_{suffix}.parquet"
-            s3_loc = "raw-data/app_details"
-            s3_key = f"{s3_loc}/store={store}/crawled_date={crawled_date}/country={country}/{file_name}"
+            s3_key = f"{RAW_DATA_APP_DETAILS}/store={store}/crawled_date={crawled_date}/country={country}/{file_name}"
             buffer = BytesIO()
             country_df.to_parquet(buffer, index=False)
             buffer.seek(0)
@@ -84,10 +89,8 @@ def app_details_to_s3(
     logger.info(f"S3 upload app details {store=} finished")
 
 
-def process_store_rankings(
-    df: pd.DataFrame,
-    store: int,
-) -> None:
+def process_store_rankings(df: pd.DataFrame, store: int) -> None:
+    """Upload store-rankings to ``raw-data/app_rankings/`` on S3."""
     logger.info(f"Process and save rankings start {store=}")
     if store is None:
         raise ValueError("store is required")
@@ -103,10 +106,15 @@ def process_store_rankings(
             )
             os.makedirs(os.path.dirname(local_path), exist_ok=True)
             df_country.to_parquet(local_path, index=False)
-            s3_key = f"raw-data/app_rankings/store={store}/crawled_date={crawled_date}/country={country}/rankings.parquet"
+            s3_key = f"{RAW_DATA_APP_RANKINGS}/store={store}/crawled_date={crawled_date}/country={country}/rankings.parquet"
             logger.info(f"Uploading to S3: {s3_key}")
             s3_client.upload_file(str(local_path), bucket, s3_key)
             local_path.unlink()
+
+
+# ---------------------------------------------------------------------------
+# Rankings import
+# ---------------------------------------------------------------------------
 
 
 def get_s3_rank_parquet_paths(
@@ -117,7 +125,7 @@ def get_s3_rank_parquet_paths(
     bucket = CONFIG[s3_config_key]["bucket"]
     for ddt in pd.date_range(dt, dt + datetime.timedelta(days=days), freq="D"):
         ddt_str = ddt.strftime("%Y-%m-%d")
-        prefix = f"raw-data/app_rankings/store={store}/crawled_date={ddt_str}/country="
+        prefix = f"{RAW_DATA_APP_RANKINGS}/store={store}/crawled_date={ddt_str}/country="
         objects = s3.list_objects_v2(Bucket=bucket, Prefix=prefix)
         parquet_paths = [
             f"s3://{bucket}/{obj['Key']}"
@@ -247,7 +255,7 @@ def query_store_collection_ranks(
     period: str,
     s3_config_key: str,
 ) -> pd.DataFrame:
-    """Query parquet files fora app country ranks."""
+    """Query parquet files for app country ranks."""
     period_query = f"""WITH all_data AS (
                 SELECT * FROM read_parquet({country_parquet_paths})
                  ),
@@ -281,63 +289,6 @@ def query_store_collection_ranks(
         return duckdb_con.execute(period_query).df()
 
 
-def combined_domain_history_to_s3(
-    pgdb: PostgresEngine,
-    start_date: str,
-    start_of_next_period: str,
-    year: int,
-    quarter: int,
-    chunk_size: int = 1_000_000,
-) -> None:
-    """Stream combined domain app history data from Postgres to S3 as parquet.
-
-    The query_report_combined_domains query can return 100M+ rows (GB+ of data).
-    This function streams it in chunks to avoid loading everything into memory,
-    writing each chunk as a separate parquet file to:
-      s3://bucket/report-data/combined-domain-app-history-quarter/year={year}/quarter={quarter}/
-    """
-    s3_client = get_s3_client()
-    bucket = CONFIG["s3"]["bucket"]
-    prefix = (
-        f"report-data/combined-domain-app-history-quarter/year={year}/quarter={quarter}"
-    )
-
-    logger.info(
-        "Streaming combined domain history to "
-        f"s3://{bucket}/{prefix}/  "
-        f"start={start_date} next={start_of_next_period}"
-    )
-
-    chunk_iter = query_report_combined_domains(
-        pgdb=pgdb,
-        start_date=start_date,
-        start_of_next_period=start_of_next_period,
-        chunksize=chunk_size,
-    )
-
-    part = 0
-    for chunk in chunk_iter:
-        chunk["year"] = year
-        chunk["quarter"] = quarter
-
-        epoch_ms = int(time.time() * 1000)
-        suffix = uuid.uuid4().hex[:8]
-        file_name = f"history_{epoch_ms}_{suffix}.parquet"
-        s3_key = f"{prefix}/{file_name}"
-
-        buffer = BytesIO()
-        chunk.to_parquet(buffer, index=False)
-        buffer.seek(0)
-        s3_client.upload_fileobj(buffer, bucket, s3_key)
-
-        part += 1
-        logger.info(
-            f"Uploaded part {part} ({len(chunk):,} rows) to s3://{bucket}/{s3_key}"
-        )
-
-    logger.info(f"Finished {part=} written to s3://{bucket}/{prefix}/")
-
-
 def manual_download_rankings(
     store: int, crawled_date: datetime.date, country: str
 ) -> pd.DataFrame:
@@ -346,7 +297,7 @@ def manual_download_rankings(
     store = 1
     country = "US"
     crawled_date = datetime.date(2025, 8, 15)
-    s3_key = f"raw-data/app_rankings/store={store}/crawled_date={crawled_date}/country={country}/rankings.parquet"
+    s3_key = f"{RAW_DATA_APP_RANKINGS}/store={store}/crawled_date={crawled_date}/country={country}/rankings.parquet"
     local_path = pathlib.Path(
         f"/tmp/exports/app_rankings/store={store}/crawled_date={crawled_date}/country={country}/rankings.parquet"
     )
@@ -354,6 +305,11 @@ def manual_download_rankings(
     s3_client.download_file(bucket, s3_key, str(local_path))
     df = pd.read_parquet(local_path)
     return df
+
+
+# ---------------------------------------------------------------------------
+# Keywords import
+# ---------------------------------------------------------------------------
 
 
 def import_keywords_from_s3(
@@ -371,8 +327,7 @@ def import_keywords_from_s3(
     for snapshot_date in pd.date_range(start_date, end_date, freq="D"):
         snapshot_date = snapshot_date.date()
         for store in [1, 2]:
-            s3_loc = "raw-data/keywords"
-            s3_key = f"{s3_loc}/store={store}/crawled_date={snapshot_date}/"
+            s3_key = f"{RAW_DATA_KEYWORDS}/store={store}/crawled_date={snapshot_date}/"
             parquet_paths = get_parquet_paths_by_prefix(bucket, s3_key)
             if len(parquet_paths) == 0:
                 logger.warning(f"No parquet paths found for {s3_key}")

@@ -17,7 +17,7 @@ from adscrawler.config import (
 from adscrawler.dbcon.connection import PostgresEngine
 from adscrawler.dbcon.queries import query_countries
 from adscrawler.mitm_ad_parser.utils import get_tld
-from adscrawler.packages.storage import (
+from adscrawler.process.storage import (
     download_mitm_log_by_key,
     get_store_id_mitm_s3_keys,
 )

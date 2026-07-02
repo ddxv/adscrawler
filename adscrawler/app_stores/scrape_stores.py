@@ -31,7 +31,7 @@ from adscrawler.app_stores.google import (
     scrape_google_ranks,
     search_play_store,
 )
-from adscrawler.app_stores.process_from_s3 import (
+from adscrawler.process.app_details import (
     app_details_to_s3,
     process_store_rankings,
     raw_keywords_to_s3,
@@ -66,7 +66,7 @@ from adscrawler.dbcon.queries import (
     update_from_df,
     upsert_df,
 )
-from adscrawler.packages.storage import get_s3_client, rankings_parquet_exists_in_s3
+from adscrawler.process.storage import get_s3_client, rankings_parquet_exists_in_s3
 
 logger = get_logger(__name__, "scrape_stores")
 

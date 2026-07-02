@@ -1,16 +1,14 @@
+"""App metrics history — raw → hashed daily → weekly → interpolated → DB."""
+
 import datetime
 
 import duckdb
 import numpy as np
 import pandas as pd
 
-from adscrawler.app_stores.utils import (
-    get_parquet_paths_by_prefix,
-)
+from adscrawler.app_stores.utils import get_parquet_paths_by_prefix
 from adscrawler.config import CONFIG, get_logger
-from adscrawler.dbcon.connection import (
-    PostgresEngine,
-)
+from adscrawler.dbcon.connection import PostgresEngine
 from adscrawler.dbcon.queries import (
     clean_app_metrics_history_table,
     delete_app_metrics_by_date_and_apps,
@@ -22,7 +20,13 @@ from adscrawler.dbcon.queries import (
     query_store_app_categories,
     upsert_df,
 )
-from adscrawler.packages.storage import (
+from adscrawler.process import (
+    AGG_APP_HASH_BUCKETS_DAILY,
+    AGG_APP_HASH_BUCKETS_FILLED,
+    AGG_APP_HASH_BUCKETS_WEEKLY,
+    RAW_DATA_APP_DETAILS,
+)
+from adscrawler.process.storage import (
     delete_s3_objects_by_date_range,
     delete_s3_objects_by_prefix,
     get_duckdb_connection,
@@ -30,12 +34,16 @@ from adscrawler.packages.storage import (
 
 logger = get_logger(__name__, "scrape_stores")
 
-# TODO: Replace with category and store benchmarks
+# ---------------------------------------------------------------------------
+# Default conversion assumptions (TODO: replace with store + category benchmarks)
+# ---------------------------------------------------------------------------
 NEW_USER_CONVERSION = 0.02  # 2% of new installs
 RETENTION_CONVERSION = 0.002  # 0.2% of returning users (2 in 1,000)
 AVG_TICKET = 5.0  # $5 average
 
-
+# ---------------------------------------------------------------------------
+# Column constants
+# ---------------------------------------------------------------------------
 STAR_COLS = [
     "one_star",
     "two_star",
@@ -89,10 +97,9 @@ GLOBAL_FINAL_COLS = [
 ]
 
 
-RAW_DATA_PREFIX = "raw-data/app_details"
-AGG_APP_HASH_BUCKETS_DAILY = "agg-data/app-hash-daily"
-AGG_APP_HASH_BUCKETS_WEEKLY = "agg-data/app-hash-weekly"
-AGG_APP_HASH_BUCKETS_FILLED = "agg-data/app-hash-weekly-filled"
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
 
 
 def check_for_duplicates(df: pd.DataFrame, key_columns: list[str]) -> None:
@@ -103,11 +110,12 @@ def check_for_duplicates(df: pd.DataFrame, key_columns: list[str]) -> None:
         ]
         logger.error(f"Duplicates found in app history data! {dups}")
         raise ValueError("Duplicates found in app history data")
-    return
 
 
 def handle_missing_trackid_files(
-    duckdb_con: duckdb.DuckDBPyConnection, app_detail_parquets: list[str], store: int
+    duckdb_con: duckdb.DuckDBPyConnection,
+    app_detail_parquets: list[str],
+    store: int,
 ) -> None:
     required_id_column = "trackId" if store == 2 else "appId"
     if store == 2:
@@ -125,7 +133,6 @@ def handle_missing_trackid_files(
                 bad_parquets.append(parquet)
         for parquet in bad_parquets:
             logger.warning(f"Wanting to deleting raw bad parquet file {parquet}")
-            # delete_s3_objects_by_prefix(bucket='adscrawler', prefix=parquet)
     else:
         logger.error(
             "trackId column missing but store is not Apple, investigate data issue"
@@ -133,40 +140,43 @@ def handle_missing_trackid_files(
 
 
 def clean_history_tables(pgdb: PostgresEngine) -> None:
-    table_name = "app_global_metrics_history"
-    clean_app_metrics_history_table(pgdb=pgdb, table_name=table_name)
-    table_name = "app_country_metrics_history"
-    clean_app_metrics_history_table(pgdb=pgdb, table_name=table_name)
+    clean_app_metrics_history_table(pgdb=pgdb, table_name="app_global_metrics_history")
+    clean_app_metrics_history_table(pgdb=pgdb, table_name="app_country_metrics_history")
+
+
+# ---------------------------------------------------------------------------
+# Full aggregation pipeline
+# ---------------------------------------------------------------------------
 
 
 def delete_and_aggregate_s3_agg(
     store: int,
     pgdb: PostgresEngine,
 ) -> None:
-
     end_date = datetime.date.today()
     raw_data_lookback_days = 3
-    # Rerun this week daily and last week at least once
     raw_weekly_lookback_days = 8
     interpolate_query_lookback_days = 180
-    # Delete window: only remove what we're confident we'll rewrite
     interpolate_delete_lookback_days = 90
     db_delete_lookback_days = 30
 
-    # Raw data to agg by DAY
-    # Purely additive, only needs to be run once for 'yesterday'
+    # Raw data → agg by DAY
     raw_start = end_date - datetime.timedelta(days=raw_data_lookback_days)
     for snapshot_date in pd.date_range(raw_start, end_date, freq="D"):
         log_info = f"{store=} {snapshot_date.date()} S3 raw app details agg"
         logger.info(f"{log_info} start")
-        make_s3_app_hash_metrics_history_daily(store=store, snapshot_date=snapshot_date)
+        make_s3_app_hash_metrics_history_daily(
+            store=store, snapshot_date=snapshot_date
+        )
 
-    # Agg DAY -> WEEK
+    # Agg DAY → WEEK
     raw_weekly_start = end_date - pd.Timedelta(days=raw_weekly_lookback_days)
     start_date_mon = raw_weekly_start - pd.Timedelta(days=raw_weekly_start.weekday())
     for hash_bucket in [f"{i:02x}" for i in range(256)]:
         for week_start in pd.date_range(start_date_mon, end_date, freq="W-MON"):
-            log_info = f"{store=} hash={hash_bucket} {week_start.date()} S3 weekly agg"
+            log_info = (
+                f"{store=} hash={hash_bucket} {week_start.date()} S3 weekly agg"
+            )
             logger.info(f"{log_info} start")
             make_s3_app_hash_metrics_history_weekly(
                 store=store,
@@ -176,6 +186,7 @@ def delete_and_aggregate_s3_agg(
                 clear_bucket_by_week=True,
             )
 
+    # WEEK → interpolated (filled) weekly
     for hash_bucket in [f"{i:02x}" for i in range(256)]:
         query_start = end_date - datetime.timedelta(
             days=interpolate_query_lookback_days
@@ -196,7 +207,6 @@ def delete_and_aggregate_s3_agg(
             hash_bucket=hash_bucket,
             end_date=end_date,
         )
-        # This can run for last 30 days only
         db_delete_start = end_date - datetime.timedelta(days=db_delete_lookback_days)
         process_app_metrics_to_db(
             hash_bucket=hash_bucket,
@@ -204,6 +214,11 @@ def delete_and_aggregate_s3_agg(
             store=store,
             db_delete_start=db_delete_start,
         )
+
+
+# ---------------------------------------------------------------------------
+# Weekly aggregation (DAY → WEEK)
+# ---------------------------------------------------------------------------
 
 
 def copy_daily_to_weekly_hash_buckets(
@@ -322,7 +337,6 @@ def make_s3_app_hash_metrics_history_weekly(
         week_agg_prefix = (
             f"{AGG_APP_HASH_BUCKETS_WEEKLY}/store={store}/hash_bucket={hash_bucket}/"
         )
-    # has 1s delays
     delete_s3_objects_by_prefix(
         bucket=bucket, prefix=week_agg_prefix, key_name=s3_config_key
     )
@@ -341,6 +355,11 @@ def make_s3_app_hash_metrics_history_weekly(
         duckdb_con.execute(query)
 
 
+# ---------------------------------------------------------------------------
+# Daily aggregation (RAW → DAY)
+# ---------------------------------------------------------------------------
+
+
 def make_s3_app_hash_metrics_history_daily(
     store: int, snapshot_date: pd.DatetimeIndex
 ) -> None:
@@ -348,7 +367,7 @@ def make_s3_app_hash_metrics_history_daily(
     bucket = CONFIG[s3_config_key]["bucket"]
     snapshot_date_str = snapshot_date.strftime("%Y-%m-%d")
     prefix = (
-        f"{RAW_DATA_PREFIX}/store={store}/crawled_date={snapshot_date_str}/country="
+        f"{RAW_DATA_APP_DETAILS}/store={store}/crawled_date={snapshot_date_str}/country="
     )
     all_parquet_paths = get_parquet_paths_by_prefix(bucket, prefix)
     hex_values = [f"{i:02x}" for i in range(256)]
@@ -382,21 +401,20 @@ def make_s3_app_hash_metrics_history_daily(
                 )
                 handle_missing_trackid_files(duckdb_con, all_parquet_paths, store)
             else:
-                # raise
                 logger.warning(
                     f"Unexpected BinderException: {e}, investigate data issue"
                 )
 
 
 def estimate_ios_installs(df: pd.DataFrame) -> pd.DataFrame:
-    # For iOS we don't have installs, but we can estimate them using the review count and a conversion rate
-    # This is a very rough estimate and should be replaced with actual install data if possible
     conversion_rate = 0.02
     df["installs_est"] = (df["rating_count"] / conversion_rate).fillna(0).astype(int)
     return df
 
 
-def merge_in_db_ids(df: pd.DataFrame, store: int, pgdb: PostgresEngine) -> pd.DataFrame:
+def merge_in_db_ids(
+    df: pd.DataFrame, store: int, pgdb: PostgresEngine
+) -> pd.DataFrame:
     store_id_map = query_live_apps(store=store, pgdb=pgdb)
     df = pd.merge(
         df,
@@ -420,12 +438,12 @@ def merge_in_db_ids(df: pd.DataFrame, store: int, pgdb: PostgresEngine) -> pd.Da
     return df
 
 
+# ---------------------------------------------------------------------------
+# Per-store metrics processing
+# ---------------------------------------------------------------------------
+
+
 def process_metrics_google(df: pd.DataFrame) -> pd.DataFrame:
-    # Take the US, crawled most, installs, rating_count are already global
-    # Review_count is a max or sum depending on global_fallback logic
-    # Stars should follow the global_fallback logic
-    # At the end, after the countries pct_of_global is calculated
-    # Merge the country tiers as sum of pct_of_global back to global_df
     global_df = df[df["country_id"] == 840].copy()
     df = df.rename(
         columns={
@@ -433,9 +451,6 @@ def process_metrics_google(df: pd.DataFrame) -> pd.DataFrame:
             "rating_count": "global_rating_count",
         }
     )
-    # Calculate each pct of global based on review_count
-    # This is then used to estimate installs per country
-    # pct_of_global will also be used for tiers
     gb = df.groupby(["store_app", "week_start"])
     df["max_reviews"] = gb["review_count"].transform("max")
     df["global_installs"] = gb["global_installs"].transform("max")
@@ -444,15 +459,10 @@ def process_metrics_google(df: pd.DataFrame) -> pd.DataFrame:
         df["max_reviews"] > 200
     )
     candidate_counts = gb["is_max_candidate"].transform("sum")
-    # Multiple countries all near the same large max → they're all receiving the global value
     df["is_global_fallback"] = (
         df["is_max_candidate"].notna() & df["is_max_candidate"] & (candidate_counts > 1)
     )
-    # For fallback rows: we don't know their true country split → set pct to 0
     df["true_review_count"] = np.where(df["is_global_fallback"], 0, df["review_count"])
-    # Since the US has a long history of being queried
-    # Use country ratio of review_counts to backfill missing review_counts
-    # Found useful for musically
     us_lookup = (
         df[df["country_id"] == 840]
         .groupby(["store_app", "week_start"])["true_review_count"]
@@ -496,9 +506,6 @@ def process_metrics_google(df: pd.DataFrame) -> pd.DataFrame:
         df["max_reviews"],
         df["grc_summed"] * df["summed_to_global_fallback_multiplier"].fillna(1),
     )
-    # cols = ['country_id','pct_of_global', 'dis', 'is_global_fallback', "review_count", "true_review_count", "grc_summed", "global_review_count", 'pct_of_us_reviews']
-    # df[(df['store_app'] == 765358) & (df['week_start'] == pd.to_datetime("2026-02-09"))][cols]
-    # df[(df['store_app'] == 765358) & (df['week_start'] == pd.to_datetime("2026-02-16"))][cols]
     df = df.drop(columns=["grc_summed"])
     df["pct_of_global"] = (
         (df["true_review_count"] / df["global_review_count"])
@@ -560,12 +567,7 @@ def process_metrics_google(df: pd.DataFrame) -> pd.DataFrame:
     return df, global_df
 
 
-def process_metrics_apple(
-    df: pd.DataFrame,
-) -> pd.DataFrame:
-    # Since the US has a long history of being queried
-    # Use country ratio of review_counts to backfill missing review_counts
-    # Found useful for musically
+def process_metrics_apple(df: pd.DataFrame) -> pd.DataFrame:
     us_lookup = (
         df[df["country_id"] == 840]
         .groupby(["store_app", "week_start"])["rating_count"]
@@ -587,28 +589,15 @@ def process_metrics_apple(
         df["us_rating_count"] * df["pct_of_us_ratings"],
         df["rating_count"],
     )
-    # Backward compatibility for old weekly files that still have histogram.
-    # if "histogram" in df.columns and not all(col in df.columns for col in STAR_COLS):
-    #     ratings_str = (
-    #         df["histogram"]
-    #         .str.extractall(r"(\d+)")
-    #         .reset_index()
-    #         .pivot_table(index="level_0", columns="match", values=0, aggfunc="first")
-    #         .astype("Int64")
-    #         .reindex(df.index, fill_value=0)
-    #     )
-    #     df[STAR_COLS] = ratings_str.iloc[:, 1::2].astype(int).to_numpy()
     for col in STAR_COLS:
         if col not in df.columns:
             df[col] = 0
         df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0).astype(int)
     df = estimate_ios_installs(df)
     df["rating_prod"] = df["rating"] * df["rating_count"]
-    # future_ios_ratios = get_ios_cached_future_country_ratios(pgdb)
     df["weekly_total_ratings"] = df.groupby(["week_start", "store_app"])[
         "rating_count"
     ].transform("sum")
-    # Latest rating_count per store_app + country_id (by week_start)
     latest_ratio = (
         df.sort_values("week_start")
         .groupby(["store_app", "country_id"])[["rating_count", "weekly_total_ratings"]]
@@ -630,7 +619,6 @@ def process_metrics_apple(
     )
     gbw = df.groupby(["week_start", "store_app"])
     df["global_rating_count"] = gbw["rating_count"].transform("sum")
-    # Here CDF is the latest row per country per app, some countries older
     df["grc_future_est_a"] = df["rating_count"] / df["rating_ratio"]
     df["grc_est_prod"] = df["rating_count"] * df["grc_future_est_a"]
     df["grc_future_est"] = gbw["grc_est_prod"].transform("sum") / gbw[
@@ -652,7 +640,6 @@ def process_metrics_apple(
     app_mean_rating = gbw["rating"].transform("mean")
     df["rating"] = df["rating"].fillna(app_mean_rating)
     df["rating_prod"] = df["rating"] * df["rating_count"]
-    # overwrites installs_est from db, but quick fix for missing, same value
     df = estimate_ios_installs(df)
     global_df = df.groupby(["week_start", "store_app"]).agg(
         rating_count=("rating_count", "sum"),
@@ -682,8 +669,12 @@ def process_metrics_apple(
     return df, global_df
 
 
+# ---------------------------------------------------------------------------
+# Interpolation helpers
+# ---------------------------------------------------------------------------
+
+
 def _build_interpolated_metrics_sql(metrics: list[str]) -> str:
-    """Build SQL for interpolation anchors using true observation dates."""
     interpolated_lines = []
     for metric in metrics:
         interpolated_lines.append(
@@ -693,8 +684,6 @@ def _build_interpolated_metrics_sql(metrics: list[str]) -> str:
 
 
 def _build_coalesce_metric_sql(metric: str) -> str:
-    """Build SQL for a single coalesce metric with linear interpolation logic."""
-    # Define which metrics are floats vs integers
     float_metrics = {"rating"}
     cast = "DOUBLE" if metric in float_metrics else "BIGINT"
     if metric == "installs":
@@ -717,23 +706,17 @@ def _build_coalesce_metric_sql(metric: str) -> str:
 
 
 def _build_coalesce_metrics_sql(metrics: list[str]) -> str:
-    """Build complete coalesce metrics SQL block from list of metric names."""
     coalesce_blocks = [_build_coalesce_metric_sql(m) for m in metrics]
     return "\n                " + "\n                ".join(coalesce_blocks)
 
 
 def _get_store_metrics_config(store: int) -> dict:
-    """Get metric configuration for a given store.
-
-    Returns a dict with keys: metrics, interpolated_metrics, coalesce_metrics.
-    """
     if store == 1:
         metrics = ["installs", "rating", "rating_count", "review_count", *STAR_COLS]
     elif store == 2:
         metrics = ["rating_count", "rating", *STAR_COLS]
     else:
         raise ValueError(f"Unsupported store: {store}")
-
     return {
         "metrics": metrics,
         "interpolated_metrics": _build_interpolated_metrics_sql(metrics),
@@ -767,7 +750,6 @@ def write_app_hash_buckets_interpolated_to_s3(
             f"No parquet paths found for agg app hash buckets {store=} {query_start_mon=} {end_date=}"
         )
         return
-    # Get metric configuration for this store
     config = _get_store_metrics_config(store)
     metrics = config["metrics"]
     interpolated_metrics = config["interpolated_metrics"]
@@ -796,9 +778,6 @@ def write_app_hash_buckets_interpolated_to_s3(
                 INTERVAL 7 DAY
             )
         ),
-        -- ============================================================
-        -- Anchors — window functions over real rows only
-        -- ============================================================
         anchors AS (
             SELECT
                 store_id,
@@ -806,14 +785,10 @@ def write_app_hash_buckets_interpolated_to_s3(
                 week_start,
                 days_since_monday,
                 observed_at,
-                -- Actuals (used when a real crawl lands on a Monday)
                 {",".join(metrics)},
                 store_last_updated,
-                -- Interpolation anchors
                {interpolated_metrics} 
-                -- Shared x-axis
                 MIN(observed_at) OVER w_future AS x2,
-                -- Carry-forward
                 MAX_BY(store_last_updated, observed_at) OVER w_past_inclusive AS store_last_updated_carry
             FROM weekly_data
             WINDOW
@@ -824,10 +799,6 @@ def write_app_hash_buckets_interpolated_to_s3(
                                      ORDER BY observed_at
                                      ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)
         ),
-        -- ============================================================
-        -- 4. Interpolate onto Mondays using true crawl dates as anchors.
-        --    Tue-Sun crawls are future observations for that Monday, not same-day values.
-        -- ============================================================
        interpolated AS (
         SELECT
             dims.store_id,
@@ -838,12 +809,10 @@ def write_app_hash_buckets_interpolated_to_s3(
             COALESCE(a_exact.store_last_updated, a_prev.store_last_updated_carry) AS store_last_updated
         FROM (SELECT DISTINCT store_id, country FROM weekly_data) dims
         CROSS JOIN target_mondays m
-        -- Exact hit: crawl lands exactly on Monday
         LEFT JOIN anchors a_exact
                 ON a_exact.store_id      = dims.store_id
                 AND a_exact.country       = dims.country
                 AND a_exact.observed_at = m.week_start
-        -- Bracketing anchor: finds the latest observation strictly before the target Monday.
         LEFT JOIN anchors a_prev
                 ON a_prev.store_id      = dims.store_id
                 AND a_prev.country       = dims.country
@@ -854,9 +823,8 @@ def write_app_hash_buckets_interpolated_to_s3(
                         AND country       = dims.country
                         AND observed_at < m.week_start
                     )
-        -- Only emit a week if there is real data somewhere to anchor it
-        WHERE a_exact.{metrics[0]} IS NOT NULL        -- crawl on Monday
-            OR (a_prev.observed_at IS NOT NULL AND a_prev.x2 IS NOT NULL) -- interpolatable: both brackets exist
+        WHERE a_exact.{metrics[0]} IS NOT NULL
+            OR (a_prev.observed_at IS NOT NULL AND a_prev.x2 IS NOT NULL)
         )
         SELECT * FROM interpolated
         WHERE week_start >= DATE '{delete_start_mon_str}'
@@ -872,7 +840,11 @@ def write_app_hash_buckets_interpolated_to_s3(
         """
     with get_duckdb_connection(s3_config_key) as duckdb_con:
         duckdb_con.execute(msv_query)
-    return
+
+
+# ---------------------------------------------------------------------------
+# Metrics processing → DB
+# ---------------------------------------------------------------------------
 
 
 def process_metrics(
@@ -888,7 +860,6 @@ def process_metrics(
         country_df, global_df = process_metrics_apple(df=df)
     country_df = country_df.convert_dtypes(dtype_backend="pyarrow")
     country_df = country_df.replace({pd.NA: None})
-    global_df[global_df["store_app"] == 1687435]
     check_for_duplicates(
         df=country_df,
         key_columns=COUNTRY_HISTORY_KEYS,
@@ -898,12 +869,10 @@ def process_metrics(
             global_df[col] = 0.0
         global_df[col] = global_df[col].fillna(0.0)
     global_df = global_df[[x for x in GLOBAL_HISTORY_COLS if x in global_df.columns]]
-    # Fill in blank rows with default
     global_df["tier_pct_sum"] = (
         global_df["tier1_pct"] + global_df["tier2_pct"] + global_df["tier3_pct"]
     )
     incomplete_tier_pct = global_df["tier_pct_sum"] < 0.5
-    # Because for US is default, many apps end up with 1.0 t1
     all_t1 = global_df["tier1_pct"] == 1
     tiers_to_fill = incomplete_tier_pct | all_t1
     global_df.loc[tiers_to_fill, "tier1_pct"] = 0.34
@@ -956,11 +925,7 @@ def delete_and_insert_app_metrics(
         store_apps=country_df["store_app"].unique().tolist(),
         table_name=table_name,
     )
-    insert_bulk(
-        df=country_df,
-        table_name=table_name,
-        pgdb=pgdb,
-    )
+    insert_bulk(df=country_df, table_name=table_name, pgdb=pgdb)
     table_name = "app_global_metrics_history"
     logger.info(f"{log_info} {table_name=} start")
     delete_app_metrics_by_date_and_apps(
@@ -969,11 +934,7 @@ def delete_and_insert_app_metrics(
         store_apps=global_df["store_app"].unique().tolist(),
         table_name=table_name,
     )
-    insert_bulk(
-        df=global_df,
-        table_name=table_name,
-        pgdb=pgdb,
-    )
+    insert_bulk(df=global_df, table_name=table_name, pgdb=pgdb)
 
 
 def ffill_app_metrics(
@@ -1107,19 +1068,14 @@ def process_app_metrics_to_db(
 ) -> None:
     log_info = f"{store=} date={db_delete_start} {hash_bucket=} process to DB"
     logger.info(f"{log_info} start")
-    df = get_app_hash_buckets_filled_from_s3(
-        store=store,
-        app_hash=hash_bucket,
-    )
+    df = get_app_hash_buckets_filled_from_s3(store=store, app_hash=hash_bucket)
     logger.info(f"{log_info} got {df.shape[0]:,} interpolated rows from S3")
     if df.empty:
         logger.warning(f"{log_info} no data found for S3 agg app metrics, skipping")
         raise ValueError(f"{log_info} no data found for S3 agg app metrics")
     if store == 1:
-        # Should be rare, filters accidental ChromeOS apps
         problem_rows = df["installs"].isna()
     elif store == 2:
-        # This is an issue and needs to be resolved in the way the iOS store_id is stored into S3
         problem_rows = df["store_id"].str.contains(".0", regex=False)
     if problem_rows.any():
         df = df[~problem_rows]
@@ -1128,11 +1084,7 @@ def process_app_metrics_to_db(
     df = df.drop(["store_id", "country"], axis=1)
     df = store_app_updated_history(df, pgdb, store)
     df = ffill_app_metrics(df, store, pgdb)
-    country_df, global_df = process_metrics(
-        store=store,
-        df=df,
-        pgdb=pgdb,
-    )
+    country_df, global_df = process_metrics(store=store, df=df, pgdb=pgdb)
     country_df, global_df = drop_unwanted_rows(
         country_df, global_df, store, db_delete_start
     )
@@ -1143,6 +1095,11 @@ def process_app_metrics_to_db(
         store=store,
         delete_from_date=db_delete_start,
     )
+
+
+# ---------------------------------------------------------------------------
+# Raw → daily-hash-buckets COPY query
+# ---------------------------------------------------------------------------
 
 
 def copy_raw_details_to_hash_buckets(
@@ -1215,7 +1172,6 @@ def copy_raw_details_to_hash_buckets(
               WITH raw_data AS (
                   SELECT 
                       {data_cols},
-                      -- Generate a 2-character hex hash bucket from the store_id
                       left(md5(store_id), 2) AS hash_bucket,
                       '{snapshot_date_str}' AS snapshot_date
                   FROM read_parquet({app_detail_parquets}, union_by_name=true)
@@ -1240,16 +1196,19 @@ def copy_raw_details_to_hash_buckets(
               ROW_GROUP_SIZE 100000, 
               COMPRESSION 'zstd',
               OVERWRITE_OR_IGNORE true
-          )
-          ;
+          );
           """
     return query
+
+
+# ---------------------------------------------------------------------------
+# Derived metrics (cohort retention, revenue estimates)
+# ---------------------------------------------------------------------------
 
 
 def calculate_derived_metrics(
     pgdb: PostgresEngine, global_df: pd.DataFrame, store: int
 ) -> pd.DataFrame:
-    """Process app global metrics weekly."""
     metrics = [
         "installs",
         "rating",
@@ -1258,7 +1217,6 @@ def calculate_derived_metrics(
         *TIER_PCT_COLS,
     ]
     xaxis_col = "week_start"
-    # Convert to date to datetime and sort by country and date, required
     global_df[xaxis_col] = pd.to_datetime(global_df[xaxis_col])
     global_df = global_df.sort_values(["store_app", xaxis_col])
     global_df["installs_diff"] = (
@@ -1273,12 +1231,9 @@ def calculate_derived_metrics(
         .diff()
         .fillna(global_df["rating_count"])
     )
-    # This drops the earliest week, since the diff will count all metrics as weekly
-    # This is ok for apps which are new to the range, that week all those metrics are new
     drop_rows = global_df["week_start"] == global_df["week_start"].min()
     global_df = global_df[~drop_rows]
     if store == 2:
-        # iOS data is very estimated and noisy, so we smooth
         global_df["installs_diff"] = (
             global_df.groupby("store_app")["installs_diff"]
             .rolling(window=3, min_periods=1)
@@ -1321,8 +1276,7 @@ def calculate_derived_metrics(
     cohorts["surviving_users"] = (
         cohorts["installs_diff_historical"] * cohorts["retention_rate"]
     )
-    mau_mult = 3.5  # Standard estimate for Monthly Reach
-    # Calculate MAU Retention Rate
+    mau_mult = 3.5
     cohorts["retention_rate_mau"] = np.where(
         cohorts["weeks_passed"] == 0,
         1.0,
@@ -1379,7 +1333,6 @@ def calculate_revenue_cols(
     global_df["mau_tier1"] = global_df["monthly_active_users"] * global_df["tier1_pct"]
     global_df["mau_tier2"] = global_df["monthly_active_users"] * global_df["tier2_pct"]
     global_df["mau_tier3"] = global_df["monthly_active_users"] * global_df["tier3_pct"]
-    # IAP Revenue
     new_rev = global_df["weekly_installs"] * NEW_USER_CONVERSION * AVG_TICKET
     returning_users = (
         global_df["weekly_active_users"] - global_df["weekly_installs"]
@@ -1388,10 +1341,8 @@ def calculate_revenue_cols(
     global_df["weekly_iap_revenue"] = np.where(
         global_df["in_app_purchases"], new_rev + base_rev, 0.0
     )
-    # Ad Revenue
     ecpm_benchmarks = get_ecpm_benchmarks(pgdb)
     avg_ecpm = ecpm_benchmarks.groupby("tier_slug")["ecpm"].mean()
-    # Needs category benchmarks
     imps_per_user = 3
     global_df["weekly_ad_revenue"] = np.where(
         global_df["ad_supported"],
