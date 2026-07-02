@@ -7,7 +7,7 @@ from sqlalchemy import text
 from adscrawler.config import get_logger
 from adscrawler.dbcon.connection import get_db_connection
 from adscrawler.dbcon.queries import upsert_df
-from adscrawler.packages.storage import (
+from adscrawler.process.storage import (
     get_s3_client,
 )
 

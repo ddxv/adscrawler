@@ -11,7 +11,7 @@ from adscrawler.config import (
     APK_TMP_UNZIPPED_DIR,
     get_logger,
 )
-from adscrawler.packages.storage import download_app_to_local
+from adscrawler.process.storage import download_app_to_local
 from adscrawler.packages.utils import (
     get_version,
     unzip_apk,

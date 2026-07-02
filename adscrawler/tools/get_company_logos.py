@@ -36,7 +36,7 @@ from adscrawler.dbcon.queries import (
     update_company_logo_url,
     upsert_df,
 )
-from adscrawler.packages.storage import get_s3_client
+from adscrawler.process.storage import get_s3_client
 
 logger = get_logger(__name__)
 

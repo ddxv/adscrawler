@@ -3,14 +3,14 @@ import datetime
 import os
 import sys
 
-import pandas as pd
-
-from adscrawler.app_stores.process_from_s3 import (
-    combined_domain_history_to_s3,
+from adscrawler.process.app_details import (
     import_keywords_from_s3,
     import_ranks_from_s3,
 )
-from adscrawler.app_stores.process_from_s3_metrics import (
+from adscrawler.process.app_domain_history import (
+    process_company_history,
+)
+from adscrawler.process.app_metrics_history import (
     clean_history_tables,
     delete_and_aggregate_s3_agg,
 )
@@ -137,6 +137,11 @@ class ProcessManager:
             "-k",
             "--crawl-keywords",
             help="Crawl keywords",
+            action="store_true",
+        )
+        parser.add_argument(
+            "--process-company-history",
+            help="Export combined domain-app history and run change-detection for all quarters",
             action="store_true",
         )
         parser.add_argument(
@@ -364,6 +369,9 @@ class ProcessManager:
         if self.args.creative_scan_single_app:
             self.creative_scan_single_app()
 
+        if self.args.process_company_history:
+            self.process_company_history()
+
         if self.args.crawl_keywords:
             self.crawl_keywords()
 
@@ -413,19 +421,7 @@ class ProcessManager:
         except Exception:
             logger.exception("Importing keywords from s3 for failed")
         try:
-            today = datetime.date.today()
-            quarters = pd.date_range(start="2025-01-01", end=today, freq="QS")
-            for start_date in quarters:
-                start_of_next_period = (
-                    start_date + pd.offsets.QuarterEnd() + datetime.timedelta(days=1)
-                )
-                combined_domain_history_to_s3(
-                    pgdb=self.pgcon,
-                    start_date=str(start_date.date()),
-                    start_of_next_period=str(start_of_next_period.date()),
-                    year=start_date.year,
-                    quarter=start_date.quarter,
-                )
+            process_company_history(pgdb=self.pgcon)
         except Exception:
             logger.exception("Exporting combined domain history to s3 failed")
 
@@ -434,6 +430,9 @@ class ProcessManager:
             scrape_store_ranks(pgdb=self.pgcon, store=store)
         except Exception:
             logger.exception("Crawling front pages failed")
+
+    def process_company_history(self) -> None:
+        process_company_history(pgdb=self.pgcon)
 
     def scrape_new_apps_devs(self, store: int) -> None:
         try:

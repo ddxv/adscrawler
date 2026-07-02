@@ -23,7 +23,7 @@ from adscrawler.dbcon.queries import (
 )
 from adscrawler.packages.apks import apkpure
 from adscrawler.packages.models import DownloadResult
-from adscrawler.packages.storage import (
+from adscrawler.process.storage import (
     upload_apk_to_s3,
 )
 from adscrawler.packages.utils import (

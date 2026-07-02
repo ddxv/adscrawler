@@ -22,7 +22,6 @@ from adscrawler.process.storage import (
 logger = get_logger(__name__, "scrape_stores")
 
 
-
 def combined_domain_history_to_s3(
     pgdb: PostgresEngine,
     start_date: str,
@@ -41,9 +40,7 @@ def combined_domain_history_to_s3(
     """
     s3_client = get_s3_client()
     bucket = CONFIG["s3"]["bucket"]
-    prefix = (
-        f"{AGG_COMBINED_DOMAIN_HISTORY}/year={year}/quarter={quarter}"
-    )
+    prefix = f"{AGG_COMBINED_DOMAIN_HISTORY}/year={year}/quarter={quarter}"
 
     # Delete any existing files for this year/quarter before writing fresh data
     logger.info(f"Clearing existing history parquets at s3://{bucket}/{prefix}/")
@@ -85,7 +82,6 @@ def combined_domain_history_to_s3(
     logger.info(f"Finished {part=} written to s3://{bucket}/{prefix}/")
 
 
-
 def store_apps_release_dates_to_s3(pgdb: PostgresEngine) -> None:
     """Export store_apps (id, release_date, store) to a static parquet in S3.
 
@@ -106,10 +102,7 @@ def store_apps_release_dates_to_s3(pgdb: PostgresEngine) -> None:
     df.to_parquet(buffer, index=False)
     buffer.seek(0)
     s3_client.upload_fileobj(buffer, bucket, s3_key)
-    logger.info(
-        f"Uploaded {len(df):,} store_app rows "
-        f"to s3://{bucket}/{s3_key}"
-    )
+    logger.info(f"Uploaded {len(df):,} store_app rows to s3://{bucket}/{s3_key}")
 
 
 def process_company_history(pgdb: PostgresEngine) -> None:
@@ -134,7 +127,9 @@ def process_company_history(pgdb: PostgresEngine) -> None:
         buffer_start_date = start_date - pd.Timedelta(weeks=3)
         if start_date <= today < buffer_start_date:
             # Apply the 3-week buffer only for the ongoing quarter
-            print("Too early in current quarter detected. Wait for 3-week buffer to start.")
+            print(
+                "Too early in current quarter detected. Wait for 3-week buffer to start."
+            )
             continue  # Skip the ongoing quarter to avoid incomplete data
 
         combined_domain_history_to_s3(
@@ -144,6 +139,3 @@ def process_company_history(pgdb: PostgresEngine) -> None:
             year=year,
             quarter=quarter,
         )
-
-    
-

@@ -35,7 +35,7 @@ from adscrawler.packages.apks.weston import (
     restart_weston,
     start_weston,
 )
-from adscrawler.packages.storage import download_app_to_local, upload_mitm_log_to_s3
+from adscrawler.process.storage import download_app_to_local, upload_mitm_log_to_s3
 from adscrawler.packages.utils import (
     get_local_file_path,
     get_md5_hash,
@@ -321,12 +321,12 @@ def process_app_for_waydroid(
     if not apk_path.exists():
         raise FileNotFoundError(f"{apk_path=} not found")
     if not check_container() or not check_session():
-        waydroid_process = restart_session()
+        waydroid_process = restart_session(run_name)
         if waydroid_process:
             logger.info(f"Waydroid restarted with pid: {waydroid_process.pid}")
         else:
             kill_waydroid()
-            waydroid_process = restart_session()
+            waydroid_process = restart_session(run_name)
             if not waydroid_process:
                 logger.error("Waydroid failed to start")
                 return
@@ -400,11 +400,13 @@ def stop_container() -> None:
     time.sleep(1)
 
 
-def restart_session() -> subprocess.Popen | None:
+def restart_session(run_name) -> subprocess.Popen | None:
     logger.info("Waydroid session restart")
     os.system("waydroid session stop")
 
-    if is_wayland_env_set() or is_weston_running():
+    if run_name == 'manual':
+        pass
+    elif is_wayland_env_set() or is_weston_running():
         logger.info("Restarting Weston since env not fully set")
         restart_weston()
         if not is_wayland_env_set():

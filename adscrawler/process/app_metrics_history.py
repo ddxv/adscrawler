@@ -165,18 +165,14 @@ def delete_and_aggregate_s3_agg(
     for snapshot_date in pd.date_range(raw_start, end_date, freq="D"):
         log_info = f"{store=} {snapshot_date.date()} S3 raw app details agg"
         logger.info(f"{log_info} start")
-        make_s3_app_hash_metrics_history_daily(
-            store=store, snapshot_date=snapshot_date
-        )
+        make_s3_app_hash_metrics_history_daily(store=store, snapshot_date=snapshot_date)
 
     # Agg DAY → WEEK
     raw_weekly_start = end_date - pd.Timedelta(days=raw_weekly_lookback_days)
     start_date_mon = raw_weekly_start - pd.Timedelta(days=raw_weekly_start.weekday())
     for hash_bucket in [f"{i:02x}" for i in range(256)]:
         for week_start in pd.date_range(start_date_mon, end_date, freq="W-MON"):
-            log_info = (
-                f"{store=} hash={hash_bucket} {week_start.date()} S3 weekly agg"
-            )
+            log_info = f"{store=} hash={hash_bucket} {week_start.date()} S3 weekly agg"
             logger.info(f"{log_info} start")
             make_s3_app_hash_metrics_history_weekly(
                 store=store,
@@ -366,9 +362,7 @@ def make_s3_app_hash_metrics_history_daily(
     s3_config_key = "s3"
     bucket = CONFIG[s3_config_key]["bucket"]
     snapshot_date_str = snapshot_date.strftime("%Y-%m-%d")
-    prefix = (
-        f"{RAW_DATA_APP_DETAILS}/store={store}/crawled_date={snapshot_date_str}/country="
-    )
+    prefix = f"{RAW_DATA_APP_DETAILS}/store={store}/crawled_date={snapshot_date_str}/country="
     all_parquet_paths = get_parquet_paths_by_prefix(bucket, prefix)
     hex_values = [f"{i:02x}" for i in range(256)]
     for hex_val in hex_values:
@@ -412,9 +406,7 @@ def estimate_ios_installs(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def merge_in_db_ids(
-    df: pd.DataFrame, store: int, pgdb: PostgresEngine
-) -> pd.DataFrame:
+def merge_in_db_ids(df: pd.DataFrame, store: int, pgdb: PostgresEngine) -> pd.DataFrame:
     store_id_map = query_live_apps(store=store, pgdb=pgdb)
     df = pd.merge(
         df,

@@ -31,11 +31,6 @@ from adscrawler.app_stores.google import (
     scrape_google_ranks,
     search_play_store,
 )
-from adscrawler.process.app_details import (
-    app_details_to_s3,
-    process_store_rankings,
-    raw_keywords_to_s3,
-)
 from adscrawler.app_stores.utils import (
     build_country_map,
     check_and_insert_new_apps,
@@ -66,6 +61,11 @@ from adscrawler.dbcon.queries import (
     update_from_df,
     upsert_df,
 )
+from adscrawler.process.app_details import (
+    app_details_to_s3,
+    process_store_rankings,
+    raw_keywords_to_s3,
+)
 from adscrawler.process.storage import get_s3_client, rankings_parquet_exists_in_s3
 
 logger = get_logger(__name__, "scrape_stores")
@@ -76,7 +76,7 @@ def process_scrape_apps_and_save(
     store: int,
     process_icon: bool,
     total_rows: int | None = None,
-    do_pg_update: bool = False
+    do_pg_update: bool = False,
 ) -> None:
     """Process a chunk of apps, scrape app, store to S3 and if country === US store app details to db store_apps table.
 

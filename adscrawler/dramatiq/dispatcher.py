@@ -202,7 +202,6 @@ def dispatch_app_details_jobs(
         logger.info(f"{log_info} no apps to update")
         return
 
-    # --- Keep the same highly-optimised chunking as update_app_details ---
     max_chunk_size = 100
     chunks: list[pd.DataFrame] = []
     for _country, country_df in df.groupby("country_code"):
