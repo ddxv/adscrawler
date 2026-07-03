@@ -97,11 +97,6 @@ GLOBAL_FINAL_COLS = [
 ]
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
 def check_for_duplicates(df: pd.DataFrame, key_columns: list[str]) -> None:
     any_duplicates = df.duplicated(subset=key_columns).any()
     if any_duplicates:
@@ -210,11 +205,6 @@ def delete_and_aggregate_s3_agg(
             store=store,
             db_delete_start=db_delete_start,
         )
-
-
-# ---------------------------------------------------------------------------
-# Weekly aggregation (DAY → WEEK)
-# ---------------------------------------------------------------------------
 
 
 def copy_daily_to_weekly_hash_buckets(
@@ -429,10 +419,6 @@ def merge_in_db_ids(df: pd.DataFrame, store: int, pgdb: PostgresEngine) -> pd.Da
     )
     return df
 
-
-# ---------------------------------------------------------------------------
-# Per-store metrics processing
-# ---------------------------------------------------------------------------
 
 
 def process_metrics_google(df: pd.DataFrame) -> pd.DataFrame:

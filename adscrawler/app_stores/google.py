@@ -3,10 +3,19 @@ import os
 import subprocess
 
 import appgoblin_play_scraper
-import langdetect
 import pandas as pd
 
 from adscrawler.config import CONFIG, MODULE_DIR, PACKAGE_DIR, get_logger
+
+
+import re
+import numpy as np
+import pandas as pd
+import fasttext
+
+_MODEL_CACHE: dict[bool, fasttext.FastText._FastText] = {}
+
+
 
 logger = get_logger(__name__, "scrape_google")
 
@@ -84,26 +93,78 @@ def scrape_app_gp(store_id: str, country: str, language: str = "en") -> dict:
     logger.debug(f"store=1 {country=} {language=} {store_id=} play store scraped")
     return result_dict
 
-
-def detect_language_safe(text: str) -> str:
-    """Detect language safely; return 'zz' if detection fails or text is null/empty."""
-    if not isinstance(text, str) or not text.strip():
-        return "zz"
+def _safe_batch_predict(
+    model: fasttext.FastText._FastText, texts: list[str], k: int = 1
+) -> tuple[list[str], list[float]]:
+    """Predict a batch; if fasttext chokes on a ragged/empty-token input,
+    fall back to per-string prediction so one bad row doesn't kill the batch."""
     try:
-        detected: str = langdetect.detect(text)
-        return detected
-    except langdetect.lang_detect_exception.LangDetectException:
-        return "zz"
+        labels, scores = model.predict(texts, k=k)
+        return (
+            [lbl[0].removeprefix("__label__") for lbl in labels],
+            [s[0] for s in scores],
+        )
+    except ValueError:
+        # Something in this batch has zero fasttext tokens; isolate it.
+        out_labels: list[str] = []
+        out_scores: list[float] = []
+        for t in texts:
+            try:
+                lbl, sc = model.predict(t, k=k)
+                out_labels.append(lbl[0].removeprefix("__label__"))
+                out_scores.append(sc[0])
+            except ValueError:
+                out_labels.append("zz")
+                out_scores.append(0.0)
+        return out_labels, out_scores
+    
 
 
-def add_language_column(apps_df: pd.DataFrame) -> pd.DataFrame:
-    """Add a store_language_code column to apps_df safely."""
-    apps_df = apps_df.copy()
-    apps_df.loc[:, "store_language_code"] = apps_df["description"].apply(
-        detect_language_safe
+def _get_model(low_memory: bool = False) -> fasttext.FastText._FastText:
+    """Load and cache the fasttext LID model once per process."""
+    if low_memory not in _MODEL_CACHE:
+        # ftlangdetect downloads these on first use to its cache dir;
+        # reuse that path so you don't need a second download mechanism.
+        from ftlangdetect.detect import get_or_load_model
+
+        _MODEL_CACHE[low_memory] = get_or_load_model(low_memory=low_memory)
+    return _MODEL_CACHE[low_memory]
+
+
+
+
+def _prep_for_detection(series: pd.Series, max_chars: int = 300) -> pd.Series:
+    """Vectorized cleanup: fasttext needs single-line input, and we
+    only need a short prefix for confident detection."""
+    cleaned = (
+        series.fillna("")
+        .astype(str)
+        .str.slice(0, max_chars)
+        .str.replace(r"\s+", " ", regex=True)  # collapses newlines/tabs too
+        .str.strip()
     )
-    return apps_df
+    return cleaned
 
+
+def add_language_column(
+    apps_df: pd.DataFrame, max_chars: int = 300, low_memory: bool = False
+) -> pd.DataFrame:
+    """Add a store_language_code column to apps_df, batched for speed."""
+    apps_df = apps_df.copy()
+    snippets = _prep_for_detection(apps_df["description"], max_chars=max_chars)
+
+    is_valid = snippets.str.len() > 0
+    valid_texts = snippets[is_valid].tolist()
+
+    codes = pd.Series("zz", index=apps_df.index, dtype="object")
+
+    if valid_texts:
+        model = _get_model(low_memory=low_memory)
+        parsed, _scores = _safe_batch_predict(model, valid_texts, k=1)
+        codes.loc[is_valid] = parsed
+
+    apps_df["store_language_code"] = codes
+    return apps_df
 
 def clean_google_play_app_df(apps_df: pd.DataFrame) -> pd.DataFrame:
     apps_df = apps_df.rename(
@@ -140,37 +201,43 @@ def clean_google_play_app_df(apps_df: pd.DataFrame) -> pd.DataFrame:
         can_replace_min_installs,
         "installs",
     ].astype(str)
-    apps_df = apps_df.assign(
-        category=apps_df["category"].str.lower(),
-        release_date=pd.to_datetime(
+
+    release_dt = pd.to_datetime(
             apps_df["release_date"], format="%b %d, %Y", errors="coerce"
         )
-        .fillna(
-            pd.to_datetime(apps_df["release_date"], format="%d %b %Y", errors="coerce")
+    still_na = release_dt.isna()
+    if still_na.any():
+        release_dt.loc[still_na] = pd.to_datetime(
+            apps_df.loc[still_na, "release_date"], format="%d %b %Y", errors="coerce"
         )
-        .dt.date,
+
+    apps_df = apps_df.assign(
+        category=apps_df["category"].str.lower(),
+        release_date=release_dt.dt.date,
         store_last_updated=pd.to_datetime(
             apps_df["store_last_updated"], unit="s", errors="coerce"
         ),
     )
     if "developer_name" in apps_df.columns:
-        apps_df.loc[apps_df["developer_name"].notna(), "developer_name"] = apps_df.loc[
-            apps_df["developer_name"].notna(), "developer_name"
-        ].str.replace("\t", " ")
+        apps_df["developer_name"] = apps_df["developer_name"].str.replace(
+            "\t", " ", regex=False
+        )
     list_cols = ["phone_image_url"]
     for list_col in list_cols:
+        col = f"{list_col}s"
         urls_empty = (
-            (apps_df[f"{list_col}s"].isna()) | (apps_df[f"{list_col}s"] == "")
+            (apps_df[col].isna()) | (apps_df[col].fillna("").str.len() == 0)
         ).all()
         if not urls_empty:
-            columns = {x: f"{list_col}_{x + 1}" for x in range(3)}
-            apps_df = pd.concat(
-                [
-                    apps_df,
-                    apps_df[f"{list_col}s"].apply(pd.Series).rename(columns=columns),
-                ],
-                axis=1,
-            )
+            expanded = pd.DataFrame(
+                apps_df[col].tolist(), index=apps_df.index
+            ).iloc[:, :3]
+            expanded.columns = [f"{list_col}_{x + 1}" for x in range(expanded.shape[1])]
+            for x in range(3):
+                name = f"{list_col}_{x + 1}"
+                if name not in expanded.columns:
+                    expanded[name] = None
+            apps_df = pd.concat([apps_df, expanded], axis=1)
         else:
             for x in range(3):
                 apps_df[f"{list_col}_{x}"] = None

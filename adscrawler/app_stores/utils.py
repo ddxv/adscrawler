@@ -107,11 +107,6 @@ def resolve_country_id(
     return None
 
 
-# ---------------------------------------------------------------------------
-# Existing utilities below
-# ---------------------------------------------------------------------------
-
-
 def truncate_utf8_bytes(s: str, max_bytes: int = 2400) -> str:
     if s is None:
         return ""

@@ -24,6 +24,7 @@ from adscrawler.packages.utils import (
     get_local_file_path,
     move_downloaded_app_to_main_dir,
 )
+from adscrawler.process import RAW_DATA_APP_RANKINGS
 
 logger = get_logger(__name__)
 
@@ -81,7 +82,7 @@ def rankings_parquet_exists_in_s3(
     """Return True if a rankings.parquet already exists in S3 for the given store/date/country."""
     s3 = get_s3_client(key_name)
     bucket = CONFIG[key_name]["bucket"]
-    s3_key = f"raw-data/app_rankings/store={store}/crawled_date={crawled_date}/country={country.upper()}/rankings.parquet"
+    s3_key = f"{RAW_DATA_APP_RANKINGS}/store={store}/crawled_date={crawled_date}/country={country.upper()}/rankings.parquet"
     try:
         s3.head_object(Bucket=bucket, Key=s3_key)
         return True
@@ -539,7 +540,7 @@ def get_duckdb_connection(s3_config_key: str) -> duckdb.DuckDBPyConnection:
     duckdb_con.execute(f"SET s3_endpoint='{endpoint}';")
     duckdb_con.execute("SET s3_url_style='path';")
     duckdb_con.execute("SET s3_url_compatibility_mode=true;")
-    duckdb_con.execute("SET threads = 3;")
+    duckdb_con.execute("SET threads = 4;")
     duckdb_con.execute(
         f"SET s3_access_key_id='{CONFIG[s3_config_key]['access_key_id']}';"
     )

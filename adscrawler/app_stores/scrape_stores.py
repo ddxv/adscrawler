@@ -63,9 +63,9 @@ from adscrawler.dbcon.queries import (
 )
 from adscrawler.process.app_details import (
     app_details_to_s3,
-    process_store_rankings,
     raw_keywords_to_s3,
 )
+from adscrawler.process.app_rankings import process_store_rankings
 from adscrawler.process.storage import get_s3_client, rankings_parquet_exists_in_s3
 
 logger = get_logger(__name__, "scrape_stores")
@@ -813,12 +813,14 @@ def process_live_app_details(
     for (crawl_result, additional_html_crawl_result), apps_df in results_df.groupby(
         ["crawl_result", "additional_html_crawl_result"]
     ):
-        log_info = f"{store=} {crawl_result=} {additional_html_crawl_result=}"
-        logger.info(f"{log_info} processing {apps_df.shape[0]} apps for db")
+        num_apps = apps_df.shape[0]
+        log_info = f"{store=} {crawl_result=} {additional_html_crawl_result=} {num_apps=}"
+        logger.info(f"{log_info} process for db start")
         if crawl_result != 1:
             # If bad crawl result, only save minimal info to avoid overwriting good data, ie name
             apps_df = apps_df[["store_id", "store", "crawled_at", "crawl_result"]]
         else:
+            logger.info(f"{log_info} clean df")
             apps_df = clean_scraped_df(
                 df=apps_df, store=store, process_icon=process_icon
             )
@@ -840,15 +842,17 @@ def process_live_app_details(
                 errors="ignore",
             )
         key_columns = ["store", "store_id"]
+
         if (apps_df["crawl_result"] == 1).all() and apps_df[
             "developer_id"
         ].notna().all():
+            logger.info(f"{log_info} update devs")
             apps_df = save_developer_info(apps_df, pgdb)
         insert_columns = [
             x for x in get_store_app_columns(pgdb) if x in apps_df.columns
         ]
         apps_df = prepare_for_psycopg(apps_df)
-        logger.info(f"{log_info} update store_apps table for {len(apps_df)} apps")
+        logger.info(f"{log_info} update store_apps table")
         update_from_df(
             table_name="store_apps",
             df=apps_df,
@@ -858,8 +862,11 @@ def process_live_app_details(
         )
         if apps_df is None or apps_df.empty or crawl_result != 1:
             continue
+        logger.info(f"{log_info} update descriptions table")
         upsert_store_apps_descriptions(apps_df, pgdb)
-        upsert_app_country_evidence(apps_df, pgdb)
+        if store == 1:
+          logger.info(f"{log_info} update countries table")
+          upsert_app_country_evidence(apps_df, pgdb)
         if "url" not in apps_df.columns or apps_df["url"].isna().all():
             logger.warning(f"{log_info} No app urls found")
             continue
@@ -868,6 +875,7 @@ def process_live_app_details(
         if app_urls.empty:
             logger.warning(f"{log_info} No app urls found")
             continue
+        logger.info(f"{log_info} update domains table")
         save_app_domains(
             apps_df=apps_df,
             pgdb=pgdb,
@@ -928,48 +936,34 @@ def upsert_app_country_evidence(
     # Build country maps once
     country_id_map, name_to_alpha2 = build_country_map(pgdb)
 
-    rows = []
-    for _, row in apps_df.iterrows():
-        store_app = row.get("store_app")
-        if pd.isna(store_app):
-            continue
+    dev_addr = apps_df["developer_address"].astype(str).str.strip()
+    legal_addr = apps_df["developer_legal_address"].astype(str).str.strip()
 
-        # Prefer developer_address, fall back to legal
-        raw_address: str | None = None
-        if (
-            pd.notna(row.get("developer_address"))
-            and str(row["developer_address"]).strip()
-        ):
-            raw_address = str(row["developer_address"]).strip()
-        elif (
-            pd.notna(row.get("developer_legal_address"))
-            and str(row["developer_legal_address"]).strip()
-        ):
-            raw_address = str(row["developer_legal_address"]).strip()
+    # Replace empty strings/nan-strings with actual NaN so .fillna works
+    dev_addr = dev_addr.replace(["", "nan", "None"], pd.NA)
+    legal_addr = legal_addr.replace(["", "nan", "None"], pd.NA)
 
-        if not raw_address:
-            continue
+    apps_df["raw_address"] = dev_addr.fillna(legal_addr)
 
+    # Drop rows that ended up with no address at all
+    apps_df = apps_df.dropna(subset=["raw_address"])
+
+    def get_country_id(raw_address: str) -> int | None:
         country_id = resolve_country_id(raw_address, country_id_map, name_to_alpha2)
-        rows.append(
-            {
-                "store_app": int(store_app),
-                "raw_address": raw_address,
-                "country_id": country_id,
-            }
-        )
+        return country_id
 
-    if not rows:
+    apps_df["country_id"] = apps_df["raw_address"].apply(get_country_id)
+
+    evidence_df = apps_df[["store_app", "raw_address", "country_id"]]
+
+    if evidence_df.empty:
         return
 
-    evidence_df = pd.DataFrame(rows)
     key_columns = ["store_app"]
     insert_columns = ["store_app", "raw_address", "country_id"]
     evidence_df = evidence_df[evidence_df["raw_address"].notna()]
     evidence_df["country_id"] = evidence_df["country_id"].astype("Int64")
-    evidence_df["country_id"] = evidence_df["country_id"].where(
-        evidence_df["country_id"].notna(), None
-    )
+    evidence_df = evidence_df.replace({pd.NA: None})
     upsert_df(
         table_name="app_country_evidence",
         df=evidence_df,
