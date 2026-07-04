@@ -704,12 +704,13 @@ def clean_scraped_df(df: pd.DataFrame, store: int, process_icon: bool) -> pd.Dat
                     lambda x: process_app_icon(x["store_id"], x["icon_url_512"]),
                     axis=1,
                 )
-                # Drop rows where icon generation failed, then extract only the
-                # 128px filename for the legacy icon_url_100 column
+                # Drop rows where icon generation failed, then extract the
+                # individual filenames into icon_url_100 (legacy), icon_128 and icon_64
                 icon_tuples = icon_tuples.dropna()
-                df.loc[icon_tuples.index, "icon_url_100"] = icon_tuples.apply(
-                    lambda t: t[0]
-                )
+                idx = icon_tuples.index
+                df.loc[idx, "icon_url_100"] = icon_tuples.apply(lambda t: t[0])
+                df.loc[idx, "icon_128"] = icon_tuples.apply(lambda t: t[0])
+                df.loc[idx, "icon_64"] = icon_tuples.apply(lambda t: t[1])
         except Exception:
             logger.warning("failed to process app icon")
     return df

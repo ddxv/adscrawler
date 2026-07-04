@@ -22,8 +22,8 @@ class TestBuildIconUpdateDf(unittest.TestCase):
         result = build_icon_update_df(apps_df)
 
         self.assertEqual(result.shape[0], 2)
-        self.assertEqual(result.loc[0, "icon_url_128"], "app_128.png")
-        self.assertEqual(result.loc[0, "icon_url_64"], "app_64.png")
+        self.assertEqual(result.loc[0, "icon_128"], "app_128.png")
+        self.assertEqual(result.loc[0, "icon_64"], "app_64.png")
         self.assertEqual(result.loc[0, "id"], 1)
         self.assertEqual(result.iloc[1]["id"], 2)
 

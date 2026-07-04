@@ -72,29 +72,29 @@ def process_app_icon(store_id: str, url: str) -> tuple[str, str] | None:
 def build_icon_update_df(apps_df: pd.DataFrame) -> pd.DataFrame:
     """Build store_apps updates for apps missing 128/64 icon variants.
 
-    Returns a DataFrame with columns ``[id, icon_url_128, icon_url_64]``
+    Returns a DataFrame with columns ``[id, icon_128, icon_64]``
     containing only the rows where at least one variant was successfully
     generated.
     """
     if apps_df.empty:
-        return pd.DataFrame(columns=["id", "icon_url_128", "icon_url_64"])
+        return pd.DataFrame(columns=["id", "icon_128", "icon_64"])
 
-    icon_128 = apps_df.get("icon_url_128")
-    icon_64 = apps_df.get("icon_url_64")
-    if icon_128 is None:
+    icol_128 = apps_df.get("icon_128")
+    icol_64 = apps_df.get("icon_64")
+    if icol_128 is None:
         apps_df = apps_df.copy()
-        apps_df["icon_url_128"] = pd.NA
-    if icon_64 is None:
+        apps_df["icon_128"] = pd.NA
+    if icol_64 is None:
         apps_df = apps_df.copy()
-        apps_df["icon_url_64"] = pd.NA
+        apps_df["icon_64"] = pd.NA
 
     needs_update = (
         apps_df["icon_url_512"].notna()
-        & (apps_df["icon_url_128"].isna() | apps_df["icon_url_64"].isna())
+        & (apps_df["icon_128"].isna() | apps_df["icon_64"].isna())
     )
     apps_to_update = apps_df.loc[needs_update].copy()
     if apps_to_update.empty:
-        return pd.DataFrame(columns=["id", "icon_url_128", "icon_url_64"])
+        return pd.DataFrame(columns=["id", "icon_128", "icon_64"])
 
     icon_results = apps_to_update.apply(
         lambda row: process_app_icon(row["store_id"], row["icon_url_512"]),
@@ -103,19 +103,19 @@ def build_icon_update_df(apps_df: pd.DataFrame) -> pd.DataFrame:
     icon_update_df = pd.DataFrame(
         {
             "id": apps_to_update["id"].astype(int),
-            "icon_url_128": [
+            "icon_128": [
                 result[0] if isinstance(result, tuple) else None
                 for result in icon_results
             ],
-            "icon_url_64": [
+            "icon_64": [
                 result[1] if isinstance(result, tuple) else None
                 for result in icon_results
             ],
         }
     )
     icon_update_df = icon_update_df[
-        icon_update_df["icon_url_128"].notna()
-        | icon_update_df["icon_url_64"].notna()
+        icon_update_df["icon_128"].notna()
+        | icon_update_df["icon_64"].notna()
     ]
     return icon_update_df
 
@@ -142,7 +142,7 @@ def refresh_app_icons(pgdb: PostgresEngine, limit: int | None = None) -> int:
     upsert_df(
         table_name="store_apps",
         df=icon_update_df,
-        insert_columns=["icon_url_128", "icon_url_64"],
+        insert_columns=["icon_128", "icon_64"],
         key_columns=["id"],
         pgdb=pgdb,
     )
