@@ -46,6 +46,7 @@ QUERY_APPS_TO_PROCESS_KEYWORDS = load_sql_file("query_apps_to_process_keywords.s
 QUERY_PUB_DOMAINS_TO_CRAWL_ADS_TXT = load_sql_file(
     "query_pub_domains_to_crawl_ads_txt.sql"
 )
+QUERY_APPS_MISSING_ICON_VARIANTS = load_sql_file("query_apps_missing_icon_variants.sql")
 
 
 def insert_df(
@@ -1194,6 +1195,23 @@ def query_keywords_to_crawl(
         QUERY_KEYWORDS_TO_CRAWL,
         params={"mylimit": limit},
         con=pgdb.engine,
+    )
+    return df
+
+
+def query_apps_missing_icon_variants(
+    pgdb: PostgresEngine,
+    limit: int | None = None,
+) -> pd.DataFrame:
+    """Return store_apps rows missing 128 and/or 64 icon variants."""
+    params: dict[str, object] = {}
+    if limit is not None:
+        params["mylimit"] = limit
+    df = pd.read_sql(
+        QUERY_APPS_MISSING_ICON_VARIANTS,
+        params=params,
+        con=pgdb.engine,
+        dtype={"id": int},
     )
     return df
 

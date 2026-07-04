@@ -1,0 +1,150 @@
+"""Process app icons — resize, upload to S3, and update missing variants."""
+
+import pathlib
+from io import BytesIO
+
+import imagehash
+import pandas as pd
+import requests
+from PIL import Image
+
+from adscrawler.config import APP_ICONS_TMP_DIR, CONFIG, get_logger
+from adscrawler.dbcon.connection import PostgresEngine
+from adscrawler.dbcon.queries import (
+    query_apps_missing_icon_variants,
+    upsert_df,
+)
+from adscrawler.process.storage import get_s3_client
+
+logger = get_logger(__name__, "process_icons")
+
+
+def process_app_icon(store_id: str, url: str) -> tuple[str, str] | None:
+    """Download a 512px icon, resize to 128×128 and 64×64, upload both to S3.
+
+    Returns ``(filename_128, filename_64)`` on success, or ``None`` on failure.
+    """
+    try:
+        response = requests.get(url, timeout=10)
+    except Exception:
+        logger.error(f"Failed to fetch image from {url}")
+        return None
+    img = Image.open(BytesIO(response.content))
+    # Always store as PNG regardless of source format
+    img_resized = img.resize((128, 128), Image.LANCZOS)
+    img_64_resized = img.resize((64, 64), Image.LANCZOS)
+    phash = str(imagehash.phash(img_resized))
+    f_128_name = f"{phash}_128.png"
+    f_64_name = f"{phash}_64.png"
+    file_path = pathlib.Path(APP_ICONS_TMP_DIR, f"{phash}_128.png")
+    file_64_path = pathlib.Path(APP_ICONS_TMP_DIR, f"{phash}_64.png")
+    img_resized.save(file_path, format="PNG")
+    img_64_resized.save(file_64_path, format="PNG")
+    # Upload to S3
+    image_format = "image/png"
+    s3_key = "digi-cloud"
+    s3_client = get_s3_client(s3_key)
+    response = s3_client.put_object(
+        Bucket=CONFIG[s3_key]["bucket"],
+        Key=f"app-icons/{store_id}/{f_128_name}",
+        ACL="public-read",
+        Body=file_path.read_bytes(),
+        ContentType=image_format,
+    )
+    if response["ResponseMetadata"]["HTTPStatusCode"] == 200:
+        logger.info(f"S3 uploaded {store_id} 128px icon")
+    else:
+        logger.error(f"S3 failed to upload {store_id} 128px icon")
+    response = s3_client.put_object(
+        Bucket=CONFIG[s3_key]["bucket"],
+        Key=f"app-icons/{store_id}/{f_64_name}",
+        ACL="public-read",
+        Body=file_64_path.read_bytes(),
+        ContentType=image_format,
+    )
+    if response["ResponseMetadata"]["HTTPStatusCode"] == 200:
+        logger.info(f"S3 uploaded {store_id} 64px icon")
+    else:
+        logger.error(f"S3 failed to upload {store_id} 64px icon")
+    return f_128_name, f_64_name
+
+
+def build_icon_update_df(apps_df: pd.DataFrame) -> pd.DataFrame:
+    """Build store_apps updates for apps missing 128/64 icon variants.
+
+    Returns a DataFrame with columns ``[id, icon_url_128, icon_url_64]``
+    containing only the rows where at least one variant was successfully
+    generated.
+    """
+    if apps_df.empty:
+        return pd.DataFrame(columns=["id", "icon_url_128", "icon_url_64"])
+
+    icon_128 = apps_df.get("icon_url_128")
+    icon_64 = apps_df.get("icon_url_64")
+    if icon_128 is None:
+        apps_df = apps_df.copy()
+        apps_df["icon_url_128"] = pd.NA
+    if icon_64 is None:
+        apps_df = apps_df.copy()
+        apps_df["icon_url_64"] = pd.NA
+
+    needs_update = (
+        apps_df["icon_url_512"].notna()
+        & (apps_df["icon_url_128"].isna() | apps_df["icon_url_64"].isna())
+    )
+    apps_to_update = apps_df.loc[needs_update].copy()
+    if apps_to_update.empty:
+        return pd.DataFrame(columns=["id", "icon_url_128", "icon_url_64"])
+
+    icon_results = apps_to_update.apply(
+        lambda row: process_app_icon(row["store_id"], row["icon_url_512"]),
+        axis=1,
+    )
+    icon_update_df = pd.DataFrame(
+        {
+            "id": apps_to_update["id"].astype(int),
+            "icon_url_128": [
+                result[0] if isinstance(result, tuple) else None
+                for result in icon_results
+            ],
+            "icon_url_64": [
+                result[1] if isinstance(result, tuple) else None
+                for result in icon_results
+            ],
+        }
+    )
+    icon_update_df = icon_update_df[
+        icon_update_df["icon_url_128"].notna()
+        | icon_update_df["icon_url_64"].notna()
+    ]
+    return icon_update_df
+
+
+def refresh_app_icons(pgdb: PostgresEngine, limit: int | None = None) -> int:
+    """Refresh missing 128/64 icon variants for apps that already have 512px icons.
+
+    Queries the database for apps that need one or both small variants,
+    generates them, uploads to S3, and upserts the filenames into
+    ``store_apps``.
+
+    Returns the number of apps updated.
+    """
+    apps_df = query_apps_missing_icon_variants(pgdb=pgdb, limit=limit)
+    if apps_df.empty:
+        logger.info("No apps need icon refresh")
+        return 0
+
+    icon_update_df = build_icon_update_df(apps_df)
+    if icon_update_df.empty:
+        logger.info("No missing icon variants could be generated")
+        return 0
+
+    upsert_df(
+        table_name="store_apps",
+        df=icon_update_df,
+        insert_columns=["icon_url_128", "icon_url_64"],
+        key_columns=["id"],
+        pgdb=pgdb,
+    )
+    logger.info(f"Updated {len(icon_update_df)} app icon variants")
+    return len(icon_update_df)

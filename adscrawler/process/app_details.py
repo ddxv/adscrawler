@@ -120,12 +120,6 @@ def import_app_details_from_s3_into_db(
     
     df['store_app'] = df['store_app_db_id'].astype(int)
 
-
-    # Resolve store_id -> store_app (DB primary key)
-    # store_id_map = query_store_id_map(pgdb, store=store)
-    # id_map = store_id_map.set_index("store_id")["id"].to_dict()
-    # df["store_app"] = df["store_id"].map(id_map)
-
     missing = df["store_app"].isna()
     if missing.any():
         logger.warning(

@@ -16,6 +16,7 @@ from adscrawler.process.app_metrics_history import (
     delete_and_aggregate_s3_agg,
 )
 from adscrawler.app_stores.process_keywords import process_app_keywords
+from adscrawler.app_stores.process_icons import refresh_app_icons
 from adscrawler.app_stores.scrape_stores import (
     crawl_developers_for_new_store_ids,
     crawl_keyword_ranks,
@@ -101,6 +102,11 @@ class ProcessManager:
         parser.add_argument(
             "--process-icons",
             help="When running update app store details, resize and upload app icon to S3",
+            action="store_true",
+        )
+        parser.add_argument(
+            "--refresh-app-icons",
+            help="Refresh missing 128/64 app icon variants for apps that already have a 512px icon",
             action="store_true",
         )
         parser.add_argument(
@@ -336,6 +342,9 @@ class ProcessManager:
         if self.args.new_apps_check_devs:
             self.scrape_new_apps_devs(store)
 
+        if self.args.refresh_app_icons:
+            self.refresh_app_icons()
+
         if self.args.update_app_store_details:
             self.update_app_details(store, country_priority_group)
 
@@ -439,6 +448,15 @@ class ProcessManager:
             scrape_store_ranks(pgdb=self.pgcon, store=store)
         except Exception:
             logger.exception("Crawling front pages failed")
+
+    def refresh_app_icons(self) -> None:
+        try:
+            refresh_app_icons(
+                pgdb=self.pgcon,
+                limit=self.args.limit_query_rows,
+            )
+        except Exception:
+            logger.exception("Refreshing app icons failed")
 
     def process_company_history(self) -> None:
         process_company_history(pgdb=self.pgcon)

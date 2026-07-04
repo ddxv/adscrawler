@@ -1,19 +1,15 @@
 import datetime
-import pathlib
 import random
 import ssl
 import time
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from io import BytesIO
 from urllib.error import URLError
 from urllib.parse import unquote_plus
 
 import appgoblin_play_scraper
-import imagehash
 import pandas as pd
 import requests
 from itunes_app_scraper.util import AppStoreException
-from PIL import Image
 
 from adscrawler.app_stores.apkcombo import get_apkcombo_android_apps
 from adscrawler.app_stores.appbrain import get_appbrain_android_apps
@@ -38,7 +34,8 @@ from adscrawler.app_stores.utils import (
     extract_root_domain,
     resolve_country_id,
 )
-from adscrawler.config import APP_ICONS_TMP_DIR, CONFIG, get_logger
+from adscrawler.app_stores.process_icons import process_app_icon
+from adscrawler.config import get_logger
 from adscrawler.dbcon.connection import (
     PostgresEngine,
     get_db_connection,
@@ -66,7 +63,7 @@ from adscrawler.process.app_details import (
     raw_keywords_to_s3,
 )
 from adscrawler.process.app_rankings import process_store_rankings
-from adscrawler.process.storage import get_s3_client, rankings_parquet_exists_in_s3
+from adscrawler.process.storage import rankings_parquet_exists_in_s3
 
 logger = get_logger(__name__, "scrape_stores")
 
@@ -703,9 +700,15 @@ def clean_scraped_df(df: pd.DataFrame, store: int, process_icon: bool) -> pd.Dat
             if df[no_icon].empty:
                 pass
             else:
-                df.loc[no_icon, "icon_url_100"] = df.loc[no_icon].apply(
+                icon_tuples = df.loc[no_icon].apply(
                     lambda x: process_app_icon(x["store_id"], x["icon_url_512"]),
                     axis=1,
+                )
+                # Drop rows where icon generation failed, then extract only the
+                # 128px filename for the legacy icon_url_100 column
+                icon_tuples = icon_tuples.dropna()
+                df.loc[icon_tuples.index, "icon_url_100"] = icon_tuples.apply(
+                    lambda t: t[0]
                 )
         except Exception:
             logger.warning("failed to process app icon")
@@ -1003,36 +1006,3 @@ def log_crawl_results(app_df: pd.DataFrame, pgdb: PostgresEngine) -> None:
     )
 
 
-def process_app_icon(store_id: str, url: str) -> str | None:
-    # Fetch image
-    f_name = None
-    try:
-        response = requests.get(url, timeout=10)
-    except Exception:
-        logger.error(f"Failed to fetch image from {url}")
-        return None
-    img = Image.open(BytesIO(response.content))
-    ext = response.headers["Content-Type"].split("/")[1]
-    # Resize to 100x100
-    img_resized = img.resize((100, 100), Image.LANCZOS)
-    phash = str(imagehash.phash(img_resized))
-    f_name = f"{phash}.{ext}"
-    file_path = pathlib.Path(APP_ICONS_TMP_DIR, f"{phash}.{ext}")
-    # Save as PNG
-    img_resized.save(file_path, format="PNG")
-    # Upload to S3
-    image_format = "image/" + ext
-    s3_key = "digi-cloud"
-    s3_client = get_s3_client(s3_key)
-    response = s3_client.put_object(
-        Bucket=CONFIG[s3_key]["bucket"],
-        Key=f"app-icons/{store_id}/{f_name}",
-        ACL="public-read",
-        Body=file_path.read_bytes(),
-        ContentType=image_format,
-    )
-    if response["ResponseMetadata"]["HTTPStatusCode"] == 200:
-        logger.info(f"S3 uploaded {store_id} app icon")
-    else:
-        logger.error(f"S3 failed to upload {store_id} app icon")
-    return f_name
