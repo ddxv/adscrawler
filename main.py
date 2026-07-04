@@ -306,6 +306,14 @@ class ProcessManager:
         ]
         return len(extract_processes) > 1
 
+    def check_refresh_app_icons_processes(self) -> bool:
+        processes = self.get_running_processes()
+        my_processes = self.filter_processes(processes, "/adscrawler/main.py")
+        found_processes = [
+            x for x in my_processes if " --refresh-app-icons" in x
+        ]
+        return len(found_processes) > 1
+
     def is_script_already_running(self) -> bool:
         if self.args.update_app_store_details:
             return self.check_app_update_processes()
@@ -321,6 +329,8 @@ class ProcessManager:
             return self.check_crawl_keywords_processes()
         elif self.args.extract_app_keywords:
             return self.check_extract_app_keywords_processes()
+        elif self.args.refresh_app_icons:
+            return self.check_refresh_app_icons_processes()
         return False
 
     def setup_pgdb(self) -> None:
@@ -450,13 +460,26 @@ class ProcessManager:
             logger.exception("Crawling front pages failed")
 
     def refresh_app_icons(self) -> None:
-        try:
-            refresh_app_icons(
-                pgdb=self.pgcon,
-                limit=self.args.limit_query_rows,
-            )
-        except Exception:
-            logger.exception("Refreshing app icons failed")
+        """Refresh app icons in batches of 1000 until all missing variants are done."""
+        batch_size = 1000
+        total_updated = 0
+        while True:
+            try:
+                updated = refresh_app_icons(
+                    pgdb=self.pgcon,
+                    limit=batch_size,
+                )
+                total_updated += updated
+                if updated == 0:
+                    break
+                logger.info(
+                    f"Icon refresh batch complete, {updated} updated, "
+                    f"{total_updated} total so far, continuing..."
+                )
+            except Exception:
+                logger.exception("Refreshing app icons failed in batch")
+                break
+        logger.info(f"Icon refresh finished, {total_updated} total apps updated")
 
     def process_company_history(self) -> None:
         process_company_history(pgdb=self.pgcon)
