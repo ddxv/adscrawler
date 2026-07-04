@@ -1,19 +1,14 @@
 import json
 import os
 import subprocess
+from typing import Any
 
 import appgoblin_play_scraper
 import pandas as pd
 
 from adscrawler.config import CONFIG, MODULE_DIR, PACKAGE_DIR, get_logger
 
-
-import re
-import numpy as np
-import pandas as pd
-import fasttext
-
-_MODEL_CACHE: dict[bool, fasttext.FastText._FastText] = {}
+_MODEL_CACHE: dict[bool, Any] = {}
 
 
 
@@ -94,7 +89,7 @@ def scrape_app_gp(store_id: str, country: str, language: str = "en") -> dict:
     return result_dict
 
 def _safe_batch_predict(
-    model: fasttext.FastText._FastText, texts: list[str], k: int = 1
+    model: Any, texts: list[str], k: int = 1
 ) -> tuple[list[str], list[float]]:
     """Predict a batch; if fasttext chokes on a ragged/empty-token input,
     fall back to per-string prediction so one bad row doesn't kill the batch."""
@@ -120,12 +115,16 @@ def _safe_batch_predict(
     
 
 
-def _get_model(low_memory: bool = False) -> fasttext.FastText._FastText:
-    """Load and cache the fasttext LID model once per process."""
+def _get_model(low_memory: bool = False) -> Any:
+    """Load and cache the fasttext LID model once per process.
+    """
     if low_memory not in _MODEL_CACHE:
-        # ftlangdetect downloads these on first use to its cache dir;
-        # reuse that path so you don't need a second download mechanism.
-        from ftlangdetect.detect import get_or_load_model
+        try:
+            from ftlangdetect.detect import get_or_load_model
+        except Exception as exc:  # pragma: no cover - optional dependency
+            raise ImportError(
+                "Language-detection requires optional packages. Install with: pip install ftlangdetect[fasttext] or pip install fasttext ftlangdetect"
+            ) from exc
 
         _MODEL_CACHE[low_memory] = get_or_load_model(low_memory=low_memory)
     return _MODEL_CACHE[low_memory]
