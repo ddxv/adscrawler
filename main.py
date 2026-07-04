@@ -114,7 +114,6 @@ class ProcessManager:
             help="Country priority group to use when updating app store details",
             type=int,
         )
-        
         (
             parser.add_argument(
                 "--dispatch-all",
@@ -385,36 +384,36 @@ class ProcessManager:
             end_date = datetime.date.today()
         else:
             raise ValueError(f"Invalid period {period}")
-        # try:
-        #     import_ranks_from_s3(
-        #         pgdb=self.pgcon,
-        #         start_date=start_date,
-        #         end_date=end_date,
-        #         period=period,
-        #     )
-        # except Exception:
-        #     logger.exception(
-        #         f"Importing {self.args.ranks_period} ranks from s3 for failed"
-        #     )
-        # for store in [1, 2]:
-        #     try:
-        #         delete_and_aggregate_s3_agg(store=store, pgdb=self.pgcon)
-        #     except Exception:
-        #         logger.exception(f"Importing {store=} app metrics from s3 for failed")
-        # try:
-        #     clean_history_tables(pgdb=self.pgcon)
-        # except Exception:
-        #     logger.exception("Cleaning history tables failed")
-        # try:
-        #     start_date = datetime.date.today() - datetime.timedelta(days=3)
-        #     end_date = datetime.date.today() - datetime.timedelta(days=1)
-        #     import_keywords_from_s3(
-        #         pgdb=self.pgcon,
-        #         start_date=start_date,
-        #         end_date=end_date,
-        #     )
-        # except Exception:
-        #     logger.exception("Importing keywords from s3 for failed")
+        try:
+            import_ranks_from_s3(
+                pgdb=self.pgcon,
+                start_date=start_date,
+                end_date=end_date,
+                period=period,
+            )
+        except Exception:
+            logger.exception(
+                f"Importing {self.args.ranks_period} ranks from s3 for failed"
+            )
+        for store in [1, 2]:
+            try:
+                delete_and_aggregate_s3_agg(store=store, pgdb=self.pgcon)
+            except Exception:
+                logger.exception(f"Importing {store=} app metrics from s3 for failed")
+        try:
+            clean_history_tables(pgdb=self.pgcon)
+        except Exception:
+            logger.exception("Cleaning history tables failed")
+        try:
+            start_date = datetime.date.today() - datetime.timedelta(days=3)
+            end_date = datetime.date.today() - datetime.timedelta(days=1)
+            import_keywords_from_s3(
+                pgdb=self.pgcon,
+                start_date=start_date,
+                end_date=end_date,
+            )
+        except Exception:
+            logger.exception("Importing keywords from s3 for failed")
         for store in [1, 2]:
             for crawled_date in [
                 (datetime.date.today() - datetime.timedelta(days=1)).isoformat(),
@@ -430,10 +429,10 @@ class ProcessManager:
                     logger.exception(
                         f"Importing app_details from s3 failed {store=} {crawled_date=}"
                     )
-        # try:
-        #     process_company_history(pgdb=self.pgcon)
-        # except Exception:
-        #     logger.exception("Exporting combined domain history to s3 failed")
+        try:
+            process_company_history(pgdb=self.pgcon)
+        except Exception:
+            logger.exception("Exporting combined domain history to s3 failed")
 
     def scrape_new_apps(self, store: int) -> None:
         try:
