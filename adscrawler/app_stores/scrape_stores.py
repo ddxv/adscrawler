@@ -540,7 +540,7 @@ def check_and_insert_developers(
 
 def check_and_insert_domains(
     domains_df: pd.DataFrame,
-    app_urls: pd.DataFrame,
+    apps_df: pd.DataFrame,
     pgdb: PostgresEngine,
 ) -> pd.DataFrame:
     """Adds missing ad domains to the database and returns updated domain DataFrame.
@@ -548,9 +548,10 @@ def check_and_insert_domains(
     For URLs with subdomains, ensures the root domain exists first and links
     the subdomain entry to it via ``root_domain_id``.
     """
+
     # --- 1. Insert any missing root domains first ---
     root_urls = (
-        app_urls[["root_url"]]
+        apps_df[["root_url"]]
         .drop_duplicates()
         .rename(columns={"root_url": "domain_name"})
     )
@@ -602,10 +603,11 @@ def check_and_insert_domains(
             )
 
     # --- 4. Insert subdomain URLs with root_domain_id ---
-    missing_subdomains = app_urls[
-        (~app_urls["url"].isin(domains_df["domain_name"]))
-        & (app_urls["url"].notna())
-        & (app_urls["url"] != app_urls["root_url"])
+    missing_subdomains = apps_df[
+        (~apps_df["url"].isin(domains_df["domain_name"]))
+        & (apps_df["url"].notna())
+        & (apps_df["root_url"].notna())
+        & (apps_df["url"] != apps_df["root_url"])
     ]
     if not missing_subdomains.empty:
         subs_to_insert = (
@@ -635,12 +637,14 @@ def save_app_domains(
 ) -> None:
     apps_df["url"] = apps_df["url"].apply(extract_domains_with_sub)
     apps_df["root_url"] = apps_df["url"].apply(extract_root_domain)
+    # Drop IPs / malfromed urls
+    apps_df = apps_df[~apps_df['root_url'].isna()]
     # This would mean that urls are frozen if 'removed' but more likely they failed a crawl
     apps_df = apps_df[~apps_df["url"].isna()]
     all_domains_df = query_all_domains(pgdb=pgdb)
     all_domains_df = check_and_insert_domains(
         domains_df=all_domains_df,
-        app_urls=apps_df,
+        apps_df=apps_df,
         pgdb=pgdb,
     )
     domain_ids_df = apps_df.merge(
