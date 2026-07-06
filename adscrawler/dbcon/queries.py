@@ -1256,6 +1256,7 @@ def query_apps_to_download(
     return df
 
 
+
 def query_zscores(pgdb: PostgresEngine, target_week: str) -> pd.DataFrame:
     df = pd.read_sql(
         QUERY_REPORT_ZSCORES,
@@ -1507,6 +1508,21 @@ def get_version_codes_full_history(
     df = pd.read_sql(sel_query, con=pgdb.engine)
     return df
 
+
+def get_version_codes_for_store_id(pgdb:PostgresEngine, store_id:str):
+    sel_query = """SELECT
+              	vc.id as version_code_db_id, version_code as version_code_str, apk_hash
+              FROM
+	              version_codes vc
+              LEFT JOIN store_apps sa ON
+	              vc.store_app = sa.id
+              WHERE
+	              sa.store_id = 'com.wte.view' AND
+	              vc.crawl_result = 1
+              ;
+              """
+    df = pd.read_sql(sel_query, con=pgdb.engine)
+    return df
 
 def get_version_code_dbid(
     store_app: int, version_code: str, pgdb: PostgresEngine

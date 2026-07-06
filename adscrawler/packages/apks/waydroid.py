@@ -27,6 +27,7 @@ from adscrawler.dbcon.queries import (
     query_apps_to_api_scan,
     query_store_app_by_store_id,
     upsert_df,
+    get_version_codes_for_store_id
 )
 from adscrawler.mitm_ad_parser import mitm_logs
 from adscrawler.mitm_ad_parser.mitm_logs import parse_log
@@ -208,6 +209,7 @@ def record_mitm_to_db(
     gdf["country_id"] = np.where(np.isnan(gdf["country_id"]), None, gdf["country_id"])
     # WARNING: this shouldn't be used outside of tests, try insert instead
     cols = ["mitm_uuid", "ip_address", "country_id", "state_iso", "city_name", "org"]
+    logger.info("Upsert geo df")
     gdf = upsert_df(
         df=gdf[
             ["mitm_uuid", "ip_address", "country_id", "state_iso", "city_name", "org"]
@@ -227,6 +229,7 @@ def record_mitm_to_db(
         how="left",
         validate="1:1",
     )
+    logger.info("Insert API calls")
     insert_api_calls(
         pgdb=pgdb,
         mdf=mdf,
@@ -273,6 +276,7 @@ def insert_missing_ad_domains(
     pgdb: PostgresEngine,
 ) -> None:
     """Adds missing ad domains to the database."""
+    logger.info("Checking all ad domains for new ones")
     domains_df = query_all_domains(pgdb=pgdb).rename(columns={"id": "domain_id"})
     check_cols = ["tld_url"]
     for col in check_cols:
@@ -404,7 +408,7 @@ def restart_session(run_name) -> subprocess.Popen | None:
     logger.info("Waydroid session restart")
     os.system("waydroid session stop")
 
-    if run_name == 'manual':
+    if 'manual' in run_name:
         pass
     elif is_wayland_env_set() or is_weston_running():
         logger.info("Restarting Weston since env not fully set")
@@ -855,6 +859,7 @@ def manual_waydroid_process(
     store_id: str,
     timeout: int,
     run_name: str,
+    version_code: str | None = None
 ) -> None:
     logger.info(f"Manual waydroid process for {store_id=}")
     store = 1
@@ -862,11 +867,24 @@ def manual_waydroid_process(
     try:
         apk_path = get_local_file_path(store, store_id)
         if apk_path is None:
+            vcdf = get_version_codes_for_store_id(pgdb, store_id)
+            if version_code:
+                vcdf = vcdf[vcdf['version_code_str'] == version_code]
+                vcs = vcdf.shape[0]
+                if vcs == 0:
+                    raise ValueError("No APK found, version code df empty")
+                if vcs > 1:
+                    logger.warning(f"Found multiple apk hashes for {version_code=} {vcdf=}")
+                    raise ValueError("Multip APKs for single version_code")
+            for _i, row in vcdf.iterrows():
+                if row.apk_hash:
+                    apk_path = get_local_file_path(store, f"{store_id}_{row.apk_hash}")
+        if apk_path is None:
             download_from_s3 = True
     except FileNotFoundError:
         download_from_s3 = True
     if download_from_s3:
-        apk_path, _version_str = download_app_to_local(store=store, store_id=store_id)
+        apk_path, _version_str = download_app_to_local(store=store, store_id=store_id, version_str=version_code)
     if not apk_path or not apk_path.exists():
         raise FileNotFoundError(f"{store_id=} not found")
 

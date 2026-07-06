@@ -219,6 +219,12 @@ class ProcessManager:
             type=int,
             default=180,
         )
+        parser.add_argument(
+            "--version-code",
+            help="Specific version code string to use when looking up the APK for waydroid",
+            type=str,
+            default=None,
+        )
         args, _ = parser.parse_known_args()
         return args
 
@@ -590,6 +596,7 @@ class ProcessManager:
                 store_id=store_id,
                 timeout=timeout,
                 run_name=run_name,
+                version_code=self.args.version_code,
             )
         else:
             # Default processing of apk/xapk files that need to be processed
