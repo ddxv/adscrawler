@@ -12,7 +12,7 @@ from adscrawler.config import APP_ICONS_TMP_DIR, CONFIG, get_logger
 from adscrawler.dbcon.connection import PostgresEngine
 from adscrawler.dbcon.queries import (
     query_apps_missing_icon_variants,
-    upsert_df,
+    update_from_df,
 )
 from adscrawler.process.storage import get_s3_client
 
@@ -139,10 +139,10 @@ def refresh_app_icons(pgdb: PostgresEngine, limit: int | None = None) -> int:
         logger.info("No missing icon variants could be generated")
         return 0
 
-    upsert_df(
+    update_from_df(
         table_name="store_apps",
         df=icon_update_df,
-        insert_columns=["icon_128", "icon_64"],
+        update_columns=["icon_128", "icon_64"],
         key_columns=["id"],
         pgdb=pgdb,
     )
