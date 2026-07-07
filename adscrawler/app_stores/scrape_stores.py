@@ -224,7 +224,7 @@ def update_app_details(
 def crawl_keyword_ranks(pgdb: PostgresEngine) -> None:
     country = "us"
     language = "en"
-    kdf = query_keywords_to_crawl(pgdb, limit=1000)
+    kdf = query_keywords_to_crawl(pgdb, limit=500)
     all_keywords = pd.DataFrame()
     crawl_log = []
     consecutive_errors = 0
