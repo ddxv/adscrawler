@@ -197,7 +197,6 @@ class ProcessManager:
             type=str,
             default="week",
         )
-        ### OPTIONS FOR MANUAL/LOCAL WAYDROID PROCESSING
         parser.add_argument(
             "--refresh-metadata",
             help="Refresh company metadata (logos, LinkedIn, country, GitHub)",
@@ -208,6 +207,7 @@ class ProcessManager:
             help="Refresh ALL company metadata (not just missing)",
             action="store_true",
         )
+        ### OPTIONS FOR MANUAL/LOCAL WAYDROID PROCESSING
         parser.add_argument(
             "--redownload-geo-dbs",
             help="Redownload geo dbs",

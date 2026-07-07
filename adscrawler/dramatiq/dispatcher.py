@@ -202,7 +202,7 @@ def dispatch_app_details_jobs(
         logger.info(f"{log_info} no apps to update")
         return
 
-    max_chunk_size = 100
+    max_chunk_size = 500
     chunks: list[pd.DataFrame] = []
     for _country, country_df in df.groupby("country_code"):
         country_size = len(country_df)
