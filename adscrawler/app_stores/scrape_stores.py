@@ -227,6 +227,7 @@ def crawl_keyword_ranks(pgdb: PostgresEngine) -> None:
     kdf = query_keywords_to_crawl(pgdb, limit=1000)
     all_keywords = pd.DataFrame()
     crawl_log = []
+    consecutive_errors = 0
     for _id, row in kdf.iterrows():
         logger.info(
             f"Crawling keywords: {_id}/{kdf.shape[0]:,} keyword={row.keyword_text}"
@@ -245,7 +246,9 @@ def crawl_keyword_ranks(pgdb: PostgresEngine) -> None:
             df["crawled_at"] = datetime.datetime.now(tz=datetime.UTC)
             df["crawled_date"] = df["crawled_at"].dt.date
             all_keywords = pd.concat([all_keywords, df], ignore_index=True)
+            consecutive_errors = 0
         except Exception:
+            consecutive_errors += 1
             logger.exception(f"Scrape keyword={keyword} hit error, skipping")
         finally:
             crawl_log.append(
@@ -254,6 +257,10 @@ def crawl_keyword_ranks(pgdb: PostgresEngine) -> None:
                     "crawled_at": datetime.datetime.now(tz=datetime.UTC),
                 }
             )
+        # Backoff: 1–3 seconds depending on recent errors
+        backoff = min(1.0 + consecutive_errors * 0.5, 3.0)
+        sleep_time = random.uniform(backoff - 0.25, backoff + 0.25)
+        time.sleep(sleep_time)
     raw_keywords_to_s3(all_keywords)
     if crawl_log:
         crawl_log_df = pd.DataFrame(crawl_log).rename(columns={"keyword_id": "keyword"})
