@@ -295,14 +295,19 @@ def scrape_store_ranks(pgdb: PostgresEngine, store: int) -> None:
                 ranked_dicts = scrape_ios_ranks(
                     collection_keyword=collection_keyword, country=country
                 )
-                process_scraped(
-                    pgdb=pgdb,
-                    ranked_dicts=ranked_dicts,
-                    crawl_source="scrape_frontpage_top",
-                    collections_map=collections_map,
-                    categories_map=categories_map,
-                    store=2,
-                )
+                if len(ranked_dicts) > 0:
+                    process_scraped(
+                        pgdb=pgdb,
+                        ranked_dicts=ranked_dicts,
+                        crawl_source="scrape_frontpage_top",
+                        collections_map=collections_map,
+                        categories_map=categories_map,
+                        store=2,
+                    )
+                else:
+                    logger.warning(
+                        f"Scrape iOS ranks {country=} produced no results, skipping"
+                    )
             except Exception as e:
                 logger.exception(
                     f"Srape iOS collection={collection_keyword} {country=} hit error={e}, skipping",

@@ -128,6 +128,9 @@ def check_and_insert_new_apps(
     crawl_source: str,
     store: int,
 ) -> None:
+    if not dicts:
+        logger.info(f"Scrape {store=} {crawl_source=} no apps to process")
+        return
     df = pd.DataFrame(dicts)
     if store in [1, 2]:
         df["store"] = store
