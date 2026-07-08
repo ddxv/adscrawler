@@ -15,25 +15,16 @@ from dramatiq.brokers.redis import RedisBroker
 from adscrawler.config import get_logger
 from adscrawler.dbcon.connection import PostgresEngine
 from adscrawler.dbcon.queries import query_store_apps_to_update
+from adscrawler.config import CONFIG
 
 logger = get_logger(__name__, "dispatcher")
 
-# ---------------------------------------------------------------------------
-# Broker — connect to Redis.  The URL is read from config.toml so it works
-# both locally (for testing) and across the VPS cluster.
-# ---------------------------------------------------------------------------
-from adscrawler.config import CONFIG  # noqa: E402
 
 _redis_url = CONFIG.get("redis", {}).get("url", "redis://127.0.0.1:6379/0")
 logger.info("Dispatcher connecting to Redis at %s", _redis_url)
 dramatiq.set_broker(RedisBroker(url=_redis_url))
 
-# Import the actor so we can call .send() on it.
-# The actor is defined in actor_defs.py (no broker setup there).
 # We import *after* setting the broker so it binds to our local Redis.
-# ---------------------------------------------------------------------------
-# Direct Redis client for distributed locks (not the Dramatiq broker).
-# ---------------------------------------------------------------------------
 import redis as redis_module  # noqa: E402
 
 from adscrawler.dramatiq.app_stores.actor_defs import (  # noqa: E402
@@ -65,9 +56,8 @@ redis_client = redis_module.Redis(
     socket_timeout=5,
 )
 
-# Max pending chunks per queue before we stop dispatching into that queue.
-# Each chunk holds up to ``max_chunk_size=3000`` apps, so ~34 chunks ≈ 100k apps.
-_MAX_PENDING_CHUNKS = 34
+_MAX_PENDING_CHUNKS = 100
+MAX_CHUNK_SIZE = 500
 
 
 def _queue_key(store: int, group: int) -> str:
@@ -182,34 +172,39 @@ def dispatch_app_details_jobs(
     # --- Throttle: don't enqueue more if this queue is already full ---
     group = country_priority_group
     pending = _count_pending_chunks(store, group)
+    empty_slots = _MAX_PENDING_CHUNKS - pending
     if pending >= _MAX_PENDING_CHUNKS:
         logger.info(
-            f"{log_info} {pending} chunks pending (>= {_MAX_PENDING_CHUNKS}), "
-            f"skipping this dispatch cycle"
+            f"{log_info} {pending=} queue is full, skipping"
         )
         return
-    logger.info(f"{log_info} {pending} chunks currently pending")
+    logger.info(f"{log_info} {pending=} {empty_slots=}")
+
+    query_app_limit = min([empty_slots * MAX_CHUNK_SIZE, app_limit])
+
+    # We do need a larger query to handle possibly locked apps still in queue
+    query_app_limit *= 2
 
     df = query_store_apps_to_update(
         store=store,
         pgdb=pgdb,
-        limit=app_limit,
+        limit=query_app_limit,
         country_priority_group=group,
     )
 
     df = df.sort_values("country_code").reset_index(drop=True)
     if df.empty:
-        logger.info(f"{log_info} no apps to update")
+        logger.info(f"{log_info} query returned no apps to update")
         return
 
-    max_chunk_size = 500
     chunks: list[pd.DataFrame] = []
+
     for _country, country_df in df.groupby("country_code"):
         country_size = len(country_df)
-        if country_size <= max_chunk_size:
+        if country_size <= MAX_CHUNK_SIZE:
             chunks.append(country_df)
         else:
-            num_chunks = (country_size + max_chunk_size - 1) // max_chunk_size
+            num_chunks = (country_size + MAX_CHUNK_SIZE - 1) // MAX_CHUNK_SIZE
             chunk_size_local = country_size // num_chunks
             for i in range(0, country_size, chunk_size_local):
                 chunks.append(country_df.iloc[i : i + chunk_size_local])
