@@ -3,20 +3,8 @@ import datetime
 import os
 import sys
 
-from adscrawler.process.app_details import (
-    import_app_details_from_s3_into_db,
-    import_keywords_from_s3,
-)
-from adscrawler.process.app_rankings import import_ranks_from_s3
-from adscrawler.process.app_domain_history import (
-    process_company_history,
-)
-from adscrawler.process.app_metrics_history import (
-    clean_history_tables,
-    delete_and_aggregate_s3_agg,
-)
-from adscrawler.app_stores.process_keywords import process_app_keywords
 from adscrawler.app_stores.process_icons import refresh_app_icons
+from adscrawler.app_stores.process_keywords import process_app_keywords
 from adscrawler.app_stores.scrape_stores import (
     crawl_developers_for_new_store_ids,
     crawl_keyword_ranks,
@@ -30,6 +18,18 @@ from adscrawler.packages.process_files import (
     manual_download_app,
     process_sdks,
 )
+from adscrawler.process.app_details import (
+    import_app_details_from_s3_into_db,
+    import_keywords_from_s3,
+)
+from adscrawler.process.app_domain_history import (
+    process_company_history,
+)
+from adscrawler.process.app_metrics_history import (
+    clean_history_tables,
+    delete_and_aggregate_s3_agg,
+)
+from adscrawler.process.app_rankings import import_ranks_from_s3
 from adscrawler.scrape import crawl_app_ads
 from adscrawler.tools.get_company_logos import refresh_metadata
 
@@ -315,9 +315,7 @@ class ProcessManager:
     def check_refresh_app_icons_processes(self) -> bool:
         processes = self.get_running_processes()
         my_processes = self.filter_processes(processes, "/adscrawler/main.py")
-        found_processes = [
-            x for x in my_processes if " --refresh-app-icons" in x
-        ]
+        found_processes = [x for x in my_processes if " --refresh-app-icons" in x]
         return len(found_processes) > 1
 
     def is_script_already_running(self) -> bool:
@@ -511,7 +509,7 @@ class ProcessManager:
             logger.info("Using Dramatiq dispatcher for ALL queues")
             dispatch_all_queues(
                 pgdb=self.pgcon,
-                process_icon=self.args.process_icons,
+                process_icon=False,
                 limit=self.args.limit_query_rows,
             )
             return

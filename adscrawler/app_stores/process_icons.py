@@ -1,6 +1,7 @@
 """Process app icons — resize, upload to S3, and update missing variants."""
 
 import pathlib
+from datetime import UTC, datetime
 from io import BytesIO
 
 import imagehash
@@ -13,10 +14,18 @@ from adscrawler.dbcon.connection import PostgresEngine
 from adscrawler.dbcon.queries import (
     query_apps_missing_icon_variants,
     update_from_df,
+    upsert_df,
 )
 from adscrawler.process.storage import get_s3_client
 
 logger = get_logger(__name__, "process_icons")
+
+
+def _ensure_rgb(img: Image.Image) -> Image.Image:
+    """Convert image to RGB if it isn't already (e.g. CMYK, RGBA, P)."""
+    if img.mode == "RGB":
+        return img
+    return img.convert("RGB")
 
 
 def process_app_icon(store_id: str, url: str) -> tuple[str, str] | None:
@@ -29,17 +38,24 @@ def process_app_icon(store_id: str, url: str) -> tuple[str, str] | None:
     except Exception:
         logger.error(f"Failed to fetch image from {url}")
         return None
-    img = Image.open(BytesIO(response.content))
-    # Always store as PNG regardless of source format
-    img_resized = img.resize((128, 128), Image.LANCZOS)
-    img_64_resized = img.resize((64, 64), Image.LANCZOS)
-    phash = str(imagehash.phash(img_resized))
-    f_128_name = f"{phash}_128.png"
-    f_64_name = f"{phash}_64.png"
-    file_path = pathlib.Path(APP_ICONS_TMP_DIR, f"{phash}_128.png")
-    file_64_path = pathlib.Path(APP_ICONS_TMP_DIR, f"{phash}_64.png")
-    img_resized.save(file_path, format="PNG")
-    img_64_resized.save(file_64_path, format="PNG")
+
+    try:
+        img = Image.open(BytesIO(response.content))
+        img = _ensure_rgb(img)
+        # Always store as PNG regardless of source format
+        img_resized = img.resize((128, 128), Image.LANCZOS)
+        img_64_resized = img.resize((64, 64), Image.LANCZOS)
+        phash = str(imagehash.phash(img_resized))
+        f_128_name = f"{phash}_128.png"
+        f_64_name = f"{phash}_64.png"
+        file_path = pathlib.Path(APP_ICONS_TMP_DIR, f"{phash}_128.png")
+        file_64_path = pathlib.Path(APP_ICONS_TMP_DIR, f"{phash}_64.png")
+        img_resized.save(file_path, format="PNG")
+        img_64_resized.save(file_64_path, format="PNG")
+    except Exception:
+        logger.exception(f"Failed to process icon for {store_id} from {url}")
+        return None
+
     # Upload to S3
     image_format = "image/png"
     s3_key = "digi-cloud"
@@ -88,9 +104,8 @@ def build_icon_update_df(apps_df: pd.DataFrame) -> pd.DataFrame:
         apps_df = apps_df.copy()
         apps_df["icon_64"] = pd.NA
 
-    needs_update = (
-        apps_df["icon_url_512"].notna()
-        & (apps_df["icon_128"].isna() | apps_df["icon_64"].isna())
+    needs_update = apps_df["icon_url_512"].notna() & (
+        apps_df["icon_128"].isna() | apps_df["icon_64"].isna()
     )
     apps_to_update = apps_df.loc[needs_update].copy()
     if apps_to_update.empty:
@@ -114,8 +129,7 @@ def build_icon_update_df(apps_df: pd.DataFrame) -> pd.DataFrame:
         }
     )
     icon_update_df = icon_update_df[
-        icon_update_df["icon_128"].notna()
-        | icon_update_df["icon_64"].notna()
+        icon_update_df["icon_128"].notna() | icon_update_df["icon_64"].notna()
     ]
     return icon_update_df
 
@@ -146,5 +160,19 @@ def refresh_app_icons(pgdb: PostgresEngine, limit: int | None = None) -> int:
         key_columns=["id"],
         pgdb=pgdb,
     )
+
+    # Log which apps were crawled
+    crawl_log = pd.DataFrame(
+        {"store_app": icon_update_df["id"], "crawled_at": datetime.now(UTC)}
+    )
+    upsert_df(
+        table_name="app_icons_crawled_at",
+        schema="logging",
+        insert_columns=["store_app", "crawled_at"],
+        df=crawl_log[["store_app", "crawled_at"]],
+        key_columns=["store_app"],
+        pgdb=pgdb,
+    )
+
     logger.info(f"Updated {len(icon_update_df)} app icon variants")
     return len(icon_update_df)
