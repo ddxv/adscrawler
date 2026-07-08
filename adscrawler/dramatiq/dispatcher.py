@@ -56,8 +56,8 @@ redis_client = redis_module.Redis(
     socket_timeout=5,
 )
 
-_MAX_PENDING_CHUNKS = 100
-MAX_CHUNK_SIZE = 500
+_MAX_PENDING_CHUNKS = 1000
+MAX_CHUNK_SIZE = 40
 
 
 def _queue_key(store: int, group: int) -> str:

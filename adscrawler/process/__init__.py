@@ -7,6 +7,7 @@ S3 prefix constants shared across the ``process`` subpackage.
 # Raw-data prefixes – written by scrape stores and read by downstream agg
 # ---------------------------------------------------------------------------
 RAW_DATA_KEYWORDS = "raw-data/keywords"
+RAW_DATA_APP_DETAILS_INCOMING = "raw-data/_incoming/app_details"
 RAW_DATA_APP_DETAILS = "raw-data/app_details"
 RAW_DATA_APP_RANKINGS = "raw-data/app_rankings"
 

@@ -22,6 +22,7 @@ from adscrawler.dbcon.queries import (
 )
 from adscrawler.process import (
     RAW_DATA_APP_DETAILS,
+    RAW_DATA_APP_DETAILS_INCOMING,
     RAW_DATA_KEYWORDS,
 )
 from adscrawler.process.storage import (
@@ -30,7 +31,6 @@ from adscrawler.process.storage import (
 )
 
 logger = get_logger(__name__, "scrape_stores")
-
 
 
 def raw_keywords_to_s3(df: pd.DataFrame) -> None:
@@ -70,7 +70,7 @@ def app_details_to_s3(df: pd.DataFrame, store: int) -> None:
             epoch_ms = int(time.time() * 1000)
             suffix = uuid.uuid4().hex[:8]
             file_name = f"app_details_{epoch_ms}_{suffix}.parquet"
-            s3_key = f"{RAW_DATA_APP_DETAILS}/store={store}/crawled_date={crawled_date}/country={country}/{file_name}"
+            s3_key = f"{RAW_DATA_APP_DETAILS_INCOMING}/store={store}/crawled_date={crawled_date}/country={country}/{file_name}"
             buffer = BytesIO()
             country_df.to_parquet(buffer, index=False)
             buffer.seek(0)
@@ -101,7 +101,9 @@ def import_app_details_from_s3_into_db(
     logger.info(f"Importing app_details from S3 {store=} {crawled_date=} country=US")
 
     bucket = CONFIG["s3"]["bucket"]
-    prefix = f"{RAW_DATA_APP_DETAILS}/store={store}/crawled_date={crawled_date}/country=US/"
+    prefix = (
+        f"{RAW_DATA_APP_DETAILS}/store={store}/crawled_date={crawled_date}/country=US/"
+    )
     parquet_paths = get_parquet_paths_by_prefix(bucket, prefix)
     if not parquet_paths:
         logger.warning(f"No app_details parquet files found at {prefix}")
@@ -111,14 +113,14 @@ def import_app_details_from_s3_into_db(
         df = duckdb_con.execute(
             f"SELECT * FROM read_parquet({parquet_paths}, union_by_name=true)"
         ).df()
-    
+
     if df.empty:
         logger.warning(f"Empty dataset at {prefix}")
         return
 
-    df = df[df['crawl_result'] == 1]
-    
-    df['store_app'] = df['store_app_db_id'].astype(int)
+    df = df[df["crawl_result"] == 1]
+
+    df["store_app"] = df["store_app_db_id"].astype(int)
 
     missing = df["store_app"].isna()
     if missing.any():
@@ -132,7 +134,9 @@ def import_app_details_from_s3_into_db(
         logger.warning("No rows left after resolving store_app IDs")
         return
 
-    from adscrawler.app_stores.scrape_stores import process_live_app_details  # noqa: PLC0415
+    from adscrawler.app_stores.scrape_stores import (
+        process_live_app_details,  # noqa: PLC0415
+    )
 
     process_live_app_details(
         store=store,
@@ -140,8 +144,6 @@ def import_app_details_from_s3_into_db(
         pgdb=pgdb,
         process_icon=False,
     )
-
-    
 
 
 def import_keywords_from_s3(
