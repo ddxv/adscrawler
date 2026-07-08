@@ -97,6 +97,12 @@ def _release_locks(store_app_ids: list[int], store: int, group: int) -> None:
         for app_id in store_app_ids:
             pipe.delete(f"{prefix}{app_id}")
         pipe.execute()
+        logger.info(
+            "Released %d locks for store=%s group=%s",
+            len(store_app_ids),
+            store,
+            group,
+        )
     except Exception:
         logger.warning("Failed to release locks", exc_info=True)
 
