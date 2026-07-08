@@ -72,8 +72,7 @@ latest_crawls AS (
         ON
             acc.store_app = sa.id
     WHERE
-        crawled_at >= :max_recrawl_ts
-        AND country_id IN (
+        country_id IN (
             SELECT country_id
             FROM
                 countries_to_crawl
@@ -143,6 +142,6 @@ ORDER BY
     ranked_app DESC,
     (
         GREATEST(total_installs, total_ratings)
-        * 10 * EXTRACT(DAY FROM (NOW() - ta.updated_at))
+        * 100 * EXTRACT(DAY FROM (NOW() - lc.crawled_at))
     ) DESC
 LIMIT :mylimit;
