@@ -138,7 +138,6 @@ def prepare_for_psycopg(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
     dt_cols = []
     for col in df.select_dtypes(include=["datetimetz", "datetime64[ns]"]):
-        print(col)
         dt_cols.append(col)
         # Convert to object dtype first so it can hold None
         # Note: This may be breaking in pandas3.0
