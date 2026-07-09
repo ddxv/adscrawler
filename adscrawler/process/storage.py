@@ -482,6 +482,58 @@ def download_s3_app_by_key(
     logger.info(f"{func_info} to local finished")
     return final_path
 
+def get_s3_dirs_by_prefix(bucket: str, prefix: str) -> list[str]:
+    """Return a list of S3 directories (prefixes) under the given prefix."""
+    s3 = get_s3_client()
+    continuation_token = None
+    all_dirs = []
+    while True:
+        params = {
+            "Bucket": bucket,
+            "Prefix": prefix,
+            "Delimiter": "/",
+        }
+        if continuation_token:
+            params["ContinuationToken"] = continuation_token
+        response = s3.list_objects_v2(**params)
+        for cp in response.get("CommonPrefixes", []):
+            all_dirs.append(cp["Prefix"])
+        if response.get("IsTruncated"):
+            continuation_token = response.get("NextContinuationToken")
+        else:
+            break
+    return all_dirs
+
+
+def get_parquet_paths_by_prefix(bucket: str, prefix: str) -> list[str]:
+
+    s3 = get_s3_client()
+    continuation_token = None
+    all_parquet_paths = []
+    while True:
+        params = {
+            "Bucket": bucket,
+            "Prefix": prefix,
+            "MaxKeys": 1000,
+        }
+        if continuation_token:
+            params["ContinuationToken"] = continuation_token
+        response = s3.list_objects_v2(**params)
+        # Extract parquet paths from this page
+        if "Contents" in response:
+            parquet_paths = [
+                f"s3://{bucket}/{obj['Key']}"
+                for obj in response["Contents"]
+                if obj["Key"].endswith(".parquet")
+            ]
+            all_parquet_paths += parquet_paths
+        if "NextContinuationToken" in response:
+            continuation_token = response["NextContinuationToken"]
+        else:
+            break
+    return all_parquet_paths
+
+
 
 def download_app_to_local(
     store: int, store_id: str, version_str: str | None = None

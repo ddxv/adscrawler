@@ -9,7 +9,6 @@ import pandas as pd
 
 from adscrawler.app_stores.utils import (
     check_and_insert_new_apps,
-    get_parquet_paths_by_prefix,
 )
 from adscrawler.config import CONFIG, get_logger
 from adscrawler.dbcon.connection import PostgresEngine
@@ -28,6 +27,8 @@ from adscrawler.process import (
 from adscrawler.process.storage import (
     get_duckdb_connection,
     get_s3_client,
+    get_parquet_paths_by_prefix,
+    get_s3_dirs_by_prefix,
 )
 
 logger = get_logger(__name__, "scrape_stores")
@@ -78,11 +79,81 @@ def app_details_to_s3(df: pd.DataFrame, store: int) -> None:
     logger.info(f"S3 upload app details {store=} finished")
 
 
+def compact_incoming_app_details(
+    store: int,
+    crawled_date: str,
+) -> None:
+    """Compact all incoming app-detail parquets into single larger parquet files.
+
+    Reads all parquet files from ``raw-data/_incoming/app_details/`` for the given
+    ``store``/``crawled_date``, compacts them per country into larger parquet files
+    using DuckDB, and writes them to ``raw-data/app_details/``.
+
+    Args:
+        store: Store ID (1 = Google Play, 2 = App Store).
+        crawled_date: ISO-format date string (e.g. ``"2026-07-09"``).
+    """
+    logger.info(f"Compacting incoming app_details {store=} {crawled_date=}")
+    bucket = CONFIG["s3"]["bucket"]
+
+    prefix = (
+        f"{RAW_DATA_APP_DETAILS_INCOMING}/store={store}/crawled_date={crawled_date}/"
+    )
+    dirs = get_s3_dirs_by_prefix(bucket, prefix)
+    countries = [x.split("country=")[-1].replace("/", "") for x in dirs]
+
+    if not countries:
+        logger.warning(f"No incoming directories found at {prefix}")
+        return
+
+    for country in countries:
+        try:
+            incoming_prefix = (
+                f"{RAW_DATA_APP_DETAILS_INCOMING}"
+                f"/store={store}/crawled_date={crawled_date}/country={country}/"
+            )
+            parquet_paths = get_parquet_paths_by_prefix(bucket, incoming_prefix)
+            if not parquet_paths:
+                logger.warning(
+                    f"No incoming parquet files for {store=} {crawled_date=} {country=}"
+                )
+                continue
+
+            logger.info(
+                f"Compacting {len(parquet_paths)} files for {store=} {crawled_date=} {country=}"
+            )
+
+            epoch_ms = int(time.time() * 1000)
+            # suffix = uuid.uuid4().hex[:8]
+            suffix = "0"
+            file_name = f"compacted_{epoch_ms}_{suffix}.parquet"
+            s3_key = (
+                f"{RAW_DATA_APP_DETAILS}"
+                f"/store={store}/crawled_date={crawled_date}/country={country}/{file_name}"
+            )
+            with get_duckdb_connection("s3") as duckdb_con:
+                duckdb_con.execute(f"""
+                            COPY (
+                                SELECT * FROM read_parquet({parquet_paths}, union_by_name=true)
+                            ) TO 's3://{bucket}/{s3_key}' (FORMAT PARQUET);
+                        """)
+
+                row_count = duckdb_con.execute(
+                    f"SELECT count(*) FROM read_parquet(['s3://{bucket}/{s3_key}'])"
+                ).fetchone()[0]
+                logger.info(f"Compacted -> s3://{bucket}/{s3_key} [{row_count:,} rows]")
+        except Exception as e:
+            logger.exception(
+                f"Error compacting {store=} {crawled_date=} {country=}: {e}"
+            )
+
+    logger.info(f"Compacting incoming app_details {store=} {crawled_date=} finished")
+
+
 def import_app_details_from_s3_into_db(
     store: int,
     crawled_date: str,
     pgdb: PostgresEngine,
-    process_icon: bool = False,
 ) -> None:
     """Read app-detail parquets from S3 for ``store``/``crawled_date``/US and
     upsert into the database via ``process_live_app_details``.
@@ -101,6 +172,9 @@ def import_app_details_from_s3_into_db(
     logger.info(f"Importing app_details from S3 {store=} {crawled_date=} country=US")
 
     bucket = CONFIG["s3"]["bucket"]
+
+    compact_incoming_app_details(store=store, crawled_date=crawled_date)
+
     prefix = (
         f"{RAW_DATA_APP_DETAILS}/store={store}/crawled_date={crawled_date}/country=US/"
     )
@@ -122,7 +196,7 @@ def import_app_details_from_s3_into_db(
     df["store_app"] = df["store_app_db_id"].astype(int)
 
     # Some data is pulled specifically for new apps, but since other crawls don't have it, they have null values
-    df = df.drop(columns=['icon_url_100'])
+    df = df.drop(columns=["icon_url_100"])
 
     missing = df["store_app"].isna()
     if missing.any():

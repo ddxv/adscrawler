@@ -6,7 +6,6 @@ import duckdb
 import numpy as np
 import pandas as pd
 
-from adscrawler.app_stores.utils import get_parquet_paths_by_prefix
 from adscrawler.config import CONFIG, get_logger
 from adscrawler.dbcon.connection import PostgresEngine
 from adscrawler.dbcon.queries import (
@@ -30,6 +29,7 @@ from adscrawler.process.storage import (
     delete_s3_objects_by_date_range,
     delete_s3_objects_by_prefix,
     get_duckdb_connection,
+get_parquet_paths_by_prefix
 )
 
 logger = get_logger(__name__, "scrape_stores")

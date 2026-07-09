@@ -11,10 +11,6 @@ from adscrawler.dbcon.queries import query_countries, query_store_id_map, upsert
 
 logger = get_logger(__name__, "scrape_stores")
 
-# ---------------------------------------------------------------------------
-# Country guessing helpers (shared with tools/get_company_logos.py)
-# ---------------------------------------------------------------------------
-
 
 def build_name_to_alpha2(countries_df: pd.DataFrame) -> dict[str, str]:
     """Build a lowercase-name -> alpha2 lookup from all language columns."""
@@ -178,35 +174,6 @@ def check_and_insert_new_apps(
         )
     return None
 
-
-def get_parquet_paths_by_prefix(bucket: str, prefix: str) -> list[str]:
-    from adscrawler.process.storage import get_s3_client  # noqa: PLC0415
-
-    s3 = get_s3_client()
-    continuation_token = None
-    all_parquet_paths = []
-    while True:
-        params = {
-            "Bucket": bucket,
-            "Prefix": prefix,
-            "MaxKeys": 1000,
-        }
-        if continuation_token:
-            params["ContinuationToken"] = continuation_token
-        response = s3.list_objects_v2(**params)
-        # Extract parquet paths from this page
-        if "Contents" in response:
-            parquet_paths = [
-                f"s3://{bucket}/{obj['Key']}"
-                for obj in response["Contents"]
-                if obj["Key"].endswith(".parquet")
-            ]
-            all_parquet_paths += parquet_paths
-        if "NextContinuationToken" in response:
-            continuation_token = response["NextContinuationToken"]
-        else:
-            break
-    return all_parquet_paths
 
 
 def extract_root_domain(url: str) -> str | None:
