@@ -872,7 +872,9 @@ def process_live_app_details(
             x for x in get_store_app_columns(pgdb) if x in apps_df.columns
         ]
         apps_df = prepare_for_psycopg(apps_df)
+        
         logger.info(f"{log_info} update store_apps table")
+
         update_from_df(
             table_name="store_apps",
             df=apps_df,

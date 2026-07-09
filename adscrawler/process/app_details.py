@@ -119,8 +119,10 @@ def import_app_details_from_s3_into_db(
         return
 
     df = df[df["crawl_result"] == 1]
-
     df["store_app"] = df["store_app_db_id"].astype(int)
+
+    # Some data is pulled specifically for new apps, but since other crawls don't have it, they have null values
+    df = df.drop(columns=['icon_url_100'])
 
     missing = df["store_app"].isna()
     if missing.any():
