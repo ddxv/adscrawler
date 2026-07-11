@@ -173,8 +173,8 @@ def dispatch_app_details_jobs(
     group = country_priority_group
     pending = _count_pending_chunks(store, group)
     empty_slots = _MAX_PENDING_CHUNKS - pending
-    if pending >= _MAX_PENDING_CHUNKS:
-        logger.info(f"{log_info} {pending=} queue is full, skipping")
+    if empty_slots > _MAX_PENDING_CHUNKS / 10:
+        logger.info(f"{log_info} {pending=} queue is mostly full, skipping")
         return
     logger.info(f"{log_info} {pending=} {empty_slots=}")
 
