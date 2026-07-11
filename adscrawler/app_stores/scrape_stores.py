@@ -85,7 +85,7 @@ def process_scrape_apps_and_save(
     """
     if total_rows is None:
         total_rows = len(df_chunk)
-    chunk_info = f"{store=} process_scrape_apps_and_save chunk={df_chunk.index[0]}-{df_chunk.index[-1]}/{total_rows}"
+    chunk_info = f"{store=} process_scrape_apps_and_save {total_rows=}"
     logger.info(f"{chunk_info} start")
     pgdb = get_db_connection()
     chunk_results = []
@@ -115,6 +115,7 @@ def process_scrape_apps_and_save(
         app_details_to_s3(results_df, store=store)
         results_df["store_app"] = results_df["store_app_db_id"].astype(int)
         log_crawl_results(results_df, pgdb=pgdb)
+        logger.info(f"{chunk_info} S3 and logging upload finished")
         if do_pg_update:
             results_df = results_df[(results_df["country"] == "US")]
             process_live_app_details(
