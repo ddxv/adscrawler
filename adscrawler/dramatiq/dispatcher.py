@@ -174,9 +174,7 @@ def dispatch_app_details_jobs(
     pending = _count_pending_chunks(store, group)
     empty_slots = _MAX_PENDING_CHUNKS - pending
     if pending >= _MAX_PENDING_CHUNKS:
-        logger.info(
-            f"{log_info} {pending=} queue is full, skipping"
-        )
+        logger.info(f"{log_info} {pending=} queue is full, skipping")
         return
     logger.info(f"{log_info} {pending=} {empty_slots=}")
 
@@ -197,9 +195,15 @@ def dispatch_app_details_jobs(
         logger.info(f"{log_info} query returned no apps to update")
         return
 
-    chunks: list[pd.DataFrame] = []
+    all_app_ids = df["store_app"].astype(int).tolist()
+    acquired_ids = _acquire_locks(all_app_ids, store, group)
+    df_active = df[df["store_app"].isin(acquired_ids)].copy()
+    if df_active.empty:
+        logger.info(f"{log_info} No new locks acquired. Skipping dispatch.")
+        return
 
-    for _country, country_df in df.groupby("country_code"):
+    chunks: list[pd.DataFrame] = []
+    for _country, country_df in df_active.groupby("country_code"):
         country_size = len(country_df)
         if country_size <= MAX_CHUNK_SIZE:
             chunks.append(country_df)
@@ -225,39 +229,16 @@ def dispatch_app_details_jobs(
         logger.error(f"{log_info} no actor registered for store={store} group={group}")
         return
 
-    total_dispatched = 0
-    total_skipped = 0
-
-    # --- Fire each chunk as a Dramatiq message ---
     for i, df_chunk in enumerate(chunks):
-        # 1. Extract store_app IDs to attempt lock acquisition
-        store_app_ids = df_chunk["store_app"].astype(int).tolist()
-
-        # 2. Atomically claim locks — only keep IDs that weren't already locked
-        acquired_ids = _acquire_locks(store_app_ids, store, group)
-
-        # 3. If every app in this chunk is already in-flight, skip entirely
-        if not acquired_ids:
-            total_skipped += len(store_app_ids)
-            continue
-
-        # 4. Filter the DataFrame down to only the newly-acquired apps
-        df_deduped = df_chunk[df_chunk["store_app"].isin(acquired_ids)]
-
-        # 5. Serialize and send
-        app_data = _serialize_chunk(df_deduped)
+        app_data = _serialize_chunk(df_chunk)
         actor.send(
             app_data=app_data,
             store=store,
             process_icon=process_icon,
         )
 
-        total_dispatched += len(acquired_ids)
-        total_skipped += len(store_app_ids) - len(acquired_ids)
-
     logger.info(
-        f"{log_info} finished: {total_dispatched} apps enqueued across "
-        f"{len(chunks)} chunks ({total_skipped} already in-flight)"
+        f"{log_info} finished: queried={len(df)} apps={len(df_active)} {len(chunks)} chunks"
     )
 
 
