@@ -35,7 +35,7 @@ from adscrawler.dramatiq.app_stores.actor_defs import (  # noqa: E402
     scrape_chunk_google_2,
 )
 
-_lock_ttl_seconds = 10800  # 3 hours — safety net for crashed workers
+_lock_ttl_seconds = 1800
 
 # Extract host/port/db from the configured URL so we always talk to the
 # same Redis instance the broker uses.
