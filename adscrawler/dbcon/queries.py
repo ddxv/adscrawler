@@ -1124,19 +1124,19 @@ def query_store_apps_to_update(
     limit: int = 1000,
 ) -> pd.DataFrame:
     short_update_days = CONFIG["crawl-settings"].get(
-        "short_update_days_{country_priority_group}", 1
+        f"short_update_days_{country_priority_group}", 1
     )
     short_update_installs = CONFIG["crawl-settings"].get(
-        "short_update_installs_{country_priority_group}", 1000
+        f"short_update_installs_{country_priority_group}", 1000
     )
     short_update_ratings = CONFIG["crawl-settings"].get(
-        "short_update_ratings_{country_priority_group}", 100
+        f"short_update_ratings_{country_priority_group}", 100
     )
     long_update_days = CONFIG["crawl-settings"].get(
-        "long_update_days_{country_priority_group}", 2
+        f"long_update_days_{country_priority_group}", 2
     )
     max_recrawl_days = CONFIG["crawl-settings"].get(
-        "max_recrawl_days_{country_priority_group}", 15
+        f"max_recrawl_days_{country_priority_group}", 15
     )
     short_update_ts = datetime.datetime.now(tz=datetime.UTC) - datetime.timedelta(
         days=short_update_days
@@ -1253,7 +1253,6 @@ def query_apps_to_download(
         params={"store": store},
     )
     return df
-
 
 
 def query_zscores(pgdb: PostgresEngine, target_week: str) -> pd.DataFrame:
@@ -1508,7 +1507,7 @@ def get_version_codes_full_history(
     return df
 
 
-def get_version_codes_for_store_id(pgdb:PostgresEngine, store_id:str):
+def get_version_codes_for_store_id(pgdb: PostgresEngine, store_id: str):
     sel_query = """SELECT
               	vc.id as version_code_db_id, version_code as version_code_str, apk_hash
               FROM
@@ -1522,6 +1521,7 @@ def get_version_codes_for_store_id(pgdb:PostgresEngine, store_id:str):
               """
     df = pd.read_sql(sel_query, con=pgdb.engine)
     return df
+
 
 def get_version_code_dbid(
     store_app: int, version_code: str, pgdb: PostgresEngine
