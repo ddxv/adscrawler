@@ -56,7 +56,7 @@ redis_client = redis_module.Redis(
     socket_timeout=5,
 )
 
-_MAX_PENDING_CHUNKS = 1000
+_MAX_PENDING_CHUNKS = 1500
 MAX_CHUNK_SIZE = 40
 
 
@@ -214,7 +214,7 @@ def dispatch_app_details_jobs(
                 chunks.append(country_df.iloc[i : i + chunk_size_local])
 
     logger.info(
-        f"{log_info} dispatching {len(df)} apps across {len(chunks)} chunks to Redis"
+        f"{log_info} dispatching {len(df_active)} apps across {len(chunks)} chunks to Redis"
     )
 
     # --- Select the right actor for this queue ---

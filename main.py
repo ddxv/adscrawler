@@ -453,7 +453,7 @@ class ProcessManager:
             )
         except Exception:
             logger.exception("Importing keywords from s3 for failed")
-        
+
         try:
             process_company_history(pgdb=self.pgcon)
         except Exception:
