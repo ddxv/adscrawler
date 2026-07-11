@@ -161,7 +161,7 @@ def _actor_body(
     except Exception:
         logger.exception("Fatal error processing chunk for store=%s", store)
         raise
-    finally:
+    else:
         _release_locks(store_app_ids, store, group)
 
 

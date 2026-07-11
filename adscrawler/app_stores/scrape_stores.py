@@ -200,6 +200,7 @@ def update_app_details(
                 store=store,
                 process_icon=process_icon,
                 total_rows=total_rows,
+                do_pg_update=True,
             )
             future_to_idx[future] = idx
             # Only stagger the initial batch to avoid simultaneous API burst
@@ -647,7 +648,7 @@ def save_app_domains(
     apps_df["url"] = apps_df["url"].apply(extract_domains_with_sub)
     apps_df["root_url"] = apps_df["url"].apply(extract_root_domain)
     # Drop IPs / malfromed urls
-    apps_df = apps_df[~apps_df['root_url'].isna()]
+    apps_df = apps_df[~apps_df["root_url"].isna()]
     # This would mean that urls are frozen if 'removed' but more likely they failed a crawl
     apps_df = apps_df[~apps_df["url"].isna()]
     all_domains_df = query_all_domains(pgdb=pgdb)
@@ -834,7 +835,9 @@ def process_live_app_details(
         ["crawl_result", "additional_html_crawl_result"]
     ):
         num_apps = apps_df.shape[0]
-        log_info = f"{store=} {crawl_result=} {additional_html_crawl_result=} {num_apps=}"
+        log_info = (
+            f"{store=} {crawl_result=} {additional_html_crawl_result=} {num_apps=}"
+        )
         logger.info(f"{log_info} process for db start")
         if crawl_result != 1:
             # If bad crawl result, only save minimal info to avoid overwriting good data, ie name
@@ -872,7 +875,7 @@ def process_live_app_details(
             x for x in get_store_app_columns(pgdb) if x in apps_df.columns
         ]
         apps_df = prepare_for_psycopg(apps_df)
-        
+
         logger.info(f"{log_info} update store_apps table")
 
         update_from_df(
@@ -887,8 +890,8 @@ def process_live_app_details(
         logger.info(f"{log_info} update descriptions table")
         upsert_store_apps_descriptions(apps_df, pgdb)
         if store == 1:
-          logger.info(f"{log_info} update countries table")
-          upsert_app_country_evidence(apps_df, pgdb)
+            logger.info(f"{log_info} update countries table")
+            upsert_app_country_evidence(apps_df, pgdb)
         if "url" not in apps_df.columns or apps_df["url"].isna().all():
             logger.warning(f"{log_info} No app urls found")
             continue
@@ -1019,5 +1022,3 @@ def log_crawl_results(app_df: pd.DataFrame, pgdb: PostgresEngine) -> None:
         if_exists="append",
         index=False,
     )
-
-

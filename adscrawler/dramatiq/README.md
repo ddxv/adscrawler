@@ -34,11 +34,9 @@ sudo cp crawl-store-apps-apple@.service  /etc/systemd/system/
 sudo systemctl daemon-reload
 
 # 4. Enable + start workers
-#    ── Google (4 processes × 2 threads = 8 concurrent) ──
 sudo systemctl enable --now crawl-store-apps-google@1
 sudo systemctl enable --now crawl-store-apps-google@2
 
-#    ── Apple (2 processes × 4 threads = 8 concurrent) ──
 sudo systemctl enable --now crawl-store-apps-apple@1
 sudo systemctl enable --now crawl-store-apps-apple@2
 ```
