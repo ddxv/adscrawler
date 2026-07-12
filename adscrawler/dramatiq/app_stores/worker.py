@@ -46,7 +46,7 @@ logger = get_logger(__name__, "worker")
 _redis_url = CONFIG.get("redis", {}).get("url", "redis://127.0.0.1:6379/0")
 logger.info("Worker broker: %s", _redis_url)
 broker = RedisBroker(url=_redis_url)
-broker.add_middleware(Prometheus(http_host="0.0.0.0", http_port=9191))
+broker.add_middleware(Prometheus())
 dramatiq.set_broker(broker)
 
 # ---------------------------------------------------------------------------
