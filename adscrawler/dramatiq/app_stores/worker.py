@@ -34,6 +34,7 @@ Dramatiq auto-discovers actors in modules that call ``dramatiq.set_broker()``.
 
 import dramatiq
 from dramatiq.brokers.redis import RedisBroker
+from dramatiq.middleware import Prometheus
 
 from adscrawler.config import CONFIG, get_logger
 
@@ -44,7 +45,9 @@ logger = get_logger(__name__, "worker")
 # ---------------------------------------------------------------------------
 _redis_url = CONFIG.get("redis", {}).get("url", "redis://127.0.0.1:6379/0")
 logger.info("Worker broker: %s", _redis_url)
-dramatiq.set_broker(RedisBroker(url=_redis_url))
+broker = RedisBroker(url=_redis_url)
+broker.add_middleware(Prometheus())
+dramatiq.set_broker(broker)
 
 # ---------------------------------------------------------------------------
 # 2. Now import the actors — they will bind to the broker we just set.
