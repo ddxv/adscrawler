@@ -11,7 +11,7 @@ See ``adscrawler/dramatiq/README.md`` for usage instructions.
 import dramatiq
 import pandas as pd
 from dramatiq.brokers.redis import RedisBroker
-from dramatiq.middleware import Prometheus
+from dramatiq.middleware.prometheus import Prometheus
 
 from adscrawler.config import get_logger
 from adscrawler.dbcon.connection import PostgresEngine
@@ -24,7 +24,7 @@ logger = get_logger(__name__, "dispatcher")
 _redis_url = CONFIG.get("redis", {}).get("url", "redis://127.0.0.1:6379/0")
 logger.info("Dispatcher connecting to Redis at %s", _redis_url)
 broker = RedisBroker(url=_redis_url)
-broker.add_middleware(Prometheus())
+broker.add_middleware(Prometheus(http_host="0.0.0.0", http_port=9191))
 dramatiq.set_broker(broker)
 
 # We import *after* setting the broker so it binds to our local Redis.
