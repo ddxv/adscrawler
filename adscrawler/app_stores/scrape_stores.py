@@ -10,7 +10,7 @@ import appgoblin_play_scraper
 from appgoblin_play_scraper.exceptions import ExtraHTTPError
 import pandas as pd
 import requests
-from itunes_app_scraper.util import AppStoreException
+from appgoblin_itunes_scraper.util import AppStoreException
 
 from adscrawler.app_stores.apkcombo import get_apkcombo_android_apps
 from adscrawler.app_stores.appbrain import get_appbrain_android_apps

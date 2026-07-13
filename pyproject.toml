@@ -13,7 +13,7 @@ dependencies = [
     'sqlalchemy',
     'appgoblin-play-scraper @ git+https://github.com/appgoblin-dev/appgoblin-play-scraper',
     'tldextract',
-    'itunes-app-scraper-dmi @ git+https://github.com/ddxv/itunes-app-scraper.git',
+    'appgoblin-itunes-scraper @ git+https://github.com/appgoblin-dev/appgoblin-itunes-scraper.git',
     'asyncssh',
     'selenium',
     'pyyaml',
@@ -37,7 +37,7 @@ dependencies = [
 
 
 [project.optional-dependencies]
-dev = ["pre-commit", "pytest","scikit-learn", "spacy", "emoji", "tqdm" ]
+dev = ["pre-commit", "pytest", "scikit-learn", "spacy", "emoji", "tqdm"]
 
 
 [build-system]

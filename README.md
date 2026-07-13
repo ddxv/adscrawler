@@ -4,7 +4,7 @@ Various tools used for collecting data for [AppGoblin's free ASO app marketing t
 
 Scrapers:
 
-- pull apps from app store and google play store top lists [digitalmethodsinitiative/itunes-app-scraper](https://github.com/digitalmethodsinitiative/itunes-app-scraper) & [facundoolano/google-play-scraper](https://github.com/facundoolano/google-play-scraper)
+- pull apps from app store and google play store top lists [appgoblin-dev/appgoblin-itunes-scraper](https://github.com/appgoblin-dev/appgoblin-itunes-scraper) & [appgoblin-dev/appgoblin-play-scraper](https://github.com/appgoblin-dev/appgoblin-play-scraper)
 - pull apps from some 3rd party stores
 - unzip/decompile Android APKs and iOS IPAs to look for 3rd party tracking/advertising tools, requires _manual_ setup of [iBotPeaches/apktool](https://github.com/iBotPeaches/Apktool) and [majd/ipatool](https://github.com/majd/ipatool/)
 - App-ads.txt files are crawled based on the Interactive Advertising Bureau's Tech Lab specs. https://iabtechlab.com/ads-txt/

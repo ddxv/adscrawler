@@ -8,8 +8,8 @@ import pandas as pd
 import requests
 import tldextract
 from bs4 import BeautifulSoup
-from itunes_app_scraper.scraper import AppStoreScraper
-from itunes_app_scraper.util import AppStoreCategories, AppStoreCollections
+from appgoblin_itunes_scraper.scraper import AppStoreScraper
+from appgoblin_itunes_scraper.util import AppStoreCategories, AppStoreCollections
 
 from adscrawler.app_stores.utils import truncate_utf8_bytes
 from adscrawler.config import DEVLEOPER_IGNORE_TLDS, get_logger
