@@ -7,6 +7,7 @@ from urllib.error import URLError
 from urllib.parse import unquote_plus
 
 import appgoblin_play_scraper
+from appgoblin_play_scraper.exceptions import ExtraHTTPError
 import pandas as pd
 import requests
 from itunes_app_scraper.util import AppStoreException
@@ -776,6 +777,22 @@ def scrape_app(
                 crawl_result = 4
                 logger.exception(f"{scrape_info} unexpected error: {error=}")
             break
+        except ExtraHTTPError as error:
+            logger.warning(
+                f"{scrape_info} HTTP error (rate limit / server error): {error=}"
+            )
+            crawl_result = 4
+            if retries <= max_retries:
+                # Add extra jitter for HTTP errors to avoid rate-limit conflicts
+                sleep_time = base_delay * (2**retries) + random.uniform(0.5, 1.5)
+                logger.info(f"{scrape_info} Retrying in {sleep_time:.2f} seconds...")
+                time.sleep(sleep_time)
+                continue
+            else:
+                logger.error(
+                    f"{scrape_info} Max retries reached for HTTP error. Giving up."
+                )
+                break
         except (URLError, ssl.SSLError, requests.exceptions.SSLError) as error:
             logger.warning(f"{scrape_info} Network/SSL error: {error=}")
             crawl_result = 4
