@@ -22,6 +22,12 @@ After=network.target
 Type=simple
 Environment=PYTHONUNBUFFERED=1
 
+Environment=dramatiq_prom_port=9192
+Environment=dramatiq_prom_db=/tmp/dramatiq-prometheus-apple-%i
+Environment=prometheus_multiproc_dir=/tmp/dramatiq-prometheus-apple-%i
+ExecStartPre=/bin/sh -c 'mkdir -p /tmp/dramatiq-prometheus-apple-%i && rm -rf /tmp/dramatiq-prometheus-apple-%i/*'
+
+
 # ── Adjust these to VPS ──────────────────────────────────────
 User=adscrawler
 WorkingDirectory=/home/adscrawler/adscrawler

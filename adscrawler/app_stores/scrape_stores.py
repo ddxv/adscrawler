@@ -64,8 +64,16 @@ from adscrawler.process.app_details import (
 )
 from adscrawler.process.app_rankings import process_store_rankings
 from adscrawler.process.storage import rankings_parquet_exists_in_s3
+from prometheus_client import Counter
 
 logger = get_logger(__name__, "scrape_stores")
+
+
+CRAWL_RESULTS_COUNTER = Counter(
+    name="app_crawl_results_total",
+    documentation="Total number of app crawls processed by store and outcome",
+    labelnames=["store", "crawl_result"],
+)
 
 
 def process_scrape_apps_and_save(
@@ -114,7 +122,7 @@ def process_scrape_apps_and_save(
         results_df["crawled_date"] = results_df["crawled_at"].dt.date
         app_details_to_s3(results_df, store=store)
         results_df["store_app"] = results_df["store_app_db_id"].astype(int)
-        log_crawl_results(results_df, pgdb=pgdb)
+        log_crawl_results(results_df, pgdb=pgdb, store=store)
         logger.info(f"{chunk_info} S3 and logging upload finished")
         if do_pg_update:
             results_df = results_df[(results_df["country"] == "US")]
@@ -1004,7 +1012,7 @@ def upsert_app_country_evidence(
     )
 
 
-def log_crawl_results(app_df: pd.DataFrame, pgdb: PostgresEngine) -> None:
+def log_crawl_results(app_df: pd.DataFrame, pgdb: PostgresEngine, store: int) -> None:
     country_map = query_countries(pgdb)
     app_df["country_id"] = app_df["country"].map(
         country_map.set_index("alpha2")["id"].to_dict()
@@ -1023,3 +1031,8 @@ def log_crawl_results(app_df: pd.DataFrame, pgdb: PostgresEngine) -> None:
         if_exists="append",
         index=False,
     )
+    counts = app_df["crawl_result"].value_counts()
+    for result_type, count in counts.items():
+        CRAWL_RESULTS_COUNTER.labels(store=store, crawl_result=str(result_type)).inc(
+            int(count)
+        )

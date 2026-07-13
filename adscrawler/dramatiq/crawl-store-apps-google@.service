@@ -21,6 +21,11 @@ After=network.target
 [Service]
 Type=simple
 Environment=PYTHONUNBUFFERED=1
+Environment=dramatiq_prom_port=9191
+Environment=dramatiq_prom_db=/tmp/dramatiq-prometheus-google-%i
+Environment=prometheus_multiproc_dir=/tmp/dramatiq-prometheus-google-%i
+ExecStartPre=/bin/sh -c 'mkdir -p /tmp/dramatiq-prometheus-google-%i && rm -rf /tmp/dramatiq-prometheus-google-%i/*'
+
 
 # ── Adjust these to VPS ──────────────────────────────────────
 User=adscrawler
