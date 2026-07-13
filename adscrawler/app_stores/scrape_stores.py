@@ -10,7 +10,11 @@ import appgoblin_play_scraper
 from appgoblin_play_scraper.exceptions import ExtraHTTPError
 import pandas as pd
 import requests
-from appgoblin_itunes_scraper.util import AppStoreException
+from appgoblin_itunes_scraper.exceptions import (
+    AppStoreException,
+    NotFoundError,
+    TemporaryBlockException,
+)
 
 from adscrawler.app_stores.apkcombo import get_apkcombo_android_apps
 from adscrawler.app_stores.appbrain import get_appbrain_android_apps
@@ -765,25 +769,20 @@ def scrape_app(
             )
             crawl_result = 1
             break  # If successful, break out of the retry loop
-        except appgoblin_play_scraper.exceptions.NotFoundError:
+        except (
+            appgoblin_play_scraper.exceptions.NotFoundError,
+            NotFoundError,
+        ):
             crawl_result = 3
             logger.warning(f"{scrape_info} failed to find app")
             break
-        except AppStoreException as error:
-            if "No app found" in str(error):
-                crawl_result = 3
-                logger.warning(f"{scrape_info} failed to find app")
-            else:
-                crawl_result = 4
-                logger.exception(f"{scrape_info} unexpected error: {error=}")
-            break
-        except ExtraHTTPError as error:
+        except (ExtraHTTPError, TemporaryBlockException) as error:
             logger.warning(
-                f"{scrape_info} HTTP error (rate limit / server error): {error=}"
+                f"{scrape_info} HTTP error / temporary block (rate limit / server error): {error=}"
             )
             crawl_result = 4
             if retries <= max_retries:
-                # Add extra jitter for HTTP errors to avoid rate-limit conflicts
+                # Add extra jitter for rate-limit errors to avoid conflicts
                 sleep_time = base_delay * (2**retries) + random.uniform(0.5, 1.5)
                 logger.info(f"{scrape_info} Retrying in {sleep_time:.2f} seconds...")
                 time.sleep(sleep_time)
@@ -793,6 +792,10 @@ def scrape_app(
                     f"{scrape_info} Max retries reached for HTTP error. Giving up."
                 )
                 break
+        except AppStoreException as error:
+            crawl_result = 4
+            logger.exception(f"{scrape_info} unexpected error: {error=}")
+            break
         except (URLError, ssl.SSLError, requests.exceptions.SSLError) as error:
             logger.warning(f"{scrape_info} Network/SSL error: {error=}")
             crawl_result = 4
