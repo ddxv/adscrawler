@@ -187,14 +187,28 @@ def crawl_apple_developers(
     return apps_df, db_ids_crawled
 
 
+def get_provider_address(soup: BeautifulSoup) -> str | None:
+    strong = soup.find("strong", string=re.compile(r"Address", re.I))
+    if not strong:
+        return None
+    li = strong.find_parent("li")
+    if not li:
+        return None
+    # Use newline separator so <br> tags produce line breaks
+    full_text = li.get_text(separator="\n", strip=True)
+    # Remove the "Address" label line
+    lines = full_text.split("\n")
+    if lines and lines[0].lower().startswith("address"):
+        lines = lines[1:]
+    return " ".join(lines).strip()
+
+
 def scrape_store_html(store_id: str, country: str) -> dict:
     """
     Scrape the store html for the developer site.
     """
-    logger.info(
-        f"Scrape store html for {store_id=} {country=} looking for developer site"
-    )
-    url = f"https://apps.apple.com/{country}/app/-/id{store_id}"
+    logger.info(f"{store_id=} {country=} scrape store html for info")
+    url = f"https://apps.apple.com/{country}/app/-/id{store_id}?l=en-GB"
     headers = {"User-Agent": "Mozilla/5.0"}
     response = requests.get(url, headers=headers)
 
@@ -207,8 +221,13 @@ def scrape_store_html(store_id: str, country: str) -> dict:
     in_app_purchase_element = soup.find(
         "p", class_=["attributes"], string=re.compile(r"Purchases", re.I)
     )
-
     has_in_app_purchases = in_app_purchase_element is not None
+
+    try:
+        address = get_provider_address(soup)
+    except Exception:
+        logger.warning(f"Failed to get provider address for {store_id=} {country=}")
+        address = None
 
     purpose_section = soup.find(
         "section", class_=lambda classes: classes and "purpose-section" in classes
@@ -226,6 +245,7 @@ def scrape_store_html(store_id: str, country: str) -> dict:
         "in_app_purchases": has_in_app_purchases,
         "ad_supported": has_third_party_advertising,
         "urls": urls,
+        "provider_address": address,
     }
 
 
@@ -313,6 +333,7 @@ def scrape_app_ios(
     result_dict: dict = scraper.get_app_details(
         store_id, country=country, add_ratings=True, timeout=10, lang=language
     )
+    result_dict.keys()
     result_dict["trackId"] = str(result_dict["trackId"])
     result_dict["artistId"] = str(result_dict["artistId"])
     if scrape_html:
@@ -326,9 +347,11 @@ def scrape_app_ios(
 def scrape_itunes_additional_html(result: dict, store_id: str, country: str) -> dict:
     try:
         # This is slow and returns 401 often, so use sparingly
-        html_res = scrape_store_html(store_id=store_id, country=country)
+        html_res = scrape_store_html(store_id=store_id, country="de")
+
         result["in_app_purchases"] = html_res["in_app_purchases"]
         result["ad_supported"] = html_res["ad_supported"]
+        result["provider_address"] = html_res["provider_address"]
         try:
             result["sellerUrl"] = get_developer_url(result, html_res["urls"])
         except Exception as e:
@@ -364,6 +387,7 @@ def clean_ios_app_df(df: pd.DataFrame) -> pd.DataFrame:
             "screenshotUrls": "phone_image_urls",
             "ipadScreenshotUrls": "tablet_image_urls",
             "languageCodesISO2A": "store_language_code",
+            "provider_address": "developer_address",
         },
     )
     if "price" not in df.columns:

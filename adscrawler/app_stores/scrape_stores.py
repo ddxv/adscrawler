@@ -918,9 +918,8 @@ def process_live_app_details(
             continue
         logger.info(f"{log_info} update descriptions table")
         upsert_store_apps_descriptions(apps_df, pgdb)
-        if store == 1:
-            logger.info(f"{log_info} update countries table")
-            upsert_app_country_evidence(apps_df, pgdb)
+        logger.info(f"{log_info} update countries table")
+        upsert_app_country_evidence(apps_df, pgdb)
         if "url" not in apps_df.columns or apps_df["url"].isna().all():
             logger.warning(f"{log_info} No app urls found")
             continue
@@ -990,6 +989,10 @@ def upsert_app_country_evidence(
     # Build country maps once
     country_id_map, name_to_alpha2 = build_country_map(pgdb)
 
+    if "developer_address" not in apps_df.columns:
+        apps_df["developer_address"] = pd.NA
+    if "developer_legal_address" not in apps_df.columns:
+        apps_df["developer_legal_address"] = pd.NA
     dev_addr = apps_df["developer_address"].astype(str).str.strip()
     legal_addr = apps_df["developer_legal_address"].astype(str).str.strip()
 
