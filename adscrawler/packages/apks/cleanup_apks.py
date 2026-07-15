@@ -81,41 +81,6 @@ def query_all_version_codes(store: int, my_cutoff_date: str) -> pd.DataFrame:
     return pd.read_sql(query, pgdb.engine)
 
 
-def query_problematic_apks(limit: int = 100) -> pd.DataFrame:
-    # NOTE Tried 500 and had zereo issues
-    query = f"""
-    WITH mysel AS (SELECT 
-    version_code_id, scan_result, count(*) AS scan_count, max(scanned_at) AS last_scanned_at
-    FROM version_code_sdk_scan_results vcssr 
-        WHERE scanned_at >= '2026-03-21' AND vcssr.scan_result != 1
-           GROUP BY version_code_id, scan_result
-           ORDER BY scan_count desc
-              LIMIT {limit}
-    )
-    SELECT * FROM mysel ms 
-    LEFT JOIN version_codes vc ON ms.version_code_id = vc.id
-    LEFT JOIN store_apps sa ON vc.store_app = sa.id
-           ;
-           """
-    return pd.read_sql(query, pgdb.engine)
-
-
-def version_codes_with_no_scans() -> pd.DataFrame:
-    query = """
-         SELECT * FROM version_codes vc WHERE id IN (
-         SELECT DISTINCT version_code_id
-         FROM version_code_api_scan_results
-         WHERE version_code_id NOT IN (
-             SELECT version_code_id
-             FROM version_code_api_scan_results
-             WHERE run_result = 1
-         )
-         AND vc.created_at <= '2026-04-01' AND vc.updated_at <= '2026-04-01'
-         );
-        """
-    return pd.read_sql(query, pgdb.engine)
-
-
 def delete_s3_apks(bucket: str, apk_keys: list[str]) -> None:
     """Delete all S3 objects with the given prefix."""
     s3 = get_s3_client()
@@ -370,9 +335,6 @@ def run_cleanup() -> None:
 
     file_cleanup(sdf=android_s3_files, vcdf=android_db_files)
     file_cleanup(sdf=ios_s3_files, vcdf=ios_db_files)
-
-    # --- Step 3: delete repeatedly-failed scan APKs ---
-    delete_failing_apps(android_s3_files=android_s3_files)
 
     total_size_bytes = (
         android_s3_files["size_bytes"].sum() + ios_s3_files["size_bytes"].sum()
