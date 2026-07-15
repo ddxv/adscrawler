@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict qf7FZrfxavz8P8VghU7m2f3hF2YTCxICrvQeS86rVDmQ1geGLv0dPLfpG0jTYqD
+\restrict SeB6VA98tnLkrby0djCMOEpEycRX5bRaMdXhtO3gVyQO6HB9azxxNlyakueVnHp
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -288,5 +288,5 @@ CREATE UNIQUE INDEX frontend_companies_overview_domain ON frontend.companies_ove
 -- PostgreSQL database dump complete
 --
 
-\unrestrict qf7FZrfxavz8P8VghU7m2f3hF2YTCxICrvQeS86rVDmQ1geGLv0dPLfpG0jTYqD
+\unrestrict SeB6VA98tnLkrby0djCMOEpEycRX5bRaMdXhtO3gVyQO6HB9azxxNlyakueVnHp
 

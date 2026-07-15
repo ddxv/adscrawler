@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict tiBTgRVYaEDUCj4jrhVKYQAHj9Ivz7l1gAwduSJ1LixRfzKaNnsbgDb0Qr8CTck
+\restrict gWYAMmWKKKbpWbzTTsYrDMe6fhu1sEej5prDLdIMbcC78fXGXsdTFUSkqNXgBM3
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -108,5 +108,5 @@ CREATE UNIQUE INDEX frontend_z_scores_top_apps_unique ON frontend.z_scores_top_a
 -- PostgreSQL database dump complete
 --
 
-\unrestrict tiBTgRVYaEDUCj4jrhVKYQAHj9Ivz7l1gAwduSJ1LixRfzKaNnsbgDb0Qr8CTck
+\unrestrict gWYAMmWKKKbpWbzTTsYrDMe6fhu1sEej5prDLdIMbcC78fXGXsdTFUSkqNXgBM3
 
