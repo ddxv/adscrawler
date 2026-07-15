@@ -8,8 +8,8 @@ import subprocess
 import pandas as pd
 
 from adscrawler.config import get_logger
-from adscrawler.process.storage import download_app_to_local
 from adscrawler.packages.utils import unzip_ipa
+from adscrawler.process.storage import download_app_to_local
 
 logger = get_logger(__name__)
 

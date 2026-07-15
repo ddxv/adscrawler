@@ -7,9 +7,9 @@ import langdetect
 import pandas as pd
 import requests
 import tldextract
-from bs4 import BeautifulSoup
 from appgoblin_itunes_scraper.scraper import AppStoreScraper
 from appgoblin_itunes_scraper.util import AppStoreCategories, AppStoreCollections
+from bs4 import BeautifulSoup
 
 from adscrawler.app_stores.utils import truncate_utf8_bytes
 from adscrawler.config import DEVLEOPER_IGNORE_TLDS, get_logger

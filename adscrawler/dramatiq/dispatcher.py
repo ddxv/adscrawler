@@ -13,10 +13,9 @@ import pandas as pd
 from dramatiq.brokers.redis import RedisBroker
 from dramatiq.middleware.prometheus import Prometheus
 
-from adscrawler.config import get_logger
+from adscrawler.config import CONFIG, get_logger
 from adscrawler.dbcon.connection import PostgresEngine
 from adscrawler.dbcon.queries import query_store_apps_to_update
-from adscrawler.config import CONFIG
 
 logger = get_logger(__name__, "dispatcher")
 

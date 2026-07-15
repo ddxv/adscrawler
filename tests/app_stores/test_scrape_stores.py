@@ -9,12 +9,22 @@ from adscrawler.app_stores.scrape_stores import extract_domains_with_sub
 
 class TestBuildIconUpdateDf(unittest.TestCase):
     @patch("adscrawler.app_stores.process_icons.process_app_icon")
-    def test_build_icon_update_df_populates_missing_variants(self, mock_process_app_icon):
+    def test_build_icon_update_df_populates_missing_variants(
+        self, mock_process_app_icon
+    ):
         mock_process_app_icon.return_value = ("app_128.png", "app_64.png")
         apps_df = pd.DataFrame(
             [
-                {"id": 1, "store_id": "com.example.one", "icon_url_512": "https://x/1.png"},
-                {"id": 2, "store_id": "com.example.two", "icon_url_512": "https://x/2.png"},
+                {
+                    "id": 1,
+                    "store_id": "com.example.one",
+                    "icon_url_512": "https://x/1.png",
+                },
+                {
+                    "id": 2,
+                    "store_id": "com.example.two",
+                    "icon_url_512": "https://x/2.png",
+                },
                 {"id": 3, "store_id": "com.example.three", "icon_url_512": None},
             ]
         )

@@ -179,7 +179,7 @@ user_requested_apps_crawl AS (
             OR lvc.updated_at IS NULL
         )
         AND sa.store = :store
-        AND (sa.free or sa.free is NULL)
+        AND (sa.free OR sa.free IS NULL)
         -- random apps requested directly BY users NOT FOUND ON store
         AND sa.name IS NOT NULL
     ORDER BY

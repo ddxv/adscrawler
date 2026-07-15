@@ -26,8 +26,8 @@ from adscrawler.process import (
 )
 from adscrawler.process.storage import (
     get_duckdb_connection,
-    get_s3_client,
     get_parquet_paths_by_prefix,
+    get_s3_client,
     get_s3_dirs_by_prefix,
 )
 

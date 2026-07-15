@@ -11,7 +11,6 @@ from adscrawler.config import CONFIG, MODULE_DIR, PACKAGE_DIR, get_logger
 _MODEL_CACHE: dict[bool, Any] = {}
 
 
-
 logger = get_logger(__name__, "scrape_google")
 
 
@@ -88,6 +87,7 @@ def scrape_app_gp(store_id: str, country: str, language: str = "en") -> dict:
     logger.debug(f"store=1 {country=} {language=} {store_id=} play store scraped")
     return result_dict
 
+
 def _safe_batch_predict(
     model: Any, texts: list[str], k: int = 1
 ) -> tuple[list[str], list[float]]:
@@ -112,12 +112,10 @@ def _safe_batch_predict(
                 out_labels.append("zz")
                 out_scores.append(0.0)
         return out_labels, out_scores
-    
 
 
 def _get_model(low_memory: bool = False) -> Any:
-    """Load and cache the fasttext LID model once per process.
-    """
+    """Load and cache the fasttext LID model once per process."""
     if low_memory not in _MODEL_CACHE:
         try:
             from ftlangdetect.detect import get_or_load_model
@@ -128,8 +126,6 @@ def _get_model(low_memory: bool = False) -> Any:
 
         _MODEL_CACHE[low_memory] = get_or_load_model(low_memory=low_memory)
     return _MODEL_CACHE[low_memory]
-
-
 
 
 def _prep_for_detection(series: pd.Series, max_chars: int = 300) -> pd.Series:
@@ -164,6 +160,7 @@ def add_language_column(
 
     apps_df["store_language_code"] = codes
     return apps_df
+
 
 def clean_google_play_app_df(apps_df: pd.DataFrame) -> pd.DataFrame:
     apps_df = apps_df.rename(
@@ -202,8 +199,8 @@ def clean_google_play_app_df(apps_df: pd.DataFrame) -> pd.DataFrame:
     ].astype(str)
 
     release_dt = pd.to_datetime(
-            apps_df["release_date"], format="%b %d, %Y", errors="coerce"
-        )
+        apps_df["release_date"], format="%b %d, %Y", errors="coerce"
+    )
     still_na = release_dt.isna()
     if still_na.any():
         release_dt.loc[still_na] = pd.to_datetime(
@@ -228,9 +225,9 @@ def clean_google_play_app_df(apps_df: pd.DataFrame) -> pd.DataFrame:
             (apps_df[col].isna()) | (apps_df[col].fillna("").str.len() == 0)
         ).all()
         if not urls_empty:
-            expanded = pd.DataFrame(
-                apps_df[col].tolist(), index=apps_df.index
-            ).iloc[:, :3]
+            expanded = pd.DataFrame(apps_df[col].tolist(), index=apps_df.index).iloc[
+                :, :3
+            ]
             expanded.columns = [f"{list_col}_{x + 1}" for x in range(expanded.shape[1])]
             for x in range(3):
                 name = f"{list_col}_{x + 1}"

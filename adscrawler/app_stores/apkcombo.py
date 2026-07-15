@@ -1,7 +1,5 @@
 import re
 
-
-
 from adscrawler.config import get_logger
 
 logger = get_logger(__name__)
@@ -13,6 +11,7 @@ def scrape_with_firefox() -> list[str]:
     from selenium import webdriver
     from selenium.webdriver.firefox.options import Options
     from selenium.webdriver.firefox.service import Service
+
     options = Options()
     options.add_argument("--headless")
 

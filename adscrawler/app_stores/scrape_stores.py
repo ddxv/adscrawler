@@ -7,7 +7,6 @@ from urllib.error import URLError
 from urllib.parse import unquote_plus
 
 import appgoblin_play_scraper
-from appgoblin_play_scraper.exceptions import ExtraHTTPError
 import pandas as pd
 import requests
 from appgoblin_itunes_scraper.exceptions import (
@@ -15,6 +14,8 @@ from appgoblin_itunes_scraper.exceptions import (
     NotFoundError,
     TemporaryBlockException,
 )
+from appgoblin_play_scraper.exceptions import ExtraHTTPError
+from prometheus_client import Counter
 
 from adscrawler.app_stores.apkcombo import get_apkcombo_android_apps
 from adscrawler.app_stores.appbrain import get_appbrain_android_apps
@@ -32,6 +33,7 @@ from adscrawler.app_stores.google import (
     scrape_google_ranks,
     search_play_store,
 )
+from adscrawler.app_stores.process_icons import process_app_icon
 from adscrawler.app_stores.utils import (
     build_country_map,
     check_and_insert_new_apps,
@@ -39,7 +41,6 @@ from adscrawler.app_stores.utils import (
     extract_root_domain,
     resolve_country_id,
 )
-from adscrawler.app_stores.process_icons import process_app_icon
 from adscrawler.config import get_logger
 from adscrawler.dbcon.connection import (
     PostgresEngine,
@@ -69,7 +70,6 @@ from adscrawler.process.app_details import (
 )
 from adscrawler.process.app_rankings import process_store_rankings
 from adscrawler.process.storage import rankings_parquet_exists_in_s3
-from prometheus_client import Counter
 
 logger = get_logger(__name__, "scrape_stores")
 

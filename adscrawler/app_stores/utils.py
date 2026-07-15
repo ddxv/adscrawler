@@ -175,7 +175,6 @@ def check_and_insert_new_apps(
     return None
 
 
-
 def extract_root_domain(url: str) -> str | None:
     """Extracts the top-level domain from a URL."""
     if url is None or (isinstance(url, float) and pd.isna(url)):

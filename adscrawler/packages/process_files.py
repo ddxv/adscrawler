@@ -18,13 +18,13 @@ from adscrawler.packages.apks.download_apk import (
 from adscrawler.packages.apks.manifest import process_manifest
 from adscrawler.packages.ipas.download_ipa import manage_ipa_download
 from adscrawler.packages.ipas.get_plist import process_plist
-from adscrawler.process.storage import (
-    get_store_id_apk_s3_keys,
-    upload_apk_to_s3,
-)
 from adscrawler.packages.utils import (
     move_downloaded_app_to_main_dir,
     remove_tmp_files,
+)
+from adscrawler.process.storage import (
+    get_store_id_apk_s3_keys,
+    upload_apk_to_s3,
 )
 
 logger = get_logger(__name__)

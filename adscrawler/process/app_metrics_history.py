@@ -29,7 +29,7 @@ from adscrawler.process.storage import (
     delete_s3_objects_by_date_range,
     delete_s3_objects_by_prefix,
     get_duckdb_connection,
-get_parquet_paths_by_prefix
+    get_parquet_paths_by_prefix,
 )
 
 logger = get_logger(__name__, "scrape_stores")
@@ -418,7 +418,6 @@ def merge_in_db_ids(df: pd.DataFrame, store: int, pgdb: PostgresEngine) -> pd.Da
         validate="m:1",
     )
     return df
-
 
 
 def process_metrics_google(df: pd.DataFrame) -> pd.DataFrame:

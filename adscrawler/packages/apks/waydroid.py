@@ -20,6 +20,7 @@ from adscrawler.config import (
 from adscrawler.dbcon.connection import PostgresEngine
 from adscrawler.dbcon.queries import (
     get_version_code_dbid,
+    get_version_codes_for_store_id,
     insert_df,
     log_version_code_scan_crawl_results,
     query_all_domains,
@@ -27,7 +28,6 @@ from adscrawler.dbcon.queries import (
     query_apps_to_api_scan,
     query_store_app_by_store_id,
     upsert_df,
-    get_version_codes_for_store_id
 )
 from adscrawler.mitm_ad_parser import mitm_logs
 from adscrawler.mitm_ad_parser.mitm_logs import parse_log
@@ -36,7 +36,6 @@ from adscrawler.packages.apks.weston import (
     restart_weston,
     start_weston,
 )
-from adscrawler.process.storage import download_app_to_local, upload_mitm_log_to_s3
 from adscrawler.packages.utils import (
     get_local_file_path,
     get_md5_hash,
@@ -44,6 +43,7 @@ from adscrawler.packages.utils import (
     remove_tmp_files,
     unzip_apk,
 )
+from adscrawler.process.storage import download_app_to_local, upload_mitm_log_to_s3
 
 logger = get_logger(__name__, "waydroid")
 
@@ -408,7 +408,7 @@ def restart_session(run_name) -> subprocess.Popen | None:
     logger.info("Waydroid session restart")
     os.system("waydroid session stop")
 
-    if 'manual' in run_name:
+    if "manual" in run_name:
         pass
     elif is_wayland_env_set() or is_weston_running():
         logger.info("Restarting Weston since env not fully set")
@@ -859,7 +859,7 @@ def manual_waydroid_process(
     store_id: str,
     timeout: int,
     run_name: str,
-    version_code: str | None = None
+    version_code: str | None = None,
 ) -> None:
     logger.info(f"Manual waydroid process for {store_id=}")
     store = 1
@@ -869,12 +869,14 @@ def manual_waydroid_process(
         if apk_path is None:
             vcdf = get_version_codes_for_store_id(pgdb, store_id)
             if version_code:
-                vcdf = vcdf[vcdf['version_code_str'] == version_code]
+                vcdf = vcdf[vcdf["version_code_str"] == version_code]
                 vcs = vcdf.shape[0]
                 if vcs == 0:
                     raise ValueError("No APK found, version code df empty")
                 if vcs > 1:
-                    logger.warning(f"Found multiple apk hashes for {version_code=} {vcdf=}")
+                    logger.warning(
+                        f"Found multiple apk hashes for {version_code=} {vcdf=}"
+                    )
                     raise ValueError("Multip APKs for single version_code")
             for _i, row in vcdf.iterrows():
                 if row.apk_hash:
@@ -884,7 +886,9 @@ def manual_waydroid_process(
     except FileNotFoundError:
         download_from_s3 = True
     if download_from_s3:
-        apk_path, _version_str = download_app_to_local(store=store, store_id=store_id, version_str=version_code)
+        apk_path, _version_str = download_app_to_local(
+            store=store, store_id=store_id, version_str=version_code
+        )
     if not apk_path or not apk_path.exists():
         raise FileNotFoundError(f"{store_id=} not found")
 

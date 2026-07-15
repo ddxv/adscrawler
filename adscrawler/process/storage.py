@@ -482,6 +482,7 @@ def download_s3_app_by_key(
     logger.info(f"{func_info} to local finished")
     return final_path
 
+
 def get_s3_dirs_by_prefix(bucket: str, prefix: str) -> list[str]:
     """Return a list of S3 directories (prefixes) under the given prefix."""
     s3 = get_s3_client()
@@ -532,7 +533,6 @@ def get_parquet_paths_by_prefix(bucket: str, prefix: str) -> list[str]:
         else:
             break
     return all_parquet_paths
-
 
 
 def download_app_to_local(

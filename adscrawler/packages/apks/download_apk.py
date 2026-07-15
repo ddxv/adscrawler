@@ -23,14 +23,14 @@ from adscrawler.dbcon.queries import (
 )
 from adscrawler.packages.apks import apkpure
 from adscrawler.packages.models import DownloadResult
-from adscrawler.process.storage import (
-    upload_apk_to_s3,
-)
 from adscrawler.packages.utils import (
     get_md5_hash,
     get_version,
     move_downloaded_app_to_main_dir,
     unzip_apk,
+)
+from adscrawler.process.storage import (
+    upload_apk_to_s3,
 )
 
 APK_SOURCES = ["gplaydl", "apkpure", "apkmirror"]
@@ -182,6 +182,7 @@ def get_download_url(store_id: str, source: str) -> str:
     """Get the download URL for the apk."""
     if source == "apkmirror":
         from adscrawler.packages.apks import apkmirror  # noqa: PLC0415
+
         try:
             download_url = apkmirror.get_download_url(store_id)
             return download_url

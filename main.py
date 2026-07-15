@@ -13,6 +13,7 @@ from adscrawler.app_stores.scrape_stores import (
 )
 from adscrawler.config import get_logger
 from adscrawler.dbcon.connection import PostgresEngine, get_db_connection
+from adscrawler.mitm_ad_parser.try_failed_mitms import retry_failed_mitm_logs
 from adscrawler.packages.apks.cleanup_apks import run_cleanup
 from adscrawler.packages.process_files import (
     download_apps,
@@ -33,7 +34,6 @@ from adscrawler.process.app_metrics_history import (
 from adscrawler.process.app_rankings import import_ranks_from_s3
 from adscrawler.scrape import crawl_app_ads
 from adscrawler.tools.get_company_logos import refresh_metadata
-from adscrawler.mitm_ad_parser.try_failed_mitms import retry_failed_mitm_logs
 
 logger = get_logger(__name__)
 
