@@ -32,6 +32,7 @@ from adscrawler.process.app_metrics_history import (
 from adscrawler.process.app_rankings import import_ranks_from_s3
 from adscrawler.scrape import crawl_app_ads
 from adscrawler.tools.get_company_logos import refresh_metadata
+from adscrawler.tools.try_failed_mitms import retry_failed_mitm_logs
 
 logger = get_logger(__name__)
 
@@ -208,6 +209,11 @@ class ProcessManager:
             action="store_true",
         )
         ### OPTIONS FOR MANUAL/LOCAL WAYDROID PROCESSING
+        parser.add_argument(
+            "--retry-failed-mitm-logs",
+            help="Retry parsing MITM logs that previously failed",
+            action="store_true",
+        )
         parser.add_argument(
             "--redownload-geo-dbs",
             help="Redownload geo dbs",
@@ -394,6 +400,9 @@ class ProcessManager:
 
         if self.args.extract_app_keywords:
             self.extract_app_keywords()
+
+        if self.args.retry_failed_mitm_logs:
+            self.retry_failed_mitm_logs()
 
         logger.info("Adscrawler exiting main")
 
@@ -604,6 +613,12 @@ class ProcessManager:
                 process_apks_for_waydroid(pgdb=self.pgcon, run_name=run_name)
             except Exception:
                 logger.exception("Process APKs with Waydroid failed")
+
+    def retry_failed_mitm_logs(self) -> None:
+        try:
+            retry_failed_mitm_logs(pgdb=self.pgcon, lookback_days=60)
+        except Exception:
+            logger.exception("Retrying failed MITM logs failed")
 
     def crawl_keywords(self) -> None:
         crawl_keyword_ranks(pgdb=self.pgcon)
