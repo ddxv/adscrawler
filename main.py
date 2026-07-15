@@ -13,7 +13,6 @@ from adscrawler.app_stores.scrape_stores import (
 )
 from adscrawler.config import get_logger
 from adscrawler.dbcon.connection import PostgresEngine, get_db_connection
-from adscrawler.mitm_ad_parser.try_failed_mitms import retry_failed_mitm_logs
 from adscrawler.packages.apks.cleanup_apks import run_cleanup
 from adscrawler.packages.process_files import (
     download_apps,
@@ -641,6 +640,10 @@ class ProcessManager:
                 logger.exception("Process APKs with Waydroid failed")
 
     def retry_failed_mitm_logs(self) -> None:
+        from adscrawler.mitm_ad_parser.try_failed_mitms import (
+            retry_failed_mitm_logs,
+        )  # noqa: PLC0415
+
         try:
             retry_failed_mitm_logs(pgdb=self.pgcon, lookback_days=60)
         except Exception:
