@@ -13,6 +13,7 @@ from adscrawler.app_stores.scrape_stores import (
 )
 from adscrawler.config import get_logger
 from adscrawler.dbcon.connection import PostgresEngine, get_db_connection
+from adscrawler.packages.apks.cleanup_apks import run_cleanup
 from adscrawler.packages.process_files import (
     download_apps,
     manual_download_app,
@@ -86,6 +87,11 @@ class ProcessManager:
         parser.add_argument(
             "--process-sdks",
             help="Process APKs, IPAS, and manifest files for sdks",
+            action="store_true",
+        )
+        parser.add_argument(
+            "--cleanup-apks",
+            help="Remove old / secondary APKs from S3 and reconcile the DB",
             action="store_true",
         )
         parser.add_argument(
@@ -283,6 +289,12 @@ class ProcessManager:
 
         return len(found_processes) > 1
 
+    def check_cleanup_apks_processes(self) -> bool:
+        processes = self.get_running_processes()
+        my_processes = self.filter_processes(processes, "/adscrawler/main.py")
+        found_processes = [x for x in my_processes if " --cleanup-apks" in x]
+        return len(found_processes) > 1
+
     def check_waydroid_processes(self) -> bool:
         processes = self.get_running_processes()
         my_processes = self.filter_processes(processes, "/adscrawler/main.py")
@@ -331,6 +343,8 @@ class ProcessManager:
             return self.check_apk_download_processes()
         elif self.args.process_sdks:
             return self.check_process_sdks_processes()
+        elif self.args.cleanup_apks:
+            return self.check_cleanup_apks_processes()
         elif self.args.waydroid:
             return self.check_waydroid_processes()
         elif self.args.app_ads_txt_scrape:
@@ -376,6 +390,9 @@ class ProcessManager:
 
         if self.args.process_sdks:
             self.process_sdks(store)
+
+        if self.args.cleanup_apks:
+            self.cleanup_apks()
 
         if self.args.refresh_metadata:
             self.refresh_metadata()
@@ -553,6 +570,12 @@ class ProcessManager:
 
     def process_sdks(self, store: int) -> None:
         process_sdks(store=store, pgdb=self.pgcon, number_of_apps_to_pull=20)
+
+    def cleanup_apks(self) -> None:
+        try:
+            run_cleanup()
+        except Exception:
+            logger.exception("APK cleanup failed")
 
     def creative_scan_all_apps(self) -> None:
         from adscrawler.mitm_ad_parser.mitm_scrape_ads import (  # noqa: PLC0415

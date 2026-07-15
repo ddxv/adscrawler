@@ -1,7 +1,7 @@
 from adscrawler.dbcon.connection import PostgresEngine
-from adscrawler.dbcon.queries import get_failed_mitm_logs
-
+from adscrawler.dbcon.queries import get_failed_mitm_logs, log_creative_scan_results
 from adscrawler.mitm_ad_parser.mitm_scrape_ads import parse_store_id_mitm_log
+from adscrawler.mitm_ad_parser.utils import log_messages_to_df
 
 
 def retry_failed_mitm_logs(pgdb: PostgresEngine, lookback_days: int = 60) -> None:
@@ -19,9 +19,19 @@ def retry_failed_mitm_logs(pgdb: PostgresEngine, lookback_days: int = 60) -> Non
         pub_store_id = row["pub_store_id"]
         run_id = row["run_id"]
         try:
-            parse_store_id_mitm_log(row["pub_store_id"], row["run_id"], pgdb)
+            log_messages = parse_store_id_mitm_log(pub_store_id, run_id, pgdb)
         except Exception as e:
             print(
                 f"Failed to parse mitm log for pub_store_id {pub_store_id} "
                 f"run_id {run_id}: {e}"
             )
+            log_messages = [
+                {
+                    "run_id": run_id,
+                    "pub_store_id": pub_store_id,
+                    "error_msg": f"Exception: {e}",
+                }
+            ]
+
+        log_msg_df = log_messages_to_df(log_messages, run_id, pub_store_id)
+        log_creative_scan_results(log_msg_df, pgdb)

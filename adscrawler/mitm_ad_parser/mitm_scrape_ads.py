@@ -27,6 +27,7 @@ from adscrawler.mitm_ad_parser.network_parsers import (
     parse_creative_request,
     parse_sent_video_df,
 )
+from adscrawler.mitm_ad_parser.utils import log_messages_to_df
 from adscrawler.process.storage import (
     creative_exists_in_s3,
     get_store_id_mitm_s3_keys,
@@ -691,38 +692,7 @@ def scan_all_apps(
             pub_store_id = result["pub_store_id"]
             log_messages = result["error_messages"]
 
-            if len(log_messages) > 0:
-                # Log results to database
-                d = [x for x in log_messages if type(x) is dict]
-                s = [x for x in log_messages if type(x) is pd.Series]
-                log_msg_df = pd.concat(
-                    [pd.DataFrame(d), pd.DataFrame(s)], ignore_index=True
-                )
-            else:
-                log_msg_df = pd.DataFrame(
-                    {
-                        "run_id": [run_id],
-                        "pub_store_id": [pub_store_id],
-                        "error_msg": ["No logs!"],
-                    }
-                )
-            mycols = [
-                x
-                for x in log_msg_df.columns
-                if x
-                in [
-                    "url",
-                    "tld_url",
-                    "path",
-                    "content_type",
-                    "run_id",
-                    "pub_store_id",
-                    "file_extension",
-                    "creative_size",
-                    "error_msg",
-                ]
-            ]
-            log_msg_df = log_msg_df[mycols]
+            log_msg_df = log_messages_to_df(log_messages, run_id, pub_store_id)
             log_creative_scan_results(log_msg_df, pgdb)
             logger.info(
                 f"{completed}/{mitms_count}: {pub_store_id=} {run_id=} completed"
