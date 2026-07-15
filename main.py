@@ -493,9 +493,12 @@ class ProcessManager:
 
     def refresh_app_icons(self) -> None:
         """Refresh app icons in batches of 1000 until all missing variants are done."""
-        batch_size = 1000
+        batch_size = 100
         total_updated = 0
-        while True:
+        batches = 1000
+        i = 0
+        while i < batches:
+            i += 1
             try:
                 updated = refresh_app_icons(
                     pgdb=self.pgcon,
