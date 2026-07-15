@@ -21,15 +21,12 @@ def retry_failed_mitm_logs(pgdb: PostgresEngine, lookback_days: int = 60) -> Non
         try:
             log_messages = parse_store_id_mitm_log(pub_store_id, run_id, pgdb)
         except Exception as e:
-            print(
-                f"Failed to parse mitm log for pub_store_id {pub_store_id} "
-                f"run_id {run_id}: {e}"
-            )
+            error_msg = f"CRITICAL uncaught error: {e}"
             log_messages = [
                 {
                     "run_id": run_id,
                     "pub_store_id": pub_store_id,
-                    "error_msg": f"Exception: {e}",
+                    "error_msg": error_msg,
                 }
             ]
 
