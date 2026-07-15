@@ -38,6 +38,7 @@ CREATE TABLE public.creative_records (
     mmp_domain_id integer,
     mmp_urls text[],
     additional_ad_domain_ids integer[],
+    advertiser_store_app_ids integer[],
     created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
     updated_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
     click_ids integer[],

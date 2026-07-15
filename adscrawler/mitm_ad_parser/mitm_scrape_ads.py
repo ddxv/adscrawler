@@ -187,9 +187,26 @@ def attribute_creatives(
             x
             for x in found_ad_infos
             if x["adv_store_id"] is not None
+            or x["advertiser_store_app_ids"] is not None
             or (x["init_tld"] is not None and x["init_tld"] != host_ad_network_tld)
         ]
-        found_advs = list(set([x["adv_store_id"] for x in found_ad_infos]))
+        found_advs = list(
+            set(
+                [
+                    x["adv_store_id"]
+                    for x in found_ad_infos
+                    if x["adv_store_id"] is not None
+                ]
+            )
+        )
+        # Collect all resolved DB IDs from advertiser_store_app_ids across ad_infos
+        all_multi_adv_db_ids = []
+        for x in found_ad_infos:
+            if x.get("advertiser_store_app_ids"):
+                all_multi_adv_db_ids.extend(x["advertiser_store_app_ids"])
+        all_multi_adv_db_ids = (
+            list(set(all_multi_adv_db_ids)) if all_multi_adv_db_ids else None
+        )
         mmp_tlds = [
             x["mmp_tld"] for x in found_ad_infos if x["found_mmp_urls"] is not None
         ]
@@ -202,24 +219,50 @@ def attribute_creatives(
                 logger.error(f"{log_info} {error_msg} for {row['tld_url']} {video_id}")
                 row["error_msg"] = error_msg
                 error_messages.append(row)
-        found_advs = list(set(found_advs))
-        if len(found_advs) > 1:
+        if len(found_advs) > 1 or (len(found_advs) >= 1 and all_multi_adv_db_ids):
+            # Multiple confident advs, or mix of confident + uncertain.
+            # Merge all resolved DB IDs into a single list for weak attribution.
+            confident_db_ids = []
+            for x in found_ad_infos:
+                if x.get("adv_store_app_id"):
+                    confident_db_ids.append(x["adv_store_app_id"])
+            merged_ids = list(set(confident_db_ids + (all_multi_adv_db_ids or [])))
             error_msg = "Found potential app! Multiple adv_store_id"
             logger.error(f"{log_info} {error_msg} for {row['tld_url']} {video_id}")
             row["error_msg"] = error_msg
             error_messages.append(row)
             adv_store_id = None
             adv_store_app_id = None
-        elif len(found_advs) == 0:
+            adv_store_app_ids = merged_ids if merged_ids else None
+        elif len(found_advs) == 1:
+            adv_store_id = found_advs[0]
+            adv_store_app_ids_for_single = [
+                x["adv_store_app_id"]
+                for x in found_ad_infos
+                if x["adv_store_app_id"] is not None
+            ]
+            adv_store_app_id = (
+                adv_store_app_ids_for_single[0]
+                if adv_store_app_ids_for_single
+                else None
+            )
+            adv_store_app_ids = None
+        elif all_multi_adv_db_ids:
+            # No confident single adv, only multi-adv entries
+            error_msg = "Found potential app! Multiple adv_store_id"
+            logger.error(f"{log_info} {error_msg} for {row['tld_url']} {video_id}")
+            row["error_msg"] = error_msg
+            error_messages.append(row)
+            adv_store_id = None
+            adv_store_app_id = None
+            adv_store_app_ids = all_multi_adv_db_ids
+        else:
             error_msg = f"No adv_store_id found for {row['tld_url']} {video_id=}"
             row["error_msg"] = error_msg
             error_messages.append(row)
             adv_store_id = None
             adv_store_app_id = None
-        else:
-            adv_store_id = found_advs[0]
-            adv_store_app_ids = [x["adv_store_app_id"] for x in found_ad_infos]
-            adv_store_app_id = adv_store_app_ids[0]
+            adv_store_app_ids = None
         found_mmp_urls = [
             x["found_mmp_urls"]
             for x in found_ad_infos
@@ -296,6 +339,7 @@ def attribute_creatives(
                 "click_url_ids": click_url_ids,
                 "adv_store_id": adv_store_id,
                 "advertiser_store_app_id": adv_store_app_id,
+                "advertiser_store_app_ids": adv_store_app_ids,
                 "mmp_urls": found_mmp_urls,
                 "found_ad_network_tlds": found_ad_network_tlds,
                 "mmp_tld": mmp_tld,
@@ -459,6 +503,7 @@ def make_creative_records_df(
             "mmp_urls",
             "additional_ad_domain_ids",
             "click_url_ids",
+            "advertiser_store_app_ids",
         ]
     ]
     # Nullable IDs, watch out for Int64
@@ -473,6 +518,10 @@ def make_creative_records_df(
         creative_records_df[col] = np.where(
             creative_records_df[col].isna(), None, creative_records_df[col]
         )
+    # Handle nullable array column: convert empty lists or NaN to None
+    creative_records_df["advertiser_store_app_ids"] = creative_records_df[
+        "advertiser_store_app_ids"
+    ].apply(lambda x: x if isinstance(x, list) and len(x) > 0 else None)
     return creative_records_df
 
 
@@ -561,6 +610,7 @@ def parse_store_id_mitm_log(
             "click_url_ids",
             "additional_ad_domain_ids",
             "mmp_urls",
+            "advertiser_store_app_ids",
             "updated_at",
         ],
     )

@@ -12,6 +12,7 @@ class AdInfo:
     found_ad_network_tlds: list[str] | None = None
     found_mmp_urls: list[str] | None = None
     click_url_ids: list[int] | None = None
+    advertiser_store_app_ids: list[str] | None = None
 
     def __getitem__(self: Self, key: str) -> Any:
         """Support dictionary-style access to dataclass fields."""

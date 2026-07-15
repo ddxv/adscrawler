@@ -423,12 +423,17 @@ def upsert_urls(urls: list[str], pgdb: PostgresEngine) -> pd.DataFrame:
         how="left",
     )
     http_urls_df["scheme"] = "http"
-    nonhttp_urls_df["scheme"] = nonhttp_urls_df["url"]\
-        .str.split("://").str[0]\
-        .str.replace(r"[^a-zA-Z0-9_\-+]", "", regex=True)\
+    nonhttp_urls_df["scheme"] = (
+        nonhttp_urls_df["url"]
+        .str.split("://")
+        .str[0]
+        .str.replace(r"[^a-zA-Z0-9_\-+]", "", regex=True)
         .str[:128]
+    )
     nonhttp_urls_df["scheme"] = nonhttp_urls_df["scheme"].fillna("unknown")
-    nonhttp_urls_df.loc[nonhttp_urls_df["scheme"].str.strip() == "", "scheme"] = "unknown"
+    nonhttp_urls_df.loc[nonhttp_urls_df["scheme"].str.strip() == "", "scheme"] = (
+        "unknown"
+    )
     new_urls_df = pd.concat([http_urls_df, nonhttp_urls_df])
     new_urls_df["domain_id"] = np.where(
         pd.isna(new_urls_df["domain_id"]), None, new_urls_df["domain_id"]
@@ -626,14 +631,18 @@ def parse_urls_for_known_parts(
     )
     if len(found_adv_store_ids) == 0:
         adv_store_id = None
+        advertiser_store_app_ids = None
     elif len(found_adv_store_ids) == 1:
         adv_store_id = found_adv_store_ids[0]
+        advertiser_store_app_ids = None
     else:
-        raise MultipleAdvertiserIdError(found_adv_store_ids=found_adv_store_ids)
+        adv_store_id = None
+        advertiser_store_app_ids = found_adv_store_ids
     return AdInfo(
         adv_store_id=adv_store_id,
         found_mmp_urls=found_mmp_urls,
         found_ad_network_tlds=found_ad_network_tlds,
+        advertiser_store_app_ids=advertiser_store_app_ids,
     )
 
 
@@ -959,6 +968,10 @@ def parse_text_for_adinfo(
         except MultipleAdvertiserIdError as e:
             error_msg = f"multiple adv_store_id found for: {e.found_adv_store_ids}"
             logger.error(f"{log_info} {error_msg}")
+        if ad_info.advertiser_store_app_ids:
+            logger.info(
+                f"{log_info} found {len(ad_info.advertiser_store_app_ids)} advertiser IDs: {ad_info.advertiser_store_app_ids}"
+            )
     else:
         error_msg = "No URLs found"
         logger.debug(f"{log_info} {error_msg}")
@@ -1250,9 +1263,14 @@ def parse_sent_video_df(
             logger.error(f"{log_info} {error_msg} for video {video_id[0:10]}")
             error_messages.append(row)
             continue
-        if ad_info["adv_store_id"] is None and not parsed_text:
+        if (
+            ad_info["adv_store_id"] is None
+            and not parsed_text
+            and not ad_info["advertiser_store_app_ids"]
+        ):
             # This is doubling the time for the run as it is parsing the text again
             # but this does seem to could catch misses often enough to keep it
+            # TODO: Big project, run this for all api calls and store separate
             ad_parts, _error_msg = parse_text_for_adinfo(
                 text=sent_video_dict["response_text"],
                 pub_store_id=sent_video_dict["pub_store_id"],
@@ -1275,9 +1293,12 @@ def parse_sent_video_df(
             row["error_msg"] = error_msg
             error_messages.append(row)
             continue
-        if ad_info["adv_store_id"] is None:
+        if ad_info["adv_store_id"] is None and not ad_info["advertiser_store_app_ids"]:
             error_msg = "No adv_store_id found"
             logger.debug(f"{log_info} {error_msg}")
+        elif ad_info["adv_store_id"] is None and ad_info["advertiser_store_app_ids"]:
+            error_msg = f"No confident adv_store_id, using multiple IDs: {ad_info['advertiser_store_app_ids']}"
+            logger.info(f"{log_info} {error_msg}")
         try:
             if ad_info["adv_store_id"] is None:
                 adv_db_id = None
@@ -1305,6 +1326,44 @@ def parse_sent_video_df(
                 row["error_msg"] = error_msg
                 error_messages.append(row)
                 continue
+
+        # Resolve multiple advertiser store IDs to DB IDs
+        adv_store_app_ids_resolved = None
+        if ad_info["advertiser_store_app_ids"]:
+            resolved_ids = []
+            rejected = False
+            for store_id in ad_info["advertiser_store_app_ids"]:
+                if store_id == pub_store_id or store_id in IGNORE_STORE_IDS:
+                    error_msg = (
+                        f"Incorrect adv_store_app_id in multi list, "
+                        f"identified pub ID or ignored ID: {store_id}"
+                    )
+                    logger.error(f"{log_info} {error_msg}")
+                    rejected = True
+                    break
+                try:
+                    db_id = query_store_app_by_store_id_cached(
+                        store_id=store_id,
+                        pgdb=pgdb,
+                        case_insensitive=True,
+                    )
+                    resolved_ids.append(db_id)
+                except Exception:
+                    db_id = _lookup_and_insert_store_app(store_id, pgdb)
+                    if db_id is not None:
+                        resolved_ids.append(db_id)
+                    else:
+                        logger.warning(
+                            f"{log_info} could not resolve multiple adv store ID {store_id}"
+                        )
+            if rejected:
+                row["error_msg"] = error_msg
+                error_messages.append(row)
+                continue
+            if resolved_ids:
+                adv_store_app_ids_resolved = list(set(resolved_ids))
+        ad_info["advertiser_store_app_ids"] = adv_store_app_ids_resolved
+
         ad_info["init_tld"] = init_tld
         found_ad_infos.append(ad_info)
     return found_ad_infos, error_messages
