@@ -258,9 +258,6 @@ def _extract_urls_from_chunks(search_chunks: list[tuple[str, bool]]) -> list[str
 
 def extract_and_decode_urls(text: str) -> list[str]:
     """Extracts and decodes all URLs from text content, handling various encoding formats."""
-    """
-    Extracts all URLs from a given text, handles HTML entities and URL encoding.
-    """
     vast_urls = []
     if "<?xml version" in text[0:13]:
         vast_tree = None
@@ -426,8 +423,12 @@ def upsert_urls(urls: list[str], pgdb: PostgresEngine) -> pd.DataFrame:
         how="left",
     )
     http_urls_df["scheme"] = "http"
-    nonhttp_urls_df["scheme"] = nonhttp_urls_df["url"].str.split("://").str[0]
+    nonhttp_urls_df["scheme"] = nonhttp_urls_df["url"]\
+        .str.split("://").str[0]\
+        .str.replace(r"[^a-zA-Z0-9_\-+]", "", regex=True)\
+        .str[:128]
     nonhttp_urls_df["scheme"] = nonhttp_urls_df["scheme"].fillna("unknown")
+    nonhttp_urls_df.loc[nonhttp_urls_df["scheme"].str.strip() == "", "scheme"] = "unknown"
     new_urls_df = pd.concat([http_urls_df, nonhttp_urls_df])
     new_urls_df["domain_id"] = np.where(
         pd.isna(new_urls_df["domain_id"]), None, new_urls_df["domain_id"]
@@ -1161,6 +1162,44 @@ def parse_creative_request(
     )
 
 
+def _lookup_and_insert_store_app(
+    adv_store_id: str,
+    pgdb: PostgresEngine,
+) -> int | None:
+    """Try to look up a store app on Play Store and insert it into the DB.
+
+    Returns the DB id if successful, None otherwise.
+    """
+    try:
+        import appgoblin_play_scraper
+
+        result_dict = appgoblin_play_scraper.app(
+            adv_store_id,
+            lang="en",
+            country="us",
+            timeout=10,
+        )
+        good_id = result_dict.get("appId", None)
+        if good_id is not None:
+            from adscrawler.app_stores.utils import check_and_insert_new_apps
+
+            check_and_insert_new_apps(
+                dicts=[{"store": 1, "store_id": adv_store_id}],
+                pgdb=pgdb,
+                crawl_source="mitm_ads",
+                store=1,
+            )
+            # Retry the query after insertion
+            return query_store_app_by_store_id_cached(
+                store_id=adv_store_id,
+                pgdb=pgdb,
+                case_insensitive=True,
+            )
+    except Exception as e:
+        logger.error(f"Failed to lookup and insert {adv_store_id}: {e}")
+    return None
+
+
 def parse_sent_video_df(
     row: pd.Series,
     pub_store_id: str,
@@ -1250,13 +1289,22 @@ def parse_sent_video_df(
                 )
             ad_info["adv_store_app_id"] = adv_db_id
         except Exception:
-            error_msg = (
-                f"found potential app but failed to get db id {ad_info['adv_store_id']}"
+            adv_store_id = ad_info["adv_store_id"]
+            adv_db_id = (
+                _lookup_and_insert_store_app(adv_store_id, pgdb)
+                if adv_store_id
+                else None
             )
-            logger.error(f"{log_info} {error_msg}")
-            row["error_msg"] = error_msg
-            error_messages.append(row)
-            continue
+            if adv_db_id is not None:
+                ad_info["adv_store_app_id"] = adv_db_id
+            else:
+                error_msg = (
+                    f"found potential app but failed to get db id {adv_store_id}"
+                )
+                logger.error(f"{log_info} {error_msg}")
+                row["error_msg"] = error_msg
+                error_messages.append(row)
+                continue
         ad_info["init_tld"] = init_tld
         found_ad_infos.append(ad_info)
     return found_ad_infos, error_messages

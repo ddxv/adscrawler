@@ -1545,7 +1545,7 @@ def get_version_code_dbid(
         raise
 
 
-def get_failed_mitm_logs(pgdb: PostgresEngine) -> pd.DataFrame:
+def get_failed_mitm_logs(pgdb: PostgresEngine, lookback_days: int = 90) -> pd.DataFrame:
     sel_query = """WITH last_run_result AS (SELECT DISTINCT ON (run_id)
       run_id, pub_store_id, error_msg, inserted_at
         FROM logging.creative_scan_results 
