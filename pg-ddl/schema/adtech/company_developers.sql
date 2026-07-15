@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict NUibLNwksur0XvOQOwdJbczouh0dORN67SgCwdkj3cxxwY08a71kYrGedLLsBTz
+\restrict uvcTejUSYQ2ArzDkuLHJBmD8UerkvyFxaYTlF9m6qFA4tjsmoBBlr3ZSjauHdvm
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -55,5 +55,5 @@ ALTER TABLE ONLY adtech.company_developers
 -- PostgreSQL database dump complete
 --
 
-\unrestrict NUibLNwksur0XvOQOwdJbczouh0dORN67SgCwdkj3cxxwY08a71kYrGedLLsBTz
+\unrestrict uvcTejUSYQ2ArzDkuLHJBmD8UerkvyFxaYTlF9m6qFA4tjsmoBBlr3ZSjauHdvm
 

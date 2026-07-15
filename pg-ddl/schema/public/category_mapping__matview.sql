@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict fpOkiadXOFSct0B38cKRwO0kfraNpK4gNVwQcYzCdyFdhXwKIbFWJQO4ZP8CDRH
+\restrict tuSkFRxRqokU9Zv2fopk7Y3SJ4gZIH7WF84IJYw7vJACu323gEPMDpRx8F6vZEl
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -67,5 +67,5 @@ CREATE UNIQUE INDEX category_mapping_idx ON public.category_mapping USING btree 
 -- PostgreSQL database dump complete
 --
 
-\unrestrict fpOkiadXOFSct0B38cKRwO0kfraNpK4gNVwQcYzCdyFdhXwKIbFWJQO4ZP8CDRH
+\unrestrict tuSkFRxRqokU9Zv2fopk7Y3SJ4gZIH7WF84IJYw7vJACu323gEPMDpRx8F6vZEl
 

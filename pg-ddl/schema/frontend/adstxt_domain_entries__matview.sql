@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict GPdtHyMa5SlYl3lBRkH2ONCzMCzlTisog4vyQJgCZac1saarovkwfpngD0nqbVt
+\restrict aedh4QvmfpYMhVhXWj0gI2j7IhLceX8dJAX1NMarn1NxYuEKcLVoi8PD7HjzNPz
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -65,5 +65,5 @@ CREATE UNIQUE INDEX adstxt_domain_entries_uniq ON frontend.adstxt_domain_entries
 -- PostgreSQL database dump complete
 --
 
-\unrestrict GPdtHyMa5SlYl3lBRkH2ONCzMCzlTisog4vyQJgCZac1saarovkwfpngD0nqbVt
+\unrestrict aedh4QvmfpYMhVhXWj0gI2j7IhLceX8dJAX1NMarn1NxYuEKcLVoi8PD7HjzNPz
 
