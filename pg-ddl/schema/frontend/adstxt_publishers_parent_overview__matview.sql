@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict cUyPlcTOexjIrhSfUaOVjc8Vf6cXg4rd22eHteCh21VZfNTzXESde0gJW5UZVEQ
+\restrict TcaobO0lsUFH0fRbShX3Tl2saKlLnIbNR4db1AuNX3cVrFVJelgwpN0rmyXbtQI
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -34,9 +34,10 @@ CREATE MATERIALIZED VIEW frontend.adstxt_publishers_parent_overview AS
             sa.store,
             aae.publisher_id,
             sa.developer,
-            aesa.store_app
-           FROM (((((frontend.adstxt_entries_store_apps aesa
-             JOIN public.store_apps sa ON ((aesa.store_app = sa.id)))
+            aum.store_app
+           FROM ((((((frontend.adstxt_domain_entries aesa
+             LEFT JOIN public.app_urls_map aum ON ((aesa.pub_domain_id = aum.pub_domain)))
+             JOIN public.store_apps sa ON ((aum.store_app = sa.id)))
              JOIN public.app_ads_entrys aae ON ((aesa.app_ad_entry_id = aae.id)))
              JOIN adtech.company_domain_mapping cdm ON ((aesa.ad_domain_id = cdm.domain_id)))
              JOIN adtech.companies c ON ((cdm.company_id = c.id)))
@@ -48,9 +49,10 @@ CREATE MATERIALIZED VIEW frontend.adstxt_publishers_parent_overview AS
             sa.store,
             aae.publisher_id,
             sa.developer,
-            aesa.store_app
-           FROM ((((frontend.adstxt_entries_store_apps aesa
-             JOIN public.store_apps sa ON ((aesa.store_app = sa.id)))
+            aum.store_app
+           FROM (((((frontend.adstxt_domain_entries aesa
+             JOIN public.app_urls_map aum ON ((aesa.pub_domain_id = aum.pub_domain)))
+             JOIN public.store_apps sa ON ((aum.store_app = sa.id)))
              JOIN public.app_ads_entrys aae ON ((aesa.app_ad_entry_id = aae.id)))
              JOIN adtech.company_domain_mapping cdm ON ((aesa.ad_domain_id = cdm.domain_id)))
              JOIN adtech.companies c ON ((cdm.company_id = c.id)))
@@ -116,5 +118,5 @@ CREATE UNIQUE INDEX adstxt_publishers_overview_parent_unique_idx ON frontend.ads
 -- PostgreSQL database dump complete
 --
 
-\unrestrict cUyPlcTOexjIrhSfUaOVjc8Vf6cXg4rd22eHteCh21VZfNTzXESde0gJW5UZVEQ
+\unrestrict TcaobO0lsUFH0fRbShX3Tl2saKlLnIbNR4db1AuNX3cVrFVJelgwpN0rmyXbtQI
 

@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict YhzAfR2CiyyHwRBva85ioOlFQqoGA49niTAJZx5Mj2FcspUDkALyqNwbRkgdBGT
+\restrict INvp2xMHGWVgwdu797RojN7Ncec16TeXtaxLzUoMydcFXyj1EtEevOzF3kids2A
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -33,9 +33,10 @@ CREATE MATERIALIZED VIEW frontend.adstxt_ad_domain_overview AS
     sa.store,
     count(DISTINCT aae.publisher_id) AS publisher_id_count,
     count(DISTINCT sa.developer) AS developer_count,
-    count(DISTINCT aesa.store_app) AS app_count
-   FROM (((frontend.adstxt_entries_store_apps aesa
-     LEFT JOIN public.store_apps sa ON ((aesa.store_app = sa.id)))
+    count(DISTINCT aum.store_app) AS app_count
+   FROM ((((frontend.adstxt_domain_entries aesa
+     LEFT JOIN public.app_urls_map aum ON ((aesa.pub_domain_id = aum.pub_domain)))
+     LEFT JOIN public.store_apps sa ON ((aum.store_app = sa.id)))
      LEFT JOIN public.app_ads_entrys aae ON ((aesa.app_ad_entry_id = aae.id)))
      LEFT JOIN public.domains ad ON ((aesa.ad_domain_id = ad.id)))
   GROUP BY ad.domain_name, aae.relationship, sa.store
@@ -62,5 +63,5 @@ CREATE UNIQUE INDEX adstxt_ad_domain_overview_unique_idx ON frontend.adstxt_ad_d
 -- PostgreSQL database dump complete
 --
 
-\unrestrict YhzAfR2CiyyHwRBva85ioOlFQqoGA49niTAJZx5Mj2FcspUDkALyqNwbRkgdBGT
+\unrestrict INvp2xMHGWVgwdu797RojN7Ncec16TeXtaxLzUoMydcFXyj1EtEevOzF3kids2A
 

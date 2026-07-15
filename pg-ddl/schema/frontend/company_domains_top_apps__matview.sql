@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict dGWOePWxbR822b69OpHk9gGOm1ptj0oPh1yQtPEPwoKvho4kTi2lyZBpWxLs16M
+\restrict 1tqsCRdyh9p7b6DuTo6ABIGkSxGE58eKnYwdMPTuUTE0u9OLEszxsu61GwierXj
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -36,7 +36,7 @@ CREATE MATERIALIZED VIEW frontend.company_domains_top_apps AS
             sa.store_id,
             sa.category AS app_category,
             sa.installs_sum_4w AS installs_d30,
-            sa.icon_url_100,
+            sa.icon_64,
             cac.sdk,
             cac.api_call,
             cac.publisher,
@@ -56,7 +56,7 @@ CREATE MATERIALIZED VIEW frontend.company_domains_top_apps AS
     store_id,
     app_category,
     installs_d30,
-    icon_url_100,
+    icon_64,
     sdk,
     api_call,
     publisher,
@@ -102,5 +102,5 @@ CREATE UNIQUE INDEX idx_unique_company_domains_top_apps ON frontend.company_doma
 -- PostgreSQL database dump complete
 --
 
-\unrestrict dGWOePWxbR822b69OpHk9gGOm1ptj0oPh1yQtPEPwoKvho4kTi2lyZBpWxLs16M
+\unrestrict 1tqsCRdyh9p7b6DuTo6ABIGkSxGE58eKnYwdMPTuUTE0u9OLEszxsu61GwierXj
 

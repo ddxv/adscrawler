@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 9d0znP8MKUhgAZgNGHNy7LwFEWJvRUKi96sAorXcIu3UaODiBpl7iNcZXLH0fPg
+\restrict MoSgnOLCCzpckR7pxIYakAC0pOOoM08NZnyrdycI0EX1Olb6KyCfAYoGLpkOVYp
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -671,6 +671,20 @@ CREATE MATERIALIZED VIEW adtech.store_app_sdk_strings AS
 ALTER MATERIALIZED VIEW adtech.store_app_sdk_strings OWNER TO postgres;
 
 --
+-- Name: app_country_crawls; Type: TABLE; Schema: logging; Owner: postgres
+--
+
+CREATE TABLE logging.app_country_crawls (
+    crawl_result bigint NOT NULL,
+    store_app bigint NOT NULL,
+    country_id bigint NOT NULL,
+    crawled_at timestamp with time zone NOT NULL
+);
+
+
+ALTER TABLE logging.app_country_crawls OWNER TO postgres;
+
+--
 -- Name: adstxt_crawl_results; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -710,6 +724,21 @@ CREATE TABLE public.api_calls (
 
 
 ALTER TABLE public.api_calls OWNER TO postgres;
+
+--
+-- Name: app_country_evidence; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.app_country_evidence (
+    id bigint NOT NULL,
+    store_app bigint NOT NULL,
+    raw_address text NOT NULL,
+    country_id smallint,
+    updated_at timestamp with time zone DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'UTC'::text)
+);
+
+
+ALTER TABLE public.app_country_evidence OWNER TO postgres;
 
 --
 -- Name: app_global_metrics_history; Type: TABLE; Schema: public; Owner: postgres
@@ -879,7 +908,9 @@ CREATE TABLE public.store_apps (
     tablet_image_url_3 character varying,
     textsearchable_index_col tsvector GENERATED ALWAYS AS (to_tsvector('simple'::regconfig, (COALESCE(name, ''::character varying))::text)) STORED,
     additional_html_scraped_at timestamp without time zone,
-    icon_url_100 text
+    icon_url_100 text,
+    icon_128 text,
+    icon_64 text
 );
 
 
@@ -1012,25 +1043,7 @@ ALTER TABLE public.version_code_api_scan_results OWNER TO postgres;
 --
 
 CREATE MATERIALIZED VIEW frontend.store_apps_overview AS
- WITH latest_version_codes AS (
-         SELECT DISTINCT ON (version_codes.store_app) version_codes.id,
-            version_codes.store_app,
-            version_codes.version_code,
-            version_codes.updated_at AS last_downloaded_at,
-            version_codes.crawl_result AS download_result
-           FROM public.version_codes
-          WHERE ((version_codes.crawl_result = 1) AND (version_codes.updated_at >= '2025-05-01 00:00:00'::timestamp without time zone))
-          ORDER BY version_codes.store_app, version_codes.updated_at DESC, (string_to_array((version_codes.version_code)::text, '.'::text))::bigint[] DESC
-        ), latest_successful_version_codes AS (
-         SELECT DISTINCT ON (vc.store_app) vc.id,
-            vc.store_app,
-            vc.version_code,
-            vc.updated_at,
-            vc.crawl_result
-           FROM public.version_codes vc
-          WHERE (vc.crawl_result = 1)
-          ORDER BY vc.store_app, (string_to_array((vc.version_code)::text, '.'::text))::bigint[] DESC
-        ), last_sdk_scan AS (
+ WITH last_sdk_scan AS (
          SELECT DISTINCT ON (vc.store_app) vc.store_app,
             lsscr.version_code_id AS version_code,
             lsscr.scanned_at,
@@ -1095,6 +1108,36 @@ CREATE MATERIALIZED VIEW frontend.store_apps_overview AS
             agml_1.installs_z_score_2w,
             agml_1.installs_z_score_4w
            FROM public.app_global_metrics_latest agml_1
+        ), app_crawl_info AS (
+         WITH ranked_us_crawls AS (
+                 SELECT app_country_crawls.store_app,
+                    app_country_crawls.crawl_result,
+                    app_country_crawls.crawled_at,
+                    row_number() OVER (PARTITION BY app_country_crawls.store_app ORDER BY app_country_crawls.crawled_at DESC) AS crawl_rank
+                   FROM logging.app_country_crawls
+                  WHERE (app_country_crawls.country_id = 840)
+                ), recent_us_crawls AS (
+                 SELECT ranked_us_crawls.store_app,
+                    ranked_us_crawls.crawl_result,
+                    ranked_us_crawls.crawled_at,
+                    ranked_us_crawls.crawl_rank
+                   FROM ranked_us_crawls
+                  WHERE (ranked_us_crawls.crawl_rank <= 2)
+                )
+         SELECT recent_us_crawls.store_app,
+                CASE
+                    WHEN ((count(*) = 2) AND (count(*) FILTER (WHERE (recent_us_crawls.crawl_result = 1)) = 0)) THEN true
+                    ELSE false
+                END AS is_removed,
+            max(recent_us_crawls.crawled_at) AS last_crawled_at,
+            count(*) FILTER (WHERE (recent_us_crawls.crawl_result = 1)) AS us_success_count_last_2_passes,
+            count(*) AS total_us_passes_evaluated
+           FROM recent_us_crawls
+          GROUP BY recent_us_crawls.store_app
+        ), country_info AS (
+         SELECT app_country_evidence.store_app,
+            app_country_evidence.country_id
+           FROM public.app_country_evidence
         )
  SELECT sa.id,
     sa.name,
@@ -1120,9 +1163,10 @@ CREATE MATERIALIZED VIEW frontend.store_apps_overview AS
     sa.in_app_purchases,
     sa.store_last_updated,
     sa.created_at,
-    sa.updated_at,
+    aci.last_crawled_at,
     sa.crawl_result,
-    sa.icon_url_100,
+    sa.icon_64,
+    COALESCE(sa.icon_128, sa.icon_url_100) AS icon_128,
     sa.icon_url_512,
     sa.release_date,
     sa.featured_image_url,
@@ -1141,30 +1185,30 @@ CREATE MATERIALIZED VIEW frontend.store_apps_overview AS
     lss.scanned_at AS sdk_last_crawled,
     lss.scan_result AS sdk_last_crawl_result,
     lsss.scanned_at AS sdk_successful_last_crawled,
-    lvc.version_code,
     ld.description,
     ld.description_short,
     lac.run_at AS api_last_crawled,
     lac.run_result,
     lsac.run_at AS api_successful_last_crawled,
     acr.ad_creative_count,
-    amc.ad_mon_creatives
+    amc.ad_mon_creatives,
+    aci.is_removed
    FROM (((((((((((((((public.store_apps sa
      LEFT JOIN public.category_mapping cm ON (((sa.category)::text = (cm.original_category)::text)))
      LEFT JOIN public.developers d ON ((sa.developer = d.id)))
      LEFT JOIN public.app_urls_map aum ON ((sa.id = aum.store_app)))
      LEFT JOIN public.domains pd ON ((aum.pub_domain = pd.id)))
      LEFT JOIN public.adstxt_crawl_results pdcr ON ((pd.id = pdcr.domain_id)))
-     LEFT JOIN latest_version_codes lvc ON ((sa.id = lvc.store_app)))
      LEFT JOIN last_sdk_scan lss ON ((sa.id = lss.store_app)))
      LEFT JOIN last_successful_sdk_scan lsss ON ((sa.id = lsss.store_app)))
-     LEFT JOIN latest_successful_version_codes lsvc ON ((sa.id = lsvc.store_app)))
      LEFT JOIN latest_en_descriptions ld ON ((sa.id = ld.store_app)))
      LEFT JOIN latest_api_calls lac ON ((sa.id = lac.store_app)))
      LEFT JOIN latest_successful_api_calls lsac ON ((sa.id = lsac.store_app)))
      LEFT JOIN my_ad_creatives acr ON ((sa.id = acr.store_app)))
      LEFT JOIN my_mon_creatives amc ON ((sa.id = amc.store_app)))
      LEFT JOIN app_metrics agml ON ((sa.id = agml.store_app)))
+     LEFT JOIN app_crawl_info aci ON ((sa.id = aci.store_app)))
+     LEFT JOIN country_info ci ON ((sa.id = ci.store_app)))
   WITH NO DATA;
 
 
@@ -2102,26 +2146,21 @@ ALTER SEQUENCE adtech.urls_id_seq OWNED BY adtech.urls.id;
 
 
 --
--- Name: adstxt_entries_store_apps; Type: MATERIALIZED VIEW; Schema: frontend; Owner: postgres
+-- Name: adstxt_domain_entries; Type: MATERIALIZED VIEW; Schema: frontend; Owner: postgres
 --
 
-CREATE MATERIALIZED VIEW frontend.adstxt_entries_store_apps AS
- SELECT DISTINCT ad.id AS ad_domain_id,
+CREATE MATERIALIZED VIEW frontend.adstxt_domain_entries AS
+ SELECT DISTINCT aae.ad_domain AS ad_domain_id,
     aae.id AS app_ad_entry_id,
-    sa.id AS store_app,
-    pd.id AS pub_domain_id
-   FROM ((((((public.app_ads_entrys aae
-     LEFT JOIN public.domains ad ON ((aae.ad_domain = ad.id)))
-     LEFT JOIN public.app_ads_map aam ON ((aae.id = aam.app_ads_entry)))
-     LEFT JOIN public.domains pd ON ((aam.pub_domain = pd.id)))
-     LEFT JOIN public.app_urls_map aum ON ((pd.id = aum.pub_domain)))
-     JOIN public.store_apps sa ON ((aum.store_app = sa.id)))
-     LEFT JOIN public.adstxt_crawl_results pdcr ON ((pd.id = pdcr.domain_id)))
+    aam.pub_domain AS pub_domain_id
+   FROM ((public.app_ads_entrys aae
+     JOIN public.app_ads_map aam ON ((aae.id = aam.app_ads_entry)))
+     LEFT JOIN public.adstxt_crawl_results pdcr ON ((aam.pub_domain = pdcr.domain_id)))
   WHERE ((pdcr.crawled_at - aam.updated_at) < '01:00:00'::interval)
   WITH NO DATA;
 
 
-ALTER MATERIALIZED VIEW frontend.adstxt_entries_store_apps OWNER TO postgres;
+ALTER MATERIALIZED VIEW frontend.adstxt_domain_entries OWNER TO postgres;
 
 --
 -- Name: adstxt_ad_domain_overview; Type: MATERIALIZED VIEW; Schema: frontend; Owner: postgres
@@ -2133,9 +2172,10 @@ CREATE MATERIALIZED VIEW frontend.adstxt_ad_domain_overview AS
     sa.store,
     count(DISTINCT aae.publisher_id) AS publisher_id_count,
     count(DISTINCT sa.developer) AS developer_count,
-    count(DISTINCT aesa.store_app) AS app_count
-   FROM (((frontend.adstxt_entries_store_apps aesa
-     LEFT JOIN public.store_apps sa ON ((aesa.store_app = sa.id)))
+    count(DISTINCT aum.store_app) AS app_count
+   FROM ((((frontend.adstxt_domain_entries aesa
+     LEFT JOIN public.app_urls_map aum ON ((aesa.pub_domain_id = aum.pub_domain)))
+     LEFT JOIN public.store_apps sa ON ((aum.store_app = sa.id)))
      LEFT JOIN public.app_ads_entrys aae ON ((aesa.app_ad_entry_id = aae.id)))
      LEFT JOIN public.domains ad ON ((aesa.ad_domain_id = ad.id)))
   GROUP BY ad.domain_name, aae.relationship, sa.store
@@ -2155,9 +2195,10 @@ CREATE MATERIALIZED VIEW frontend.adstxt_ad_domain_parent_overview AS
             sa.store,
             aae.publisher_id,
             sa.developer,
-            aesa.store_app
-           FROM (((((frontend.adstxt_entries_store_apps aesa
-             LEFT JOIN public.store_apps sa ON ((aesa.store_app = sa.id)))
+            aum.store_app
+           FROM ((((((frontend.adstxt_domain_entries aesa
+             LEFT JOIN public.app_urls_map aum ON ((aesa.pub_domain_id = aum.pub_domain)))
+             LEFT JOIN public.store_apps sa ON ((aum.store_app = sa.id)))
              LEFT JOIN public.app_ads_entrys aae ON ((aesa.app_ad_entry_id = aae.id)))
              LEFT JOIN adtech.company_domain_mapping cdm ON ((aesa.ad_domain_id = cdm.domain_id)))
              LEFT JOIN adtech.companies c ON ((cdm.company_id = c.id)))
@@ -2169,9 +2210,10 @@ CREATE MATERIALIZED VIEW frontend.adstxt_ad_domain_parent_overview AS
             sa.store,
             aae.publisher_id,
             sa.developer,
-            aesa.store_app
-           FROM ((((frontend.adstxt_entries_store_apps aesa
-             LEFT JOIN public.store_apps sa ON ((aesa.store_app = sa.id)))
+            aum.store_app
+           FROM (((((frontend.adstxt_domain_entries aesa
+             LEFT JOIN public.app_urls_map aum ON ((aesa.pub_domain_id = aum.pub_domain)))
+             LEFT JOIN public.store_apps sa ON ((aum.store_app = sa.id)))
              LEFT JOIN public.app_ads_entrys aae ON ((aesa.app_ad_entry_id = aae.id)))
              LEFT JOIN adtech.company_domain_mapping cdm ON ((aesa.ad_domain_id = cdm.domain_id)))
              JOIN adtech.companies c ON ((cdm.company_id = c.id)))
@@ -2219,10 +2261,11 @@ CREATE MATERIALIZED VIEW frontend.adstxt_publishers_overview AS
             sa.store,
             aae.publisher_id,
             count(DISTINCT sa.developer) AS developer_count,
-            count(DISTINCT aesa.store_app) AS app_count,
-            row_number() OVER (PARTITION BY ad.domain_name, aae.relationship, sa.store ORDER BY (count(DISTINCT aesa.store_app)) DESC) AS pubrank
-           FROM (((frontend.adstxt_entries_store_apps aesa
-             LEFT JOIN public.store_apps sa ON ((aesa.store_app = sa.id)))
+            count(DISTINCT aum.store_app) AS app_count,
+            row_number() OVER (PARTITION BY ad.domain_name, aae.relationship, sa.store ORDER BY (count(DISTINCT aum.store_app)) DESC) AS pubrank
+           FROM ((((frontend.adstxt_domain_entries aesa
+             LEFT JOIN public.app_urls_map aum ON ((aesa.pub_domain_id = aum.pub_domain)))
+             LEFT JOIN public.store_apps sa ON ((aum.store_app = sa.id)))
              LEFT JOIN public.app_ads_entrys aae ON ((aesa.app_ad_entry_id = aae.id)))
              LEFT JOIN public.domains ad ON ((aesa.ad_domain_id = ad.id)))
           GROUP BY ad.domain_name, aae.relationship, sa.store, aae.publisher_id
@@ -2252,9 +2295,10 @@ CREATE MATERIALIZED VIEW frontend.adstxt_publishers_parent_overview AS
             sa.store,
             aae.publisher_id,
             sa.developer,
-            aesa.store_app
-           FROM (((((frontend.adstxt_entries_store_apps aesa
-             JOIN public.store_apps sa ON ((aesa.store_app = sa.id)))
+            aum.store_app
+           FROM ((((((frontend.adstxt_domain_entries aesa
+             LEFT JOIN public.app_urls_map aum ON ((aesa.pub_domain_id = aum.pub_domain)))
+             JOIN public.store_apps sa ON ((aum.store_app = sa.id)))
              JOIN public.app_ads_entrys aae ON ((aesa.app_ad_entry_id = aae.id)))
              JOIN adtech.company_domain_mapping cdm ON ((aesa.ad_domain_id = cdm.domain_id)))
              JOIN adtech.companies c ON ((cdm.company_id = c.id)))
@@ -2266,9 +2310,10 @@ CREATE MATERIALIZED VIEW frontend.adstxt_publishers_parent_overview AS
             sa.store,
             aae.publisher_id,
             sa.developer,
-            aesa.store_app
-           FROM ((((frontend.adstxt_entries_store_apps aesa
-             JOIN public.store_apps sa ON ((aesa.store_app = sa.id)))
+            aum.store_app
+           FROM (((((frontend.adstxt_domain_entries aesa
+             JOIN public.app_urls_map aum ON ((aesa.pub_domain_id = aum.pub_domain)))
+             JOIN public.store_apps sa ON ((aum.store_app = sa.id)))
              JOIN public.app_ads_entrys aae ON ((aesa.app_ad_entry_id = aae.id)))
              JOIN adtech.company_domain_mapping cdm ON ((aesa.ad_domain_id = cdm.domain_id)))
              JOIN adtech.companies c ON ((cdm.company_id = c.id)))
@@ -2382,7 +2427,7 @@ CREATE MATERIALIZED VIEW frontend.advertiser_creative_rankings_recent_month AS
         )
  SELECT saa.name AS advertiser_name,
     saa.store_id AS advertiser_store_id,
-    saa.icon_url_100 AS advertiser_icon_url_100,
+    saa.icon_128 AS advertiser_icon_url_100,
     saa.icon_url_512 AS advertiser_icon_url_512,
     saa.category AS advertiser_category,
     saa.installs AS advertiser_installs,
@@ -2411,7 +2456,7 @@ CREATE MATERIALIZED VIEW frontend.advertiser_creative_rankings_recent_month AS
      LEFT JOIN adv_mmp ON ((cr.advertiser_store_app_id = adv_mmp.advertiser_store_app_id)))
      LEFT JOIN ad_network_domains adis ON ((cr.advertiser_store_app_id = adis.advertiser_store_app_id)))
   WHERE ((vcasr.run_at >= (now() - '1 mon'::interval)) AND (cr.advertiser_store_app_id IS NOT NULL))
-  GROUP BY saa.name, saa.store_id, saa.icon_url_512, saa.category, saa.installs, saa.id, saa.icon_url_100, saa.rating, saa.rating_count, saa.installs_sum_1w, saa.installs_sum_4w
+  GROUP BY saa.name, saa.store_id, saa.icon_url_512, saa.category, saa.installs, saa.id, saa.icon_128, saa.rating, saa.rating_count, saa.installs_sum_1w, saa.installs_sum_4w
   ORDER BY (count(DISTINCT ca.md5_hash)) DESC
   WITH NO DATA;
 
@@ -2436,8 +2481,8 @@ CREATE MATERIALIZED VIEW frontend.advertiser_creatives AS
     ac.name AS ad_domain_company_name,
     ca.md5_hash,
     ca.file_extension,
-    sap.icon_url_100 AS pub_icon_url_100,
-    saa.icon_url_100 AS adv_icon_url_100,
+    sap.icon_128 AS pub_icon_url_100,
+    saa.icon_128 AS adv_icon_url_100,
     sap.icon_url_512 AS pub_icon_url_512,
     saa.icon_url_512 AS adv_icon_url_512,
     mmp.name AS mmp_name,
@@ -2645,9 +2690,8 @@ CREATE MATERIALIZED VIEW frontend.apps_new_monthly AS
             sa_1.ad_supported,
             sa_1.in_app_purchases,
             sa_1.created_at,
-            sa_1.updated_at,
             sa_1.crawl_result,
-            sa_1.icon_url_100,
+            sa_1.icon_128,
             sa_1.release_date,
             sa_1.rating_count,
             sa_1.featured_image_url,
@@ -2676,9 +2720,8 @@ CREATE MATERIALIZED VIEW frontend.apps_new_monthly AS
     ad_supported,
     in_app_purchases,
     created_at,
-    updated_at,
     crawl_result,
-    icon_url_100,
+    icon_128,
     release_date,
     rating_count,
     featured_image_url,
@@ -2718,9 +2761,8 @@ CREATE MATERIALIZED VIEW frontend.apps_new_weekly AS
             sa_1.ad_supported,
             sa_1.in_app_purchases,
             sa_1.created_at,
-            sa_1.updated_at,
             sa_1.crawl_result,
-            sa_1.icon_url_100,
+            sa_1.icon_128,
             sa_1.release_date,
             sa_1.rating_count,
             sa_1.featured_image_url,
@@ -2749,9 +2791,8 @@ CREATE MATERIALIZED VIEW frontend.apps_new_weekly AS
     ad_supported,
     in_app_purchases,
     created_at,
-    updated_at,
     crawl_result,
-    icon_url_100,
+    icon_128,
     release_date,
     rating_count,
     featured_image_url,
@@ -2782,7 +2823,7 @@ CREATE MATERIALIZED VIEW frontend.apps_new_yearly AS
             sa_1.store,
             sa_1.category,
             sa_1.developer_name,
-            sa_1.icon_url_100,
+            sa_1.icon_128,
             sa_1.rating,
             sa_1.installs,
             sa_1.installs_sum_1w,
@@ -2792,7 +2833,6 @@ CREATE MATERIALIZED VIEW frontend.apps_new_yearly AS
             sa_1.ad_supported,
             sa_1.in_app_purchases,
             sa_1.created_at,
-            sa_1.updated_at,
             sa_1.crawl_result,
             sa_1.icon_url_512,
             sa_1.release_date,
@@ -2823,9 +2863,8 @@ CREATE MATERIALIZED VIEW frontend.apps_new_yearly AS
     ad_supported,
     in_app_purchases,
     created_at,
-    updated_at,
     crawl_result,
-    icon_url_100,
+    icon_128,
     release_date,
     rating_count,
     featured_image_url,
@@ -3209,11 +3248,11 @@ CREATE MATERIALIZED VIEW frontend.companies_creative_rankings AS
     saa.installs_sum_4w,
     vd.last_seen,
         CASE
-            WHEN (saa.icon_url_100 IS NOT NULL) THEN (concat('https://media.appgoblin.info/app-icons/', saa.store_id, '/', saa.icon_url_100))::character varying
+            WHEN (saa.icon_128 IS NOT NULL) THEN (concat('https://media.appgoblin.info/app-icons/', saa.store_id, '/', saa.icon_128))::character varying
             ELSE saa.icon_url_512
         END AS advertiser_icon_url,
         CASE
-            WHEN (sap.icon_url_100 IS NOT NULL) THEN (concat('https://media.appgoblin.info/app-icons/', sap.store_id, '/', sap.icon_url_100))::character varying
+            WHEN (sap.icon_128 IS NOT NULL) THEN (concat('https://media.appgoblin.info/app-icons/', sap.store_id, '/', sap.icon_128))::character varying
             ELSE sap.icon_url_512
         END AS publisher_icon_url
    FROM ((((((visually_distinct vd
@@ -3455,6 +3494,12 @@ CREATE MATERIALIZED VIEW frontend.companies_overview AS
            FROM frontend.adstxt_ad_domain_overview
           WHERE ((adstxt_ad_domain_overview.relationship)::text = 'DIRECT'::text)
           GROUP BY adstxt_ad_domain_overview.ad_domain_url
+        ), parent_adstxt_ad_domain_agg AS (
+         SELECT aadpo.ad_domain_url,
+            sum(aadpo.app_count) AS adstxt_parent_app_count
+           FROM frontend.adstxt_ad_domain_parent_overview aadpo
+          WHERE ((aadpo.relationship)::text = 'DIRECT'::text)
+          GROUP BY aadpo.ad_domain_url
         ), ip_country_resolved AS (
          SELECT company_domain_country.company_domain,
             company_domain_country.most_common_country AS api_ip_resolved_country
@@ -3585,16 +3630,18 @@ CREATE MATERIALIZED VIEW frontend.companies_overview AS
     COALESCE(s.sdk_count, 0) AS sdk_count_direct,
     COALESCE(m.mediation_adapter_count, 0) AS mediation_adapter_count_direct,
     COALESCE(aa.adstxt_direct_app_count, (0)::numeric) AS adstxt_direct_app_count,
+    COALESCE(paa.adstxt_parent_app_count, (0)::numeric) AS adstxt_parent_app_count,
     (((dom.company_id IS NOT NULL) AND (dom.company_id IN ( SELECT DISTINCT companies.parent_company_id
            FROM adtech.companies
           WHERE (companies.parent_company_id IS NOT NULL)))))::integer AS is_parent_domain
-   FROM (((((((((((((((((domain_base dom
+   FROM ((((((((((((((((((domain_base dom
      LEFT JOIN creatives_agg c ON (((dom.company_domain)::text = (c.company_domain)::text)))
      LEFT JOIN trends_agg t ON (((dom.company_domain)::text = t.company_domain)))
      LEFT JOIN app_changes_agg a ON (((dom.company_domain)::text = (a.company_domain)::text)))
      LEFT JOIN sdks_agg s ON (((dom.company_domain)::text = (s.company_domain)::text)))
      LEFT JOIN mediation_agg m ON (((dom.company_domain)::text = (m.company_domain)::text)))
      LEFT JOIN adstxt_ad_domain_agg aa ON (((dom.company_domain)::text = (aa.ad_domain_url)::text)))
+     LEFT JOIN parent_adstxt_ad_domain_agg paa ON (((dom.company_domain)::text = (paa.ad_domain_url)::text)))
      LEFT JOIN parent_creatives_rollup p_cr ON (((dom.company_domain)::text = (p_cr.parent_domain)::text)))
      LEFT JOIN parent_changes_rollup p_ch ON (((dom.company_domain)::text = (p_ch.parent_domain)::text)))
      LEFT JOIN parent_sdks_rollup p_sd ON (((dom.company_domain)::text = (p_sd.parent_domain)::text)))
@@ -3714,7 +3761,7 @@ CREATE MATERIALIZED VIEW frontend.company_domains_top_apps AS
             sa.store_id,
             sa.category AS app_category,
             sa.installs_sum_4w AS installs_d30,
-            sa.icon_url_100,
+            sa.icon_64,
             cac.sdk,
             cac.api_call,
             cac.publisher,
@@ -3734,7 +3781,7 @@ CREATE MATERIALIZED VIEW frontend.company_domains_top_apps AS
     store_id,
     app_category,
     installs_d30,
-    icon_url_100,
+    icon_64,
     sdk,
     api_call,
     publisher,
@@ -3761,7 +3808,7 @@ CREATE MATERIALIZED VIEW frontend.company_parent_top_apps AS
             sa.store_id,
             sa.category AS app_category,
             sa.developer_name,
-            sa.icon_url_100,
+            sa.icon_64,
             sa.installs_sum_4w AS installs_d30,
             csapc.sdk,
             csapc.api_call,
@@ -3779,7 +3826,7 @@ CREATE MATERIALIZED VIEW frontend.company_parent_top_apps AS
             deduped_data.name,
             deduped_data.store_id,
             deduped_data.developer_name,
-            deduped_data.icon_url_100,
+            deduped_data.icon_64,
             deduped_data.app_category,
             deduped_data.installs_d30,
             deduped_data.sdk,
@@ -3797,7 +3844,7 @@ CREATE MATERIALIZED VIEW frontend.company_parent_top_apps AS
     store_id,
     developer_name,
     app_category,
-    icon_url_100,
+    icon_64,
     installs_d30,
     sdk,
     api_call,
@@ -3825,7 +3872,7 @@ CREATE MATERIALIZED VIEW frontend.company_top_apps AS
             sa.store_id,
             sa.category AS app_category,
             sa.developer_name,
-            sa.icon_url_100,
+            sa.icon_64,
             sa.installs_sum_4w AS installs_d30,
             bool_or(cac.sdk) AS sdk,
             bool_or(cac.api_call) AS api_call,
@@ -3837,7 +3884,7 @@ CREATE MATERIALIZED VIEW frontend.company_top_apps AS
              LEFT JOIN adtech.companies c ON ((cac.company_id = c.id)))
              LEFT JOIN public.domains cd ON ((c.domain_id = cd.id)))
           WHERE (cac.app_ads_direct OR cac.sdk OR cac.api_call OR cac.publisher)
-          GROUP BY COALESCE(cd.domain_name, ad.domain_name), c.name, sa.store, sa.name, sa.store_id, sa.category, sa.developer_name, sa.icon_url_100, sa.installs_sum_4w
+          GROUP BY COALESCE(cd.domain_name, ad.domain_name), c.name, sa.store, sa.name, sa.store_id, sa.category, sa.developer_name, sa.icon_64, sa.installs_sum_4w
         ), ranked_apps AS (
          SELECT deduped_data.company_domain,
             deduped_data.company_name,
@@ -3845,7 +3892,7 @@ CREATE MATERIALIZED VIEW frontend.company_top_apps AS
             deduped_data.name,
             deduped_data.store_id,
             deduped_data.developer_name,
-            deduped_data.icon_url_100,
+            deduped_data.icon_64,
             deduped_data.app_category,
             deduped_data.installs_d30,
             deduped_data.sdk,
@@ -3862,7 +3909,7 @@ CREATE MATERIALIZED VIEW frontend.company_top_apps AS
     name,
     store_id,
     developer_name,
-    icon_url_100,
+    icon_64,
     app_category,
     installs_d30,
     sdk,
@@ -4176,7 +4223,7 @@ CREATE MATERIALIZED VIEW frontend.store_app_ranks_latest AS
     sa.installs_sum_1w,
     sa.installs_sum_4w,
     sa.ratings_sum_1w,
-    sa.icon_url_100,
+    sa.icon_64,
     ar.store_collection,
     ar.store_category,
     c.alpha2 AS country,
@@ -4223,11 +4270,10 @@ CREATE MATERIALIZED VIEW frontend.z_scores_top_apps AS
             sa.ad_supported,
             sa.in_app_purchases,
             sa.created_at,
-            sa.updated_at,
             sa.crawl_result,
             sa.release_date,
             agml.total_ratings AS rating_count,
-            sa.icon_url_100,
+            sa.icon_64,
             row_number() OVER (PARTITION BY sa.store, sa.category,
                 CASE
                     WHEN (sa.store = 2) THEN 'rating'::text
@@ -4244,7 +4290,7 @@ CREATE MATERIALIZED VIEW frontend.z_scores_top_apps AS
     app_category,
     in_app_purchases,
     ad_supported,
-    icon_url_100,
+    icon_64,
     installs,
     rating_count,
     installs_sum_1w,
@@ -4267,20 +4313,6 @@ CREATE MATERIALIZED VIEW frontend.z_scores_top_apps AS
 ALTER MATERIALIZED VIEW frontend.z_scores_top_apps OWNER TO postgres;
 
 --
--- Name: app_country_crawls; Type: TABLE; Schema: logging; Owner: postgres
---
-
-CREATE TABLE logging.app_country_crawls (
-    crawl_result bigint NOT NULL,
-    store_app bigint NOT NULL,
-    country_id bigint NOT NULL,
-    crawled_at timestamp with time zone NOT NULL
-);
-
-
-ALTER TABLE logging.app_country_crawls OWNER TO postgres;
-
---
 -- Name: app_description_keywords_extracted; Type: TABLE; Schema: logging; Owner: postgres
 --
 
@@ -4294,18 +4326,51 @@ CREATE TABLE logging.app_description_keywords_extracted (
 ALTER TABLE logging.app_description_keywords_extracted OWNER TO postgres;
 
 --
--- Name: app_global_crawls; Type: TABLE; Schema: logging; Owner: postgres
+-- Name: app_icons_crawled_at; Type: TABLE; Schema: logging; Owner: postgres
 --
 
-CREATE TABLE logging.app_global_crawls (
-    crawl_result smallint,
-    store_app integer,
-    success_country_count smallint,
-    crawled_at timestamp without time zone
+CREATE TABLE logging.app_icons_crawled_at (
+    store_app integer NOT NULL,
+    crawled_at timestamp without time zone NOT NULL
 );
 
 
-ALTER TABLE logging.app_global_crawls OWNER TO postgres;
+ALTER TABLE logging.app_icons_crawled_at OWNER TO postgres;
+
+--
+-- Name: app_status; Type: MATERIALIZED VIEW; Schema: logging; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW logging.app_status AS
+ WITH ranked_us_crawls AS (
+         SELECT app_country_crawls.store_app,
+            app_country_crawls.crawl_result,
+            app_country_crawls.crawled_at,
+            row_number() OVER (PARTITION BY app_country_crawls.store_app ORDER BY app_country_crawls.crawled_at DESC) AS crawl_rank
+           FROM logging.app_country_crawls
+          WHERE (app_country_crawls.country_id = 840)
+        ), recent_us_crawls AS (
+         SELECT ranked_us_crawls.store_app,
+            ranked_us_crawls.crawl_result,
+            ranked_us_crawls.crawled_at,
+            ranked_us_crawls.crawl_rank
+           FROM ranked_us_crawls
+          WHERE (ranked_us_crawls.crawl_rank <= 2)
+        )
+ SELECT store_app,
+        CASE
+            WHEN ((count(*) = 2) AND (count(*) FILTER (WHERE (crawl_result = 1)) = 0)) THEN true
+            ELSE false
+        END AS is_removed,
+    max(crawled_at) AS last_crawled_at,
+    count(*) FILTER (WHERE (crawl_result = 1)) AS us_success_count_last_2_passes,
+    count(*) AS total_us_passes_evaluated
+   FROM recent_us_crawls
+  GROUP BY store_app
+  WITH NO DATA;
+
+
+ALTER MATERIALIZED VIEW logging.app_status OWNER TO postgres;
 
 --
 -- Name: creative_scan_results; Type: TABLE; Schema: logging; Owner: postgres
@@ -4569,21 +4634,6 @@ ALTER TABLE public.app_ads_map ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENT
     CACHE 1
 );
 
-
---
--- Name: app_country_evidence; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE public.app_country_evidence (
-    id bigint NOT NULL,
-    store_app bigint NOT NULL,
-    raw_address text NOT NULL,
-    country_id smallint,
-    updated_at timestamp with time zone DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'UTC'::text)
-);
-
-
-ALTER TABLE public.app_country_evidence OWNER TO postgres;
 
 --
 -- Name: app_country_evidence_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
@@ -5854,6 +5904,14 @@ ALTER TABLE ONLY logging.keywords_crawled_at
 
 
 --
+-- Name: app_icons_crawled_at store_app; Type: CONSTRAINT; Schema: logging; Owner: postgres
+--
+
+ALTER TABLE ONLY logging.app_icons_crawled_at
+    ADD CONSTRAINT store_app PRIMARY KEY (store_app);
+
+
+--
 -- Name: store_app_sources store_app_sources_pk; Type: CONSTRAINT; Schema: logging; Owner: postgres
 --
 
@@ -6526,24 +6584,24 @@ CREATE UNIQUE INDEX adstxt_ad_domain_parent_overview_unique_idx ON frontend.adst
 
 
 --
--- Name: adstxt_entries_store_apps_domain_pub_idx; Type: INDEX; Schema: frontend; Owner: postgres
+-- Name: adstxt_domain_entries_ad_idx; Type: INDEX; Schema: frontend; Owner: postgres
 --
 
-CREATE INDEX adstxt_entries_store_apps_domain_pub_idx ON frontend.adstxt_entries_store_apps USING btree (ad_domain_id, app_ad_entry_id);
-
-
---
--- Name: adstxt_entries_store_apps_idx; Type: INDEX; Schema: frontend; Owner: postgres
---
-
-CREATE INDEX adstxt_entries_store_apps_idx ON frontend.adstxt_entries_store_apps USING btree (store_app);
+CREATE INDEX adstxt_domain_entries_ad_idx ON frontend.adstxt_domain_entries USING btree (ad_domain_id, app_ad_entry_id);
 
 
 --
--- Name: adstxt_entries_store_apps_unique_idx; Type: INDEX; Schema: frontend; Owner: postgres
+-- Name: adstxt_domain_entries_pub_domain_idx; Type: INDEX; Schema: frontend; Owner: postgres
 --
 
-CREATE UNIQUE INDEX adstxt_entries_store_apps_unique_idx ON frontend.adstxt_entries_store_apps USING btree (ad_domain_id, app_ad_entry_id, store_app);
+CREATE INDEX adstxt_domain_entries_pub_domain_idx ON frontend.adstxt_domain_entries USING btree (pub_domain_id);
+
+
+--
+-- Name: adstxt_domain_entries_uniq; Type: INDEX; Schema: frontend; Owner: postgres
+--
+
+CREATE UNIQUE INDEX adstxt_domain_entries_uniq ON frontend.adstxt_domain_entries USING btree (ad_domain_id, app_ad_entry_id, pub_domain_id);
 
 
 --
@@ -6900,14 +6958,14 @@ CREATE UNIQUE INDEX idx_store_app_ranks_latest_filter_sort ON frontend.store_app
 -- Name: idx_store_apps_overview_updated_at; Type: INDEX; Schema: frontend; Owner: postgres
 --
 
-CREATE INDEX idx_store_apps_overview_updated_at ON frontend.store_apps_overview USING btree (updated_at DESC);
+CREATE INDEX idx_store_apps_overview_updated_at ON frontend.store_apps_overview USING btree (last_crawled_at DESC);
 
 
 --
 -- Name: idx_store_apps_overview_updated_at_brin; Type: INDEX; Schema: frontend; Owner: postgres
 --
 
-CREATE INDEX idx_store_apps_overview_updated_at_brin ON frontend.store_apps_overview USING brin (updated_at);
+CREATE INDEX idx_store_apps_overview_updated_at_brin ON frontend.store_apps_overview USING brin (last_crawled_at);
 
 
 --
@@ -7020,13 +7078,6 @@ CREATE INDEX app_description_keywords_extrac_description_id_extracted_at_idx ON 
 --
 
 CREATE INDEX idx_app_country_crawls_latest ON logging.app_country_crawls USING btree (store_app, crawled_at DESC);
-
-
---
--- Name: idx_app_global_crawls_latest; Type: INDEX; Schema: logging; Owner: postgres
---
-
-CREATE INDEX idx_app_global_crawls_latest ON logging.app_global_crawls USING btree (store_app, crawled_at DESC);
 
 
 --
@@ -7950,5 +8001,5 @@ GRANT ALL ON SCHEMA public TO PUBLIC;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 9d0znP8MKUhgAZgNGHNy7LwFEWJvRUKi96sAorXcIu3UaODiBpl7iNcZXLH0fPg
+\unrestrict MoSgnOLCCzpckR7pxIYakAC0pOOoM08NZnyrdycI0EX1Olb6KyCfAYoGLpkOVYp
 

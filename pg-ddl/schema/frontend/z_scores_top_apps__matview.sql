@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict hMeFtB9LVBWW1lO5aLj0B9lsDYEVBBeUzDjIlOGN8P1wcjEM9I4l15D61cvRLj6
+\restrict tiBTgRVYaEDUCj4jrhVKYQAHj9Ivz7l1gAwduSJ1LixRfzKaNnsbgDb0Qr8CTck
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -55,11 +55,10 @@ CREATE MATERIALIZED VIEW frontend.z_scores_top_apps AS
             sa.ad_supported,
             sa.in_app_purchases,
             sa.created_at,
-            sa.updated_at,
             sa.crawl_result,
             sa.release_date,
             agml.total_ratings AS rating_count,
-            sa.icon_url_100,
+            sa.icon_64,
             row_number() OVER (PARTITION BY sa.store, sa.category,
                 CASE
                     WHEN (sa.store = 2) THEN 'rating'::text
@@ -76,7 +75,7 @@ CREATE MATERIALIZED VIEW frontend.z_scores_top_apps AS
     app_category,
     in_app_purchases,
     ad_supported,
-    icon_url_100,
+    icon_64,
     installs,
     rating_count,
     installs_sum_1w,
@@ -109,5 +108,5 @@ CREATE UNIQUE INDEX frontend_z_scores_top_apps_unique ON frontend.z_scores_top_a
 -- PostgreSQL database dump complete
 --
 
-\unrestrict hMeFtB9LVBWW1lO5aLj0B9lsDYEVBBeUzDjIlOGN8P1wcjEM9I4l15D61cvRLj6
+\unrestrict tiBTgRVYaEDUCj4jrhVKYQAHj9Ivz7l1gAwduSJ1LixRfzKaNnsbgDb0Qr8CTck
 

@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict BxlcFdHhS86gar7DWTlWae3YfwTrzbAGIVrNmJ4pQQA0e5rYADvb5JrkAve3VXx
+\restrict NuIzqJKdHUesMYU6fjQNFfQzTsm5NJ5fzyGpjZA6cOhr0DJIlKzX3vwS2fb5oU9
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -55,5 +55,5 @@ ALTER TABLE ONLY logging.keywords_crawled_at
 -- PostgreSQL database dump complete
 --
 
-\unrestrict BxlcFdHhS86gar7DWTlWae3YfwTrzbAGIVrNmJ4pQQA0e5rYADvb5JrkAve3VXx
+\unrestrict NuIzqJKdHUesMYU6fjQNFfQzTsm5NJ5fzyGpjZA6cOhr0DJIlKzX3vwS2fb5oU9
 

@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 79h9xHBux75S0E9mdW04nXWdeNYIQLKt2ghV5jVpRLTf7trjjQLIMqMwb5nKFIv
+\restrict 1NiHrfxQswQOmpe6lCjnbecnzw7EJ4PyDLgwyyW00MT6fa7cxEjw9BoSEsOLvgY
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -35,7 +35,7 @@ CREATE MATERIALIZED VIEW frontend.apps_new_yearly AS
             sa_1.store,
             sa_1.category,
             sa_1.developer_name,
-            sa_1.icon_url_100,
+            sa_1.icon_128,
             sa_1.rating,
             sa_1.installs,
             sa_1.installs_sum_1w,
@@ -45,7 +45,6 @@ CREATE MATERIALIZED VIEW frontend.apps_new_yearly AS
             sa_1.ad_supported,
             sa_1.in_app_purchases,
             sa_1.created_at,
-            sa_1.updated_at,
             sa_1.crawl_result,
             sa_1.icon_url_512,
             sa_1.release_date,
@@ -76,9 +75,8 @@ CREATE MATERIALIZED VIEW frontend.apps_new_yearly AS
     ad_supported,
     in_app_purchases,
     created_at,
-    updated_at,
     crawl_result,
-    icon_url_100,
+    icon_128,
     release_date,
     rating_count,
     featured_image_url,
@@ -115,5 +113,5 @@ CREATE UNIQUE INDEX idx_apps_new_yearly ON frontend.apps_new_yearly USING btree 
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 79h9xHBux75S0E9mdW04nXWdeNYIQLKt2ghV5jVpRLTf7trjjQLIMqMwb5nKFIv
+\unrestrict 1NiHrfxQswQOmpe6lCjnbecnzw7EJ4PyDLgwyyW00MT6fa7cxEjw9BoSEsOLvgY
 

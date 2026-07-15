@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict PDZj0Y4LOORWkprmhpRCAuT3JgflmuqdJcGeRaXo19IdRxTbBk4dKAjBsNCBPRx
+\restrict 7MQtVzaOHqIpAaHpDSDVjORKLR8fSrrd2zdExC8KIRlYWVUWGBnXM9dbH4cLzOm
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -41,8 +41,8 @@ CREATE MATERIALIZED VIEW frontend.advertiser_creatives AS
     ac.name AS ad_domain_company_name,
     ca.md5_hash,
     ca.file_extension,
-    sap.icon_url_100 AS pub_icon_url_100,
-    saa.icon_url_100 AS adv_icon_url_100,
+    sap.icon_128 AS pub_icon_url_100,
+    saa.icon_128 AS adv_icon_url_100,
     sap.icon_url_512 AS pub_icon_url_512,
     saa.icon_url_512 AS adv_icon_url_512,
     mmp.name AS mmp_name,
@@ -80,5 +80,5 @@ ALTER MATERIALIZED VIEW frontend.advertiser_creatives OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict PDZj0Y4LOORWkprmhpRCAuT3JgflmuqdJcGeRaXo19IdRxTbBk4dKAjBsNCBPRx
+\unrestrict 7MQtVzaOHqIpAaHpDSDVjORKLR8fSrrd2zdExC8KIRlYWVUWGBnXM9dbH4cLzOm
 

@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict YrjzptiCf4hBqGd4PwYF0YSxRb2P9PcqOukgq9MladbgSiVhN0FGfXBIKktoZow
+\restrict 7DFFKi3aNA0iHGJpMkgBMjn4KeXBbaIAEWj1oOyz0f9VfeMVDrvViO7aFodvXtd
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -34,9 +34,10 @@ CREATE MATERIALIZED VIEW frontend.adstxt_ad_domain_parent_overview AS
             sa.store,
             aae.publisher_id,
             sa.developer,
-            aesa.store_app
-           FROM (((((frontend.adstxt_entries_store_apps aesa
-             LEFT JOIN public.store_apps sa ON ((aesa.store_app = sa.id)))
+            aum.store_app
+           FROM ((((((frontend.adstxt_domain_entries aesa
+             LEFT JOIN public.app_urls_map aum ON ((aesa.pub_domain_id = aum.pub_domain)))
+             LEFT JOIN public.store_apps sa ON ((aum.store_app = sa.id)))
              LEFT JOIN public.app_ads_entrys aae ON ((aesa.app_ad_entry_id = aae.id)))
              LEFT JOIN adtech.company_domain_mapping cdm ON ((aesa.ad_domain_id = cdm.domain_id)))
              LEFT JOIN adtech.companies c ON ((cdm.company_id = c.id)))
@@ -48,9 +49,10 @@ CREATE MATERIALIZED VIEW frontend.adstxt_ad_domain_parent_overview AS
             sa.store,
             aae.publisher_id,
             sa.developer,
-            aesa.store_app
-           FROM ((((frontend.adstxt_entries_store_apps aesa
-             LEFT JOIN public.store_apps sa ON ((aesa.store_app = sa.id)))
+            aum.store_app
+           FROM (((((frontend.adstxt_domain_entries aesa
+             LEFT JOIN public.app_urls_map aum ON ((aesa.pub_domain_id = aum.pub_domain)))
+             LEFT JOIN public.store_apps sa ON ((aum.store_app = sa.id)))
              LEFT JOIN public.app_ads_entrys aae ON ((aesa.app_ad_entry_id = aae.id)))
              LEFT JOIN adtech.company_domain_mapping cdm ON ((aesa.ad_domain_id = cdm.domain_id)))
              JOIN adtech.companies c ON ((cdm.company_id = c.id)))
@@ -105,5 +107,5 @@ CREATE UNIQUE INDEX adstxt_ad_domain_parent_overview_unique_idx ON frontend.adst
 -- PostgreSQL database dump complete
 --
 
-\unrestrict YrjzptiCf4hBqGd4PwYF0YSxRb2P9PcqOukgq9MladbgSiVhN0FGfXBIKktoZow
+\unrestrict 7DFFKi3aNA0iHGJpMkgBMjn4KeXBbaIAEWj1oOyz0f9VfeMVDrvViO7aFodvXtd
 

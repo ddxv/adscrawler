@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict BW52wDqw61Ybeuj0uOtLhF7CrAKyjmQNJ0fRNIJAffZkn42Z6MEseaeae3E57JF
+\restrict G4ZfLVQA0AvySd6ZFl3QVanUlekGH0mpkh2VmxgDYVPEnuVF1aUHjamKKpm6lah
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -104,11 +104,11 @@ CREATE MATERIALIZED VIEW frontend.companies_creative_rankings AS
     saa.installs_sum_4w,
     vd.last_seen,
         CASE
-            WHEN (saa.icon_url_100 IS NOT NULL) THEN (concat('https://media.appgoblin.info/app-icons/', saa.store_id, '/', saa.icon_url_100))::character varying
+            WHEN (saa.icon_128 IS NOT NULL) THEN (concat('https://media.appgoblin.info/app-icons/', saa.store_id, '/', saa.icon_128))::character varying
             ELSE saa.icon_url_512
         END AS advertiser_icon_url,
         CASE
-            WHEN (sap.icon_url_100 IS NOT NULL) THEN (concat('https://media.appgoblin.info/app-icons/', sap.store_id, '/', sap.icon_url_100))::character varying
+            WHEN (sap.icon_128 IS NOT NULL) THEN (concat('https://media.appgoblin.info/app-icons/', sap.store_id, '/', sap.icon_128))::character varying
             ELSE sap.icon_url_512
         END AS publisher_icon_url
    FROM ((((((visually_distinct vd
@@ -129,5 +129,5 @@ ALTER MATERIALIZED VIEW frontend.companies_creative_rankings OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict BW52wDqw61Ybeuj0uOtLhF7CrAKyjmQNJ0fRNIJAffZkn42Z6MEseaeae3E57JF
+\unrestrict G4ZfLVQA0AvySd6ZFl3QVanUlekGH0mpkh2VmxgDYVPEnuVF1aUHjamKKpm6lah
 

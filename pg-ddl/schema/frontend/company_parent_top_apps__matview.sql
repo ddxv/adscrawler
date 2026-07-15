@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict XvOkpp0sAH6idbWqfkeHHca6kbfbCJDMNv80xonDToIFaCPPZ4Qy0r8gwgl2VYN
+\restrict udpggVU1vRND2X7TgwcamwIYYcxSSf1SySQdTJSWpfjhg05bxgGClDNJsBRumsY
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -36,7 +36,7 @@ CREATE MATERIALIZED VIEW frontend.company_parent_top_apps AS
             sa.store_id,
             sa.category AS app_category,
             sa.developer_name,
-            sa.icon_url_100,
+            sa.icon_64,
             sa.installs_sum_4w AS installs_d30,
             csapc.sdk,
             csapc.api_call,
@@ -54,7 +54,7 @@ CREATE MATERIALIZED VIEW frontend.company_parent_top_apps AS
             deduped_data.name,
             deduped_data.store_id,
             deduped_data.developer_name,
-            deduped_data.icon_url_100,
+            deduped_data.icon_64,
             deduped_data.app_category,
             deduped_data.installs_d30,
             deduped_data.sdk,
@@ -72,7 +72,7 @@ CREATE MATERIALIZED VIEW frontend.company_parent_top_apps AS
     store_id,
     developer_name,
     app_category,
-    icon_url_100,
+    icon_64,
     installs_d30,
     sdk,
     api_call,
@@ -112,5 +112,5 @@ CREATE UNIQUE INDEX idx_company_parent_top_apps_unique ON frontend.company_paren
 -- PostgreSQL database dump complete
 --
 
-\unrestrict XvOkpp0sAH6idbWqfkeHHca6kbfbCJDMNv80xonDToIFaCPPZ4Qy0r8gwgl2VYN
+\unrestrict udpggVU1vRND2X7TgwcamwIYYcxSSf1SySQdTJSWpfjhg05bxgGClDNJsBRumsY
 

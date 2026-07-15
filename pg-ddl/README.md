@@ -9,10 +9,10 @@
 2. SCP to overwrite existing schema dir
    `scp -r ads-db:/home/ads-db/tmp-pg-ddl/* schema/`
 
-3. Run pre-commit across all files.
-   `pre-commit run --files schema/*`
+3. Removing MVs? Delete MV files from schema directories.
 
-4. Removing MVs? Delete MV files from schema directories.
+4. Run pre-commit across all files.
+   `pre-commit run --files schema/*`
 
 5. Rerunning MVs? 
    `python pg-ddl/recreate_all_mvs.py --create-all-mvs --config-key madrone`

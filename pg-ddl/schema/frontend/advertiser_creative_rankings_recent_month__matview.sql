@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 6UEnjkiQ0GhQli0cvlhgVhcf7OJvBxVrdOY3Sf3jNQtfD8pJB4gV0M61Vu9OeWx
+\restrict p8pAX4l0EofNvhehtTYUg36b42FryKVsFjBXxukgNmdW3b4bWdCKcuSxm7npk3b
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -74,7 +74,7 @@ CREATE MATERIALIZED VIEW frontend.advertiser_creative_rankings_recent_month AS
         )
  SELECT saa.name AS advertiser_name,
     saa.store_id AS advertiser_store_id,
-    saa.icon_url_100 AS advertiser_icon_url_100,
+    saa.icon_128 AS advertiser_icon_url_100,
     saa.icon_url_512 AS advertiser_icon_url_512,
     saa.category AS advertiser_category,
     saa.installs AS advertiser_installs,
@@ -103,7 +103,7 @@ CREATE MATERIALIZED VIEW frontend.advertiser_creative_rankings_recent_month AS
      LEFT JOIN adv_mmp ON ((cr.advertiser_store_app_id = adv_mmp.advertiser_store_app_id)))
      LEFT JOIN ad_network_domains adis ON ((cr.advertiser_store_app_id = adis.advertiser_store_app_id)))
   WHERE ((vcasr.run_at >= (now() - '1 mon'::interval)) AND (cr.advertiser_store_app_id IS NOT NULL))
-  GROUP BY saa.name, saa.store_id, saa.icon_url_512, saa.category, saa.installs, saa.id, saa.icon_url_100, saa.rating, saa.rating_count, saa.installs_sum_1w, saa.installs_sum_4w
+  GROUP BY saa.name, saa.store_id, saa.icon_url_512, saa.category, saa.installs, saa.id, saa.icon_128, saa.rating, saa.rating_count, saa.installs_sum_1w, saa.installs_sum_4w
   ORDER BY (count(DISTINCT ca.md5_hash)) DESC
   WITH NO DATA;
 
@@ -114,5 +114,5 @@ ALTER MATERIALIZED VIEW frontend.advertiser_creative_rankings_recent_month OWNER
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 6UEnjkiQ0GhQli0cvlhgVhcf7OJvBxVrdOY3Sf3jNQtfD8pJB4gV0M61Vu9OeWx
+\unrestrict p8pAX4l0EofNvhehtTYUg36b42FryKVsFjBXxukgNmdW3b4bWdCKcuSxm7npk3b
 

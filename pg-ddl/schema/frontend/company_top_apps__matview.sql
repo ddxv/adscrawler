@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict pp208hUMnaK7coDtRVkTX99ddRSAgpkv0cfX6u20OWMb1wqJShB8dCcM7CaWvbd
+\restrict tPbV86OYUFqjHxYHhpsQS1i2yQpCIjdxqrJlDjbUE7Og85LrGgbdLnF692ZYYhd
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -36,7 +36,7 @@ CREATE MATERIALIZED VIEW frontend.company_top_apps AS
             sa.store_id,
             sa.category AS app_category,
             sa.developer_name,
-            sa.icon_url_100,
+            sa.icon_64,
             sa.installs_sum_4w AS installs_d30,
             bool_or(cac.sdk) AS sdk,
             bool_or(cac.api_call) AS api_call,
@@ -48,7 +48,7 @@ CREATE MATERIALIZED VIEW frontend.company_top_apps AS
              LEFT JOIN adtech.companies c ON ((cac.company_id = c.id)))
              LEFT JOIN public.domains cd ON ((c.domain_id = cd.id)))
           WHERE (cac.app_ads_direct OR cac.sdk OR cac.api_call OR cac.publisher)
-          GROUP BY COALESCE(cd.domain_name, ad.domain_name), c.name, sa.store, sa.name, sa.store_id, sa.category, sa.developer_name, sa.icon_url_100, sa.installs_sum_4w
+          GROUP BY COALESCE(cd.domain_name, ad.domain_name), c.name, sa.store, sa.name, sa.store_id, sa.category, sa.developer_name, sa.icon_64, sa.installs_sum_4w
         ), ranked_apps AS (
          SELECT deduped_data.company_domain,
             deduped_data.company_name,
@@ -56,7 +56,7 @@ CREATE MATERIALIZED VIEW frontend.company_top_apps AS
             deduped_data.name,
             deduped_data.store_id,
             deduped_data.developer_name,
-            deduped_data.icon_url_100,
+            deduped_data.icon_64,
             deduped_data.app_category,
             deduped_data.installs_d30,
             deduped_data.sdk,
@@ -73,7 +73,7 @@ CREATE MATERIALIZED VIEW frontend.company_top_apps AS
     name,
     store_id,
     developer_name,
-    icon_url_100,
+    icon_64,
     app_category,
     installs_d30,
     sdk,
@@ -121,5 +121,5 @@ CREATE UNIQUE INDEX idx_unique_company_top_apps ON frontend.company_top_apps USI
 -- PostgreSQL database dump complete
 --
 
-\unrestrict pp208hUMnaK7coDtRVkTX99ddRSAgpkv0cfX6u20OWMb1wqJShB8dCcM7CaWvbd
+\unrestrict tPbV86OYUFqjHxYHhpsQS1i2yQpCIjdxqrJlDjbUE7Og85LrGgbdLnF692ZYYhd
 

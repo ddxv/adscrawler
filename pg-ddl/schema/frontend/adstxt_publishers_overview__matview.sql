@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict gpjkBhDPJVe23Qpm2cmKKjWhxdZqlBzA8jmxNXATkCzBggDVrz01NhiLsC0osDS
+\restrict Xaa0K8bot8HMTxffhLyMrD9I3xeiX0bSa8UUiOFng9qRe6UZyI32FmM8fMaFaxX
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -34,10 +34,11 @@ CREATE MATERIALIZED VIEW frontend.adstxt_publishers_overview AS
             sa.store,
             aae.publisher_id,
             count(DISTINCT sa.developer) AS developer_count,
-            count(DISTINCT aesa.store_app) AS app_count,
-            row_number() OVER (PARTITION BY ad.domain_name, aae.relationship, sa.store ORDER BY (count(DISTINCT aesa.store_app)) DESC) AS pubrank
-           FROM (((frontend.adstxt_entries_store_apps aesa
-             LEFT JOIN public.store_apps sa ON ((aesa.store_app = sa.id)))
+            count(DISTINCT aum.store_app) AS app_count,
+            row_number() OVER (PARTITION BY ad.domain_name, aae.relationship, sa.store ORDER BY (count(DISTINCT aum.store_app)) DESC) AS pubrank
+           FROM ((((frontend.adstxt_domain_entries aesa
+             LEFT JOIN public.app_urls_map aum ON ((aesa.pub_domain_id = aum.pub_domain)))
+             LEFT JOIN public.store_apps sa ON ((aum.store_app = sa.id)))
              LEFT JOIN public.app_ads_entrys aae ON ((aesa.app_ad_entry_id = aae.id)))
              LEFT JOIN public.domains ad ON ((aesa.ad_domain_id = ad.id)))
           GROUP BY ad.domain_name, aae.relationship, sa.store, aae.publisher_id
@@ -74,5 +75,5 @@ CREATE UNIQUE INDEX adstxt_publishers_overview_ad_domain_unique_idx ON frontend.
 -- PostgreSQL database dump complete
 --
 
-\unrestrict gpjkBhDPJVe23Qpm2cmKKjWhxdZqlBzA8jmxNXATkCzBggDVrz01NhiLsC0osDS
+\unrestrict Xaa0K8bot8HMTxffhLyMrD9I3xeiX0bSa8UUiOFng9qRe6UZyI32FmM8fMaFaxX
 

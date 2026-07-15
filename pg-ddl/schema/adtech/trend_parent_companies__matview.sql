@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict ubFxHdDXI81WCRqQYtfNCn0KCmOx1TTJaCp5zTIOLsgiVwzB9ko00gGYQaVdpUk
+\restrict iDt9zzhuNiHnWlGEU5gg8e44wmVAVJ1ScujbrkaraSK5GooempOGCgTLlElsiJx
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -134,5 +134,5 @@ CREATE UNIQUE INDEX idx_trend_parent_companies_concurrent ON adtech.trend_parent
 -- PostgreSQL database dump complete
 --
 
-\unrestrict ubFxHdDXI81WCRqQYtfNCn0KCmOx1TTJaCp5zTIOLsgiVwzB9ko00gGYQaVdpUk
+\unrestrict iDt9zzhuNiHnWlGEU5gg8e44wmVAVJ1ScujbrkaraSK5GooempOGCgTLlElsiJx
 

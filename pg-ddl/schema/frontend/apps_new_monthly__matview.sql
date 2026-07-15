@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 25kmVGFpzHJh5IKEnYZg2AaHOX1VYAKpMeM6Qgfm6RcNX0Fkgg46LKmqMfcyMSs
+\restrict qqsx3LQ8XZOkDGtM5JgoRJhGQlHhzVSONX3KePBXGIHz0Rg5PAsCVpOWMMzgSOL
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -44,9 +44,8 @@ CREATE MATERIALIZED VIEW frontend.apps_new_monthly AS
             sa_1.ad_supported,
             sa_1.in_app_purchases,
             sa_1.created_at,
-            sa_1.updated_at,
             sa_1.crawl_result,
-            sa_1.icon_url_100,
+            sa_1.icon_128,
             sa_1.release_date,
             sa_1.rating_count,
             sa_1.featured_image_url,
@@ -75,9 +74,8 @@ CREATE MATERIALIZED VIEW frontend.apps_new_monthly AS
     ad_supported,
     in_app_purchases,
     created_at,
-    updated_at,
     crawl_result,
-    icon_url_100,
+    icon_128,
     release_date,
     rating_count,
     featured_image_url,
@@ -114,5 +112,5 @@ CREATE UNIQUE INDEX idx_apps_new_monthly ON frontend.apps_new_monthly USING btre
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 25kmVGFpzHJh5IKEnYZg2AaHOX1VYAKpMeM6Qgfm6RcNX0Fkgg46LKmqMfcyMSs
+\unrestrict qqsx3LQ8XZOkDGtM5JgoRJhGQlHhzVSONX3KePBXGIHz0Rg5PAsCVpOWMMzgSOL
 

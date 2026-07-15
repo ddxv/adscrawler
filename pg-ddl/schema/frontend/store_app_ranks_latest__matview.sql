@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict yc1Nvulk4VV5xPukYgXpESOc6KFUzwqcgqLH9NdnW2hdDR6RgmtwVYZzQMcBzBa
+\restrict o3PFmMeaonpXKQAJ5kyhhEYCQFkrQlnlMfuCc9bCve5yWnK49qhcdo7rPO9USaY
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -46,7 +46,7 @@ CREATE MATERIALIZED VIEW frontend.store_app_ranks_latest AS
     sa.installs_sum_1w,
     sa.installs_sum_4w,
     sa.ratings_sum_1w,
-    sa.icon_url_100,
+    sa.icon_64,
     ar.store_collection,
     ar.store_category,
     c.alpha2 AS country,
@@ -72,5 +72,5 @@ CREATE UNIQUE INDEX idx_store_app_ranks_latest_filter_sort ON frontend.store_app
 -- PostgreSQL database dump complete
 --
 
-\unrestrict yc1Nvulk4VV5xPukYgXpESOc6KFUzwqcgqLH9NdnW2hdDR6RgmtwVYZzQMcBzBa
+\unrestrict o3PFmMeaonpXKQAJ5kyhhEYCQFkrQlnlMfuCc9bCve5yWnK49qhcdo7rPO9USaY
 

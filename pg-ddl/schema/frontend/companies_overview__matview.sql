@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict UC00wW3nl3nuvuUWaVr1oZHMVFve95wcG2dgECmz5kyqZ5ogoAXzW3F22aetyTy
+\restrict qf7FZrfxavz8P8VghU7m2f3hF2YTCxICrvQeS86rVDmQ1geGLv0dPLfpG0jTYqD
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -106,6 +106,12 @@ CREATE MATERIALIZED VIEW frontend.companies_overview AS
            FROM frontend.adstxt_ad_domain_overview
           WHERE ((adstxt_ad_domain_overview.relationship)::text = 'DIRECT'::text)
           GROUP BY adstxt_ad_domain_overview.ad_domain_url
+        ), parent_adstxt_ad_domain_agg AS (
+         SELECT aadpo.ad_domain_url,
+            sum(aadpo.app_count) AS adstxt_parent_app_count
+           FROM frontend.adstxt_ad_domain_parent_overview aadpo
+          WHERE ((aadpo.relationship)::text = 'DIRECT'::text)
+          GROUP BY aadpo.ad_domain_url
         ), ip_country_resolved AS (
          SELECT company_domain_country.company_domain,
             company_domain_country.most_common_country AS api_ip_resolved_country
@@ -236,16 +242,18 @@ CREATE MATERIALIZED VIEW frontend.companies_overview AS
     COALESCE(s.sdk_count, 0) AS sdk_count_direct,
     COALESCE(m.mediation_adapter_count, 0) AS mediation_adapter_count_direct,
     COALESCE(aa.adstxt_direct_app_count, (0)::numeric) AS adstxt_direct_app_count,
+    COALESCE(paa.adstxt_parent_app_count, (0)::numeric) AS adstxt_parent_app_count,
     (((dom.company_id IS NOT NULL) AND (dom.company_id IN ( SELECT DISTINCT companies.parent_company_id
            FROM adtech.companies
           WHERE (companies.parent_company_id IS NOT NULL)))))::integer AS is_parent_domain
-   FROM (((((((((((((((((domain_base dom
+   FROM ((((((((((((((((((domain_base dom
      LEFT JOIN creatives_agg c ON (((dom.company_domain)::text = (c.company_domain)::text)))
      LEFT JOIN trends_agg t ON (((dom.company_domain)::text = t.company_domain)))
      LEFT JOIN app_changes_agg a ON (((dom.company_domain)::text = (a.company_domain)::text)))
      LEFT JOIN sdks_agg s ON (((dom.company_domain)::text = (s.company_domain)::text)))
      LEFT JOIN mediation_agg m ON (((dom.company_domain)::text = (m.company_domain)::text)))
      LEFT JOIN adstxt_ad_domain_agg aa ON (((dom.company_domain)::text = (aa.ad_domain_url)::text)))
+     LEFT JOIN parent_adstxt_ad_domain_agg paa ON (((dom.company_domain)::text = (paa.ad_domain_url)::text)))
      LEFT JOIN parent_creatives_rollup p_cr ON (((dom.company_domain)::text = (p_cr.parent_domain)::text)))
      LEFT JOIN parent_changes_rollup p_ch ON (((dom.company_domain)::text = (p_ch.parent_domain)::text)))
      LEFT JOIN parent_sdks_rollup p_sd ON (((dom.company_domain)::text = (p_sd.parent_domain)::text)))
@@ -280,5 +288,5 @@ CREATE UNIQUE INDEX frontend_companies_overview_domain ON frontend.companies_ove
 -- PostgreSQL database dump complete
 --
 
-\unrestrict UC00wW3nl3nuvuUWaVr1oZHMVFve95wcG2dgECmz5kyqZ5ogoAXzW3F22aetyTy
+\unrestrict qf7FZrfxavz8P8VghU7m2f3hF2YTCxICrvQeS86rVDmQ1geGLv0dPLfpG0jTYqD
 

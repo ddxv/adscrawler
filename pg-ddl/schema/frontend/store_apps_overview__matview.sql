@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict qSzlhr7A2Yg0C5dAH6ktz1qXtPoUHUWZCQ9fxgb2gjvbeaPHitKIcS4f3PwcIyc
+\restrict qfHUSL6DeqwfObv8HTGQuRCr0uT3bKWU9R69dtBqP5qNgJlbitPVpmzSqSAiaKW
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -28,25 +28,7 @@ SET default_table_access_method = heap;
 --
 
 CREATE MATERIALIZED VIEW frontend.store_apps_overview AS
- WITH latest_version_codes AS (
-         SELECT DISTINCT ON (version_codes.store_app) version_codes.id,
-            version_codes.store_app,
-            version_codes.version_code,
-            version_codes.updated_at AS last_downloaded_at,
-            version_codes.crawl_result AS download_result
-           FROM public.version_codes
-          WHERE ((version_codes.crawl_result = 1) AND (version_codes.updated_at >= '2025-05-01 00:00:00'::timestamp without time zone))
-          ORDER BY version_codes.store_app, version_codes.updated_at DESC, (string_to_array((version_codes.version_code)::text, '.'::text))::bigint[] DESC
-        ), latest_successful_version_codes AS (
-         SELECT DISTINCT ON (vc.store_app) vc.id,
-            vc.store_app,
-            vc.version_code,
-            vc.updated_at,
-            vc.crawl_result
-           FROM public.version_codes vc
-          WHERE (vc.crawl_result = 1)
-          ORDER BY vc.store_app, (string_to_array((vc.version_code)::text, '.'::text))::bigint[] DESC
-        ), last_sdk_scan AS (
+ WITH last_sdk_scan AS (
          SELECT DISTINCT ON (vc.store_app) vc.store_app,
             lsscr.version_code_id AS version_code,
             lsscr.scanned_at,
@@ -111,6 +93,36 @@ CREATE MATERIALIZED VIEW frontend.store_apps_overview AS
             agml_1.installs_z_score_2w,
             agml_1.installs_z_score_4w
            FROM public.app_global_metrics_latest agml_1
+        ), app_crawl_info AS (
+         WITH ranked_us_crawls AS (
+                 SELECT app_country_crawls.store_app,
+                    app_country_crawls.crawl_result,
+                    app_country_crawls.crawled_at,
+                    row_number() OVER (PARTITION BY app_country_crawls.store_app ORDER BY app_country_crawls.crawled_at DESC) AS crawl_rank
+                   FROM logging.app_country_crawls
+                  WHERE (app_country_crawls.country_id = 840)
+                ), recent_us_crawls AS (
+                 SELECT ranked_us_crawls.store_app,
+                    ranked_us_crawls.crawl_result,
+                    ranked_us_crawls.crawled_at,
+                    ranked_us_crawls.crawl_rank
+                   FROM ranked_us_crawls
+                  WHERE (ranked_us_crawls.crawl_rank <= 2)
+                )
+         SELECT recent_us_crawls.store_app,
+                CASE
+                    WHEN ((count(*) = 2) AND (count(*) FILTER (WHERE (recent_us_crawls.crawl_result = 1)) = 0)) THEN true
+                    ELSE false
+                END AS is_removed,
+            max(recent_us_crawls.crawled_at) AS last_crawled_at,
+            count(*) FILTER (WHERE (recent_us_crawls.crawl_result = 1)) AS us_success_count_last_2_passes,
+            count(*) AS total_us_passes_evaluated
+           FROM recent_us_crawls
+          GROUP BY recent_us_crawls.store_app
+        ), country_info AS (
+         SELECT app_country_evidence.store_app,
+            app_country_evidence.country_id
+           FROM public.app_country_evidence
         )
  SELECT sa.id,
     sa.name,
@@ -136,9 +148,10 @@ CREATE MATERIALIZED VIEW frontend.store_apps_overview AS
     sa.in_app_purchases,
     sa.store_last_updated,
     sa.created_at,
-    sa.updated_at,
+    aci.last_crawled_at,
     sa.crawl_result,
-    sa.icon_url_100,
+    sa.icon_64,
+    COALESCE(sa.icon_128, sa.icon_url_100) AS icon_128,
     sa.icon_url_512,
     sa.release_date,
     sa.featured_image_url,
@@ -157,30 +170,30 @@ CREATE MATERIALIZED VIEW frontend.store_apps_overview AS
     lss.scanned_at AS sdk_last_crawled,
     lss.scan_result AS sdk_last_crawl_result,
     lsss.scanned_at AS sdk_successful_last_crawled,
-    lvc.version_code,
     ld.description,
     ld.description_short,
     lac.run_at AS api_last_crawled,
     lac.run_result,
     lsac.run_at AS api_successful_last_crawled,
     acr.ad_creative_count,
-    amc.ad_mon_creatives
+    amc.ad_mon_creatives,
+    aci.is_removed
    FROM (((((((((((((((public.store_apps sa
      LEFT JOIN public.category_mapping cm ON (((sa.category)::text = (cm.original_category)::text)))
      LEFT JOIN public.developers d ON ((sa.developer = d.id)))
      LEFT JOIN public.app_urls_map aum ON ((sa.id = aum.store_app)))
      LEFT JOIN public.domains pd ON ((aum.pub_domain = pd.id)))
      LEFT JOIN public.adstxt_crawl_results pdcr ON ((pd.id = pdcr.domain_id)))
-     LEFT JOIN latest_version_codes lvc ON ((sa.id = lvc.store_app)))
      LEFT JOIN last_sdk_scan lss ON ((sa.id = lss.store_app)))
      LEFT JOIN last_successful_sdk_scan lsss ON ((sa.id = lsss.store_app)))
-     LEFT JOIN latest_successful_version_codes lsvc ON ((sa.id = lsvc.store_app)))
      LEFT JOIN latest_en_descriptions ld ON ((sa.id = ld.store_app)))
      LEFT JOIN latest_api_calls lac ON ((sa.id = lac.store_app)))
      LEFT JOIN latest_successful_api_calls lsac ON ((sa.id = lsac.store_app)))
      LEFT JOIN my_ad_creatives acr ON ((sa.id = acr.store_app)))
      LEFT JOIN my_mon_creatives amc ON ((sa.id = amc.store_app)))
      LEFT JOIN app_metrics agml ON ((sa.id = agml.store_app)))
+     LEFT JOIN app_crawl_info aci ON ((sa.id = aci.store_app)))
+     LEFT JOIN country_info ci ON ((sa.id = ci.store_app)))
   WITH NO DATA;
 
 
@@ -190,14 +203,14 @@ ALTER MATERIALIZED VIEW frontend.store_apps_overview OWNER TO postgres;
 -- Name: idx_store_apps_overview_updated_at; Type: INDEX; Schema: frontend; Owner: postgres
 --
 
-CREATE INDEX idx_store_apps_overview_updated_at ON frontend.store_apps_overview USING btree (updated_at DESC);
+CREATE INDEX idx_store_apps_overview_updated_at ON frontend.store_apps_overview USING btree (last_crawled_at DESC);
 
 
 --
 -- Name: idx_store_apps_overview_updated_at_brin; Type: INDEX; Schema: frontend; Owner: postgres
 --
 
-CREATE INDEX idx_store_apps_overview_updated_at_brin ON frontend.store_apps_overview USING brin (updated_at);
+CREATE INDEX idx_store_apps_overview_updated_at_brin ON frontend.store_apps_overview USING brin (last_crawled_at);
 
 
 --
@@ -253,5 +266,5 @@ CREATE UNIQUE INDEX store_apps_overview_unique_store_id_idx ON frontend.store_ap
 -- PostgreSQL database dump complete
 --
 
-\unrestrict qSzlhr7A2Yg0C5dAH6ktz1qXtPoUHUWZCQ9fxgb2gjvbeaPHitKIcS4f3PwcIyc
+\unrestrict qfHUSL6DeqwfObv8HTGQuRCr0uT3bKWU9R69dtBqP5qNgJlbitPVpmzSqSAiaKW
 

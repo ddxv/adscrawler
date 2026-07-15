@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict zPb3d92SIdD1ff9qBTQSybR1I6bRTqZlQ8awINtG1EbQHsAJhUaI52rhC8usfkw
+\restrict nXYcgS8ykTcZ5pffYIlUQAoQyplE41BX9318yDfZMSLbMAnLNtGMnlnctBtdUtC
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -57,7 +57,9 @@ CREATE TABLE public.store_apps (
     tablet_image_url_3 character varying,
     textsearchable_index_col tsvector GENERATED ALWAYS AS (to_tsvector('simple'::regconfig, (COALESCE(name, ''::character varying))::text)) STORED,
     additional_html_scraped_at timestamp without time zone,
-    icon_url_100 text
+    icon_url_100 text,
+    icon_128 text,
+    icon_64 text
 );
 
 
@@ -177,5 +179,5 @@ ALTER TABLE ONLY public.store_apps
 -- PostgreSQL database dump complete
 --
 
-\unrestrict zPb3d92SIdD1ff9qBTQSybR1I6bRTqZlQ8awINtG1EbQHsAJhUaI52rhC8usfkw
+\unrestrict nXYcgS8ykTcZ5pffYIlUQAoQyplE41BX9318yDfZMSLbMAnLNtGMnlnctBtdUtC
 
