@@ -32,7 +32,7 @@ from adscrawler.process.app_metrics_history import (
 from adscrawler.process.app_rankings import import_ranks_from_s3
 from adscrawler.scrape import crawl_app_ads
 from adscrawler.tools.get_company_logos import refresh_metadata
-from adscrawler.tools.try_failed_mitms import retry_failed_mitm_logs
+from adscrawler.mitm_ad_parser.try_failed_mitms import retry_failed_mitm_logs
 
 logger = get_logger(__name__)
 
