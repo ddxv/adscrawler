@@ -19,5 +19,10 @@ WHERE
         OR aica.crawled_at < CURRENT_DATE - INTERVAL '3 days'
     )
 ORDER BY
-    sa.updated_at DESC NULLS LAST
+    CASE
+        WHEN sa.icon_128 IS NULL AND sa.icon_64 IS NULL THEN 0
+        WHEN sa.icon_128 IS NULL OR sa.icon_64 IS NULL THEN 1
+        ELSE 2
+    END ASC,
+    sa.updated_at DESC
 LIMIT :mylimit;
