@@ -1201,11 +1201,23 @@ def query_keywords_to_crawl(
 def query_apps_missing_icon_variants(
     pgdb: PostgresEngine,
     limit: int | None = None,
+    store: int | None = None,
 ) -> pd.DataFrame:
-    """Return store_apps rows missing 128 and/or 64 icon variants."""
+    """Return store_apps rows missing 128 and/or 64 icon variants.
+
+    Parameters
+    ----------
+    pgdb : PostgresEngine
+        Database connection.
+    limit : int, optional
+        Maximum number of rows to return.
+    store : int, optional
+        Filter by store (1 = Google, 2 = Apple). Pass None for all stores.
+    """
     params: dict[str, object] = {}
     if limit is not None:
         params["mylimit"] = limit
+    params["store_filter"] = store
     df = pd.read_sql(
         QUERY_APPS_MISSING_ICON_VARIANTS,
         params=params,

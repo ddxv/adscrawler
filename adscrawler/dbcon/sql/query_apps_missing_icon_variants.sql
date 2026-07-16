@@ -1,6 +1,7 @@
 SELECT
     sa.id,
     sa.store_id,
+    sa.store,
     sa.icon_url_512,
     sa.icon_128,
     sa.icon_64
@@ -13,6 +14,7 @@ WHERE
     (sa.icon_128 IS NULL OR sa.icon_64 IS NULL)
     AND sa.icon_url_512 IS NOT NULL
     AND sa.crawl_result = 1
+    AND (:store_filter IS NULL OR sa.store = :store_filter)
     AND (
         aica.store_app IS NULL
         -- initial crawls

@@ -1,6 +1,7 @@
 """Process app icons — resize, upload to S3, and update missing variants."""
 
 import pathlib
+import time
 from datetime import UTC, datetime
 from io import BytesIO
 
@@ -20,6 +21,9 @@ from adscrawler.process.storage import get_s3_client
 
 logger = get_logger(__name__, "process_icons")
 
+# Retry delays (in seconds) for failed icon processing
+_ICON_RETRY_DELAYS = [0.5, 1.0, 1.5, 2.0]
+
 
 def _ensure_rgb(img: Image.Image) -> Image.Image:
     """Convert image to RGB if it isn't already (e.g. CMYK, RGBA, P)."""
@@ -31,58 +35,80 @@ def _ensure_rgb(img: Image.Image) -> Image.Image:
 def process_app_icon(store_id: str, url: str) -> tuple[str, str] | None:
     """Download a 512px icon, resize to 128×128 and 64×64, upload both to S3.
 
+    Retries on failure with backoff delays of 0.5, 1, 1.5, and 2 seconds.
+
     Returns ``(filename_128, filename_64)`` on success, or ``None`` on failure.
     """
-    try:
-        response = requests.get(url, timeout=10)
-    except Exception:
-        logger.error(f"Failed to fetch image from {url}")
-        return None
+    last_exception: Exception | None = None
+    for attempt, delay in enumerate(_ICON_RETRY_DELAYS, start=1):
+        try:
+            response = requests.get(url, timeout=10)
+        except Exception as exc:
+            logger.warning(
+                f"Attempt {attempt}/{len(_ICON_RETRY_DELAYS)} — "
+                f"failed to fetch image from {url}: {exc}"
+            )
+            last_exception = exc
+            if attempt < len(_ICON_RETRY_DELAYS):
+                time.sleep(delay)
+            continue
 
-    try:
-        img = Image.open(BytesIO(response.content))
-        img = _ensure_rgb(img)
-        # Always store as PNG regardless of source format
-        img_resized = img.resize((128, 128), Image.LANCZOS)
-        img_64_resized = img.resize((64, 64), Image.LANCZOS)
-        phash = str(imagehash.phash(img_resized))
-        f_128_name = f"{phash}_128.png"
-        f_64_name = f"{phash}_64.png"
-        file_path = pathlib.Path(APP_ICONS_TMP_DIR, f"{phash}_128.png")
-        file_64_path = pathlib.Path(APP_ICONS_TMP_DIR, f"{phash}_64.png")
-        img_resized.save(file_path, format="PNG")
-        img_64_resized.save(file_64_path, format="PNG")
-    except Exception:
-        logger.exception(f"Failed to process icon for {store_id} from {url}")
-        return None
+        try:
+            img = Image.open(BytesIO(response.content))
+            img = _ensure_rgb(img)
+            # Always store as PNG regardless of source format
+            img_resized = img.resize((128, 128), Image.LANCZOS)
+            img_64_resized = img.resize((64, 64), Image.LANCZOS)
+            phash = str(imagehash.phash(img_resized))
+            f_128_name = f"{phash}_128.png"
+            f_64_name = f"{phash}_64.png"
+            file_path = pathlib.Path(APP_ICONS_TMP_DIR, f"{phash}_128.png")
+            file_64_path = pathlib.Path(APP_ICONS_TMP_DIR, f"{phash}_64.png")
+            img_resized.save(file_path, format="PNG")
+            img_64_resized.save(file_64_path, format="PNG")
+        except Exception as exc:
+            logger.warning(
+                f"Attempt {attempt}/{len(_ICON_RETRY_DELAYS)} — "
+                f"failed to process icon for {store_id} from {url}: {exc}"
+            )
+            last_exception = exc
+            if attempt < len(_ICON_RETRY_DELAYS):
+                time.sleep(delay)
+            continue
 
-    # Upload to S3
-    image_format = "image/png"
-    s3_key = "digi-cloud"
-    s3_client = get_s3_client(s3_key)
-    response = s3_client.put_object(
-        Bucket=CONFIG[s3_key]["bucket"],
-        Key=f"app-icons/{store_id}/{f_128_name}",
-        ACL="public-read",
-        Body=file_path.read_bytes(),
-        ContentType=image_format,
+        # Upload to S3
+        image_format = "image/png"
+        s3_key = "digi-cloud"
+        s3_client = get_s3_client(s3_key)
+        response = s3_client.put_object(
+            Bucket=CONFIG[s3_key]["bucket"],
+            Key=f"app-icons/{store_id}/{f_128_name}",
+            ACL="public-read",
+            Body=file_path.read_bytes(),
+            ContentType=image_format,
+        )
+        if response["ResponseMetadata"]["HTTPStatusCode"] == 200:
+            logger.info(f"S3 uploaded {store_id} 128px icon")
+        else:
+            logger.error(f"S3 failed to upload {store_id} 128px icon")
+        response = s3_client.put_object(
+            Bucket=CONFIG[s3_key]["bucket"],
+            Key=f"app-icons/{store_id}/{f_64_name}",
+            ACL="public-read",
+            Body=file_64_path.read_bytes(),
+            ContentType=image_format,
+        )
+        if response["ResponseMetadata"]["HTTPStatusCode"] == 200:
+            logger.info(f"S3 uploaded {store_id} 64px icon")
+        else:
+            logger.error(f"S3 failed to upload {store_id} 64px icon")
+        return f_128_name, f_64_name
+
+    logger.error(
+        f"All {len(_ICON_RETRY_DELAYS)} attempts failed for icon {store_id} "
+        f"from {url}: {last_exception}"
     )
-    if response["ResponseMetadata"]["HTTPStatusCode"] == 200:
-        logger.info(f"S3 uploaded {store_id} 128px icon")
-    else:
-        logger.error(f"S3 failed to upload {store_id} 128px icon")
-    response = s3_client.put_object(
-        Bucket=CONFIG[s3_key]["bucket"],
-        Key=f"app-icons/{store_id}/{f_64_name}",
-        ACL="public-read",
-        Body=file_64_path.read_bytes(),
-        ContentType=image_format,
-    )
-    if response["ResponseMetadata"]["HTTPStatusCode"] == 200:
-        logger.info(f"S3 uploaded {store_id} 64px icon")
-    else:
-        logger.error(f"S3 failed to upload {store_id} 64px icon")
-    return f_128_name, f_64_name
+    return None
 
 
 def build_icon_update_df(apps_df: pd.DataFrame) -> pd.DataFrame:
@@ -134,16 +160,27 @@ def build_icon_update_df(apps_df: pd.DataFrame) -> pd.DataFrame:
     return icon_update_df
 
 
-def refresh_app_icons(pgdb: PostgresEngine, limit: int | None = None) -> int:
+def refresh_app_icons(
+    pgdb: PostgresEngine, limit: int | None = None, store: int | None = None
+) -> int:
     """Refresh missing 128/64 icon variants for apps that already have 512px icons.
 
     Queries the database for apps that need one or both small variants,
     generates them, uploads to S3, and upserts the filenames into
     ``store_apps``.
 
+    Parameters
+    ----------
+    pgdb : PostgresEngine
+        Database connection.
+    limit : int, optional
+        Maximum number of apps to process per batch.
+    store : int, optional
+        Filter by store (1 = Google, 2 = Apple). Pass None for all stores.
+
     Returns the number of apps updated.
     """
-    apps_df = query_apps_missing_icon_variants(pgdb=pgdb, limit=limit)
+    apps_df = query_apps_missing_icon_variants(pgdb=pgdb, limit=limit, store=store)
     if apps_df.empty:
         logger.info("No apps need icon refresh")
         return 0

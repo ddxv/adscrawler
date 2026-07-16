@@ -333,6 +333,8 @@ class ProcessManager:
         processes = self.get_running_processes()
         my_processes = self.filter_processes(processes, "/adscrawler/main.py")
         found_processes = [x for x in my_processes if " --refresh-app-icons" in x]
+        if self.args.platform:
+            found_processes = [x for x in found_processes if self.args.platform in x]
         return len(found_processes) > 1
 
     def is_script_already_running(self) -> bool:
@@ -376,7 +378,7 @@ class ProcessManager:
             self.scrape_new_apps_devs(store)
 
         if self.args.refresh_app_icons:
-            self.refresh_app_icons()
+            self.refresh_app_icons(store)
 
         if self.args.update_app_store_details:
             self.update_app_details(store, country_priority_group)
@@ -490,30 +492,44 @@ class ProcessManager:
         except Exception:
             logger.exception("Crawling front pages failed")
 
-    def refresh_app_icons(self) -> None:
-        """Refresh app icons in batches of 1000 until all missing variants are done."""
+    def refresh_app_icons(self, store: int | None = None) -> None:
+        """Refresh app icons in batches of 1000 until all missing variants are done.
+
+        Processes a single store when ``store`` is provided (1 = Google, 2 = Apple),
+        or all stores when ``None``.  Run two instances with ``-p google`` and
+        ``-p apple`` to process both stores concurrently.
+        """
+        stores = [store] if store else [1, 2]
         batch_size = 100
-        total_updated = 0
-        batches = 1000
-        i = 0
-        while i < batches:
-            i += 1
-            try:
-                updated = refresh_app_icons(
-                    pgdb=self.pgcon,
-                    limit=batch_size,
-                )
-                total_updated += updated
-                if updated == 0:
+        for current_store in stores:
+            total_updated = 0
+            batches = 1000
+            i = 0
+            while i < batches:
+                i += 1
+                try:
+                    updated = refresh_app_icons(
+                        pgdb=self.pgcon,
+                        limit=batch_size,
+                        store=current_store,
+                    )
+                    total_updated += updated
+                    if updated == 0:
+                        break
+                    logger.info(
+                        f"Icon refresh batch for store={current_store} complete, "
+                        f"{updated} updated, {total_updated} total so far, "
+                        f"continuing..."
+                    )
+                except Exception:
+                    logger.exception(
+                        f"Refreshing app icons failed in batch for store={current_store}"
+                    )
                     break
-                logger.info(
-                    f"Icon refresh batch complete, {updated} updated, "
-                    f"{total_updated} total so far, continuing..."
-                )
-            except Exception:
-                logger.exception("Refreshing app icons failed in batch")
-                break
-        logger.info(f"Icon refresh finished, {total_updated} total apps updated")
+            logger.info(
+                f"Icon refresh for store={current_store} finished, "
+                f"{total_updated} total apps updated"
+            )
 
     def process_company_history(self) -> None:
         process_company_history(pgdb=self.pgcon)
