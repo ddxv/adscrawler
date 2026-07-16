@@ -1704,6 +1704,31 @@ def get_ecpm_benchmarks(pgdb: PostgresEngine) -> pd.DataFrame:
     return df
 
 
+def delete_combined_history_by_quarter(
+    pgdb: PostgresEngine,
+    delete_year: int,
+    delete_quarter: int,
+) -> None:
+    table_name = "combined_domain_app_history"
+    del_query = text(f"""
+        DELETE FROM adtech.{table_name} acmh 
+        WHERE 
+            acmh.year = :delete_year
+            AND acmh.quarter = :delete_quarter
+    """)
+    with pgdb.engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
+        result = conn.execute(
+            del_query,
+            {
+                "delete_year": delete_year,
+                "delete_quarter": delete_quarter,
+            },
+        )
+        logger.info(
+            f"{delete_year=} {delete_quarter=} deleted {result.rowcount} rows from {table_name}"
+        )
+
+
 def delete_app_metrics_by_date_and_apps(
     pgdb: PostgresEngine,
     delete_from_date: datetime.date,

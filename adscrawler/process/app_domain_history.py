@@ -9,7 +9,11 @@ import pandas as pd
 
 from adscrawler.config import CONFIG, get_logger
 from adscrawler.dbcon.connection import PostgresEngine
-from adscrawler.dbcon.queries import query_report_combined_domains
+from adscrawler.dbcon.queries import (
+    delete_combined_history_by_quarter,
+    insert_bulk,
+    query_report_combined_domains,
+)
 from adscrawler.process import (
     AGG_COMBINED_DOMAIN_HISTORY,
     AGG_STORE_APPS_RELEASE_DATES,
@@ -82,6 +86,45 @@ def combined_domain_history_to_s3(
     logger.info(f"Finished {part=} written to s3://{bucket}/{prefix}/")
 
 
+def combined_domain_history_db_to_db(
+    pgdb: PostgresEngine,
+    start_date: str,
+    start_of_next_period: str,
+) -> None:
+    """Stream combined domain app history from Postgres query directly into
+    the adtech.combined_domain_app_history table (DB-to-DB).
+
+    Deletes existing data for the same year/quarter first, then bulk-inserts.
+    """
+    logger.info(
+        "Inserting combined domain history into adtech.combined_domain_app_history "
+        f"start={start_date} next={start_of_next_period}"
+    )
+
+    df = query_report_combined_domains(
+        pgdb=pgdb,
+        start_date=start_date,
+        start_of_next_period=start_of_next_period,
+    )
+    year = pd.Timestamp(start_date).year
+    quarter = pd.Timestamp(start_date).quarter
+    df["year"] = year
+    df["quarter"] = quarter
+
+    delete_combined_history_by_quarter(
+        pgdb=pgdb,
+        delete_year=year,
+        delete_quarter=quarter,
+    )
+    insert_bulk(
+        df=df,
+        schema="adtech",
+        table_name="combined_domain_app_history",
+        pgdb=pgdb,
+        chunk_size=5000000,
+    )
+
+
 def store_apps_release_dates_to_s3(pgdb: PostgresEngine) -> None:
     """Export store_apps (id, release_date, store) to a static parquet in S3.
 
@@ -115,7 +158,7 @@ def process_company_history(pgdb: PostgresEngine) -> None:
     today = datetime.date.today()
     quarters = pd.date_range(start="2025-01-01", end=today, freq="QS")
     # Export lookup tables once (idempotent)
-    store_apps_release_dates_to_s3(pgdb)
+    # store_apps_release_dates_to_s3(pgdb)
     for start_date in quarters:
         start_of_next_period = (
             start_date + pd.offsets.QuarterEnd() + datetime.timedelta(days=1)
@@ -125,17 +168,15 @@ def process_company_history(pgdb: PostgresEngine) -> None:
         logger.info(f"Company history: exporting {year=} {quarter=}")
         # Check if 'today' falls within this quarter's standard range
         buffer_start_date = start_date - pd.Timedelta(weeks=3)
-        if start_date <= today < buffer_start_date:
+        if start_date <= pd.to_datetime(today) < buffer_start_date:
             # Apply the 3-week buffer only for the ongoing quarter
             print(
                 "Too early in current quarter detected. Wait for 3-week buffer to start."
             )
             continue  # Skip the ongoing quarter to avoid incomplete data
 
-        combined_domain_history_to_s3(
+        combined_domain_history_db_to_db(
             pgdb=pgdb,
             start_date=str(start_date.date()),
             start_of_next_period=str(start_of_next_period.date()),
-            year=year,
-            quarter=quarter,
         )
