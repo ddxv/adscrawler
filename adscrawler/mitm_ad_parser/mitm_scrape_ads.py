@@ -202,7 +202,7 @@ def attribute_creatives(
         # Collect all resolved DB IDs from advertiser_store_app_ids across ad_infos
         all_multi_adv_db_ids = []
         for x in found_ad_infos:
-            if x.get("advertiser_store_app_ids"):
+            if x["advertiser_store_app_ids"]:
                 all_multi_adv_db_ids.extend(x["advertiser_store_app_ids"])
         all_multi_adv_db_ids = (
             list(set(all_multi_adv_db_ids)) if all_multi_adv_db_ids else None
