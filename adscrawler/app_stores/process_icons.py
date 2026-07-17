@@ -32,7 +32,9 @@ def _ensure_rgb(img: Image.Image) -> Image.Image:
     return img.convert("RGB")
 
 
-def process_app_icon(store_id: str, url: str) -> tuple[str, str] | None:
+def process_app_icon(
+    store_id: str, url: str, proxies: dict[str, str] | None = None
+) -> tuple[str, str] | None:
     """Download a 512px icon, resize to 128×128 and 64×64, upload both to S3.
 
     Retries on failure with backoff delays of 0.5, 1, 1.5, and 2 seconds.
@@ -42,7 +44,10 @@ def process_app_icon(store_id: str, url: str) -> tuple[str, str] | None:
     last_exception: Exception | None = None
     for attempt, delay in enumerate(_ICON_RETRY_DELAYS, start=1):
         try:
-            response = requests.get(url, timeout=10)
+            if attempt == 1:
+                response = requests.get(url, timeout=10)
+            else:
+                response = requests.get(url, timeout=10, proxies=proxies)
         except Exception as exc:
             logger.warning(
                 f"Attempt {attempt}/{len(_ICON_RETRY_DELAYS)} — "
@@ -72,8 +77,6 @@ def process_app_icon(store_id: str, url: str) -> tuple[str, str] | None:
                 f"failed to process icon for {store_id} from {url}: {exc}"
             )
             last_exception = exc
-            if attempt < len(_ICON_RETRY_DELAYS):
-                time.sleep(delay)
             continue
 
         # Upload to S3
@@ -118,8 +121,11 @@ def build_icon_update_df(apps_df: pd.DataFrame) -> pd.DataFrame:
     containing only the rows where at least one variant was successfully
     generated.
     """
+
     if apps_df.empty:
         return pd.DataFrame(columns=["id", "icon_128", "icon_64"])
+
+    proxies = CONFIG.get("proxies", None)
 
     icol_128 = apps_df.get("icon_128")
     icol_64 = apps_df.get("icon_64")
@@ -138,7 +144,7 @@ def build_icon_update_df(apps_df: pd.DataFrame) -> pd.DataFrame:
         return pd.DataFrame(columns=["id", "icon_128", "icon_64"])
 
     icon_results = apps_to_update.apply(
-        lambda row: process_app_icon(row["store_id"], row["icon_url_512"]),
+        lambda row: process_app_icon(row["store_id"], row["icon_url_512"], proxies),
         axis=1,
     )
     icon_update_df = pd.DataFrame(
