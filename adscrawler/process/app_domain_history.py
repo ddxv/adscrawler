@@ -34,29 +34,18 @@ def run_trends():
     bucket = CONFIG[s3_config_key]["bucket"]
     prefix = AGG_COMBINED_DOMAIN_HISTORY
     parquet_files = get_parquet_paths_by_prefix(bucket=bucket, prefix=prefix)
-    import random
-
-    parquet_files = random.choices(parquet_files, k=5)
 
     # Load the DuckDB SQL as a raw string (not via SQLAlchemy text())
     sql_path = SQL_DIR / "duckdb" / "company_trends.sql"
     raw_sql = sql_path.read_text()
 
-    # Replace :parquet_files with read_parquet() so DuckDB can read the files
-    parquet_list_literal = "[" + ", ".join(f"'{f}'" for f in parquet_files) + "]"
-    raw_sql = raw_sql.replace(
-        "FROM :parquet_files", f"FROM read_parquet({parquet_list_literal}) h"
-    )
-
     # The store_apps table needs to come from the parquet created by store_apps_release_dates_to_s3
     store_apps_key = f"s3://{bucket}/{AGG_STORE_APPS_RELEASE_DATES}/store_apps.parquet"
-    raw_sql = raw_sql.replace(
-        "LEFT JOIN store_apps sa",
-        f"LEFT JOIN read_parquet('{store_apps_key}') sa",
-    )
 
     with get_duckdb_connection(s3_config_key) as duckdb_con:
-        duckdb_con.execute(raw_sql)
+        duckdb_con.execute(
+            raw_sql, {"parquet_files": parquet_files, "store_apps_key": store_apps_key}
+        )
 
 
 def combined_domain_history_to_s3(

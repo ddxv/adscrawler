@@ -1,3 +1,5 @@
+PRAGMA temp_directory='/tmp/duckdb_temp/';
+PRAGMA max_memory='8GB';
 COPY (
     WITH enriched_raw AS (
     SELECT
@@ -9,8 +11,8 @@ COPY (
         h.year,
         h.quarter,
         sa.release_date
-    FROM :parquet_files
-    LEFT JOIN store_apps sa ON sa.id = h.store_app
+    FROM read_parquet($parquet_files) h
+    LEFT JOIN read_parquet($store_apps_key) sa ON sa.id = h.store_app
 ),
 enriched AS (
     SELECT domain_id, store_app, year, quarter, release_date, 'sdk' AS tag_source
