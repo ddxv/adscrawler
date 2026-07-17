@@ -7,7 +7,7 @@ from io import BytesIO
 
 import pandas as pd
 
-from adscrawler.config import CONFIG, get_logger
+from adscrawler.config import CONFIG, SQL_DIR, get_logger
 from adscrawler.dbcon.connection import PostgresEngine
 from adscrawler.dbcon.queries import (
     delete_combined_history_by_quarter,
@@ -20,10 +20,43 @@ from adscrawler.process import (
 )
 from adscrawler.process.storage import (
     delete_s3_objects_by_prefix,
+    get_parquet_paths_by_prefix,
     get_s3_client,
+    get_duckdb_connection,
 )
 
 logger = get_logger(__name__, "scrape_stores")
+
+
+def run_trends():
+
+    s3_config_key = "s3"
+    bucket = CONFIG[s3_config_key]["bucket"]
+    prefix = AGG_COMBINED_DOMAIN_HISTORY
+    parquet_files = get_parquet_paths_by_prefix(bucket=bucket, prefix=prefix)
+    import random
+
+    parquet_files = random.choices(parquet_files, k=5)
+
+    # Load the DuckDB SQL as a raw string (not via SQLAlchemy text())
+    sql_path = SQL_DIR / "duckdb" / "company_trends.sql"
+    raw_sql = sql_path.read_text()
+
+    # Replace :parquet_files with read_parquet() so DuckDB can read the files
+    parquet_list_literal = "[" + ", ".join(f"'{f}'" for f in parquet_files) + "]"
+    raw_sql = raw_sql.replace(
+        "FROM :parquet_files", f"FROM read_parquet({parquet_list_literal}) h"
+    )
+
+    # The store_apps table needs to come from the parquet created by store_apps_release_dates_to_s3
+    store_apps_key = f"s3://{bucket}/{AGG_STORE_APPS_RELEASE_DATES}/store_apps.parquet"
+    raw_sql = raw_sql.replace(
+        "LEFT JOIN store_apps sa",
+        f"LEFT JOIN read_parquet('{store_apps_key}') sa",
+    )
+
+    with get_duckdb_connection(s3_config_key) as duckdb_con:
+        duckdb_con.execute(raw_sql)
 
 
 def combined_domain_history_to_s3(
@@ -175,8 +208,8 @@ def process_company_history(pgdb: PostgresEngine) -> None:
             )
             continue  # Skip the ongoing quarter to avoid incomplete data
 
-        # combined_domain_history_db_to_db(
-        #     pgdb=pgdb,
-        #     start_date=str(start_date.date()),
-        #     start_of_next_period=str(start_of_next_period.date()),
-        # )
+        combined_domain_history_db_to_db(
+            pgdb=pgdb,
+            start_date=str(start_date.date()),
+            start_of_next_period=str(start_of_next_period.date()),
+        )

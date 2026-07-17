@@ -48,6 +48,11 @@ QUERY_PUB_DOMAINS_TO_CRAWL_ADS_TXT = load_sql_file(
 )
 QUERY_APPS_MISSING_ICON_VARIANTS = load_sql_file("query_apps_missing_icon_variants.sql")
 
+# duckdb
+CREATE_COMPANY_TRENDS = load_sql_file("duckdb/company_trends.sql")
+
+
+
 
 def insert_df(
     df: pd.DataFrame,
@@ -1793,3 +1798,4 @@ def query_live_apps(pgdb: PostgresEngine, store: int) -> pd.DataFrame:
         ;"""
     df = pd.read_sql(sel_query, con=pgdb.engine)
     return df
+
