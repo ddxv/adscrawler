@@ -175,8 +175,8 @@ def process_company_history(pgdb: PostgresEngine) -> None:
             )
             continue  # Skip the ongoing quarter to avoid incomplete data
 
-        combined_domain_history_db_to_db(
-            pgdb=pgdb,
-            start_date=str(start_date.date()),
-            start_of_next_period=str(start_of_next_period.date()),
-        )
+        # combined_domain_history_db_to_db(
+        #     pgdb=pgdb,
+        #     start_date=str(start_date.date()),
+        #     start_of_next_period=str(start_of_next_period.date()),
+        # )
