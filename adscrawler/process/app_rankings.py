@@ -24,14 +24,10 @@ from adscrawler.process.storage import get_duckdb_connection, get_s3_client
 logger = get_logger(__name__, "scrape_stores")
 
 
-# ---------------------------------------------------------------------------
-# Rankings upload
-# ---------------------------------------------------------------------------
-
-
 def process_store_rankings(df: pd.DataFrame, store: int) -> None:
     """Upload store-rankings to ``raw-data/app_rankings/`` on S3."""
-    logger.info(f"Process and save rankings start {store=}")
+    log_info = f"Upload rank parquets {store=}"
+    logger.info(f"{log_info} start")
     if store is None:
         raise ValueError("store is required")
     output_dir = f"/tmp/exports/app_rankings/store={store}"
@@ -41,20 +37,20 @@ def process_store_rankings(df: pd.DataFrame, store: int) -> None:
         if isinstance(crawled_date, datetime.date):
             crawled_date = crawled_date.strftime("%Y-%m-%d")
         for country, df_country in df_crawled_date.groupby("country"):
+            if df_country.empty:
+                logger.warning(
+                    f"{log_info} {crawled_date=} country={country=} empty dataframe, skipping upload"
+                )
+                continue
             local_path = pathlib.Path(
                 f"{output_dir}/crawled_date={crawled_date}/country={country}/rankings.parquet"
             )
             os.makedirs(os.path.dirname(local_path), exist_ok=True)
             df_country.to_parquet(local_path, index=False)
             s3_key = f"{RAW_DATA_APP_RANKINGS}/store={store}/crawled_date={crawled_date}/country={country}/rankings.parquet"
-            logger.info(f"Uploading to S3: {s3_key}")
+            logger.info(f"{log_info} {crawled_date=} {country=} uploading to S3")
             s3_client.upload_file(str(local_path), bucket, s3_key)
             local_path.unlink()
-
-
-# ---------------------------------------------------------------------------
-# Rankings import
-# ---------------------------------------------------------------------------
 
 
 def get_s3_rank_parquet_paths(
