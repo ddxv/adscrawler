@@ -37,21 +37,32 @@ def process_app_icon(
 ) -> tuple[str, str] | None:
     """Download a 512px icon, resize to 128×128 and 64×64, upload both to S3.
 
+    Strips control characters (newlines, tabs, etc.) from the URL to handle
+    database-corrupted values. If the response ``Content-Type`` is not an
+    image type, the attempt is treated as a failure.
+
     Retries on failure with backoff delays of 0.5, 1, 1.5, and 2 seconds.
 
     Returns ``(filename_128, filename_64)`` on success, or ``None`` on failure.
     """
+    # Strip control characters (e.g. \\n) that may be embedded in stored URLs
+    clean_url = "".join(
+        c for c in url if c.isprintable() or c in "/:?#[]@!$&'()*+,;=-._~% "
+    )
+    if clean_url != url:
+        logger.warning(f"Sanitised control characters in icon URL for {store_id}")
+
     last_exception: Exception | None = None
     for attempt, delay in enumerate(_ICON_RETRY_DELAYS, start=1):
         try:
             if attempt == 1:
-                response = requests.get(url, timeout=10)
+                response = requests.get(clean_url, timeout=10)
             else:
-                response = requests.get(url, timeout=10, proxies=proxies)
+                response = requests.get(clean_url, timeout=10, proxies=proxies)
         except Exception as exc:
             logger.warning(
                 f"Attempt {attempt}/{len(_ICON_RETRY_DELAYS)} — "
-                f"failed to fetch image from {url}: {exc}"
+                f"failed to fetch image from {clean_url}: {exc}"
             )
             last_exception = exc
             if attempt < len(_ICON_RETRY_DELAYS):
@@ -59,6 +70,14 @@ def process_app_icon(
             continue
 
         try:
+            content_type = response.headers.get("Content-Type", "")
+            if not content_type.startswith("image/"):
+                logger.warning(
+                    f"Attempt {attempt}/{len(_ICON_RETRY_DELAYS)} — "
+                    f"non-image Content-Type '{content_type}' for {store_id} from {clean_url}"
+                )
+                raise ValueError(f"Expected image/, got {content_type}")
+
             img = Image.open(BytesIO(response.content))
             img = _ensure_rgb(img)
             # Always store as PNG regardless of source format
@@ -74,7 +93,7 @@ def process_app_icon(
         except Exception as exc:
             logger.warning(
                 f"Attempt {attempt}/{len(_ICON_RETRY_DELAYS)} — "
-                f"failed to process icon for {store_id} from {url}: {exc}"
+                f"failed to process icon for {store_id} from {clean_url}: {exc}"
             )
             last_exception = exc
             continue
@@ -109,7 +128,7 @@ def process_app_icon(
 
     logger.error(
         f"All {len(_ICON_RETRY_DELAYS)} attempts failed for icon {store_id} "
-        f"from {url}: {last_exception}"
+        f"from {clean_url}: {last_exception}"
     )
     return None
 
