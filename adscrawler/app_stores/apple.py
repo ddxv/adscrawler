@@ -114,10 +114,10 @@ def scrape_ios_ranks(
         f"Scrape iOS ranks for {collection_keyword=} {category_keyword=} {country=}"
     )
     logger.info(f"{scrape_info} starting")
-    # Eg: MAGAZINES_MEN, GAMES_ADVENTURE
     collections = get_app_store_collections(
         collection_keyword=collection_keyword,
     )
+    # Eg: MAGAZINES_MEN, GAMES_ADVENTURE
     categories = get_app_store_categories(category_keyword=category_keyword)
     ranked_dicts: list[dict] = []
     scraper = AppStoreScraper()

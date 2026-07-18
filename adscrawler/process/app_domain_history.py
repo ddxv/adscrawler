@@ -2,6 +2,7 @@
 
 import datetime
 import time
+import os
 import uuid
 from io import BytesIO
 
@@ -9,10 +10,12 @@ import pandas as pd
 
 from adscrawler.config import CONFIG, SQL_DIR, get_logger
 from adscrawler.dbcon.connection import PostgresEngine
+from adscrawler.dbcon.atomic_swap import atomic_swap_partition
 from adscrawler.dbcon.queries import (
     delete_combined_history_by_quarter,
     insert_bulk,
     query_report_combined_domains,
+    CREATE_DOMAIN_APP_CHANGES,
 )
 from adscrawler.process import (
     AGG_COMBINED_DOMAIN_HISTORY,
@@ -28,24 +31,26 @@ from adscrawler.process.storage import (
 logger = get_logger(__name__, "scrape_stores")
 
 
-def run_trends():
+def run_changes(pgdb: PostgresEngine, store_apps_key: str) -> None:
 
     s3_config_key = "s3"
     bucket = CONFIG[s3_config_key]["bucket"]
-    prefix = AGG_COMBINED_DOMAIN_HISTORY
-    parquet_files = get_parquet_paths_by_prefix(bucket=bucket, prefix=prefix)
+    parquet_files = get_parquet_paths_by_prefix(
+        bucket=bucket, prefix=AGG_COMBINED_DOMAIN_HISTORY
+    )
 
-    # Load the DuckDB SQL as a raw string (not via SQLAlchemy text())
-    sql_path = SQL_DIR / "duckdb" / "company_trends.sql"
-    raw_sql = sql_path.read_text()
+    tmp_parquet_path = "/tmp/domain_app_changes.parquet"
+    os.unlink(tmp_parquet_path) if os.path.exists(tmp_parquet_path) else None
 
-    # The store_apps table needs to come from the parquet created by store_apps_release_dates_to_s3
-    store_apps_key = f"s3://{bucket}/{AGG_STORE_APPS_RELEASE_DATES}/store_apps.parquet"
+    statements = [s.strip() for s in CREATE_DOMAIN_APP_CHANGES.split(";") if s.strip()]
 
     with get_duckdb_connection(s3_config_key) as duckdb_con:
-        duckdb_con.execute(
-            raw_sql, {"parquet_files": parquet_files, "store_apps_key": store_apps_key}
-        )
+        for statement in statements:
+            duckdb_con.execute(statement, {**parquet_files, **store_apps_key})
+
+    df = pd.read_parquet(tmp_parquet_path)
+    df["batch_date"] = datetime.date.today()
+    atomic_swap_partition(df, pgdb, schema="adtech", table="domain_app_changes")
 
 
 def combined_domain_history_to_s3(
