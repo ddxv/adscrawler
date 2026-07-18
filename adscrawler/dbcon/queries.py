@@ -50,6 +50,12 @@ QUERY_APPS_MISSING_ICON_VARIANTS = load_sql_file("query_apps_missing_icon_varian
 
 # duckdb
 CREATE_DOMAIN_APP_CHANGES = (SQL_DIR / "duckdb" / "domain_app_changes.sql").read_text()
+PG_CACHE_TABLES = (SQL_DIR / "duckdb" / "cache_pg_tables.sql").read_text()
+CREATE_TREND_DOMAINS = (SQL_DIR / "duckdb" / "trend_domains.sql").read_text()
+CREATE_TREND_COMPANIES = (SQL_DIR / "duckdb" / "trend_companies.sql").read_text()
+CREATE_TREND_PARENT_COMPANIES = (
+    SQL_DIR / "duckdb" / "trend_parent_companies.sql"
+).read_text()
 
 
 def insert_df(

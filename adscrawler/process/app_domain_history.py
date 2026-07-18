@@ -1,21 +1,24 @@
 """Combined domain-app history export + change-detection (domain_app_changes_quarterly)."""
 
 import datetime
-import time
 import os
+import time
 import uuid
 from io import BytesIO
+from typing import Any
 
 import pandas as pd
 
-from adscrawler.config import CONFIG, SQL_DIR, get_logger
-from adscrawler.dbcon.connection import PostgresEngine
+from adscrawler.config import CONFIG, get_logger
 from adscrawler.dbcon.atomic_swap import atomic_swap_partition
+from adscrawler.dbcon.connection import PostgresEngine
 from adscrawler.dbcon.queries import (
+    CREATE_DOMAIN_APP_CHANGES,
+    CREATE_TREND_DOMAINS,
+    PG_CACHE_TABLES,
     delete_combined_history_by_quarter,
     insert_bulk,
     query_report_combined_domains,
-    CREATE_DOMAIN_APP_CHANGES,
 )
 from adscrawler.process import (
     AGG_COMBINED_DOMAIN_HISTORY,
@@ -23,12 +26,35 @@ from adscrawler.process import (
 )
 from adscrawler.process.storage import (
     delete_s3_objects_by_prefix,
+    get_duckdb_connection,
     get_parquet_paths_by_prefix,
     get_s3_client,
-    get_duckdb_connection,
 )
 
 logger = get_logger(__name__, "scrape_stores")
+
+
+def pg_db_uri():
+    """Return a Postgres connection URI string for the configured database."""
+    db_config = CONFIG["madrone"]
+    user = db_config["db_user"]
+    password = db_config["db_password"]
+    host = db_config["host"]
+    database = db_config["db"]
+    return f"dbname={database} host={host} user={user} password={password}"
+
+
+def _run_multi_statement(conn: Any, raw_sql: str, params: dict[str, str]) -> None:
+    """Execute a multi-statement SQL blob with manual param substitution.
+
+    DuckDB prepared parameters only work with single-statement SQL, so we
+    substitute ``$var`` and ``{var}`` placeholders manually before splitting.
+    """
+    substituted = raw_sql
+    for key, value in params.items():
+        substituted = substituted.replace(f"${key}", value).replace(f"{{{key}}}", value)
+    for stmt in (s.strip() for s in substituted.split(";") if s.strip()):
+        conn.execute(stmt)
 
 
 def run_changes(pgdb: PostgresEngine, store_apps_key: str) -> None:
@@ -39,14 +65,47 @@ def run_changes(pgdb: PostgresEngine, store_apps_key: str) -> None:
         bucket=bucket, prefix=AGG_COMBINED_DOMAIN_HISTORY
     )
 
-    tmp_parquet_path = "/tmp/domain_app_changes.parquet"
-    os.unlink(tmp_parquet_path) if os.path.exists(tmp_parquet_path) else None
+    tmp_domain_changes = "/tmp/domain_app_changes.parquet"
+    os.unlink(tmp_domain_changes) if os.path.exists(tmp_domain_changes) else None
+    tmp_trend_domains = "/tmp/trend_domains.parquet"
+    os.unlink(tmp_trend_domains) if os.path.exists(tmp_trend_domains) else None
 
-    statements = [s.strip() for s in CREATE_DOMAIN_APP_CHANGES.split(";") if s.strip()]
+    # Convert list of parquet paths into a DuckDB list literal: ['p1', 'p2', ...]
+    parquet_files_literal = "[" + ", ".join(f"'{p}'" for p in parquet_files) + "]"
+
+    db_uri = pg_db_uri()
+    store_apps_key = f"s3://{bucket}/{AGG_STORE_APPS_RELEASE_DATES}/store_apps.parquet"
 
     with get_duckdb_connection(s3_config_key) as duckdb_con:
-        for statement in statements:
-            duckdb_con.execute(statement, {**parquet_files, **store_apps_key})
+        logger.info("Create Domain Changes")
+        _run_multi_statement(
+            duckdb_con,
+            CREATE_DOMAIN_APP_CHANGES,
+            {
+                "parquet_files": parquet_files_literal,
+                "store_apps_key": f"'{store_apps_key}'",
+            },
+        )
+        logger.info("Caching Postgres lookup tables into DuckDB...")
+        _run_multi_statement(
+            duckdb_con,
+            PG_CACHE_TABLES,
+            {"db_uri": db_uri},
+        )
+        logger.info("Computing domain trends...")
+        _run_multi_statement(
+            duckdb_con,
+            CREATE_TREND_DOMAINS,
+            {"store_apps_key": f"'{store_apps_key}'"},
+        )
+        # logger.info("Computing company trends...")
+        # _run_multi_statement(duckdb_con, CREATE_TREND_COMPANIES, {...})
+        # logger.info("Computing parent-company trends...")
+        # _run_multi_statement(duckdb_con, CREATE_TREND_PARENT_COMPANIES, {...})
+
+    df = pd.read_parquet(tmp_parquet_path)
+    df["batch_date"] = datetime.date.today()
+    atomic_swap_partition(df, pgdb, schema="adtech", table="domain_app_changes")
 
     df = pd.read_parquet(tmp_parquet_path)
     df["batch_date"] = datetime.date.today()

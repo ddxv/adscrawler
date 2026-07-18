@@ -3,6 +3,7 @@
 import datetime
 import io
 from typing import Any
+
 import pandas as pd
 from psycopg import sql
 
@@ -10,6 +11,44 @@ from adscrawler.config import get_logger
 from adscrawler.dbcon.connection import PostgresEngine
 
 logger = get_logger(__name__)
+
+
+def _apply_parent_indexes_to_staging(
+    cursor: Any, schema: str, parent_table: str, staging_table: str, date_str: str
+) -> None:
+    """Find all indexes on the parent table and replicate them dynamically on the staging table."""
+    # Query to fetch definitions of all indexes belonging to the parent table
+    cursor.execute(
+        """
+        SELECT c.relname, pg_get_indexdef(i.indexrelid)
+        FROM pg_index i
+        JOIN pg_class c ON c.oid = i.indexrelid
+        JOIN pg_class p ON p.oid = i.indrelid
+        JOIN pg_namespace n ON n.oid = p.relnamespace
+        WHERE n.nspname = %(schema)s AND p.relname = %(parent_table)s;
+        """,
+        {"schema": schema, "parent_table": parent_table},
+    )
+    parent_indexes = cursor.fetchall()
+
+    for old_index_name, index_def in parent_indexes:
+        # Example index_def:
+        # CREATE INDEX idx_changes_domain_id ON adtech.domain_app_changes USING btree (domain_id)
+
+        # 1. Generate a completely unique name for the new staging index to avoid collisions
+        new_index_name = f"idx_{staging_table}_{old_index_name}_{date_str}"
+
+        # 2. Safely swap the target table name and the index name in the raw SQL definition string
+        # We replace the parent table name with the staging table name
+        localized_def = index_def.replace(
+            f"{schema}.{parent_table}", f"{schema}.{staging_table}"
+        ).replace(f" {parent_table} ", f" {staging_table} ")
+
+        # Replace the old index name with our unique staging index name
+        localized_def = localized_def.replace(old_index_name, new_index_name)
+
+        logger.info("Dynamically creating replicated index: %s", new_index_name)
+        cursor.execute(sql.SQL(localized_def))
 
 
 def _get_existing_partitions(cursor: Any, schema: str, table: str) -> list[str]:
@@ -50,6 +89,7 @@ def atomic_swap_partition(
     id_constraint = sql.Identifier(f"{table}_{date_str}_batch_date_check")
 
     with pgdb.engine.raw_connection() as conn:
+        conn.autocommit = True
         with conn.cursor() as cur:
             logger.info(
                 "Preparing standalone staging table: %s.%s", schema, staging_table_name
@@ -57,24 +97,32 @@ def atomic_swap_partition(
 
             with conn.transaction():
                 cur.execute(sql.SQL("DROP TABLE IF EXISTS {};").format(id_staging))
-                cur.execute(sql.SQL("""
+                cur.execute(
+                    sql.SQL("""
                     CREATE TABLE {} (
                         LIKE {}.{} INCLUDING DEFAULTS INCLUDING STORAGE
                     );
-                """).format(id_staging, id_schema, id_parent))
+                """).format(id_staging, id_schema, id_parent)
+                )
 
-                cur.execute(sql.SQL("""
+                cur.execute(
+                    sql.SQL("""
                     ALTER TABLE {} ADD CONSTRAINT {} 
                     CHECK (batch_date = {})
-                """).format(id_staging, id_constraint, sql.Literal(batch_date)))
+                """).format(id_staging, id_constraint, sql.Literal(batch_date))
+                )
 
                 logger.info("Bulk copying %s rows with FREEZE optimization...", len(df))
                 _copy_df_to_table_freeze(df, id_staging, cur)
 
-            logger.info("Building indexes on staging table...")
-            cur.execute(sql.SQL("""
-                CREATE INDEX {} ON {} (domain_id);
-            """).format(sql.Identifier(f"idx_{staging_table_name}_domain"), id_staging))
+            logger.info("Analyzing parent table index structure to mirror layout...")
+            _apply_parent_indexes_to_staging(
+                cursor=cur,
+                schema=schema,
+                parent_table=table,
+                staging_table=staging_table_name,
+                date_str=date_str,
+            )
 
             cur.execute(sql.SQL("ANALYZE {};").format(id_staging))
 
@@ -97,10 +145,12 @@ def atomic_swap_partition(
                         )
                     )
 
-                cur.execute(sql.SQL("""
+                cur.execute(
+                    sql.SQL("""
                     ALTER TABLE {}.{} ATTACH PARTITION {} 
                     FOR VALUES IN ({})
-                """).format(id_schema, id_parent, id_staging, sql.Literal(batch_date)))
+                """).format(id_schema, id_parent, id_staging, sql.Literal(batch_date))
+                )
 
                 logger.info("Cutover transaction committed successfully.")
 
