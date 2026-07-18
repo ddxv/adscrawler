@@ -10,15 +10,17 @@ from typing import Any
 import pandas as pd
 
 from adscrawler.config import CONFIG, get_logger
-from adscrawler.dbcon.atomic_swap import atomic_swap_partition
 from adscrawler.dbcon.connection import PostgresEngine
+from adscrawler.dbcon.atomic_swap import atomic_swap_partition
 from adscrawler.dbcon.queries import (
-    CREATE_DOMAIN_APP_CHANGES,
-    CREATE_TREND_DOMAINS,
-    PG_CACHE_TABLES,
     delete_combined_history_by_quarter,
     insert_bulk,
     query_report_combined_domains,
+    CREATE_DOMAIN_APP_CHANGES,
+    PG_CACHE_TABLES,
+    CREATE_TREND_DOMAINS,
+    CREATE_TREND_COMPANIES,
+    CREATE_TREND_PARENT_COMPANIES,
 )
 from adscrawler.process import (
     AGG_COMBINED_DOMAIN_HISTORY,
@@ -26,9 +28,9 @@ from adscrawler.process import (
 )
 from adscrawler.process.storage import (
     delete_s3_objects_by_prefix,
-    get_duckdb_connection,
     get_parquet_paths_by_prefix,
     get_s3_client,
+    get_duckdb_connection,
 )
 
 logger = get_logger(__name__, "scrape_stores")
@@ -103,13 +105,13 @@ def run_changes(pgdb: PostgresEngine, store_apps_key: str) -> None:
         # logger.info("Computing parent-company trends...")
         # _run_multi_statement(duckdb_con, CREATE_TREND_PARENT_COMPANIES, {...})
 
-    df = pd.read_parquet(tmp_parquet_path)
+    df = pd.read_parquet(tmp_domain_changes)
     df["batch_date"] = datetime.date.today()
     atomic_swap_partition(df, pgdb, schema="adtech", table="domain_app_changes")
 
-    df = pd.read_parquet(tmp_parquet_path)
-    df["batch_date"] = datetime.date.today()
-    atomic_swap_partition(df, pgdb, schema="adtech", table="domain_app_changes")
+    df = pd.read_parquet(tmp_trend_domains)
+    df["batch_date"] = datetime.datetime.now(datetime.timezone.utc).date()
+    atomic_swap_partition(df, pgdb, schema="adtech", table="trend_domains_test")
 
 
 def combined_domain_history_to_s3(
@@ -261,8 +263,8 @@ def process_company_history(pgdb: PostgresEngine) -> None:
             )
             continue  # Skip the ongoing quarter to avoid incomplete data
 
-        combined_domain_history_db_to_db(
-            pgdb=pgdb,
-            start_date=str(start_date.date()),
-            start_of_next_period=str(start_of_next_period.date()),
-        )
+        # combined_domain_history_db_to_db(
+        #     pgdb=pgdb,
+        #     start_date=str(start_date.date()),
+        #     start_of_next_period=str(start_of_next_period.date()),
+        # )
