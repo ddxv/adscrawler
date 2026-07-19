@@ -73,7 +73,7 @@ def run_changes(pgdb: PostgresEngine, store_apps_key: str) -> None:
     os.unlink(tmp_trend_domains) if os.path.exists(tmp_trend_domains) else None
 
     # Convert list of parquet paths into a DuckDB list literal: ['p1', 'p2', ...]
-    parquet_files_literal = "[" + ", ".join(f"'{p}'" for p in parquet_files) + "]"
+    parquet_files_literal = "[" + ", ".join(f"'{p}'" for p in parquet_files[0:10]) + "]"
 
     db_uri = pg_db_uri()
     store_apps_key = f"s3://{bucket}/{AGG_STORE_APPS_RELEASE_DATES}/store_apps.parquet"
@@ -85,7 +85,7 @@ def run_changes(pgdb: PostgresEngine, store_apps_key: str) -> None:
             CREATE_DOMAIN_APP_CHANGES,
             {
                 "parquet_files": parquet_files_literal,
-                "store_apps_key": f"'{store_apps_key}'",
+                "store_apps_key": f"['{store_apps_key}']",
             },
         )
         logger.info("Caching Postgres lookup tables into DuckDB...")
@@ -95,11 +95,7 @@ def run_changes(pgdb: PostgresEngine, store_apps_key: str) -> None:
             {"db_uri": db_uri},
         )
         logger.info("Computing domain trends...")
-        _run_multi_statement(
-            duckdb_con,
-            CREATE_TREND_DOMAINS,
-            {"store_apps_key": f"'{store_apps_key}'"},
-        )
+        _run_multi_statement(duckdb_con, CREATE_TREND_DOMAINS, {})
         # logger.info("Computing company trends...")
         # _run_multi_statement(duckdb_con, CREATE_TREND_COMPANIES, {...})
         # logger.info("Computing parent-company trends...")

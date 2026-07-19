@@ -60,9 +60,7 @@ def _open_image_safe(data: bytes) -> Image.Image:
     except Exception:
         pass
 
-    logging.info(
-        "Failed to open PNG, attempting to salvage by stripping corrupt chunks"
-    )
+    logger.info("Failed to open PNG, attempting to salvage by stripping corrupt chunks")
 
     # Attempt to salvage: walk chunks and strip corrupt ancillary ones
     sig = data[:8]
