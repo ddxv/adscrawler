@@ -88,7 +88,8 @@ def atomic_swap_partition(
     id_staging = sql.Identifier(schema, staging_table_name)
     id_constraint = sql.Identifier(f"{table}_{date_str}_batch_date_check")
 
-    with pgdb.engine.raw_connection() as conn:
+    with pgdb.engine.connect() as connection:
+        conn = connection.driver_connection
         conn.autocommit = True
         with conn.cursor() as cur:
             logger.info(
@@ -97,20 +98,16 @@ def atomic_swap_partition(
 
             with conn.transaction():
                 cur.execute(sql.SQL("DROP TABLE IF EXISTS {};").format(id_staging))
-                cur.execute(
-                    sql.SQL("""
+                cur.execute(sql.SQL("""
                     CREATE TABLE {} (
                         LIKE {}.{} INCLUDING DEFAULTS INCLUDING STORAGE
                     );
-                """).format(id_staging, id_schema, id_parent)
-                )
+                """).format(id_staging, id_schema, id_parent))
 
-                cur.execute(
-                    sql.SQL("""
+                cur.execute(sql.SQL("""
                     ALTER TABLE {} ADD CONSTRAINT {} 
                     CHECK (batch_date = {})
-                """).format(id_staging, id_constraint, sql.Literal(batch_date))
-                )
+                """).format(id_staging, id_constraint, sql.Literal(batch_date)))
 
                 logger.info("Bulk copying %s rows with FREEZE optimization...", len(df))
                 _copy_df_to_table_freeze(df, id_staging, cur)
@@ -145,12 +142,10 @@ def atomic_swap_partition(
                         )
                     )
 
-                cur.execute(
-                    sql.SQL("""
+                cur.execute(sql.SQL("""
                     ALTER TABLE {}.{} ATTACH PARTITION {} 
                     FOR VALUES IN ({})
-                """).format(id_schema, id_parent, id_staging, sql.Literal(batch_date))
-                )
+                """).format(id_schema, id_parent, id_staging, sql.Literal(batch_date)))
 
                 logger.info("Cutover transaction committed successfully.")
 
