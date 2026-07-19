@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 9EVN4xcTKOqeDaSFiT2f9iVpHQYqzkHoyUVO20Jz6z7ishtnqDJ69toyCp5uJWi
+\restrict 2aqzbA3aIZBjlFzYFksYTl3m6Ph6ufCIy967TLZrncTm5BgbLQ1OGeotP6LpQt8
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -38,11 +38,11 @@ CREATE TABLE public.creative_records (
     mmp_domain_id integer,
     mmp_urls text[],
     additional_ad_domain_ids integer[],
-    advertiser_store_app_ids integer[],
     created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
     updated_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
     click_ids integer[],
     click_url_ids integer[],
+    advertiser_store_app_ids integer[],
     CONSTRAINT check_advertiser_or_advertiser_domain CHECK (((advertiser_store_app_id IS NOT NULL) OR (advertiser_domain_id IS NOT NULL) OR ((advertiser_store_app_id IS NULL) AND (advertiser_domain_id IS NULL))))
 );
 
@@ -154,5 +154,5 @@ ALTER TABLE ONLY public.creative_records
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 9EVN4xcTKOqeDaSFiT2f9iVpHQYqzkHoyUVO20Jz6z7ishtnqDJ69toyCp5uJWi
+\unrestrict 2aqzbA3aIZBjlFzYFksYTl3m6Ph6ufCIy967TLZrncTm5BgbLQ1OGeotP6LpQt8
 

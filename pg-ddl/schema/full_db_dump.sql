@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict WjTrTlcm1dG0c5IuM9LwUG4fLLkYBcoTeDEmyc3Z2uzTy29XdUzc81xfvPPOmWc
+\restrict JxHd3sb9yX6a1rm77MOLJIfIfmV831RE18iHv8NGm6V5m8kADabTUBHps2BhQEd
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -964,11 +964,11 @@ CREATE TABLE public.creative_records (
     mmp_domain_id integer,
     mmp_urls text[],
     additional_ad_domain_ids integer[],
-    advertiser_store_app_ids integer[],
     created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
     updated_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
     click_ids integer[],
     click_url_ids integer[],
+    advertiser_store_app_ids integer[],
     CONSTRAINT check_advertiser_or_advertiser_domain CHECK (((advertiser_store_app_id IS NOT NULL) OR (advertiser_domain_id IS NOT NULL) OR ((advertiser_store_app_id IS NULL) AND (advertiser_domain_id IS NULL))))
 );
 
@@ -8002,5 +8002,5 @@ GRANT ALL ON SCHEMA public TO PUBLIC;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict WjTrTlcm1dG0c5IuM9LwUG4fLLkYBcoTeDEmyc3Z2uzTy29XdUzc81xfvPPOmWc
+\unrestrict JxHd3sb9yX6a1rm77MOLJIfIfmV831RE18iHv8NGm6V5m8kADabTUBHps2BhQEd
 

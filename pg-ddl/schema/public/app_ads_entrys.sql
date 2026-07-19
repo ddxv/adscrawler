@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict sYvUdviT3jOZSRKGzlcRCHaLcClBFD4Vv7TDyHNDuiUcfl4I5AhGLqqw3Pz0Agy
+\restrict VcmBVqRIeTn5khjLMgGOFRPg37fD8nxK60QsuwJL695MXdJv6cnM2kfW0c9vylo
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -90,5 +90,5 @@ ALTER TABLE ONLY public.app_ads_entrys
 -- PostgreSQL database dump complete
 --
 
-\unrestrict sYvUdviT3jOZSRKGzlcRCHaLcClBFD4Vv7TDyHNDuiUcfl4I5AhGLqqw3Pz0Agy
+\unrestrict VcmBVqRIeTn5khjLMgGOFRPg37fD8nxK60QsuwJL695MXdJv6cnM2kfW0c9vylo
 

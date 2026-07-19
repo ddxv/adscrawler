@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 4aHnrcvLztg4wmWQwJhIPofNGLthjKXNUtQqRxQheT7zhfYmQgickbqSKrfnVSU
+\restrict f9sTZqNZggNG748EqfaeXYda6vrmHV00u4Rq8I1wzT9lu7V9exqf28K2TN64cCo
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -92,5 +92,5 @@ CREATE INDEX version_strings_xml_path_lower_idx ON public.version_strings USING 
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 4aHnrcvLztg4wmWQwJhIPofNGLthjKXNUtQqRxQheT7zhfYmQgickbqSKrfnVSU
+\unrestrict f9sTZqNZggNG748EqfaeXYda6vrmHV00u4Rq8I1wzT9lu7V9exqf28K2TN64cCo
 
