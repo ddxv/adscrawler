@@ -36,7 +36,7 @@ def lookupby_id(app_id: str) -> dict:
 def get_app_ids_with_retry(
     scraper: AppStoreScraper, coll_value: str, cat_value: str, country: str
 ) -> list[str]:
-    max_retries = 2
+    max_retries = 1
     base_delay = 1
     max_delay = 10
     retries = 0
@@ -49,7 +49,7 @@ def get_app_ids_with_retry(
                 category=cat_value,
                 country=country,
                 num=200,
-                timeout=10,
+                timeout=12,
             )
         except Exception as e:
             if retries == max_retries:
