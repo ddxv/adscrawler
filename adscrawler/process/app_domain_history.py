@@ -13,8 +13,6 @@ from adscrawler.config import CONFIG, get_logger
 from adscrawler.dbcon.connection import PostgresEngine
 from adscrawler.dbcon.atomic_swap import atomic_swap_partition
 from adscrawler.dbcon.queries import (
-    delete_combined_history_by_quarter,
-    insert_bulk,
     query_report_combined_domains,
     CREATE_DOMAIN_APP_CHANGES,
     PG_CACHE_TABLES,
@@ -228,7 +226,7 @@ def process_company_history(pgdb: PostgresEngine) -> None:
         quarter = start_date.quarter
         logger.info(f"Company history: exporting {year=} {quarter=}")
         # Check if 'today' falls within this quarter's standard range
-        buffer_start_date = start_date - pd.Timedelta(weeks=3)
+        buffer_start_date = start_date + pd.Timedelta(weeks=3)
         if start_date <= pd.to_datetime(today) < buffer_start_date:
             # Apply the 3-week buffer only for the ongoing quarter
             print(
