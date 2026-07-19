@@ -81,20 +81,19 @@ def run_changes(pgdb: PostgresEngine) -> None:
     store_apps_key = f"s3://{bucket}/{AGG_STORE_APPS_RELEASE_DATES}/store_apps.parquet"
 
     with get_duckdb_connection(s3_config_key) as duckdb_con:
+        logger.info("Caching Postgres lookup tables into DuckDB...")
+        _run_multi_statement(
+            duckdb_con,
+            PG_CACHE_TABLES,
+            {"db_uri": db_uri, "store_apps_key": f"['{store_apps_key}']"},
+        )
         logger.info("Create Domain Changes")
         _run_multi_statement(
             duckdb_con,
             CREATE_DOMAIN_APP_CHANGES,
             {
                 "parquet_files": parquet_files_literal,
-                "store_apps_key": f"['{store_apps_key}']",
             },
-        )
-        logger.info("Caching Postgres lookup tables into DuckDB...")
-        _run_multi_statement(
-            duckdb_con,
-            PG_CACHE_TABLES,
-            {"db_uri": db_uri},
         )
         logger.info("Computing domain trends...")
         _run_multi_statement(duckdb_con, CREATE_TREND_DOMAINS, {})
