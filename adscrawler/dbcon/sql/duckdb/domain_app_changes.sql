@@ -72,7 +72,7 @@ COPY (
     SELECT domain_id, store_app, tag_source, year, quarter, status FROM added
     UNION ALL
     SELECT domain_id, store_app, tag_source, year, quarter, status FROM removed
-) TO '/tmp/domain_app_changes.parquet'
+) TO '/tmp/domain_app_changes_quarterly.parquet'
 (
     FORMAT PARQUET,
     ROW_GROUP_SIZE 100000,
