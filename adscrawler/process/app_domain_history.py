@@ -1,7 +1,7 @@
 """Combined domain-app history export + change-detection (domain_app_changes_quarterly)."""
 
 import datetime
-import os
+import pathlib
 import time
 import uuid
 from io import BytesIO
@@ -59,7 +59,7 @@ def _run_multi_statement(conn: Any, raw_sql: str, params: dict[str, str]) -> Non
         conn.execute(stmt)
 
 
-def run_changes(pgdb: PostgresEngine, store_apps_key: str) -> None:
+def run_changes(pgdb: PostgresEngine) -> None:
 
     s3_config_key = "s3"
     bucket = CONFIG[s3_config_key]["bucket"]
@@ -67,13 +67,17 @@ def run_changes(pgdb: PostgresEngine, store_apps_key: str) -> None:
         bucket=bucket, prefix=AGG_COMBINED_DOMAIN_HISTORY
     )
 
-    tmp_domain_changes = "/tmp/domain_app_changes.parquet"
-    os.unlink(tmp_domain_changes) if os.path.exists(tmp_domain_changes) else None
-    tmp_trend_domains = "/tmp/trend_domains.parquet"
-    os.unlink(tmp_trend_domains) if os.path.exists(tmp_trend_domains) else None
+    tmp_domain_changes = pathlib.Path("/tmp/domain_app_changes.parquet")
+    tmp_domain_changes.unlink(missing_ok=True)
+    tmp_trend_domains = pathlib.Path("/tmp/trend_domains.parquet")
+    tmp_trend_domains.unlink(missing_ok=True)
+    tmp_trend_companies = pathlib.Path("/tmp/trend_companies.parquet")
+    tmp_trend_companies.unlink(missing_ok=True)
+    tmp_trend_parent_companies = pathlib.Path("/tmp/trend_parent_companies.parquet")
+    tmp_trend_parent_companies.unlink(missing_ok=True)
 
     # Convert list of parquet paths into a DuckDB list literal: ['p1', 'p2', ...]
-    parquet_files_literal = "[" + ", ".join(f"'{p}'" for p in parquet_files[0:10]) + "]"
+    parquet_files_literal = "[" + ", ".join(f"'{p}'" for p in parquet_files) + "]"
 
     db_uri = pg_db_uri()
     store_apps_key = f"s3://{bucket}/{AGG_STORE_APPS_RELEASE_DATES}/store_apps.parquet"
@@ -96,18 +100,30 @@ def run_changes(pgdb: PostgresEngine, store_apps_key: str) -> None:
         )
         logger.info("Computing domain trends...")
         _run_multi_statement(duckdb_con, CREATE_TREND_DOMAINS, {})
-        # logger.info("Computing company trends...")
-        # _run_multi_statement(duckdb_con, CREATE_TREND_COMPANIES, {...})
-        # logger.info("Computing parent-company trends...")
-        # _run_multi_statement(duckdb_con, CREATE_TREND_PARENT_COMPANIES, {...})
+        logger.info("Computing company trends...")
+        _run_multi_statement(duckdb_con, CREATE_TREND_COMPANIES, {})
+        logger.info("Computing parent-company trends...")
+        _run_multi_statement(duckdb_con, CREATE_TREND_PARENT_COMPANIES, {})
+
+    batch_date = datetime.date.today()
 
     df = pd.read_parquet(tmp_domain_changes)
-    df["batch_date"] = datetime.date.today()
+    df["batch_date"] = batch_date
     atomic_swap_partition(df, pgdb, schema="adtech", table="domain_app_changes")
 
     df = pd.read_parquet(tmp_trend_domains)
-    df["batch_date"] = datetime.datetime.now(datetime.timezone.utc).date()
+    df["batch_date"] = batch_date
     atomic_swap_partition(df, pgdb, schema="adtech", table="trend_domains_test")
+
+    df = pd.read_parquet(tmp_trend_companies)
+    df["batch_date"] = batch_date
+    atomic_swap_partition(df, pgdb, schema="adtech", table="trend_companies_test")
+
+    df = pd.read_parquet(tmp_trend_parent_companies)
+    df["batch_date"] = batch_date
+    atomic_swap_partition(
+        df, pgdb, schema="adtech", table="trend_parent_companies_test"
+    )
 
 
 def combined_domain_history_to_s3(
@@ -170,45 +186,6 @@ def combined_domain_history_to_s3(
     logger.info(f"Finished {part=} written to s3://{bucket}/{prefix}/")
 
 
-def combined_domain_history_db_to_db(
-    pgdb: PostgresEngine,
-    start_date: str,
-    start_of_next_period: str,
-) -> None:
-    """Stream combined domain app history from Postgres query directly into
-    the adtech.combined_domain_app_history table (DB-to-DB).
-
-    Deletes existing data for the same year/quarter first, then bulk-inserts.
-    """
-    logger.info(
-        "Inserting combined domain history into adtech.combined_domain_app_history "
-        f"start={start_date} next={start_of_next_period}"
-    )
-
-    df = query_report_combined_domains(
-        pgdb=pgdb,
-        start_date=start_date,
-        start_of_next_period=start_of_next_period,
-    )
-    year = pd.Timestamp(start_date).year
-    quarter = pd.Timestamp(start_date).quarter
-    df["year"] = year
-    df["quarter"] = quarter
-
-    delete_combined_history_by_quarter(
-        pgdb=pgdb,
-        delete_year=year,
-        delete_quarter=quarter,
-    )
-    insert_bulk(
-        df=df,
-        schema="adtech",
-        table_name="combined_domain_app_history",
-        pgdb=pgdb,
-        chunk_size=5000000,
-    )
-
-
 def store_apps_release_dates_to_s3(pgdb: PostgresEngine) -> None:
     """Export store_apps (id, release_date, store) to a static parquet in S3.
 
@@ -242,7 +219,7 @@ def process_company_history(pgdb: PostgresEngine) -> None:
     today = datetime.date.today()
     quarters = pd.date_range(start="2025-01-01", end=today, freq="QS")
     # Export lookup tables once (idempotent)
-    # store_apps_release_dates_to_s3(pgdb)
+    store_apps_release_dates_to_s3(pgdb)
     for start_date in quarters:
         start_of_next_period = (
             start_date + pd.offsets.QuarterEnd() + datetime.timedelta(days=1)
@@ -259,8 +236,11 @@ def process_company_history(pgdb: PostgresEngine) -> None:
             )
             continue  # Skip the ongoing quarter to avoid incomplete data
 
-        # combined_domain_history_db_to_db(
-        #     pgdb=pgdb,
-        #     start_date=str(start_date.date()),
-        #     start_of_next_period=str(start_of_next_period.date()),
-        # )
+        combined_domain_history_to_s3(
+            pgdb=pgdb,
+            start_date=str(start_date.date()),
+            start_of_next_period=str(start_of_next_period.date()),
+            year=year,
+            quarter=quarter,
+        )
+    run_changes(pgdb=pgdb)

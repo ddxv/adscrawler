@@ -1,17 +1,31 @@
-COPY (
-WITH enriched_store AS (
-    SELECT
-        e.domain_id,
-        e.store_app,
-        e.year,
-        e.quarter,
-        e.tag_source,
-        sa.store
-    FROM enriched e
-    LEFT JOIN read_parquet($store_apps_key) sa
-        ON sa.id = e.store_app
-),
+CREATE TEMP TABLE enriched_company AS
+SELECT 
+    cdm.company_id,
+    e.store_app,
+    e.year,
+    e.quarter,
+    e.tag_source
+FROM enriched e
+JOIN company_domain_mapping_cache cdm 
+  ON e.domain_id = cdm.domain_id
+GROUP BY cdm.company_id, e.store_app, e.year, e.quarter, e.tag_source;
 
+CREATE TEMP TABLE enriched_windowed_company AS
+SELECT
+    ec.*,
+    sa.store,
+    (ec.year * 10 + ec.quarter)                                 AS yq,
+    CASE WHEN ec.quarter = 1 THEN 7 ELSE 1 END                  AS prev_delta,
+    CASE WHEN ec.quarter = 4 THEN 7 ELSE 1 END                  AS next_delta,
+    LAG(ec.year * 10 + ec.quarter)  OVER w                      AS prev_yq,
+    LEAD(ec.year * 10 + ec.quarter) OVER w                      AS next_yq
+FROM enriched_company ec
+LEFT JOIN store_app_store sa
+  ON sa.id = ec.store_app
+WINDOW w AS (PARTITION BY ec.company_id, ec.store_app, ec.tag_source ORDER BY ec.year, ec.quarter);
+
+COPY (
+WITH
 pre_agg AS (
     SELECT
         year,
@@ -19,31 +33,28 @@ pre_agg AS (
         store,
         tag_source,
         COUNT(DISTINCT store_app) AS total_apps_in_quarter
-    FROM enriched_store
-    GROUP BY
-        year,
-        quarter,
-        store,
-        tag_source
+    -- Uses company table, though distinct app count across the market remains identical
+    FROM enriched_windowed_company 
+    GROUP BY year, quarter, store, tag_source
 ),
 
 current_quarter AS (
     SELECT
-        e.domain_id,
+        e.company_id,
         e.year,
         e.quarter,
         e.store,
         e.tag_source,
         COUNT(*) AS total_apps,
         p.total_apps_in_quarter
-    FROM enriched_store e
+    FROM enriched_windowed_company e
     JOIN pre_agg p
       ON p.year = e.year
      AND p.quarter = e.quarter
      AND p.store = e.store
      AND p.tag_source = e.tag_source
     GROUP BY
-        e.domain_id,
+        e.company_id,
         e.year,
         e.quarter,
         e.store,
@@ -53,74 +64,32 @@ current_quarter AS (
 
 churned AS (
     SELECT
-        p.domain_id,
-        p.store,
-        p.tag_source,
-        CASE
-            WHEN p.quarter = 4 THEN p.year + 1
-            ELSE CAST(p.year AS INTEGER)
-        END AS year,
-        CASE
-            WHEN p.quarter = 4 THEN 1
-            ELSE p.quarter + 1
-        END AS quarter,
+        company_id,
+        store,
+        tag_source,
+        CASE WHEN quarter = 4 THEN year + 1 ELSE year END AS year,
+        CASE WHEN quarter = 4 THEN 1 ELSE quarter + 1 END AS quarter,
         COUNT(*) AS apps_lost
-    FROM enriched_store p
-    LEFT JOIN enriched_store c
-      ON c.domain_id = p.domain_id
-     AND c.store_app = p.store_app
-     AND c.store = p.store
-     AND c.tag_source = p.tag_source
-     AND (
-            (p.quarter = 4
-                AND c.year = p.year + 1
-                AND c.quarter = 1)
-         OR (p.quarter < 4
-                AND c.year = p.year
-                AND c.quarter = p.quarter + 1)
-     )
-    WHERE c.store_app IS NULL
-    GROUP BY
-        p.domain_id,
-        p.year,
-        p.quarter,
-        p.store,
-        p.tag_source
+    FROM enriched_windowed_company
+    WHERE next_yq IS NULL OR next_yq != yq + next_delta
+    GROUP BY company_id, store, tag_source, year, quarter
 ),
 
 added AS (
     SELECT
-        c.domain_id,
-        c.store,
-        c.tag_source,
-        c.year,
-        c.quarter,
+        company_id,
+        store,
+        tag_source,
+        year,
+        quarter,
         COUNT(*) AS apps_added
-    FROM enriched_store c
-    LEFT JOIN enriched_store p
-      ON p.domain_id = c.domain_id
-     AND p.store_app = c.store_app
-     AND p.store = c.store
-     AND p.tag_source = c.tag_source
-     AND (
-            (c.quarter = 1
-                AND p.year = c.year - 1
-                AND p.quarter = 4)
-         OR (c.quarter > 1
-                AND p.year = c.year
-                AND p.quarter = c.quarter - 1)
-     )
-    WHERE p.store_app IS NULL
-    GROUP BY
-        c.domain_id,
-        c.year,
-        c.quarter,
-        c.store,
-        c.tag_source
+    FROM enriched_windowed_company
+    WHERE prev_yq IS NULL OR prev_yq != yq - prev_delta
+    GROUP BY company_id, store, tag_source, year, quarter
 )
 
 SELECT
-    d.domain_name,
+    ad.domain_name AS company_domain,
     cq.year,
     cq.quarter,
     cq.store,
@@ -130,42 +99,42 @@ SELECT
     COALESCE(ch.apps_lost, 0) AS apps_lost,
     COALESCE(a.apps_added, 0) AS apps_added,
     ROUND(
-        cq.total_apps * 100.0
-        / NULLIF(cq.total_apps_in_quarter, 0),
+        cq.total_apps * 100.0 / NULLIF(cq.total_apps_in_quarter, 0), 
         5
     ) AS pct_market_share,
     ROUND(
-        COALESCE(a.apps_added, 0) * 100.0
-        / NULLIF(cq.total_apps - COALESCE(a.apps_added, 0), 0),
+        COALESCE(a.apps_added, 0) * 100.0 / NULLIF(cq.total_apps - COALESCE(a.apps_added, 0), 0), 
         2
     ) AS pct_apps_added,
     ROUND(
-        COALESCE(ch.apps_lost, 0) * 100.0
-        / NULLIF(cq.total_apps + COALESCE(ch.apps_lost, 0), 0),
+        COALESCE(ch.apps_lost, 0) * 100.0 / NULLIF(cq.total_apps + COALESCE(ch.apps_lost, 0), 0), 
         2
     ) AS pct_apps_lost
 FROM current_quarter cq
 LEFT JOIN churned ch
-    ON ch.domain_id = cq.domain_id
+    ON ch.company_id = cq.company_id
    AND ch.year = cq.year
    AND ch.quarter = cq.quarter
    AND ch.store = cq.store
    AND ch.tag_source = cq.tag_source
 LEFT JOIN added a
-    ON a.domain_id = cq.domain_id
+    ON a.company_id = cq.company_id
    AND a.year = cq.year
    AND a.quarter = cq.quarter
    AND a.store = cq.store
    AND a.tag_source = cq.tag_source
-LEFT JOIN pg.domains d
-    ON d.id = cq.domain_id
+-- Map company back to metadata using your pre-cached items
+LEFT JOIN companies_cache co 
+    ON cq.company_id = co.id
+LEFT JOIN domains_cache ad 
+    ON co.domain_id = ad.id
 ORDER BY
     cq.year,
     cq.quarter,
     cq.tag_source,
     cq.total_apps DESC
 )
-TO '/tmp/trend_domains.parquet'
+TO '/tmp/trend_companies.parquet'
 (
     FORMAT PARQUET,
     ROW_GROUP_SIZE 100000,

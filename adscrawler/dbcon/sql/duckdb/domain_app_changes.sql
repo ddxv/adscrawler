@@ -1,8 +1,3 @@
-PRAGMA temp_directory='/tmp/duckdb_temp/';
-PRAGMA max_memory='8GB';
-
-CREATE TEMP TABLE store_app_store AS SELECT id, store, release_date FROM read_parquet($store_apps_key);
-
 CREATE TEMP TABLE enriched AS
 SELECT domain_id, store_app, year, quarter, tag_source
 FROM (

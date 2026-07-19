@@ -39,43 +39,6 @@ current_quarter AS (
         p.total_apps_in_quarter
 ),
 
--- churned AS (
---     SELECT
---         p.domain_id,
---         p.store,
---         p.tag_source,
---         CASE
---             WHEN p.quarter = 4 THEN p.year + 1
---             ELSE CAST(p.year AS INTEGER)
---         END AS year,
---         CASE
---             WHEN p.quarter = 4 THEN 1
---             ELSE p.quarter + 1
---         END AS quarter,
---         COUNT(*) AS apps_lost
---     FROM enriched_store p
---     LEFT JOIN enriched_store c
---       ON c.domain_id = p.domain_id
---      AND c.store_app = p.store_app
---      AND c.store = p.store
---      AND c.tag_source = p.tag_source
---      AND (
---             (p.quarter = 4
---                 AND c.year = p.year + 1
---                 AND c.quarter = 1)
---          OR (p.quarter < 4
---                 AND c.year = p.year
---                 AND c.quarter = p.quarter + 1)
---      )
---     WHERE c.store_app IS NULL
---     GROUP BY
---         p.domain_id,
---         p.year,
---         p.quarter,
---         p.store,
---         p.tag_source
--- ),
-
 
 churned AS (
     SELECT
@@ -116,37 +79,6 @@ added AS (
         year,
         quarter
 )
-
--- added AS (
---     SELECT
---         c.domain_id,
---         c.store,
---         c.tag_source,
---         c.year,
---         c.quarter,
---         COUNT(*) AS apps_added
---     FROM enriched_store c
---     LEFT JOIN enriched_store p
---       ON p.domain_id = c.domain_id
---      AND p.store_app = c.store_app
---      AND p.store = c.store
---      AND p.tag_source = c.tag_source
---      AND (
---             (c.quarter = 1
---                 AND p.year = c.year - 1
---                 AND p.quarter = 4)
---          OR (c.quarter > 1
---                 AND p.year = c.year
---                 AND p.quarter = c.quarter - 1)
---      )
---     WHERE p.store_app IS NULL
---     GROUP BY
---         c.domain_id,
---         c.year,
---         c.quarter,
---         c.store,
---         c.tag_source
--- )
 
 SELECT
     d.domain_name,
