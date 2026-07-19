@@ -88,79 +88,81 @@ def atomic_swap_partition(
     id_staging = sql.Identifier(schema, staging_table_name)
     id_constraint = sql.Identifier(f"{table}_{date_str}_batch_date_check")
 
-    with pgdb.engine.connect() as connection:
-        conn = connection.driver_connection
-        conn.autocommit = True
-        with conn.cursor() as cur:
-            logger.info(
-                "Preparing standalone staging table: %s.%s", schema, staging_table_name
-            )
+    with pgdb.get_driver_connection(autocommit=False) as (conn, cur):
+        logger.info(
+            "Preparing standalone staging table: %s.%s", schema, staging_table_name
+        )
 
-            with conn.transaction():
-                cur.execute(sql.SQL("DROP TABLE IF EXISTS {};").format(id_staging))
-                cur.execute(sql.SQL("""
+        with conn.transaction():
+            cur.execute(sql.SQL("DROP TABLE IF EXISTS {};").format(id_staging))
+            cur.execute(
+                sql.SQL("""
                     CREATE TABLE {} (
                         LIKE {}.{} INCLUDING DEFAULTS INCLUDING STORAGE
                     );
-                """).format(id_staging, id_schema, id_parent))
+                """).format(id_staging, id_schema, id_parent)
+            )
 
-                cur.execute(sql.SQL("""
+            cur.execute(
+                sql.SQL("""
                     ALTER TABLE {} ADD CONSTRAINT {} 
                     CHECK (batch_date = {})
-                """).format(id_staging, id_constraint, sql.Literal(batch_date)))
-
-                logger.info("Bulk copying %s rows with FREEZE optimization...", len(df))
-                _copy_df_to_table_freeze(df, id_staging, cur)
-
-            logger.info("Analyzing parent table index structure to mirror layout...")
-            _apply_parent_indexes_to_staging(
-                cursor=cur,
-                schema=schema,
-                parent_table=table,
-                staging_table=staging_table_name,
-                date_str=date_str,
+                """).format(id_staging, id_constraint, sql.Literal(batch_date))
             )
 
-            cur.execute(sql.SQL("ANALYZE {};").format(id_staging))
+            logger.info("Bulk copying %s rows with FREEZE optimization...", len(df))
+            _copy_df_to_table_freeze(df, id_staging, cur)
 
-        with conn.cursor() as cur:
-            attached_partitions = _get_existing_partitions(cur, schema, table)
-            logger.info(
-                "Active child partitions slated for detachment: %s", attached_partitions
-            )
+        logger.info("Analyzing parent table index structure to mirror layout...")
+        _apply_parent_indexes_to_staging(
+            cursor=cur,
+            schema=schema,
+            parent_table=table,
+            staging_table=staging_table_name,
+            date_str=date_str,
+        )
 
-            with conn.transaction():
-                for old_partition in attached_partitions:
-                    cur.execute(
-                        sql.SQL("""
-                        ALTER TABLE {}.{} DETACH PARTITION {}.{};
-                    """).format(
-                            id_schema,
-                            id_parent,
-                            id_schema,
-                            sql.Identifier(old_partition),
-                        )
-                    )
+        conn.commit()
+        cur.execute(sql.SQL("ANALYZE {};").format(id_staging))
+        conn.commit()
 
-                cur.execute(sql.SQL("""
-                    ALTER TABLE {}.{} ATTACH PARTITION {} 
-                    FOR VALUES IN ({})
-                """).format(id_schema, id_parent, id_staging, sql.Literal(batch_date)))
+        attached_partitions = _get_existing_partitions(cur, schema, table)
+        logger.info(
+            "Active child partitions slated for detachment: %s", attached_partitions
+        )
 
-                logger.info("Cutover transaction committed successfully.")
-
-        with conn.cursor() as cur:
+        with conn.transaction():
             for old_partition in attached_partitions:
-                if old_partition != staging_table_name:
-                    logger.info(
-                        "Pruning historical detached partition: %s", old_partition
+                cur.execute(
+                    sql.SQL("""
+                            ALTER TABLE {}.{} DETACH PARTITION {}.{};
+                        """).format(
+                        id_schema,
+                        id_parent,
+                        id_schema,
+                        sql.Identifier(old_partition),
                     )
-                    cur.execute(
-                        sql.SQL("DROP TABLE IF EXISTS {}.{};").format(
-                            id_schema, sql.Identifier(old_partition)
-                        )
-                    )
+                )
 
+            cur.execute(
+                sql.SQL("""
+                        ALTER TABLE {}.{} ATTACH PARTITION {} 
+                        FOR VALUES IN ({})
+                    """).format(
+                    id_schema, id_parent, id_staging, sql.Literal(batch_date)
+                )
+            )
+
+            logger.info("Cutover transaction committed successfully.")
+
+        for old_partition in attached_partitions:
+            if old_partition != staging_table_name:
+                logger.info("Pruning historical detached partition: %s", old_partition)
+                cur.execute(
+                    sql.SQL("DROP TABLE IF EXISTS {}.{};").format(
+                        id_schema, sql.Identifier(old_partition)
+                    )
+                )
     logger.info("Pipeline complete for batch_date=%s", batch_date)
 
 

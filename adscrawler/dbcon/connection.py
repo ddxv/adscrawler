@@ -59,6 +59,30 @@ class PostgresEngine:
             raise
 
     @contextmanager
+    def get_driver_connection(
+        self, autocommit: bool = False
+    ) -> Generator[tuple[Any, Any]]:
+        """Dedicated method for low-level driver access (yielding conn and cursor)."""
+        raw_fairy = self.engine.raw_connection()
+        conn = raw_fairy.driver_connection
+        if autocommit:
+            conn.autocommit = True
+        cursor = None
+        try:
+            cursor = conn.cursor()
+            yield conn, cursor
+            if not autocommit:
+                conn.commit()
+        except Exception:
+            if not autocommit:
+                conn.rollback()
+            raise
+        finally:
+            if cursor:
+                cursor.close()
+            raw_fairy.close()
+
+    @contextmanager
     def get_cursor(self) -> Generator[Any]:
         """Context manager for database connection and cursor."""
         conn = self.engine.raw_connection()
