@@ -1,7 +1,9 @@
 """Process app icons — resize, upload to S3, and update missing variants."""
 
 import pathlib
+import struct
 import time
+import zlib
 from datetime import UTC, datetime
 from io import BytesIO
 
@@ -23,6 +25,83 @@ logger = get_logger(__name__, "process_icons")
 
 # Retry delays (in seconds) for failed icon processing
 _ICON_RETRY_DELAYS = [0.5, 1.0, 1.5, 2.0]
+
+# Ancillary (non-critical) PNG chunk types that can be safely stripped
+_ANCILLARY_CHUNKS = {
+    "zTXt",
+    "iCCP",
+    "bKGD",
+    "cHRM",
+    "gAMA",
+    "hIST",
+    "iTXt",
+    "oFFs",
+    "pCAL",
+    "sCAL",
+    "sPLT",
+    "sRGB",
+    "sTER",
+    "tEXt",
+    "tIME",
+    "tRNS",
+}
+
+
+def _open_image_safe(data: bytes) -> Image.Image:
+    """Open a PNG image, falling back to stripping corrupt ancillary chunks.
+
+    Some PNGs served by CDNs (notably Google Play) contain ancillary chunks
+    with invalid CRCs, which causes Pillow >= 12.0 to reject the entire file.
+    This helper retries by stripping any ancillary chunk whose CRC does not
+    match, keeping only the critical chunks (IHDR, IDAT, IEND).
+    """
+    try:
+        return Image.open(BytesIO(data))
+    except Exception:
+        pass
+
+    logging.info(
+        "Failed to open PNG, attempting to salvage by stripping corrupt chunks"
+    )
+
+    # Attempt to salvage: walk chunks and strip corrupt ancillary ones
+    sig = data[:8]
+    pos = 8
+    cleaned = bytearray()
+    cleaned.extend(sig)
+    stripped = set()
+
+    while pos + 8 <= len(data):
+        length = struct.unpack(">I", data[pos : pos + 4])[0]
+        chunk_type = data[pos + 4 : pos + 8].decode("ascii", errors="replace")
+        chunk_data = data[pos + 8 : pos + 8 + length]
+        crc_stored = struct.unpack(">I", data[pos + 8 + length : pos + 12 + length])[0]
+        crc_calc = zlib.crc32(chunk_type.encode() + chunk_data) & 0xFFFFFFFF
+
+        if chunk_type in _ANCILLARY_CHUNKS and crc_stored != crc_calc:
+            logger.debug(
+                "Stripping corrupt %s chunk (CRC %08x != %08x)",
+                chunk_type,
+                crc_stored,
+                crc_calc,
+            )
+            stripped.add(chunk_type)
+            pos += 12 + length
+            continue
+
+        cleaned.extend(data[pos : pos + 12 + length])
+        pos += 12 + length
+        if chunk_type == "IEND":
+            break
+
+    if stripped:
+        logger.info(
+            "Salvaged PNG by stripping %d corrupt chunk(s): %s",
+            len(stripped),
+            ", ".join(sorted(stripped)),
+        )
+
+    return Image.open(BytesIO(bytes(cleaned)))
 
 
 def _ensure_rgb(img: Image.Image) -> Image.Image:
@@ -78,7 +157,7 @@ def process_app_icon(
                 )
                 raise ValueError(f"Expected image/, got {content_type}")
 
-            img = Image.open(BytesIO(response.content))
+            img = _open_image_safe(response.content)
             img = _ensure_rgb(img)
             # Always store as PNG regardless of source format
             img_resized = img.resize((128, 128), Image.LANCZOS)
