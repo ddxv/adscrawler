@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict cb8FL9GXgjuuA1cHTcGbOQYxyEHpicGlaFm99ckBrIQDL1czJJEnabOAgbKjKEK
+\restrict UkaBjfxrd5jdamuDXx2gBLhjGOSd0ImHYQTg0YmCDIAUN6PBb342BT4IibeWok4
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -80,5 +80,5 @@ ALTER MATERIALIZED VIEW frontend.advertiser_creatives OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict cb8FL9GXgjuuA1cHTcGbOQYxyEHpicGlaFm99ckBrIQDL1czJJEnabOAgbKjKEK
+\unrestrict UkaBjfxrd5jdamuDXx2gBLhjGOSd0ImHYQTg0YmCDIAUN6PBb342BT4IibeWok4
 

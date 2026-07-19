@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict JxHd3sb9yX6a1rm77MOLJIfIfmV831RE18iHv8NGm6V5m8kADabTUBHps2BhQEd
+\restrict eZpQ19twIjP8lpq6fOaEHIHJpeexV2aZTHqqRmAgByyei0tlXLazC6r3gnryAg4
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -1193,7 +1193,8 @@ CREATE MATERIALIZED VIEW frontend.store_apps_overview AS
     lsac.run_at AS api_successful_last_crawled,
     acr.ad_creative_count,
     amc.ad_mon_creatives,
-    aci.is_removed
+    aci.is_removed,
+    ci.country_id
    FROM (((((((((((((((public.store_apps sa
      LEFT JOIN public.category_mapping cm ON (((sa.category)::text = (cm.original_category)::text)))
      LEFT JOIN public.developers d ON ((sa.developer = d.id)))
@@ -1470,24 +1471,6 @@ CREATE MATERIALIZED VIEW adtech.combined_app_parent_companies AS
 ALTER MATERIALIZED VIEW adtech.combined_app_parent_companies OWNER TO postgres;
 
 --
--- Name: combined_domain_app_history; Type: TABLE; Schema: adtech; Owner: postgres
---
-
-CREATE TABLE adtech.combined_domain_app_history (
-    domain_id bigint NOT NULL,
-    store_app bigint NOT NULL,
-    sdk boolean NOT NULL,
-    api_call boolean NOT NULL,
-    app_ads_direct boolean NOT NULL,
-    year smallint NOT NULL,
-    quarter smallint NOT NULL,
-    app_ads_reseller boolean DEFAULT false NOT NULL
-);
-
-
-ALTER TABLE adtech.combined_domain_app_history OWNER TO postgres;
-
---
 -- Name: companies_id_seq; Type: SEQUENCE; Schema: adtech; Owner: postgres
 --
 
@@ -1593,100 +1576,40 @@ CREATE TABLE adtech.company_mediation_adapters (
 ALTER TABLE adtech.company_mediation_adapters OWNER TO postgres;
 
 --
--- Name: domain_app_changes_quarterly; Type: MATERIALIZED VIEW; Schema: adtech; Owner: postgres
+-- Name: domain_app_changes_quarterly; Type: TABLE; Schema: adtech; Owner: postgres
 --
 
-CREATE MATERIALIZED VIEW adtech.domain_app_changes_quarterly AS
- WITH enriched_raw AS (
-         SELECT h.domain_id,
-            h.store_app,
-            h.sdk,
-            h.api_call,
-            h.app_ads_direct,
-            h.year,
-            h.quarter,
-            sa.release_date
-           FROM (adtech.combined_domain_app_history h
-             LEFT JOIN public.store_apps sa ON ((sa.id = h.store_app)))
-        ), enriched AS (
-         SELECT enriched_raw.domain_id,
-            enriched_raw.store_app,
-            enriched_raw.year,
-            enriched_raw.quarter,
-            enriched_raw.release_date,
-            t.tag_source
-           FROM enriched_raw,
-            LATERAL ( VALUES ('sdk'::text,enriched_raw.sdk), ('api_call'::text,enriched_raw.api_call), ('app_ads_direct'::text,enriched_raw.app_ads_direct)) t(tag_source, is_active)
-          WHERE (t.is_active = true)
-        ), max_period AS (
-         SELECT max(((enriched.year * 10) + enriched.quarter)) AS max_yq
-           FROM enriched
-        ), app_tag_first_seen AS (
-         SELECT enriched.store_app,
-            enriched.tag_source,
-            min(((enriched.year * 10) + enriched.quarter)) AS first_seen_key
-           FROM enriched
-          GROUP BY enriched.store_app, enriched.tag_source
-        ), added AS (
-         SELECT c.domain_id,
-            c.store_app,
-            c.tag_source,
-            c.year,
-            c.quarter,
-                CASE
-                    WHEN ((((c.year * 10) + c.quarter) = af.first_seen_key) AND (NOT ((c.release_date >= make_date((c.year)::integer, (((c.quarter - 1) * 3) + 1), 1)) AND (c.release_date < (make_date((c.year)::integer, (((c.quarter - 1) * 3) + 1), 1) + '3 mons'::interval))))) THEN 'added_initial'::adtech.change_status_enum
-                    ELSE 'added'::adtech.change_status_enum
-                END AS status
-           FROM ((enriched c
-             LEFT JOIN enriched p ON (((c.domain_id = p.domain_id) AND (c.store_app = p.store_app) AND (c.tag_source = p.tag_source) AND (((c.quarter = 1) AND (p.year = (c.year - 1)) AND (p.quarter = 4)) OR ((c.quarter > 1) AND (p.year = c.year) AND (p.quarter = (c.quarter - 1)))))))
-             JOIN app_tag_first_seen af ON (((c.store_app = af.store_app) AND (c.tag_source = af.tag_source))))
-          WHERE (p.store_app IS NULL)
-        ), removed AS (
-         SELECT p.domain_id,
-            p.store_app,
-            p.tag_source,
-                CASE
-                    WHEN (p.quarter = 4) THEN (p.year + 1)
-                    ELSE (p.year)::integer
-                END AS year,
-                CASE
-                    WHEN (p.quarter = 4) THEN 1
-                    ELSE (p.quarter + 1)
-                END AS quarter,
-            'removed'::adtech.change_status_enum AS status
-           FROM ((enriched p
-             CROSS JOIN max_period mp)
-             LEFT JOIN enriched c ON (((p.domain_id = c.domain_id) AND (p.store_app = c.store_app) AND (p.tag_source = c.tag_source) AND (((p.quarter = 4) AND (c.year = (p.year + 1)) AND (c.quarter = 1)) OR ((p.quarter < 4) AND (c.year = p.year) AND (c.quarter = (p.quarter + 1)))))))
-          WHERE ((c.store_app IS NULL) AND (((
-                CASE
-                    WHEN (p.quarter = 4) THEN (p.year + 1)
-                    ELSE (p.year)::integer
-                END * 10) +
-                CASE
-                    WHEN (p.quarter = 4) THEN 1
-                    ELSE (p.quarter + 1)
-                END) <= mp.max_yq))
-        )
- SELECT added.domain_id,
-    added.store_app,
-    added.tag_source,
-    added.year,
-    added.quarter,
-    added.status
-   FROM added
-UNION ALL
- SELECT removed.domain_id,
-    removed.store_app,
-    removed.tag_source,
-    removed.year,
-    removed.quarter,
-    removed.status
-   FROM removed
-  ORDER BY 4, 5, 1, 3, 6
-  WITH NO DATA;
+CREATE TABLE adtech.domain_app_changes_quarterly (
+    domain_id integer,
+    store_app integer,
+    tag_source text,
+    year smallint,
+    quarter smallint,
+    status text,
+    batch_date date NOT NULL
+)
+PARTITION BY LIST (batch_date);
 
 
-ALTER MATERIALIZED VIEW adtech.domain_app_changes_quarterly OWNER TO postgres;
+ALTER TABLE adtech.domain_app_changes_quarterly OWNER TO postgres;
+
+--
+-- Name: domain_app_changes_quarterly_20260719; Type: TABLE; Schema: adtech; Owner: postgres
+--
+
+CREATE TABLE adtech.domain_app_changes_quarterly_20260719 (
+    domain_id integer,
+    store_app integer,
+    tag_source text,
+    year smallint,
+    quarter smallint,
+    status text,
+    batch_date date CONSTRAINT domain_app_changes_quarterly_batch_date_not_null NOT NULL,
+    CONSTRAINT domain_app_changes_quarterly_20260719_batch_date_check CHECK ((batch_date = '2026-07-19'::date))
+);
+
+
+ALTER TABLE adtech.domain_app_changes_quarterly_20260719 OWNER TO postgres;
 
 --
 -- Name: sdk_packages_id_seq; Type: SEQUENCE; Schema: adtech; Owner: postgres
@@ -1771,299 +1694,148 @@ CREATE MATERIALIZED VIEW adtech.tag_totals AS
 ALTER MATERIALIZED VIEW adtech.tag_totals OWNER TO postgres;
 
 --
--- Name: trend_companies; Type: MATERIALIZED VIEW; Schema: adtech; Owner: postgres
+-- Name: trend_companies; Type: TABLE; Schema: adtech; Owner: postgres
 --
 
-CREATE MATERIALIZED VIEW adtech.trend_companies AS
- WITH enriched_raw AS (
-         SELECT cdm.company_id,
-            h.store_app,
-            bool_or(h.sdk) AS sdk,
-            bool_or(h.api_call) AS api_call,
-            bool_or(h.app_ads_direct) AS app_ads_direct,
-            h.year,
-            h.quarter,
-            sa.store
-           FROM ((adtech.combined_domain_app_history h
-             LEFT JOIN public.store_apps sa ON ((sa.id = h.store_app)))
-             LEFT JOIN adtech.company_domain_mapping cdm ON ((h.domain_id = cdm.domain_id)))
-          GROUP BY cdm.company_id, h.store_app, h.year, h.quarter, sa.store
-        ), enriched AS (
-         SELECT enriched_raw.company_id,
-            enriched_raw.store_app,
-            enriched_raw.year,
-            enriched_raw.quarter,
-            enriched_raw.store,
-            t.tag_source
-           FROM enriched_raw,
-            LATERAL ( VALUES ('sdk'::text,enriched_raw.sdk), ('api_call'::text,enriched_raw.api_call), ('app_ads_direct'::text,enriched_raw.app_ads_direct)) t(tag_source, is_active)
-          WHERE (t.is_active = true)
-        ), pre_agg AS (
-         SELECT enriched.year,
-            enriched.quarter,
-            enriched.store,
-            enriched.tag_source,
-            count(DISTINCT enriched.store_app) AS total_apps_in_quarter
-           FROM enriched
-          GROUP BY enriched.year, enriched.quarter, enriched.store, enriched.tag_source
-        ), current_quarter AS (
-         SELECT enriched.company_id,
-            enriched.year,
-            enriched.quarter,
-            enriched.store,
-            enriched.tag_source,
-            count(enriched.store_app) AS total_apps,
-            pre_agg.total_apps_in_quarter
-           FROM (enriched
-             JOIN pre_agg ON (((pre_agg.year = enriched.year) AND (pre_agg.quarter = enriched.quarter) AND (pre_agg.store = enriched.store) AND (pre_agg.tag_source = enriched.tag_source))))
-          GROUP BY enriched.company_id, enriched.year, enriched.quarter, enriched.store, enriched.tag_source, pre_agg.total_apps_in_quarter
-        ), churned AS (
-         SELECT p.company_id,
-            p.store,
-            p.tag_source,
-                CASE
-                    WHEN (p.quarter = 4) THEN (p.year + 1)
-                    ELSE (p.year)::integer
-                END AS year,
-                CASE
-                    WHEN (p.quarter = 4) THEN (1)::bigint
-                    ELSE ((p.quarter + 1))::bigint
-                END AS quarter,
-            count(p.store_app) AS apps_lost
-           FROM (enriched p
-             LEFT JOIN enriched c ON (((p.company_id = c.company_id) AND (p.store_app = c.store_app) AND (p.store = c.store) AND (p.tag_source = c.tag_source) AND (((p.quarter = 4) AND (c.year = (p.year + 1)) AND (c.quarter = 1)) OR ((p.quarter < 4) AND (c.year = p.year) AND (c.quarter = (p.quarter + 1)))))))
-          WHERE (c.store_app IS NULL)
-          GROUP BY p.company_id, p.year, p.quarter, p.store, p.tag_source
-        ), added AS (
-         SELECT c.company_id,
-            c.store,
-            c.tag_source,
-            c.year,
-            c.quarter,
-            count(c.store_app) AS apps_added
-           FROM (enriched c
-             LEFT JOIN enriched p ON (((c.company_id = p.company_id) AND (c.store_app = p.store_app) AND (c.store = p.store) AND (c.tag_source = p.tag_source) AND (((c.quarter = 1) AND (p.year = (c.year - 1)) AND (p.quarter = 4)) OR ((c.quarter > 1) AND (p.year = c.year) AND (p.quarter = (c.quarter - 1)))))))
-          WHERE (p.store_app IS NULL)
-          GROUP BY c.company_id, c.year, c.quarter, c.store, c.tag_source
-        )
- SELECT ad.domain_name AS company_domain,
-    cq.year,
-    cq.quarter,
-    cq.store,
-    cq.tag_source,
-    cq.total_apps,
-    cq.total_apps_in_quarter,
-    COALESCE(ch.apps_lost, (0)::bigint) AS apps_lost,
-    COALESCE(a.apps_added, (0)::bigint) AS apps_added,
-    round((((cq.total_apps)::numeric * 100.0) / NULLIF((cq.total_apps_in_quarter)::numeric, (0)::numeric)), 5) AS pct_market_share,
-    round((((COALESCE(a.apps_added, (0)::bigint))::numeric * 100.0) / (NULLIF((cq.total_apps - COALESCE(a.apps_added, (0)::bigint)), 0))::numeric), 2) AS pct_apps_added,
-    round((((COALESCE(ch.apps_lost, (0)::bigint))::numeric * 100.0) / (NULLIF((cq.total_apps + COALESCE(ch.apps_lost, (0)::bigint)), 0))::numeric), 2) AS pct_apps_lost
-   FROM ((((current_quarter cq
-     LEFT JOIN churned ch ON (((cq.company_id = ch.company_id) AND (cq.year = ch.year) AND (cq.quarter = ch.quarter) AND (cq.store = ch.store) AND (cq.tag_source = ch.tag_source))))
-     LEFT JOIN added a ON (((cq.company_id = a.company_id) AND (cq.year = a.year) AND (cq.quarter = a.quarter) AND (cq.store = a.store) AND (cq.tag_source = a.tag_source))))
-     LEFT JOIN adtech.companies co ON ((cq.company_id = co.id)))
-     LEFT JOIN public.domains ad ON ((co.domain_id = ad.id)))
-  ORDER BY cq.year, cq.quarter, cq.tag_source, cq.total_apps DESC
-  WITH NO DATA;
+CREATE TABLE adtech.trend_companies (
+    company_domain character varying,
+    year smallint,
+    quarter smallint,
+    store integer,
+    tag_source text,
+    total_apps bigint,
+    total_apps_in_quarter bigint,
+    apps_lost bigint,
+    apps_added bigint,
+    pct_market_share numeric,
+    pct_apps_added numeric,
+    pct_apps_lost numeric,
+    batch_date date NOT NULL
+)
+PARTITION BY LIST (batch_date);
 
 
-ALTER MATERIALIZED VIEW adtech.trend_companies OWNER TO postgres;
+ALTER TABLE adtech.trend_companies OWNER TO postgres;
 
 --
--- Name: trend_domains; Type: MATERIALIZED VIEW; Schema: adtech; Owner: postgres
+-- Name: trend_companies_20260719; Type: TABLE; Schema: adtech; Owner: postgres
 --
 
-CREATE MATERIALIZED VIEW adtech.trend_domains AS
- WITH enriched_raw AS (
-         SELECT h.domain_id,
-            h.store_app,
-            h.sdk,
-            h.api_call,
-            h.app_ads_direct,
-            h.year,
-            h.quarter,
-            sa.store
-           FROM (adtech.combined_domain_app_history h
-             LEFT JOIN public.store_apps sa ON ((sa.id = h.store_app)))
-        ), enriched AS (
-         SELECT enriched_raw.domain_id,
-            enriched_raw.store_app,
-            enriched_raw.year,
-            enriched_raw.quarter,
-            enriched_raw.store,
-            t.tag_source
-           FROM enriched_raw,
-            LATERAL ( VALUES ('sdk'::text,enriched_raw.sdk), ('api_call'::text,enriched_raw.api_call), ('app_ads_direct'::text,enriched_raw.app_ads_direct)) t(tag_source, is_active)
-          WHERE (t.is_active = true)
-        ), pre_agg AS (
-         SELECT enriched.year,
-            enriched.quarter,
-            enriched.store,
-            enriched.tag_source,
-            count(DISTINCT enriched.store_app) AS total_apps_in_quarter
-           FROM enriched
-          GROUP BY enriched.year, enriched.quarter, enriched.store, enriched.tag_source
-        ), current_quarter AS (
-         SELECT enriched.domain_id,
-            enriched.year,
-            enriched.quarter,
-            enriched.store,
-            enriched.tag_source,
-            count(enriched.store_app) AS total_apps,
-            pre_agg.total_apps_in_quarter
-           FROM (enriched
-             JOIN pre_agg ON (((pre_agg.year = enriched.year) AND (pre_agg.quarter = enriched.quarter) AND (pre_agg.store = enriched.store) AND (pre_agg.tag_source = enriched.tag_source))))
-          GROUP BY enriched.domain_id, enriched.year, enriched.quarter, enriched.store, enriched.tag_source, pre_agg.total_apps_in_quarter
-        ), churned AS (
-         SELECT p.domain_id,
-            p.store,
-            p.tag_source,
-                CASE
-                    WHEN (p.quarter = 4) THEN (p.year + 1)
-                    ELSE (p.year)::integer
-                END AS year,
-                CASE
-                    WHEN (p.quarter = 4) THEN (1)::bigint
-                    ELSE ((p.quarter + 1))::bigint
-                END AS quarter,
-            count(p.store_app) AS apps_lost
-           FROM (enriched p
-             LEFT JOIN enriched c ON (((p.domain_id = c.domain_id) AND (p.store_app = c.store_app) AND (p.store = c.store) AND (p.tag_source = c.tag_source) AND (((p.quarter = 4) AND (c.year = (p.year + 1)) AND (c.quarter = 1)) OR ((p.quarter < 4) AND (c.year = p.year) AND (c.quarter = (p.quarter + 1)))))))
-          WHERE (c.store_app IS NULL)
-          GROUP BY p.domain_id, p.year, p.quarter, p.store, p.tag_source
-        ), added AS (
-         SELECT c.domain_id,
-            c.store,
-            c.tag_source,
-            c.year,
-            c.quarter,
-            count(c.store_app) AS apps_added
-           FROM (enriched c
-             LEFT JOIN enriched p ON (((c.domain_id = p.domain_id) AND (c.store_app = p.store_app) AND (c.store = p.store) AND (c.tag_source = p.tag_source) AND (((c.quarter = 1) AND (p.year = (c.year - 1)) AND (p.quarter = 4)) OR ((c.quarter > 1) AND (p.year = c.year) AND (p.quarter = (c.quarter - 1)))))))
-          WHERE (p.store_app IS NULL)
-          GROUP BY c.domain_id, c.year, c.quarter, c.store, c.tag_source
-        )
- SELECT ad.domain_name,
-    cq.year,
-    cq.quarter,
-    cq.store,
-    cq.tag_source,
-    cq.total_apps,
-    cq.total_apps_in_quarter,
-    COALESCE(ch.apps_lost, (0)::bigint) AS apps_lost,
-    COALESCE(a.apps_added, (0)::bigint) AS apps_added,
-    round((((cq.total_apps)::numeric * 100.0) / NULLIF((cq.total_apps_in_quarter)::numeric, (0)::numeric)), 5) AS pct_market_share,
-    round((((COALESCE(a.apps_added, (0)::bigint))::numeric * 100.0) / (NULLIF((cq.total_apps - COALESCE(a.apps_added, (0)::bigint)), 0))::numeric), 2) AS pct_apps_added,
-    round((((COALESCE(ch.apps_lost, (0)::bigint))::numeric * 100.0) / (NULLIF((cq.total_apps + COALESCE(ch.apps_lost, (0)::bigint)), 0))::numeric), 2) AS pct_apps_lost
-   FROM (((current_quarter cq
-     LEFT JOIN churned ch ON (((cq.domain_id = ch.domain_id) AND (cq.year = ch.year) AND (cq.quarter = ch.quarter) AND (cq.store = ch.store) AND (cq.tag_source = ch.tag_source))))
-     LEFT JOIN added a ON (((cq.domain_id = a.domain_id) AND (cq.year = a.year) AND (cq.quarter = a.quarter) AND (cq.store = a.store) AND (cq.tag_source = a.tag_source))))
-     LEFT JOIN public.domains ad ON ((cq.domain_id = ad.id)))
-  ORDER BY cq.year, cq.quarter, cq.tag_source, cq.total_apps DESC
-  WITH NO DATA;
+CREATE TABLE adtech.trend_companies_20260719 (
+    company_domain character varying,
+    year smallint,
+    quarter smallint,
+    store integer,
+    tag_source text,
+    total_apps bigint,
+    total_apps_in_quarter bigint,
+    apps_lost bigint,
+    apps_added bigint,
+    pct_market_share numeric,
+    pct_apps_added numeric,
+    pct_apps_lost numeric,
+    batch_date date CONSTRAINT trend_companies_batch_date_not_null NOT NULL,
+    CONSTRAINT trend_companies_20260719_batch_date_check CHECK ((batch_date = '2026-07-19'::date))
+);
 
 
-ALTER MATERIALIZED VIEW adtech.trend_domains OWNER TO postgres;
+ALTER TABLE adtech.trend_companies_20260719 OWNER TO postgres;
 
 --
--- Name: trend_parent_companies; Type: MATERIALIZED VIEW; Schema: adtech; Owner: postgres
+-- Name: trend_domains; Type: TABLE; Schema: adtech; Owner: postgres
 --
 
-CREATE MATERIALIZED VIEW adtech.trend_parent_companies AS
- WITH enriched_raw AS (
-         SELECT COALESCE(c.parent_company_id, cdm.company_id) AS parent_company_id,
-            h.store_app,
-            bool_or(h.sdk) AS sdk,
-            bool_or(h.api_call) AS api_call,
-            bool_or(h.app_ads_direct) AS app_ads_direct,
-            h.year,
-            h.quarter,
-            sa.store
-           FROM (((adtech.combined_domain_app_history h
-             LEFT JOIN public.store_apps sa ON ((sa.id = h.store_app)))
-             LEFT JOIN adtech.company_domain_mapping cdm ON ((h.domain_id = cdm.domain_id)))
-             LEFT JOIN adtech.companies c ON ((cdm.company_id = c.id)))
-          GROUP BY COALESCE(c.parent_company_id, cdm.company_id), h.store_app, h.year, h.quarter, sa.store
-        ), enriched AS (
-         SELECT enriched_raw.parent_company_id,
-            enriched_raw.store_app,
-            enriched_raw.year,
-            enriched_raw.quarter,
-            enriched_raw.store,
-            t.tag_source
-           FROM enriched_raw,
-            LATERAL ( VALUES ('sdk'::text,enriched_raw.sdk), ('api_call'::text,enriched_raw.api_call), ('app_ads_direct'::text,enriched_raw.app_ads_direct)) t(tag_source, is_active)
-          WHERE (t.is_active = true)
-        ), pre_agg AS (
-         SELECT enriched.year,
-            enriched.quarter,
-            enriched.store,
-            enriched.tag_source,
-            count(DISTINCT enriched.store_app) AS total_apps_in_quarter
-           FROM enriched
-          GROUP BY enriched.year, enriched.quarter, enriched.store, enriched.tag_source
-        ), current_quarter AS (
-         SELECT enriched.parent_company_id,
-            enriched.year,
-            enriched.quarter,
-            enriched.store,
-            enriched.tag_source,
-            count(enriched.store_app) AS total_apps,
-            pre_agg.total_apps_in_quarter
-           FROM (enriched
-             JOIN pre_agg ON (((pre_agg.year = enriched.year) AND (pre_agg.quarter = enriched.quarter) AND (pre_agg.store = enriched.store) AND (pre_agg.tag_source = enriched.tag_source))))
-          GROUP BY enriched.parent_company_id, enriched.year, enriched.quarter, enriched.store, enriched.tag_source, pre_agg.total_apps_in_quarter
-        ), churned AS (
-         SELECT p.parent_company_id,
-            p.store,
-            p.tag_source,
-                CASE
-                    WHEN (p.quarter = 4) THEN (p.year + 1)
-                    ELSE (p.year)::integer
-                END AS year,
-                CASE
-                    WHEN (p.quarter = 4) THEN (1)::bigint
-                    ELSE ((p.quarter + 1))::bigint
-                END AS quarter,
-            count(p.store_app) AS apps_lost
-           FROM (enriched p
-             LEFT JOIN enriched c ON (((p.parent_company_id = c.parent_company_id) AND (p.store_app = c.store_app) AND (p.store = c.store) AND (p.tag_source = c.tag_source) AND (((p.quarter = 4) AND (c.year = (p.year + 1)) AND (c.quarter = 1)) OR ((p.quarter < 4) AND (c.year = p.year) AND (c.quarter = (p.quarter + 1)))))))
-          WHERE (c.store_app IS NULL)
-          GROUP BY p.parent_company_id, p.year, p.quarter, p.store, p.tag_source
-        ), added AS (
-         SELECT c.parent_company_id,
-            c.store,
-            c.tag_source,
-            c.year,
-            c.quarter,
-            count(c.store_app) AS apps_added
-           FROM (enriched c
-             LEFT JOIN enriched p ON (((c.parent_company_id = p.parent_company_id) AND (c.store_app = p.store_app) AND (c.store = p.store) AND (c.tag_source = p.tag_source) AND (((c.quarter = 1) AND (p.year = (c.year - 1)) AND (p.quarter = 4)) OR ((c.quarter > 1) AND (p.year = c.year) AND (p.quarter = (c.quarter - 1)))))))
-          WHERE (p.store_app IS NULL)
-          GROUP BY c.parent_company_id, c.year, c.quarter, c.store, c.tag_source
-        )
- SELECT ad.domain_name AS company_domain,
-    cq.year,
-    cq.quarter,
-    cq.store,
-    cq.tag_source,
-    cq.total_apps,
-    cq.total_apps_in_quarter,
-    COALESCE(ch.apps_lost, (0)::bigint) AS apps_lost,
-    COALESCE(a.apps_added, (0)::bigint) AS apps_added,
-    round((((cq.total_apps)::numeric * 100.0) / NULLIF((cq.total_apps_in_quarter)::numeric, (0)::numeric)), 5) AS pct_market_share,
-    round((((COALESCE(a.apps_added, (0)::bigint))::numeric * 100.0) / (NULLIF((cq.total_apps - COALESCE(a.apps_added, (0)::bigint)), 0))::numeric), 2) AS pct_apps_added,
-    round((((COALESCE(ch.apps_lost, (0)::bigint))::numeric * 100.0) / (NULLIF((cq.total_apps + COALESCE(ch.apps_lost, (0)::bigint)), 0))::numeric), 2) AS pct_apps_lost
-   FROM ((((current_quarter cq
-     LEFT JOIN churned ch ON (((cq.parent_company_id = ch.parent_company_id) AND (cq.year = ch.year) AND (cq.quarter = ch.quarter) AND (cq.store = ch.store) AND (cq.tag_source = ch.tag_source))))
-     LEFT JOIN added a ON (((cq.parent_company_id = a.parent_company_id) AND (cq.year = a.year) AND (cq.quarter = a.quarter) AND (cq.store = a.store) AND (cq.tag_source = a.tag_source))))
-     LEFT JOIN adtech.companies co ON ((cq.parent_company_id = co.id)))
-     LEFT JOIN public.domains ad ON ((co.domain_id = ad.id)))
-  ORDER BY cq.year, cq.quarter, cq.tag_source, cq.total_apps DESC
-  WITH NO DATA;
+CREATE TABLE adtech.trend_domains (
+    domain_name character varying,
+    year smallint,
+    quarter smallint,
+    store integer,
+    tag_source text,
+    total_apps bigint,
+    total_apps_in_quarter bigint,
+    apps_lost bigint,
+    apps_added bigint,
+    pct_market_share numeric,
+    pct_apps_added numeric,
+    pct_apps_lost numeric,
+    batch_date date NOT NULL
+)
+PARTITION BY LIST (batch_date);
 
 
-ALTER MATERIALIZED VIEW adtech.trend_parent_companies OWNER TO postgres;
+ALTER TABLE adtech.trend_domains OWNER TO postgres;
+
+--
+-- Name: trend_domains_20260719; Type: TABLE; Schema: adtech; Owner: postgres
+--
+
+CREATE TABLE adtech.trend_domains_20260719 (
+    domain_name character varying,
+    year smallint,
+    quarter smallint,
+    store integer,
+    tag_source text,
+    total_apps bigint,
+    total_apps_in_quarter bigint,
+    apps_lost bigint,
+    apps_added bigint,
+    pct_market_share numeric,
+    pct_apps_added numeric,
+    pct_apps_lost numeric,
+    batch_date date CONSTRAINT trend_domains_batch_date_not_null NOT NULL,
+    CONSTRAINT trend_domains_20260719_batch_date_check CHECK ((batch_date = '2026-07-19'::date))
+);
+
+
+ALTER TABLE adtech.trend_domains_20260719 OWNER TO postgres;
+
+--
+-- Name: trend_parent_companies; Type: TABLE; Schema: adtech; Owner: postgres
+--
+
+CREATE TABLE adtech.trend_parent_companies (
+    company_domain character varying,
+    year smallint,
+    quarter smallint,
+    store integer,
+    tag_source text,
+    total_apps bigint,
+    total_apps_in_quarter bigint,
+    apps_lost bigint,
+    apps_added bigint,
+    pct_market_share numeric,
+    pct_apps_added numeric,
+    pct_apps_lost numeric,
+    batch_date date NOT NULL
+)
+PARTITION BY LIST (batch_date);
+
+
+ALTER TABLE adtech.trend_parent_companies OWNER TO postgres;
+
+--
+-- Name: trend_parent_companies_20260719; Type: TABLE; Schema: adtech; Owner: postgres
+--
+
+CREATE TABLE adtech.trend_parent_companies_20260719 (
+    company_domain character varying,
+    year smallint,
+    quarter smallint,
+    store integer,
+    tag_source text,
+    total_apps bigint,
+    total_apps_in_quarter bigint,
+    apps_lost bigint,
+    apps_added bigint,
+    pct_market_share numeric,
+    pct_apps_added numeric,
+    pct_apps_lost numeric,
+    batch_date date CONSTRAINT trend_parent_companies_batch_date_not_null NOT NULL,
+    CONSTRAINT trend_parent_companies_20260719_batch_date_check CHECK ((batch_date = '2026-07-19'::date))
+);
+
+
+ALTER TABLE adtech.trend_parent_companies_20260719 OWNER TO postgres;
 
 --
 -- Name: url_redirect_chains; Type: TABLE; Schema: adtech; Owner: postgres
@@ -3462,10 +3234,10 @@ CREATE MATERIALIZED VIEW frontend.companies_overview AS
                   WHERE (ROW(trend_parent_companies.year, trend_parent_companies.quarter) >= ROW((EXTRACT(year FROM (CURRENT_DATE - '3 mons'::interval)))::integer, (EXTRACT(quarter FROM (CURRENT_DATE - '3 mons'::interval)))::integer))) sub
         ), app_changes_agg AS (
          SELECT d.domain_name AS company_domain,
-            (count(*) FILTER (WHERE ((dacq.status = 'added'::adtech.change_status_enum) AND (dacq.tag_source = 'sdk'::text))))::integer AS apps_sdk_added_count,
-            (count(*) FILTER (WHERE ((dacq.status = 'removed'::adtech.change_status_enum) AND (dacq.tag_source = 'sdk'::text))))::integer AS apps_sdk_lost_count,
-            (count(*) FILTER (WHERE ((dacq.status = 'added'::adtech.change_status_enum) AND (dacq.tag_source = 'app_ads_direct'::text))))::integer AS apps_adstxt_direct_added_count,
-            (count(*) FILTER (WHERE ((dacq.status = 'removed'::adtech.change_status_enum) AND (dacq.tag_source = 'app_ads_direct'::text))))::integer AS apps_adstxt_direct_lost_count
+            (count(*) FILTER (WHERE ((dacq.status = 'added'::text) AND (dacq.tag_source = 'sdk'::text))))::integer AS apps_sdk_added_count,
+            (count(*) FILTER (WHERE ((dacq.status = 'removed'::text) AND (dacq.tag_source = 'sdk'::text))))::integer AS apps_sdk_lost_count,
+            (count(*) FILTER (WHERE ((dacq.status = 'added'::text) AND (dacq.tag_source = 'app_ads_direct'::text))))::integer AS apps_adstxt_direct_added_count,
+            (count(*) FILTER (WHERE ((dacq.status = 'removed'::text) AND (dacq.tag_source = 'app_ads_direct'::text))))::integer AS apps_adstxt_direct_lost_count
            FROM (adtech.domain_app_changes_quarterly dacq
              LEFT JOIN public.domains d ON ((dacq.domain_id = d.id)))
           WHERE (ROW(dacq.year, dacq.quarter) >= ROW((EXTRACT(year FROM (CURRENT_DATE - '3 mons'::interval)))::integer, (EXTRACT(quarter FROM (CURRENT_DATE - '3 mons'::interval)))::integer))
@@ -5524,6 +5296,34 @@ ALTER TABLE public.version_strings ALTER COLUMN id ADD GENERATED BY DEFAULT AS I
 
 
 --
+-- Name: domain_app_changes_quarterly_20260719; Type: TABLE ATTACH; Schema: adtech; Owner: postgres
+--
+
+ALTER TABLE ONLY adtech.domain_app_changes_quarterly ATTACH PARTITION adtech.domain_app_changes_quarterly_20260719 FOR VALUES IN ('2026-07-19');
+
+
+--
+-- Name: trend_companies_20260719; Type: TABLE ATTACH; Schema: adtech; Owner: postgres
+--
+
+ALTER TABLE ONLY adtech.trend_companies ATTACH PARTITION adtech.trend_companies_20260719 FOR VALUES IN ('2026-07-19');
+
+
+--
+-- Name: trend_domains_20260719; Type: TABLE ATTACH; Schema: adtech; Owner: postgres
+--
+
+ALTER TABLE ONLY adtech.trend_domains ATTACH PARTITION adtech.trend_domains_20260719 FOR VALUES IN ('2026-07-19');
+
+
+--
+-- Name: trend_parent_companies_20260719; Type: TABLE ATTACH; Schema: adtech; Owner: postgres
+--
+
+ALTER TABLE ONLY adtech.trend_parent_companies ATTACH PARTITION adtech.trend_parent_companies_20260719 FOR VALUES IN ('2026-07-19');
+
+
+--
 -- Name: api_call_urls id; Type: DEFAULT; Schema: adtech; Owner: postgres
 --
 
@@ -6424,13 +6224,6 @@ CREATE INDEX adtech_company_category ON adtech.company_categories USING btree (c
 
 
 --
--- Name: idx_cdah_active_domain_store_year_quarter; Type: INDEX; Schema: adtech; Owner: postgres
---
-
-CREATE INDEX idx_cdah_active_domain_store_year_quarter ON adtech.combined_domain_app_history USING btree (domain_id, store_app, year, quarter);
-
-
---
 -- Name: idx_combined_app_parent_companies_idx; Type: INDEX; Schema: adtech; Owner: postgres
 --
 
@@ -6438,17 +6231,17 @@ CREATE UNIQUE INDEX idx_combined_app_parent_companies_idx ON adtech.combined_app
 
 
 --
--- Name: idx_domain_app_changes_quarterly_lookup; Type: INDEX; Schema: adtech; Owner: postgres
+-- Name: idx_domain_app_changes_lookup; Type: INDEX; Schema: adtech; Owner: postgres
 --
 
-CREATE INDEX idx_domain_app_changes_quarterly_lookup ON adtech.domain_app_changes_quarterly USING btree (year, quarter, domain_id);
+CREATE INDEX idx_domain_app_changes_lookup ON ONLY adtech.domain_app_changes_quarterly USING btree (year, quarter, domain_id);
 
 
 --
--- Name: idx_domain_app_changes_quarterly_pk; Type: INDEX; Schema: adtech; Owner: postgres
+-- Name: idx_domain_app_changes_quarterly_20260719_idx_domain_app_change; Type: INDEX; Schema: adtech; Owner: postgres
 --
 
-CREATE UNIQUE INDEX idx_domain_app_changes_quarterly_pk ON adtech.domain_app_changes_quarterly USING btree (domain_id, store_app, year, quarter, tag_source, status);
+CREATE INDEX idx_domain_app_changes_quarterly_20260719_idx_domain_app_change ON adtech.domain_app_changes_quarterly_20260719 USING btree (year, quarter, domain_id);
 
 
 --
@@ -6456,27 +6249,6 @@ CREATE UNIQUE INDEX idx_domain_app_changes_quarterly_pk ON adtech.domain_app_cha
 --
 
 CREATE INDEX idx_found_urls_run ON adtech.api_call_urls USING btree (run_id);
-
-
---
--- Name: idx_trend_companies_concurrent; Type: INDEX; Schema: adtech; Owner: postgres
---
-
-CREATE UNIQUE INDEX idx_trend_companies_concurrent ON adtech.trend_companies USING btree (company_domain, year, quarter, store, tag_source);
-
-
---
--- Name: idx_trend_domains_concurrent; Type: INDEX; Schema: adtech; Owner: postgres
---
-
-CREATE UNIQUE INDEX idx_trend_domains_concurrent ON adtech.trend_domains USING btree (domain_name, year, quarter, store, tag_source);
-
-
---
--- Name: idx_trend_parent_companies_concurrent; Type: INDEX; Schema: adtech; Owner: postgres
---
-
-CREATE UNIQUE INDEX idx_trend_parent_companies_concurrent ON adtech.trend_parent_companies USING btree (company_domain, year, quarter, store, tag_source);
 
 
 --
@@ -7285,6 +7057,13 @@ CREATE INDEX version_strings_xml_path_lower_idx ON public.version_strings USING 
 
 
 --
+-- Name: idx_domain_app_changes_quarterly_20260719_idx_domain_app_change; Type: INDEX ATTACH; Schema: adtech; Owner: postgres
+--
+
+ALTER INDEX adtech.idx_domain_app_changes_lookup ATTACH PARTITION adtech.idx_domain_app_changes_quarterly_20260719_idx_domain_app_change;
+
+
+--
 -- Name: app_ads_entrys app_ads_entrys_updated_at; Type: TRIGGER; Schema: public; Owner: james
 --
 
@@ -8002,5 +7781,5 @@ GRANT ALL ON SCHEMA public TO PUBLIC;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict JxHd3sb9yX6a1rm77MOLJIfIfmV831RE18iHv8NGm6V5m8kADabTUBHps2BhQEd
+\unrestrict eZpQ19twIjP8lpq6fOaEHIHJpeexV2aZTHqqRmAgByyei0tlXLazC6r3gnryAg4
 

@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 1oYeBLpy0cc6da1p1mffls7P1US4nWRDrUzpOK0xLm6x1bemAlnuhFdfzrRD869
+\restrict M6h9dyLnkfsX2zsmoIzHC7jHlPnRas7gZ8PD0RfaSvSfbHrgLWRV0SLZJ7S6rXj
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -150,5 +150,5 @@ CREATE UNIQUE INDEX keyword_scores_store_keyword_id_idx ON frontend.keyword_scor
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 1oYeBLpy0cc6da1p1mffls7P1US4nWRDrUzpOK0xLm6x1bemAlnuhFdfzrRD869
+\unrestrict M6h9dyLnkfsX2zsmoIzHC7jHlPnRas7gZ8PD0RfaSvSfbHrgLWRV0SLZJ7S6rXj
 

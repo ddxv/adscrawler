@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 7v28IJ6XFpn7D7Z7qa75Qr5FzREmLDgLHwv7WBWodemDYdQFtI3HPEa1D3hSUP1
+\restrict 9BGd1iacmbclTdTrT31jAZsvqh4KMjMsD1ToUWgN0N8PzCCxXb4fsZTziuUBEbc
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -177,7 +177,8 @@ CREATE MATERIALIZED VIEW frontend.store_apps_overview AS
     lsac.run_at AS api_successful_last_crawled,
     acr.ad_creative_count,
     amc.ad_mon_creatives,
-    aci.is_removed
+    aci.is_removed,
+    ci.country_id
    FROM (((((((((((((((public.store_apps sa
      LEFT JOIN public.category_mapping cm ON (((sa.category)::text = (cm.original_category)::text)))
      LEFT JOIN public.developers d ON ((sa.developer = d.id)))
@@ -266,5 +267,5 @@ CREATE UNIQUE INDEX store_apps_overview_unique_store_id_idx ON frontend.store_ap
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 7v28IJ6XFpn7D7Z7qa75Qr5FzREmLDgLHwv7WBWodemDYdQFtI3HPEa1D3hSUP1
+\unrestrict 9BGd1iacmbclTdTrT31jAZsvqh4KMjMsD1ToUWgN0N8PzCCxXb4fsZTziuUBEbc
 

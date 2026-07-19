@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict vJqCRbLWWnGDzgFT3QpIT7D1O6kTQhDNUOmL34qVYNS5niPQMW23d098GcvqFt7
+\restrict vh1wZQ4uNuTRTLgZTZyd0h6E1RznvnMEkOgG9NC1jeY25fycPtqHdPpuG4arwuV
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -57,5 +57,5 @@ CREATE INDEX adtech_company_category ON adtech.company_categories USING btree (c
 -- PostgreSQL database dump complete
 --
 
-\unrestrict vJqCRbLWWnGDzgFT3QpIT7D1O6kTQhDNUOmL34qVYNS5niPQMW23d098GcvqFt7
+\unrestrict vh1wZQ4uNuTRTLgZTZyd0h6E1RznvnMEkOgG9NC1jeY25fycPtqHdPpuG4arwuV
 

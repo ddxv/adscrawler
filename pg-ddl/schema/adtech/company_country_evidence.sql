@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 7Y8uojOPr2Rx7IRuEo7gR6ufEr9Z6LjrAfc2bJCF5vPFGkalrLwAgmGGYFGsLqM
+\restrict d2EMkcmqWtgayXFfqxqhmeY1if8yjq721hqxE1qtArSLqDhYIiVrIueGd4peYml
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -90,5 +90,5 @@ ALTER TABLE ONLY adtech.company_country_evidence
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 7Y8uojOPr2Rx7IRuEo7gR6ufEr9Z6LjrAfc2bJCF5vPFGkalrLwAgmGGYFGsLqM
+\unrestrict d2EMkcmqWtgayXFfqxqhmeY1if8yjq721hqxE1qtArSLqDhYIiVrIueGd4peYml
 

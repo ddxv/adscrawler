@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict cIro17KhMG1Ua4TOaQO2eL8ORWaxIvw6mHgjLOh3l6PhvbgTFgJnQMb84mcavgQ
+\restrict qgqEhOoIVvBcDPuhrDrBpEDCTpGHhBIH7y9ORQEh6TnSugCLTDoXNQKZx3FbIp6
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -75,5 +75,5 @@ CREATE UNIQUE INDEX adstxt_publishers_overview_ad_domain_unique_idx ON frontend.
 -- PostgreSQL database dump complete
 --
 
-\unrestrict cIro17KhMG1Ua4TOaQO2eL8ORWaxIvw6mHgjLOh3l6PhvbgTFgJnQMb84mcavgQ
+\unrestrict qgqEhOoIVvBcDPuhrDrBpEDCTpGHhBIH7y9ORQEh6TnSugCLTDoXNQKZx3FbIp6
 

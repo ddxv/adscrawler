@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict wNC006N55D6q6mb8NYehv3ohYm6B2q0qdL24czxODYvh40cO43Kc6DgTUG9ApHC
+\restrict tgQmmQ1pshmjdFugssflZQ8Cgc2nwCipt2gPgVr24v81acuZd8nfbGjErPTguSb
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -73,10 +73,10 @@ CREATE MATERIALIZED VIEW frontend.companies_overview AS
                   WHERE (ROW(trend_parent_companies.year, trend_parent_companies.quarter) >= ROW((EXTRACT(year FROM (CURRENT_DATE - '3 mons'::interval)))::integer, (EXTRACT(quarter FROM (CURRENT_DATE - '3 mons'::interval)))::integer))) sub
         ), app_changes_agg AS (
          SELECT d.domain_name AS company_domain,
-            (count(*) FILTER (WHERE ((dacq.status = 'added'::adtech.change_status_enum) AND (dacq.tag_source = 'sdk'::text))))::integer AS apps_sdk_added_count,
-            (count(*) FILTER (WHERE ((dacq.status = 'removed'::adtech.change_status_enum) AND (dacq.tag_source = 'sdk'::text))))::integer AS apps_sdk_lost_count,
-            (count(*) FILTER (WHERE ((dacq.status = 'added'::adtech.change_status_enum) AND (dacq.tag_source = 'app_ads_direct'::text))))::integer AS apps_adstxt_direct_added_count,
-            (count(*) FILTER (WHERE ((dacq.status = 'removed'::adtech.change_status_enum) AND (dacq.tag_source = 'app_ads_direct'::text))))::integer AS apps_adstxt_direct_lost_count
+            (count(*) FILTER (WHERE ((dacq.status = 'added'::text) AND (dacq.tag_source = 'sdk'::text))))::integer AS apps_sdk_added_count,
+            (count(*) FILTER (WHERE ((dacq.status = 'removed'::text) AND (dacq.tag_source = 'sdk'::text))))::integer AS apps_sdk_lost_count,
+            (count(*) FILTER (WHERE ((dacq.status = 'added'::text) AND (dacq.tag_source = 'app_ads_direct'::text))))::integer AS apps_adstxt_direct_added_count,
+            (count(*) FILTER (WHERE ((dacq.status = 'removed'::text) AND (dacq.tag_source = 'app_ads_direct'::text))))::integer AS apps_adstxt_direct_lost_count
            FROM (adtech.domain_app_changes_quarterly dacq
              LEFT JOIN public.domains d ON ((dacq.domain_id = d.id)))
           WHERE (ROW(dacq.year, dacq.quarter) >= ROW((EXTRACT(year FROM (CURRENT_DATE - '3 mons'::interval)))::integer, (EXTRACT(quarter FROM (CURRENT_DATE - '3 mons'::interval)))::integer))
@@ -288,5 +288,5 @@ CREATE UNIQUE INDEX frontend_companies_overview_domain ON frontend.companies_ove
 -- PostgreSQL database dump complete
 --
 
-\unrestrict wNC006N55D6q6mb8NYehv3ohYm6B2q0qdL24czxODYvh40cO43Kc6DgTUG9ApHC
+\unrestrict tgQmmQ1pshmjdFugssflZQ8Cgc2nwCipt2gPgVr24v81acuZd8nfbGjErPTguSb
 
