@@ -24,7 +24,7 @@ from adscrawler.process.storage import get_s3_client
 logger = get_logger(__name__, "process_icons")
 
 # Retry delays (in seconds) for failed icon processing
-_ICON_RETRY_DELAYS = [0.5, 1.0, 1.5, 2.0]
+_ICON_RETRY_DELAYS = [0.5, 1.0, 2.0]
 
 # Ancillary (non-critical) PNG chunk types that can be safely stripped
 _ANCILLARY_CHUNKS = {
@@ -302,7 +302,7 @@ def refresh_app_icons(
 
     # Log which apps were crawled
     crawl_log = pd.DataFrame(
-        {"store_app": icon_update_df["id"], "crawled_at": datetime.now(UTC)}
+        {"store_app": apps_df["id"], "crawled_at": datetime.now(UTC)}
     )
     upsert_df(
         table_name="app_icons_crawled_at",
