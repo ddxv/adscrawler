@@ -11,8 +11,7 @@ LEFT JOIN logging.app_icons_crawled_at AS aica
     ON sa.id = aica.store_app
 WHERE
     -- initial crawls
-    -- (sa.icon_128 IS NULL AND sa.icon_64 IS NULL)
-    (sa.icon_128 IS NULL)
+    (sa.icon_128 IS NULL OR sa.icon_64 IS NULL)
     AND sa.icon_url_512 IS NOT NULL
     AND sa.crawl_result = 1
     AND (:store_filter IS NULL OR sa.store = :store_filter)
