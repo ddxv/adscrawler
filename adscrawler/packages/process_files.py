@@ -9,7 +9,7 @@ from adscrawler.dbcon.queries import (
     insert_version_code,
     query_apps_to_download,
     query_apps_to_sdk_scan,
-    upsert_sdk_details_df,
+    upsert_df,
 )
 from adscrawler.packages.apks.download_apk import (
     manage_apk_download,
@@ -26,6 +26,8 @@ from adscrawler.process.storage import (
     get_store_id_apk_s3_keys,
     upload_apk_to_s3,
 )
+
+from adscrawler.process.version_details import write_version_details_to_s3
 
 logger = get_logger(__name__)
 
@@ -219,3 +221,61 @@ def process_sdks(
             logger.info(f"{store_id=} crawl_result {crawl_result=} skipping upsert")
 
         remove_tmp_files(store_id=store_id)
+
+
+def upsert_sdk_details_df(
+    details_df: pd.DataFrame,
+    pgdb: PostgresEngine,
+    store_id: str,
+    raw_txt_str: str,
+) -> None:
+    details_df = details_df.rename(
+        columns={
+            "path": "xml_path",
+            "android_name": "value_name",
+            "version_code_id": "version_code",
+        }
+    )
+    key_insert_columns = ["xml_path", "tag", "value_name"]
+    logger.info(f"{store_id=} insert {details_df.shape[0]:,} version_strings to db")
+    details_df.loc[details_df["tag"].isna(), "tag"] = ""
+    strings_df = details_df[key_insert_columns + ["version_code"]].drop_duplicates()
+    version_strings_df = upsert_df(
+        df=strings_df,
+        table_name="version_strings",
+        pgdb=pgdb,
+        key_columns=key_insert_columns,
+        insert_columns=key_insert_columns,
+        return_rows=True,
+    )
+    if version_strings_df is None:
+        logger.error(f"{store_id=} insert version_strings to db returned None")
+        logger.error(strings_df[strings_df["tag"].isna()])
+        raise Exception(f"{store_id=} insert version_strings to db")
+    version_strings_df = version_strings_df.rename(columns={"id": "string_id"})
+    strings_map_df = pd.merge(
+        strings_df,
+        version_strings_df,
+        how="left",
+        on=["xml_path", "tag", "value_name"],
+        validate="many_to_one",
+    )
+    if strings_map_df["string_id"].isna().any():
+        logger.error(f"{store_id=} insert strings_map to db")
+        logger.error(strings_map_df[strings_map_df["string_id"].isna()])
+    write_version_details_to_s3(
+        version_details_df=strings_map_df.rename(
+            columns={"version_code": "version_code_id"}
+        )[["version_code_id", "string_id"]],
+        store_id=store_id,
+    )
+    strings_map_df["manifest_string"] = raw_txt_str
+    manifest_df = strings_map_df[["version_code", "manifest_string"]].drop_duplicates()
+    upsert_df(
+        df=manifest_df,
+        table_name="version_manifests",
+        pgdb=pgdb,
+        key_columns=["version_code"],
+        insert_columns=["version_code", "manifest_string"],
+    )
+    logger.info(f"{store_id=} finished")
