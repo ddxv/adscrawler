@@ -26,7 +26,6 @@ from adscrawler.process.storage import (
     get_store_id_apk_s3_keys,
     upload_apk_to_s3,
 )
-
 from adscrawler.process.version_details import write_version_details_to_s3
 
 logger = get_logger(__name__)
