@@ -10,15 +10,15 @@ from typing import Any
 import pandas as pd
 
 from adscrawler.config import CONFIG, get_logger
-from adscrawler.dbcon.connection import PostgresEngine
 from adscrawler.dbcon.atomic_swap import atomic_swap_partition
+from adscrawler.dbcon.connection import PostgresEngine
 from adscrawler.dbcon.queries import (
-    query_report_combined_domains,
     CREATE_DOMAIN_APP_CHANGES,
-    PG_CACHE_TABLES,
-    CREATE_TREND_DOMAINS,
     CREATE_TREND_COMPANIES,
+    CREATE_TREND_DOMAINS,
     CREATE_TREND_PARENT_COMPANIES,
+    PG_CACHE_TABLES,
+    query_report_combined_domains,
 )
 from adscrawler.process import (
     AGG_COMBINED_DOMAIN_HISTORY,
@@ -26,9 +26,9 @@ from adscrawler.process import (
 )
 from adscrawler.process.storage import (
     delete_s3_objects_by_prefix,
+    get_duckdb_connection,
     get_parquet_paths_by_prefix,
     get_s3_client,
-    get_duckdb_connection,
 )
 
 logger = get_logger(__name__, "scrape_stores")

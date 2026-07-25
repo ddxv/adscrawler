@@ -1,8 +1,8 @@
+from adscrawler.config import get_logger
 from adscrawler.dbcon.connection import PostgresEngine
 from adscrawler.dbcon.queries import get_failed_mitm_logs, log_creative_scan_results
 from adscrawler.mitm_ad_parser.mitm_scrape_ads import parse_store_id_mitm_log
 from adscrawler.mitm_ad_parser.utils import log_messages_to_df
-from adscrawler.config import get_logger
 
 logger = get_logger(__name__)
 

@@ -123,7 +123,7 @@ def write_version_details_to_s3(
     ].drop_duplicates()
     s3_client = get_s3_client()
     bucket = CONFIG["s3"]["bucket"]
-    date_str = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d")
+    date_str = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d")
     epoch_ms = int(time.time() * 1000)
     suffix = uuid.uuid4().hex[:8]
     file_name = f"version_details_{epoch_ms}_{suffix}.parquet"
@@ -134,8 +134,7 @@ def write_version_details_to_s3(
     buffer.seek(0)
     s3_client.upload_fileobj(buffer, bucket, s3_key)
     logger.info(
-        f"{store_id=} wrote {len(version_details_df)} rows to "
-        f"s3://{bucket}/{s3_key}"
+        f"{store_id=} wrote {len(version_details_df)} rows to s3://{bucket}/{s3_key}"
     )
 
 
@@ -493,7 +492,7 @@ def map_version_details(
         sync_postgres: Compute presence diffs/LAG and push to `adtech.store_app_sdk_changes`.
     """
     if date_str is None:
-        date_str = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d")
+        date_str = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d")
 
     start_time = time.time()
     logger.info(f"Starting map_version_details entrypoint run for date={date_str}")
