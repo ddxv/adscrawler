@@ -8,8 +8,15 @@ S3 prefix constants shared across the ``process`` subpackage.
 # ---------------------------------------------------------------------------
 RAW_DATA_KEYWORDS = "raw-data/keywords"
 RAW_DATA_APP_DETAILS_INCOMING = "raw-data/_incoming/app_details"
+RAW_DATA_VERSION_DETAILS_INCOMING = "raw-data/_incoming/version-details-map"
 RAW_DATA_APP_DETAILS = "raw-data/app_details"
+RAW_DATA_VERSION_DETAILS = "raw-data/version-details-map"
 RAW_DATA_APP_RANKINGS = "raw-data/app_rankings"
+
+AGG_VERSION_DETAILS = "agg-data/version-details-map"
+AGG_PATTERN_MATCHES = "agg-data/pattern-matches"
+AGG_MATCHED_SDKS = "agg-data/matched-sdks"
+
 
 # ---------------------------------------------------------------------------
 # Aggregated app metrics (app_metrics_history.py)

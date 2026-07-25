@@ -17,6 +17,7 @@ from sqlalchemy.sql.elements import TextClause
 
 from adscrawler.config import CONFIG, SQL_DIR, get_logger
 from adscrawler.dbcon.connection import PostgresEngine
+from adscrawler.process.version_details import write_version_details_to_s3
 
 logger = get_logger(__name__)
 
@@ -765,13 +766,11 @@ def upsert_sdk_details_df(
     if strings_map_df["string_id"].isna().any():
         logger.error(f"{store_id=} insert strings_map to db")
         logger.error(strings_map_df[strings_map_df["string_id"].isna()])
-    insert_columns = ["version_code", "string_id"]
-    upsert_df(
-        table_name="version_details_map",
-        insert_columns=insert_columns,
-        df=strings_map_df,
-        key_columns=insert_columns,
-        pgdb=pgdb,
+    write_version_details_to_s3(
+        version_details_df=strings_map_df.rename(
+            columns={"version_code": "version_code_id"}
+        )[["version_code_id", "string_id"]],
+        store_id=store_id,
     )
     strings_map_df["manifest_string"] = raw_txt_str
     manifest_df = strings_map_df[["version_code", "manifest_string"]].drop_duplicates()
