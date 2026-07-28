@@ -26,6 +26,7 @@ from adscrawler.process.app_details import (
 from adscrawler.process.app_domain_history import (
     process_company_history,
 )
+from adscrawler.process.version_details import map_version_details
 from adscrawler.process.app_metrics_history import (
     clean_history_tables,
     delete_and_aggregate_s3_agg,
@@ -485,6 +486,13 @@ class ProcessManager:
             process_company_history(pgdb=self.pgcon)
         except Exception:
             logger.exception("Exporting combined domain history to s3 failed")
+
+        try:
+            map_version_details(
+                date_str=datetime.date.today().isoformat(), pgdb=self.pgcon
+            )
+        except Exception:
+            logger.exception("Syncing version details to Postgres failed")
 
     def scrape_new_apps(self, store: int) -> None:
         try:
