@@ -13,9 +13,21 @@ RAW_DATA_APP_DETAILS = "raw-data/app_details"
 RAW_DATA_VERSION_DETAILS = "raw-data/version-details-map"
 RAW_DATA_APP_RANKINGS = "raw-data/app_rankings"
 
+RAW_DATA_VERSION_DETAILS_INITIAL = "raw-data/initial-version-details-map"
+
 AGG_VERSION_DETAILS = "agg-data/version-details-map"
+TMP_VERSION_DETAILS = "tmp/version-details-map"
 AGG_PATTERN_MATCHES = "agg-data/pattern-matches"
+TMP_PATTERN_MATCHES = "tmp/pattern-matches"
 AGG_MATCHED_SDKS = "agg-data/matched-sdks"
+TMP_MATCHED_SDKS = "tmp/matched-sdks"
+
+
+LOOKUP_VERSION_STRINGS = "lookups/version-strings/version-strings.parquet"
+LOOKUP_SDK_PACKAGE_PATTERNS = "lookups/adtech-sdk-packages/sdk-packages.parquet"
+LOOKUP_SDK_PATH_PATTERNS = "lookups/adtech-sdk-paths/sdk-paths.parquet"
+LOOKUP_SDK_MEDIATION_PATTERNS = "lookups/adtech-sdk-mediation/sdk-mediation.parquet"
+LOOKUP_VERSION_CODES = "lookups/version-codes/version-codes.parquet"
 
 
 # ---------------------------------------------------------------------------

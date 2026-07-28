@@ -3,26 +3,33 @@
 import datetime
 import io
 import time
-import urllib.parse
 import uuid
 
 import pandas as pd
-import duckdb
 
 from adscrawler.config import CONFIG, get_logger
 from adscrawler.process import (
     AGG_MATCHED_SDKS,
     AGG_PATTERN_MATCHES,
     AGG_VERSION_DETAILS,
+    AGG_VERSION_DETAILS,
     RAW_DATA_VERSION_DETAILS,
+    RAW_DATA_VERSION_DETAILS_INITIAL,
     RAW_DATA_VERSION_DETAILS_INCOMING,
+    TMP_VERSION_DETAILS,
+    TMP_MATCHED_SDKS,
+    TMP_PATTERN_MATCHES,
+    LOOKUP_VERSION_STRINGS,
+    LOOKUP_SDK_PACKAGE_PATTERNS,
+    LOOKUP_SDK_PATH_PATTERNS,
+    LOOKUP_SDK_MEDIATION_PATTERNS,
+    LOOKUP_VERSION_CODES,
 )
 from adscrawler.process.storage import (
     delete_s3_objects_by_prefix,
     get_duckdb_connection,
     get_parquet_paths_by_prefix,
     get_s3_client,
-    get_s3_dirs_by_prefix,
     pg_db_uri,
 )
 
@@ -31,14 +38,36 @@ logger = get_logger(__name__, "version_details")
 # Default row-group size for DuckDB parquet writer.
 _ROW_GROUP_SIZE = 100_000
 
-# Shared SQL snippet that produces the string_bucket partition label from a `sid` column.
-# Groups every 5 Mio string_id values into labels like ``00M-05M``, ``05M-10M``, etc.
-_STRING_BUCKET_SQL = (
-    "LPAD((DIV(sid, 5000000) * 5)::VARCHAR, 2, '0')"
-    " || 'M-'"
-    " || LPAD(((DIV(sid, 5000000) + 1) * 5)::VARCHAR, 2, '0')"
-    " || 'M'"
-)
+# Groups every 5 Mio string_id values into labels like ``000M-005M``, ``005M-100M``, etc.
+# Manual boundaries reflecting real density: narrow near the dense low end,
+# progressively wider as ids get sparse. Adjust freely.
+_BUCKET_BOUNDARIES = [
+    0,
+    50_000_000,
+    100_000_000,
+    200_000_000,
+    500_000_000,
+    1_000_000_000,
+    2_000_000_000,
+]
+
+
+def _bucket_label(lo: int, hi: int) -> str:
+    # width-4 zero pad supports up to 9999M (~10B), well past the 2B ceiling
+    fmt = lambda n: f"{n // 1_000_000:04d}M"
+    return f"{fmt(lo)}-{fmt(hi)}"
+
+
+def _build_bucket_case_sql(boundaries: list[int]) -> str:
+    clauses = [
+        f"WHEN sid >= {lo} AND sid < {hi} THEN '{_bucket_label(lo, hi)}'"
+        for lo, hi in zip(boundaries[:-1], boundaries[1:])
+    ]
+    overflow_label = f"{boundaries[-1] // 1_000_000:04d}M-plus"
+    return "CASE " + " ".join(clauses) + f" ELSE '{overflow_label}' END"
+
+
+_STRING_BUCKET_SQL = _build_bucket_case_sql(_BUCKET_BOUNDARIES)
 
 
 def compact_incoming_to_raw_archive(date_str: str) -> None:
@@ -49,6 +78,9 @@ def compact_incoming_to_raw_archive(date_str: str) -> None:
     dates.  All rows are stamped with the single ``date_str`` passed in (one compaction
     run = one logical batch), NOT filtered by upload date.
     """
+    if date_str >= datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d"):
+        logger.info("Do not run compaction for 'today', need to wait for all data")
+        return
     bucket = CONFIG["s3"]["bucket"]
     raw_output_path = f"s3://{bucket}/{RAW_DATA_VERSION_DETAILS}/"
 
@@ -56,20 +88,10 @@ def compact_incoming_to_raw_archive(date_str: str) -> None:
     # We delete only these exact keys later so that any file written by
     # a concurrent write_version_details_to_s3() between now and the delete
     # is NOT silently dropped.
-    prefix = f"{RAW_DATA_VERSION_DETAILS_INCOMING}/"
-    dirs = get_s3_dirs_by_prefix(bucket, prefix)
-    if not dirs:
-        logger.info("No incoming directories found.")
-        return
+    prefix = f"{RAW_DATA_VERSION_DETAILS_INCOMING}/date={date_str}"
+    all_incoming_keys = get_parquet_paths_by_prefix(bucket, prefix)
 
-    all_incoming_paths: list[str] = []
-    all_incoming_keys: list[str] = []
-    for s3_dir in dirs:
-        for s3_path in get_parquet_paths_by_prefix(bucket, s3_dir):
-            all_incoming_paths.append(f"s3://{bucket}/{s3_path}")
-            all_incoming_keys.append(s3_path)
-
-    if not all_incoming_paths:
+    if not all_incoming_keys:
         logger.info("No incoming parquet files found.")
         return
 
@@ -80,7 +102,7 @@ def compact_incoming_to_raw_archive(date_str: str) -> None:
                     SELECT 
                         CAST(string_id AS BIGINT) AS sid,
                         version_code_id
-                    FROM read_parquet({all_incoming_paths}, union_by_name=true)
+                    FROM read_parquet({all_incoming_keys}, union_by_name=true)
                     WHERE string_id IS NOT NULL
                 )
                 SELECT
@@ -93,6 +115,7 @@ def compact_incoming_to_raw_archive(date_str: str) -> None:
             ) TO '{raw_output_path}' (
                 FORMAT PARQUET,
                 PARTITION_BY (string_bucket, date),
+                OVERWRITE_OR_IGNORE true,
                 COMPRESSION 'zstd',
                 ROW_GROUP_SIZE {_ROW_GROUP_SIZE}
             )
@@ -101,11 +124,11 @@ def compact_incoming_to_raw_archive(date_str: str) -> None:
     # Delete only the specific files we just archived — not the whole prefix.
     # This avoids the race where a file written between the COPY and this
     # delete would be removed without being archived.
-    s3 = get_s3_client()
-    for i in range(0, len(all_incoming_keys), 1000):
-        batch = [{"Key": k} for k in all_incoming_keys[i : i + 1000]]
-        s3.delete_objects(Bucket=bucket, Delete={"Objects": batch})
-    logger.info(f"Archived {len(all_incoming_paths)} incoming files for {date_str}")
+    # s3 = get_s3_client()
+    # for i in range(0, len(all_incoming_keys), 1000):
+    #     batch = [{"Key": k} for k in all_incoming_keys[i : i + 1000]]
+    #     s3.delete_objects(Bucket=bucket, Delete={"Objects": batch})
+    # logger.info(f"Archived {len(all_incoming_paths)} incoming files for {date_str}")
 
 
 def write_version_details_to_s3(
@@ -140,32 +163,31 @@ def write_version_details_to_s3(
     )
 
 
-def build_aggregated_master_buckets() -> None:
+def build_aggregated_version_details() -> None:
     """Rebuild the deduplicated, globally sorted master query files in agg-data."""
     bucket = CONFIG["s3"]["bucket"]
 
     # Read everything under raw-data (backfill + daily date subfolders)
-    agg_tmp_output = f"s3://{bucket}/{AGG_VERSION_DETAILS}_tmp/"
-    agg_final_output = f"s3://{bucket}/{AGG_VERSION_DETAILS}/"
+    agg_tmp_output = f"s3://{bucket}/{TMP_VERSION_DETAILS}/"
+    # agg_final_output = f"s3://{bucket}/{AGG_VERSION_DETAILS}/"
 
     logger.info("Rebuilding aggregated master buckets in agg-data...")
 
     # Wipe any stale remnants from a prior failed run before writing new data.
-    delete_s3_objects_by_prefix(bucket, f"{AGG_VERSION_DETAILS}_tmp/")
+    delete_s3_objects_by_prefix(bucket, f"{TMP_VERSION_DETAILS}/")
 
     # Collect all parquet paths under raw-data.
     raw_prefix = f"{RAW_DATA_VERSION_DETAILS}/"
-    dirs = get_s3_dirs_by_prefix(bucket, raw_prefix)
-    if not dirs:
-        logger.warning("No raw-data directories found; nothing to aggregate.")
-        return
-    raw_paths: list[str] = []
-    for s3_dir in dirs:
-        for s3_path in get_parquet_paths_by_prefix(bucket, s3_dir):
-            raw_paths.append(f"s3://{bucket}/{s3_path}")
+    raw_paths = get_parquet_paths_by_prefix(bucket, raw_prefix)
     if not raw_paths:
         logger.warning("No parquet files found under raw-data; nothing to aggregate.")
         return
+
+    raw_initial_paths = get_parquet_paths_by_prefix(
+        bucket, RAW_DATA_VERSION_DETAILS_INITIAL
+    )
+
+    raw_paths += raw_initial_paths
 
     with get_duckdb_connection("s3") as duckdb_con:
         duckdb_con.execute(f"""
@@ -191,13 +213,12 @@ def build_aggregated_master_buckets() -> None:
                 OVERWRITE_OR_IGNORE true
             )
         """)
-
         # Calculate row counts for validation (from the deduplicated tmp output)
+        tmp_parqs = get_parquet_paths_by_prefix(bucket, TMP_VERSION_DETAILS)
         row_count = duckdb_con.execute(f"""
             SELECT count(*)
-            FROM read_parquet('{agg_tmp_output}*/*.parquet', hive_partitioning=true)
+            FROM read_parquet({tmp_parqs})
         """).fetchone()[0]
-
         logger.info(f"Aggregated master dataset contains {row_count:,} unique rows.")
 
     # Validation: refuse to publish an empty or trivially-small dataset.
@@ -207,9 +228,10 @@ def build_aggregated_master_buckets() -> None:
     # Compare against existing agg-data row count if available.
     try:
         with get_duckdb_connection("s3") as duckdb_con:
+            agg_parqs = get_parquet_paths_by_prefix(bucket, AGG_VERSION_DETAILS)
             existing_count = duckdb_con.execute(f"""
                 SELECT count(*)
-                FROM read_parquet('{agg_final_output}*/*.parquet', hive_partitioning=true)
+                FROM read_parquet({agg_parqs})
             """).fetchone()[0]
         if existing_count > 0 and row_count < existing_count * 0.5:
             logger.warning(
@@ -221,7 +243,9 @@ def build_aggregated_master_buckets() -> None:
         logger.info("No existing agg-data to compare against; proceeding.")
 
     # Swap tmp directory to final query location
-    replace_s3_prefix(bucket, f"{AGG_VERSION_DETAILS}_tmp/", f"{AGG_VERSION_DETAILS}/")
+    replace_s3_prefix(
+        bucket, src_prefix=TMP_VERSION_DETAILS, dst_prefix=AGG_VERSION_DETAILS
+    )
     logger.info("Master aggregation successfully updated in agg-data.")
 
 
@@ -238,47 +262,42 @@ def replace_s3_prefix(bucket: str, src_prefix: str, dst_prefix: str) -> None:
     src_prefix = src_prefix.rstrip("/") + "/"
     dst_prefix = dst_prefix.rstrip("/") + "/"
 
-    paginator = s3.get_paginator("list_objects_v2")
-
-    # Step 1: Copy src -> dst & track all newly written keys in dst
+    # Step 1: Copy src -> dst & track all newly written dst keys
     new_dst_keys: set[str] = set()
-    src_keys: list[dict[str, str]] = []
 
-    for page in paginator.paginate(Bucket=bucket, Prefix=src_prefix):
-        for obj in page.get("Contents", []):
-            src_key = obj["Key"]
-            relative_path = src_key[len(src_prefix) :]
-            dst_key = dst_prefix + relative_path
+    src = f"s3://{bucket}/{src_prefix}"
+    src_len = len(src)
 
-            # Track destination key so we don't accidently delete it in Step 2
-            new_dst_keys.add(dst_key)
+    src_keys = get_parquet_paths_by_prefix(bucket, src_prefix)
 
-            encoded_src_key = urllib.parse.quote(src_key)
-            s3.copy_object(
-                Bucket=bucket,
-                CopySource=f"{bucket}/{encoded_src_key}",
-                Key=dst_key,
-            )
+    if len(src_keys) == 0:
+        logger.error("no tmp files found!")
+        return
 
-            src_keys.append({"Key": src_key})
+    for src_key in src_keys:
+        relative_path = src_key[src_len:]
+        src_key = src_key.replace("s3://", "")
+        dst_key = dst_prefix + relative_path
+        # Track destination key so we don't accidently delete it in Step 2
+        new_dst_keys.add(f"s3://{bucket}/{dst_key}")
+        # encoded_src_key = urllib.parse.quote(src_key)
+        s3.copy_object(
+            Bucket=bucket,
+            CopySource=src_key,
+            Key=dst_key,
+        )
 
-    # Step 2: Delete stale leftovers in dst (keys that exist in dst but were NOT copied in Step 1)
-    stale_dst_keys: list[dict[str, str]] = []
-    for page in paginator.paginate(Bucket=bucket, Prefix=dst_prefix):
-        for obj in page.get("Contents", []):
-            dst_key = obj["Key"]
-            if dst_key not in new_dst_keys:
-                stale_dst_keys.append({"Key": dst_key})
-                if len(stale_dst_keys) == 1000:
-                    s3.delete_objects(Bucket=bucket, Delete={"Objects": stale_dst_keys})
-                    stale_dst_keys = []
-
-    if stale_dst_keys:
-        s3.delete_objects(Bucket=bucket, Delete={"Objects": stale_dst_keys})
+    # Step 2: Delete stale leftovers in dst (keys not in new_dst_keys)
+    stale_keys = [
+        {"Key": k}
+        for k in get_parquet_paths_by_prefix(bucket, dst_prefix)
+        if k not in new_dst_keys
+    ]
+    for i in range(0, len(stale_keys), 1000):
+        s3.delete_objects(Bucket=bucket, Delete={"Objects": stale_keys[i : i + 1000]})
 
     # Step 3: Delete all src keys now that both copy and dst cleanup are verified
-    for i in range(0, len(src_keys), 1000):
-        s3.delete_objects(Bucket=bucket, Delete={"Objects": src_keys[i : i + 1000]})
+    delete_s3_objects_by_prefix(bucket, src_prefix)
 
 
 def build_aggregated_pattern_matches() -> None:
@@ -286,17 +305,17 @@ def build_aggregated_pattern_matches() -> None:
 
     bucket = CONFIG["s3"]["bucket"]
 
-    strings_path = f"s3://{bucket}/lookups/version_strings.parquet"
-    pkg_path = f"s3://{bucket}/lookups/sdk_packages.parquet"
-    paths_path = f"s3://{bucket}/lookups/sdk_paths.parquet"
-    med_path = f"s3://{bucket}/lookups/sdk_mediation_patterns.parquet"
+    strings_path = f"s3://{bucket}/{LOOKUP_VERSION_STRINGS}"
+    pkg_path = f"s3://{bucket}/{LOOKUP_SDK_PACKAGE_PATTERNS}"
+    paths_path = f"s3://{bucket}/{LOOKUP_SDK_PATH_PATTERNS}"
+    med_path = f"s3://{bucket}/{LOOKUP_SDK_MEDIATION_PATTERNS}"
 
-    agg_tmp_output = f"s3://{bucket}/{AGG_PATTERN_MATCHES}_tmp/"
+    agg_tmp_output = f"s3://{bucket}/{TMP_PATTERN_MATCHES}/"
 
     logger.info("Starting aggregated pattern matching build...")
 
     # Wipe any stale remnants from a prior failed run before writing new data.
-    delete_s3_objects_by_prefix(bucket, f"{AGG_PATTERN_MATCHES}_tmp/")
+    delete_s3_objects_by_prefix(bucket, f"{TMP_PATTERN_MATCHES}/")
 
     with get_duckdb_connection("s3") as duckdb_con:
         duckdb_con.execute(f"""
@@ -363,9 +382,10 @@ def build_aggregated_pattern_matches() -> None:
         """)
 
         # Validation count
+        tmp_parqs = get_parquet_paths_by_prefix(bucket, TMP_PATTERN_MATCHES)
         match_count = duckdb_con.execute(f"""
             SELECT count(*)
-            FROM read_parquet('{agg_tmp_output}*/*.parquet', hive_partitioning=true)
+            FROM read_parquet({tmp_parqs})
         """).fetchone()[0]
 
         logger.info(
@@ -378,7 +398,7 @@ def build_aggregated_pattern_matches() -> None:
         return
 
     # Atomic swap to final query zone
-    replace_s3_prefix(bucket, f"{AGG_PATTERN_MATCHES}_tmp/", f"{AGG_PATTERN_MATCHES}/")
+    replace_s3_prefix(bucket, TMP_PATTERN_MATCHES, AGG_PATTERN_MATCHES)
     logger.info("Successfully updated agg-data/pattern-matches in S3.")
 
 
@@ -386,62 +406,46 @@ def build_aggregated_matched_sdks() -> None:
     """Build matched SDKs artifact by joining version-details-map with pattern-matches."""
     bucket = CONFIG["s3"]["bucket"]
 
-    vdm_path = f"s3://{bucket}/{AGG_VERSION_DETAILS}/"
-    pm_path = f"s3://{bucket}/{AGG_PATTERN_MATCHES}/"
-    vc_path = f"s3://{bucket}/lookups/version_codes.parquet"
+    vc_path = f"s3://{bucket}/{LOOKUP_VERSION_CODES}"
 
-    agg_tmp_output = f"s3://{bucket}/{AGG_MATCHED_SDKS}_tmp/"
+    vdm_parqs = get_parquet_paths_by_prefix(bucket=bucket, prefix=AGG_VERSION_DETAILS)
+    pm_parqs = get_parquet_paths_by_prefix(bucket=bucket, prefix=AGG_PATTERN_MATCHES)
+
+    if len(vdm_parqs) == 0:
+        ValueError(), "Missing vdm_parqs"
+    if len(pm_parqs) == 0:
+        ValueError(), "Missing pm_parqs"
+
+    agg_tmp_output = f"s3://{bucket}/{TMP_MATCHED_SDKS}"
     agg_final_output = f"s3://{bucket}/{AGG_MATCHED_SDKS}/"
 
     logger.info("Building aggregated matched SDKs...")
 
     # Wipe any stale remnants from a prior failed run.
-    delete_s3_objects_by_prefix(bucket, f"{AGG_MATCHED_SDKS}_tmp/")
+    delete_s3_objects_by_prefix(bucket, f"{TMP_MATCHED_SDKS}/")
 
     with get_duckdb_connection("s3") as duckdb_con:
-        # Check that both input datasets exist.
-        has_vdm = (
-            duckdb_con.execute(
-                "SELECT count(*) FROM glob(:path)",
-                {"path": f"{vdm_path}*/*.parquet"},
-            ).fetchone()[0]
-            > 0
-        )
-        has_pm = (
-            duckdb_con.execute(
-                "SELECT count(*) FROM glob(:path)",
-                {"path": f"{pm_path}*/*.parquet"},
-            ).fetchone()[0]
-            > 0
-        )
-        if not has_vdm or not has_pm:
-            logger.warning(
-                "Missing parquet files in VDM or pattern-matches; "
-                "cannot build matched SDKs."
-            )
-            return
-
         duckdb_con.execute(f"""
             COPY (
                 WITH raw_version_sdks AS (
                     SELECT DISTINCT
-                        vc.store_app_id,
+                        vc.store_app,
                         vdm.version_code_id,
                         vc.created_at::DATE AS version_code_created_at,
                         pm.sdk_id
-                    FROM read_parquet('{vdm_path}*/*.parquet', hive_partitioning=true) vdm
-                    JOIN read_parquet('{pm_path}*/*.parquet', hive_partitioning=true) pm
+                    FROM read_parquet({vdm_parqs}) vdm
+                    JOIN read_parquet({pm_parqs}) pm
                       ON vdm.string_id = pm.string_id
                     JOIN read_parquet('{vc_path}') vc
                       ON vdm.version_code_id = vc.id
                 )
                 SELECT 
-                    store_app_id,
+                    store_app,
                     version_code_id,
                     version_code_created_at,
                     sdk_id
                 FROM raw_version_sdks
-                ORDER BY store_app_id ASC, version_code_created_at ASC
+                ORDER BY store_app ASC, version_code_created_at ASC
             ) TO '{agg_tmp_output}' (
                 FORMAT PARQUET,
                 PARTITION_BY (sdk_id),
@@ -450,11 +454,11 @@ def build_aggregated_matched_sdks() -> None:
                 OVERWRITE_OR_IGNORE true
             )
         """)
-
         # Validate output has rows before swapping.
+        tmp_parqs = get_parquet_paths_by_prefix(bucket, TMP_MATCHED_SDKS)
         matched_count = duckdb_con.execute(f"""
             SELECT count(*)
-            FROM read_parquet('{agg_tmp_output}*/*.parquet', hive_partitioning=true)
+            FROM read_parquet({tmp_parqs})
         """).fetchone()[0]
         logger.info(f"Matched SDKs dataset contains {matched_count:,} rows.")
 
@@ -463,19 +467,16 @@ def build_aggregated_matched_sdks() -> None:
         return
 
     # Swap tmp to final
-    replace_s3_prefix(bucket, f"{AGG_MATCHED_SDKS}_tmp/", f"{AGG_MATCHED_SDKS}/")
+    replace_s3_prefix(bucket, f"{TMP_MATCHED_SDKS}/", f"{AGG_MATCHED_SDKS}/")
     logger.info("Successfully updated agg-data/matched-sdks in S3.")
 
 
 def initial_backfill_version_details_map() -> None:
     bucket = CONFIG["s3"]["bucket"]
-    s3_path = f"s3://{bucket}/{AGG_VERSION_DETAILS}/initial_backfill"
+    s3_path = f"s3://{bucket}/{RAW_DATA_VERSION_DETAILS_INITIAL}"
     pg_conn_str = pg_db_uri()
 
     con = get_duckdb_connection("s3")
-
-    # Clear old objects using S3 client first...
-    # delete_s3_objects_by_prefix(bucket=bucket, prefix=f"{AGG_VERSION_DETAILS}/initial_backfill/")
 
     # Install & load necessary DuckDB extensions
     con.execute("INSTALL postgres; LOAD postgres;")
@@ -502,73 +503,107 @@ def initial_backfill_version_details_map() -> None:
     logger.info("Finished writing parquet files to S3.")
 
 
+def _pg_table_to_s3(sql_query: str, s3_key: str, description: str) -> None:
+    """Stream a Postgres query result directly to a single S3 parquet file.
+
+    Uses DuckDB's ``ATTACH`` + ``COPY`` to stream data from Postgres to S3
+    without loading it into Python memory — suitable for large tables.
+
+    Args:
+        sql_query: Full SQL query to run against the attached Postgres database.
+        s3_key: Destination S3 key (relative to bucket, e.g. ``"lookups/foo.parquet"``).
+        description: Human-readable label for logging (e.g. ``"version_strings"``).
+    """
+    bucket = CONFIG["s3"]["bucket"]
+    s3_path = f"s3://{bucket}/{s3_key}"
+    pg_conn_str = pg_db_uri()
+
+    con = get_duckdb_connection("s3")
+    con.execute("INSTALL postgres; LOAD postgres;")
+    con.execute(f"ATTACH '{pg_conn_str}' AS pg (TYPE POSTGRES);")
+
+    logger.info("Streaming %s directly to %s", description, s3_path)
+    con.execute(f"""
+        COPY ({sql_query})
+        TO '{s3_path}'
+        (FORMAT PARQUET, COMPRESSION 'ZSTD')
+    """)
+    logger.info("Finished writing %s to %s", description, s3_path)
+
+
+def copy_lookups() -> None:
+    """Export lookup tables to static parquet files in S3.
+
+    Streams ``version_strings``, ``sdk_packages``, ``sdk_paths``, and
+    ``sdk_mediation_patterns`` to their respective ``lookups/`` keys, where
+    downstream DuckDB build functions read them.
+    """
+    _pg_table_to_s3(
+        "SELECT id, xml_path, tag, value_name FROM pg.public.version_strings ORDER BY id ASC",
+        LOOKUP_VERSION_STRINGS,
+        "version_strings",
+    )
+    _pg_table_to_s3(
+        "SELECT id, sdk_id, package_pattern FROM pg.adtech.sdk_packages ORDER BY id ASC",
+        LOOKUP_SDK_PACKAGE_PATTERNS,
+        "sdk_packages",
+    )
+    _pg_table_to_s3(
+        "SELECT id, sdk_id, path_pattern FROM pg.adtech.sdk_paths ORDER BY id ASC",
+        LOOKUP_SDK_PATH_PATTERNS,
+        "sdk_paths",
+    )
+    _pg_table_to_s3(
+        "SELECT sdk_id, mediation_pattern FROM pg.adtech.sdk_mediation_patterns ORDER BY sdk_id ASC",
+        LOOKUP_SDK_MEDIATION_PATTERNS,
+        "sdk_mediation_patterns",
+    )
+    _pg_table_to_s3(
+        "SELECT id, created_at, store_app FROM pg.public.version_codes ORDER BY id ASC",
+        LOOKUP_VERSION_CODES,
+        "version_codes",
+    )
+
+
 def map_version_details(
-    date_str: str | None = None,
-    run_compaction: bool = True,
-    rebuild_master: bool = True,
+    date_str: str,
     rebuild_patterns: bool = False,
     rebuild_matched_sdks: bool = True,
     sync_postgres: bool = False,
 ) -> None:
     """Orchestrate the entire version details processing pipeline.
 
-    Flow:
-    1. Compact micro-batch incoming files to raw partition storage.
-    2. Rebuild master deduplicated agg-data buckets for version details.
-    3. (Optional) Rebuild pattern matches lookup if rules changed.
-    4. Build aggregated matched SDKs artifact (joins version details & pattern matches).
-    5. (Optional) Compute window functions and sync state changes to Postgres.
 
     Args:
         date_str: Logical partition date for incoming compaction (YYYY-MM-DD).
-                 Defaults to current UTC date if None.
-        run_compaction: Compact `raw-data/_incoming/` into `raw-data/`.
-        rebuild_master: Re-aggregate master `agg-data/version-details-map/`.
         rebuild_patterns: Re-run pattern matcher engine against lookups.
         rebuild_matched_sdks: Re-join VDM with pattern-matches into `agg-data/matched-sdks/`.
         sync_postgres: Compute presence diffs/LAG and push to `adtech.store_app_sdk_changes`.
     """
-    if date_str is None:
-        date_str = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d")
-
+    date_str = (datetime.datetime.today() - datetime.timedelta(days=1)).strftime(
+        "%Y-%m-%d"
+    )
     start_time = time.time()
     logger.info(f"Starting map_version_details entrypoint run for date={date_str}")
 
-    # Stage 1: Compact Incoming Buffer -> Raw Daily Storage
-    if run_compaction:
-        logger.info("--- Stage 1: Compacting incoming version details ---")
-        try:
-            compact_incoming_to_raw_archive(date_str=date_str)
-        except Exception as e:
-            logger.error(f"Stage 1 failed (compaction): {e}")
-            raise
+    logger.info("--- Stage 1: Compacting incoming version details ---")
+    try:
+        compact_incoming_to_raw_archive(date_str=date_str)
+    except Exception as e:
+        logger.error(f"Stage 1 failed (compaction): {e}")
+        raise
 
     # Stage 2: Master Bucket Aggregation
-    if rebuild_master:
-        logger.info("--- Stage 2: Rebuilding aggregated master version details ---")
-        try:
-            build_aggregated_master_buckets()
-        except Exception as e:
-            logger.error(f"Stage 2 failed (master aggregation): {e}")
-            raise
+    logger.info("--- Stage 2: Rebuilding aggregated master version details ---")
+    build_aggregated_version_details()
 
-    # Stage 3: Pattern Matcher Engine (Optional / Rule Changes)
-    if rebuild_patterns:
-        logger.info("--- Stage 3: Rebuilding aggregated pattern matches ---")
-        try:
-            build_aggregated_pattern_matches()
-        except Exception as e:
-            logger.error(f"Stage 3 failed (pattern matching): {e}")
-            raise
+    copy_lookups()
+
+    logger.info("--- Stage 3: Rebuilding aggregated pattern matches ---")
+    build_aggregated_pattern_matches()
 
     # Stage 4: Matched SDKs Join
-    if rebuild_matched_sdks:
-        logger.info("--- Stage 4: Building aggregated matched SDKs ---")
-        try:
-            build_aggregated_matched_sdks()
-        except Exception as e:
-            logger.error(f"Stage 4 failed (matched SDKs build): {e}")
-            raise
+    build_aggregated_matched_sdks()
 
     # Stage 5: Postgres B2B API Layer Sync (Window Functions)
     if sync_postgres:
