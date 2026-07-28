@@ -8,22 +8,22 @@ import uuid
 import pandas as pd
 
 from adscrawler.config import CONFIG, get_logger
+from adscrawler.dbcon.atomic_swap import atomic_swap_partition
 from adscrawler.process import (
     AGG_MATCHED_SDKS,
     AGG_PATTERN_MATCHES,
     AGG_VERSION_DETAILS,
-    AGG_VERSION_DETAILS,
-    RAW_DATA_VERSION_DETAILS,
-    RAW_DATA_VERSION_DETAILS_INITIAL,
-    RAW_DATA_VERSION_DETAILS_INCOMING,
-    TMP_VERSION_DETAILS,
-    TMP_MATCHED_SDKS,
-    TMP_PATTERN_MATCHES,
-    LOOKUP_VERSION_STRINGS,
+    LOOKUP_SDK_MEDIATION_PATTERNS,
     LOOKUP_SDK_PACKAGE_PATTERNS,
     LOOKUP_SDK_PATH_PATTERNS,
-    LOOKUP_SDK_MEDIATION_PATTERNS,
     LOOKUP_VERSION_CODES,
+    LOOKUP_VERSION_STRINGS,
+    RAW_DATA_VERSION_DETAILS,
+    RAW_DATA_VERSION_DETAILS_INCOMING,
+    RAW_DATA_VERSION_DETAILS_INITIAL,
+    TMP_MATCHED_SDKS,
+    TMP_PATTERN_MATCHES,
+    TMP_VERSION_DETAILS,
 )
 from adscrawler.process.storage import (
     delete_s3_objects_by_prefix,
@@ -78,7 +78,7 @@ def compact_incoming_to_raw_archive(date_str: str) -> None:
     dates.  All rows are stamped with the single ``date_str`` passed in (one compaction
     run = one logical batch), NOT filtered by upload date.
     """
-    if date_str >= datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d"):
+    if date_str >= datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d"):
         logger.info("Do not run compaction for 'today', need to wait for all data")
         return
     bucket = CONFIG["s3"]["bucket"]
@@ -166,15 +166,10 @@ def write_version_details_to_s3(
 def build_aggregated_version_details() -> None:
     """Rebuild the deduplicated, globally sorted master query files in agg-data."""
     bucket = CONFIG["s3"]["bucket"]
-
-    # Read everything under raw-data (backfill + daily date subfolders)
-    agg_tmp_output = f"s3://{bucket}/{TMP_VERSION_DETAILS}/"
-    # agg_final_output = f"s3://{bucket}/{AGG_VERSION_DETAILS}/"
-
     logger.info("Rebuilding aggregated master buckets in agg-data...")
 
     # Wipe any stale remnants from a prior failed run before writing new data.
-    delete_s3_objects_by_prefix(bucket, f"{TMP_VERSION_DETAILS}/")
+    delete_s3_objects_by_prefix(bucket, TMP_VERSION_DETAILS)
 
     # Collect all parquet paths under raw-data.
     raw_prefix = f"{RAW_DATA_VERSION_DETAILS}/"
@@ -189,6 +184,7 @@ def build_aggregated_version_details() -> None:
 
     raw_paths += raw_initial_paths
 
+    agg_tmp_output = f"s3://{bucket}/{TMP_VERSION_DETAILS}/"
     with get_duckdb_connection("s3") as duckdb_con:
         duckdb_con.execute(f"""
             COPY (
@@ -412,12 +408,11 @@ def build_aggregated_matched_sdks() -> None:
     pm_parqs = get_parquet_paths_by_prefix(bucket=bucket, prefix=AGG_PATTERN_MATCHES)
 
     if len(vdm_parqs) == 0:
-        ValueError(), "Missing vdm_parqs"
+        raise ValueError("Missing vdm_parqs")
     if len(pm_parqs) == 0:
-        ValueError(), "Missing pm_parqs"
+        raise ValueError("Missing pm_parqs")
 
     agg_tmp_output = f"s3://{bucket}/{TMP_MATCHED_SDKS}"
-    agg_final_output = f"s3://{bucket}/{AGG_MATCHED_SDKS}/"
 
     logger.info("Building aggregated matched SDKs...")
 
@@ -458,7 +453,7 @@ def build_aggregated_matched_sdks() -> None:
         tmp_parqs = get_parquet_paths_by_prefix(bucket, TMP_MATCHED_SDKS)
         matched_count = duckdb_con.execute(f"""
             SELECT count(*)
-            FROM read_parquet({tmp_parqs})
+            FROM read_parquet({tmp_parqs}, union_by_name=true)
         """).fetchone()[0]
         logger.info(f"Matched SDKs dataset contains {matched_count:,} rows.")
 
@@ -475,21 +470,13 @@ def initial_backfill_version_details_map() -> None:
     bucket = CONFIG["s3"]["bucket"]
     s3_path = f"s3://{bucket}/{RAW_DATA_VERSION_DETAILS_INITIAL}"
     pg_conn_str = pg_db_uri()
-
     con = get_duckdb_connection("s3")
-
-    # Install & load necessary DuckDB extensions
     con.execute("INSTALL postgres; LOAD postgres;")
-
-    # Attach Postgres database
     con.execute(f"ATTACH '{pg_conn_str}' AS pg (TYPE POSTGRES);")
-
     logger.info(f"Streaming public.version_details_map directly to {s3_path}")
-
-    # Export directly from Postgres to S3 Parquet
     con.execute(f"""
         COPY (
-            SELECT version_code, string_id 
+            SELECT version_code as version_code_id, string_id 
             FROM pg.public.version_details_map 
             ORDER BY version_code ASC, string_id ASC
         ) 
@@ -499,7 +486,6 @@ def initial_backfill_version_details_map() -> None:
     OVERWRITE_OR_IGNORE true)
         ;
     """)
-
     logger.info("Finished writing parquet files to S3.")
 
 
@@ -565,35 +551,25 @@ def copy_lookups() -> None:
     )
 
 
-def map_version_details(
-    date_str: str,
-    rebuild_patterns: bool = False,
-    rebuild_matched_sdks: bool = True,
-    sync_postgres: bool = False,
-) -> None:
+def map_version_details(date_str: str, pgdb) -> None:
     """Orchestrate the entire version details processing pipeline.
-
 
     Args:
         date_str: Logical partition date for incoming compaction (YYYY-MM-DD).
-        rebuild_patterns: Re-run pattern matcher engine against lookups.
-        rebuild_matched_sdks: Re-join VDM with pattern-matches into `agg-data/matched-sdks/`.
-        sync_postgres: Compute presence diffs/LAG and push to `adtech.store_app_sdk_changes`.
     """
-    date_str = (datetime.datetime.today() - datetime.timedelta(days=1)).strftime(
-        "%Y-%m-%d"
-    )
+
+    bucket = CONFIG["s3"]["bucket"]
     start_time = time.time()
     logger.info(f"Starting map_version_details entrypoint run for date={date_str}")
 
-    logger.info("--- Stage 1: Compacting incoming version details ---")
-    try:
-        compact_incoming_to_raw_archive(date_str=date_str)
-    except Exception as e:
-        logger.error(f"Stage 1 failed (compaction): {e}")
-        raise
+    ### TODO: THIS IS A LOOP, not related to rest of flow?
+    for day in range(1, 4):
+        target_compact_date = (
+            datetime.datetime.today() - datetime.timedelta(days=day)
+        ).strftime("%Y-%m-%d")
+        logger.info("--- Stage 1: Compacting incoming version details ---")
+        compact_incoming_to_raw_archive(date_str=target_compact_date)
 
-    # Stage 2: Master Bucket Aggregation
     logger.info("--- Stage 2: Rebuilding aggregated master version details ---")
     build_aggregated_version_details()
 
@@ -601,20 +577,35 @@ def map_version_details(
 
     logger.info("--- Stage 3: Rebuilding aggregated pattern matches ---")
     build_aggregated_pattern_matches()
-
-    # Stage 4: Matched SDKs Join
     build_aggregated_matched_sdks()
 
-    # Stage 5: Postgres B2B API Layer Sync (Window Functions)
-    if sync_postgres:
-        logger.info("--- Stage 5: Syncing SDK changes to Postgres API Layer ---")
-        try:
-            # Place holder call to your windowing & PG insertion logic
-            # e.g., sync_store_app_sdk_changes_to_postgres()
-            pass
-        except Exception as e:
-            logger.error(f"Stage 5 failed (Postgres sync): {e}")
-            raise
+    logger.info("--- Stage 5: Syncing SDK agg to Postgres ---")
 
+    matched_parqs = get_parquet_paths_by_prefix(bucket, AGG_MATCHED_SDKS)
+
+    local_tmp = "/tmp/matched_sdks.parquet"
+
+    with get_duckdb_connection("s3") as duckdb_con:
+        duckdb_con.execute(f"""
+            COPY (
+                SELECT 
+                    store_app,
+                    version_code_id,
+                    version_code_created_at,
+                    sdk_id
+                FROM read_parquet({matched_parqs}, union_by_name=true)
+            ) TO '{local_tmp}' (
+                FORMAT PARQUET,
+                COMPRESSION 'zstd',
+                ROW_GROUP_SIZE {_ROW_GROUP_SIZE},
+                OVERWRITE_OR_IGNORE true
+            )
+        """)
+    df = pd.read_parquet(local_tmp)
+
+    batch_date = datetime.date.today()
+    df["batch_date"] = batch_date
+
+    atomic_swap_partition(df, pgdb, schema="adtech", table="app_sdks")
     elapsed = time.time() - start_time
     logger.info(f"Completed map_version_details run in {elapsed:.2f}s")
