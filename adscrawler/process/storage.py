@@ -604,4 +604,14 @@ def get_duckdb_connection(s3_config_key: str) -> duckdb.DuckDBPyConnection:
     return duckdb_con
 
 
+def pg_db_uri():
+    """Return a DuckDB Postgres connection URI string for the configured database."""
+    db_config = CONFIG["madrone"]
+    user = db_config["db_user"]
+    password = db_config["db_password"]
+    host = db_config["host"]
+    database = db_config["db"]
+    return f"dbname={database} host={host} user={user} password={password}"
+
+
 S3_CLIENTS: dict = {}

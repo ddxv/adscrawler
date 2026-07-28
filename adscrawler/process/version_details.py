@@ -7,6 +7,7 @@ import urllib.parse
 import uuid
 
 import pandas as pd
+import duckdb
 
 from adscrawler.config import CONFIG, get_logger
 from adscrawler.process import (
@@ -22,6 +23,7 @@ from adscrawler.process.storage import (
     get_parquet_paths_by_prefix,
     get_s3_client,
     get_s3_dirs_by_prefix,
+    pg_db_uri,
 )
 
 logger = get_logger(__name__, "version_details")
@@ -463,6 +465,41 @@ def build_aggregated_matched_sdks() -> None:
     # Swap tmp to final
     replace_s3_prefix(bucket, f"{AGG_MATCHED_SDKS}_tmp/", f"{AGG_MATCHED_SDKS}/")
     logger.info("Successfully updated agg-data/matched-sdks in S3.")
+
+
+def initial_backfill_version_details_map() -> None:
+    bucket = CONFIG["s3"]["bucket"]
+    s3_path = f"s3://{bucket}/{AGG_VERSION_DETAILS}/initial_backfill"
+    pg_conn_str = pg_db_uri()
+
+    con = get_duckdb_connection("s3")
+
+    # Clear old objects using S3 client first...
+    # delete_s3_objects_by_prefix(bucket=bucket, prefix=f"{AGG_VERSION_DETAILS}/initial_backfill/")
+
+    # Install & load necessary DuckDB extensions
+    con.execute("INSTALL postgres; LOAD postgres;")
+
+    # Attach Postgres database
+    con.execute(f"ATTACH '{pg_conn_str}' AS pg (TYPE POSTGRES);")
+
+    logger.info(f"Streaming public.version_details_map directly to {s3_path}")
+
+    # Export directly from Postgres to S3 Parquet
+    con.execute(f"""
+        COPY (
+            SELECT version_code, string_id 
+            FROM pg.public.version_details_map 
+            ORDER BY version_code ASC, string_id ASC
+        ) 
+        TO '{s3_path}' 
+        (FORMAT PARQUET, PER_THREAD_OUTPUT TRUE, COMPRESSION 'ZSTD',
+    ROW_GROUP_SIZE 100000,
+    OVERWRITE_OR_IGNORE true)
+        ;
+    """)
+
+    logger.info("Finished writing parquet files to S3.")
 
 
 def map_version_details(

@@ -22,26 +22,17 @@ from adscrawler.dbcon.queries import (
 )
 from adscrawler.process import (
     AGG_COMBINED_DOMAIN_HISTORY,
-    AGG_STORE_APPS_RELEASE_DATES,
+    LOOKUP_STORE_APPS_RELEASE_DATES,
 )
 from adscrawler.process.storage import (
     delete_s3_objects_by_prefix,
     get_duckdb_connection,
     get_parquet_paths_by_prefix,
     get_s3_client,
+    pg_db_uri,
 )
 
 logger = get_logger(__name__, "scrape_stores")
-
-
-def pg_db_uri():
-    """Return a Postgres connection URI string for the configured database."""
-    db_config = CONFIG["madrone"]
-    user = db_config["db_user"]
-    password = db_config["db_password"]
-    host = db_config["host"]
-    database = db_config["db"]
-    return f"dbname={database} host={host} user={user} password={password}"
 
 
 def _run_multi_statement(conn: Any, raw_sql: str, params: dict[str, str]) -> None:
@@ -78,7 +69,9 @@ def run_changes(pgdb: PostgresEngine) -> None:
     parquet_files_literal = "[" + ", ".join(f"'{p}'" for p in parquet_files) + "]"
 
     db_uri = pg_db_uri()
-    store_apps_key = f"s3://{bucket}/{AGG_STORE_APPS_RELEASE_DATES}/store_apps.parquet"
+    store_apps_key = (
+        f"s3://{bucket}/{LOOKUP_STORE_APPS_RELEASE_DATES}/store_apps.parquet"
+    )
 
     with get_duckdb_connection(s3_config_key) as duckdb_con:
         logger.info("Caching Postgres lookup tables into DuckDB...")
@@ -192,7 +185,7 @@ def store_apps_release_dates_to_s3(pgdb: PostgresEngine) -> None:
     """
     s3_client = get_s3_client()
     bucket = CONFIG["s3"]["bucket"]
-    s3_key = f"{AGG_STORE_APPS_RELEASE_DATES}/store_apps.parquet"
+    s3_key = f"{LOOKUP_STORE_APPS_RELEASE_DATES}/store_apps.parquet"
 
     logger.info("Exporting store_apps (id, release_date, store) to S3")
     df = pd.read_sql(
