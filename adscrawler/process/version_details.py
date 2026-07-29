@@ -10,7 +10,6 @@ import pandas as pd
 from adscrawler.config import CONFIG, get_logger
 from adscrawler.dbcon.atomic_swap import atomic_swap_partition
 from adscrawler.process import (
-    AGG_MATCHED_SDKS,
     AGG_MATCHED_SDK_STRINGS,
     AGG_MATCHED_SDK_STRINGS_LATEST,
     AGG_PATTERN_MATCHES,
@@ -23,7 +22,6 @@ from adscrawler.process import (
     RAW_DATA_VERSION_DETAILS,
     RAW_DATA_VERSION_DETAILS_INCOMING,
     RAW_DATA_VERSION_DETAILS_INITIAL,
-    TMP_MATCHED_SDKS,
     TMP_MATCHED_SDK_STRINGS,
     TMP_MATCHED_SDK_STRINGS_LATEST,
     TMP_PATTERN_MATCHES,
@@ -440,7 +438,8 @@ def build_matched_app_sdk_strings() -> None:
                     store_app,
                     version_code_id,
                     string_id,
-                    sdk_id
+                    sdk_id,
+                    version_code_created_at
                 FROM raw_version_sdks
                 ORDER BY store_app ASC, version_code_created_at ASC
             ) TO '{agg_tmp_output}' (
@@ -705,7 +704,7 @@ def map_version_details(date_str: str, pgdb) -> None:
     logger.info("--- Stage 5: Syncing SDK agg to Postgres ---")
     swap_matched_app_sdks_todb(pgdb)
 
-    swap_matched_app_sdks_todb(pgdb)
+    swap_matched_app_strings_latest_todb(pgdb)
 
     elapsed = time.time() - start_time
     logger.info(f"Completed map_version_details run in {elapsed:.2f}s")
