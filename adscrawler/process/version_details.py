@@ -40,6 +40,7 @@ logger = get_logger(__name__, "version_details")
 
 # Default row-group size for DuckDB parquet writer.
 _ROW_GROUP_SIZE = 100_000
+_LARGE_ROW_GROUP_SIZE = 1_000_000
 
 # Groups every 5 Mio string_id values into labels like ``000M-005M``, ``005M-100M``, etc.
 # Manual boundaries reflecting real density: narrow near the dense low end,
@@ -406,61 +407,62 @@ def build_matched_app_sdk_strings() -> None:
     bucket = CONFIG["s3"]["bucket"]
     vc_path = f"s3://{bucket}/{LOOKUP_VERSION_CODES}"
 
-    vdm_parqs = get_parquet_paths_by_prefix(bucket=bucket, prefix=AGG_VERSION_DETAILS)
-    pm_parqs = get_parquet_paths_by_prefix(bucket=bucket, prefix=AGG_PATTERN_MATCHES)
+    # Build S3 glob paths directly instead of fetching file lists via S3 API
+    vdm_glob = f"s3://{bucket}/{AGG_VERSION_DETAILS}/*/*.parquet"
+    pm_glob = f"s3://{bucket}/{AGG_PATTERN_MATCHES}/*/*.parquet"
 
-    if len(vdm_parqs) == 0:
-        raise ValueError("Missing vdm_parqs")
-    if len(pm_parqs) == 0:
-        raise ValueError("Missing pm_parqs")
+    tmp_output_glob = f"s3://{bucket}/{TMP_MATCHED_SDK_STRINGS}/*.parquet"
     agg_tmp_output = f"s3://{bucket}/{TMP_MATCHED_SDK_STRINGS}"
+
     logger.info("Building aggregated matched SDK strings...")
 
     # Wipe any stale remnants from a prior failed run.
     delete_s3_objects_by_prefix(bucket, f"{TMP_MATCHED_SDK_STRINGS}/")
 
+    query = f"""COPY (
+             WITH raw_version_sdks AS (
+                 SELECT 
+                     vc.store_app,
+                     vdm.version_code_id,
+                     vdm.string_id,
+                     pm.sdk_id,
+                     vc.created_at as version_code_created_at
+                 FROM read_parquet('{vdm_glob}', union_by_name=true) vdm
+                 LEFT JOIN read_parquet('{pm_glob}', union_by_name=true) pm
+                   ON vdm.string_id = pm.string_id
+                 JOIN read_parquet('{vc_path}') vc
+                   ON vdm.version_code_id = vc.id
+             )
+             SELECT 
+                 store_app,
+                 version_code_id,
+                 string_id,
+                 sdk_id,
+                 version_code_created_at
+             FROM raw_version_sdks
+             ORDER BY store_app ASC, version_code_created_at DESC
+         ) TO '{agg_tmp_output}' (
+             FORMAT PARQUET,
+             FILE_SIZE_BYTES '128MB',
+             COMPRESSION 'zstd',
+             ROW_GROUP_SIZE {_ROW_GROUP_SIZE},
+             OVERWRITE_OR_IGNORE true
+         )
+         """
+
     with get_duckdb_connection("s3") as duckdb_con:
-        duckdb_con.execute(f"""
-            COPY (
-                WITH raw_version_sdks AS (
-                    SELECT 
-                        vc.store_app,
-                        vdm.version_code_id,
-                        vdm.string_id,
-                        pm.sdk_id,
-                        vc.version_code_created_at
-                    FROM read_parquet({vdm_parqs}) vdm
-                    LEFT JOIN read_parquet({pm_parqs}) pm
-                      ON vdm.string_id = pm.string_id
-                    JOIN read_parquet('{vc_path}') vc
-                      ON vdm.version_code_id = vc.id
-                )
-                SELECT 
-                    store_app,
-                    version_code_id,
-                    string_id,
-                    sdk_id,
-                    version_code_created_at
-                FROM raw_version_sdks
-                ORDER BY store_app ASC, version_code_created_at ASC
-            ) TO '{agg_tmp_output}' (
-                FORMAT PARQUET,
-                PARTITION_BY (sdk_id),
-                COMPRESSION 'zstd',
-                ROW_GROUP_SIZE {_ROW_GROUP_SIZE},
-                OVERWRITE_OR_IGNORE true
-            )
-        """)
-        # Validate output has rows before swapping.
-        tmp_parqs = get_parquet_paths_by_prefix(bucket, TMP_MATCHED_SDK_STRINGS)
+        duckdb_con.execute(query)
+        # Validate output using glob + hive_partitioning
         matched_count = duckdb_con.execute(f"""
             SELECT count(*)
-            FROM read_parquet({tmp_parqs}, union_by_name=true)
+            FROM read_parquet('{tmp_output_glob}')
         """).fetchone()[0]
         logger.info(f"Matched SDKs dataset contains {matched_count:,} rows.")
+
     if matched_count == 0:
         logger.error("Refusing to publish: matched SDK strings dataset is empty.")
         return
+
     # Swap tmp to final
     replace_s3_prefix(
         bucket, f"{TMP_MATCHED_SDK_STRINGS}/", f"{AGG_MATCHED_SDK_STRINGS}/"
@@ -469,65 +471,69 @@ def build_matched_app_sdk_strings() -> None:
 
 
 def build_matched_app_sdk_strings_latest() -> None:
-    """Build matched SDKs artifact by joining version-details-map with pattern-matches."""
+    """Build latest matched SDKs artifact by picking the newest version_code per store_app."""
     bucket = CONFIG["s3"]["bucket"]
 
-    app_parqs = get_parquet_paths_by_prefix(
-        bucket=bucket, prefix=AGG_MATCHED_SDK_STRINGS
-    )
-
-    if len(app_parqs) == 0:
-        raise ValueError("Missing app_parqs")
-
+    # S3 Glob locations
+    input_glob = f"s3://{bucket}/{AGG_MATCHED_SDK_STRINGS}/*.parquet"
     agg_tmp_output = f"s3://{bucket}/{TMP_MATCHED_SDK_STRINGS_LATEST}"
+    tmp_output_glob = f"s3://{bucket}/{TMP_MATCHED_SDK_STRINGS_LATEST}/*.parquet"
+
     logger.info("Building latest matched SDK strings...")
 
     # Wipe any stale remnants from a prior failed run.
     delete_s3_objects_by_prefix(bucket, f"{TMP_MATCHED_SDK_STRINGS_LATEST}/")
 
-    with get_duckdb_connection("s3") as duckdb_con:
-        duckdb_con.execute(f"""
-            COPY (
-                WITH raw_version_sdks AS (
-                    SELECT 
-                    DISTINCT ON (ap.store_app)
-                        ap.store_app,
-                        ap.version_code_id,
-                        ap.string_id,
-                        ap.sdk_id
-                    FROM read_parquet({app_parqs}) ap
-                    ORDER BY ap.store_app, ap.version_code_created_at DESC
-                )
-                SELECT 
-                    store_app,
-                    string_id,
-                    sdk_id
-                FROM raw_version_sdks
-                ORDER BY store_app ASC
-            ) TO '{agg_tmp_output}' (
-                FORMAT PARQUET,
-                COMPRESSION 'zstd',
-                ROW_GROUP_SIZE {_ROW_GROUP_SIZE},
-                OVERWRITE_OR_IGNORE true
+    query = f"""
+        COPY (
+            WITH latest_version_sdks AS (
+                SELECT DISTINCT ON (ap.store_app)
+                    ap.store_app,
+                    ap.string_id,
+                    ap.sdk_id,
+                    ap.version_code_created_at
+                FROM read_parquet('{input_glob}') ap
+                ORDER BY ap.store_app ASC, ap.version_code_created_at DESC
             )
-        """)
-        # Validate output has rows before swapping.
-        tmp_parqs = get_parquet_paths_by_prefix(bucket, TMP_MATCHED_SDK_STRINGS_LATEST)
+            SELECT 
+                store_app,
+                string_id,
+                sdk_id
+            FROM latest_version_sdks
+            ORDER BY store_app ASC
+        ) TO '{agg_tmp_output}' (
+            FORMAT PARQUET,
+            FILE_SIZE_BYTES '128MB',
+            COMPRESSION 'zstd',
+            ROW_GROUP_SIZE {_ROW_GROUP_SIZE},
+            OVERWRITE_OR_IGNORE true
+        )
+    """
+
+    with get_duckdb_connection("s3") as duckdb_con:
+        duckdb_con.execute(query)
+
+        # Validate output has rows using S3 glob instead of fetching Python lists
         matched_count = duckdb_con.execute(f"""
             SELECT count(*)
-            FROM read_parquet({tmp_parqs}, union_by_name=true)
+            FROM read_parquet('{tmp_output_glob}')
         """).fetchone()[0]
-        logger.info(f"Matched SDKs dataset contains {matched_count:,} rows.")
+
+        logger.info(f"Latest matched SDKs dataset contains {matched_count:,} rows.")
+
     if matched_count == 0:
-        logger.error("Refusing to publish: matched SDK strings dataset is empty.")
+        logger.error(
+            "Refusing to publish: matched SDK strings latest dataset is empty."
+        )
         return
+
     # Swap tmp to final
     replace_s3_prefix(
         bucket,
         f"{TMP_MATCHED_SDK_STRINGS_LATEST}/",
         f"{AGG_MATCHED_SDK_STRINGS_LATEST}/",
     )
-    logger.info(f"Successfully {AGG_MATCHED_SDK_STRINGS_LATEST} in S3.")
+    logger.info(f"Successfully updated {AGG_MATCHED_SDK_STRINGS_LATEST} in S3.")
 
 
 def initial_backfill_version_details_map() -> None:
@@ -694,7 +700,7 @@ def map_version_details(date_str: str, pgdb) -> None:
     logger.info(f"Starting map_version_details entrypoint run for date={date_str}")
 
     ### TODO: THIS IS A LOOP, not related to rest of flow?
-    for day in range(1, 4):
+    for day in range(1, 3):
         target_compact_date = (
             datetime.datetime.today() - datetime.timedelta(days=day)
         ).strftime("%Y-%m-%d")

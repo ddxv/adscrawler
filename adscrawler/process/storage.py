@@ -592,7 +592,8 @@ def get_duckdb_connection(s3_config_key: str) -> duckdb.DuckDBPyConnection:
     duckdb_con.execute(f"SET s3_region='{s3_region}';")
     duckdb_con.execute(f"SET s3_endpoint='{endpoint}';")
     duckdb_con.execute("SET s3_url_style='path';")
-    duckdb_con.execute("SET s3_url_compatibility_mode=true;")
+    # S3 curl compatibility mode controls the glob expansions
+    duckdb_con.execute("SET s3_url_compatibility_mode=false;")
     duckdb_con.execute("SET threads = 4;")
     duckdb_con.execute(
         f"SET s3_access_key_id='{CONFIG[s3_config_key]['access_key_id']}';"
