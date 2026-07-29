@@ -11,6 +11,8 @@ from adscrawler.config import CONFIG, get_logger
 from adscrawler.dbcon.atomic_swap import atomic_swap_partition
 from adscrawler.process import (
     AGG_MATCHED_SDKS,
+    AGG_MATCHED_SDK_STRINGS,
+    AGG_MATCHED_SDK_STRINGS_LATEST,
     AGG_PATTERN_MATCHES,
     AGG_VERSION_DETAILS,
     LOOKUP_SDK_MEDIATION_PATTERNS,
@@ -22,6 +24,8 @@ from adscrawler.process import (
     RAW_DATA_VERSION_DETAILS_INCOMING,
     RAW_DATA_VERSION_DETAILS_INITIAL,
     TMP_MATCHED_SDKS,
+    TMP_MATCHED_SDK_STRINGS,
+    TMP_MATCHED_SDK_STRINGS_LATEST,
     TMP_PATTERN_MATCHES,
     TMP_VERSION_DETAILS,
 )
@@ -398,10 +402,9 @@ def build_aggregated_pattern_matches() -> None:
     logger.info("Successfully updated agg-data/pattern-matches in S3.")
 
 
-def build_aggregated_matched_sdks() -> None:
+def build_matched_app_sdk_strings() -> None:
     """Build matched SDKs artifact by joining version-details-map with pattern-matches."""
     bucket = CONFIG["s3"]["bucket"]
-
     vc_path = f"s3://{bucket}/{LOOKUP_VERSION_CODES}"
 
     vdm_parqs = get_parquet_paths_by_prefix(bucket=bucket, prefix=AGG_VERSION_DETAILS)
@@ -411,25 +414,24 @@ def build_aggregated_matched_sdks() -> None:
         raise ValueError("Missing vdm_parqs")
     if len(pm_parqs) == 0:
         raise ValueError("Missing pm_parqs")
-
-    agg_tmp_output = f"s3://{bucket}/{TMP_MATCHED_SDKS}"
-
-    logger.info("Building aggregated matched SDKs...")
+    agg_tmp_output = f"s3://{bucket}/{TMP_MATCHED_SDK_STRINGS}"
+    logger.info("Building aggregated matched SDK strings...")
 
     # Wipe any stale remnants from a prior failed run.
-    delete_s3_objects_by_prefix(bucket, f"{TMP_MATCHED_SDKS}/")
+    delete_s3_objects_by_prefix(bucket, f"{TMP_MATCHED_SDK_STRINGS}/")
 
     with get_duckdb_connection("s3") as duckdb_con:
         duckdb_con.execute(f"""
             COPY (
                 WITH raw_version_sdks AS (
-                    SELECT DISTINCT
+                    SELECT 
                         vc.store_app,
                         vdm.version_code_id,
-                        vc.created_at::DATE AS version_code_created_at,
-                        pm.sdk_id
+                        vdm.string_id,
+                        pm.sdk_id,
+                        vc.version_code_created_at
                     FROM read_parquet({vdm_parqs}) vdm
-                    JOIN read_parquet({pm_parqs}) pm
+                    LEFT JOIN read_parquet({pm_parqs}) pm
                       ON vdm.string_id = pm.string_id
                     JOIN read_parquet('{vc_path}') vc
                       ON vdm.version_code_id = vc.id
@@ -437,7 +439,7 @@ def build_aggregated_matched_sdks() -> None:
                 SELECT 
                     store_app,
                     version_code_id,
-                    version_code_created_at,
+                    string_id,
                     sdk_id
                 FROM raw_version_sdks
                 ORDER BY store_app ASC, version_code_created_at ASC
@@ -450,20 +452,82 @@ def build_aggregated_matched_sdks() -> None:
             )
         """)
         # Validate output has rows before swapping.
-        tmp_parqs = get_parquet_paths_by_prefix(bucket, TMP_MATCHED_SDKS)
+        tmp_parqs = get_parquet_paths_by_prefix(bucket, TMP_MATCHED_SDK_STRINGS)
         matched_count = duckdb_con.execute(f"""
             SELECT count(*)
             FROM read_parquet({tmp_parqs}, union_by_name=true)
         """).fetchone()[0]
         logger.info(f"Matched SDKs dataset contains {matched_count:,} rows.")
-
     if matched_count == 0:
-        logger.error("Refusing to publish: matched SDKs dataset is empty.")
+        logger.error("Refusing to publish: matched SDK strings dataset is empty.")
         return
-
     # Swap tmp to final
-    replace_s3_prefix(bucket, f"{TMP_MATCHED_SDKS}/", f"{AGG_MATCHED_SDKS}/")
-    logger.info("Successfully updated agg-data/matched-sdks in S3.")
+    replace_s3_prefix(
+        bucket, f"{TMP_MATCHED_SDK_STRINGS}/", f"{AGG_MATCHED_SDK_STRINGS}/"
+    )
+    logger.info("Successfully updated agg-data/matched-sdk-strings in S3.")
+
+
+def build_matched_app_sdk_strings_latest() -> None:
+    """Build matched SDKs artifact by joining version-details-map with pattern-matches."""
+    bucket = CONFIG["s3"]["bucket"]
+
+    app_parqs = get_parquet_paths_by_prefix(
+        bucket=bucket, prefix=AGG_MATCHED_SDK_STRINGS
+    )
+
+    if len(app_parqs) == 0:
+        raise ValueError("Missing app_parqs")
+
+    agg_tmp_output = f"s3://{bucket}/{TMP_MATCHED_SDK_STRINGS_LATEST}"
+    logger.info("Building latest matched SDK strings...")
+
+    # Wipe any stale remnants from a prior failed run.
+    delete_s3_objects_by_prefix(bucket, f"{TMP_MATCHED_SDK_STRINGS_LATEST}/")
+
+    with get_duckdb_connection("s3") as duckdb_con:
+        duckdb_con.execute(f"""
+            COPY (
+                WITH raw_version_sdks AS (
+                    SELECT 
+                    DISTINCT ON (ap.store_app)
+                        ap.store_app,
+                        ap.version_code_id,
+                        ap.string_id,
+                        ap.sdk_id
+                    FROM read_parquet({app_parqs}) ap
+                    ORDER BY ap.store_app, ap.version_code_created_at DESC
+                )
+                SELECT 
+                    store_app,
+                    string_id,
+                    sdk_id
+                FROM raw_version_sdks
+                ORDER BY store_app ASC
+            ) TO '{agg_tmp_output}' (
+                FORMAT PARQUET,
+                COMPRESSION 'zstd',
+                ROW_GROUP_SIZE {_ROW_GROUP_SIZE},
+                OVERWRITE_OR_IGNORE true
+            )
+        """)
+        # Validate output has rows before swapping.
+        tmp_parqs = get_parquet_paths_by_prefix(bucket, TMP_MATCHED_SDK_STRINGS_LATEST)
+        matched_count = duckdb_con.execute(f"""
+            SELECT count(*)
+            FROM read_parquet({tmp_parqs}, union_by_name=true)
+        """).fetchone()[0]
+        logger.info(f"Matched SDKs dataset contains {matched_count:,} rows.")
+    if matched_count == 0:
+        logger.error("Refusing to publish: matched SDK strings dataset is empty.")
+        return
+    # Swap tmp to final
+    replace_s3_prefix(
+        bucket,
+        f"{TMP_MATCHED_SDK_STRINGS_LATEST}/",
+        f"{AGG_MATCHED_SDK_STRINGS_LATEST}/",
+    )
+    logger.info(f"Successfully {AGG_MATCHED_SDK_STRINGS_LATEST} in S3.")
 
 
 def initial_backfill_version_details_map() -> None:
@@ -551,6 +615,65 @@ def copy_lookups() -> None:
     )
 
 
+def swap_matched_app_strings_latest_todb(pgdb):
+    bucket = CONFIG["s3"]["bucket"]
+    app_sdk_parqs = get_parquet_paths_by_prefix(
+        bucket=bucket, prefix=AGG_MATCHED_SDK_STRINGS_LATEST
+    )
+    local_tmp = "/tmp/sdk_strings_latest.parquet"
+    with get_duckdb_connection("s3") as duckdb_con:
+        duckdb_con.execute(f"""
+            COPY (
+                SELECT
+                    store_app,
+                    string_id,
+                    sdk_id
+                FROM read_parquet({app_sdk_parqs}, union_by_name=true)
+            ) TO '{local_tmp}' (
+                FORMAT PARQUET,
+                COMPRESSION 'zstd',
+                ROW_GROUP_SIZE {_ROW_GROUP_SIZE},
+                OVERWRITE_OR_IGNORE true
+            )
+        """)
+    df = pd.read_parquet(local_tmp)
+    batch_date = datetime.date.today()
+    df["batch_date"] = batch_date
+    atomic_swap_partition(df, pgdb, schema="adtech", table="app_sdk_strings")
+
+
+def swap_matched_app_sdks_todb(pgdb):
+    bucket = CONFIG["s3"]["bucket"]
+    app_sdk_parqs = get_parquet_paths_by_prefix(
+        bucket=bucket, prefix=AGG_MATCHED_SDK_STRINGS
+    )
+    local_tmp = "/tmp/matched_sdks.parquet"
+    with get_duckdb_connection("s3") as duckdb_con:
+        duckdb_con.execute(f"""
+            COPY (
+                SELECT
+                DISTINCT 
+                    store_app,
+                    version_code_id,
+                    version_code_created_at,
+                    sdk_id
+                FROM read_parquet({app_sdk_parqs}, union_by_name=true)
+                WHERE sdk_id IS NOT NULL
+            ) TO '{local_tmp}' (
+                FORMAT PARQUET,
+                COMPRESSION 'zstd',
+                ROW_GROUP_SIZE {_ROW_GROUP_SIZE},
+                OVERWRITE_OR_IGNORE true
+            )
+        """)
+    df = pd.read_parquet(local_tmp)
+
+    batch_date = datetime.date.today()
+    df["batch_date"] = batch_date
+
+    atomic_swap_partition(df, pgdb, schema="adtech", table="app_sdks")
+
+
 def map_version_details(date_str: str, pgdb) -> None:
     """Orchestrate the entire version details processing pipeline.
 
@@ -558,7 +681,6 @@ def map_version_details(date_str: str, pgdb) -> None:
         date_str: Logical partition date for incoming compaction (YYYY-MM-DD).
     """
 
-    bucket = CONFIG["s3"]["bucket"]
     start_time = time.time()
     logger.info(f"Starting map_version_details entrypoint run for date={date_str}")
 
@@ -577,35 +699,13 @@ def map_version_details(date_str: str, pgdb) -> None:
 
     logger.info("--- Stage 3: Rebuilding aggregated pattern matches ---")
     build_aggregated_pattern_matches()
-    build_aggregated_matched_sdks()
+    build_matched_app_sdk_strings()
+    build_matched_app_sdk_strings_latest()
 
     logger.info("--- Stage 5: Syncing SDK agg to Postgres ---")
+    swap_matched_app_sdks_todb(pgdb)
 
-    matched_parqs = get_parquet_paths_by_prefix(bucket, AGG_MATCHED_SDKS)
+    swap_matched_app_sdks_todb(pgdb)
 
-    local_tmp = "/tmp/matched_sdks.parquet"
-
-    with get_duckdb_connection("s3") as duckdb_con:
-        duckdb_con.execute(f"""
-            COPY (
-                SELECT 
-                    store_app,
-                    version_code_id,
-                    version_code_created_at,
-                    sdk_id
-                FROM read_parquet({matched_parqs}, union_by_name=true)
-            ) TO '{local_tmp}' (
-                FORMAT PARQUET,
-                COMPRESSION 'zstd',
-                ROW_GROUP_SIZE {_ROW_GROUP_SIZE},
-                OVERWRITE_OR_IGNORE true
-            )
-        """)
-    df = pd.read_parquet(local_tmp)
-
-    batch_date = datetime.date.today()
-    df["batch_date"] = batch_date
-
-    atomic_swap_partition(df, pgdb, schema="adtech", table="app_sdks")
     elapsed = time.time() - start_time
     logger.info(f"Completed map_version_details run in {elapsed:.2f}s")

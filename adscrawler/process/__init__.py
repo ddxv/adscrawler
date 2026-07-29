@@ -20,7 +20,11 @@ TMP_VERSION_DETAILS = "tmp/version-details-map"
 AGG_PATTERN_MATCHES = "agg-data/pattern-matches"
 TMP_PATTERN_MATCHES = "tmp/pattern-matches"
 AGG_MATCHED_SDKS = "agg-data/matched-sdks"
+AGG_MATCHED_SDK_STRINGS = "agg-data/matched-sdk-strings"
+AGG_MATCHED_SDK_STRINGS_LATEST = "agg-data/matched-sdk-strings-latest"
 TMP_MATCHED_SDKS = "tmp/matched-sdks"
+TMP_MATCHED_SDK_STRINGS = "tmp/matched-sdk-strings"
+TMP_MATCHED_SDK_STRINGS_LATEST = "tmp/matched-sdk-strings-latest"
 
 
 LOOKUP_VERSION_STRINGS = "lookups/version-strings/version-strings.parquet"
