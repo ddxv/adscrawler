@@ -414,11 +414,10 @@ def build_matched_app_sdk_strings() -> None:
     tmp_output_glob = f"s3://{bucket}/{TMP_MATCHED_SDK_STRINGS}/*.parquet"
     agg_tmp_output = f"s3://{bucket}/{TMP_MATCHED_SDK_STRINGS}"
 
-    logger.info("Building aggregated matched SDK strings...")
-
     # Wipe any stale remnants from a prior failed run.
     delete_s3_objects_by_prefix(bucket, f"{TMP_MATCHED_SDK_STRINGS}/")
 
+    logger.info("Building aggregated matched SDK strings...")
     query = f"""COPY (
              WITH raw_version_sdks AS (
                  SELECT 
@@ -658,7 +657,6 @@ def swap_matched_app_sdks_todb(pgdb):
     batch_date = datetime.date.today()
     batch_date_str = batch_date.strftime("%Y-%m-%d")
 
-    # Inject batch_date directly into DuckDB projection
     query = f"""
         SELECT DISTINCT
             store_app,

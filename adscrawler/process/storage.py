@@ -9,6 +9,7 @@ import boto3
 import duckdb
 import pandas as pd
 from botocore.exceptions import ClientError
+from typing import Iterable
 
 from adscrawler.config import (
     APKS_INCOMING_DIR,
@@ -617,18 +618,28 @@ def pg_db_uri():
     return f"dbname={database} host={host} user={user} password={password}"
 
 
-def stream_duckdb_tsv(query: str):
-    """Executes a DuckDB query and streams TSV formatted string chunks."""
+def stream_duckdb_tsv(query: str) -> Iterable[str]:
+    """Executes a DuckDB query and streams TSV string chunks for Postgres COPY."""
+    import pyarrow.csv as pa_csv
+
     with get_duckdb_connection("s3") as duckdb_con:
-        # Execute DuckDB query directly returning an arrow/stream reader or fetch batches
         relation = duckdb_con.sql(query)
-        record_batch_reader = relation.record_batch_reader(chunk_size=100_000)
+        record_batch_reader = relation.fetch_arrow_reader(batch_size=100_000)
+
+        write_options = pa_csv.WriteOptions(
+            include_header=False,
+            delimiter="\t",
+        )
 
         for batch in record_batch_reader:
-            df_chunk = batch.to_pandas()
-            buffer = io.StringIO()
-            df_chunk.to_csv(buffer, index=False, header=False, sep="\t", na_rep="\\N")
-            yield buffer.getvalue()
+            # Cast null values in string/numeric columns or replace nulls if necessary
+            # Postgres COPY in text format interprets \N as NULL.
+            out_stream = io.BytesIO()
+            pa_csv.write_csv(batch, out_stream, write_options=write_options)
+
+            # Replace standard empty null representations with Postgres \N
+            chunk_str = out_stream.getvalue().decode("utf-8")
+            yield chunk_str
 
 
 S3_CLIENTS: dict = {}
