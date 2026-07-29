@@ -1,4 +1,5 @@
 import datetime
+import io
 import os
 import pathlib
 import shutil
@@ -612,6 +613,20 @@ def pg_db_uri():
     host = db_config["host"]
     database = db_config["db"]
     return f"dbname={database} host={host} user={user} password={password}"
+
+
+def stream_duckdb_tsv(query: str):
+    """Executes a DuckDB query and streams TSV formatted string chunks."""
+    with get_duckdb_connection("s3") as duckdb_con:
+        # Execute DuckDB query directly returning an arrow/stream reader or fetch batches
+        relation = duckdb_con.sql(query)
+        record_batch_reader = relation.record_batch_reader(chunk_size=100_000)
+
+        for batch in record_batch_reader:
+            df_chunk = batch.to_pandas()
+            buffer = io.StringIO()
+            df_chunk.to_csv(buffer, index=False, header=False, sep="\t", na_rep="\\N")
+            yield buffer.getvalue()
 
 
 S3_CLIENTS: dict = {}

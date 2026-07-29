@@ -2,6 +2,7 @@
 
 import datetime
 import io
+from collections.abc import Iterable
 from typing import Any
 
 import pandas as pd
@@ -70,8 +71,8 @@ def _get_existing_partitions(cursor: Any, schema: str, table: str) -> list[str]:
 def atomic_swap_partition(
     df: pd.DataFrame,
     pgdb: PostgresEngine,
-    schema: str = "adtech",
-    table: str = "domain_app_changes",
+    schema,
+    table,
     batch_date: datetime.date | None = None,
 ) -> None:
     """Swap data for *batch_date* into a list-partitioned table with zero downtime."""
@@ -184,3 +185,106 @@ def _copy_df_to_table_freeze(
     with cursor.copy(copy_query) as copy:
         while data := buffer.read(1048576):
             copy.write(data)
+
+
+def atomic_swap_partition_stream(
+    stream: Iterable[str],
+    columns: list[str],
+    batch_date: datetime.date,
+    pgdb: PostgresEngine,
+    schema: str,
+    table: str,
+) -> None:
+    """Swap data into a list-partitioned table using a streaming chunk generator (no DataFrame required)."""
+    date_str = batch_date.strftime("%Y%m%d")
+    staging_table_name = f"{table}_{date_str}"
+
+    id_schema = sql.Identifier(schema)
+    id_parent = sql.Identifier(table)
+    id_staging = sql.Identifier(schema, staging_table_name)
+    id_constraint = sql.Identifier(f"{table}_{date_str}_batch_date_check")
+
+    with pgdb.get_driver_connection(autocommit=False) as (conn, cur):
+        logger.info(
+            "Preparing standalone staging table: %s.%s", schema, staging_table_name
+        )
+
+        with conn.transaction():
+            cur.execute(sql.SQL("DROP TABLE IF EXISTS {};").format(id_staging))
+            cur.execute(
+                sql.SQL("""
+                    CREATE TABLE {} (
+                        LIKE {}.{} INCLUDING DEFAULTS INCLUDING STORAGE
+                    );
+                """).format(id_staging, id_schema, id_parent)
+            )
+
+            cur.execute(
+                sql.SQL("""
+                    ALTER TABLE {} ADD CONSTRAINT {} 
+                    CHECK (batch_date = {})
+                """).format(id_staging, id_constraint, sql.Literal(batch_date))
+            )
+
+            logger.info("Streaming bulk COPY into staging with FREEZE optimization...")
+            _copy_stream_to_table_freeze(stream, columns, id_staging, cur)
+
+        logger.info("Analyzing parent table index structure to mirror layout...")
+        _apply_parent_indexes_to_staging(
+            cursor=cur,
+            schema=schema,
+            parent_table=table,
+            staging_table=staging_table_name,
+            date_str=date_str,
+        )
+
+        conn.commit()
+        cur.execute(sql.SQL("ANALYZE {};").format(id_staging))
+        conn.commit()
+
+        attached_partitions = _get_existing_partitions(cur, schema, table)
+        conn.commit()
+
+        with conn.transaction():
+            for old_partition in attached_partitions:
+                cur.execute(
+                    sql.SQL("""
+                        ALTER TABLE {}.{} DETACH PARTITION {}.{};
+                    """).format(
+                        id_schema,
+                        id_parent,
+                        id_schema,
+                        sql.Identifier(old_partition),
+                    )
+                )
+
+            cur.execute(
+                sql.SQL("""
+                    ALTER TABLE {}.{} ATTACH PARTITION {} 
+                    FOR VALUES IN ({})
+                """).format(id_schema, id_parent, id_staging, sql.Literal(batch_date))
+            )
+
+            logger.info("Cutover transaction committed successfully.")
+
+        for old_partition in attached_partitions:
+            if old_partition != staging_table_name:
+                logger.info("Pruning historical detached partition: %s", old_partition)
+                cur.execute(
+                    sql.SQL("DROP TABLE IF EXISTS {}.{};").format(
+                        id_schema, sql.Identifier(old_partition)
+                    )
+                )
+
+
+def _copy_stream_to_table_freeze(
+    stream: Iterable[str], columns: list[str], id_staging: sql.Identifier, cursor: Any
+) -> None:
+    col_list = sql.SQL(", ").join([sql.Identifier(c) for c in columns])
+    copy_query = sql.SQL(
+        "COPY {} ({}) FROM STDIN WITH (FREEZE, FORMAT text, NULL '\\N')"
+    ).format(id_staging, col_list)
+
+    with cursor.copy(copy_query) as copy:
+        for chunk in stream:
+            copy.write(chunk)

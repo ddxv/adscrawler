@@ -8,7 +8,7 @@ import uuid
 import pandas as pd
 
 from adscrawler.config import CONFIG, get_logger
-from adscrawler.dbcon.atomic_swap import atomic_swap_partition
+from adscrawler.dbcon.atomic_swap import atomic_swap_partition_stream
 from adscrawler.process import (
     AGG_MATCHED_SDK_STRINGS,
     AGG_MATCHED_SDK_STRINGS_LATEST,
@@ -33,6 +33,7 @@ from adscrawler.process.storage import (
     get_parquet_paths_by_prefix,
     get_s3_client,
     pg_db_uri,
+    stream_duckdb_tsv,
 )
 
 logger = get_logger(__name__, "version_details")
@@ -619,26 +620,29 @@ def swap_matched_app_strings_latest_todb(pgdb):
     app_sdk_parqs = get_parquet_paths_by_prefix(
         bucket=bucket, prefix=AGG_MATCHED_SDK_STRINGS_LATEST
     )
-    local_tmp = "/tmp/sdk_strings_latest.parquet"
-    with get_duckdb_connection("s3") as duckdb_con:
-        duckdb_con.execute(f"""
-            COPY (
-                SELECT
-                    store_app,
-                    string_id,
-                    sdk_id
-                FROM read_parquet({app_sdk_parqs}, union_by_name=true)
-            ) TO '{local_tmp}' (
-                FORMAT PARQUET,
-                COMPRESSION 'zstd',
-                ROW_GROUP_SIZE {_ROW_GROUP_SIZE},
-                OVERWRITE_OR_IGNORE true
-            )
-        """)
-    df = pd.read_parquet(local_tmp)
     batch_date = datetime.date.today()
-    df["batch_date"] = batch_date
-    atomic_swap_partition(df, pgdb, schema="adtech", table="app_sdk_strings")
+    batch_date_str = batch_date.strftime("%Y-%m-%d")
+
+    # Inject batch_date directly into DuckDB projection
+    query = f"""
+        SELECT
+            store_app,
+            string_id,
+            sdk_id,
+            '{batch_date_str}'::DATE AS batch_date
+        FROM read_parquet({app_sdk_parqs}, union_by_name=true)
+    """
+
+    columns = ["store_app", "string_id", "sdk_id", "batch_date"]
+
+    atomic_swap_partition_stream(
+        stream=stream_duckdb_tsv(query),
+        columns=columns,
+        batch_date=batch_date,
+        pgdb=pgdb,
+        schema="adtech",
+        table="app_sdk_strings",
+    )
 
 
 def swap_matched_app_sdks_todb(pgdb):
@@ -646,31 +650,37 @@ def swap_matched_app_sdks_todb(pgdb):
     app_sdk_parqs = get_parquet_paths_by_prefix(
         bucket=bucket, prefix=AGG_MATCHED_SDK_STRINGS
     )
-    local_tmp = "/tmp/matched_sdks.parquet"
-    with get_duckdb_connection("s3") as duckdb_con:
-        duckdb_con.execute(f"""
-            COPY (
-                SELECT
-                DISTINCT 
-                    store_app,
-                    version_code_id,
-                    version_code_created_at,
-                    sdk_id
-                FROM read_parquet({app_sdk_parqs}, union_by_name=true)
-                WHERE sdk_id IS NOT NULL
-            ) TO '{local_tmp}' (
-                FORMAT PARQUET,
-                COMPRESSION 'zstd',
-                ROW_GROUP_SIZE {_ROW_GROUP_SIZE},
-                OVERWRITE_OR_IGNORE true
-            )
-        """)
-    df = pd.read_parquet(local_tmp)
-
     batch_date = datetime.date.today()
-    df["batch_date"] = batch_date
+    batch_date_str = batch_date.strftime("%Y-%m-%d")
 
-    atomic_swap_partition(df, pgdb, schema="adtech", table="app_sdks")
+    # Inject batch_date directly into DuckDB projection
+    query = f"""
+        SELECT DISTINCT
+            store_app,
+            version_code_id,
+            version_code_created_at,
+            sdk_id,
+            '{batch_date_str}'::DATE AS batch_date
+        FROM read_parquet({app_sdk_parqs}, union_by_name=true)
+        WHERE sdk_id IS NOT NULL
+    """
+
+    columns = [
+        "store_app",
+        "version_code_id",
+        "version_code_created_at",
+        "sdk_id",
+        "batch_date",
+    ]
+
+    atomic_swap_partition_stream(
+        stream=stream_duckdb_tsv(query),
+        columns=columns,
+        batch_date=batch_date,
+        pgdb=pgdb,
+        schema="adtech",
+        table="app_sdks",
+    )
 
 
 def map_version_details(date_str: str, pgdb) -> None:
@@ -703,7 +713,6 @@ def map_version_details(date_str: str, pgdb) -> None:
 
     logger.info("--- Stage 5: Syncing SDK agg to Postgres ---")
     swap_matched_app_sdks_todb(pgdb)
-
     swap_matched_app_strings_latest_todb(pgdb)
 
     elapsed = time.time() - start_time
