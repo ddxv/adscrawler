@@ -440,7 +440,6 @@ def build_matched_app_sdk_strings() -> None:
                  sdk_id,
                  version_code_created_at
              FROM raw_version_sdks
-             ORDER BY store_app ASC, version_code_created_at DESC
          ) TO '{agg_tmp_output}' (
              FORMAT PARQUET,
              FILE_SIZE_BYTES '128MB',
