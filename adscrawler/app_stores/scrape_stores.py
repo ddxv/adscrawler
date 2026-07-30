@@ -41,7 +41,7 @@ from adscrawler.app_stores.utils import (
     extract_root_domain,
     resolve_country_id,
 )
-from adscrawler.config import get_logger
+from adscrawler.config import CONFIG, get_logger
 from adscrawler.dbcon.connection import (
     PostgresEngine,
     get_db_connection,
@@ -697,16 +697,23 @@ def scrape_from_store(
     country: str,
     language: str,
     html_recently_scraped: bool | None = None,
+    proxies: dict | None = None,
 ) -> dict:
     if store == 1:
-        result_dict = scrape_app_gp(store_id, country=country, language=language)
+        result_dict = scrape_app_gp(
+            store_id, country=country, language=language, proxies=proxies
+        )
     elif store == 2:
         scrape_html = False
         # Watch for pd.NaT
         if country == "us" and not html_recently_scraped:
             scrape_html = True
         result_dict = scrape_app_ios(
-            store_id, country=country, language=language, scrape_html=scrape_html
+            store_id,
+            country=country,
+            language=language,
+            scrape_html=scrape_html,
+            proxies=proxies,
         )
     else:
         logger.error(f"Store not supported {store=}")
@@ -751,6 +758,7 @@ def scrape_app(
     html_recently_scraped: bool | None = None,
 ) -> dict:
     scrape_info = f"{store=}, {country=}, {language=}, {store_id=} scrape_app"
+    proxies = None
     max_retries = 2
     base_delay = 0.5
     retries = 0
@@ -759,6 +767,8 @@ def scrape_app(
     crawl_result = 0
     while retries <= max_retries:
         retries += 1
+        if retries > 1:
+            proxies = CONFIG.get("proxies", None)
         try:
             result_dict = scrape_from_store(
                 store=store,
@@ -766,6 +776,7 @@ def scrape_app(
                 country=country,
                 language=language,
                 html_recently_scraped=html_recently_scraped,
+                proxies=proxies,
             )
             crawl_result = 1
             break  # If successful, break out of the retry loop

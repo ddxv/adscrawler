@@ -54,7 +54,9 @@ def normalize_google_search_results(
     return normalized_results
 
 
-def scrape_app_gp(store_id: str, country: str, language: str = "en") -> dict:
+def scrape_app_gp(
+    store_id: str, country: str, language: str = "en", proxies: dict | None = None
+) -> dict:
     """
     yt_us = scrape_app_gp("com.google.android.youtube", "us", language="en")
     yt_de = scrape_app_gp("com.google.android.youtube", "mx", language="en")
@@ -79,10 +81,7 @@ def scrape_app_gp(store_id: str, country: str, language: str = "en") -> dict:
     yt_us["description"] == yt_de_en["description"]
     """
     result_dict: dict = appgoblin_play_scraper.app(
-        store_id,
-        lang=language,
-        country=country,
-        timeout=10,
+        store_id, lang=language, country=country, timeout=10, proxies=proxies
     )
     logger.debug(f"store=1 {country=} {language=} {store_id=} play store scraped")
     return result_dict

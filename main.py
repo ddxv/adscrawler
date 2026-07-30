@@ -26,12 +26,12 @@ from adscrawler.process.app_details import (
 from adscrawler.process.app_domain_history import (
     process_company_history,
 )
-from adscrawler.process.version_details import map_version_details
 from adscrawler.process.app_metrics_history import (
     clean_history_tables,
     delete_and_aggregate_s3_agg,
 )
 from adscrawler.process.app_rankings import import_ranks_from_s3
+from adscrawler.process.version_details import map_version_details
 from adscrawler.scrape import crawl_app_ads
 from adscrawler.tools.get_company_logos import refresh_metadata
 

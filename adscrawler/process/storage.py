@@ -4,12 +4,12 @@ import os
 import pathlib
 import shutil
 import time
+from collections.abc import Iterable
 
 import boto3
 import duckdb
 import pandas as pd
 from botocore.exceptions import ClientError
-from typing import Iterable
 
 from adscrawler.config import (
     APKS_INCOMING_DIR,

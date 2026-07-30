@@ -203,14 +203,14 @@ def get_provider_address(soup: BeautifulSoup) -> str | None:
     return " ".join(lines).strip()
 
 
-def scrape_store_html(store_id: str, country: str) -> dict:
+def scrape_store_html(store_id: str, country: str, proxies: dict | None = None) -> dict:
     """
     Scrape the store html for the developer site.
     """
     logger.info(f"{store_id=} {country=} scrape store html for info")
     url = f"https://apps.apple.com/{country}/app/-/id{store_id}?l=en-GB"
     headers = {"User-Agent": "Mozilla/5.0"}
-    response = requests.get(url, headers=headers)
+    response = requests.get(url, headers=headers, proxies=proxies)
 
     if response.status_code != 200:
         logger.error(f"Failed to retrieve the page: {response.status_code}")
@@ -305,7 +305,11 @@ def get_developer_url(result: dict, urls: dict) -> str:
 
 
 def scrape_app_ios(
-    store_id: str, country: str, language: str, scrape_html: bool = False
+    store_id: str,
+    country: str,
+    language: str,
+    scrape_html: bool = False,
+    proxies: dict | None = None,
 ) -> dict:
     """Scrape iOS app details from the App Store.
     yt_us = scrape_app_ios("544007664", "us", language="en")
@@ -331,23 +335,32 @@ def scrape_app_ios(
     scraper = AppStoreScraper()
     # Note add_ratings is pulling reviews, then not storing them!
     result_dict: dict = scraper.get_app_details(
-        store_id, country=country, add_ratings=True, timeout=10, lang=language
+        store_id,
+        country=country,
+        add_ratings=True,
+        timeout=10,
+        lang=language,
+        proxies=proxies,
     )
     result_dict.keys()
     result_dict["trackId"] = str(result_dict["trackId"])
     result_dict["artistId"] = str(result_dict["artistId"])
     if scrape_html:
-        result_dict = scrape_itunes_additional_html(result_dict, store_id, country)
+        result_dict = scrape_itunes_additional_html(
+            result_dict, store_id, country, proxies
+        )
     else:
         result_dict["additional_html_crawl_result"] = 0
     logger.debug(f"store=2 {country=} {language=} {store_id=} ios store scraped")
     return result_dict
 
 
-def scrape_itunes_additional_html(result: dict, store_id: str, country: str) -> dict:
+def scrape_itunes_additional_html(
+    result: dict, store_id: str, country: str, proxies: dict | None = None
+) -> dict:
     try:
         # This is slow and returns 401 often, so use sparingly
-        html_res = scrape_store_html(store_id=store_id, country="de")
+        html_res = scrape_store_html(store_id=store_id, country="de", proxies=proxies)
 
         result["in_app_purchases"] = html_res["in_app_purchases"]
         result["ad_supported"] = html_res["ad_supported"]
