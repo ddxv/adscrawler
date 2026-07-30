@@ -14,6 +14,7 @@ from typing import Iterable
 from adscrawler.config import (
     APKS_INCOMING_DIR,
     CONFIG,
+    TMP_DIR,
     CREATIVE_RAW_DIR,
     IPAS_INCOMING_DIR,
     MITM_DIR,
@@ -596,14 +597,14 @@ def get_duckdb_connection(s3_config_key: str) -> duckdb.DuckDBPyConnection:
     # S3 curl compatibility mode controls the glob expansions
     duckdb_con.execute("SET s3_url_compatibility_mode=false;")
     duckdb_con.execute("SET threads = 4;")
-    duckdb_con.execute("SET max_memory='8GB'")
+    duckdb_con.execute("SET memory_limit='9GB'")
     duckdb_con.execute(
         f"SET s3_access_key_id='{CONFIG[s3_config_key]['access_key_id']}';"
     )
     duckdb_con.execute(
         f"SET s3_secret_access_key='{CONFIG[s3_config_key]['secret_key']}';"
     )
-    duckdb_con.execute("SET temp_directory = '/tmp/duckdb.tmp/';")
+    duckdb_con.execute(f"SET temp_directory = '{TMP_DIR}';")
     duckdb_con.execute("SET preserve_insertion_order = false;")
     return duckdb_con
 

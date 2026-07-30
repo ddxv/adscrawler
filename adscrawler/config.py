@@ -13,6 +13,7 @@ PROJECT_NAME = "adscrawler"
 TOP_CONFIGDIR = pathlib.Path(HOME, pathlib.Path(".config"))
 CONFIG_DIR = pathlib.Path(TOP_CONFIGDIR, pathlib.Path(PROJECT_NAME))
 LOG_DIR = pathlib.Path(CONFIG_DIR, pathlib.Path("logs"))
+TMP_DIR = pathlib.Path(CONFIG_DIR, pathlib.Path("tmp"))
 MODULE_DIR = pathlib.Path(__file__).resolve().parent
 PACKAGE_DIR = pathlib.Path(__file__).resolve().parent.parent
 SQL_DIR = pathlib.Path(MODULE_DIR, pathlib.Path("dbcon/sql"))
@@ -45,8 +46,6 @@ IPAS_DIR = pathlib.Path(APP_FILES_DIR, "ipas")
 XAPKS_ISSUES_DIR = pathlib.Path(APP_FILES_DIR, "xapks-issues")
 APKS_ISSUES_DIR = pathlib.Path(APP_FILES_DIR, "apks-issues")
 IPAS_ISSUES_DIR = pathlib.Path(APP_FILES_DIR, "ipas-issues")
-
-TMP_DIR = pathlib.Path("/tmp/adscrawler")
 
 # The TMP partials dir has the base APK from an unzipped xapk.
 # Careful, as the files look like APKs but are not installable on their own.
@@ -93,6 +92,7 @@ def check_dirs() -> None:
         TOP_CONFIGDIR,
         CONFIG_DIR,
         LOG_DIR,
+        TMP_DIR,
         APP_FILES_DIR,
         TMP_DIR,
         INCOMING_DIR,

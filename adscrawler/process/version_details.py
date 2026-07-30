@@ -476,38 +476,38 @@ def build_matched_app_sdk_strings_latest() -> None:
     input_glob = f"s3://{bucket}/{AGG_MATCHED_SDK_STRINGS}/*.parquet"
     agg_tmp_output = f"s3://{bucket}/{TMP_MATCHED_SDK_STRINGS_LATEST}"
     tmp_output_glob = f"s3://{bucket}/{TMP_MATCHED_SDK_STRINGS_LATEST}/*.parquet"
+    vc_path = f"s3://{bucket}/{LOOKUP_VERSION_CODES}"
+
+    delete_s3_objects_by_prefix(bucket, f"{TMP_MATCHED_SDK_STRINGS_LATEST}/")
 
     logger.info("Building latest matched SDK strings...")
 
-    # Wipe any stale remnants from a prior failed run.
-    delete_s3_objects_by_prefix(bucket, f"{TMP_MATCHED_SDK_STRINGS_LATEST}/")
-
     query = f"""
         COPY (
-            WITH latest_version_sdks AS (
-                SELECT DISTINCT ON (ap.store_app)
-                    ap.store_app,
-                    ap.string_id,
-                    ap.sdk_id,
-                    ap.version_code_created_at
-                FROM read_parquet('{input_glob}') ap
-                ORDER BY ap.store_app ASC, ap.version_code_created_at DESC
+            WITH latest_vc AS (
+                SELECT 
+                    store_app, 
+                    id AS version_code_id
+                FROM read_parquet('{vc_path}')
+                QUALIFY DENSE_RANK() OVER (
+                    PARTITION BY store_app 
+                    ORDER BY created_at DESC, id DESC
+                ) = 1
             )
             SELECT 
-                store_app,
-                string_id,
-                sdk_id
-            FROM latest_version_sdks
-            ORDER BY store_app ASC
+                ap.store_app,
+                ap.string_id,
+                ap.sdk_id
+            FROM read_parquet('{input_glob}') ap
+            JOIN latest_vc lvc
+              ON ap.store_app = lvc.store_app
+             AND ap.version_code_id = lvc.version_code_id
         ) TO '{agg_tmp_output}' (
             FORMAT PARQUET,
             FILE_SIZE_BYTES '128MB',
-            COMPRESSION 'zstd',
-            ROW_GROUP_SIZE {_ROW_GROUP_SIZE},
-            OVERWRITE_OR_IGNORE true
+            COMPRESSION 'zstd'
         )
     """
-
     with get_duckdb_connection("s3") as duckdb_con:
         duckdb_con.execute(query)
 
