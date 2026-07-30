@@ -4,12 +4,12 @@ import os
 import pathlib
 import shutil
 import time
-from collections.abc import Iterable
 
 import boto3
 import duckdb
 import pandas as pd
 from botocore.exceptions import ClientError
+from typing import Iterable
 
 from adscrawler.config import (
     APKS_INCOMING_DIR,
@@ -646,6 +646,7 @@ def stream_duckdb_tsv(query: str) -> Iterable[str]:
                 fields = [f if f != "" else "\\N" for f in fields]
                 fixed_lines.append("\t".join(fields))
             chunk_str = "\n".join(fixed_lines) + ("\n" if fixed_lines else "")
+            yield chunk_str
 
 
 S3_CLIENTS: dict = {}
