@@ -794,7 +794,7 @@ def scrape_app(
             crawl_result = 4
             if retries <= max_retries:
                 # Add extra jitter for rate-limit errors to avoid conflicts
-                sleep_time = base_delay * (2**retries) + random.uniform(0.5, 1.5)
+                sleep_time = base_delay * (2**retries) + random.uniform(0.05, 1)
                 logger.info(f"{scrape_info} Retrying in {sleep_time:.2f} seconds...")
                 time.sleep(sleep_time)
                 continue
