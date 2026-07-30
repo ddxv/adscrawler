@@ -664,12 +664,17 @@ class ProcessManager:
                 logger.exception("Process APKs with Waydroid failed")
 
     def retry_failed_mitm_logs(self) -> None:
-        from adscrawler.mitm_ad_parser.try_failed_mitms import (
-            retry_failed_mitm_logs,
-        )  # noqa: PLC0415
+        from adscrawler.mitm_ad_parser.mitm_scrape_ads import (  # noqa: PLC0415
+            scan_all_apps,
+        )
 
         try:
-            retry_failed_mitm_logs(pgdb=self.pgcon, lookback_days=60)
+            scan_all_apps(
+                pgdb=self.pgcon,
+                retry_failed=True,
+                retry_lookback_days=60,
+                max_workers=int(self.args.workers),
+            )
         except Exception:
             logger.exception("Retrying failed MITM logs failed")
 

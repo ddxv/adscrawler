@@ -11,6 +11,7 @@ import pandas as pd
 from adscrawler.config import CREATIVE_THUMBS_DIR, get_logger
 from adscrawler.dbcon.connection import PostgresEngine, get_db_connection
 from adscrawler.dbcon.queries import (
+    get_failed_mitm_logs,
     log_creative_scan_results,
     query_all_domains,
     query_api_calls_for_mitm_uuids,
@@ -708,23 +709,46 @@ def scan_all_apps(
     only_new_apps: bool = False,
     recent_months: bool = False,
     max_workers: int = 1,
+    retry_failed: bool = False,
+    retry_lookback_days: int = 60,
 ) -> None:
-    """Scans all apps for creative content and uploads thumbnails to S3."""
-    mitm_runs_to_scan = query_api_calls_to_creative_scan(
-        pgdb=pgdb, recent_months=recent_months
-    )
-    logger.info(f"MITM logs to scan: {mitm_runs_to_scan.shape[0]:,}")
+    """Scans all apps for creative content and uploads thumbnails to S3.
 
-    if only_new_apps:
-        creative_records = query_creative_records(pgdb=pgdb)
-        mitm_runs_to_scan = mitm_runs_to_scan[
-            ~mitm_runs_to_scan["run_id"]
-            .astype(str)
-            .isin(creative_records["run_id"].astype(str))
-        ]
-        logger.info(
-            f"Apps to scan (limited to new apps): {mitm_runs_to_scan.shape[0]:,}"
+    Args:
+        pgdb: Database connection.
+        only_new_apps: If True, only scan apps not yet processed.
+        recent_months: If True, only scan recent MITM logs.
+        max_workers: Number of parallel worker processes.
+        retry_failed: If True, scan only previously failed MITM logs.
+        retry_lookback_days: Lookback days for failed logs (used when retry_failed=True).
+    """
+    if retry_failed:
+        df = get_failed_mitm_logs(pgdb, lookback_days=retry_lookback_days)
+        mitm_runs_to_scan = df.sort_values(
+            by="inserted_at", ascending=True
+        ).reset_index(drop=True)
+        # Normalize column name: get_failed_mitm_logs returns pub_store_id,
+        # while the worker function expects store_id
+        mitm_runs_to_scan = mitm_runs_to_scan.rename(
+            columns={"pub_store_id": "store_id"}
         )
+        logger.info(f"Failed MITM logs to retry: {mitm_runs_to_scan.shape[0]:,}")
+    else:
+        mitm_runs_to_scan = query_api_calls_to_creative_scan(
+            pgdb=pgdb, recent_months=recent_months
+        )
+        logger.info(f"MITM logs to scan: {mitm_runs_to_scan.shape[0]:,}")
+
+        if only_new_apps:
+            creative_records = query_creative_records(pgdb=pgdb)
+            mitm_runs_to_scan = mitm_runs_to_scan[
+                ~mitm_runs_to_scan["run_id"]
+                .astype(str)
+                .isin(creative_records["run_id"].astype(str))
+            ]
+            logger.info(
+                f"Apps to scan (limited to new apps): {mitm_runs_to_scan.shape[0]:,}"
+            )
 
     mitms_count = mitm_runs_to_scan.shape[0]
     logger.info(f"Starting parallel processing with {max_workers} workers")
