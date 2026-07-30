@@ -810,7 +810,7 @@ def scrape_app(
         except (URLError, ssl.SSLError, requests.exceptions.SSLError) as error:
             logger.warning(f"{scrape_info} Network/SSL error: {error=}")
             crawl_result = 4
-            if retries <= max_retries:
+            if not proxies and retries <= max_retries:
                 # Add extra jitter for SSL errors to avoid connection conflicts
                 sleep_time = base_delay * (2**retries) + random.uniform(0.1, 0.5)
                 logger.info(f"{scrape_info} Retrying in {sleep_time:.2f} seconds...")
