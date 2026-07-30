@@ -224,7 +224,7 @@ def attribute_creatives(
             # Merge all resolved DB IDs into a single list for weak attribution.
             confident_db_ids = []
             for x in found_ad_infos:
-                if x.get("adv_store_app_id"):
+                if x["adv_store_app_id"]:
                     confident_db_ids.append(x["adv_store_app_id"])
             merged_ids = list(set(confident_db_ids + (all_multi_adv_db_ids or [])))
             error_msg = "Found potential app! Multiple adv_store_id"
