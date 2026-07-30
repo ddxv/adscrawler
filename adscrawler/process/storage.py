@@ -632,14 +632,20 @@ def stream_duckdb_tsv(query: str) -> Iterable[str]:
         )
 
         for batch in record_batch_reader:
-            # Cast null values in string/numeric columns or replace nulls if necessary
-            # Postgres COPY in text format interprets \N as NULL.
             out_stream = io.BytesIO()
             pa_csv.write_csv(batch, out_stream, write_options=write_options)
 
-            # Replace standard empty null representations with Postgres \N
             chunk_str = out_stream.getvalue().decode("utf-8")
-            yield chunk_str
+
+            lines = chunk_str.split("\n")
+            fixed_lines = []
+            for line in lines:
+                if not line:
+                    continue
+                fields = line.split("\t")
+                fields = [f if f != "" else "\\N" for f in fields]
+                fixed_lines.append("\t".join(fields))
+            chunk_str = "\n".join(fixed_lines) + ("\n" if fixed_lines else "")
 
 
 S3_CLIENTS: dict = {}

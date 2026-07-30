@@ -665,7 +665,7 @@ def swap_matched_app_sdks_todb(pgdb):
             sdk_id,
             '{batch_date_str}'::DATE AS batch_date
         FROM read_parquet({app_sdk_parqs}, union_by_name=true)
-        WHERE sdk_id IS NOT NULL
+        WHERE sdk_id IS NOT NULL and version_code_id IS NOT NULL
     """
 
     columns = [
