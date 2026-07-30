@@ -179,9 +179,6 @@ def delete_and_aggregate_s3_agg(
 
     # WEEK → interpolated (filled) weekly
     for hash_bucket in [f"{i:02x}" for i in range(256)]:
-        print(hash_bucket)
-        if hash_bucket < '10':
-            continue
         query_start = end_date - datetime.timedelta(
             days=interpolate_query_lookback_days
         )
