@@ -7,7 +7,9 @@ from adscrawler.mitm_ad_parser.utils import log_messages_to_df
 logger = get_logger(__name__)
 
 
-def retry_failed_mitm_logs(pgdb: PostgresEngine, lookback_days: int = 60) -> None:
+def retry_failed_mitm_logs(
+    pgdb: PostgresEngine, lookback_days: int = 60, throw_errors: bool = False
+) -> None:
     """Retry parsing MITM logs that previously failed.
 
     Catches all exceptions since failures need to be investigated manually.
@@ -23,7 +25,8 @@ def retry_failed_mitm_logs(pgdb: PostgresEngine, lookback_days: int = 60) -> Non
         try:
             log_messages = parse_store_id_mitm_log(pub_store_id, run_id, pgdb)
         except Exception as e:
-            raise
+            if throw_errors:
+                raise
             error_msg = f"CRITICAL uncaught error: {e}"
             log_messages = [
                 {
