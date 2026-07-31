@@ -180,6 +180,7 @@ def process_sdks(
                 raise ValueError(f"Invalid store: {store}")
         except Exception:
             logger.exception(f"Manifest for {store_id} failed")
+            raise
         version_code_dbid = get_version_code_dbid(
             store_app=store_app,
             version_code=version_str,

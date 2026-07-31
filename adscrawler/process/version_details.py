@@ -165,36 +165,6 @@ def write_version_details_to_s3(
     logger.info(
         f"{store_id=} wrote {len(version_details_df)} rows to s3://{bucket}/{s3_key}"
     )
-    raw_initial_paths = get_parquet_paths_by_prefix(
-        bucket, RAW_DATA_VERSION_DETAILS_INITIAL
-    )
-    raw_output_path = f"s3://{bucket}/{RAW_DATA_VERSION_DETAILS}/"
-    with get_duckdb_connection("s3") as duckdb_con:
-        duckdb_con.execute(f"""
-            COPY (
-                WITH prepared AS (
-                    SELECT 
-                        CAST(string_id AS BIGINT) AS sid,
-                        version_code_id
-                    FROM read_parquet({raw_initial_paths})
-                    WHERE string_id IS NOT NULL
-                )
-                SELECT
-                    {_STRING_BUCKET_SQL} AS string_bucket,
-                     -- EARLY DATE before other raw data
-                    '2026-07-20' AS date, 
-                    sid AS string_id,
-                    version_code_id
-                FROM prepared
-                ORDER BY string_id ASC, version_code_id ASC
-            ) TO '{raw_output_path}' (
-                FORMAT PARQUET,
-                PARTITION_BY (string_bucket, date),
-                COMPRESSION 'zstd',
-                ROW_GROUP_SIZE {_LARGE_ROW_GROUP_SIZE},
-                OVERWRITE_OR_IGNORE true
-            )
-        """)
 
 
 def build_aggregated_version_details() -> None:
@@ -563,6 +533,36 @@ def initial_backfill_version_details_map() -> None:
         ;
     """)
     logger.info("Finished writing parquet files to S3.")
+    raw_initial_paths = get_parquet_paths_by_prefix(
+        bucket, RAW_DATA_VERSION_DETAILS_INITIAL
+    )
+    raw_output_path = f"s3://{bucket}/{RAW_DATA_VERSION_DETAILS}/"
+    with get_duckdb_connection("s3") as duckdb_con:
+        duckdb_con.execute(f"""
+            COPY (
+                WITH prepared AS (
+                    SELECT 
+                        CAST(string_id AS BIGINT) AS sid,
+                        version_code_id
+                    FROM read_parquet({raw_initial_paths})
+                    WHERE string_id IS NOT NULL
+                )
+                SELECT
+                    {_STRING_BUCKET_SQL} AS string_bucket,
+                     -- EARLY DATE before other raw data
+                    '2026-07-20' AS date, 
+                    sid AS string_id,
+                    version_code_id
+                FROM prepared
+                ORDER BY string_id ASC, version_code_id ASC
+            ) TO '{raw_output_path}' (
+                FORMAT PARQUET,
+                PARTITION_BY (string_bucket, date),
+                COMPRESSION 'zstd',
+                ROW_GROUP_SIZE {_LARGE_ROW_GROUP_SIZE},
+                OVERWRITE_OR_IGNORE true
+            )
+        """)
 
 
 def _pg_table_to_s3(sql_query: str, s3_key: str, description: str) -> None:

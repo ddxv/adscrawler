@@ -634,6 +634,7 @@ def download_app_to_local(
                 )
             except FileNotFoundError:
                 logger.info(f"S3 {s3_config_key=}, no file found for {version_str=}")
+                file_path = None
                 pass
     else:
         file_path = get_local_file_path(store, store_id)

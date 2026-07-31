@@ -153,8 +153,6 @@ def xml_to_dataframe(root: ElementTree.Element) -> pd.DataFrame:
     # Then call extract_data with the root element of your XML document
     data = extract_data(root)
 
-    # Extract data starting from the root
-    data = extract_data(root)
     # Convert the list to a pandas DataFrame
     df = pd.DataFrame(data)
     return df
