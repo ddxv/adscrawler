@@ -488,9 +488,7 @@ class ProcessManager:
             logger.exception("Exporting combined domain history to s3 failed")
 
         try:
-            map_version_details(
-                date_str=datetime.date.today().isoformat(), pgdb=self.pgcon
-            )
+            map_version_details(pgdb=self.pgcon)
         except Exception:
             logger.exception("Syncing version details to Postgres failed")
 

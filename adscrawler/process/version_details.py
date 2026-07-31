@@ -687,7 +687,7 @@ def swap_matched_app_sdks_todb(pgdb):
     )
 
 
-def map_version_details(date_str: str, pgdb) -> None:
+def map_version_details(pgdb) -> None:
     """Orchestrate the entire version details processing pipeline.
 
     Args:
@@ -695,10 +695,10 @@ def map_version_details(date_str: str, pgdb) -> None:
     """
 
     start_time = time.time()
-    logger.info(f"Starting map_version_details entrypoint run for date={date_str}")
+    logger.info(f"Starting map_version_details entrypoint run for past days")
 
     ### TODO: THIS IS A LOOP, not related to rest of flow?
-    for day in range(1, 3):
+    for day in range(1, 4):
         target_compact_date = (
             datetime.datetime.today() - datetime.timedelta(days=day)
         ).strftime("%Y-%m-%d")
