@@ -165,51 +165,67 @@ def write_version_details_to_s3(
     logger.info(
         f"{store_id=} wrote {len(version_details_df)} rows to s3://{bucket}/{s3_key}"
     )
+    raw_initial_paths = get_parquet_paths_by_prefix(
+        bucket, RAW_DATA_VERSION_DETAILS_INITIAL
+    )
+    raw_output_path = f"s3://{bucket}/{RAW_DATA_VERSION_DETAILS}/"
+    with get_duckdb_connection("s3") as duckdb_con:
+        duckdb_con.execute(f"""
+            COPY (
+                WITH prepared AS (
+                    SELECT 
+                        CAST(string_id AS BIGINT) AS sid,
+                        version_code_id
+                    FROM read_parquet({raw_initial_paths})
+                    WHERE string_id IS NOT NULL
+                )
+                SELECT
+                    {_STRING_BUCKET_SQL} AS string_bucket,
+                     -- EARLY DATE before other raw data
+                    '2026-07-20' AS date, 
+                    sid AS string_id,
+                    version_code_id
+                FROM prepared
+                ORDER BY string_id ASC, version_code_id ASC
+            ) TO '{raw_output_path}' (
+                FORMAT PARQUET,
+                PARTITION_BY (string_bucket, date),
+                COMPRESSION 'zstd',
+                ROW_GROUP_SIZE {_LARGE_ROW_GROUP_SIZE},
+                OVERWRITE_OR_IGNORE true
+            )
+        """)
 
 
 def build_aggregated_version_details() -> None:
     """Rebuild the deduplicated, globally sorted master query files in agg-data."""
     bucket = CONFIG["s3"]["bucket"]
-    logger.info("Rebuilding aggregated master buckets in agg-data...")
 
     # Wipe any stale remnants from a prior failed run before writing new data.
     delete_s3_objects_by_prefix(bucket, TMP_VERSION_DETAILS)
 
+    logger.info("Rebuilding aggregated master buckets in agg-data...")
     # Collect all parquet paths under raw-data.
-    raw_prefix = f"{RAW_DATA_VERSION_DETAILS}/"
-    raw_paths = get_parquet_paths_by_prefix(bucket, raw_prefix)
+    raw_paths = get_parquet_paths_by_prefix(bucket, f"{RAW_DATA_VERSION_DETAILS}/")
     if not raw_paths:
         logger.warning("No parquet files found under raw-data; nothing to aggregate.")
         return
 
-    raw_initial_paths = get_parquet_paths_by_prefix(
-        bucket, RAW_DATA_VERSION_DETAILS_INITIAL
-    )
-
-    raw_paths += raw_initial_paths
+    raw_vd_glob = f"s3://{bucket}/{RAW_DATA_VERSION_DETAILS}/*/*/*.parquet"
 
     agg_tmp_output = f"s3://{bucket}/{TMP_VERSION_DETAILS}/"
     with get_duckdb_connection("s3") as duckdb_con:
-        duckdb_con.execute(f"""
-            COPY (
-                WITH prepared AS (
-                    SELECT DISTINCT
-                        CAST(string_id AS BIGINT) AS sid,
-                        version_code_id
-                    FROM read_parquet({raw_paths}, union_by_name=true)
-                    WHERE string_id IS NOT NULL
-                )
-                SELECT
-                    {_STRING_BUCKET_SQL} AS string_bucket,
-                    sid AS string_id,
+        duckdb_con.execute(f"""COPY (
+                SELECT DISTINCT
+                    string_bucket,
+                    string_id,
                     version_code_id
-                FROM prepared
-                ORDER BY string_id ASC, version_code_id ASC
+                FROM read_parquet('{raw_vd_glob}', hive_partitioning=true)
             ) TO '{agg_tmp_output}' (
                 FORMAT PARQUET,
                 PARTITION_BY (string_bucket),
                 COMPRESSION 'zstd',
-                ROW_GROUP_SIZE {_ROW_GROUP_SIZE},
+                ROW_GROUP_SIZE {_LARGE_ROW_GROUP_SIZE},
                 OVERWRITE_OR_IGNORE true
             )
         """)
@@ -419,31 +435,22 @@ def build_matched_app_sdk_strings() -> None:
 
     logger.info("Building aggregated matched SDK strings...")
     query = f"""COPY (
-             WITH raw_version_sdks AS (
                  SELECT 
                      vc.store_app,
                      vdm.version_code_id,
                      vdm.string_id,
                      pm.sdk_id,
                      vc.created_at as version_code_created_at
-                 FROM read_parquet('{vdm_glob}', union_by_name=true) vdm
-                 LEFT JOIN read_parquet('{pm_glob}', union_by_name=true) pm
-                   ON vdm.string_id = pm.string_id
+                 FROM read_parquet('{vdm_glob}') vdm
                  JOIN read_parquet('{vc_path}') vc
                    ON vdm.version_code_id = vc.id
-             )
-             SELECT 
-                 store_app,
-                 version_code_id,
-                 string_id,
-                 sdk_id,
-                 version_code_created_at
-             FROM raw_version_sdks
+                 LEFT JOIN read_parquet('{pm_glob}') pm
+                   ON vdm.string_id = pm.string_id
          ) TO '{agg_tmp_output}' (
              FORMAT PARQUET,
              FILE_SIZE_BYTES '128MB',
              COMPRESSION 'zstd',
-             ROW_GROUP_SIZE {_ROW_GROUP_SIZE},
+             ROW_GROUP_SIZE {_LARGE_ROW_GROUP_SIZE},
              OVERWRITE_OR_IGNORE true
          )
          """
@@ -622,12 +629,9 @@ def copy_lookups() -> None:
 
 def swap_matched_app_strings_latest_todb(pgdb):
     bucket = CONFIG["s3"]["bucket"]
-    app_sdk_parqs = get_parquet_paths_by_prefix(
-        bucket=bucket, prefix=AGG_MATCHED_SDK_STRINGS_LATEST
-    )
+    app_sdk_latest_glob = f"s3://{bucket}/{AGG_MATCHED_SDK_STRINGS_LATEST}/*.parquet"
     batch_date = datetime.date.today()
     batch_date_str = batch_date.strftime("%Y-%m-%d")
-
     # Inject batch_date directly into DuckDB projection
     query = f"""
         SELECT
@@ -635,11 +639,9 @@ def swap_matched_app_strings_latest_todb(pgdb):
             string_id,
             sdk_id,
             '{batch_date_str}'::DATE AS batch_date
-        FROM read_parquet({app_sdk_parqs}, union_by_name=true)
+        FROM read_parquet('{app_sdk_latest_glob}')
     """
-
     columns = ["store_app", "string_id", "sdk_id", "batch_date"]
-
     atomic_swap_partition_stream(
         stream=stream_duckdb_tsv(query),
         columns=columns,
@@ -652,12 +654,9 @@ def swap_matched_app_strings_latest_todb(pgdb):
 
 def swap_matched_app_sdks_todb(pgdb):
     bucket = CONFIG["s3"]["bucket"]
-    app_sdk_parqs = get_parquet_paths_by_prefix(
-        bucket=bucket, prefix=AGG_MATCHED_SDK_STRINGS
-    )
     batch_date = datetime.date.today()
     batch_date_str = batch_date.strftime("%Y-%m-%d")
-
+    app_sdks_glob = f"s3://{bucket}/{AGG_MATCHED_SDK_STRINGS}/*.parquet"
     query = f"""
         SELECT DISTINCT
             store_app,
@@ -665,7 +664,7 @@ def swap_matched_app_sdks_todb(pgdb):
             version_code_created_at,
             sdk_id,
             '{batch_date_str}'::DATE AS batch_date
-        FROM read_parquet({app_sdk_parqs}, union_by_name=true)
+        FROM read_parquet('{app_sdks_glob}')
         WHERE sdk_id IS NOT NULL and version_code_id IS NOT NULL
     """
 
@@ -708,9 +707,8 @@ def map_version_details(pgdb) -> None:
     logger.info("--- Stage 2: Rebuilding aggregated master version details ---")
     build_aggregated_version_details()
 
-    copy_lookups()
-
     logger.info("--- Stage 3: Rebuilding aggregated pattern matches ---")
+    copy_lookups()
     build_aggregated_pattern_matches()
     build_matched_app_sdk_strings()
     build_matched_app_sdk_strings_latest()

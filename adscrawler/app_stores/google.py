@@ -275,6 +275,10 @@ def scrape_google_ranks(country: str) -> list[dict]:
     except Exception as error:
         logger.exception(f"JS pull failed with {country=} {error=}")
     ranked_dicts = get_js_data(filepath)
+    try:
+        os.unlink(filepath)
+    except FileNotFoundError:
+        pass
     logger.info(f"Scrape Google ranks {country=} finished: {len(ranked_dicts)}")
     return ranked_dicts
 
