@@ -1,6 +1,7 @@
 """Process app icons — resize, upload to S3, and update missing variants."""
 
 import pathlib
+import os
 import struct
 import time
 import zlib
@@ -201,6 +202,14 @@ def process_app_icon(
             logger.info(f"S3 uploaded {store_id} 64px icon")
         else:
             logger.error(f"S3 failed to upload {store_id} 64px icon")
+        try:
+            os.unlink(file_path)
+        except FileNotFoundError:
+            pass
+        try:
+            os.unlink(file_64_path)
+        except FileNotFoundError:
+            pass
         return f_128_name, f_64_name
 
     logger.error(
