@@ -9,6 +9,7 @@ from adscrawler.dbcon.queries import (
     insert_version_code,
     query_apps_to_download,
     query_apps_to_sdk_scan,
+    query_apps_to_sdk_scan_fix,
     upsert_df,
 )
 from adscrawler.packages.apks.download_apk import (
@@ -136,17 +137,23 @@ def download_apps(
 
 
 def process_sdks(
-    store: int, pgdb: PostgresEngine, number_of_apps_to_pull: int = 20
+    store: int,
+    pgdb: PostgresEngine,
+    number_of_apps_to_pull: int = 20,
+    run_fixes: bool = False,
 ) -> None:
     """
     Decompile the app into its various files and directories.
     This shows which SDKs are used in the app.
     All results are saved to the database.
     """
-    apps = query_apps_to_sdk_scan(
-        pgdb=pgdb,
-        store=store,
-    )
+    if run_fixes:
+        apps = query_apps_to_sdk_scan_fix(pgdb, store)
+    else:
+        apps = query_apps_to_sdk_scan(
+            pgdb=pgdb,
+            store=store,
+        )
     apps["store"] = store
     logger.info(
         f"SDK processing: {store=} total apps:{apps.shape[0]:,} top {number_of_apps_to_pull} start"
@@ -156,12 +163,14 @@ def process_sdks(
         store_id = row.store_id
         store_app = row.store_app
         version_str = None
+        if run_fixes:
+            version_str = row["version_code_str"]
         crawl_result = 3
         logger.info(f"SDK processing: {store_id=} start")
         try:
             if store == 1:
                 details_df, crawl_result, version_str, raw_txt_str = process_manifest(
-                    store_id=store_id, store=store
+                    store_id=store_id, store=store, specific_version_str=version_str
                 )
             elif store == 2:
                 details_df, crawl_result, version_str, raw_txt_str = process_plist(

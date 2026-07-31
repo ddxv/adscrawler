@@ -354,6 +354,38 @@ def get_store_id_mitm_s3_keys(store_id: str) -> pd.DataFrame:
     return df
 
 
+def get_store_id_vc_apk_s3_keys(
+    store: int, store_id: str, version_str: str, s3_config_key: str
+) -> pd.DataFrame:
+    if store == 1:
+        prefix = f"apks/android/{store_id}/{version_str}"
+    elif store == 2:
+        prefix = f"apks/ios/{store_id}/{version_str}"
+    else:
+        raise ValueError(f"Invalid store: {store}")
+    logger.debug(f"S3 getting apk keys start {store_id=}")
+    s3_client = get_s3_client(s3_config_key)
+    response = s3_client.list_objects_v2(
+        Bucket=CONFIG[s3_config_key]["bucket"], Prefix=prefix
+    )
+    objects_data = []
+    if response["KeyCount"] == 0:
+        logger.error(f"S3 no apk found for {store_id=}")
+        raise FileNotFoundError(f"S3 no apk found for {store_id=}")
+    for obj in response["Contents"]:
+        objects_data.append(
+            {
+                "key": obj["Key"],
+                "store_id": store_id,
+                "size": obj["Size"],
+                "last_modified": obj["LastModified"],
+            }
+        )
+    df = pd.DataFrame(objects_data)
+    logger.info(f"S3 keys found {store_id=} {df.shape[0]:,}")
+    return df
+
+
 def get_store_id_apk_s3_keys(store: int, store_id: str) -> pd.DataFrame:
     if store == 1:
         prefix = f"apks/android/{store_id}/"
@@ -401,6 +433,48 @@ def download_mitm_log_by_key(key: str, filename: str) -> pathlib.Path:
     if not downloaded_file_path.exists():
         raise FileNotFoundError(f"{downloaded_file_path=} after download not found")
     return downloaded_file_path
+
+
+def download_app_by_vc(
+    store: int, store_id: str, version_str: str, s3_config_key: str
+) -> tuple[pathlib.Path, str]:
+    func_info = f"S3 download_app_by_store_id {store_id=} {version_str=}"
+    df = get_store_id_vc_apk_s3_keys(store, store_id, version_str, s3_config_key)
+    if df.empty:
+        logger.error(f"S3 no apk found for {store_id=}")
+        raise FileNotFoundError(f"S3 no apk found for {store_id=}")
+    if df.empty:
+        logger.error(f"S3 only has failed apk for {store_id=}, no version_code")
+    try:
+        key = df["key"].to_numpy()[0]
+    except IndexError:
+        logger.error(f"S3 no apk found for {store_id=} with version_code={version_str}")
+        raise FileNotFoundError(
+            f"S3 no apk found for {store_id=} with version_code={version_str}"
+        )
+    filename = key.split("/")[-1]
+    extension = filename.split(".")[-1]
+    if extension == "apk":
+        downloaded_file_path = pathlib.Path(APKS_INCOMING_DIR, filename)
+    elif extension == "xapk":
+        downloaded_file_path = pathlib.Path(XAPKS_INCOMING_DIR, filename)
+    elif extension == "ipa":
+        downloaded_file_path = pathlib.Path(IPAS_INCOMING_DIR, filename)
+    else:
+        raise ValueError(f"Invalid extension: {extension}")
+    logger.info(f"{func_info} {key=} to local start")
+    s3_client = get_s3_client()
+    with open(downloaded_file_path, "wb") as f:
+        s3_client.download_fileobj(
+            Bucket=CONFIG[s3_config_key]["bucket"],
+            Key=key,
+            Fileobj=f,
+        )
+    if not downloaded_file_path.exists():
+        raise FileNotFoundError(f"{downloaded_file_path=} after download not found")
+    final_path = move_downloaded_app_to_main_dir(downloaded_file_path)
+    logger.info(f"{func_info} to local finished")
+    return final_path
 
 
 def download_app_by_store_id(
@@ -551,13 +625,17 @@ def download_app_to_local(
         A tuple of (local_file_path, resolved_version_str). The version may be
         None when an existing local file is reused and no version was provided.
     """
-    file_path = get_local_file_path(store, store_id)
-    if file_path:
-        logger.info(f"{store_id=} app already downloaded")
-        return file_path, version_str
-    file_path, version_str = download_app_by_store_id(
-        store=store, store_id=store_id, version_str=version_str
-    )
+    if version_str:
+        s3_config_key = "s3"
+        file_path = download_app_by_vc(store, store_id, version_str, s3_config_key)
+    else:
+        file_path = get_local_file_path(store, store_id)
+        if file_path:
+            logger.info(f"{store_id=} app already downloaded")
+            return file_path, version_str
+        file_path, version_str = download_app_by_store_id(
+            store=store, store_id=store_id, version_str=version_str
+        )
     if file_path is None:
         raise FileNotFoundError(f"{store_id=} no file found: {file_path=}")
     return file_path, version_str

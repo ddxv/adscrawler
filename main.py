@@ -90,6 +90,11 @@ class ProcessManager:
             action="store_true",
         )
         parser.add_argument(
+            "--run-fixes",
+            help="When processing SDKs, scan apps that need fixes (pulls 200 apps)",
+            action="store_true",
+        )
+        parser.add_argument(
             "--cleanup-apks",
             help="Remove old / secondary APKs from S3 and reconcile the DB",
             action="store_true",
@@ -593,7 +598,14 @@ class ProcessManager:
             logger.exception(f"Download app/decompile failing {store=}")
 
     def process_sdks(self, store: int) -> None:
-        process_sdks(store=store, pgdb=self.pgcon, number_of_apps_to_pull=20)
+        run_fixes = self.args.run_fixes
+        number_of_apps_to_pull = 200 if run_fixes else 20
+        process_sdks(
+            store=store,
+            pgdb=self.pgcon,
+            number_of_apps_to_pull=number_of_apps_to_pull,
+            run_fixes=run_fixes,
+        )
 
     def cleanup_apks(self) -> None:
         try:

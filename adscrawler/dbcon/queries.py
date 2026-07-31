@@ -33,6 +33,7 @@ QUERY_APPS_TO_UPDATE_PRIMARY = load_sql_file("query_apps_to_update_primary.sql")
 QUERY_APPS_TO_UPDATE_ANY_NEW = load_sql_file("query_apps_to_update_any_new.sql")
 QUERY_APPS_TO_DOWNLOAD = load_sql_file("query_apps_to_download.sql")
 QUERY_APPS_TO_SDK_SCAN = load_sql_file("query_apps_to_sdk_scan.sql")
+QUERY_APPS_TO_SDK_SCAN_FIX = load_sql_file("query_apps_to_sdk_scan_fix.sql")
 QUERY_APPS_TO_API_SCAN = load_sql_file("query_apps_to_api_scan.sql")
 QUERY_APPS_TO_API_SCAN_ADS = load_sql_file("query_apps_to_api_scan_ads.sql")
 QUERY_DEVS_TO_UPDATE = load_sql_file("query_devs_to_update.sql")
@@ -1243,6 +1244,15 @@ def query_sdk_keys(pgdb: PostgresEngine) -> pd.DataFrame:
     df = pd.read_sql(
         sel_query,
         con=pgdb.engine,
+    )
+    return df
+
+
+def query_apps_to_sdk_scan_fix(pgdb: PostgresEngine, store: int) -> pd.DataFrame:
+    df = pd.read_sql(
+        QUERY_APPS_TO_SDK_SCAN_FIX,
+        con=pgdb.engine,
+        params={"store": store},
     )
     return df
 
