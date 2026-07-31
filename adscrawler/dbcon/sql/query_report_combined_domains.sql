@@ -18,19 +18,7 @@ WITH latest_version_codes AS (
         AND vc_1.created_at < :start_of_next_period
     ORDER BY
         vc_1.store_app,
-        (string_to_array(vc_1.version_code::text, '.'::text)::bigint []) DESC
-),
-store_app_sdk_strings AS (
-    SELECT
-        vc.store_app,
-        vdm.string_id AS version_string_id,
-        sd.id AS sdk_id
-    FROM latest_version_codes AS vc
-    INNER JOIN version_details_map AS vdm ON vc.id = vdm.version_code
-    INNER JOIN
-        adtech.sdk_strings AS css
-        ON vdm.string_id = css.version_string_id
-    INNER JOIN adtech.sdks AS sd ON css.sdk_id = sd.id
+        vc_1.created_at desc
 ),
 api_based_companies AS (
     SELECT DISTINCT
@@ -47,7 +35,8 @@ sdk_based_companies AS (
     SELECT DISTINCT
         sasd.store_app,
         c_1.domain_id
-    FROM store_app_sdk_strings AS sasd
+    FROM adtech.app_sdks AS sasd
+    INNER JOIN latest_version_codes lvc ON sasd.version_code_id = lvc.id
     LEFT JOIN adtech.sdks AS sd ON sasd.sdk_id = sd.id
     LEFT JOIN adtech.companies AS c_1 ON sd.company_id = c_1.id
 ),
@@ -115,4 +104,5 @@ SELECT
     bool_or(cs.tag_source = 'app_ads_direct'::text) AS app_ads_direct,
     bool_or(cs.tag_source = 'app_ads_reseller'::text) AS app_ads_reseller
 FROM combined_sources AS cs
-GROUP BY cs.domain_id, cs.store_app;
+GROUP BY cs.domain_id, cs.store_app
+;
