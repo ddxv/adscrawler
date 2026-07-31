@@ -113,6 +113,8 @@ def unzip_apk(store_id: str, file_path: pathlib.Path) -> pathlib.Path:
             "decode",
             apk_to_decode_path.as_posix(),
             "-f",
+            "-j",
+            "4",
             "-o",
             tmp_decoded_output_path.as_posix(),
         ]

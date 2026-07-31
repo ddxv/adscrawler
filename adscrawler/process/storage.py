@@ -626,8 +626,17 @@ def download_app_to_local(
         None when an existing local file is reused and no version was provided.
     """
     if version_str:
-        s3_config_key = "s3"
-        file_path = download_app_by_vc(store, store_id, version_str, s3_config_key)
+        s3_config_key = ["s3", "s3thirdgate"]
+        for s3_config_key in s3_config_keys:
+            try:
+                file_path = download_app_by_vc(
+                    store, store_id, version_str, s3_config_key
+                )
+            except FileNotFoundError:
+                logger.info(
+                    f"Checked {s3_config_key=}, no file found for {version_str=}"
+                )
+                pass
     else:
         file_path = get_local_file_path(store, store_id)
         if file_path:
