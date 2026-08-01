@@ -5,11 +5,12 @@ import pandas as pd
 from sqlalchemy import text
 
 from adscrawler.config import get_logger
-from adscrawler.dbcon.connection import get_db_connection
+from adscrawler.dbcon.connection import get_db_connection, PostgresEngine
 from adscrawler.dbcon.queries import upsert_df
 from adscrawler.process.storage import (
     get_s3_client,
 )
+from adscrawler.dbcon.atomic_swap import atomic_swap_partition
 
 logger = get_logger(__name__)
 
@@ -284,6 +285,91 @@ def delete_failing_apps(
     )
 
 
+def update_db_package_inventory() -> None:
+    today = datetime.datetime.now(tz=datetime.UTC)
+    android_s3_files = get_s3_apk_paths(
+        s3_client="s3",
+        bucket="adscrawler",
+        prefix="apks/android",
+        my_cutoff_date=today,
+    )
+    ios_s3_files = get_s3_apk_paths(
+        s3_client="s3",
+        bucket="adscrawler",
+        prefix="apks/ios",
+        my_cutoff_date=today,
+    )
+    atdf = get_s3_apk_paths(
+        s3_client="s3thirdgate",
+        bucket="apks",
+        prefix=f"android",
+        my_cutoff_date=today,
+    )
+    itdf = get_s3_apk_paths(
+        s3_client="s3thirdgate",
+        bucket="apks",
+        prefix=f"ios",
+        my_cutoff_date=today,
+    )
+    itdf["myregion"] = "thirdgate"
+    atdf["myregion"] = "thirdgate"
+    ios_s3_files["myregion"] = "loki"
+    android_s3_files["myregion"] = "loki"
+
+    df = pd.concat([itdf, atdf, ios_s3_files, android_s3_files])
+
+    ios_version_codes = query_all_version_codes(store=2, my_cutoff_date=today)
+    android_version_codes = query_all_version_codes(store=1, my_cutoff_date=today)
+
+    version_codes = pd.concat([ios_version_codes, android_version_codes])
+
+    mdf = pd.merge(
+        df,
+        version_codes,
+        how="outer",
+        left_on=["store_id", "versionstr"],
+        right_on=["store_id", "version_code"],
+    )
+
+    # All -2 that do not have files
+    mdf[(mdf["id"].notna()) & (mdf["s3_key"].isna()) & (mdf["apk_hash"].str.len() > 2)]
+
+    mdf = pd.merge(
+        df,
+        version_codes,
+        how="left",
+        left_on=["store_id", "versionstr"],
+        right_on=["store_id", "version_code"],
+    )
+
+    mdf = mdf[~(mdf["id"].isna())].rename(
+        columns={"id": "version_code_id", "s3_key": "file_key"}
+    )
+
+    int_cols = ["store_app", "version_code_id"]
+    for col in int_cols:
+        mdf[col] = mdf[col].astype("Int64")
+
+    mdf = mdf[
+        [
+            "store_app",
+            "version_code_id",
+            "versionstr",
+            "myregion",
+            "file_key",
+            "last_modified",
+        ]
+    ]
+    mdf["batch_date"] = today.date()
+    atomic_swap_partition(
+        df=mdf,
+        pgdb=pgdb,
+        schema="adtech",
+        table="s3_package_inventory",
+        batch_date=today.date(),
+    )
+
+
 def run_cleanup() -> None:
     """Main entry point: remove old / secondary APKs from S3 and reconcile the DB.
 
@@ -330,11 +416,11 @@ def run_cleanup() -> None:
         my_cutoff_date=one_week_ago_str,
     )
 
-    android_db_files = query_all_version_codes(store=1, my_cutoff_date=one_week_ago_str)
-    ios_db_files = query_all_version_codes(store=2, my_cutoff_date=one_week_ago_str)
+    # android_db_files = query_all_version_codes(store=1, my_cutoff_date=one_week_ago_str)
+    # ios_db_files = query_all_version_codes(store=2, my_cutoff_date=one_week_ago_str)
 
-    file_cleanup(sdf=android_s3_files, vcdf=android_db_files)
-    file_cleanup(sdf=ios_s3_files, vcdf=ios_db_files)
+    # file_cleanup(sdf=android_s3_files, vcdf=android_db_files)
+    # file_cleanup(sdf=ios_s3_files, vcdf=ios_db_files)
 
     total_size_bytes = (
         android_s3_files["size_bytes"].sum() + ios_s3_files["size_bytes"].sum()
@@ -345,3 +431,4 @@ def run_cleanup() -> None:
 
 if __name__ == "__main__":
     run_cleanup()
+    update_db_package_inventory()

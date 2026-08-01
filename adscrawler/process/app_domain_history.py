@@ -100,20 +100,30 @@ def run_changes(pgdb: PostgresEngine) -> None:
     df = pd.read_parquet(tmp_domain_changes)
     df["batch_date"] = batch_date
     atomic_swap_partition(
-        df, pgdb, schema="adtech", table="domain_app_changes_quarterly"
+        df,
+        pgdb,
+        schema="adtech",
+        table="domain_app_changes_quarterly",
+        batch_date=batch_date,
     )
 
     df = pd.read_parquet(tmp_trend_domains)
     df["batch_date"] = batch_date
-    atomic_swap_partition(df, pgdb, schema="adtech", table="trend_domains")
+    atomic_swap_partition(
+        df, pgdb, schema="adtech", table="trend_domains", batch_date=batch_date
+    )
 
     df = pd.read_parquet(tmp_trend_companies)
     df["batch_date"] = batch_date
-    atomic_swap_partition(df, pgdb, schema="adtech", table="trend_companies")
+    atomic_swap_partition(
+        df, pgdb, schema="adtech", table="trend_companies", batch_date=batch_date
+    )
 
     df = pd.read_parquet(tmp_trend_parent_companies)
     df["batch_date"] = batch_date
-    atomic_swap_partition(df, pgdb, schema="adtech", table="trend_parent_companies")
+    atomic_swap_partition(
+        df, pgdb, schema="adtech", table="trend_parent_companies", batch_date=batch_date
+    )
 
 
 def combined_domain_history_to_s3(
