@@ -1,20 +1,32 @@
-WITH latest_version_codes AS (
+WITH s3_file_keys AS (SELECT DISTINCT ON (store_app, version_code_id)
+	version_code_id,
+	myregion,
+	file_key
+FROM
+	s3_package_inventory
+WHERE
+	store_app IS NOT NULL
+	AND version_code_id IS NOT NULL
+ORDER BY
+	store_app,
+	version_code_id,
+	CASE WHEN myregion = 'loki' THEN 0 ELSE 1 END ASC
+),
+latest_version_codes AS (
     SELECT DISTINCT ON
-    (store_app)
-        id,
-        store_app,
-        version_code,
-        created_at AS last_downloaded_at,
-        crawl_result AS download_result
+    (vc.store_app)
+        vc.id,
+        vc.store_app,
+        vc.version_code,
+        sfk.myregion,
+        sfk.file_key
     FROM
-        version_codes
-    WHERE
-        crawl_result = 1
+        version_codes vc
+        JOIN s3_file_keys sfk ON vc.id = sfk.version_code_id
     ORDER BY
         store_app ASC,
-        created_at DESC,
-        string_to_array(version_code, '.')::bigint [] DESC
-),
+        created_at DESC
+        ),
 last_scanned AS (
     SELECT DISTINCT ON
     (vc.store_app)
@@ -38,7 +50,7 @@ last_successful_scanned AS (
     LEFT JOIN version_codes AS vc
         ON vasr.version_code_id = vc.id
     WHERE
-        vc.crawl_result = 1
+        vasr.crawl_result = 1
     ORDER BY vc.store_app ASC, vasr.run_at DESC
 ),
 failed_runs AS (
@@ -61,8 +73,7 @@ all_scheduled_to_run AS (
         ls.run_at AS last_run_at,
         fr.failed_attempts,
         ls.run_result AS last_run_result,
-        lss.run_at AS last_succesful_run_at,
-        lvc.last_downloaded_at
+        lss.run_at AS last_succesful_run_at
     FROM
         latest_version_codes AS lvc
     LEFT JOIN last_scanned AS ls
@@ -92,7 +103,6 @@ user_requested_apps_crawl AS (
         fr.failed_attempts,
         ls.run_result AS last_run_result,
         lss.run_at AS last_succesful_run_at,
-        lsvc.last_downloaded_at,
         urs.created_at AS user_requested_at
     FROM
         agadmin.user_requested_scan AS urs
@@ -127,7 +137,6 @@ SELECT
     failed_attempts,
     last_run_result,
     last_succesful_run_at,
-    last_downloaded_at,
     user_requested_at,
     'user' AS mysource
 FROM user_requested_apps_crawl
@@ -142,7 +151,6 @@ SELECT
     failed_attempts,
     last_run_result,
     last_succesful_run_at,
-    last_downloaded_at,
     NULL AS user_requested_at,
     'scheduled' AS mysource
 FROM all_scheduled_to_run;

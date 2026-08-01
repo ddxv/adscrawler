@@ -51,7 +51,6 @@ def get_s3_apk_paths(
     sdf["versionstr"] = sdf["s3_key"].str.split("/").str[-2]
     sdf["store_id"] = sdf["s3_key"].str.split("/").str[-3]
     init_rows = sdf.shape[0]
-    sdf = sdf[sdf["last_modified"] < my_cutoff_date]
     logger.info(f"Filtered {init_rows - sdf.shape[0]} APKs newer than cutoff date")
     logger.info(f"Returning df with {sdf.shape[0]} APKs")
     return sdf
@@ -153,22 +152,15 @@ def query_version_codes_with_failed_scans(scan_cutoff_date: str) -> pd.DataFrame
     return df
 
 
-def delete_copied_apks(store_name: str, sdf: pd.DataFrame) -> None:
-    today_str = datetime.datetime.now(tz=datetime.UTC).strftime("%Y-%m-%d")
-    tdf = get_s3_apk_paths(
-        s3_client="s3thirdgate",
-        bucket="apks",
-        prefix=f"{store_name}",
-        my_cutoff_date=today_str,
-    )
-    sdf["store_id_count"] = sdf.groupby("store_id")["store_id"].transform("count")
-    duplicated_sdf = (
-        sdf[sdf["store_id_count"] > 1]
+def delete_copied_apks(tdf: pd.DataFrame, ldf: pd.DataFrame) -> None:
+    ldf["store_id_count"] = ldf.groupby("store_id")["store_id"].transform("count")
+    duplicated_ldf = (
+        ldf[ldf["store_id_count"] > 1]
         .sort_values(["store_id", "last_modified"], ascending=False)
         .drop_duplicates(subset=["store_id"], keep="first")
     )
     dupes_copied_to_thirdgate = pd.merge(
-        duplicated_sdf[["store_id", "versionstr", "s3_key"]],
+        duplicated_ldf[["store_id", "versionstr", "s3_key"]],
         tdf[["store_id", "versionstr"]],
         on=["store_id", "versionstr"],
         how="inner",
@@ -178,9 +170,11 @@ def delete_copied_apks(store_name: str, sdf: pd.DataFrame) -> None:
         f"{len(dupes_in_thirdgate_keys)} duplicated APKs in original S3 that have been copied to thirdgate, deleting from original S3"
     )
     delete_s3_apks(bucket="adscrawler", apk_keys=dupes_in_thirdgate_keys)
+    return dupes_in_thirdgate_keys
 
 
 def file_cleanup(sdf: pd.DataFrame, vcdf: pd.DataFrame) -> None:
+    """Aggressive Cleanup"""
     # In S3 but never recorded
     in_s3_unrecorded = (
         sdf[~sdf["store_id"].isin(vcdf["store_id"].unique())]["s3_key"]
@@ -253,7 +247,7 @@ def delete_failing_apps(
     Parameters
     ----------
     android_s3_files : pd.DataFrame
-        Current S3 APK file listing for Android (from ``get_s3_apk_paths``).
+        Current S3 APK file listing
     cutoff_date : str
         Date string used to filter version_codes (older than this).
     """
@@ -285,55 +279,99 @@ def delete_failing_apps(
     )
 
 
-def update_db_package_inventory() -> None:
-    today = datetime.datetime.now(tz=datetime.UTC)
-    android_s3_files = get_s3_apk_paths(
+def run_cleanup() -> None:
+    """Main entry point: remove old / secondary APKs from S3 and reconcile the DB."""
+    today_now = datetime.datetime.now(tz=datetime.UTC)
+    aldf = get_s3_apk_paths(
         s3_client="s3",
         bucket="adscrawler",
         prefix="apks/android",
-        my_cutoff_date=today,
+        my_cutoff_date=today_now,
     )
-    ios_s3_files = get_s3_apk_paths(
+    ildf = get_s3_apk_paths(
         s3_client="s3",
         bucket="adscrawler",
         prefix="apks/ios",
-        my_cutoff_date=today,
+        my_cutoff_date=today_now,
     )
     atdf = get_s3_apk_paths(
         s3_client="s3thirdgate",
         bucket="apks",
         prefix=f"android",
-        my_cutoff_date=today,
+        my_cutoff_date=today_now,
     )
     itdf = get_s3_apk_paths(
         s3_client="s3thirdgate",
         bucket="apks",
         prefix=f"ios",
-        my_cutoff_date=today,
+        my_cutoff_date=today_now,
     )
+
+    one_week_ago = today_now - datetime.timedelta(days=7)
+    one_week_ago_str = one_week_ago.strftime("%Y-%m-%d")
+
+    aldf = get_s3_apk_paths(
+        s3_client="s3",
+        bucket="adscrawler",
+        prefix="apks/android",
+        my_cutoff_date=one_week_ago_str,
+    )
+    ildf = get_s3_apk_paths(
+        s3_client="s3",
+        bucket="adscrawler",
+        prefix="apks/ios",
+        my_cutoff_date=one_week_ago_str,
+    )
+
+    aldf_old = aldf[aldf["last_modified"] < one_week_ago_str].copy()
+    ildf_old = ildf[ildf["last_modified"] < one_week_ago_str].copy()
+    today_str = datetime.datetime.now(tz=datetime.UTC).strftime("%Y-%m-%d")
+    atdf_old = atdf[atdf["last_modified"] < today_str].copy()
+    itdf_old = itdf[itdf["last_modified"] < today_str].copy()
+
+    # DELETE FROM S3: LOKI
+    al_deleted = delete_copied_apks(ldf=aldf_old, tdf=atdf_old)
+    il_deleted = delete_copied_apks(ldf=ildf_old, tdf=itdf_old)
+
+    aldf = aldf[~(aldf["s3_key"].isin(al_deleted))]
+    ildf = ildf[~(ildf["s3_key"].isin(il_deleted))]
+
+    # --- Step 2: re-list after deletions, then reconcile with DB ---
+    # android_s3_files = get_s3_apk_paths(
+    #     s3_client="s3",
+    #     bucket="adscrawler",
+    #     prefix="apks/android",
+    #     my_cutoff_date=one_week_ago_str,
+    # )
+    # ios_s3_files = get_s3_apk_paths(
+    #     s3_client="s3",
+    #     bucket="adscrawler",
+    #     prefix="apks/ios",
+    #     my_cutoff_date=one_week_ago_str,
+    # )
+
+    # android_db_files = query_all_version_codes(store=1, my_cutoff_date=one_week_ago_str)
+    # ios_db_files = query_all_version_codes(store=2, my_cutoff_date=one_week_ago_str)
+    # file_cleanup(sdf=android_s3_files, vcdf=android_db_files)
+    # file_cleanup(sdf=ios_s3_files, vcdf=ios_db_files)
     itdf["myregion"] = "thirdgate"
     atdf["myregion"] = "thirdgate"
-    ios_s3_files["myregion"] = "loki"
-    android_s3_files["myregion"] = "loki"
-
-    df = pd.concat([itdf, atdf, ios_s3_files, android_s3_files])
-
-    ios_version_codes = query_all_version_codes(store=2, my_cutoff_date=today)
-    android_version_codes = query_all_version_codes(store=1, my_cutoff_date=today)
-
+    ildf["myregion"] = "loki"
+    aldf["myregion"] = "loki"
+    df = pd.concat([itdf, atdf, ildf, aldf])
+    ios_version_codes = query_all_version_codes(store=2, my_cutoff_date=today_now)
+    android_version_codes = query_all_version_codes(store=1, my_cutoff_date=today_now)
     version_codes = pd.concat([ios_version_codes, android_version_codes])
+    # mdf = pd.merge(
+    #     df,
+    #     version_codes,
+    #     how="outer",
+    #     left_on=["store_id", "versionstr"],
+    #     right_on=["store_id", "version_code"],
+    # )
 
-    mdf = pd.merge(
-        df,
-        version_codes,
-        how="outer",
-        left_on=["store_id", "versionstr"],
-        right_on=["store_id", "version_code"],
-    )
-
-    # All -2 that do not have files
-    mdf[(mdf["id"].notna()) & (mdf["s3_key"].isna()) & (mdf["apk_hash"].str.len() > 2)]
-
+    # # All -2 that do not have files
+    # mdf[(mdf["id"].notna()) & (mdf["s3_key"].isna()) & (mdf["apk_hash"].str.len() > 2)]
     mdf = pd.merge(
         df,
         version_codes,
@@ -360,75 +398,16 @@ def update_db_package_inventory() -> None:
             "last_modified",
         ]
     ]
-    mdf["batch_date"] = today.date()
+    mdf["batch_date"] = today_now.date()
     atomic_swap_partition(
         df=mdf,
         pgdb=pgdb,
-        schema="adtech",
+        schema="public",
         table="s3_package_inventory",
-        batch_date=today.date(),
+        batch_date=today_now.date(),
     )
-
-
-def run_cleanup() -> None:
-    """Main entry point: remove old / secondary APKs from S3 and reconcile the DB.
-
-    Steps
-    -----
-    1. Delete secondary APK versions that have been confirmed on thirdgate.
-    2. Delete S3 files with no matching or only bad DB records.
-    3. Mark ``version_codes`` with ``crawl_result = 1`` but no S3 file as
-       ``crawl_result = -2``.
-    4. Delete repeatedly-failed scan APKs (Android only).
-    """
-    today = datetime.datetime.now(tz=datetime.UTC)
-    one_week_ago = today - datetime.timedelta(days=7)
-    one_week_ago_str = one_week_ago.strftime("%Y-%m-%d")
-
-    # --- Step 1: delete APKs already copied to thirdgate ---
-    android_s3_files = get_s3_apk_paths(
-        s3_client="s3",
-        bucket="adscrawler",
-        prefix="apks/android",
-        my_cutoff_date=one_week_ago_str,
-    )
-    ios_s3_files = get_s3_apk_paths(
-        s3_client="s3",
-        bucket="adscrawler",
-        prefix="apks/ios",
-        my_cutoff_date=one_week_ago_str,
-    )
-
-    delete_copied_apks(store_name="android", sdf=android_s3_files)
-    delete_copied_apks(store_name="ios", sdf=ios_s3_files)
-
-    # --- Step 2: re-list after deletions, then reconcile with DB ---
-    android_s3_files = get_s3_apk_paths(
-        s3_client="s3",
-        bucket="adscrawler",
-        prefix="apks/android",
-        my_cutoff_date=one_week_ago_str,
-    )
-    ios_s3_files = get_s3_apk_paths(
-        s3_client="s3",
-        bucket="adscrawler",
-        prefix="apks/ios",
-        my_cutoff_date=one_week_ago_str,
-    )
-
-    # android_db_files = query_all_version_codes(store=1, my_cutoff_date=one_week_ago_str)
-    # ios_db_files = query_all_version_codes(store=2, my_cutoff_date=one_week_ago_str)
-
-    # file_cleanup(sdf=android_s3_files, vcdf=android_db_files)
-    # file_cleanup(sdf=ios_s3_files, vcdf=ios_db_files)
-
-    total_size_bytes = (
-        android_s3_files["size_bytes"].sum() + ios_s3_files["size_bytes"].sum()
-    )
-    bytes_in_tb = total_size_bytes / 1e12
-    logger.info(f"Total size of remaining APKs in S3: {bytes_in_tb:.2f} TB")
 
 
 if __name__ == "__main__":
+
     run_cleanup()
-    update_db_package_inventory()

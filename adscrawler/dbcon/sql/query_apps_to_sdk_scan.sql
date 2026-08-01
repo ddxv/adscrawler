@@ -1,20 +1,32 @@
-WITH latest_version_codes AS (
+WITH s3_file_keys AS (SELECT DISTINCT ON (store_app, version_code_id)
+	version_code_id,
+	myregion,
+	file_key
+FROM
+	s3_package_inventory
+WHERE
+	store_app IS NOT NULL
+	AND version_code_id IS NOT NULL
+ORDER BY
+	store_app,
+	version_code_id,
+	CASE WHEN myregion = 'loki' THEN 0 ELSE 1 END ASC
+),
+latest_version_codes AS (
     SELECT DISTINCT ON
-    (store_app)
-        id,
-        store_app,
-        version_code,
-        created_at AS last_downloaded_at,
-        crawl_result AS download_result
+    (vc.store_app)
+        vc.id,
+        vc.store_app,
+        vc.version_code,
+        sfk.myregion,
+        sfk.file_key
     FROM
-        version_codes
-    WHERE
-        crawl_result = 1
+        version_codes vc
+        JOIN s3_file_keys sfk ON vc.id = sfk.version_code_id
     ORDER BY
         store_app ASC,
-        created_at DESC,
-        string_to_array(version_code, '.')::bigint [] DESC
-),
+        created_at DESC
+        ),
 last_scan AS (
     SELECT DISTINCT ON
     (vc.store_app)
@@ -49,7 +61,7 @@ last_scan_succeed AS (
     ORDER BY
         vc.store_app ASC,
         vcss.scanned_at DESC,
-        string_to_array(vc.version_code, '.')::bigint [] DESC
+        vc.created_at DESC
 ),
 scheduled_apps_crawl AS (
     SELECT

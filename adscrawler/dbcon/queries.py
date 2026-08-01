@@ -1469,14 +1469,14 @@ def get_version_codes_full_history(
 
 
 def get_version_codes_for_store_id(pgdb: PostgresEngine, store_id: str):
-    sel_query = """SELECT
+    sel_query = f"""SELECT
               	vc.id as version_code_db_id, version_code as version_code_str, apk_hash
               FROM
 	              version_codes vc
               LEFT JOIN store_apps sa ON
 	              vc.store_app = sa.id
               WHERE
-	              sa.store_id = 'com.wte.view' AND
+	              sa.store_id = f'{store_id}' AND
 	              vc.crawl_result = 1
               ;
               """
@@ -1522,26 +1522,6 @@ def get_failed_mitm_logs(pgdb: PostgresEngine, lookback_days: int = 90) -> pd.Da
     """
     df = pd.read_sql(sel_query, con=pgdb.engine)
     return df
-
-
-def get_version_code_by_md5_hash(
-    pgdb: PostgresEngine, md5_hash: str, store_id: str
-) -> int | None:
-    sel_query = f"""SELECT * FROM version_codes vc
-    LEFT JOIN store_apps sa ON
-        sa.id = vc.store_app
-    WHERE apk_hash = '{md5_hash}' AND sa.store_id = '{store_id}'
-    AND vc.crawl_result = 1
-    ;
-    """
-    df = pd.read_sql(sel_query, con=pgdb.engine)
-    if df.empty:
-        return None
-    try:
-        return int(df.iloc[0]["id"])
-    except Exception:
-        logger.exception(f"Error getting version code id for {md5_hash} and {store_id}")
-        raise
 
 
 @lru_cache(maxsize=1000)

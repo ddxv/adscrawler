@@ -15,6 +15,5 @@ WITH myresults AS (
     WHERE
         sa.store = 1
         AND vcasr.run_result = 1
---    AND vc.crawl_result = 1
 )
 SELECT * FROM myresults;

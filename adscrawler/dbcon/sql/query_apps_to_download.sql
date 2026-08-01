@@ -1,4 +1,18 @@
-WITH latest_version_codes AS (
+WITH s3_file_keys AS (SELECT DISTINCT ON (store_app, version_code_id)
+	version_code_id,
+	myregion,
+	file_key
+FROM
+	s3_package_inventory
+WHERE
+	store_app IS NOT NULL
+	AND version_code_id IS NOT NULL
+ORDER BY
+	store_app,
+	version_code_id,
+	CASE WHEN myregion = 'loki' THEN 0 ELSE 1 END ASC
+),
+latest_version_codes AS (
     SELECT DISTINCT ON
     (store_app)
         id,
@@ -10,8 +24,7 @@ WITH latest_version_codes AS (
         version_codes
     ORDER BY
         store_app ASC,
-        updated_at DESC,
-        string_to_array(version_code, '.')::bigint [] DESC
+        created_at DESC,
 ),
 latest_success_version_codes AS (
     SELECT DISTINCT ON
@@ -24,12 +37,13 @@ latest_success_version_codes AS (
         crawl_result
     FROM
         version_codes
+    LEFT JOIN s3_file_keys AS sfk ON
+        version_codes.id = sfk.version_code_id
     WHERE
-        crawl_result = 1
+        sfk.file_key IS NOT NULL
     ORDER BY
         store_app ASC,
-        updated_at DESC,
-        string_to_array(version_code, '.')::bigint [] DESC
+        created_at DESC
 ),
 faily_downloads_monthly AS (
     SELECT
@@ -71,7 +85,6 @@ scheduled_apps_crawl AS (
         dc.name,
         dc.installs,
         dc.rating_count,
-        vc.crawl_result AS last_crawl_result,
         vc.updated_at AS last_download_attempt,
         lsvc.created_at AS last_downloaded_at,
         lsvc.version_code AS last_downloaded_version_code,
@@ -143,7 +156,6 @@ user_requested_apps_crawl AS (
         agm.total_installs AS installs,
         agm.total_ratings AS rating_count,
         urs.created_at AS user_last_requested,
-        lvc.crawl_result AS last_crawl_result,
         lvc.updated_at AS last_download_attempt,
         lsvc.created_at AS last_downloaded_at,
         lsvc.version_code AS last_downloaded_version_code,
@@ -195,7 +207,6 @@ combined AS (
         rating_count,
         failed_attempts_month,
         failed_attempts_quarter,
-        last_crawl_result,
         'user' AS mysource,
         last_download_attempt,
         last_downloaded_at,
@@ -213,7 +224,6 @@ combined AS (
         rating_count,
         failed_attempts_month,
         failed_attempts_quarter,
-        last_crawl_result,
         CASE
             WHEN
                 store_app IN (
@@ -246,7 +256,6 @@ final_selection AS (
         rating_count,
         failed_attempts_month,
         failed_attempts_quarter,
-        last_crawl_result,
         mysource,
         last_download_attempt,
         last_downloaded_at,
@@ -289,7 +298,6 @@ SELECT
     rating_count,
     failed_attempts_month,
     failed_attempts_quarter,
-    last_crawl_result,
     mysource,
     last_download_attempt,
     last_downloaded_at,
