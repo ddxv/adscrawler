@@ -51,7 +51,7 @@ last_successful_scanned AS (
     LEFT JOIN version_codes AS vc
         ON vasr.version_code_id = vc.id
     WHERE
-        vasr.crawl_result = 1
+        vasr.run_result = 1
     ORDER BY vc.store_app ASC, vasr.run_at DESC
 ),
 failed_runs AS (
