@@ -466,7 +466,6 @@ def build_matched_app_sdk_strings_latest() -> None:
                     store_app, 
                     id AS version_code_id
                 FROM read_parquet('{vc_path}')
-                WHERE version_code != '-1'
                 QUALIFY DENSE_RANK() OVER (
                     PARTITION BY store_app 
                     ORDER BY created_at DESC, id DESC
@@ -621,7 +620,7 @@ def copy_lookups() -> None:
         "sdk_mediation_patterns",
     )
     _pg_table_to_s3(
-        "SELECT id, created_at, store_app, version_code FROM pg.public.version_codes ORDER BY id ASC",
+        "SELECT id, created_at, store_app, version_code FROM pg.public.version_codes WHERE version_code != '-1' ORDER BY id ASC",
         LOOKUP_VERSION_CODES,
         "version_codes",
     )
