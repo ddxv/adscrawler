@@ -5,7 +5,6 @@ import pandas as pd
 from adscrawler.config import get_logger
 from adscrawler.dbcon.connection import PostgresEngine
 from adscrawler.dbcon.queries import (
-    get_version_code_dbid,
     insert_version_code,
     query_apps_to_download,
     query_apps_to_sdk_scan,
@@ -163,8 +162,14 @@ def process_sdks(
         store_id = row.store_id
         store_app = row.store_app
         version_str = row["version_code_str"]
+        version_code_dbid = row["version_code_db_id"]
         crawl_result = 3
         logger.info(f"SDK processing: {store_id=} start")
+        if version_code_dbid is None:
+            logger.error(
+                f"Version code dbid is None for {store_id=}, data not recorded!"
+            )
+            raise
         try:
             if store == 1:
                 details_df, crawl_result, version_str, raw_txt_str = process_manifest(
@@ -180,19 +185,6 @@ def process_sdks(
             logger.exception(f"Manifest for {store_id} failed")
             raise
 
-        version_code_dbid = get_version_code_dbid(
-            store_app=store_app,
-            version_code=version_str,
-            pgdb=pgdb,
-        )
-        if version_code_dbid is None:
-            if row["latest_version_code_db_id"] is not None:
-                version_code_dbid = row["latest_version_code_db_id"]
-            else:
-                logger.error(
-                    f"Version code dbid is None for {store_id=}, data not recorded!"
-                )
-                continue
         if details_df is None or details_df.empty:
             details_df = pd.DataFrame(
                 [
