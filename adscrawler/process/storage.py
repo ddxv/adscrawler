@@ -616,6 +616,9 @@ def get_parquet_paths_by_prefix(bucket: str, prefix: str) -> list[str]:
 def download_app_to_local(
     store: int, store_id: str, version_str: str | None = None
 ) -> tuple[pathlib.Path, str | None]:
+    store = 2
+    store_id = "944011620"
+    version_str = "2.2.680179"
     """Return a local app package path, downloading from S3 when needed.
 
     If the app already exists locally, that path is returned immediately.
@@ -634,9 +637,16 @@ def download_app_to_local(
                     store, store_id, version_str, s3_config_key
                 )
             except FileNotFoundError:
-                logger.info(f"S3 {s3_config_key=}, no file found for {version_str=}")
+                logger.warning(
+                    f"Not found: {s3_config_key=} {store_id=} {version_str=}"
+                )
                 file_path = None
                 pass
+            if file_path:
+                logger.info(
+                    f"Downloaded {store_id=} {version_str=} from {s3_config_key=}"
+                )
+                return file_path, version_str
     else:
         file_path = get_local_file_path(store, store_id)
         if file_path:
@@ -646,7 +656,7 @@ def download_app_to_local(
             store=store, store_id=store_id, version_str=version_str
         )
     if file_path is None:
-        raise FileNotFoundError(f"{store_id=} no file found: {file_path=}")
+        raise FileNotFoundError(f"{store_id=} no file found")
     return file_path, version_str
 
 
