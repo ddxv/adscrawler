@@ -370,8 +370,9 @@ def get_store_id_vc_apk_s3_keys(
     )
     objects_data = []
     if response["KeyCount"] == 0:
-        logger.error(f"S3 no apk found for {store_id=}")
-        raise FileNotFoundError(f"S3 no apk found for {store_id=}")
+        log_msg = f"S3 no apk found for {s3_config_key=} {store_id=} {version_str=}"
+        logger.error(log_msg)
+        raise FileNotFoundError(log_msg)
     for obj in response["Contents"]:
         objects_data.append(
             {
@@ -398,8 +399,9 @@ def get_store_id_apk_s3_keys(store: int, store_id: str) -> pd.DataFrame:
     response = s3_client.list_objects_v2(Bucket=CONFIG["s3"]["bucket"], Prefix=prefix)
     objects_data = []
     if response["KeyCount"] == 0:
-        logger.error(f"S3 no apk found for {store_id=}")
-        raise FileNotFoundError(f"S3 no apk found for {store_id=}")
+        err_msg = f"S3 no apk found for {store_id=} any version_code"
+        logger.error(err_msg)
+        raise FileNotFoundError(err_msg)
     for obj in response["Contents"]:
         key_parts = obj["Key"].split("/")
         if len(key_parts) >= 4:
@@ -441,10 +443,9 @@ def download_app_by_vc(
     func_info = f"S3 download_app_by_vc {store_id=} {version_str=}"
     df = get_store_id_vc_apk_s3_keys(store, store_id, version_str, s3_config_key)
     if df.empty:
-        logger.error(f"S3 no apk found for {store_id=}")
-        raise FileNotFoundError(f"S3 no apk found for {store_id=}")
-    if df.empty:
-        logger.error(f"S3 only has failed apk for {store_id=}, no version_code")
+        err_msg = f"S3 no apk df returned {s3_config_key=} {store_id=} {version_str=}"
+        logger.error(err_msg)
+        raise FileNotFoundError(err_msg)
     try:
         key = df["key"].to_numpy()[0]
     except IndexError:
@@ -483,8 +484,8 @@ def download_app_by_store_id(
     func_info = f"S3 download_app_by_store_id {store_id=} {version_str=}"
     df = get_store_id_apk_s3_keys(store, store_id)
     if df.empty:
-        logger.error(f"S3 no apk found for {store_id=}")
-        raise FileNotFoundError(f"S3 no apk found for {store_id=}")
+        logger.error(f"S3 no apks found for {store_id=}")
+        raise FileNotFoundError(f"S3 no apks found for {store_id=}")
     df = df[~(df["version_code"] == "failed")]
     if df.empty:
         logger.error(f"S3 only has failed apk for {store_id=}, no version_code")
