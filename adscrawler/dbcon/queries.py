@@ -1490,13 +1490,16 @@ def get_version_code_dbid(
     sel_query = f"""SELECT * FROM version_codes WHERE store_app = {store_app} AND version_code = '{version_code}'"""
     df = pd.read_sql(sel_query, con=pgdb.engine)
     if df.empty:
-        insert_version_code(
-            version_str=version_code,
-            store_app=store_app,
-            crawl_result=4,
-            pgdb=pgdb,
+        # insert_version_code(
+        #     version_str=version_code,
+        #     store_app=store_app,
+        #     crawl_result=4,
+        #     pgdb=pgdb,
+        # )
+        # return None
+        raise ValueError(
+            f"Version code {version_code} not found for store app {store_app}"
         )
-        return None
     try:
         return int(df.iloc[0]["id"])
     except Exception:

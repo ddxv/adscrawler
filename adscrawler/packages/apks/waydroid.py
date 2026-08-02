@@ -1,7 +1,6 @@
 import datetime
 import os
 import pathlib
-import re
 import select
 import subprocess
 import time
@@ -58,21 +57,19 @@ def run_app(
     store_id: str,
     store_app: int,
     run_name: str,
+    version_code_id: int,
+    version_str: str,
     timeout: int = 60,
 ) -> None:
     function_info = f"run_app {store_id=}"
     crawl_result = 3
-    version_code_id = None
-    version_str = None
     logger.info(f"{function_info} clearing mitmdump")
     mitm_script = pathlib.Path(PACKAGE_DIR, "adscrawler/packages/apks/mitm_start.sh")
     os.system(f"{mitm_script.as_posix()} -d")
     mdf = pd.DataFrame()
     try:
-        version_str, version_code_id = launch_and_track_app(
+        launch_and_track_app(
             store_id,
-            store_app,
-            pgdb,
             apk_path,
             timeout=timeout,
         )
@@ -80,16 +77,6 @@ def run_app(
     except Exception:
         crawl_result = 2
         logger.exception(f"{function_info} launch_and_track_app failed")
-    if version_code_id is None:
-        try:
-            version_str, version_code_id = get_version_via_apktool(
-                store_id, apk_path, store_app, pgdb
-            )
-        except Exception:
-            logger.exception(f"{function_info} apktool failed to get version code")
-            version_code_id = None
-        if version_code_id is None:
-            logger.error(f"{function_info} failed to get version code id")
 
     md5_hash = get_md5_hash(apk_path)
     logger.info(f"{function_info} log: {md5_hash=} {version_code_id=} {crawl_result=}")
@@ -101,17 +88,6 @@ def run_app(
         crawl_result=crawl_result,
         pgdb=pgdb,
     )
-
-    if version_code_id is None:
-        logger.error(
-            f"{function_info} failed: No version code id with {mdf.shape[0]:,} api calls"
-        )
-        return
-    if version_str is None:
-        logger.error(
-            f"{function_info} failed: No version str with {mdf.shape[0]:,} api calls"
-        )
-        return
 
     try:
         mdf = mitm_logs.parse_log(store_id=store_id, run_id=None, pgdb=pgdb)
@@ -320,6 +296,8 @@ def process_app_for_waydroid(
     store_app: int,
     apk_path: pathlib.Path,
     run_name: str,
+    version_code_id: int,
+    version_str: str,
     timeout: int = 60,
 ) -> None:
     if not apk_path.exists():
@@ -343,6 +321,8 @@ def process_app_for_waydroid(
             store_id=store_id,
             store_app=store_app,
             run_name=run_name,
+            version_code_id=version_code_id,
+            version_str=version_str,
             timeout=timeout,
         )
     except Exception:
@@ -545,36 +525,36 @@ def prep_xapk_splits(store_id: str, xapk_path: pathlib.Path) -> list[str]:
     return split_apk_paths
 
 
-def get_installed_version_str(
-    store_id: str, store_app: int, pgdb: PostgresEngine
-) -> tuple[str | None, int | None]:
-    package_info = subprocess.run(
-        ["sudo", "waydroid", "shell", "dumpsys", "package", store_id],
-        capture_output=True,
-        text=True,
-        check=False,
-        timeout=20,
-    )
+# def get_installed_version_str(
+#     store_id: str, store_app: int, pgdb: PostgresEngine
+# ) -> tuple[str | None, int]:
+#     package_info = subprocess.run(
+#         ["sudo", "waydroid", "shell", "dumpsys", "package", store_id],
+#         capture_output=True,
+#         text=True,
+#         check=False,
+#         timeout=20,
+#     )
 
-    version_info = package_info.stdout
+#     version_info = package_info.stdout
 
-    match = re.search(r"versionCode=(\d+)", version_info)
-    version_code_id = None
-    version_str = None
-    if match:
-        version_str = match.group(1)
-        logger.info(f"found versionCode: {version_str}")
-        version_code_id = get_version_code_dbid(store_app, version_str, pgdb)
+#     match = re.search(r"versionCode=(\d+)", version_info)
+#     version_code_id = None
+#     version_str = None
+#     if match:
+#         version_str = match.group(1)
+#         logger.info(f"found versionCode: {version_str}")
+#         try:
+#             version_code_id = get_version_code_dbid(store_app, version_str, pgdb)
+#         except ValueError:
+#             logger.error(f"No version code id found for {store_id=}")
+#             raise
 
-    if version_code_id is None:
-        logger.error(f"No version code id found for {store_id=}")
-    return version_str, version_code_id
+#     return version_str, version_code_id
 
 
 def launch_and_track_app(
     store_id: str,
-    store_app: int,
-    pgdb: PostgresEngine,
     apk_path: pathlib.Path,
     timeout: int = 60,
 ) -> tuple[str, int]:
@@ -608,12 +588,12 @@ def launch_and_track_app(
     time.sleep(timeout)
     logger.info(f"{function_info} stopping app & mitmdump")
     os.system(f"{mitm_script.as_posix()} -d")
-    version_str, version_code_id = get_installed_version_str(store_id, store_app, pgdb)
+    # version_str, version_code_id = get_installed_version_str(store_id, store_app, pgdb)
     remove_app(store_id)
-    if version_code_id is None:
-        raise Exception(f"{function_info} failed to get version code")
-    logger.info(f"{function_info} {version_code_id=} success")
-    return version_str, version_code_id
+    # if version_code_id is None:
+    # raise Exception(f"{function_info} failed to get version code")
+    logger.info(f"{function_info} success")
+    # return version_str, version_code_id
 
 
 def remove_app(store_id: str) -> None:
@@ -893,12 +873,15 @@ def manual_waydroid_process(
         raise FileNotFoundError(f"{store_id=} not found")
 
     store_app = query_store_app_by_store_id(pgdb, store_id)
+    version_code_id = get_version_code_dbid(store_app, version_code, pgdb)
     process_app_for_waydroid(
         pgdb=pgdb,
         store_id=store_id,
         store_app=store_app,
         apk_path=apk_path,
         timeout=timeout,
+        version_str=version_code,
+        version_code_id=version_code_id,
         run_name=run_name,
     )
     remove_all_third_party_apps()
@@ -917,6 +900,7 @@ def process_apks_for_waydroid(
         store_id = row.store_id
         store_app = row.store_app
         version_str = row.version_string
+        version_code_id = row.version_code_id
         try:
             apk_path, _version_str = download_app_to_local(
                 store=1, store_id=store_id, version_str=version_str
@@ -931,6 +915,8 @@ def process_apks_for_waydroid(
             apk_path=apk_path,
             store_id=store_id,
             store_app=store_app,
+            version_code_id=version_code_id,
+            version_str=version_str,
             run_name=run_name,
         )
         remove_tmp_files(store_id=store_id)

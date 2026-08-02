@@ -4,20 +4,20 @@ import os
 import pathlib
 import shutil
 import time
+from collections.abc import Iterable
 
 import boto3
 import duckdb
 import pandas as pd
 from botocore.exceptions import ClientError
-from typing import Iterable
 
 from adscrawler.config import (
     APKS_INCOMING_DIR,
     CONFIG,
-    TMP_DIR,
     CREATIVE_RAW_DIR,
     IPAS_INCOMING_DIR,
     MITM_DIR,
+    TMP_DIR,
     XAPKS_INCOMING_DIR,
     get_logger,
 )
@@ -438,7 +438,7 @@ def download_mitm_log_by_key(key: str, filename: str) -> pathlib.Path:
 def download_app_by_vc(
     store: int, store_id: str, version_str: str, s3_config_key: str
 ) -> tuple[pathlib.Path, str]:
-    func_info = f"S3 download_app_by_store_id {store_id=} {version_str=}"
+    func_info = f"S3 download_app_by_vc {store_id=} {version_str=}"
     df = get_store_id_vc_apk_s3_keys(store, store_id, version_str, s3_config_key)
     if df.empty:
         logger.error(f"S3 no apk found for {store_id=}")

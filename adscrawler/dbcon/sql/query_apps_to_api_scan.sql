@@ -1,16 +1,17 @@
-WITH s3_file_keys AS (SELECT DISTINCT ON (store_app, version_code_id)
-	version_code_id,
-	myregion,
-	file_key
-FROM
-	s3_package_inventory
-WHERE
-	store_app IS NOT NULL
-	AND version_code_id IS NOT NULL
-ORDER BY
-	store_app,
-	version_code_id,
-	CASE WHEN myregion = 'loki' THEN 0 ELSE 1 END ASC
+WITH s3_file_keys AS (
+    SELECT DISTINCT ON (store_app, version_code_id)
+        version_code_id,
+        myregion,
+        file_key
+    FROM
+        s3_package_inventory
+    WHERE
+        store_app IS NOT NULL
+        AND version_code_id IS NOT NULL
+    ORDER BY
+        store_app,
+        version_code_id,
+        CASE WHEN myregion = 'loki' THEN 0 ELSE 1 END ASC
 ),
 latest_version_codes AS (
     SELECT DISTINCT ON
@@ -21,12 +22,12 @@ latest_version_codes AS (
         sfk.myregion,
         sfk.file_key
     FROM
-        version_codes vc
-        JOIN s3_file_keys sfk ON vc.id = sfk.version_code_id
+        version_codes AS vc
+    INNER JOIN s3_file_keys AS sfk ON vc.id = sfk.version_code_id
     ORDER BY
         store_app ASC,
         created_at DESC
-        ),
+),
 last_scanned AS (
     SELECT DISTINCT ON
     (vc.store_app)
@@ -69,6 +70,7 @@ all_scheduled_to_run AS (
         sa.name,
         sa.store_id,
         lvc.version_code AS version_string,
+        lvc.id AS version_code_id,
         agm.total_installs AS installs,
         ls.run_at AS last_run_at,
         fr.failed_attempts,
@@ -97,6 +99,7 @@ user_requested_apps_crawl AS (
         sa.id AS store_app,
         sa.store_id,
         sa.name,
+        lsvc.id AS version_code_id,
         lsvc.version_code AS version_string,
         agm.total_installs AS installs,
         ls.run_at AS last_run_at,
@@ -132,6 +135,7 @@ SELECT
     store_id,
     name,
     version_string,
+    version_code_id,
     installs,
     last_run_at,
     failed_attempts,
@@ -146,6 +150,7 @@ SELECT
     store_id,
     name,
     version_string,
+    version_code_id,
     installs,
     last_run_at,
     failed_attempts,
