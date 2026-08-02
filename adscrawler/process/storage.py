@@ -468,7 +468,7 @@ def download_app_by_vc(
     else:
         raise ValueError(f"Invalid extension: {extension}")
     logger.info(f"{func_info} {key=} to local start")
-    s3_client = get_s3_client()
+    s3_client = get_s3_client(s3_config_key)
     with open(downloaded_file_path, "wb") as f:
         s3_client.download_fileobj(
             Bucket=CONFIG[s3_config_key]["bucket"],
