@@ -77,7 +77,7 @@ scheduled_apps_crawl AS (
         vc.id AS latest_version_code_db_id
     FROM
         store_apps_in_latest_rankings AS dc
-    RIGHT JOIN latest_version_codes AS vc
+    JOIN latest_version_codes AS vc
         ON
             dc.store_app = vc.store_app
     LEFT JOIN last_scan AS ls
@@ -88,7 +88,6 @@ scheduled_apps_crawl AS (
             dc.store_app = lsvc.store_app
     WHERE
         dc.store = :store
-        AND vc.download_result = 1
         AND
         (
             ls.scanned_at IS NULL
@@ -115,12 +114,6 @@ scheduled_apps_crawl AS (
             )
         )
     ORDER BY
-        (
-            CASE
-                WHEN vc.download_result IS NULL THEN 0
-                ELSE 1
-            END
-        ),
         greatest(
             coalesce(dc.installs, 0),
             coalesce(dc.rating_count::bigint, 0) * 50
