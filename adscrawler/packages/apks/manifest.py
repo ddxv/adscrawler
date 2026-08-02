@@ -169,9 +169,6 @@ def process_manifest(
     manifest_str = ""
 
     try:
-        store = 1
-        store_id = "com.elinter.app.solark"
-        specific_version_str = "118"
         apk_path, _version_str = download_app_to_local(
             store=store, store_id=store_id, version_str=specific_version_str
         )
