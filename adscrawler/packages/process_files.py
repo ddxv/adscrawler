@@ -162,9 +162,7 @@ def process_sdks(
     for _id, row in apps.iterrows():
         store_id = row.store_id
         store_app = row.store_app
-        version_str = None
-        if run_fixes:
-            version_str = row["version_code_str"]
+        version_str = row["version_code_str"]
         crawl_result = 3
         logger.info(f"SDK processing: {store_id=} start")
         try:
