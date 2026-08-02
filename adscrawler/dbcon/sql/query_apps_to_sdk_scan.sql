@@ -1,4 +1,3 @@
-
 WITH s3_file_keys AS (
 	SELECT
 		DISTINCT ON

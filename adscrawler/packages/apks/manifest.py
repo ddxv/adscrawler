@@ -12,7 +12,6 @@ from adscrawler.config import (
     get_logger,
 )
 from adscrawler.packages.utils import (
-    get_version,
     unzip_apk,
 )
 from adscrawler.process.storage import download_app_to_local
@@ -167,11 +166,10 @@ def process_manifest(
     crawl_result = 3
     logger.info(f"process_manifest {store_id=} start")
     details_df = pd.DataFrame()
-    version_str = None
     manifest_str = ""
 
     try:
-        apk_path, version_str = download_app_to_local(
+        apk_path, _version_str = download_app_to_local(
             store=store, store_id=store_id, version_str=specific_version_str
         )
         if apk_path is None:
@@ -182,8 +180,8 @@ def process_manifest(
         manifest_str, details_df = get_parsed_manifest(
             apk_tmp_decoded_output_path, store_id
         )
-        apktool_info_path = pathlib.Path(apk_tmp_decoded_output_path, "apktool.yml")
-        version_str = get_version(apktool_info_path)
+        # apktool_info_path = pathlib.Path(apk_tmp_decoded_output_path, "apktool.yml")
+        # version_str = get_version(apktool_info_path)
         crawl_result = 1
 
     except FileNotFoundError as e:
@@ -195,4 +193,4 @@ def process_manifest(
     except Exception as e:
         logger.exception(f"Unexpected error for {store_id=}: {str(e)}")
         crawl_result = 3  # Unexpected errors
-    return details_df, crawl_result, version_str, manifest_str
+    return details_df, crawl_result, manifest_str

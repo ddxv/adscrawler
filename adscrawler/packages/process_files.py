@@ -172,12 +172,12 @@ def process_sdks(
             raise
         try:
             if store == 1:
-                details_df, crawl_result, version_str, raw_txt_str = process_manifest(
+                details_df, crawl_result, raw_txt_str = process_manifest(
                     store_id=store_id, store=store, specific_version_str=version_str
                 )
             elif store == 2:
-                details_df, crawl_result, version_str, raw_txt_str = process_plist(
-                    store_id=store_id
+                details_df, crawl_result, raw_txt_str = process_plist(
+                    store_id=store_id, version_str=version_str
                 )
             else:
                 raise ValueError(f"Invalid store: {store}")

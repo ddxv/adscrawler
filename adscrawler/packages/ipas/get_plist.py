@@ -197,15 +197,16 @@ def special_files(tmp_decoded_output_path: pathlib.Path) -> pd.DataFrame:
 
 def process_plist(
     store_id: str,
+    version_str: str,
 ) -> tuple[pd.DataFrame, int, str, str]:
     store = 2
-    downloaded_file_path, version_str = download_app_to_local(
-        store=store, store_id=store_id
+    downloaded_file_path, _version_str = download_app_to_local(
+        store=store, store_id=store_id, version_str=version_str
     )
     tmp_decoded_output_path = unzip_ipa(
         ipa_path=downloaded_file_path, store_id=store_id
     )
-    version_str, plist_str, details_df = get_parsed_plist(
+    _parsed_version_str, plist_str, details_df = get_parsed_plist(
         tmp_decoded_output_path=tmp_decoded_output_path
     )
     crawl_result = 1
