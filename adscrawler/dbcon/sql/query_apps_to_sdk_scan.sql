@@ -21,7 +21,8 @@ WITH s3_file_keys AS (
 			ELSE 1
 		END ASC
 ),
-all_version_codes AS (	SELECT
+all_version_codes AS (
+	SELECT
         vc.id,
 		vc.store_app,
 		vc.version_code,
@@ -32,7 +33,6 @@ all_version_codes AS (	SELECT
 		version_codes vc
 	JOIN s3_file_keys sfk ON
 		vc.id = sfk.version_code_id
---	WHERE store_app = 580889
 ),
 latest_version_codes AS (
 	SELECT

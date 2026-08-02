@@ -24,7 +24,7 @@ latest_version_codes AS (
         version_codes
     ORDER BY
         store_app ASC,
-        created_at DESC,
+        created_at DESC
 ),
 latest_success_version_codes AS (
     SELECT DISTINCT ON

@@ -473,7 +473,7 @@ def download_app_by_vc(
     if not downloaded_file_path.exists():
         raise FileNotFoundError(f"{downloaded_file_path=} after download not found")
     final_path = move_downloaded_app_to_main_dir(downloaded_file_path)
-    logger.info(f"{func_info} to local finished")
+    logger.info(f"{func_info} end")
     return final_path
 
 
@@ -526,7 +526,7 @@ def download_app_by_store_id(
     if not downloaded_file_path.exists():
         raise FileNotFoundError(f"{downloaded_file_path=} after download not found")
     final_path = move_downloaded_app_to_main_dir(downloaded_file_path)
-    logger.info(f"{func_info} to local finished")
+    logger.info(f"{func_info} end")
     return final_path, final_version_str
 
 
@@ -556,7 +556,7 @@ def download_s3_app_by_key(
         final_path = move_downloaded_app_to_main_dir(local_path)
     else:
         final_path = local_path
-    logger.info(f"{func_info} to local finished")
+    logger.info(f"{func_info} end")
     return final_path
 
 
