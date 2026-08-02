@@ -210,4 +210,4 @@ def process_plist(
         tmp_decoded_output_path=tmp_decoded_output_path
     )
     crawl_result = 1
-    return details_df, crawl_result, version_str, plist_str
+    return details_df, crawl_result, plist_str
