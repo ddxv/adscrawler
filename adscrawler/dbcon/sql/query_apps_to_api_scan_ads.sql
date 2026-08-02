@@ -51,7 +51,7 @@ last_successful_scanned AS (
     LEFT JOIN version_codes AS vc
         ON vasr.version_code_id = vc.id
    WHERE 
-        vasr.run_result = 1
+        vasr.crawl_result = 1
     ORDER BY vc.store_app ASC, vasr.run_at DESC
 ),
 failed_runs AS (
@@ -60,7 +60,7 @@ failed_runs AS (
         count(*) AS failed_attempts
     FROM logging.version_code_api_scan_results
     WHERE
-        run_result != 1
+        crawl_result != 1
         AND updated_at >= current_date - interval '3 days'
     GROUP BY store_app
 ),
