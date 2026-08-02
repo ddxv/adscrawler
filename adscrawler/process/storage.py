@@ -359,8 +359,12 @@ def get_store_id_vc_apk_s3_keys(
 ) -> pd.DataFrame:
     if store == 1:
         prefix = f"apks/android/{store_id}/{version_str}"
+        if s3_config_key == "s3thirdgate":
+            prefix = f"android/{store_id}/{version_str}"
     elif store == 2:
         prefix = f"apks/ios/{store_id}/{version_str}"
+        if s3_config_key == "s3thirdgate":
+            prefix = f"ios/{store_id}/{version_str}"
     else:
         raise ValueError(f"Invalid store: {store}")
     logger.debug(f"S3 getting apk keys start {store_id=}")
