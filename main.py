@@ -609,7 +609,7 @@ class ProcessManager:
 
     def cleanup_apks(self) -> None:
         try:
-            run_cleanup()
+            run_cleanup(pgdb=self.pgcon)
         except Exception:
             logger.exception("APK cleanup failed")
 

@@ -15,9 +15,6 @@ from adscrawler.process.storage import (
 logger = get_logger(__name__)
 
 
-pgdb = get_db_connection()
-
-
 def get_s3_apk_paths(
     s3_client: str, bucket: str, prefix: str, my_cutoff_date: str
 ) -> pd.DataFrame:
@@ -56,18 +53,7 @@ def get_s3_apk_paths(
     return sdf
 
 
-def query_apps_to_check(limit: int = 100) -> pd.DataFrame:
-    query = f"""
-    SELECT * FROM version_codes 
-    LEFT JOIN store_apps
-    ON version_codes.store_app = store_apps.id
-    WHERE apk_hash IS NOT NULL
-    LIMIT {limit}
-    """
-    return pd.read_sql(query, pgdb.engine)
-
-
-def query_all_version_codes(store: int, my_cutoff_date: str) -> pd.DataFrame:
+def query_all_version_codes(pgdb, store: int, my_cutoff_date: str) -> pd.DataFrame:
     query = f"""
     SELECT vc.*, 
     sa.store_id 
@@ -104,59 +90,6 @@ def delete_s3_apks(bucket: str, apk_keys: list[str]) -> None:
             time.sleep(0.3)
 
 
-def query_version_codes_with_failed_scans(scan_cutoff_date: str) -> pd.DataFrame:
-    query = """WITH failed_api_scans AS (
-        SELECT DISTINCT ON (version_code_id)
-            version_code_id,
-            run_at,
-            COUNT(*) OVER (PARTITION BY version_code_id) AS failed_count
-        FROM version_code_api_scan_results r
-        WHERE NOT EXISTS (
-            SELECT 1
-            FROM api_calls ac LEFT JOIN version_code_api_scan_results vcasr ON ac.run_id = vcasr.id
-            WHERE version_code_id = r.id
-        )
-        ORDER BY version_code_id, run_at DESC 
-    ),
-    failed_sdk_scans AS (
-        SELECT DISTINCT ON (version_code_id)
-            version_code_id,
-            scanned_at,
-            COUNT(*) OVER (PARTITION BY version_code_id) AS failed_count
-        FROM version_code_sdk_scan_results r
-        WHERE NOT EXISTS (
-            SELECT 1
-            FROM version_code_sdk_scan_results
-            WHERE version_code_id = r.version_code_id
-              AND scan_result = 1
-        )
-        ORDER BY version_code_id, scanned_at DESC
-    )
-    SELECT
-        vc.*,
-        sa.store_id,
-        fas.version_code_id IS NOT NULL AS failed_api,
-        fas.run_at                       AS last_failed_api,
-        fas.failed_count                 AS failed_api_count,
-        fss.version_code_id IS NOT NULL AS failed_sdk,
-        fss.scanned_at                   AS last_failed_sdk,
-        fss.failed_count                 AS failed_sdk_count
-    FROM version_codes vc
-    LEFT JOIN failed_api_scans fas ON fas.version_code_id = vc.id
-    LEFT JOIN failed_sdk_scans fss ON fss.version_code_id = vc.id
-    LEFT JOIN store_apps sa ON vc.store_app = sa.id
-    WHERE
-        vc.crawl_result = 1
-        AND vc.created_at  < :scan_cutoff_date
-        AND vc.updated_at  < :scan_cutoff_date
-        AND (fas.version_code_id IS NOT NULL OR fss.version_code_id IS NOT NULL);
-        """
-    df = pd.read_sql(
-        text(query), pgdb.engine, params={"scan_cutoff_date": scan_cutoff_date}
-    )
-    return df
-
-
 def delete_copied_apks(tdf: pd.DataFrame, ldf: pd.DataFrame) -> None:
     ldf["store_id_count"] = ldf.groupby("store_id")["store_id"].transform("count")
     duplicated_ldf = (
@@ -178,7 +111,7 @@ def delete_copied_apks(tdf: pd.DataFrame, ldf: pd.DataFrame) -> None:
     return dupes_in_thirdgate_keys
 
 
-def file_cleanup(sdf: pd.DataFrame, vcdf: pd.DataFrame) -> None:
+def file_cleanup(pgdb, sdf: pd.DataFrame, vcdf: pd.DataFrame) -> None:
     """Aggressive Cleanup"""
     # In S3 but never recorded
     in_s3_unrecorded = (
@@ -244,47 +177,7 @@ def file_cleanup(sdf: pd.DataFrame, vcdf: pd.DataFrame) -> None:
     )
 
 
-def delete_failing_apps(
-    android_s3_files: pd.DataFrame, cutoff_date: str = "2026-04-01"
-) -> None:
-    """Delete APKs that have repeatedly failed API or SDK scans.
-
-    Parameters
-    ----------
-    android_s3_files : pd.DataFrame
-        Current S3 APK file listing
-    cutoff_date : str
-        Date string used to filter version_codes (older than this).
-    """
-    noscans = query_version_codes_with_failed_scans(scan_cutoff_date=cutoff_date)
-    noscans = noscans[
-        (noscans["failed_api"]) & (noscans["failed_api_count"] > 2)
-        | (noscans["failed_sdk"]) & (noscans["failed_sdk_count"] > 3)
-    ]
-    ndf = pd.merge(
-        noscans,
-        android_s3_files,
-        left_on=["store_id", "version_code"],
-        right_on=["store_id", "versionstr"],
-        how="inner",
-    )
-    failing_unzip = ndf["s3_key"].unique().tolist()
-    fdf = ndf[["id", "store_app", "crawl_result", "version_code", "created_at"]]
-    fdf["crawl_result"] = -2
-    logger.info(
-        f"{len(failing_unzip)} APKs with failed SDK scans and files in S3, likely failing to unzip or process manifest"
-    )
-    delete_s3_apks(bucket="adscrawler", apk_keys=failing_unzip)
-    upsert_df(
-        df=fdf,
-        table_name="version_codes",
-        key_columns=["id"],
-        insert_columns=["crawl_result", "store_app", "version_code"],
-        pgdb=pgdb,
-    )
-
-
-def run_cleanup() -> None:
+def run_cleanup(pgdb) -> None:
     """Main entry point: remove old / secondary APKs from S3 and reconcile the DB."""
     today_now = datetime.datetime.now(tz=datetime.UTC)
     aldf = get_s3_apk_paths(
@@ -342,8 +235,12 @@ def run_cleanup() -> None:
     ildf["myregion"] = "loki"
     aldf["myregion"] = "loki"
     df = pd.concat([itdf, atdf, ildf, aldf])
-    ios_version_codes = query_all_version_codes(store=2, my_cutoff_date=today_now)
-    android_version_codes = query_all_version_codes(store=1, my_cutoff_date=today_now)
+    ios_version_codes = query_all_version_codes(
+        pgdb=pgdb, store=2, my_cutoff_date=today_now
+    )
+    android_version_codes = query_all_version_codes(
+        pgdb=pgdb, store=1, my_cutoff_date=today_now
+    )
     version_codes = pd.concat([ios_version_codes, android_version_codes])
     # mdf = pd.merge(
     #     df,

@@ -25,7 +25,6 @@ from adscrawler.packages.utils import (
     remove_tmp_files,
 )
 from adscrawler.process.storage import (
-    get_store_id_apk_s3_keys,
     upload_apk_to_s3,
 )
 from adscrawler.process.version_details import write_version_details_to_s3
@@ -68,20 +67,6 @@ def download_apps(
         last_downloaded_version_code = row.last_downloaded_version_code
         s3_key = None
         download_result = None
-        try:
-            s3df = get_store_id_apk_s3_keys(store=store, store_id=store_id)
-            if not s3df.empty:
-                s3df = s3df[
-                    s3df["version_code"].notna() & ~(s3df["version_code"] == "failed")
-                ]
-            if s3df.empty:
-                raise FileNotFoundError(f"No S3 key found for {store_id=}")
-            if max(s3df["last_modified"]) < pd.Timestamp.now(tz="UTC") - pd.Timedelta(
-                days=1
-            ):
-                raise FileNotFoundError(f"S3 key for {store_id=} is old")
-        except FileNotFoundError:
-            pass
         try:
             if store == 1:
                 download_result = manage_apk_download(
