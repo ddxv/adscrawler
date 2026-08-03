@@ -1,7 +1,8 @@
+
 WITH
 s3_file_keys AS (
     SELECT * FROM public.s3_file_keys
-),
+),	
 latest_version_codes AS (
     SELECT DISTINCT ON
     (store_app)
@@ -26,15 +27,23 @@ latest_success_version_codes AS (
         vc.updated_at,
         vc.crawl_result
     FROM
-        version_codes AS vc
-    LEFT JOIN s3_file_keys AS sfk
-        ON
-            vc.id = sfk.version_code_id
-    WHERE
-        sfk.file_key IS NOT NULL
+        version_codes vc
+    INNER JOIN s3_file_keys AS sfk ON
+        vc.id = sfk.version_code_id
     ORDER BY
         store_app ASC,
-        created_at DESC
+        vc.created_at DESC
+),
+apps_last_downloaded AS (
+    SELECT
+        store_app,
+        max(updated_at) AS last_downloaded_at
+    FROM
+        logging.store_app_downloads sad
+    WHERE
+        crawl_result = 1
+    GROUP BY
+        store_app
 ),
 faily_downloads_monthly AS (
     SELECT
@@ -77,7 +86,7 @@ scheduled_apps_crawl AS (
         dc.installs,
         dc.rating_count,
         vc.updated_at AS last_download_attempt,
-        lsvc.created_at AS last_downloaded_at,
+        ald.last_downloaded_at,
         lsvc.version_code AS last_downloaded_version_code,
         coalesce(fd.attempt_count, 0) AS failed_attempts_month,
         coalesce(fdq.attempt_count, 0) AS failed_attempts_quarter
@@ -86,9 +95,10 @@ scheduled_apps_crawl AS (
     LEFT JOIN latest_version_codes AS vc
         ON
             dc.store_app = vc.store_app
-    LEFT JOIN latest_success_version_codes AS lsvc
+    LEFT JOIN apps_last_downloaded AS ald
         ON
-            dc.store_app = lsvc.store_app
+            dc.store_app = ald.store_app
+    LEFT JOIN latest_success_version_codes AS lsvc ON dc.store_app = lsvc.store_app
     LEFT JOIN faily_downloads_monthly AS fd
         ON
             vc.store_app = fd.store_app
@@ -107,10 +117,10 @@ scheduled_apps_crawl AS (
             (
                 (
                     -- never downloaded
-                    lsvc.created_at IS NULL
+                    ald.last_downloaded_at IS NULL
                     -- success not downloaded > x days and store recently updated
                     OR (
-                        lsvc.updated_at < current_date - interval '120 days'
+                        ald.last_downloaded_at < current_date - interval '120 days'
                         AND (
                             sa.store_last_updated
                             > current_date - interval '90 days'
@@ -121,8 +131,8 @@ scheduled_apps_crawl AS (
                 OR
                 -- Retry failing every couple days, including same x days from above
                 (
-                    lsvc.created_at IS NULL
-                    OR lsvc.created_at < current_date - interval '120 days'
+                    ald.last_downloaded_at IS NULL
+                    OR ald.last_downloaded_at < current_date - interval '120 days'
                     AND (
                         sa.store_last_updated
                         > current_date - interval '90 days'
@@ -148,7 +158,7 @@ user_requested_apps_crawl AS (
         agm.total_ratings AS rating_count,
         urs.created_at AS user_last_requested,
         lvc.updated_at AS last_download_attempt,
-        lsvc.created_at AS last_downloaded_at,
+        ald.last_downloaded_at,
         lsvc.version_code AS last_downloaded_version_code,
         coalesce(fd.attempt_count, 0) AS failed_attempts_month,
         coalesce(fdq.attempt_count, 0) AS failed_attempts_quarter
@@ -160,6 +170,7 @@ user_requested_apps_crawl AS (
     LEFT JOIN app_global_metrics_latest AS agm
         ON
             sa.id = agm.store_app
+    LEFT JOIN apps_last_downloaded AS ald ON sa.id = ald.store_app
     LEFT JOIN latest_success_version_codes AS lsvc
         ON
             sa.id = lsvc.store_app
@@ -174,8 +185,8 @@ user_requested_apps_crawl AS (
             sa.id = fdq.store_app
     WHERE
         (
-            lsvc.created_at < urs.created_at
-            OR lsvc.created_at IS NULL
+            ald.last_downloaded_at < urs.created_at
+            OR ald.last_downloaded_at IS NULL
         )
         AND (
             lvc.updated_at < now() - interval '1 hour'
@@ -295,4 +306,5 @@ SELECT
     last_downloaded_version_code,
     app_rank
 FROM
-    final_selection;
+    final_selection
+    ;
