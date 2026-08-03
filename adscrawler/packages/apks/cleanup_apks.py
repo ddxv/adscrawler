@@ -315,19 +315,6 @@ def run_cleanup() -> None:
     one_week_ago = today_now - datetime.timedelta(days=7)
     one_week_ago_str = one_week_ago.strftime("%Y-%m-%d")
 
-    aldf = get_s3_apk_paths(
-        s3_client="s3",
-        bucket="adscrawler",
-        prefix="apks/android",
-        my_cutoff_date=one_week_ago_str,
-    )
-    ildf = get_s3_apk_paths(
-        s3_client="s3",
-        bucket="adscrawler",
-        prefix="apks/ios",
-        my_cutoff_date=one_week_ago_str,
-    )
-
     aldf_old = aldf[aldf["last_modified"] < one_week_ago_str].copy()
     ildf_old = ildf[ildf["last_modified"] < one_week_ago_str].copy()
     today_str = datetime.datetime.now(tz=datetime.UTC).strftime("%Y-%m-%d")
