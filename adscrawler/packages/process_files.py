@@ -1,3 +1,4 @@
+import datetime
 import time
 
 import pandas as pd
@@ -5,6 +6,7 @@ import pandas as pd
 from adscrawler.config import get_logger
 from adscrawler.dbcon.connection import PostgresEngine
 from adscrawler.dbcon.queries import (
+    insert_s3_key_to_hot,
     insert_version_code,
     query_apps_to_download,
     query_apps_to_sdk_scan,
@@ -62,7 +64,10 @@ def download_apps(
     apps = apps.head(number_of_apps_to_pull)
     for _id, row in apps.iterrows():
         store_id = row.store_id
+        store_app = row.store_app
         last_downloaded_version_code = row.last_downloaded_version_code
+        s3_key = None
+        download_result = None
         try:
             s3df = get_store_id_apk_s3_keys(store=store, store_id=store_id)
             if not s3df.empty:
@@ -87,27 +92,43 @@ def download_apps(
                 download_result = manage_ipa_download(
                     store_id=store_id,
                 )
+            else:
+                raise ValueError(f"Invalid store: {store}")
             if (
                 download_result.downloaded_file_path
                 and download_result.crawl_result in [1, 3]
                 and download_result.md5_hash
             ):
-                upload_apk_to_s3(
-                    store,
-                    store_id,
-                    download_result.downloaded_file_path.suffix.replace(".", ""),
-                    download_result.md5_hash,
-                    download_result.version_str,
-                    download_result.downloaded_file_path,
+                s3_key = upload_apk_to_s3(
+                    store=store,
+                    store_id=store_id,
+                    extension=download_result.downloaded_file_path.suffix.replace(
+                        ".", ""
+                    ),
+                    md5_hash=download_result.md5_hash,
+                    version_str=download_result.version_str,
+                    file_path=download_result.downloaded_file_path,
                 )
+
                 move_downloaded_app_to_main_dir(download_result.downloaded_file_path)
-            insert_version_code(
+            version_code_db_id = insert_version_code(
                 version_str=download_result.version_str,
                 store_app=row.store_app,
                 crawl_result=download_result.crawl_result,
                 pgdb=pgdb,
                 apk_hash=download_result.md5_hash,
             )
+            if version_code_db_id and s3_key:
+                insert_s3_key_to_hot(
+                    myregion="loki",
+                    s3_key=s3_key,
+                    store_app=store_app,
+                    version_str=download_result.version_str,
+                    version_code_id=version_code_db_id,
+                    last_modified=datetime.datetime.now(datetime.UTC),
+                    pgdb=pgdb,
+                )
+
         except Exception:
             logger.exception(f"Download for {store_id} failed")
         remove_tmp_files(store_id=store_id)

@@ -609,6 +609,35 @@ def query_developers(
     return df
 
 
+def insert_s3_key_to_hot(
+    myregion: str,
+    s3_key: str,
+    store_app: int,
+    version_code_id: int,
+    version_str: str,
+    last_modified: datetime.datetime,
+    pgdb: PostgresEngine,
+) -> None:
+    cols = {
+        "myregion": myregion,
+        "store_app": store_app,
+        "version_code_id": version_code_id,
+        "versionstr": version_str,
+        "last_modified": last_modified,
+        "file_key": s3_key,
+    }
+    s3_key_df = pd.DataFrame([cols])
+    insert_cols = s3_key_df.columns.tolist()
+    upsert_df(
+        df=s3_key_df,
+        table_name="insert_s3_key_to_hot",
+        pgdb=pgdb,
+        key_columns=["myregion", "file_key"],
+        insert_columns=insert_cols,
+    )
+    logger.info(f"{store_app=} {version_str=} {s3_key=} inserted to db")
+
+
 def insert_version_code(
     version_str: str,
     store_app: int,
@@ -630,14 +659,17 @@ def insert_version_code(
         logger.error(f"{store_app=} {version_str=} {crawl_result=} {apk_hash=} {e=}")
         raise e
     insert_cols = version_code_df.columns.tolist()
-    upsert_df(
+    version_codes = upsert_df(
         df=version_code_df,
         table_name="version_codes",
         pgdb=pgdb,
         key_columns=["store_app", "version_code"],
         insert_columns=insert_cols,
+        return_rows=True,
     )
+    version_code_db_id = version_codes["id"].iloc[0]
     logger.info(f"{store_app=} {version_str=} inserted to db")
+    return version_code_db_id
 
 
 def log_download_crawl_results(df: pd.DataFrame, pgdb: PostgresEngine) -> None:

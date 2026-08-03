@@ -22,7 +22,9 @@ from adscrawler.config import (
     get_logger,
 )
 from adscrawler.dbcon.connection import PostgresEngine, start_ssh_tunnel
-from adscrawler.dbcon.queries import query_latest_api_scan_by_store_id
+from adscrawler.dbcon.queries import (
+    query_latest_api_scan_by_store_id,
+)
 from adscrawler.packages.utils import (
     get_local_file_path,
     move_downloaded_app_to_main_dir,
@@ -234,7 +236,9 @@ def upload_apk_to_s3(
     file_path: pathlib.Path,
 ) -> None:
     """Upload apk to s3."""
+    s3_config_key = "s3"
     app_prefix = f"{store_id}/{version_str}/{store_id}_{md5_hash}.{extension}"
+    bucket = CONFIG[s3_config_key]["bucket"]
     if store == 1:
         prefix = f"apks/android/{app_prefix}"
     elif store == 2:
@@ -246,17 +250,20 @@ def upload_apk_to_s3(
         "version_code": version_str,
         "md5": md5_hash,
     }
-    s3_client = get_s3_client()
+    s3_client = get_s3_client(s3_config_key)
     response = s3_client.put_object(
-        Bucket=CONFIG["s3"]["bucket"],
+        Bucket=bucket,
         Key=prefix,
         Body=file_path.read_bytes(),
         Metadata=metadata,
     )
     if response["ResponseMetadata"]["HTTPStatusCode"] == 200:
-        logger.info(f"S3 uploaded apk={store_id}")
+        logger.info(f"S3 uploaded apk={store_id} prefix={prefix}")
     else:
-        logger.error(f"S3 upload failed apk={store_id}")
+        logger.error(f"S3 upload failed apk={store_id} prefix={prefix}")
+        return None
+    s3_key = f"s3://{bucket}/{prefix}"
+    return s3_key
 
 
 def get_downloaded_mitm_files(pgdb: PostgresEngine) -> pd.DataFrame:
