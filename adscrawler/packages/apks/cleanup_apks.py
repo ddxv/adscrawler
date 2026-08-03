@@ -85,7 +85,7 @@ def delete_s3_apks(bucket: str, apk_keys: list[str]) -> None:
     """Delete all S3 objects with the given prefix."""
     s3 = get_s3_client()
     keys = [k.replace(f"s3://{bucket}/", "") for k in apk_keys]
-    chunk_size = 1000
+    chunk_size = 100
     for i in range(0, len(keys), chunk_size):
         chunk = keys[i : i + chunk_size]
         logger.info(f"Deleting {len(chunk)} objects (batch {i // chunk_size + 1})")
