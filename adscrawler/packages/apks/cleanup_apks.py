@@ -330,25 +330,16 @@ def run_cleanup() -> None:
     itdf_old = itdf[itdf["last_modified"] < today_str].copy()
 
     # DELETE FROM S3: LOKI
-    al_deleted = delete_copied_apks(ldf=aldf_old, tdf=atdf_old)
-    il_deleted = delete_copied_apks(ldf=ildf_old, tdf=itdf_old)
-
-    aldf = aldf[~(aldf["s3_key"].isin(al_deleted))]
-    ildf = ildf[~(ildf["s3_key"].isin(il_deleted))]
-
-    # --- Step 2: re-list after deletions, then reconcile with DB ---
-    # android_s3_files = get_s3_apk_paths(
-    #     s3_client="s3",
-    #     bucket="adscrawler",
-    #     prefix="apks/android",
-    #     my_cutoff_date=one_week_ago_str,
-    # )
-    # ios_s3_files = get_s3_apk_paths(
-    #     s3_client="s3",
-    #     bucket="adscrawler",
-    #     prefix="apks/ios",
-    #     my_cutoff_date=one_week_ago_str,
-    # )
+    try:
+        al_deleted = delete_copied_apks(ldf=aldf_old, tdf=atdf_old)
+        aldf = aldf[~(aldf["s3_key"].isin(al_deleted))]
+    except Exception as e:
+        logger.error(f"Error deleting copied APKs: {e}")
+    try:
+        il_deleted = delete_copied_apks(ldf=ildf_old, tdf=itdf_old)
+        ildf = ildf[~(ildf["s3_key"].isin(il_deleted))]
+    except Exception as e:
+        logger.error(f"Error deleting copied APKs: {e}")
 
     # android_db_files = query_all_version_codes(store=1, my_cutoff_date=one_week_ago_str)
     # ios_db_files = query_all_version_codes(store=2, my_cutoff_date=one_week_ago_str)
