@@ -85,6 +85,11 @@ def delete_s3_apks(bucket: str, apk_keys: list[str]) -> None:
     """Delete all S3 objects with the given prefix."""
     s3 = get_s3_client()
     keys = [k.replace(f"s3://{bucket}/", "") for k in apk_keys]
+    too_short_keys = [k for k in keys if len(k) < 20]
+    if too_short_keys:
+        raise ValueError(
+            f"Some keys are too short to safely delete: {too_short_keys}. Aborting."
+        )
     chunk_size = 500
     for i in range(0, len(keys), chunk_size):
         chunk = keys[i : i + chunk_size]
