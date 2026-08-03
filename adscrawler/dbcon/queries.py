@@ -630,7 +630,7 @@ def insert_s3_key_to_hot(
     insert_cols = s3_key_df.columns.tolist()
     upsert_df(
         df=s3_key_df,
-        table_name="insert_s3_key_to_hot",
+        table_name="s3_package_inventory_hot",
         pgdb=pgdb,
         key_columns=["myregion", "file_key"],
         insert_columns=insert_cols,

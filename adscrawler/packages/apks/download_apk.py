@@ -298,6 +298,7 @@ def external_download(
     """
     for source in APK_SOURCES:
         func_info = f"download {store_id=} {source=}"
+        logger.info(f"{func_info} start")
         try:
             if source == "gplaydl":
                 apk_filepath = gplaydl_download(store_id, last_downloaded_version_code)
