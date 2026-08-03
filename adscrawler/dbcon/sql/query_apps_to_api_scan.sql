@@ -1,17 +1,5 @@
 WITH s3_file_keys AS (
-    SELECT DISTINCT ON (store_app, version_code_id)
-        version_code_id,
-        myregion,
-        file_key
-    FROM
-        s3_package_inventory
-    WHERE
-        store_app IS NOT NULL
-        AND version_code_id IS NOT NULL
-    ORDER BY
-        store_app,
-        version_code_id,
-        CASE WHEN myregion = 'loki' THEN 0 ELSE 1 END ASC
+    SELECT * FROM public.s3_file_keys
 ),
 latest_version_codes AS (
     SELECT DISTINCT ON
