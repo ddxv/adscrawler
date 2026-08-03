@@ -17,8 +17,8 @@ WITH latest_version_codes AS (
         >= '2025-01-01 00:00:00'::timestamp without time zone
         AND vc_1.created_at < :start_of_next_period
     ORDER BY
-        vc_1.store_app,
-        vc_1.created_at desc
+        vc_1.store_app ASC,
+        vc_1.created_at DESC
 ),
 api_based_companies AS (
     SELECT DISTINCT
@@ -36,7 +36,7 @@ sdk_based_companies AS (
         sasd.store_app,
         c_1.domain_id
     FROM adtech.app_sdks AS sasd
-    INNER JOIN latest_version_codes lvc ON sasd.version_code_id = lvc.id
+    INNER JOIN latest_version_codes AS lvc ON sasd.version_code_id = lvc.id
     LEFT JOIN adtech.sdks AS sd ON sasd.sdk_id = sd.id
     LEFT JOIN adtech.companies AS c_1 ON sd.company_id = c_1.id
 ),
@@ -104,5 +104,4 @@ SELECT
     bool_or(cs.tag_source = 'app_ads_direct'::text) AS app_ads_direct,
     bool_or(cs.tag_source = 'app_ads_reseller'::text) AS app_ads_reseller
 FROM combined_sources AS cs
-GROUP BY cs.domain_id, cs.store_app
-;
+GROUP BY cs.domain_id, cs.store_app;

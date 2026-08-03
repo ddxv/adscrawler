@@ -92,16 +92,20 @@ def atomic_swap_partition(
 
         with conn.transaction():
             cur.execute(sql.SQL("DROP TABLE IF EXISTS {};").format(id_staging))
-            cur.execute(sql.SQL("""
+            cur.execute(
+                sql.SQL("""
                     CREATE TABLE {} (
                         LIKE {}.{} INCLUDING DEFAULTS INCLUDING STORAGE
                     );
-                """).format(id_staging, id_schema, id_parent))
+                """).format(id_staging, id_schema, id_parent)
+            )
 
-            cur.execute(sql.SQL("""
+            cur.execute(
+                sql.SQL("""
                     ALTER TABLE {} ADD CONSTRAINT {} 
                     CHECK (batch_date = {})
-                """).format(id_staging, id_constraint, sql.Literal(batch_date)))
+                """).format(id_staging, id_constraint, sql.Literal(batch_date))
+            )
 
             logger.info("Bulk copying %s rows with FREEZE optimization...", len(df))
             _copy_df_to_table_freeze(df, id_staging, cur)
@@ -203,16 +207,20 @@ def atomic_swap_partition_stream(
 
         with conn.transaction():
             cur.execute(sql.SQL("DROP TABLE IF EXISTS {};").format(id_staging))
-            cur.execute(sql.SQL("""
+            cur.execute(
+                sql.SQL("""
                     CREATE TABLE {} (
                         LIKE {}.{} INCLUDING DEFAULTS INCLUDING STORAGE
                     );
-                """).format(id_staging, id_schema, id_parent))
+                """).format(id_staging, id_schema, id_parent)
+            )
 
-            cur.execute(sql.SQL("""
+            cur.execute(
+                sql.SQL("""
                     ALTER TABLE {} ADD CONSTRAINT {} 
                     CHECK (batch_date = {})
-                """).format(id_staging, id_constraint, sql.Literal(batch_date)))
+                """).format(id_staging, id_constraint, sql.Literal(batch_date))
+            )
 
             logger.info("Streaming bulk COPY into staging with FREEZE optimization...")
             _copy_stream_to_table_freeze(stream, columns, id_staging, cur)
@@ -246,10 +254,12 @@ def atomic_swap_partition_stream(
                     )
                 )
 
-            cur.execute(sql.SQL("""
+            cur.execute(
+                sql.SQL("""
                     ALTER TABLE {}.{} ATTACH PARTITION {} 
                     FOR VALUES IN ({})
-                """).format(id_schema, id_parent, id_staging, sql.Literal(batch_date)))
+                """).format(id_schema, id_parent, id_staging, sql.Literal(batch_date))
+            )
 
             logger.info("Cutover transaction committed successfully.")
 

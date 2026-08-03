@@ -1,7 +1,7 @@
 """Process app icons — resize, upload to S3, and update missing variants."""
 
-import pathlib
 import os
+import pathlib
 import struct
 import time
 import zlib

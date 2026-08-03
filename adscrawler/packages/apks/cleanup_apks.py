@@ -5,12 +5,12 @@ import pandas as pd
 from sqlalchemy import text
 
 from adscrawler.config import get_logger
-from adscrawler.dbcon.connection import get_db_connection, PostgresEngine
+from adscrawler.dbcon.atomic_swap import atomic_swap_partition
+from adscrawler.dbcon.connection import get_db_connection
 from adscrawler.dbcon.queries import upsert_df
 from adscrawler.process.storage import (
     get_s3_client,
 )
-from adscrawler.dbcon.atomic_swap import atomic_swap_partition
 
 logger = get_logger(__name__)
 
@@ -297,13 +297,13 @@ def run_cleanup() -> None:
     atdf = get_s3_apk_paths(
         s3_client="s3thirdgate",
         bucket="apks",
-        prefix=f"android",
+        prefix="android",
         my_cutoff_date=today_now,
     )
     itdf = get_s3_apk_paths(
         s3_client="s3thirdgate",
         bucket="apks",
-        prefix=f"ios",
+        prefix="ios",
         my_cutoff_date=today_now,
     )
 
@@ -409,5 +409,4 @@ def run_cleanup() -> None:
 
 
 if __name__ == "__main__":
-
     run_cleanup()

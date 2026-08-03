@@ -693,7 +693,7 @@ def map_version_details(pgdb) -> None:
     """
 
     start_time = time.time()
-    logger.info(f"Starting map_version_details entrypoint run for past days")
+    logger.info("Starting map_version_details entrypoint run for past days")
 
     ### TODO: THIS IS A LOOP, not related to rest of flow?
     for day in range(1, 4):
