@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict UkaBjfxrd5jdamuDXx2gBLhjGOSd0ImHYQTg0YmCDIAUN6PBb342BT4IibeWok4
+\restrict bJWrF3PqBkF8DAmnTydCFJW7uhW3JlDn9xqhGNxkDMnLH4djt9yff4oz0sPzdWg
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -77,8 +77,36 @@ CREATE MATERIALIZED VIEW frontend.advertiser_creatives AS
 ALTER MATERIALIZED VIEW frontend.advertiser_creatives OWNER TO postgres;
 
 --
+-- Name: idx_adv_creatives_ad_domain; Type: INDEX; Schema: frontend; Owner: postgres
+--
+
+CREATE INDEX idx_adv_creatives_ad_domain ON frontend.advertiser_creatives USING btree (ad_domain);
+
+
+--
+-- Name: idx_adv_creatives_ad_domain_company_domain; Type: INDEX; Schema: frontend; Owner: postgres
+--
+
+CREATE INDEX idx_adv_creatives_ad_domain_company_domain ON frontend.advertiser_creatives USING btree (ad_domain_company_domain);
+
+
+--
+-- Name: idx_adv_creatives_host_domain; Type: INDEX; Schema: frontend; Owner: postgres
+--
+
+CREATE INDEX idx_adv_creatives_host_domain ON frontend.advertiser_creatives USING btree (host_domain);
+
+
+--
+-- Name: idx_adv_creatives_host_domain_company_domain; Type: INDEX; Schema: frontend; Owner: postgres
+--
+
+CREATE INDEX idx_adv_creatives_host_domain_company_domain ON frontend.advertiser_creatives USING btree (host_domain_company_domain);
+
+
+--
 -- PostgreSQL database dump complete
 --
 
-\unrestrict UkaBjfxrd5jdamuDXx2gBLhjGOSd0ImHYQTg0YmCDIAUN6PBb342BT4IibeWok4
+\unrestrict bJWrF3PqBkF8DAmnTydCFJW7uhW3JlDn9xqhGNxkDMnLH4djt9yff4oz0sPzdWg
 

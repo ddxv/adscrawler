@@ -638,10 +638,10 @@ class ProcessManager:
         logger.info(f"Error messages: {error_messages}")
 
     def refresh_metadata(self) -> None:
-        refresh_metadata(missing_only=True)
+        refresh_metadata(pgdb=self.pgcon, missing_only=True)
 
     def refresh_metadata_all(self) -> None:
-        refresh_metadata(missing_only=False)
+        refresh_metadata(pgdb=self.pgcon, missing_only=False)
 
     def waydroid_mitm(self) -> None:
         from adscrawler.packages.apks.waydroid import (  # noqa: PLC0415

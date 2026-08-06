@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 4pCElyI1hg5m32VEphNl95cVcKRL1ozdNYZphvIzzlcLGgfp2F7fNUDWfO2u4b1
+\restrict mWRHrETlspVUw2gVMrBgt7Tjjv2lBVm54bI2JnvPltepJ8eeXstUbcDgCufRUcD
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -35,7 +35,6 @@ CREATE TABLE public.store_app_z_scores_history_2026 (
     app_name text,
     in_app_purchases boolean,
     ad_supported boolean,
-    icon_url_100 text,
     target_week_installs bigint,
     baseline_installs double precision,
     baseline_installs_pct double precision,
@@ -46,7 +45,10 @@ CREATE TABLE public.store_app_z_scores_history_2026 (
     wow_growth_pct double precision,
     two_week_growth_pct double precision,
     momentum_pct double precision,
-    has_reliable_baseline boolean
+    has_reliable_baseline boolean,
+    target_week_mau bigint,
+    target_week_iap_revenue double precision,
+    target_week_ad_revenue double precision
 );
 
 
@@ -56,5 +58,5 @@ ALTER TABLE public.store_app_z_scores_history_2026 OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 4pCElyI1hg5m32VEphNl95cVcKRL1ozdNYZphvIzzlcLGgfp2F7fNUDWfO2u4b1
+\unrestrict mWRHrETlspVUw2gVMrBgt7Tjjv2lBVm54bI2JnvPltepJ8eeXstUbcDgCufRUcD
 

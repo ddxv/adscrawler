@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict eZpQ19twIjP8lpq6fOaEHIHJpeexV2aZTHqqRmAgByyei0tlXLazC6r3gnryAg4
+\restrict DZVtE28DxuzetTFfUtzB7RbHYUmo3A6TWCs6YQhNlfNih1aWUPbb3ZdJEMz6w9I
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -418,6 +418,144 @@ ALTER SEQUENCE adtech.api_call_urls_id_seq OWNER TO postgres;
 
 ALTER SEQUENCE adtech.api_call_urls_id_seq OWNED BY adtech.api_call_urls.id;
 
+
+--
+-- Name: app_sdks; Type: TABLE; Schema: adtech; Owner: postgres
+--
+
+CREATE TABLE adtech.app_sdks (
+    store_app integer NOT NULL,
+    version_code_id integer NOT NULL,
+    sdk_id integer NOT NULL,
+    version_code_created_at timestamp without time zone NOT NULL,
+    batch_date date NOT NULL
+)
+PARTITION BY LIST (batch_date);
+
+
+ALTER TABLE adtech.app_sdks OWNER TO postgres;
+
+--
+-- Name: app_sdk_changes; Type: MATERIALIZED VIEW; Schema: adtech; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW adtech.app_sdk_changes AS
+ WITH app_versions AS (
+         SELECT DISTINCT app_sdks.store_app,
+            app_sdks.version_code_id,
+            app_sdks.version_code_created_at
+           FROM adtech.app_sdks
+        ), version_chain AS (
+         SELECT app_versions.store_app,
+            app_versions.version_code_id,
+            app_versions.version_code_created_at,
+            lag(app_versions.version_code_id) OVER w_app AS prev_version_code_id,
+            lead(app_versions.version_code_id) OVER w_app AS next_version_code_id,
+            min(app_versions.version_code_created_at) OVER (PARTITION BY app_versions.store_app) AS first_app_version_date
+           FROM app_versions
+          WINDOW w_app AS (PARTITION BY app_versions.store_app ORDER BY app_versions.version_code_created_at, app_versions.version_code_id)
+        ), sdk_lifecycle AS (
+         SELECT s.store_app,
+            s.sdk_id,
+            s.version_code_id,
+            s.version_code_created_at,
+            vc.next_version_code_id,
+            lag(s.version_code_id) OVER w_sdk AS prev_sdk_version_code_id,
+                CASE
+                    WHEN (s.version_code_created_at = vc.first_app_version_date) THEN true
+                    ELSE false
+                END AS is_first_app_version
+           FROM (adtech.app_sdks s
+             JOIN version_chain vc ON (((s.store_app = vc.store_app) AND (s.version_code_id = vc.version_code_id))))
+          WINDOW w_sdk AS (PARTITION BY s.store_app, s.sdk_id ORDER BY s.version_code_created_at, s.version_code_id)
+        ), added_events AS (
+         SELECT sdk_lifecycle.store_app,
+            sdk_lifecycle.sdk_id,
+            sdk_lifecycle.version_code_id,
+            sdk_lifecycle.version_code_created_at,
+                CASE
+                    WHEN ((sdk_lifecycle.prev_sdk_version_code_id IS NULL) AND sdk_lifecycle.is_first_app_version) THEN 'added_initial'::text
+                    WHEN ((sdk_lifecycle.prev_sdk_version_code_id IS NULL) OR (sdk_lifecycle.prev_sdk_version_code_id <> lag(sdk_lifecycle.version_code_id) OVER (PARTITION BY sdk_lifecycle.store_app, sdk_lifecycle.sdk_id ORDER BY sdk_lifecycle.version_code_created_at))) THEN 'added'::text
+                    ELSE NULL::text
+                END AS status
+           FROM sdk_lifecycle
+        ), removed_events AS (
+         SELECT s.store_app,
+            s.sdk_id,
+            vc.next_version_code_id AS version_code_id,
+            vc_next.version_code_created_at,
+            'removed'::text AS status
+           FROM (((sdk_lifecycle s
+             JOIN version_chain vc ON (((s.store_app = vc.store_app) AND (s.version_code_id = vc.version_code_id))))
+             JOIN version_chain vc_next ON (((vc.store_app = vc_next.store_app) AND (vc.next_version_code_id = vc_next.version_code_id))))
+             LEFT JOIN adtech.app_sdks next_sdk ON (((s.store_app = next_sdk.store_app) AND (s.sdk_id = next_sdk.sdk_id) AND (vc.next_version_code_id = next_sdk.version_code_id))))
+          WHERE ((vc.next_version_code_id IS NOT NULL) AND (next_sdk.sdk_id IS NULL))
+        )
+ SELECT added_events.store_app,
+    added_events.sdk_id,
+    added_events.version_code_id,
+    added_events.version_code_created_at,
+    added_events.status
+   FROM added_events
+  WHERE (added_events.status IS NOT NULL)
+UNION ALL
+ SELECT removed_events.store_app,
+    removed_events.sdk_id,
+    removed_events.version_code_id,
+    removed_events.version_code_created_at,
+    removed_events.status
+   FROM removed_events
+  ORDER BY 1, 4, 2
+  WITH NO DATA;
+
+
+ALTER MATERIALIZED VIEW adtech.app_sdk_changes OWNER TO postgres;
+
+--
+-- Name: app_sdk_strings; Type: TABLE; Schema: adtech; Owner: postgres
+--
+
+CREATE TABLE adtech.app_sdk_strings (
+    store_app integer NOT NULL,
+    string_id integer NOT NULL,
+    sdk_id integer,
+    batch_date date NOT NULL
+)
+PARTITION BY LIST (batch_date);
+
+
+ALTER TABLE adtech.app_sdk_strings OWNER TO postgres;
+
+--
+-- Name: app_sdk_strings_20260803; Type: TABLE; Schema: adtech; Owner: postgres
+--
+
+CREATE TABLE adtech.app_sdk_strings_20260803 (
+    store_app integer CONSTRAINT app_sdk_strings_store_app_not_null NOT NULL,
+    string_id integer CONSTRAINT app_sdk_strings_string_id_not_null NOT NULL,
+    sdk_id integer,
+    batch_date date CONSTRAINT app_sdk_strings_batch_date_not_null NOT NULL,
+    CONSTRAINT app_sdk_strings_20260803_batch_date_check CHECK ((batch_date = '2026-08-03'::date))
+);
+
+
+ALTER TABLE adtech.app_sdk_strings_20260803 OWNER TO postgres;
+
+--
+-- Name: app_sdks_20260803; Type: TABLE; Schema: adtech; Owner: postgres
+--
+
+CREATE TABLE adtech.app_sdks_20260803 (
+    store_app integer CONSTRAINT app_sdks_store_app_not_null NOT NULL,
+    version_code_id integer CONSTRAINT app_sdks_version_code_id_not_null NOT NULL,
+    sdk_id integer CONSTRAINT app_sdks_sdk_id_not_null NOT NULL,
+    version_code_created_at timestamp without time zone CONSTRAINT app_sdks_version_code_created_at_not_null NOT NULL,
+    batch_date date CONSTRAINT app_sdks_batch_date_not_null NOT NULL,
+    CONSTRAINT app_sdks_20260803_batch_date_check CHECK ((batch_date = '2026-08-03'::date))
+);
+
+
+ALTER TABLE adtech.app_sdks_20260803 OWNER TO postgres;
 
 --
 -- Name: categories; Type: TABLE; Schema: adtech; Owner: postgres
@@ -1594,10 +1732,10 @@ PARTITION BY LIST (batch_date);
 ALTER TABLE adtech.domain_app_changes_quarterly OWNER TO postgres;
 
 --
--- Name: domain_app_changes_quarterly_20260719; Type: TABLE; Schema: adtech; Owner: postgres
+-- Name: domain_app_changes_quarterly_20260801; Type: TABLE; Schema: adtech; Owner: postgres
 --
 
-CREATE TABLE adtech.domain_app_changes_quarterly_20260719 (
+CREATE TABLE adtech.domain_app_changes_quarterly_20260801 (
     domain_id integer,
     store_app integer,
     tag_source text,
@@ -1605,11 +1743,88 @@ CREATE TABLE adtech.domain_app_changes_quarterly_20260719 (
     quarter smallint,
     status text,
     batch_date date CONSTRAINT domain_app_changes_quarterly_batch_date_not_null NOT NULL,
-    CONSTRAINT domain_app_changes_quarterly_20260719_batch_date_check CHECK ((batch_date = '2026-07-19'::date))
+    CONSTRAINT domain_app_changes_quarterly_20260801_batch_date_check CHECK ((batch_date = '2026-08-01'::date))
 );
 
 
-ALTER TABLE adtech.domain_app_changes_quarterly_20260719 OWNER TO postgres;
+ALTER TABLE adtech.domain_app_changes_quarterly_20260801 OWNER TO postgres;
+
+--
+-- Name: eg_comb_2026_02; Type: MATERIALIZED VIEW; Schema: adtech; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW adtech.eg_comb_2026_02 AS
+ WITH latest_version_codes AS (
+         SELECT DISTINCT ON (vc_1.store_app) vc_1.id,
+            vc_1.store_app,
+            vc_1.version_code,
+            vc_1.updated_at,
+            vc_1.crawl_result
+           FROM (public.version_codes vc_1
+             JOIN public.version_code_sdk_scan_results vcssr ON ((vc_1.id = vcssr.version_code_id)))
+          WHERE ((vcssr.scan_result = 1) AND (vc_1.created_at >= '2025-01-01 00:00:00'::timestamp without time zone) AND (vc_1.created_at < '2026-07-01 00:00:00'::timestamp without time zone))
+          ORDER BY vc_1.store_app, vc_1.created_at DESC
+        ), api_based_companies AS (
+         SELECT DISTINCT ac.store_app,
+            ad_1.id AS domain_id
+           FROM (public.api_calls ac
+             LEFT JOIN public.domains ad_1 ON ((ac.tld_url = (ad_1.domain_name)::text)))
+          WHERE ((ac.called_at >= '2025-01-01 00:00:00'::timestamp without time zone) AND (ac.called_at < '2026-07-01 00:00:00'::timestamp without time zone) AND (ad_1.id IS NOT NULL))
+        ), sdk_based_companies AS (
+         SELECT DISTINCT sasd.store_app,
+            c_1.domain_id
+           FROM (((adtech.app_sdks sasd
+             JOIN latest_version_codes lvc ON ((sasd.version_code_id = lvc.id)))
+             LEFT JOIN adtech.sdks sd ON ((sasd.sdk_id = sd.id)))
+             LEFT JOIN adtech.companies c_1 ON ((sd.company_id = c_1.id)))
+        ), distinct_ad_and_pub_domains AS (
+         SELECT DISTINCT aam.pub_domain AS publisher_domain_id,
+            aae.ad_domain AS ad_domain_id,
+            aae.relationship
+           FROM (((public.app_ads_entrys aae
+             LEFT JOIN public.app_ads_map aam ON ((aae.id = aam.app_ads_entry)))
+             LEFT JOIN public.domains pd ON ((aam.pub_domain = pd.id)))
+             LEFT JOIN public.adstxt_crawl_results acc ON ((pd.id = acc.domain_id)))
+          WHERE ((acc.crawled_at >= '2026-04-01 00:00:00'::timestamp without time zone) AND (acc.created_at < '2026-07-01 00:00:00'::timestamp without time zone) AND ((acc.crawled_at - aam.updated_at) < '01:00:00'::interval) AND (aae.updated_at >= '2026-04-01 00:00:00'::timestamp without time zone) AND (aae.created_at < '2026-07-01 00:00:00'::timestamp without time zone))
+        ), adstxt_based_companies AS (
+         SELECT DISTINCT aum.store_app,
+            pnv.ad_domain_id AS domain_id,
+                CASE
+                    WHEN ((pnv.relationship)::text = 'DIRECT'::text) THEN 'app_ads_direct'::text
+                    ELSE 'app_ads_reseller'::text
+                END AS tag_source
+           FROM ((public.app_urls_map aum
+             LEFT JOIN public.domains pd ON ((aum.pub_domain = pd.id)))
+             LEFT JOIN distinct_ad_and_pub_domains pnv ON ((pd.id = pnv.publisher_domain_id)))
+          WHERE ((pnv.ad_domain_id IS NOT NULL) AND (aum.updated_at >= '2026-04-01 00:00:00'::timestamp without time zone) AND (aum.created_at < '2026-07-01 00:00:00'::timestamp without time zone))
+        ), combined_sources AS (
+         SELECT abc.domain_id,
+            abc.store_app,
+            'api_call'::text AS tag_source
+           FROM api_based_companies abc
+        UNION ALL
+         SELECT sbc.domain_id,
+            sbc.store_app,
+            'sdk'::text AS tag_source
+           FROM sdk_based_companies sbc
+        UNION ALL
+         SELECT atbc.domain_id,
+            atbc.store_app,
+            atbc.tag_source
+           FROM adstxt_based_companies atbc
+        )
+ SELECT domain_id,
+    store_app,
+    bool_or((tag_source = 'sdk'::text)) AS sdk,
+    bool_or((tag_source = 'api_call'::text)) AS api_call,
+    bool_or((tag_source = 'app_ads_direct'::text)) AS app_ads_direct,
+    bool_or((tag_source = 'app_ads_reseller'::text)) AS app_ads_reseller
+   FROM combined_sources cs
+  GROUP BY domain_id, store_app
+  WITH NO DATA;
+
+
+ALTER MATERIALIZED VIEW adtech.eg_comb_2026_02 OWNER TO postgres;
 
 --
 -- Name: sdk_packages_id_seq; Type: SEQUENCE; Schema: adtech; Owner: postgres
@@ -1718,10 +1933,10 @@ PARTITION BY LIST (batch_date);
 ALTER TABLE adtech.trend_companies OWNER TO postgres;
 
 --
--- Name: trend_companies_20260719; Type: TABLE; Schema: adtech; Owner: postgres
+-- Name: trend_companies_20260801; Type: TABLE; Schema: adtech; Owner: postgres
 --
 
-CREATE TABLE adtech.trend_companies_20260719 (
+CREATE TABLE adtech.trend_companies_20260801 (
     company_domain character varying,
     year smallint,
     quarter smallint,
@@ -1735,11 +1950,11 @@ CREATE TABLE adtech.trend_companies_20260719 (
     pct_apps_added numeric,
     pct_apps_lost numeric,
     batch_date date CONSTRAINT trend_companies_batch_date_not_null NOT NULL,
-    CONSTRAINT trend_companies_20260719_batch_date_check CHECK ((batch_date = '2026-07-19'::date))
+    CONSTRAINT trend_companies_20260801_batch_date_check CHECK ((batch_date = '2026-08-01'::date))
 );
 
 
-ALTER TABLE adtech.trend_companies_20260719 OWNER TO postgres;
+ALTER TABLE adtech.trend_companies_20260801 OWNER TO postgres;
 
 --
 -- Name: trend_domains; Type: TABLE; Schema: adtech; Owner: postgres
@@ -1766,10 +1981,10 @@ PARTITION BY LIST (batch_date);
 ALTER TABLE adtech.trend_domains OWNER TO postgres;
 
 --
--- Name: trend_domains_20260719; Type: TABLE; Schema: adtech; Owner: postgres
+-- Name: trend_domains_20260801; Type: TABLE; Schema: adtech; Owner: postgres
 --
 
-CREATE TABLE adtech.trend_domains_20260719 (
+CREATE TABLE adtech.trend_domains_20260801 (
     domain_name character varying,
     year smallint,
     quarter smallint,
@@ -1783,11 +1998,11 @@ CREATE TABLE adtech.trend_domains_20260719 (
     pct_apps_added numeric,
     pct_apps_lost numeric,
     batch_date date CONSTRAINT trend_domains_batch_date_not_null NOT NULL,
-    CONSTRAINT trend_domains_20260719_batch_date_check CHECK ((batch_date = '2026-07-19'::date))
+    CONSTRAINT trend_domains_20260801_batch_date_check CHECK ((batch_date = '2026-08-01'::date))
 );
 
 
-ALTER TABLE adtech.trend_domains_20260719 OWNER TO postgres;
+ALTER TABLE adtech.trend_domains_20260801 OWNER TO postgres;
 
 --
 -- Name: trend_parent_companies; Type: TABLE; Schema: adtech; Owner: postgres
@@ -1814,10 +2029,10 @@ PARTITION BY LIST (batch_date);
 ALTER TABLE adtech.trend_parent_companies OWNER TO postgres;
 
 --
--- Name: trend_parent_companies_20260719; Type: TABLE; Schema: adtech; Owner: postgres
+-- Name: trend_parent_companies_20260801; Type: TABLE; Schema: adtech; Owner: postgres
 --
 
-CREATE TABLE adtech.trend_parent_companies_20260719 (
+CREATE TABLE adtech.trend_parent_companies_20260801 (
     company_domain character varying,
     year smallint,
     quarter smallint,
@@ -1831,11 +2046,11 @@ CREATE TABLE adtech.trend_parent_companies_20260719 (
     pct_apps_added numeric,
     pct_apps_lost numeric,
     batch_date date CONSTRAINT trend_parent_companies_batch_date_not_null NOT NULL,
-    CONSTRAINT trend_parent_companies_20260719_batch_date_check CHECK ((batch_date = '2026-07-19'::date))
+    CONSTRAINT trend_parent_companies_20260801_batch_date_check CHECK ((batch_date = '2026-08-01'::date))
 );
 
 
-ALTER TABLE adtech.trend_parent_companies_20260719 OWNER TO postgres;
+ALTER TABLE adtech.trend_parent_companies_20260801 OWNER TO postgres;
 
 --
 -- Name: url_redirect_chains; Type: TABLE; Schema: adtech; Owner: postgres
@@ -3699,6 +3914,71 @@ CREATE MATERIALIZED VIEW frontend.company_top_apps AS
 ALTER MATERIALIZED VIEW frontend.company_top_apps OWNER TO postgres;
 
 --
+-- Name: company_top_apps_new; Type: MATERIALIZED VIEW; Schema: frontend; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW frontend.company_top_apps_new AS
+ WITH deduped_data AS (
+         SELECT COALESCE(cd.domain_name, ad.domain_name) AS company_domain,
+            c_1.name AS company_name,
+            cac.store_app,
+            bool_or(cac.sdk) AS sdk,
+            bool_or(cac.api_call) AS api_call,
+            bool_or(cac.publisher) AS publisher,
+            bool_or(cac.app_ads_direct) AS app_ads_direct
+           FROM (((adtech.combined_app_companies cac
+             LEFT JOIN public.domains ad ON ((cac.domain_id = ad.id)))
+             LEFT JOIN adtech.companies c_1 ON ((cac.company_id = c_1.id)))
+             LEFT JOIN public.domains cd ON ((c_1.domain_id = cd.id)))
+          WHERE (cac.app_ads_direct OR cac.sdk OR cac.api_call OR cac.publisher)
+          GROUP BY COALESCE(cd.domain_name, ad.domain_name), c_1.name, cac.store_app
+        ), ranked_apps AS (
+         SELECT dd.company_domain,
+            dd.company_name,
+            sa.store,
+            sa.name,
+            sa.store_id,
+            sa.category,
+            sa.developer_name,
+            sa.icon_64,
+            sa.installs_sum_4w,
+            sa.country_id,
+            sa.is_removed,
+            dd.sdk,
+            dd.api_call,
+            dd.publisher,
+            dd.app_ads_direct,
+            row_number() OVER (PARTITION BY sa.store, dd.company_domain, dd.company_name ORDER BY (COALESCE((dd.sdk)::integer, 0) + COALESCE((dd.api_call)::integer, 0)) DESC, COALESCE((sa.installs_sum_4w)::double precision, (0)::double precision) DESC) AS app_company_rank,
+            row_number() OVER (PARTITION BY sa.store, sa.category, dd.company_domain, dd.company_name ORDER BY (COALESCE((dd.sdk)::integer, 0) + COALESCE((dd.api_call)::integer, 0)) DESC, COALESCE((sa.installs_sum_4w)::double precision, (0)::double precision) DESC) AS app_company_category_rank
+           FROM (deduped_data dd
+             JOIN frontend.store_apps_overview sa ON ((dd.store_app = sa.id)))
+        )
+ SELECT ra.company_domain,
+    ra.company_name,
+    ra.store,
+    ra.name,
+    ra.store_id,
+    ra.developer_name,
+    ra.icon_64,
+    ra.category AS app_category,
+    ra.installs_sum_4w AS installs_d30,
+    c.alpha2,
+    ra.is_removed,
+    ra.sdk,
+    ra.api_call,
+    ra.publisher,
+    ra.app_ads_direct,
+    ra.app_company_rank,
+    ra.app_company_category_rank
+   FROM (ranked_apps ra
+     LEFT JOIN public.countries c ON ((ra.country_id = c.id)))
+  WHERE (ra.app_company_category_rank <= 20)
+  WITH NO DATA;
+
+
+ALTER MATERIALIZED VIEW frontend.company_top_apps_new OWNER TO postgres;
+
+--
 -- Name: app_keywords_extracted; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -3845,27 +4125,28 @@ ALTER MATERIALIZED VIEW frontend.keyword_scores OWNER TO postgres;
 --
 
 CREATE MATERIALIZED VIEW frontend.latest_sdk_scanned_apps AS
- WITH latest_version_codes AS (
-         SELECT DISTINCT ON (version_codes.store_app) version_codes.id,
-            version_codes.store_app,
-            version_codes.version_code,
-            version_codes.updated_at,
-            version_codes.crawl_result
-           FROM public.version_codes
-          ORDER BY version_codes.store_app, (string_to_array((version_codes.version_code)::text, '.'::text))::bigint[] DESC
+ WITH last_successful_scanned AS (
+         SELECT DISTINCT ON (vc.store_app) vc.store_app,
+            vasr.version_code_id,
+            vc.version_code,
+            vasr.run_result AS crawl_result,
+            vasr.run_at
+           FROM (public.version_code_api_scan_results vasr
+             LEFT JOIN public.version_codes vc ON ((vasr.version_code_id = vc.id)))
+          ORDER BY vc.store_app, vasr.run_at DESC
         ), ranked_apps AS (
-         SELECT lvc.updated_at AS sdk_crawled_at,
-            lvc.version_code,
-            lvc.crawl_result,
+         SELECT lss.run_at AS sdk_crawled_at,
+            lss.version_code,
+            lss.crawl_result,
             sa.store,
             sa.store_id,
             sa.name,
             sa.installs,
             sa.rating_count,
-            row_number() OVER (PARTITION BY sa.store, lvc.crawl_result ORDER BY lvc.updated_at DESC) AS updated_rank
-           FROM (latest_version_codes lvc
-             LEFT JOIN frontend.store_apps_overview sa ON ((lvc.store_app = sa.id)))
-          WHERE (lvc.updated_at <= (CURRENT_DATE - '1 day'::interval))
+            row_number() OVER (PARTITION BY sa.store, lss.crawl_result ORDER BY lss.run_at DESC) AS updated_rank
+           FROM (last_successful_scanned lss
+             LEFT JOIN frontend.store_apps_overview sa ON ((lss.store_app = sa.id)))
+          WHERE (lss.run_at <= (CURRENT_DATE - '1 day'::interval))
         )
  SELECT sdk_crawled_at,
     version_code,
@@ -4826,6 +5107,95 @@ CREATE TABLE public.retention_global_benchmarks (
 ALTER TABLE public.retention_global_benchmarks OWNER TO postgres;
 
 --
+-- Name: s3_package_inventory; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.s3_package_inventory (
+    myregion text NOT NULL,
+    versionstr text NOT NULL,
+    version_code_id integer,
+    store_app integer,
+    file_key text NOT NULL,
+    last_modified timestamp with time zone NOT NULL,
+    batch_date date NOT NULL
+)
+PARTITION BY LIST (batch_date);
+
+
+ALTER TABLE public.s3_package_inventory OWNER TO postgres;
+
+--
+-- Name: s3_package_inventory_hot; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.s3_package_inventory_hot (
+    myregion text NOT NULL,
+    versionstr text NOT NULL,
+    version_code_id integer,
+    store_app integer,
+    file_key text NOT NULL,
+    last_modified timestamp with time zone NOT NULL,
+    inserted_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE public.s3_package_inventory_hot OWNER TO postgres;
+
+--
+-- Name: s3_file_keys; Type: VIEW; Schema: public; Owner: postgres
+--
+
+CREATE VIEW public.s3_file_keys AS
+ WITH files_combined AS (
+         SELECT s3_package_inventory_hot.store_app,
+            s3_package_inventory_hot.version_code_id,
+            s3_package_inventory_hot.myregion,
+            s3_package_inventory_hot.file_key,
+            0 AS priority
+           FROM public.s3_package_inventory_hot
+          WHERE ((s3_package_inventory_hot.inserted_at >= (now() - '24:00:00'::interval)) AND (s3_package_inventory_hot.store_app IS NOT NULL) AND (s3_package_inventory_hot.version_code_id IS NOT NULL))
+        UNION ALL
+         SELECT s3_package_inventory.store_app,
+            s3_package_inventory.version_code_id,
+            s3_package_inventory.myregion,
+            s3_package_inventory.file_key,
+            1 AS priority
+           FROM public.s3_package_inventory
+          WHERE ((s3_package_inventory.store_app IS NOT NULL) AND (s3_package_inventory.version_code_id IS NOT NULL))
+        )
+ SELECT DISTINCT ON (store_app, version_code_id) store_app,
+    version_code_id,
+    myregion,
+    file_key
+   FROM files_combined
+  ORDER BY store_app, version_code_id, priority,
+        CASE
+            WHEN (myregion = 'loki'::text) THEN 0
+            ELSE 1
+        END;
+
+
+ALTER VIEW public.s3_file_keys OWNER TO postgres;
+
+--
+-- Name: s3_package_inventory_20260803; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.s3_package_inventory_20260803 (
+    myregion text CONSTRAINT s3_package_inventory_myregion_not_null NOT NULL,
+    versionstr text CONSTRAINT s3_package_inventory_versionstr_not_null NOT NULL,
+    version_code_id integer,
+    store_app integer,
+    file_key text CONSTRAINT s3_package_inventory_file_key_not_null NOT NULL,
+    last_modified timestamp with time zone CONSTRAINT s3_package_inventory_last_modified_not_null NOT NULL,
+    batch_date date CONSTRAINT s3_package_inventory_batch_date_not_null NOT NULL,
+    CONSTRAINT s3_package_inventory_20260803_batch_date_check CHECK ((batch_date = '2026-08-03'::date))
+);
+
+
+ALTER TABLE public.s3_package_inventory_20260803 OWNER TO postgres;
+
+--
 -- Name: store_app_z_scores_history_2025; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -4866,7 +5236,6 @@ CREATE TABLE public.store_app_z_scores_history_2026 (
     app_name text,
     in_app_purchases boolean,
     ad_supported boolean,
-    icon_url_100 text,
     target_week_installs bigint,
     baseline_installs double precision,
     baseline_installs_pct double precision,
@@ -4877,7 +5246,10 @@ CREATE TABLE public.store_app_z_scores_history_2026 (
     wow_growth_pct double precision,
     two_week_growth_pct double precision,
     momentum_pct double precision,
-    has_reliable_baseline boolean
+    has_reliable_baseline boolean,
+    target_week_mau bigint,
+    target_week_iap_revenue double precision,
+    target_week_ad_revenue double precision
 );
 
 
@@ -5088,78 +5460,97 @@ CREATE MATERIALIZED VIEW public.total_count_overview AS
                 END) AS ios_apps,
             count(
                 CASE
-                    WHEN ((sa.store = 1) AND (sa.crawl_result = 1)) THEN 1
+                    WHEN ((sa.store = 1) AND (NOT sa.is_removed)) THEN 1
                     ELSE NULL::integer
                 END) AS success_android_apps,
             count(
                 CASE
-                    WHEN ((sa.store = 2) AND (sa.crawl_result = 1)) THEN 1
+                    WHEN ((sa.store = 2) AND (NOT sa.is_removed)) THEN 1
                     ELSE NULL::integer
                 END) AS success_ios_apps,
             count(
                 CASE
-                    WHEN ((sa.store = 1) AND (sa.updated_at >= (CURRENT_DATE - '7 days'::interval))) THEN 1
+                    WHEN ((sa.store = 1) AND (sa.last_crawled_at >= (CURRENT_DATE - '7 days'::interval))) THEN 1
                     ELSE NULL::integer
                 END) AS weekly_scanned_android_apps,
             count(
                 CASE
-                    WHEN ((sa.store = 2) AND (sa.updated_at >= (CURRENT_DATE - '7 days'::interval))) THEN 1
+                    WHEN ((sa.store = 2) AND (sa.last_crawled_at >= (CURRENT_DATE - '7 days'::interval))) THEN 1
                     ELSE NULL::integer
                 END) AS weekly_scanned_ios_apps,
             count(
                 CASE
-                    WHEN ((sa.store = 1) AND (sa.crawl_result = 1) AND (sa.updated_at >= (CURRENT_DATE - '7 days'::interval))) THEN 1
+                    WHEN ((sa.store = 1) AND (NOT sa.is_removed) AND (sa.last_crawled_at >= (CURRENT_DATE - '7 days'::interval))) THEN 1
                     ELSE NULL::integer
                 END) AS weekly_success_scanned_android_apps,
             count(
                 CASE
-                    WHEN ((sa.store = 2) AND (sa.crawl_result = 1) AND (sa.updated_at >= (CURRENT_DATE - '7 days'::interval))) THEN 1
+                    WHEN ((sa.store = 2) AND (NOT sa.is_removed) AND (sa.last_crawled_at >= (CURRENT_DATE - '7 days'::interval))) THEN 1
                     ELSE NULL::integer
                 END) AS weekly_success_scanned_ios_apps
-           FROM public.store_apps sa
+           FROM frontend.store_apps_overview sa
+        ), last_scan AS (
+         SELECT DISTINCT ON (vc.store_app) vc.store_app,
+            lsscr.version_code_id AS version_code,
+            lsscr.scanned_at,
+            lsscr.scan_result
+           FROM (public.version_code_sdk_scan_results lsscr
+             LEFT JOIN public.version_codes vc ON ((lsscr.version_code_id = vc.id)))
+          ORDER BY vc.store_app, lsscr.scanned_at DESC
+        ), last_scan_succeed AS (
+         SELECT DISTINCT ON (vc.store_app) vc.id,
+            vc.store_app,
+            vc.version_code,
+            vcss.scanned_at,
+            vcss.scan_result
+           FROM (public.version_codes vc
+             LEFT JOIN public.version_code_sdk_scan_results vcss ON ((vc.id = vcss.version_code_id)))
+          WHERE (vcss.scan_result = 1)
+          ORDER BY vc.store_app, vcss.scanned_at DESC, (string_to_array((vc.version_code)::text, '.'::text))::bigint[] DESC
         ), sdk_app_count AS (
          SELECT count(DISTINCT
                 CASE
-                    WHEN (sa.store = 1) THEN vc.store_app
+                    WHEN (sa.store = 1) THEN ls.store_app
                     ELSE NULL::integer
                 END) AS sdk_android_apps,
             count(DISTINCT
                 CASE
-                    WHEN (sa.store = 2) THEN vc.store_app
+                    WHEN (sa.store = 2) THEN ls.store_app
                     ELSE NULL::integer
                 END) AS sdk_ios_apps,
             count(DISTINCT
                 CASE
-                    WHEN ((sa.store = 1) AND (vc.crawl_result = 1)) THEN vc.store_app
+                    WHEN (sa.store = 1) THEN lss.store_app
                     ELSE NULL::integer
                 END) AS sdk_success_android_apps,
             count(DISTINCT
                 CASE
-                    WHEN ((sa.store = 2) AND (vc.crawl_result = 1)) THEN vc.store_app
+                    WHEN (sa.store = 2) THEN lss.store_app
                     ELSE NULL::integer
                 END) AS sdk_success_ios_apps,
             count(DISTINCT
                 CASE
-                    WHEN ((sa.store = 1) AND (vc.updated_at >= (CURRENT_DATE - '7 days'::interval)) AND (vc.crawl_result = 1)) THEN vc.store_app
+                    WHEN ((sa.store = 1) AND (lss.scanned_at >= (CURRENT_DATE - '7 days'::interval))) THEN lss.store_app
                     ELSE NULL::integer
                 END) AS sdk_weekly_success_android_apps,
             count(DISTINCT
                 CASE
-                    WHEN ((sa.store = 2) AND (vc.updated_at >= (CURRENT_DATE - '7 days'::interval)) AND (vc.crawl_result = 1)) THEN vc.store_app
+                    WHEN ((sa.store = 2) AND (lss.scanned_at >= (CURRENT_DATE - '7 days'::interval))) THEN lss.store_app
                     ELSE NULL::integer
                 END) AS sdk_weekly_success_ios_apps,
             count(DISTINCT
                 CASE
-                    WHEN ((sa.store = 1) AND (vc.updated_at >= (CURRENT_DATE - '7 days'::interval))) THEN vc.store_app
+                    WHEN ((sa.store = 1) AND (ls.scanned_at >= (CURRENT_DATE - '7 days'::interval))) THEN ls.store_app
                     ELSE NULL::integer
                 END) AS sdk_weekly_android_apps,
             count(DISTINCT
                 CASE
-                    WHEN ((sa.store = 2) AND (vc.updated_at >= (CURRENT_DATE - '7 days'::interval))) THEN vc.store_app
+                    WHEN ((sa.store = 2) AND (ls.scanned_at >= (CURRENT_DATE - '7 days'::interval))) THEN ls.store_app
                     ELSE NULL::integer
                 END) AS sdk_weekly_ios_apps
-           FROM (public.version_codes vc
-             LEFT JOIN public.store_apps sa ON ((vc.store_app = sa.id)))
+           FROM ((last_scan ls
+             LEFT JOIN last_scan_succeed lss ON ((ls.store_app = lss.store_app)))
+             LEFT JOIN frontend.store_apps_overview sa ON ((sa.id = ls.store_app)))
         ), appads_url_count AS (
          SELECT count(DISTINCT pd.domain_name) AS appads_urls,
             count(DISTINCT
@@ -5296,31 +5687,52 @@ ALTER TABLE public.version_strings ALTER COLUMN id ADD GENERATED BY DEFAULT AS I
 
 
 --
--- Name: domain_app_changes_quarterly_20260719; Type: TABLE ATTACH; Schema: adtech; Owner: postgres
+-- Name: app_sdk_strings_20260803; Type: TABLE ATTACH; Schema: adtech; Owner: postgres
 --
 
-ALTER TABLE ONLY adtech.domain_app_changes_quarterly ATTACH PARTITION adtech.domain_app_changes_quarterly_20260719 FOR VALUES IN ('2026-07-19');
-
-
---
--- Name: trend_companies_20260719; Type: TABLE ATTACH; Schema: adtech; Owner: postgres
---
-
-ALTER TABLE ONLY adtech.trend_companies ATTACH PARTITION adtech.trend_companies_20260719 FOR VALUES IN ('2026-07-19');
+ALTER TABLE ONLY adtech.app_sdk_strings ATTACH PARTITION adtech.app_sdk_strings_20260803 FOR VALUES IN ('2026-08-03');
 
 
 --
--- Name: trend_domains_20260719; Type: TABLE ATTACH; Schema: adtech; Owner: postgres
+-- Name: app_sdks_20260803; Type: TABLE ATTACH; Schema: adtech; Owner: postgres
 --
 
-ALTER TABLE ONLY adtech.trend_domains ATTACH PARTITION adtech.trend_domains_20260719 FOR VALUES IN ('2026-07-19');
+ALTER TABLE ONLY adtech.app_sdks ATTACH PARTITION adtech.app_sdks_20260803 FOR VALUES IN ('2026-08-03');
 
 
 --
--- Name: trend_parent_companies_20260719; Type: TABLE ATTACH; Schema: adtech; Owner: postgres
+-- Name: domain_app_changes_quarterly_20260801; Type: TABLE ATTACH; Schema: adtech; Owner: postgres
 --
 
-ALTER TABLE ONLY adtech.trend_parent_companies ATTACH PARTITION adtech.trend_parent_companies_20260719 FOR VALUES IN ('2026-07-19');
+ALTER TABLE ONLY adtech.domain_app_changes_quarterly ATTACH PARTITION adtech.domain_app_changes_quarterly_20260801 FOR VALUES IN ('2026-08-01');
+
+
+--
+-- Name: trend_companies_20260801; Type: TABLE ATTACH; Schema: adtech; Owner: postgres
+--
+
+ALTER TABLE ONLY adtech.trend_companies ATTACH PARTITION adtech.trend_companies_20260801 FOR VALUES IN ('2026-08-01');
+
+
+--
+-- Name: trend_domains_20260801; Type: TABLE ATTACH; Schema: adtech; Owner: postgres
+--
+
+ALTER TABLE ONLY adtech.trend_domains ATTACH PARTITION adtech.trend_domains_20260801 FOR VALUES IN ('2026-08-01');
+
+
+--
+-- Name: trend_parent_companies_20260801; Type: TABLE ATTACH; Schema: adtech; Owner: postgres
+--
+
+ALTER TABLE ONLY adtech.trend_parent_companies ATTACH PARTITION adtech.trend_parent_companies_20260801 FOR VALUES IN ('2026-08-01');
+
+
+--
+-- Name: s3_package_inventory_20260803; Type: TABLE ATTACH; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.s3_package_inventory ATTACH PARTITION public.s3_package_inventory_20260803 FOR VALUES IN ('2026-08-03');
 
 
 --
@@ -6224,6 +6636,13 @@ CREATE INDEX adtech_company_category ON adtech.company_categories USING btree (c
 
 
 --
+-- Name: adtech_tag_totals_unique; Type: INDEX; Schema: adtech; Owner: postgres
+--
+
+CREATE UNIQUE INDEX adtech_tag_totals_unique ON adtech.tag_totals USING btree (store, app_category, tag_source);
+
+
+--
 -- Name: idx_combined_app_parent_companies_idx; Type: INDEX; Schema: adtech; Owner: postgres
 --
 
@@ -6238,10 +6657,10 @@ CREATE INDEX idx_domain_app_changes_lookup ON ONLY adtech.domain_app_changes_qua
 
 
 --
--- Name: idx_domain_app_changes_quarterly_20260719_idx_domain_app_change; Type: INDEX; Schema: adtech; Owner: postgres
+-- Name: idx_domain_app_changes_quarterly_20260801_idx_domain_app_change; Type: INDEX; Schema: adtech; Owner: postgres
 --
 
-CREATE INDEX idx_domain_app_changes_quarterly_20260719_idx_domain_app_change ON adtech.domain_app_changes_quarterly_20260719 USING btree (year, quarter, domain_id);
+CREATE INDEX idx_domain_app_changes_quarterly_20260801_idx_domain_app_change ON adtech.domain_app_changes_quarterly_20260801 USING btree (year, quarter, domain_id);
 
 
 --
@@ -6578,6 +6997,34 @@ CREATE UNIQUE INDEX frontend_company_domain_country_unique ON frontend.company_d
 --
 
 CREATE UNIQUE INDEX frontend_z_scores_top_apps_unique ON frontend.z_scores_top_apps USING btree (store, store_id);
+
+
+--
+-- Name: idx_adv_creatives_ad_domain; Type: INDEX; Schema: frontend; Owner: postgres
+--
+
+CREATE INDEX idx_adv_creatives_ad_domain ON frontend.advertiser_creatives USING btree (ad_domain);
+
+
+--
+-- Name: idx_adv_creatives_ad_domain_company_domain; Type: INDEX; Schema: frontend; Owner: postgres
+--
+
+CREATE INDEX idx_adv_creatives_ad_domain_company_domain ON frontend.advertiser_creatives USING btree (ad_domain_company_domain);
+
+
+--
+-- Name: idx_adv_creatives_host_domain; Type: INDEX; Schema: frontend; Owner: postgres
+--
+
+CREATE INDEX idx_adv_creatives_host_domain ON frontend.advertiser_creatives USING btree (host_domain);
+
+
+--
+-- Name: idx_adv_creatives_host_domain_company_domain; Type: INDEX; Schema: frontend; Owner: postgres
+--
+
+CREATE INDEX idx_adv_creatives_host_domain_company_domain ON frontend.advertiser_creatives USING btree (host_domain_company_domain);
 
 
 --
@@ -6980,6 +7427,27 @@ CREATE INDEX idx_ip_geo_mitm_uuid ON public.ip_geo_snapshots USING btree (mitm_u
 
 
 --
+-- Name: s3_package_inventory_myregion_file_key_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX s3_package_inventory_myregion_file_key_idx ON ONLY public.s3_package_inventory USING btree (myregion, file_key, batch_date);
+
+
+--
+-- Name: idx_s3_package_inventory_20260803_s3_package_inventory_myregion; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX idx_s3_package_inventory_20260803_s3_package_inventory_myregion ON public.s3_package_inventory_20260803 USING btree (myregion, file_key, batch_date);
+
+
+--
+-- Name: s3_package_inventory_hot_myregion_file_key_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX s3_package_inventory_hot_myregion_file_key_idx ON public.s3_package_inventory_hot USING btree (myregion, file_key);
+
+
+--
 -- Name: store_apps_descriptions_unique_hash_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -7057,10 +7525,17 @@ CREATE INDEX version_strings_xml_path_lower_idx ON public.version_strings USING 
 
 
 --
--- Name: idx_domain_app_changes_quarterly_20260719_idx_domain_app_change; Type: INDEX ATTACH; Schema: adtech; Owner: postgres
+-- Name: idx_domain_app_changes_quarterly_20260801_idx_domain_app_change; Type: INDEX ATTACH; Schema: adtech; Owner: postgres
 --
 
-ALTER INDEX adtech.idx_domain_app_changes_lookup ATTACH PARTITION adtech.idx_domain_app_changes_quarterly_20260719_idx_domain_app_change;
+ALTER INDEX adtech.idx_domain_app_changes_lookup ATTACH PARTITION adtech.idx_domain_app_changes_quarterly_20260801_idx_domain_app_change;
+
+
+--
+-- Name: idx_s3_package_inventory_20260803_s3_package_inventory_myregion; Type: INDEX ATTACH; Schema: public; Owner: postgres
+--
+
+ALTER INDEX public.s3_package_inventory_myregion_file_key_idx ATTACH PARTITION public.idx_s3_package_inventory_20260803_s3_package_inventory_myregion;
 
 
 --
@@ -7781,5 +8256,5 @@ GRANT ALL ON SCHEMA public TO PUBLIC;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict eZpQ19twIjP8lpq6fOaEHIHJpeexV2aZTHqqRmAgByyei0tlXLazC6r3gnryAg4
+\unrestrict DZVtE28DxuzetTFfUtzB7RbHYUmo3A6TWCs6YQhNlfNih1aWUPbb3ZdJEMz6w9I
 

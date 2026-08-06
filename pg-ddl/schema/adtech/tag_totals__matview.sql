@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict bqu5Qz9SlQJUQg5vIFDxtUdnZtOgwKuzffwjYPxuxPiRhAr5nFdClbLzYeASkoB
+\restrict kAMgjMHe2oPZflvdBevON1hjnvJGMTASvfc05D2fMSVIB4xxKo0P7VLItkK8lzx
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -64,8 +64,15 @@ CREATE MATERIALIZED VIEW adtech.tag_totals AS
 ALTER MATERIALIZED VIEW adtech.tag_totals OWNER TO postgres;
 
 --
+-- Name: adtech_tag_totals_unique; Type: INDEX; Schema: adtech; Owner: postgres
+--
+
+CREATE UNIQUE INDEX adtech_tag_totals_unique ON adtech.tag_totals USING btree (store, app_category, tag_source);
+
+
+--
 -- PostgreSQL database dump complete
 --
 
-\unrestrict bqu5Qz9SlQJUQg5vIFDxtUdnZtOgwKuzffwjYPxuxPiRhAr5nFdClbLzYeASkoB
+\unrestrict kAMgjMHe2oPZflvdBevON1hjnvJGMTASvfc05D2fMSVIB4xxKo0P7VLItkK8lzx
 

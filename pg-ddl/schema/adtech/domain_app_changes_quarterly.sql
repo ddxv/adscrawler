@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 9iBV5Lep42DuoU96KqRnrHFPnExNmGN48V2dIKc8qkXQvo7ZPT6ZRoYhzFhGZ00
+\restrict r1BAHkpy09bpqTKt7fPAM00O9WeRyJfK0Ir8TwS82DHnDiY1YLlRdtcfAAX92Ja
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -50,5 +50,5 @@ CREATE INDEX idx_domain_app_changes_lookup ON ONLY adtech.domain_app_changes_qua
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 9iBV5Lep42DuoU96KqRnrHFPnExNmGN48V2dIKc8qkXQvo7ZPT6ZRoYhzFhGZ00
+\unrestrict r1BAHkpy09bpqTKt7fPAM00O9WeRyJfK0Ir8TwS82DHnDiY1YLlRdtcfAAX92Ja
 

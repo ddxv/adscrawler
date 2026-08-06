@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict t81IidqAjvDq5T2yn0RRaVd1qrmVs2c3HfJdB8AXTLKKyBKKIVWoVYsj5ZmGxgT
+\restrict m0Mc5Svelg4Z7mjjnowfVGGKa3RbNUM18dX0ZNfotKSbtm29r10ClXsdhzEdWae
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -69,5 +69,5 @@ CREATE INDEX companies_parent_category_stats_query_idx ON frontend.companies_par
 -- PostgreSQL database dump complete
 --
 
-\unrestrict t81IidqAjvDq5T2yn0RRaVd1qrmVs2c3HfJdB8AXTLKKyBKKIVWoVYsj5ZmGxgT
+\unrestrict m0Mc5Svelg4Z7mjjnowfVGGKa3RbNUM18dX0ZNfotKSbtm29r10ClXsdhzEdWae
 

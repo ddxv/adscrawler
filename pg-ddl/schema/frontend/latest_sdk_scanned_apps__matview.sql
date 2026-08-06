@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict XjPNd6vv9WFBEUEP126CNJ9bXkAik6Vvy73nfHiLHhCEfISLURtmve8oq0PwByb
+\restrict bjeWGg4WqwyWDitImG2sTedabOMp7NSYNHZtAWwDAFvyHImTuZVYHSt3PS3KNFU
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -28,27 +28,28 @@ SET default_table_access_method = heap;
 --
 
 CREATE MATERIALIZED VIEW frontend.latest_sdk_scanned_apps AS
- WITH latest_version_codes AS (
-         SELECT DISTINCT ON (version_codes.store_app) version_codes.id,
-            version_codes.store_app,
-            version_codes.version_code,
-            version_codes.updated_at,
-            version_codes.crawl_result
-           FROM public.version_codes
-          ORDER BY version_codes.store_app, (string_to_array((version_codes.version_code)::text, '.'::text))::bigint[] DESC
+ WITH last_successful_scanned AS (
+         SELECT DISTINCT ON (vc.store_app) vc.store_app,
+            vasr.version_code_id,
+            vc.version_code,
+            vasr.run_result AS crawl_result,
+            vasr.run_at
+           FROM (public.version_code_api_scan_results vasr
+             LEFT JOIN public.version_codes vc ON ((vasr.version_code_id = vc.id)))
+          ORDER BY vc.store_app, vasr.run_at DESC
         ), ranked_apps AS (
-         SELECT lvc.updated_at AS sdk_crawled_at,
-            lvc.version_code,
-            lvc.crawl_result,
+         SELECT lss.run_at AS sdk_crawled_at,
+            lss.version_code,
+            lss.crawl_result,
             sa.store,
             sa.store_id,
             sa.name,
             sa.installs,
             sa.rating_count,
-            row_number() OVER (PARTITION BY sa.store, lvc.crawl_result ORDER BY lvc.updated_at DESC) AS updated_rank
-           FROM (latest_version_codes lvc
-             LEFT JOIN frontend.store_apps_overview sa ON ((lvc.store_app = sa.id)))
-          WHERE (lvc.updated_at <= (CURRENT_DATE - '1 day'::interval))
+            row_number() OVER (PARTITION BY sa.store, lss.crawl_result ORDER BY lss.run_at DESC) AS updated_rank
+           FROM (last_successful_scanned lss
+             LEFT JOIN frontend.store_apps_overview sa ON ((lss.store_app = sa.id)))
+          WHERE (lss.run_at <= (CURRENT_DATE - '1 day'::interval))
         )
  SELECT sdk_crawled_at,
     version_code,
@@ -77,5 +78,5 @@ CREATE UNIQUE INDEX latest_sdk_scanned_apps_unique_index ON frontend.latest_sdk_
 -- PostgreSQL database dump complete
 --
 
-\unrestrict XjPNd6vv9WFBEUEP126CNJ9bXkAik6Vvy73nfHiLHhCEfISLURtmve8oq0PwByb
+\unrestrict bjeWGg4WqwyWDitImG2sTedabOMp7NSYNHZtAWwDAFvyHImTuZVYHSt3PS3KNFU
 

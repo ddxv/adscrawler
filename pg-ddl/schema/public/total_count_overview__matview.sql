@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict dqZgKMsW7ohErUZNPTT6qBoakFo8h0tam54ThGIqEh82bmg76MUE2CE5k83Rsr6
+\restrict BWxj97549Nay77T99LitTIyJRVqolMVZhg1zeXhQTG2HdHWOmqMdGC3O42b2u06
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -41,78 +41,97 @@ CREATE MATERIALIZED VIEW public.total_count_overview AS
                 END) AS ios_apps,
             count(
                 CASE
-                    WHEN ((sa.store = 1) AND (sa.crawl_result = 1)) THEN 1
+                    WHEN ((sa.store = 1) AND (NOT sa.is_removed)) THEN 1
                     ELSE NULL::integer
                 END) AS success_android_apps,
             count(
                 CASE
-                    WHEN ((sa.store = 2) AND (sa.crawl_result = 1)) THEN 1
+                    WHEN ((sa.store = 2) AND (NOT sa.is_removed)) THEN 1
                     ELSE NULL::integer
                 END) AS success_ios_apps,
             count(
                 CASE
-                    WHEN ((sa.store = 1) AND (sa.updated_at >= (CURRENT_DATE - '7 days'::interval))) THEN 1
+                    WHEN ((sa.store = 1) AND (sa.last_crawled_at >= (CURRENT_DATE - '7 days'::interval))) THEN 1
                     ELSE NULL::integer
                 END) AS weekly_scanned_android_apps,
             count(
                 CASE
-                    WHEN ((sa.store = 2) AND (sa.updated_at >= (CURRENT_DATE - '7 days'::interval))) THEN 1
+                    WHEN ((sa.store = 2) AND (sa.last_crawled_at >= (CURRENT_DATE - '7 days'::interval))) THEN 1
                     ELSE NULL::integer
                 END) AS weekly_scanned_ios_apps,
             count(
                 CASE
-                    WHEN ((sa.store = 1) AND (sa.crawl_result = 1) AND (sa.updated_at >= (CURRENT_DATE - '7 days'::interval))) THEN 1
+                    WHEN ((sa.store = 1) AND (NOT sa.is_removed) AND (sa.last_crawled_at >= (CURRENT_DATE - '7 days'::interval))) THEN 1
                     ELSE NULL::integer
                 END) AS weekly_success_scanned_android_apps,
             count(
                 CASE
-                    WHEN ((sa.store = 2) AND (sa.crawl_result = 1) AND (sa.updated_at >= (CURRENT_DATE - '7 days'::interval))) THEN 1
+                    WHEN ((sa.store = 2) AND (NOT sa.is_removed) AND (sa.last_crawled_at >= (CURRENT_DATE - '7 days'::interval))) THEN 1
                     ELSE NULL::integer
                 END) AS weekly_success_scanned_ios_apps
-           FROM public.store_apps sa
+           FROM frontend.store_apps_overview sa
+        ), last_scan AS (
+         SELECT DISTINCT ON (vc.store_app) vc.store_app,
+            lsscr.version_code_id AS version_code,
+            lsscr.scanned_at,
+            lsscr.scan_result
+           FROM (public.version_code_sdk_scan_results lsscr
+             LEFT JOIN public.version_codes vc ON ((lsscr.version_code_id = vc.id)))
+          ORDER BY vc.store_app, lsscr.scanned_at DESC
+        ), last_scan_succeed AS (
+         SELECT DISTINCT ON (vc.store_app) vc.id,
+            vc.store_app,
+            vc.version_code,
+            vcss.scanned_at,
+            vcss.scan_result
+           FROM (public.version_codes vc
+             LEFT JOIN public.version_code_sdk_scan_results vcss ON ((vc.id = vcss.version_code_id)))
+          WHERE (vcss.scan_result = 1)
+          ORDER BY vc.store_app, vcss.scanned_at DESC, (string_to_array((vc.version_code)::text, '.'::text))::bigint[] DESC
         ), sdk_app_count AS (
          SELECT count(DISTINCT
                 CASE
-                    WHEN (sa.store = 1) THEN vc.store_app
+                    WHEN (sa.store = 1) THEN ls.store_app
                     ELSE NULL::integer
                 END) AS sdk_android_apps,
             count(DISTINCT
                 CASE
-                    WHEN (sa.store = 2) THEN vc.store_app
+                    WHEN (sa.store = 2) THEN ls.store_app
                     ELSE NULL::integer
                 END) AS sdk_ios_apps,
             count(DISTINCT
                 CASE
-                    WHEN ((sa.store = 1) AND (vc.crawl_result = 1)) THEN vc.store_app
+                    WHEN (sa.store = 1) THEN lss.store_app
                     ELSE NULL::integer
                 END) AS sdk_success_android_apps,
             count(DISTINCT
                 CASE
-                    WHEN ((sa.store = 2) AND (vc.crawl_result = 1)) THEN vc.store_app
+                    WHEN (sa.store = 2) THEN lss.store_app
                     ELSE NULL::integer
                 END) AS sdk_success_ios_apps,
             count(DISTINCT
                 CASE
-                    WHEN ((sa.store = 1) AND (vc.updated_at >= (CURRENT_DATE - '7 days'::interval)) AND (vc.crawl_result = 1)) THEN vc.store_app
+                    WHEN ((sa.store = 1) AND (lss.scanned_at >= (CURRENT_DATE - '7 days'::interval))) THEN lss.store_app
                     ELSE NULL::integer
                 END) AS sdk_weekly_success_android_apps,
             count(DISTINCT
                 CASE
-                    WHEN ((sa.store = 2) AND (vc.updated_at >= (CURRENT_DATE - '7 days'::interval)) AND (vc.crawl_result = 1)) THEN vc.store_app
+                    WHEN ((sa.store = 2) AND (lss.scanned_at >= (CURRENT_DATE - '7 days'::interval))) THEN lss.store_app
                     ELSE NULL::integer
                 END) AS sdk_weekly_success_ios_apps,
             count(DISTINCT
                 CASE
-                    WHEN ((sa.store = 1) AND (vc.updated_at >= (CURRENT_DATE - '7 days'::interval))) THEN vc.store_app
+                    WHEN ((sa.store = 1) AND (ls.scanned_at >= (CURRENT_DATE - '7 days'::interval))) THEN ls.store_app
                     ELSE NULL::integer
                 END) AS sdk_weekly_android_apps,
             count(DISTINCT
                 CASE
-                    WHEN ((sa.store = 2) AND (vc.updated_at >= (CURRENT_DATE - '7 days'::interval))) THEN vc.store_app
+                    WHEN ((sa.store = 2) AND (ls.scanned_at >= (CURRENT_DATE - '7 days'::interval))) THEN ls.store_app
                     ELSE NULL::integer
                 END) AS sdk_weekly_ios_apps
-           FROM (public.version_codes vc
-             LEFT JOIN public.store_apps sa ON ((vc.store_app = sa.id)))
+           FROM ((last_scan ls
+             LEFT JOIN last_scan_succeed lss ON ((ls.store_app = lss.store_app)))
+             LEFT JOIN frontend.store_apps_overview sa ON ((sa.id = ls.store_app)))
         ), appads_url_count AS (
          SELECT count(DISTINCT pd.domain_name) AS appads_urls,
             count(DISTINCT
@@ -166,5 +185,5 @@ ALTER MATERIALIZED VIEW public.total_count_overview OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict dqZgKMsW7ohErUZNPTT6qBoakFo8h0tam54ThGIqEh82bmg76MUE2CE5k83Rsr6
+\unrestrict BWxj97549Nay77T99LitTIyJRVqolMVZhg1zeXhQTG2HdHWOmqMdGC3O42b2u06
 

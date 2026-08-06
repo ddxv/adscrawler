@@ -820,7 +820,7 @@ def process_new_company(company_name: str) -> None:
     )
 
 
-def refresh_metadata(missing_only: bool = True) -> None:
+def refresh_metadata(pgdb, missing_only: bool = True) -> None:
     """Batch refresh company metadata (logos, LinkedIn URLs, country evidence, GitHub user).
 
     Parameters
@@ -830,7 +830,6 @@ def refresh_metadata(missing_only: bool = True) -> None:
         resolved country, or a GitHub user.  If False, process *all* companies.
     """
     os.makedirs(OUTPUT_DIR, exist_ok=True)
-    pgdb = get_db_connection()
     country_id_map, name_to_alpha2 = _build_country_map(pgdb)
 
     companies = query_companies(pgdb=pgdb)

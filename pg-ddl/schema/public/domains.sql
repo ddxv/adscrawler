@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict WrhoAIK7OU9uGTvaiumhx6lE9gzg3UbupdNV3a55thpXBXdj1vibtju8yFENcZ0
+\restrict uCVgbNwDu6giDFVelFLyLKs88T0xXaljqPnha6qfqdyuQbPmuEPAJELC5t6cm7o
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
@@ -94,5 +94,5 @@ ALTER TABLE ONLY public.domains
 -- PostgreSQL database dump complete
 --
 
-\unrestrict WrhoAIK7OU9uGTvaiumhx6lE9gzg3UbupdNV3a55thpXBXdj1vibtju8yFENcZ0
+\unrestrict uCVgbNwDu6giDFVelFLyLKs88T0xXaljqPnha6qfqdyuQbPmuEPAJELC5t6cm7o
 
