@@ -33,7 +33,6 @@ def manage_ipa_download(
 ) -> DownloadResult:
     func_info = f"manage_ipa_download {store_id=}"
     logger.info(f"{func_info} start")
-    ipatool_auth()
     error_count = 0
     crawl_result = 4
     version_str = FAILED_VERSION_STR
@@ -41,9 +40,10 @@ def manage_ipa_download(
     downloaded_file_path = None
 
     try:
+        ipatool_auth()
         r = lookupby_id(app_id=store_id)
         bundle_id: str = r["bundleId"]
-        time.sleep(1)
+        time.sleep(2)
         downloaded_file_path = external_download(
             store_id=store_id, bundle_id=bundle_id, do_redownload=True
         )
