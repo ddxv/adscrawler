@@ -63,14 +63,8 @@ WAYDROID_INTERNAL_EMULATED_DIR = pathlib.Path("/data/media/")
 
 
 # SysLogHandler parameters
-# Address can be '/dev/log' for local Unix socket (most common on Linux)
-# or ('hostname', port) for a remote syslog server.
-SYSLOG_ADDRESS = "/dev/log"  # For Linux
-# On macOS, it might be '/var/run/syslog'
-# If /dev/log doesn't work, check your system's syslog socket path.
+SYSLOG_ADDRESS = "/dev/log"
 
-# Facility tells syslog what kind of program is logging.
-# 'local0' through 'local7' are generally free for custom use.
 SYSLOG_FACILITY = logging.handlers.SysLogHandler.LOG_LOCAL0
 
 LOG_LEVEL = logging.DEBUG

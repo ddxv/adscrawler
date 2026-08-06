@@ -4,8 +4,10 @@
 CONFIG will expect apple: email, password
 """
 
-import os
 import pathlib
+import re
+import subprocess
+import time
 
 import requests
 
@@ -41,6 +43,7 @@ def manage_ipa_download(
     try:
         r = lookupby_id(app_id=store_id)
         bundle_id: str = r["bundleId"]
+        time.sleep(1)
         downloaded_file_path = external_download(
             store_id=store_id, bundle_id=bundle_id, do_redownload=True
         )
@@ -60,8 +63,8 @@ def manage_ipa_download(
         crawl_result = 3  # 404s etc
     except requests.exceptions.ConnectionError:
         crawl_result = 3  # 404s etc
-    except FileNotFoundError:
-        logger.exception(f"{store_id=} unable to unpack IPA or unpack failed")
+    except (FileNotFoundError, RuntimeError):
+        logger.exception(f"{store_id=} unable to unpack IPA or download failed")
         crawl_result = 2
     except Exception as e:
         logger.exception(f"Unexpected error for {store_id=}: {str(e)}")
@@ -82,11 +85,71 @@ def manage_ipa_download(
     )
 
 
+IPATOOL_KNOWN_ERRORS = {
+    re.compile(
+        r"HTTP 204.*empty or non-plist body"
+    ): "Apple returned empty response (HTTP 204) — try again later",
+    re.compile(
+        r"HTTP 503.*Service Temporarily Unavailable"
+    ): "Apple service temporarily unavailable (HTTP 503)",
+    re.compile(r"HTTP 4\d{2}"): "Apple returned a client error (HTTP 4xx)",
+    re.compile(r"request failed"): "Generic ipatool request failure",
+    re.compile(r"invalid.*credentials", re.IGNORECASE): "Invalid Apple ID credentials",
+}
+
+
+def _parse_ipatool_error(stderr: str, stdout: str) -> str | None:
+    """Return a human-readable error message if a known ipatool failure is detected."""
+    combined = stderr + "\n" + stdout
+    for pattern, message in IPATOOL_KNOWN_ERRORS.items():
+        if pattern.search(combined):
+            return message
+    return None
+
+
+def _run_ipatool(command: str) -> subprocess.CompletedProcess:
+    """Run an ipatool command via subprocess and log the outcome.
+
+    Raises:
+        RuntimeError: if the command exits non-zero and a known error is matched.
+    """
+    logger.debug(f"Running: {command}")
+    result = subprocess.run(
+        command,
+        shell=True,
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    logger.info(f"ipatool exit code: {result.returncode}")
+
+    if result.returncode != 0:
+        error_msg = _parse_ipatool_error(result.stderr, result.stdout)
+        if error_msg:
+            logger.error(
+                f"ipatool failed: {error_msg} (stderr: {result.stderr.strip()})"
+            )
+            raise RuntimeError(f"ipatool failed: {error_msg}")
+        logger.error(
+            f"ipatool non-zero exit: {result.returncode} (stderr: {result.stderr.strip()})"
+        )
+        raise RuntimeError(
+            f"ipatool exited with code {result.returncode}: {result.stderr.strip()}"
+        )
+    return result
+
+
 def ipatool_auth() -> None:
-    command = f"ipatool auth login --email {EMAIL} --password '{PASSWORD}' --non-interactive --keychain-passphrase '{KEYCHAIN_PASSPHRASE}'"
-    print(command)
-    result = os.system(command)
-    logger.info(f"ipatool auth result: {result}")
+    command = (
+        f"ipatool auth login --email {EMAIL} --password '{PASSWORD}' "
+        f"--non-interactive --keychain-passphrase '{KEYCHAIN_PASSPHRASE}'"
+    )
+    try:
+        _run_ipatool(command)
+        logger.info("ipatool auth succeeded")
+    except RuntimeError:
+        logger.exception("ipatool auth failed")
+        raise
 
 
 def external_download(
@@ -99,9 +162,16 @@ def external_download(
             logger.info(f"ipa already exists {filepath=}, skipping")
             return
     logger.info(f"Will download {bundle_id}")
-    command = f"ipatool download -b '{bundle_id}' -o  {filepath.as_posix()} --keychain-passphrase '{KEYCHAIN_PASSPHRASE}' --non-interactive --purchase --verbose >> ~/.config/adscrawler/logs/ipatool.log 2>&1"
-    result = os.system(command)
-    logger.info(f"ipatool download result: {result}")
+    command = (
+        f"ipatool download -b '{bundle_id}' -o {filepath.as_posix()} "
+        f"--keychain-passphrase '{KEYCHAIN_PASSPHRASE}' "
+        f"--non-interactive --purchase --verbose"
+    )
+    try:
+        _run_ipatool(command)
+    except RuntimeError:
+        logger.exception(f"ipatool download failed for {bundle_id}")
+        raise FileNotFoundError(f"ipatool download failed for {bundle_id}")
     if filepath.exists():
         return filepath
     else:
