@@ -47,7 +47,7 @@ class PostgresEngine:
             else:
                 db_login = f"postgresql+psycopg://{self.db_user}"
             db_uri = f"{db_login}@{self.db_ip}:{self.db_port}/{self.db_name}"
-            logger.info(f"PostgreSQL: config_key:{self.config_key} db:{self.db_name}")
+            logger.debug(f"PostgreSQL: config_key={self.config_key} db={self.db_name}")
             self.engine = sqlalchemy.create_engine(
                 db_uri,
                 connect_args={"connect_timeout": 10, "application_name": "adscrawler"},
@@ -183,7 +183,9 @@ def get_db_connection(config_key: str = "madrone") -> PostgresEngine:
 def get_host_ip(hostname: str) -> str:
     """Convert hostname to IPv4 address if needed."""
     # Check if hostname is already an IPv4 address
-    if all(part.isdigit() and 0 <= int(part) <= 255 for part in hostname.split(".")):  # noqa: PLR2004
+    if all(
+        part.isdigit() and 0 <= int(part) <= 255 for part in hostname.split(".")
+    ):  # noqa: PLR2004
         return hostname
     ip_address = gethostbyname(hostname)
     logger.info(f"Resolved {hostname} to {ip_address}")
