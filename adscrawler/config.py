@@ -21,28 +21,21 @@ SSH_KNOWN_HOSTS = pathlib.Path(HOME, pathlib.Path(".ssh/known_hosts"))
 
 GEO_DATA_DIR = pathlib.Path(CONFIG_DIR, pathlib.Path("geo-data"))
 
-MITM_DIR = pathlib.Path(PACKAGE_DIR, pathlib.Path("mitmlogs"))
-CREATIVES_DIR = pathlib.Path(PACKAGE_DIR, pathlib.Path("creatives"))
+# Temp download dirs
+MITM_DIR = pathlib.Path(CONFIG_DIR, pathlib.Path("mitmlogs"))
+CREATIVES_DIR = pathlib.Path(CONFIG_DIR, pathlib.Path("creatives"))
 CREATIVE_THUMBS_DIR = pathlib.Path(CREATIVES_DIR, pathlib.Path("thumbs"))
 CREATIVE_RAW_DIR = pathlib.Path(CREATIVES_DIR, pathlib.Path("raw"))
 
-# APK File dirs
-APP_FILES_DIR = pathlib.Path(HOME, "apk-files")
-
-
-# Incoming for downloading/downloaded but not yet processed
+APP_FILES_DIR = pathlib.Path(CONFIG_DIR, "apk-files")
 INCOMING_DIR = pathlib.Path(APP_FILES_DIR, "incoming")
 APKS_INCOMING_DIR = pathlib.Path(INCOMING_DIR, "apks")
 XAPKS_INCOMING_DIR = pathlib.Path(INCOMING_DIR, "xapks")
 IPAS_INCOMING_DIR = pathlib.Path(INCOMING_DIR, "ipas")
 SPLITS_INCOMING_DIR = pathlib.Path(INCOMING_DIR, "splits")
-
-# Processed and ready for use
 APKS_DIR = pathlib.Path(APP_FILES_DIR, "apks")
 XAPKS_DIR = pathlib.Path(APP_FILES_DIR, "xapks")
 IPAS_DIR = pathlib.Path(APP_FILES_DIR, "ipas")
-
-# Failed to unzip, often due to unzip tool. I think failed during download?
 XAPKS_ISSUES_DIR = pathlib.Path(APP_FILES_DIR, "xapks-issues")
 APKS_ISSUES_DIR = pathlib.Path(APP_FILES_DIR, "apks-issues")
 IPAS_ISSUES_DIR = pathlib.Path(APP_FILES_DIR, "ipas-issues")
