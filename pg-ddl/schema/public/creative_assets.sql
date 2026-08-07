@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict 0iQQKWDGk6kkTMMqbziA8xhzRUTPRX9N1qWEAjVslGUqyNjHab8RzkYpeM37XY8
+\restrict lST0fi3eq5Xaa4FjkNrVqzsb8FOA0FnGur7OlxgFnwcuQWhJxBdJlfRmbPj45WI
 
--- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
--- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
+-- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
+-- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -94,5 +94,5 @@ CREATE INDEX idx_creative_assets_phash ON public.creative_assets USING btree (ph
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 0iQQKWDGk6kkTMMqbziA8xhzRUTPRX9N1qWEAjVslGUqyNjHab8RzkYpeM37XY8
+\unrestrict lST0fi3eq5Xaa4FjkNrVqzsb8FOA0FnGur7OlxgFnwcuQWhJxBdJlfRmbPj45WI
 

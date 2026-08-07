@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict LMPzL6nYNUqiQHCCew1Fa6TF56Xzv8pqgHpp1PTXoA1vnlOwIWs9uweW562qfTZ
+\restrict CmAEgJrvaXVNGkClkbQK1kVkYW1WQBJeYQfHgtliGmtoqWKiAlCpCj8CWqvedUI
 
--- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
--- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
+-- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
+-- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -44,5 +44,5 @@ ALTER TABLE logging.store_apps_snapshot OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict LMPzL6nYNUqiQHCCew1Fa6TF56Xzv8pqgHpp1PTXoA1vnlOwIWs9uweW562qfTZ
+\unrestrict CmAEgJrvaXVNGkClkbQK1kVkYW1WQBJeYQfHgtliGmtoqWKiAlCpCj8CWqvedUI
 

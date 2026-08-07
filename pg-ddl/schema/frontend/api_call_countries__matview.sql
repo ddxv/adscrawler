@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict FjU6SAwOG5HhUmvs22fMv6CBRRXo7tO5bDI21DDmJ1c7vS1OckxpGUpp16Peij4
+\restrict hVt8u1LOFP1uLb42HQPuHp05WnJhrKSxaDCMWfaFwfmkwT45EbeE2QwaRcxPfQE
 
--- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
--- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
+-- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
+-- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -87,5 +87,5 @@ CREATE UNIQUE INDEX api_call_countries_unique ON frontend.api_call_countries USI
 -- PostgreSQL database dump complete
 --
 
-\unrestrict FjU6SAwOG5HhUmvs22fMv6CBRRXo7tO5bDI21DDmJ1c7vS1OckxpGUpp16Peij4
+\unrestrict hVt8u1LOFP1uLb42HQPuHp05WnJhrKSxaDCMWfaFwfmkwT45EbeE2QwaRcxPfQE
 

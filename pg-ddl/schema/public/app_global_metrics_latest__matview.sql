@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict kvtTFCchOHpbGTrZUTgmtAqRdadh05Ff9SVEaHwYkEkKYLQPYxdO34lr5zp4ZSN
+\restrict BVgdQhZf2LKvj7g3RxyETr0X16vGzKRvo11RMidIYqEg2Rv6A9hoKoDlM3VHbo2
 
--- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
--- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
+-- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
+-- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -127,5 +127,5 @@ CREATE UNIQUE INDEX app_global_metrics_latest_idx ON public.app_global_metrics_l
 -- PostgreSQL database dump complete
 --
 
-\unrestrict kvtTFCchOHpbGTrZUTgmtAqRdadh05Ff9SVEaHwYkEkKYLQPYxdO34lr5zp4ZSN
+\unrestrict BVgdQhZf2LKvj7g3RxyETr0X16vGzKRvo11RMidIYqEg2Rv6A9hoKoDlM3VHbo2
 

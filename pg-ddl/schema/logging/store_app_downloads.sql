@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict PQ97KJbmeA36ZLiH6IpurO5tLRn9nUlEedG6l1pN50jrHt2okcf0oa4DxIyDV4w
+\restrict L3mGPVK7VxF63xB8EvQWlLHBaPdCv7zjGEvtAjIAxF8Zokpka9X9iauJg37YnGr
 
--- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
--- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
+-- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
+-- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -49,5 +49,5 @@ ALTER TABLE ONLY logging.store_app_downloads
 -- PostgreSQL database dump complete
 --
 
-\unrestrict PQ97KJbmeA36ZLiH6IpurO5tLRn9nUlEedG6l1pN50jrHt2okcf0oa4DxIyDV4w
+\unrestrict L3mGPVK7VxF63xB8EvQWlLHBaPdCv7zjGEvtAjIAxF8Zokpka9X9iauJg37YnGr
 

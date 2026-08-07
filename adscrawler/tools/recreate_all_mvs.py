@@ -208,6 +208,8 @@ def create_all_mvs(mv_files: list[Path], stop_on_error: bool = False) -> None:
 
         if mv_name not in existing_mvs:
             mvs_missing_in_db.append((mv_name, file_content_str.strip(), mv_file.name))
+        else:
+            logger.info(f"MV already exists in db: {mv_name}")
 
     logger.info(f"Found {len(mvs_missing_in_db)} missing MVs to create in db")
 
@@ -253,6 +255,7 @@ def get_correct_order_from_dump(mv_files: list[Path]) -> list[str]:
             mv_file_names.add(mv_name)
 
     ordered_existing_mvs = [mv for mv in ordered_mv_names if mv in mv_file_names]
+    # ordered_existing_mvs = [mv for mv in mv_file_names]
     return ordered_existing_mvs
 
 

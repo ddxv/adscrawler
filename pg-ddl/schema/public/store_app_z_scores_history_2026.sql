@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict mWRHrETlspVUw2gVMrBgt7Tjjv2lBVm54bI2JnvPltepJ8eeXstUbcDgCufRUcD
+\restrict 6rr6FywAsEd0X6SVTSNhjP2D3RMlhm5McJyrIxPf3FVrm6j1KgorGrfj57NOvZO
 
--- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
--- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
+-- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
+-- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -58,5 +58,5 @@ ALTER TABLE public.store_app_z_scores_history_2026 OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict mWRHrETlspVUw2gVMrBgt7Tjjv2lBVm54bI2JnvPltepJ8eeXstUbcDgCufRUcD
+\unrestrict 6rr6FywAsEd0X6SVTSNhjP2D3RMlhm5McJyrIxPf3FVrm6j1KgorGrfj57NOvZO
 

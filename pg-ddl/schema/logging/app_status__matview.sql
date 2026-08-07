@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict PfbUJqKjqjemWUO67qM01vFDoDpZl3lKakiU6dNiOrJv6uX9kOgTggSOHQH4HQ0
+\restrict zD05l1fzzVcXXbRoXiIiCVf8aRoyu1iNr3xLoVBJQ3E6IodBuPJNxy2ChiXTaKP
 
--- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
--- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
+-- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
+-- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -62,5 +62,5 @@ ALTER MATERIALIZED VIEW logging.app_status OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict PfbUJqKjqjemWUO67qM01vFDoDpZl3lKakiU6dNiOrJv6uX9kOgTggSOHQH4HQ0
+\unrestrict zD05l1fzzVcXXbRoXiIiCVf8aRoyu1iNr3xLoVBJQ3E6IodBuPJNxy2ChiXTaKP
 

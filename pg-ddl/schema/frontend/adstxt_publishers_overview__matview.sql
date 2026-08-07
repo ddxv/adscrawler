@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict LK5sOrLpVJde4C9roI24c8aYLNh1OOVarxUvUUBxJ3f4cGPCWMo1gafYvTOywT4
+\restrict 9ZaV9sXbdOaxDYPjZZNXjc54sYPSNBkqhxVK2boOFAohtAfuGbhsUGwhtN36V4z
 
--- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
--- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
+-- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
+-- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -75,5 +75,5 @@ CREATE UNIQUE INDEX adstxt_publishers_overview_ad_domain_unique_idx ON frontend.
 -- PostgreSQL database dump complete
 --
 
-\unrestrict LK5sOrLpVJde4C9roI24c8aYLNh1OOVarxUvUUBxJ3f4cGPCWMo1gafYvTOywT4
+\unrestrict 9ZaV9sXbdOaxDYPjZZNXjc54sYPSNBkqhxVK2boOFAohtAfuGbhsUGwhtN36V4z
 

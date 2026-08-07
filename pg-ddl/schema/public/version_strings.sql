@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict ENsQ2eA1mwwM6pQOgbBCKRRllx0wxSL0Eu0SVxOgn5CSCyf4YFabIWnJu0CcFB9
+\restrict JvyHHohbbFegKc5C5pVOu5uJ7qxb9ee3yoYE6BC2oP2mSGwMswgKmf4VUEpvTf6
 
--- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
--- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
+-- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
+-- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -92,5 +92,5 @@ CREATE INDEX version_strings_xml_path_lower_idx ON public.version_strings USING 
 -- PostgreSQL database dump complete
 --
 
-\unrestrict ENsQ2eA1mwwM6pQOgbBCKRRllx0wxSL0Eu0SVxOgn5CSCyf4YFabIWnJu0CcFB9
+\unrestrict JvyHHohbbFegKc5C5pVOu5uJ7qxb9ee3yoYE6BC2oP2mSGwMswgKmf4VUEpvTf6
 

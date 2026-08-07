@@ -25,10 +25,29 @@ for schema in "${SCHEMAS[@]}"; do
   mkdir -p "$OUTDIR/$schema"
 
   # --- Tables ---
-  for t in $(sudo -u postgres psql -d "$DB" -Atc "select tablename from pg_tables where schemaname='${schema}'"); do
-    echo "  dumping schema table: $schema.$t"
-    sudo -u postgres pg_dump -d "$DB" --schema-only --table="${schema}.${t}" > "$OUTDIR/$schema/${t}.sql"
-  done
+  # for t in $(sudo -u postgres psql -d "$DB" -Atc "select tablename from pg_tables where schemaname='${schema}'"); do
+  #   echo "  dumping schema table: $schema.$t"
+  #   sudo -u postgres pg_dump -d "$DB" --schema-only --table="${schema}.${t}" > "$OUTDIR/$schema/${t}.sql"
+  # done
+
+  for t in $(
+  sudo -u postgres psql -d "$DB" -Atc "
+    SELECT c.relname
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = '${schema}'
+      AND c.relkind IN ('r','p')          -- ordinary + partitioned tables
+      AND NOT c.relispartition            -- exclude partition children
+    ORDER BY c.relname;
+  "
+); do
+  echo "  dumping schema table: $schema.$t"
+  sudo -u postgres pg_dump \
+    -d "$DB" \
+    --schema-only \
+    --table="${schema}.${t}" \
+    > "$OUTDIR/$schema/${t}.sql"
+done
 
   # --- Materialized Views ---
   for mv in $(sudo -u postgres psql -d "$DB" -Atc "select matviewname from pg_matviews where schemaname='${schema}'"); do

@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict HLgVwchi1nqo7pLJrbrFZY3k2L1nU4PF0dLaU6miGHuHXro4tFUYvgDp6Ey2S2P
+\restrict ygLSnC0CGQ3uDbKp30hDslj5c6mJLtzcghWNQDIsw0MWPbXbO24LbpwaznZjNMQ
 
--- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
--- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
+-- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
+-- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -150,5 +150,5 @@ CREATE UNIQUE INDEX keyword_scores_store_keyword_id_idx ON frontend.keyword_scor
 -- PostgreSQL database dump complete
 --
 
-\unrestrict HLgVwchi1nqo7pLJrbrFZY3k2L1nU4PF0dLaU6miGHuHXro4tFUYvgDp6Ey2S2P
+\unrestrict ygLSnC0CGQ3uDbKp30hDslj5c6mJLtzcghWNQDIsw0MWPbXbO24LbpwaznZjNMQ
 

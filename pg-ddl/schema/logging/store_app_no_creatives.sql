@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict l0H9uosJ2cbFgGfdlvj4tyQY6dStFh73GWx3B5Xhdt9qu755d5JthEREcnO7g2Q
+\restrict v3uzWfYAPpCGwm5UlhwTHChY38XMZOMchM1roG6V77nOIW3Vk7SIkRKCujv1YLr
 
--- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
--- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
+-- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
+-- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -40,5 +40,5 @@ ALTER TABLE logging.store_app_no_creatives OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict l0H9uosJ2cbFgGfdlvj4tyQY6dStFh73GWx3B5Xhdt9qu755d5JthEREcnO7g2Q
+\unrestrict v3uzWfYAPpCGwm5UlhwTHChY38XMZOMchM1roG6V77nOIW3Vk7SIkRKCujv1YLr
 

@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict z7e0KcOyQnhOA2k7SVkbaFWHUtlwwXKiG8ixuKKIZ3gVagidmgSckRMYYCmITOw
+\restrict 5MFKoS8dnqL3EpD2Kgs1s5pj0cJf1sC6rVM90aefXspxSp8RGmrZtK8o2krc2q2
 
--- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
--- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
+-- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
+-- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -62,5 +62,5 @@ ALTER TABLE ONLY adtech.categories
 -- PostgreSQL database dump complete
 --
 
-\unrestrict z7e0KcOyQnhOA2k7SVkbaFWHUtlwwXKiG8ixuKKIZ3gVagidmgSckRMYYCmITOw
+\unrestrict 5MFKoS8dnqL3EpD2Kgs1s5pj0cJf1sC6rVM90aefXspxSp8RGmrZtK8o2krc2q2
 

@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict 8bjRRFwR3c3gut9lei5IA2CG26hch2KSDWtsrixi3Y9BQ3GqTyNOBhX2CtVRvmV
+\restrict GUV0Cc1Xf9DkoRjGRgoEUUIaTNratBrHxodnuxaNi24AiI4u3dylYiMoYrysrYU
 
--- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
--- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
+-- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
+-- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -86,5 +86,5 @@ ALTER TABLE ONLY public.version_code_sdk_scan_results
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 8bjRRFwR3c3gut9lei5IA2CG26hch2KSDWtsrixi3Y9BQ3GqTyNOBhX2CtVRvmV
+\unrestrict GUV0Cc1Xf9DkoRjGRgoEUUIaTNratBrHxodnuxaNi24AiI4u3dylYiMoYrysrYU
 

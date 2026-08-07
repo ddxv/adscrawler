@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict Hl6Uddm340UaOUoG3A941IRh0g0RrBRk2ZRQhhZJwEo29KOEaZYMVv4akiVr6i6
+\restrict W8lNTukYGBmxr7vjddoj2eLOLqaeCyYyHQ6rXJQWru2yqGk4CScmcTekUzxZDSZ
 
--- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
--- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
+-- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
+-- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -55,5 +55,5 @@ CREATE INDEX app_description_keywords_extrac_description_id_extracted_at_idx ON 
 -- PostgreSQL database dump complete
 --
 
-\unrestrict Hl6Uddm340UaOUoG3A941IRh0g0RrBRk2ZRQhhZJwEo29KOEaZYMVv4akiVr6i6
+\unrestrict W8lNTukYGBmxr7vjddoj2eLOLqaeCyYyHQ6rXJQWru2yqGk4CScmcTekUzxZDSZ
 

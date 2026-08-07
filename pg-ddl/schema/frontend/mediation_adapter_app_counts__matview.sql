@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict Oc0dsYClaSjvLD4CFZQHqjihLIk4MmB26a6xbRaAy7b9kjMXp7XfTDaa2AyzluJ
+\restrict xzZKtoUey5sKhzLkS00SJMCFsS9EobRxRlnsKGZUeCvfl9TfDZNI8dAO0GbUKsH
 
--- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
--- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
+-- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
+-- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -51,8 +51,8 @@ CREATE MATERIALIZED VIEW frontend.mediation_adapter_app_counts AS
             ms.adapter_company_id,
             cm.mapped_category AS app_category,
             count(DISTINCT sass.store_app) AS app_count
-           FROM (((adtech.store_app_sdk_strings sass
-             JOIN mediation_strings ms ON ((sass.version_string_id = ms.string_id)))
+           FROM (((adtech.app_sdk_strings sass
+             JOIN mediation_strings ms ON ((sass.string_id = ms.string_id)))
              LEFT JOIN public.store_apps sa ON ((sass.store_app = sa.id)))
              LEFT JOIN public.category_mapping cm ON (((sa.category)::text = (cm.original_category)::text)))
           GROUP BY ms.mediation_company_id, ms.adapter_string, ms.adapter_company_id, cm.mapped_category
@@ -85,5 +85,5 @@ CREATE UNIQUE INDEX mediation_adapter_app_counts_unique ON frontend.mediation_ad
 -- PostgreSQL database dump complete
 --
 
-\unrestrict Oc0dsYClaSjvLD4CFZQHqjihLIk4MmB26a6xbRaAy7b9kjMXp7XfTDaa2AyzluJ
+\unrestrict xzZKtoUey5sKhzLkS00SJMCFsS9EobRxRlnsKGZUeCvfl9TfDZNI8dAO0GbUKsH
 

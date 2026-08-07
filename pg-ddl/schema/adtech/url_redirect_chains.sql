@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict teTsBy2L2hq26v45NQkWNxNYmXICK1t9320fEqym3inROxXOGDk79pKGJloU2he
+\restrict vknFYmYaehHD8cc20MzBD4ZeFFfqii2LXf6ugu5CLR62aMIXq4aAjtGRXq8uPOr
 
--- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
--- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
+-- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
+-- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -122,5 +122,5 @@ ALTER TABLE ONLY adtech.url_redirect_chains
 -- PostgreSQL database dump complete
 --
 
-\unrestrict teTsBy2L2hq26v45NQkWNxNYmXICK1t9320fEqym3inROxXOGDk79pKGJloU2he
+\unrestrict vknFYmYaehHD8cc20MzBD4ZeFFfqii2LXf6ugu5CLR62aMIXq4aAjtGRXq8uPOr
 

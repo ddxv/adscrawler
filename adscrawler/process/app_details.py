@@ -119,12 +119,11 @@ def compact_incoming_app_details(
                 f"/store={store}/crawled_date={crawled_date}/country={country}"
             )
 
+            country_parquet_paths = get_parquet_paths_by_prefix(bucket, incoming_prefix)
             glob_path = f"s3://{bucket}/{incoming_prefix}*.parquet"
             epoch_ms = int(time.time() * 1000)
-            country_parquet_paths = get_parquet_paths_by_prefix(bucket, incoming_prefix)
 
             with get_duckdb_connection("s3") as duckdb_con:
-                # COPY automatically returns the total row count written
                 res = duckdb_con.execute(f"""
                     COPY (
                         SELECT * FROM read_parquet('{glob_path}', union_by_name=true)
@@ -133,7 +132,6 @@ def compact_incoming_app_details(
                         PARTITION_BY (crawl_result),
                         FILENAME_PATTERN 'compacted_{epoch_ms}_{{i}}',
                         OVERWRITE_OR_IGNORE 1,
-                        FILE_SIZE_BYTES '128MB',
                         COMPRESSION 'zstd'
                     );
                 """)
@@ -187,13 +185,6 @@ def import_app_details_from_s3_into_db(
 
     bucket = CONFIG["s3"]["bucket"]
 
-    # start_date = "2026-07-10"
-    # end_date = "2026-08-07"
-    # for crawled_date in pd.date_range(start_date, end_date):
-    #     crawled_date = crawled_date.date().strftime("%Y-%m-%d")
-    #     for store in [1, 2]:
-    #         print(crawled_date, store)
-    #         compact_incoming_app_details(store=store, crawled_date=crawled_date)
     compact_incoming_app_details(store=store, crawled_date=crawled_date)
 
     prefix = f"{RAW_DATA_APP_DETAILS}/store={store}/crawled_date={crawled_date}/country=US/crawl_result=1/"
@@ -203,7 +194,6 @@ def import_app_details_from_s3_into_db(
         return
 
     for parquet_path in parquet_paths:
-        print(parquet_path)
         with get_duckdb_connection("s3") as duckdb_con:
             df = duckdb_con.execute(
                 f"SELECT * FROM read_parquet({[parquet_path]}, union_by_name=true)"

@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict eHJ4MfOlE5phKPWqwRXagEG0seyZZ2VNuL9qoKhq1LS06wdNkp8777fkcQXBtk7
+\restrict hScObP5GQ1wcarNLuMM1iocq2HUbFGVCbhPZOxH3dgHAVLp2posQveb5miUJlCU
 
--- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
--- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
+-- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
+-- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -113,5 +113,5 @@ CREATE UNIQUE INDEX idx_apps_new_yearly ON frontend.apps_new_yearly USING btree 
 -- PostgreSQL database dump complete
 --
 
-\unrestrict eHJ4MfOlE5phKPWqwRXagEG0seyZZ2VNuL9qoKhq1LS06wdNkp8777fkcQXBtk7
+\unrestrict hScObP5GQ1wcarNLuMM1iocq2HUbFGVCbhPZOxH3dgHAVLp2posQveb5miUJlCU
 

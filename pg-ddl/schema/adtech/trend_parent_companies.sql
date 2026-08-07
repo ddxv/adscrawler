@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict 63AJanRonhbtJUwndwLhOdAuipVygG46mscetJuDr6PbTVL8NzFI3b6Xjiu8VN5
+\restrict NAcz0ogKz9OCcYvGzjMwWNRDwYwdQohqboGOHyqxae5ZEhFbx8icGCsttFw9PCK
 
--- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
--- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
+-- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
+-- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -49,5 +49,5 @@ ALTER TABLE adtech.trend_parent_companies OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 63AJanRonhbtJUwndwLhOdAuipVygG46mscetJuDr6PbTVL8NzFI3b6Xjiu8VN5
+\unrestrict NAcz0ogKz9OCcYvGzjMwWNRDwYwdQohqboGOHyqxae5ZEhFbx8icGCsttFw9PCK
 

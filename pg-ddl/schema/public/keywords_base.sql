@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict EXchYBUb3DtXeYcnLWjGNZm4usAr0e3PO0j5pBevHh0iMCaEpzQV2JiVKg086Zr
+\restrict 8vu0MaErjI6LUDp2M4jyU3mP5VUDBdF7GtJvJpujSeGxoLJbqIEtowS5RHB10Fd
 
--- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
--- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
+-- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
+-- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -38,5 +38,5 @@ ALTER TABLE public.keywords_base OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict EXchYBUb3DtXeYcnLWjGNZm4usAr0e3PO0j5pBevHh0iMCaEpzQV2JiVKg086Zr
+\unrestrict 8vu0MaErjI6LUDp2M4jyU3mP5VUDBdF7GtJvJpujSeGxoLJbqIEtowS5RHB10Fd
 

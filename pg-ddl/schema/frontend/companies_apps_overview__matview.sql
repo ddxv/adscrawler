@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict 1PB0snPUgnsRsOI9vmfgOLnIDvG7keJ70y2iGdJFZegJxKL2tN2hvxmuW8egd3z
+\restrict UHk6FQ3VYuAKrvpzvOb3ge0J7ijQzSGD9jZN9JnlMNqZHjz9kT7GZIP7Zx2CKhr
 
--- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
--- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
+-- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
+-- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -32,7 +32,7 @@ CREATE MATERIALIZED VIEW frontend.companies_apps_overview AS
          SELECT DISTINCT savs.store_app,
             sd.company_id,
             sc.category_id
-           FROM ((adtech.store_app_sdk_strings savs
+           FROM ((adtech.app_sdks savs
              LEFT JOIN adtech.sdks sd ON ((savs.sdk_id = sd.id)))
              JOIN adtech.sdk_categories sc ON ((savs.sdk_id = sc.sdk_id)))
         )
@@ -70,5 +70,5 @@ CREATE UNIQUE INDEX companies_apps_overview_unique_idx ON frontend.companies_app
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 1PB0snPUgnsRsOI9vmfgOLnIDvG7keJ70y2iGdJFZegJxKL2tN2hvxmuW8egd3z
+\unrestrict UHk6FQ3VYuAKrvpzvOb3ge0J7ijQzSGD9jZN9JnlMNqZHjz9kT7GZIP7Zx2CKhr
 

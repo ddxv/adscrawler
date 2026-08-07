@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict a8AeVGhJJnToPe3RuUB4u3stKDJsSJiMgO93ja50iw2DcFHxbrO0CfLq5y5CDaC
+\restrict T2xTcC5YKjoP5Q5Fy3QaMQ3IVraNs984Hsk71V3I9E9l2ebdF6fWgk465lfyqT5
 
--- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
--- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
+-- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
+-- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -48,5 +48,5 @@ CREATE INDEX idx_app_country_crawls_latest ON logging.app_country_crawls USING b
 -- PostgreSQL database dump complete
 --
 
-\unrestrict a8AeVGhJJnToPe3RuUB4u3stKDJsSJiMgO93ja50iw2DcFHxbrO0CfLq5y5CDaC
+\unrestrict T2xTcC5YKjoP5Q5Fy3QaMQ3IVraNs984Hsk71V3I9E9l2ebdF6fWgk465lfyqT5
 

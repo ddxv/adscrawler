@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict xvIzMHl3gOFFvgyTqG87H5jued7MYCdgsF5hmZXLL5FFDNs13TeJOeYNzFcYRux
+\restrict o12xnhRnmATLCLKEGAipaQtmLKYj91oh7WxED9wbqEcetRYvItqjEa7dGvEcc9x
 
--- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
--- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
+-- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
+-- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -55,5 +55,5 @@ ALTER TABLE ONLY logging.developers_crawled_at
 -- PostgreSQL database dump complete
 --
 
-\unrestrict xvIzMHl3gOFFvgyTqG87H5jued7MYCdgsF5hmZXLL5FFDNs13TeJOeYNzFcYRux
+\unrestrict o12xnhRnmATLCLKEGAipaQtmLKYj91oh7WxED9wbqEcetRYvItqjEa7dGvEcc9x
 

@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict qij3VTSfMg8SH63wRsIJuhLBlyq6XVOacjebpfCwtqQZDeza5a8cyjXiAZBhw2p
+\restrict KwO0cdA77vAdegLpRzgndrHpf6bvCbhWVcEcchPXEabP0wuhl41c9yPrtZp3O5h
 
--- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
--- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
+-- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
+-- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -45,5 +45,5 @@ ALTER MATERIALIZED VIEW public.mv_app_categories OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict qij3VTSfMg8SH63wRsIJuhLBlyq6XVOacjebpfCwtqQZDeza5a8cyjXiAZBhw2p
+\unrestrict KwO0cdA77vAdegLpRzgndrHpf6bvCbhWVcEcchPXEabP0wuhl41c9yPrtZp3O5h
 

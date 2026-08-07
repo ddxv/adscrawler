@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict gQR1eo2qanp7gQCTPZajFeecXhU3w3J9DeasI1WgzTafmVrF96yve8JOLtVFhOU
+\restrict m1kW4pzg8yPsyecS46QslzmMXVGp2QYbLAlWbqFVzQv7VLhgpgZ4GUQyBAFhCMB
 
--- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
--- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
+-- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
+-- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -37,7 +37,7 @@ CREATE MATERIALIZED VIEW adtech.combined_app_companies AS
         ), sdk_based_companies AS (
          SELECT DISTINCT sasd.store_app,
             c_1.domain_id
-           FROM ((adtech.store_app_sdk_strings sasd
+           FROM ((adtech.app_sdks sasd
              LEFT JOIN adtech.sdks sac ON ((sac.id = sasd.sdk_id)))
              LEFT JOIN adtech.companies c_1 ON ((sac.company_id = c_1.id)))
         ), distinct_ad_and_pub_domains AS (
@@ -139,5 +139,5 @@ ALTER MATERIALIZED VIEW adtech.combined_app_companies OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict gQR1eo2qanp7gQCTPZajFeecXhU3w3J9DeasI1WgzTafmVrF96yve8JOLtVFhOU
+\unrestrict m1kW4pzg8yPsyecS46QslzmMXVGp2QYbLAlWbqFVzQv7VLhgpgZ4GUQyBAFhCMB
 

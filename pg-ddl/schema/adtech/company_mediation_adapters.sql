@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict brmAd2Z63dy4CtKPXamD4zNeWm151VzvCDPaeLwbiBbr81cmrQ5fdqEXVFsSXFi
+\restrict R5g7lbxopIn2iV4cgJ8oIOkqJ9KCUcJzvQR04ytD8XfTOFh6QBiiq4V4QpipbcU
 
--- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
--- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
+-- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
+-- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -55,5 +55,5 @@ ALTER TABLE ONLY adtech.company_mediation_adapters
 -- PostgreSQL database dump complete
 --
 
-\unrestrict brmAd2Z63dy4CtKPXamD4zNeWm151VzvCDPaeLwbiBbr81cmrQ5fdqEXVFsSXFi
+\unrestrict R5g7lbxopIn2iV4cgJ8oIOkqJ9KCUcJzvQR04ytD8XfTOFh6QBiiq4V4QpipbcU
 

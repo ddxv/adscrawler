@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict ouapWd6ePPDkqNxkxhlh7qyXlMBnxmWRoUEr66TwUvWyPA7rfE2nxZ414Ra1nbt
+\restrict BOtRIj4dj9ChsbJx1jTuBCcEsvjtfCuS9qnf2B8XYoavy48U0B03DxkPwbQ3C6a
 
--- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
--- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg24.04+1)
+-- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
+-- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -45,8 +45,7 @@ CREATE MATERIALIZED VIEW frontend.companies_category_tag_type_stats AS
                     ELSE cats.url_slug
                 END AS type_url_slug,
             count(DISTINCT csac.store_app) AS app_count,
-            sum(sa.installs_sum_4w) AS installs_d30,
-            sum(sa.installs) AS installs_total
+            sum(sa.installs_sum_4w) AS installs_d30
            FROM (((((((adtech.combined_app_companies csac
              LEFT JOIN public.domains ad ON ((csac.domain_id = ad.id)))
              LEFT JOIN adtech.companies c ON ((csac.company_id = c.id)))
@@ -62,11 +61,16 @@ CREATE MATERIALIZED VIEW frontend.companies_category_tag_type_stats AS
                     WHEN (tag.tag_source = 'publisher'::text) THEN 'app-publishers'::character varying
                     ELSE cats.url_slug
                 END
+        ), latest_store_app_c AS (
+         SELECT app_sdks.store_app,
+            max(app_sdks.version_code_created_at) AS latest_created_at
+           FROM adtech.app_sdks
+          GROUP BY app_sdks.store_app
         ), store_app_sdks AS (
-         SELECT DISTINCT sass.store_app,
-            sass.sdk_id
-           FROM adtech.store_app_sdk_strings sass
-          WHERE (sass.sdk_id IS NOT NULL)
+         SELECT DISTINCT a.store_app,
+            a.sdk_id
+           FROM (adtech.app_sdks a
+             JOIN latest_store_app_c l ON (((l.store_app = a.store_app) AND (l.latest_created_at = a.version_code_created_at))))
         ), sdk_and_mediation AS (
          SELECT sa.store,
             sa.category AS app_category,
@@ -75,8 +79,7 @@ CREATE MATERIALIZED VIEW frontend.companies_category_tag_type_stats AS
             c.name AS company_name,
             cats.url_slug AS type_url_slug,
             count(DISTINCT sas.store_app) AS app_count,
-            sum(sa.installs_sum_4w) AS installs_d30,
-            sum(sa.installs) AS installs_total
+            sum(sa.installs_sum_4w) AS installs_d30
            FROM ((((((store_app_sdks sas
              LEFT JOIN adtech.sdks s ON ((sas.sdk_id = s.id)))
              LEFT JOIN adtech.companies c ON ((s.company_id = c.id)))
@@ -93,8 +96,7 @@ CREATE MATERIALIZED VIEW frontend.companies_category_tag_type_stats AS
     api_and_app_ads.company_name,
     api_and_app_ads.type_url_slug,
     api_and_app_ads.app_count,
-    api_and_app_ads.installs_d30,
-    api_and_app_ads.installs_total
+    api_and_app_ads.installs_d30
    FROM api_and_app_ads
 UNION ALL
  SELECT sdk_and_mediation.store,
@@ -104,8 +106,7 @@ UNION ALL
     sdk_and_mediation.company_name,
     sdk_and_mediation.type_url_slug,
     sdk_and_mediation.app_count,
-    sdk_and_mediation.installs_d30,
-    sdk_and_mediation.installs_total
+    sdk_and_mediation.installs_d30
    FROM sdk_and_mediation
   WITH NO DATA;
 
@@ -123,5 +124,5 @@ CREATE UNIQUE INDEX frontend_companies_category_tag_type_stats_unique ON fronten
 -- PostgreSQL database dump complete
 --
 
-\unrestrict ouapWd6ePPDkqNxkxhlh7qyXlMBnxmWRoUEr66TwUvWyPA7rfE2nxZ414Ra1nbt
+\unrestrict BOtRIj4dj9ChsbJx1jTuBCcEsvjtfCuS9qnf2B8XYoavy48U0B03DxkPwbQ3C6a
 
