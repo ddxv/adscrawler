@@ -28,7 +28,7 @@ import pandas as pd
 from sqlalchemy import text
 
 from adscrawler.config import CONFIG, get_logger
-from adscrawler.dbcon.connection import get_db_connection
+from adscrawler.dbcon.connection import get_db_connection, PostgresEngine
 from adscrawler.dbcon.queries import update_from_df
 from adscrawler.process.storage import get_s3_client
 
@@ -37,8 +37,6 @@ logger = get_logger(__name__)
 ICON_S3_KEY = "digi-cloud"
 ICON_BUCKET = CONFIG[ICON_S3_KEY]["bucket"]
 ICON_PREFIX = "app-icons"
-
-pgdb = get_db_connection()
 
 
 # ── Data structures ─────────────────────────────────────────────────────
@@ -100,10 +98,7 @@ def list_all_icons_from_s3() -> dict[str, dict[str, IconFile]]:
     return result
 
 
-# ── Phase 2: query the current DB state ─────────────────────────────────
-
-
-def query_apps_icon_state() -> pd.DataFrame:
+def query_apps_icon_state(pgdb: PostgresEngine) -> pd.DataFrame:
     """Return *all* ``store_apps`` rows with their current icon columns.
 
     We need the full picture so we can spot discrepancies in both directions.
@@ -181,7 +176,7 @@ def cross_reference(
 # ── Phase 4: apply updates ──────────────────────────────────────────────
 
 
-def apply_restore(rows: list[dict[str, Any]]) -> None:
+def apply_restore(rows: list[dict[str, Any]], pgdb: PostgresEngine) -> None:
     """Update DB rows with icon filenames recovered from S3."""
     if not rows:
         return
@@ -196,7 +191,9 @@ def apply_restore(rows: list[dict[str, Any]]) -> None:
     logger.info("Restored icon_128/icon_64 for %d app(s) from S3", len(rows))
 
 
-def apply_nullify(to_null_128: list[int], to_null_64: list[int]) -> None:
+def apply_nullify(
+    to_null_128: list[int], to_null_64: list[int], pgdb: PostgresEngine
+) -> None:
     """NULL out orphaned icon columns and clear their crawl log."""
     affected_ids: set[int] = set()
 
@@ -255,11 +252,12 @@ def run_icon_cleanup() -> None:
     4. Apply restores (S3 → DB) and nullifications (orphans).
     """
 
+    pgdb = get_db_connection()
     logger.info("Phase 1/3: Walking S3 app-icons/ prefix …")
     s3_map = list_all_icons_from_s3()
     logger.info("Phase 1/3: Walking S3 app-icons/ prefix …")
 
-    apps_df = query_apps_icon_state()
+    apps_df = query_apps_icon_state(pgdb)
 
     logger.info("Phase 2/3: Fetching app icon states …")
     logger.info("S3 icons: %d", len(s3_map))
@@ -279,9 +277,9 @@ def run_icon_cleanup() -> None:
     )
 
     if to_restore:
-        apply_restore(to_restore)
+        apply_restore(to_restore, pgdb)
     if to_null_128 or to_null_64:
-        apply_nullify(to_null_128, to_null_64)
+        apply_nullify(to_null_128, to_null_64, pgdb)
 
     if not to_restore and not to_null_128 and not to_null_64:
         logger.info("No discrepancies found — everything is consistent.")
