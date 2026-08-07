@@ -99,20 +99,65 @@ def rankings_parquet_exists_in_s3(
 
 
 def delete_s3_objects_by_prefix(bucket: str, prefix: str, key_name: str = "s3") -> None:
-    """Delete all S3 objects with the given prefix."""
+    """Delete all S3 objects with the given prefix.
+
+    Paginates all matching objects, then deletes in batches of 1000
+    with a small sleep between batches.
+    """
     s3 = get_s3_client(key_name)
-    response = s3.list_objects_v2(
-        Bucket=bucket,
-        Prefix=prefix,
-    )
-    time.sleep(0.1)
-    if "Contents" in response:
-        logger.info("found objects, deleting")
+    paginator = s3.get_paginator("list_objects_v2")
+    keys_to_delete = []
+    for page in paginator.paginate(Bucket=bucket, Prefix=prefix):
+        for obj in page.get("Contents", []):
+            keys_to_delete.append({"Key": obj["Key"]})
+    if not keys_to_delete:
+        logger.info(f"No objects to delete at prefix {prefix}")
+        return
+    logger.info(f"Deleting {len(keys_to_delete)} objects with prefix {prefix}")
+    chunk_size = 500
+    key_len = len(keys_to_delete)
+    for i in range(0, key_len, chunk_size):
+        logger.info(f"Deleting {key_len} objects in batch {i} / {key_len}")
+        chunk = keys_to_delete[i : i + chunk_size]
+        s3.delete_objects(Bucket=bucket, Delete={"Objects": chunk})
+        if i + chunk_size < len(keys_to_delete):
+            time.sleep(0.1)
+
+
+def delete_s3_objects_by_keys(
+    bucket: str, s3_paths: list[str], key_name: str = "s3"
+) -> None:
+    """Delete specific S3 objects by their ``s3://bucket/...`` paths.
+
+    Deletes in batches of 500 with a small sleep between batches.
+    Extracts the S3 key from each ``s3://bucket/key`` path automatically.
+
+    Args:
+        bucket: S3 bucket name.
+        s3_paths: List of ``s3://bucket/key`` paths to delete.
+        key_name: S3 config key (default ``"s3"``).
+    """
+    s3 = get_s3_client(key_name)
+    bucket_prefix = f"s3://{bucket}/"
+    keys_to_delete = []
+    for path in s3_paths:
+        if path.startswith(bucket_prefix):
+            keys_to_delete.append({"Key": path[len(bucket_prefix) :]})
+        else:
+            keys_to_delete.append({"Key": path})
+
+    logger.info(f"Deleting {len(keys_to_delete)} S3 objects in batches of 500")
+    for i in range(0, len(keys_to_delete), 500):
+        logger.info(
+            f"Deleting {len(keys_to_delete)} S3 objects in batch {i // 500 + 1}"
+        )
+        batch = keys_to_delete[i : i + 500]
         s3.delete_objects(
             Bucket=bucket,
-            Delete={"Objects": [{"Key": obj["Key"]} for obj in response["Contents"]]},
+            Delete={"Objects": batch},
         )
-    time.sleep(0.1)
+        if i + 500 < len(keys_to_delete):
+            time.sleep(0.1)
 
 
 def delete_s3_objects_by_date_range(

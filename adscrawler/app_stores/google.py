@@ -120,7 +120,7 @@ def _get_model(low_memory: bool = False) -> Any:
             from ftlangdetect.detect import get_or_load_model
         except Exception as exc:  # pragma: no cover - optional dependency
             raise ImportError(
-                "Language-detection requires optional packages. Install with: pip install ftlangdetect[fasttext] or pip install fasttext ftlangdetect"
+                "Language-detection requires packages: pip install fasttext fasttext-langdetect"
             ) from exc
 
         _MODEL_CACHE[low_memory] = get_or_load_model(low_memory=low_memory)

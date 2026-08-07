@@ -25,6 +25,7 @@ from adscrawler.process import (
     RAW_DATA_KEYWORDS,
 )
 from adscrawler.process.storage import (
+    delete_s3_objects_by_keys,
     get_duckdb_connection,
     get_parquet_paths_by_prefix,
     get_s3_client,
@@ -93,7 +94,8 @@ def compact_incoming_app_details(
         store: Store ID (1 = Google Play, 2 = App Store).
         crawled_date: ISO-format date string (e.g. ``"2026-07-09"``).
     """
-    logger.info(f"Compacting incoming app_details {store=} {crawled_date=}")
+    log_info = f"compacting: {crawled_date=} {store=}"
+    logger.info(f"{log_info} start")
     bucket = CONFIG["s3"]["bucket"]
 
     prefix = (
@@ -112,42 +114,54 @@ def compact_incoming_app_details(
                 f"{RAW_DATA_APP_DETAILS_INCOMING}"
                 f"/store={store}/crawled_date={crawled_date}/country={country}/"
             )
-            parquet_paths = get_parquet_paths_by_prefix(bucket, incoming_prefix)
-            if not parquet_paths:
-                logger.warning(
-                    f"No incoming parquet files for {store=} {crawled_date=} {country=}"
-                )
-                continue
-
-            logger.info(
-                f"Compacting {len(parquet_paths)} files for {store=} {crawled_date=} {country=}"
-            )
-
-            epoch_ms = int(time.time() * 1000)
-            # suffix = uuid.uuid4().hex[:8]
-            suffix = "0"
-            file_name = f"compacted_{epoch_ms}_{suffix}.parquet"
-            s3_key = (
+            output_dir = (
                 f"{RAW_DATA_APP_DETAILS}"
-                f"/store={store}/crawled_date={crawled_date}/country={country}/{file_name}"
+                f"/store={store}/crawled_date={crawled_date}/country={country}"
             )
+
+            glob_path = f"s3://{bucket}/{incoming_prefix}*.parquet"
+            epoch_ms = int(time.time() * 1000)
+            country_parquet_paths = get_parquet_paths_by_prefix(bucket, incoming_prefix)
+
             with get_duckdb_connection("s3") as duckdb_con:
-                duckdb_con.execute(f"""
-                            COPY (
-                                SELECT * FROM read_parquet({parquet_paths}, union_by_name=true)
-                            ) TO 's3://{bucket}/{s3_key}' (FORMAT PARQUET);
-                        """)
+                # COPY automatically returns the total row count written
+                res = duckdb_con.execute(f"""
+                    COPY (
+                        SELECT * FROM read_parquet('{glob_path}', union_by_name=true)
+                    ) TO 's3://{bucket}/{output_dir}' (
+                        FORMAT PARQUET,
+                        PARTITION_BY (crawl_result),
+                        FILENAME_PATTERN 'compacted_{epoch_ms}_{{i}}',
+                        OVERWRITE_OR_IGNORE 1,
+                        FILE_SIZE_BYTES '128MB',
+                        COMPRESSION 'zstd'
+                    );
+                """)
+                copied_count = res.fetchone()[0]
 
-                row_count = duckdb_con.execute(
-                    f"SELECT count(*) FROM read_parquet(['s3://{bucket}/{s3_key}'])"
+                # Read back from source glob to verify row counts match
+                source_count = duckdb_con.execute(
+                    f"SELECT count(*) FROM read_parquet('{glob_path}', union_by_name=true)"
                 ).fetchone()[0]
-                logger.info(f"Compacted -> s3://{bucket}/{s3_key} [{row_count:,} rows]")
-        except Exception as e:
-            logger.exception(
-                f"Error compacting {store=} {crawled_date=} {country=}: {e}"
+
+                logger.info(
+                    f"{log_info} {country=} compacted {copied_count}/{source_count} rows"
+                )
+
+                if source_count != copied_count or copied_count == 0:
+                    raise ValueError(
+                        f"Row count mismatch! Source had {source_count} rows, but {copied_count} were copied."
+                    )
+
+            delete_s3_objects_by_keys(bucket=bucket, s3_paths=country_parquet_paths)
+            logger.info(
+                f"{log_info} {country=} Deleted {len(country_parquet_paths)} incoming files"
             )
 
-    logger.info(f"Compacting incoming app_details {store=} {crawled_date=} finished")
+        except Exception as e:
+            logger.exception(f"Error compacting {log_info} {country=}: {e}")
+
+    logger.info(f"{log_info} finished")
 
 
 def import_app_details_from_s3_into_db(
@@ -173,53 +187,63 @@ def import_app_details_from_s3_into_db(
 
     bucket = CONFIG["s3"]["bucket"]
 
+    # start_date = "2026-07-10"
+    # end_date = "2026-08-07"
+    # for crawled_date in pd.date_range(start_date, end_date):
+    #     crawled_date = crawled_date.date().strftime("%Y-%m-%d")
+    #     for store in [1, 2]:
+    #         print(crawled_date, store)
+    #         compact_incoming_app_details(store=store, crawled_date=crawled_date)
     compact_incoming_app_details(store=store, crawled_date=crawled_date)
 
-    prefix = (
-        f"{RAW_DATA_APP_DETAILS}/store={store}/crawled_date={crawled_date}/country=US/"
-    )
+    prefix = f"{RAW_DATA_APP_DETAILS}/store={store}/crawled_date={crawled_date}/country=US/crawl_result=1/"
     parquet_paths = get_parquet_paths_by_prefix(bucket, prefix)
     if not parquet_paths:
         logger.warning(f"No app_details parquet files found at {prefix}")
         return
 
-    with get_duckdb_connection("s3") as duckdb_con:
-        df = duckdb_con.execute(
-            f"SELECT * FROM read_parquet({parquet_paths}, union_by_name=true)"
-        ).df()
+    for parquet_path in parquet_paths:
+        print(parquet_path)
+        with get_duckdb_connection("s3") as duckdb_con:
+            df = duckdb_con.execute(
+                f"SELECT * FROM read_parquet({[parquet_path]}, union_by_name=true)"
+            ).df()
 
-    if df.empty:
-        logger.warning(f"Empty dataset at {prefix}")
-        return
+        if df.empty:
+            logger.warning(f"Empty dataset at {prefix}")
+            continue
 
-    df = df[df["crawl_result"] == 1]
-    df["store_app"] = df["store_app_db_id"].astype(int)
+        df = df[df["crawl_result"] == 1]
+        df["store_app"] = df["store_app_db_id"].astype(int)
 
-    # Some data is pulled specifically for new apps, but since other crawls don't have it, they have null values
-    df = df.drop(columns=["icon_url_100"])
+        # Some data is pulled specifically for new apps, but since other crawls don't have it, they have null values
+        cols_to_drop = ["icon_url_100", "icon_128", "icon_64"]
+        for col in cols_to_drop:
+            if col in df.columns:
+                df = df.drop(columns=[col])
 
-    missing = df["store_app"].isna()
-    if missing.any():
-        logger.warning(
-            f"DROPPING {missing.sum()} rows with unknown store_ids "
-            f"(not yet in the store_apps table)"
+        missing = df["store_app"].isna()
+        if missing.any():
+            logger.warning(
+                f"DROPPING {missing.sum()} rows with unknown store_ids "
+                f"(not yet in the store_apps table)"
+            )
+            df = df[~missing]
+
+        if df.empty:
+            logger.warning("No rows left after resolving store_app IDs")
+            continue
+
+        from adscrawler.app_stores.scrape_stores import (
+            process_live_app_details,  # noqa: PLC0415
         )
-        df = df[~missing]
 
-    if df.empty:
-        logger.warning("No rows left after resolving store_app IDs")
-        return
-
-    from adscrawler.app_stores.scrape_stores import (
-        process_live_app_details,  # noqa: PLC0415
-    )
-
-    process_live_app_details(
-        store=store,
-        results_df=df,
-        pgdb=pgdb,
-        process_icon=False,
-    )
+        process_live_app_details(
+            store=store,
+            results_df=df,
+            pgdb=pgdb,
+            process_icon=False,
+        )
 
 
 def import_keywords_from_s3(
