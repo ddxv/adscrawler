@@ -65,6 +65,7 @@ def move_downloaded_app_to_main_dir(downloaded_file_path: pathlib.Path) -> pathl
 
 
 def unzip_apk(store_id: str, file_path: pathlib.Path) -> pathlib.Path:
+    log_info = f"unzip apk like file {store_id=}"
     extension = file_path.suffix
     if extension == ".apk":
         apk_to_decode_path = file_path
@@ -136,30 +137,32 @@ def unzip_apk(store_id: str, file_path: pathlib.Path) -> pathlib.Path:
             )
 
         if result.stderr:
-            logger.error(f"Error: {result.stderr}")
+            logger.error(f"{log_info} error: {result.stderr}")
 
         # Check return code
         if result.returncode != 0:
             raise subprocess.CalledProcessError(result.returncode, command)
 
     except subprocess.CalledProcessError as e:
-        logger.error(f"Command failed with return code {e.returncode}")
+        logger.error(f"{log_info} Command failed with return code {e.returncode}")
         raise
+    logger.info(f"{log_info} unzipped to {tmp_decoded_output_path=}")
     return tmp_decoded_output_path
 
 
 def unzip_ipa(ipa_path: pathlib.Path, store_id: str) -> pathlib.Path:
+    log_info = f"unzip ipa file {store_id=}"
     tmp_decoded_output_path = pathlib.Path(IPAS_TMP_UNZIPPED_DIR, store_id)
     if tmp_decoded_output_path.exists():
         empty_folder(tmp_decoded_output_path)
     if not ipa_path.exists():
-        logger.error(f"path: {ipa_path.as_posix()} file not found")
+        logger.error(f"{log_info} path: {ipa_path.as_posix()} file not found")
         raise FileNotFoundError(f"IPA file not found: {ipa_path.as_posix()}")
     command = f"unzip {ipa_path.as_posix()} -d {tmp_decoded_output_path.as_posix()}"
     # Run the command
     result = os.system(command)
     # Print the standard output of the command
-    logger.info(f"Unzip output: {result}")
+    logger.info(f"{log_info} end")
     return tmp_decoded_output_path
 
 
