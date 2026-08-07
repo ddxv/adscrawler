@@ -1,3 +1,4 @@
+import subprocess
 import datetime
 import io
 import os
@@ -622,6 +623,45 @@ def get_parquet_paths_by_prefix(bucket: str, prefix: str) -> list[str]:
         else:
             break
     return all_parquet_paths
+
+
+def set_iptables_rule_for_wt0() -> None:
+    """
+    Ensures the iptables-legacy rule allowing output on wt0 is placed at position 1.
+    Silently succeeds if the command isn't available or fails gracefully on missing permissions.
+    """
+    check_cmd = ["sudo", "iptables-legacy", "-C", "OUTPUT", "-o", "wt0", "-j", "ACCEPT"]
+    insert_cmd = [
+        "sudo",
+        "iptables-legacy",
+        "-I",
+        "OUTPUT",
+        "1",
+        "-o",
+        "wt0",
+        "-j",
+        "ACCEPT",
+    ]
+
+    try:
+        # Check if rule already exists (returns 0 if exists, non-zero if missing)
+        result = subprocess.run(
+            check_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+        )
+
+        if result.returncode != 0:
+            # Rule doesn't exist, insert it at position 1
+            subprocess.run(
+                insert_cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+            )
+            logger.info("Successfully added wt0 ACCEPT rule to iptables-legacy.")
+        else:
+            logger.debug("wt0 ACCEPT rule already present in iptables-legacy.")
+
+    except FileNotFoundError:
+        logger.warning("sudo or iptables-legacy command not found on this system.")
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Failed to set iptables rule: {e.stderr.decode().strip()}")
 
 
 def download_app_to_local(

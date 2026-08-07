@@ -42,7 +42,11 @@ from adscrawler.packages.utils import (
     remove_tmp_files,
     unzip_apk,
 )
-from adscrawler.process.storage import download_app_to_local, upload_mitm_log_to_s3
+from adscrawler.process.storage import (
+    download_app_to_local,
+    set_iptables_rule_for_wt0,
+    upload_mitm_log_to_s3,
+)
 
 logger = get_logger(__name__, "waydroid")
 
@@ -895,6 +899,7 @@ def process_apks_for_waydroid(
         f"Waydroid has {apps_df.shape[0]:,} apps to process, starting {num_apps}"
     )
     apps_df = apps_df.head(num_apps)
+    set_iptables_rule_for_wt0()
     for _, row in apps_df.iterrows():
         logger.info(f"Start app {_}/{apps_df.shape[0]:,}: {row.store_id}")
         store_id = row.store_id
