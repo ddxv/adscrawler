@@ -781,8 +781,22 @@ def set_iptables_rule_for_wt0() -> None:
         "-j",
         "ACCEPT",
     ]
+    insert_cmd2 = [
+        "sudo",
+        "iptables",
+        "-I",
+        "OUTPUT",
+        "1",
+        "-o",
+        "wt0",
+        "-j",
+        "ACCEPT",
+    ]
     subprocess.run(
         insert_cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+    )
+    subprocess.run(
+        insert_cmd2, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
     )
     logger.info("Successfully added wt0 ACCEPT rule to iptables-legacy.")
 
