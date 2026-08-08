@@ -195,45 +195,55 @@ def import_app_details_from_s3_into_db(
 
     for parquet_path in parquet_paths:
         with get_duckdb_connection("s3") as duckdb_con:
-            df = duckdb_con.execute(
-                f"SELECT * FROM read_parquet({[parquet_path]}, union_by_name=true)"
-            ).df()
-
-        if df.empty:
-            logger.warning(f"Empty dataset at {prefix}")
-            continue
-
-        df = df[df["crawl_result"] == 1]
-        df["store_app"] = df["store_app_db_id"].astype(int)
-
-        # Some data is pulled specifically for new apps, but since other crawls don't have it, they have null values
-        cols_to_drop = ["icon_url_100", "icon_128", "icon_64"]
-        for col in cols_to_drop:
-            if col in df.columns:
-                df = df.drop(columns=[col])
-
-        missing = df["store_app"].isna()
-        if missing.any():
-            logger.warning(
-                f"DROPPING {missing.sum()} rows with unknown store_ids "
-                f"(not yet in the store_apps table)"
+            # Execute query without calling .df() immediately
+            rel = duckdb_con.execute(
+                f"SELECT * FROM read_parquet('{parquet_path}', union_by_name=true)"
             )
-            df = df[~missing]
+            # vectors * 2,048 = rows
+            while True:
+                df_chunk = rel.fetch_df_chunk(vectors_per_chunk=100)
+                if df_chunk.empty:
+                    break
+                process_chunk(df_chunk, store, pgdb)
 
-        if df.empty:
-            logger.warning("No rows left after resolving store_app IDs")
-            continue
 
-        from adscrawler.app_stores.scrape_stores import (
-            process_live_app_details,  # noqa: PLC0415
+def process_chunk(df_chunk: pd.DataFrame, store: int, pgdb: PostgresEngine) -> None:
+    """Process a chunk of app details DataFrame."""
+    if df_chunk.empty:
+        logger.warning(f"Empty dataset!")
+        return
+
+    df_chunk = df_chunk[df_chunk["crawl_result"] == 1]
+    df_chunk["store_app"] = df_chunk["store_app_db_id"].astype(int)
+
+    # Some data is pulled specifically for new apps, but since other crawls don't have it, they have null values
+    cols_to_drop = ["icon_url_100", "icon_128", "icon_64"]
+    for col in cols_to_drop:
+        if col in df_chunk.columns:
+            df_chunk = df_chunk.drop(columns=[col])
+
+    missing = df_chunk["store_app"].isna()
+    if missing.any():
+        logger.warning(
+            f"DROPPING {missing.sum()} rows with unknown store_ids "
+            f"(not yet in the store_apps table)"
         )
+        df_chunk = df_chunk[~missing]
 
-        process_live_app_details(
-            store=store,
-            results_df=df,
-            pgdb=pgdb,
-            process_icon=False,
-        )
+    if df_chunk.empty:
+        logger.warning("No rows left after resolving store_app IDs")
+        return
+
+    from adscrawler.app_stores.scrape_stores import (
+        process_live_app_details,  # noqa: PLC0415
+    )
+
+    process_live_app_details(
+        store=store,
+        results_df=df_chunk,
+        pgdb=pgdb,
+        process_icon=False,
+    )
 
 
 def import_keywords_from_s3(
