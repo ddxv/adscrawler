@@ -22,6 +22,7 @@ from adscrawler.packages.process_files import (
 from adscrawler.process.app_details import (
     import_app_details_from_s3_into_db,
     import_keywords_from_s3,
+    compact_incoming_app_details,
 )
 from adscrawler.process.app_domain_history import (
     process_company_history,
@@ -457,6 +458,7 @@ class ProcessManager:
                 datetime.date.today().isoformat(),
             ]:
                 try:
+                    compact_incoming_app_details(store=store, crawled_date=crawled_date)
                     import_app_details_from_s3_into_db(
                         store=store,
                         crawled_date=crawled_date,

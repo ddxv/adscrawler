@@ -30,6 +30,9 @@ from adscrawler.process.storage import (
     get_parquet_paths_by_prefix,
     get_s3_client,
     get_s3_dirs_by_prefix,
+    filter_unprocessed_s3_files,
+    record_s3_file_status,
+    get_s3_objects_metadata,
 )
 
 logger = get_logger(__name__, "scrape_stores")
@@ -171,7 +174,7 @@ def import_app_details_from_s3_into_db(
     upsert into the database via ``process_live_app_details``.
 
     The function reads all parquet files under
-    ``raw-data/app_details/store={store}/crawled_date={crawled_date}/country=US/``,
+    ``raw-data/app_details/store={store}/crawled_date={crawled_date}/country=US/crawl_result=1/``,
     resolves the ``store_app`` primary key for each row, and delegates to
     :func:`adscrawler.app_stores.scrape_stores.process_live_app_details`.
 
@@ -179,13 +182,10 @@ def import_app_details_from_s3_into_db(
         store: Store ID (1 = Google Play, 2 = App Store).
         crawled_date: ISO-format date string (e.g. ``"2026-07-02"``).
         pgdb: Database connection.
-        process_icon: Whether to process app icons (passed through).
     """
     logger.info(f"Importing app_details from S3 {store=} {crawled_date=} country=US")
 
     bucket = CONFIG["s3"]["bucket"]
-
-    compact_incoming_app_details(store=store, crawled_date=crawled_date)
 
     prefix = f"{RAW_DATA_APP_DETAILS}/store={store}/crawled_date={crawled_date}/country=US/crawl_result=1/"
     parquet_paths = get_parquet_paths_by_prefix(bucket, prefix)
@@ -193,18 +193,58 @@ def import_app_details_from_s3_into_db(
         logger.warning(f"No app_details parquet files found at {prefix}")
         return
 
+    # Skip files already recorded as completed for this pipeline
+    parquet_paths = filter_unprocessed_s3_files(
+        parquet_paths, pipeline_name="import_app_details_from_s3", pgdb=pgdb
+    )
+    if not parquet_paths:
+        logger.info("No unprocessed app_details parquet files found; nothing to do")
+        return
+
     for parquet_path in parquet_paths:
-        with get_duckdb_connection("s3") as duckdb_con:
-            # Execute query without calling .df() immediately
-            rel = duckdb_con.execute(
-                f"SELECT * FROM read_parquet('{parquet_path}', union_by_name=true)"
-            )
-            # vectors * 2,048 = rows
-            while True:
-                df_chunk = rel.fetch_df_chunk(vectors_per_chunk=100)
-                if df_chunk.empty:
-                    break
-                process_chunk(df_chunk, store, pgdb)
+        # Gather s3 metadata (etag, size) for recording
+        meta = get_s3_objects_metadata(bucket, [parquet_path])
+        etag = meta.get(parquet_path, {}).get("etag")
+        size = meta.get(parquet_path, {}).get("size")
+        rows_processed = 0
+        try:
+            with get_duckdb_connection("s3") as duckdb_con:
+                # Execute query without calling .df() immediately
+                rel = duckdb_con.execute(
+                    f"SELECT * FROM read_parquet('{parquet_path}', union_by_name=true)"
+                )
+                # vectors * 2,048 = rows
+                while True:
+                    df_chunk = rel.fetch_df_chunk(vectors_per_chunk=100)
+                    if df_chunk.empty:
+                        break
+                    process_chunk(df_chunk, store, pgdb)
+                    rows_processed += len(df_chunk)
+
+            # Record successful processing for this parquet file
+            record_s3_file_status(
+                    pipeline_name="import_app_details_from_s3",
+                    file_path=parquet_path,
+                    status="completed",
+                    pgdb=pgdb,
+                    row_count=rows_processed,
+                    error_message=None,
+                    e_tag=etag,
+                    file_size_bytes=size,
+                )
+
+        except Exception as e:
+            record_s3_file_status(
+                    pipeline_name="import_app_details_from_s3",
+                    file_path=parquet_path,
+                    status="failed",
+                    pgdb=pgdb,
+                    row_count=rows_processed or None,
+                    error_message=str(e),
+                    e_tag=etag,
+                    file_size_bytes=size,
+                )
+            logger.exception(f"Error processing parquet {parquet_path}: {e}")
 
 
 def process_chunk(df_chunk: pd.DataFrame, store: int, pgdb: PostgresEngine) -> None:

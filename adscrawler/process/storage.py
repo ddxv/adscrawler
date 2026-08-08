@@ -25,6 +25,7 @@ from adscrawler.config import (
 from adscrawler.dbcon.connection import PostgresEngine, start_ssh_tunnel
 from adscrawler.dbcon.queries import (
     query_latest_api_scan_by_store_id,
+    upsert_df,
 )
 from adscrawler.packages.utils import (
     get_local_file_path,
@@ -666,6 +667,103 @@ def get_parquet_paths_by_prefix(bucket: str, prefix: str) -> list[str]:
         else:
             break
     return all_parquet_paths
+
+
+def get_s3_objects_metadata(
+    bucket: str, s3_paths: list[str], key_name: str = "s3"
+) -> dict[str, dict]:
+    """Return metadata (etag, size) for the given list of `s3://{bucket}/key` paths.
+
+    Returns a mapping from the full s3:// path to a dict with keys `etag` and `size`.
+    """
+    s3 = get_s3_client(key_name)
+    prefix = f"s3://{bucket}/"
+    metas: dict[str, dict] = {}
+    for path in s3_paths:
+        if path.startswith(prefix):
+            key = path[len(prefix) :]
+        elif path.startswith("s3://"):
+            # Different bucket or absolute path — strip scheme
+            key = path.split("/", 3)[-1]
+        else:
+            key = path
+        try:
+            head = s3.head_object(Bucket=bucket, Key=key)
+            metas[path] = {
+                "etag": head.get("ETag"),
+                "size": head.get("ContentLength"),
+            }
+        except ClientError:
+            metas[path] = {"etag": None, "size": None}
+    return metas
+
+
+def filter_unprocessed_s3_files(
+    parquet_paths: list[str], pipeline_name: str, pgdb: PostgresEngine
+) -> list[str]:
+    """Return paths that have NOT been successfully completed for the pipeline.
+
+    Uses the `s3_processed_files` table to filter out already-completed files.
+    """
+    if not parquet_paths:
+        return []
+
+    # Build a parameterized IN clause for SQLAlchemy execution
+    # Use positional parameters: first is pipeline_name, then parquet paths
+    placeholders = ",".join(["%s" for _ in parquet_paths])
+    sql = (
+        "SELECT file_path FROM s3_processed_files "
+        "WHERE pipeline_name = %s AND file_path IN ("
+        + placeholders
+        + ") AND status = 'completed'"
+    )
+    params = [pipeline_name] + parquet_paths
+    completed_set: set[str] = set()
+    with pgdb.engine.connect() as conn:
+        res = conn.execute(sql, params)
+        for row in res.fetchall():
+            completed_set.add(row[0])
+
+    return [path for path in parquet_paths if path not in completed_set]
+
+
+def record_s3_file_status(
+    pipeline_name: str,
+    file_path: str,
+    status: str,
+    pgdb: PostgresEngine,
+    row_count: int | None = None,
+    error_message: str | None = None,
+    e_tag: str | None = None,
+    file_size_bytes: int | None = None,
+) -> None:
+    """Insert or update a row in `s3_processed_files` recording processing outcome.
+
+    Uses `upsert_df` to perform an idempotent upsert for the given pipeline/file.
+    """
+    cols = {
+        "pipeline_name": pipeline_name,
+        "file_path": file_path,
+        "status": status,
+        "row_count": row_count,
+        "error_message": error_message,
+        "e_tag": e_tag,
+        "file_size_bytes": file_size_bytes,
+    }
+    df = pd.DataFrame([cols])
+    insert_cols = [c for c in df.columns]
+    try:
+        upsert_df(
+            df=df,
+            table_name="s3_processed_files",
+            pgdb=pgdb,
+            key_columns=["pipeline_name", "file_path"],
+            insert_columns=insert_cols,
+            on_conflict_update=True,
+        )
+        logger.info(f"Recorded s3 status {pipeline_name=} {file_path=} {status=}")
+    except Exception as e:
+        logger.exception(f"Failed to record s3 file status for {file_path}: {e}")
 
 
 def set_iptables_rule_for_wt0() -> None:
