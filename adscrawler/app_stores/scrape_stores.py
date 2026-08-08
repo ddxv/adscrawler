@@ -969,7 +969,7 @@ def upsert_store_apps_descriptions(
         null_langs = apps_df[null_ids][
             ["store_id", "store_language_code"]
         ].drop_duplicates()
-        logger.error(f"App descriptions dropping unknown language codes: {null_langs}")
+        logger.debug(f"App descriptions dropping unknown language codes")
         apps_df = apps_df[~null_ids]
         if apps_df.empty:
             logger.debug("Dropped all descriptions, no language id found")

@@ -210,6 +210,11 @@ def import_app_details_from_s3_into_db(
         size = file_meta.get("size")
         rows_processed = 0
         err_msg = None
+        with get_duckdb_connection("s3") as duckdb_con:
+            # Check if the parquet file is empty before processing
+            count_query = f"SELECT COUNT(*) FROM read_parquet('{parquet_path}', union_by_name=true)"
+            row_count = duckdb_con.execute(count_query).fetchone()[0]
+        chunk_est = max(1, row_count // 2048)
         try:
             with get_duckdb_connection("s3") as duckdb_con:
                 # Execute query without calling .df() immediately
@@ -217,13 +222,17 @@ def import_app_details_from_s3_into_db(
                     f"SELECT * FROM read_parquet('{parquet_path}', union_by_name=true)"
                 )
                 # vectors * 2,048 = rows
+                i = 0
                 while True:
-                    df_chunk = rel.fetch_df_chunk(vectors_per_chunk=40)
+                    i += 1
+                    logger.info(
+                        f"chunk {i}/{chunk_est} rows {rows_processed}/{row_count}"
+                    )
+                    df_chunk = rel.fetch_df_chunk(vectors_per_chunk=5)
                     if df_chunk.empty:
                         break
                     process_chunk(df_chunk, store, pgdb)
                     rows_processed += len(df_chunk)
-
             status = "completed"
         except Exception as e:
             status = "failed"
