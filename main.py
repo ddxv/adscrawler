@@ -20,9 +20,9 @@ from adscrawler.packages.process_files import (
     process_sdks,
 )
 from adscrawler.process.app_details import (
+    compact_incoming_app_details,
     import_app_details_from_s3_into_db,
     import_keywords_from_s3,
-    compact_incoming_app_details,
 )
 from adscrawler.process.app_domain_history import (
     process_company_history,
@@ -32,7 +32,10 @@ from adscrawler.process.app_metrics_history import (
     delete_and_aggregate_s3_agg,
 )
 from adscrawler.process.app_rankings import import_ranks_from_s3
-from adscrawler.process.version_details import map_version_details
+from adscrawler.process.version_details import (
+    compact_incoming_version_details,
+    map_version_details,
+)
 from adscrawler.scrape import crawl_app_ads
 from adscrawler.tools.get_company_logos import refresh_metadata
 
@@ -452,11 +455,23 @@ class ProcessManager:
             logger.exception(
                 f"Importing {self.args.ranks_period} ranks from s3 for failed"
             )
-        for store in [1, 2]:
-            for crawled_date in [
-                (datetime.date.today() - datetime.timedelta(days=5)).isoformat(),
-                datetime.date.today().isoformat(),
-            ]:
+        try:
+            start_date = datetime.date.today() - datetime.timedelta(days=5)
+            end_date = datetime.date.today() - datetime.timedelta(days=1)
+            import_keywords_from_s3(
+                pgdb=self.pgcon,
+                start_date=start_date,
+                end_date=end_date,
+            )
+        except Exception:
+            logger.exception("Importing keywords from s3 for failed")
+
+        for crawled_date in [
+            (datetime.date.today() - datetime.timedelta(days=5)).isoformat(),
+            datetime.date.today().isoformat(),
+        ]:
+            compact_incoming_version_details(date_str=crawled_date)
+            for store in [1, 2]:
                 try:
                     compact_incoming_app_details(store=store, crawled_date=crawled_date)
                     import_app_details_from_s3_into_db(
@@ -478,16 +493,6 @@ class ProcessManager:
             clean_history_tables(pgdb=self.pgcon)
         except Exception:
             logger.exception("Cleaning history tables failed")
-        try:
-            start_date = datetime.date.today() - datetime.timedelta(days=3)
-            end_date = datetime.date.today() - datetime.timedelta(days=1)
-            import_keywords_from_s3(
-                pgdb=self.pgcon,
-                start_date=start_date,
-                end_date=end_date,
-            )
-        except Exception:
-            logger.exception("Importing keywords from s3 for failed")
 
         try:
             process_company_history(pgdb=self.pgcon)

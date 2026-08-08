@@ -1,9 +1,9 @@
-import subprocess
 import datetime
 import io
 import os
 import pathlib
 import shutil
+import subprocess
 import time
 from collections.abc import Iterable
 
@@ -728,7 +728,7 @@ def filter_unprocessed_s3_files(
 
 def record_s3_file_status(
     pipeline_name: str,
-    file_path: str,
+    file_path: str | list[str],
     status: str,
     pgdb: PostgresEngine,
     row_count: int | None = None,
@@ -749,7 +749,10 @@ def record_s3_file_status(
         "e_tag": e_tag,
         "file_size_bytes": file_size_bytes,
     }
-    df = pd.DataFrame([cols])
+    if type(file_path) is list:
+        df = pd.DataFrame(cols)
+    else:
+        df = pd.DataFrame([cols])
     insert_cols = [c for c in df.columns]
     upsert_df(
         df=df,
@@ -759,7 +762,7 @@ def record_s3_file_status(
         insert_columns=insert_cols,
         on_conflict_update=True,
     )
-    logger.info(f"Recorded s3 status {pipeline_name=} {file_path=} {status=}")
+    logger.info(f"Recorded s3 status {pipeline_name=} {status=}")
 
 
 def set_iptables_rule_for_wt0() -> None:

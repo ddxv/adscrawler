@@ -28,6 +28,7 @@ from adscrawler.process import (
     TMP_VERSION_DETAILS,
 )
 from adscrawler.process.storage import (
+    delete_s3_objects_by_keys,
     delete_s3_objects_by_prefix,
     get_duckdb_connection,
     get_parquet_paths_by_prefix,
@@ -74,39 +75,35 @@ def _build_bucket_case_sql(boundaries: list[int]) -> str:
 _STRING_BUCKET_SQL = _build_bucket_case_sql(_BUCKET_BOUNDARIES)
 
 
-def compact_incoming_to_raw_archive(date_str: str) -> None:
+def compact_incoming_version_details(date_str: str) -> None:
     """Read incoming micro-files and write to daily raw partition storage.
 
-    The glob picks up *all* incoming parquet files under
-    ``raw-data/_incoming/version-details-map/`` regardless of their individual upload
-    dates.  All rows are stamped with the single ``date_str`` passed in (one compaction
-    run = one logical batch), NOT filtered by upload date.
+    The glob picks up incoming parquet files under
+    ``raw-data/_incoming/version-details-map/`` .
     """
     if date_str >= datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d"):
         logger.info("Do not run compaction for 'today', need to wait for all data")
         return
+    logger.info(f"Compacting incoming version details for {date_str}")
     bucket = CONFIG["s3"]["bucket"]
     raw_output_path = f"s3://{bucket}/{RAW_DATA_VERSION_DETAILS}/"
 
-    # Collect *all* incoming parquet paths up front.
-    # We delete only these exact keys later so that any file written by
-    # a concurrent write_version_details_to_s3() between now and the delete
-    # is NOT silently dropped.
+    # Collect incoming parquet paths up front.
     prefix = f"{RAW_DATA_VERSION_DETAILS_INCOMING}/date={date_str}"
-    all_incoming_keys = get_parquet_paths_by_prefix(bucket, prefix)
+    incoming_keys = get_parquet_paths_by_prefix(bucket, prefix)
 
-    if not all_incoming_keys:
+    if not incoming_keys:
         logger.info("No incoming parquet files found.")
         return
 
     with get_duckdb_connection("s3") as duckdb_con:
-        duckdb_con.execute(f"""
+        res = duckdb_con.execute(f"""
             COPY (
                 WITH prepared AS (
                     SELECT 
                         CAST(string_id AS BIGINT) AS sid,
                         version_code_id
-                    FROM read_parquet({all_incoming_keys}, union_by_name=true)
+                    FROM read_parquet({incoming_keys}, union_by_name=true)
                     WHERE string_id IS NOT NULL
                 )
                 SELECT
@@ -124,15 +121,10 @@ def compact_incoming_to_raw_archive(date_str: str) -> None:
                 ROW_GROUP_SIZE {_ROW_GROUP_SIZE}
             )
         """)
+        row_count = res.fetchone()[0]
 
-    # Delete only the specific files we just archived — not the whole prefix.
-    # This avoids the race where a file written between the COPY and this
-    # delete would be removed without being archived.
-    # s3 = get_s3_client()
-    # for i in range(0, len(all_incoming_keys), 1000):
-    #     batch = [{"Key": k} for k in all_incoming_keys[i : i + 1000]]
-    #     s3.delete_objects(Bucket=bucket, Delete={"Objects": batch})
-    # logger.info(f"Archived {len(all_incoming_paths)} incoming files for {date_str}")
+    # Delete only the specific files we just archived
+    delete_s3_objects_by_keys(bucket, incoming_keys)
 
 
 def write_version_details_to_s3(
@@ -694,14 +686,6 @@ def map_version_details(pgdb) -> None:
 
     start_time = time.time()
     logger.info("Starting map_version_details entrypoint run for past days")
-
-    ### TODO: THIS IS A LOOP, not related to rest of flow?
-    for day in range(1, 4):
-        target_compact_date = (
-            datetime.datetime.today() - datetime.timedelta(days=day)
-        ).strftime("%Y-%m-%d")
-        logger.info("--- Stage 1: Compacting incoming version details ---")
-        compact_incoming_to_raw_archive(date_str=target_compact_date)
 
     logger.info("--- Stage 2: Rebuilding aggregated master version details ---")
     build_aggregated_version_details()

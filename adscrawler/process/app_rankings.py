@@ -19,7 +19,11 @@ from adscrawler.dbcon.queries import (
     upsert_df,
 )
 from adscrawler.process import RAW_DATA_APP_RANKINGS
-from adscrawler.process.storage import get_duckdb_connection, get_s3_client
+from adscrawler.process.storage import (
+    get_duckdb_connection,
+    get_parquet_paths_by_prefix,
+    get_s3_client,
+)
 
 logger = get_logger(__name__, "scrape_stores")
 
@@ -56,7 +60,6 @@ def process_store_rankings(df: pd.DataFrame, store: int) -> None:
 def get_s3_rank_parquet_paths(
     s3_config_key: str, dt: pd.DatetimeIndex, days: int, store: int
 ) -> list[str]:
-    s3 = get_s3_client()
     all_parquet_paths = []
     bucket = CONFIG[s3_config_key]["bucket"]
     for ddt in pd.date_range(dt, dt + datetime.timedelta(days=days), freq="D"):
@@ -64,12 +67,7 @@ def get_s3_rank_parquet_paths(
         prefix = (
             f"{RAW_DATA_APP_RANKINGS}/store={store}/crawled_date={ddt_str}/country="
         )
-        objects = s3.list_objects_v2(Bucket=bucket, Prefix=prefix)
-        parquet_paths = [
-            f"s3://{bucket}/{obj['Key']}"
-            for obj in objects.get("Contents", [])
-            if obj["Key"].endswith("rankings.parquet")
-        ]
+        parquet_paths = get_parquet_paths_by_prefix(bucket=bucket, prefix=prefix)
         all_parquet_paths += parquet_paths
     return all_parquet_paths
 

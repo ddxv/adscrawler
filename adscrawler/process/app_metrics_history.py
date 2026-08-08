@@ -139,11 +139,6 @@ def clean_history_tables(pgdb: PostgresEngine) -> None:
     clean_app_metrics_history_table(pgdb=pgdb, table_name="app_country_metrics_history")
 
 
-# ---------------------------------------------------------------------------
-# Full aggregation pipeline
-# ---------------------------------------------------------------------------
-
-
 def delete_and_aggregate_s3_agg(
     store: int,
     pgdb: PostgresEngine,
@@ -339,11 +334,6 @@ def make_s3_app_hash_metrics_history_weekly(
     )
     with get_duckdb_connection(s3_config_key) as duckdb_con:
         duckdb_con.execute(query)
-
-
-# ---------------------------------------------------------------------------
-# Daily aggregation (RAW → DAY)
-# ---------------------------------------------------------------------------
 
 
 def make_s3_app_hash_metrics_history_daily(
