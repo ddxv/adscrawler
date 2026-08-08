@@ -467,7 +467,7 @@ class ProcessManager:
         except Exception:
             logger.exception("Importing keywords from s3 for failed")
 
-        start_date = datetime.date.today() - datetime.timedelta(days=14)
+        start_date = datetime.date.today() - datetime.timedelta(days=5)
         end_date = datetime.date.today().isoformat()
         for dt in pd.date_range(start_date, end_date, freq="D"):
             crawled_date = dt.strftime("%Y-%m-%d")
@@ -475,11 +475,11 @@ class ProcessManager:
             for store in [1, 2]:
                 try:
                     compact_incoming_app_details(store=store, crawled_date=crawled_date)
-                    # import_app_details_from_s3_into_db(
-                    #     store=store,
-                    #     crawled_date=crawled_date,
-                    #     pgdb=self.pgcon,
-                    # )
+                    import_app_details_from_s3_into_db(
+                        store=store,
+                        crawled_date=crawled_date,
+                        pgdb=self.pgcon,
+                    )
                 except Exception:
                     logger.exception(
                         f"Importing app_details from s3 failed {store=} {crawled_date=}"
