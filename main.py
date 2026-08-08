@@ -2,6 +2,7 @@ import argparse
 import datetime
 import os
 import sys
+import pandas as pd
 
 from adscrawler.app_stores.process_icons import refresh_app_icons
 from adscrawler.app_stores.process_keywords import process_app_keywords
@@ -466,28 +467,28 @@ class ProcessManager:
         except Exception:
             logger.exception("Importing keywords from s3 for failed")
 
-        for crawled_date in [
-            (datetime.date.today() - datetime.timedelta(days=5)).isoformat(),
-            datetime.date.today().isoformat(),
-        ]:
+        start_date = datetime.date.today() - datetime.timedelta(days=14)
+        end_date = datetime.date.today().isoformat()
+        for dt in pd.date_range(start_date, end_date, freq="D"):
+            crawled_date = dt.strftime("%Y-%m-%d")
             compact_incoming_version_details(date_str=crawled_date)
             for store in [1, 2]:
                 try:
                     compact_incoming_app_details(store=store, crawled_date=crawled_date)
-                    import_app_details_from_s3_into_db(
-                        store=store,
-                        crawled_date=crawled_date,
-                        pgdb=self.pgcon,
-                    )
+                    # import_app_details_from_s3_into_db(
+                    #     store=store,
+                    #     crawled_date=crawled_date,
+                    #     pgdb=self.pgcon,
+                    # )
                 except Exception:
                     logger.exception(
                         f"Importing app_details from s3 failed {store=} {crawled_date=}"
                     )
 
-            try:
-                delete_and_aggregate_s3_agg(store=store, pgdb=self.pgcon)
-            except Exception:
-                logger.exception(f"Importing {store=} app metrics from s3 for failed")
+        try:
+            delete_and_aggregate_s3_agg(store=store, pgdb=self.pgcon)
+        except Exception:
+            logger.exception(f"Importing {store=} app metrics from s3 for failed")
 
         try:
             clean_history_tables(pgdb=self.pgcon)

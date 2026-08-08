@@ -96,6 +96,7 @@ def compact_incoming_version_details(date_str: str) -> None:
         logger.info("No incoming parquet files found.")
         return
 
+    epoch_ms = int(time.time() * 1000)
     with get_duckdb_connection("s3") as duckdb_con:
         res = duckdb_con.execute(f"""
             COPY (
@@ -116,6 +117,7 @@ def compact_incoming_version_details(date_str: str) -> None:
             ) TO '{raw_output_path}' (
                 FORMAT PARQUET,
                 PARTITION_BY (string_bucket, date),
+                FILENAME_PATTERN 'compacted_{epoch_ms}_{{i}}',
                 OVERWRITE_OR_IGNORE true,
                 COMPRESSION 'zstd',
                 ROW_GROUP_SIZE {_ROW_GROUP_SIZE}
