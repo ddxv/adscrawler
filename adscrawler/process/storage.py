@@ -11,6 +11,7 @@ import boto3
 import duckdb
 import pandas as pd
 from botocore.exceptions import ClientError
+from sqlalchemy import text
 
 from adscrawler.config import (
     APKS_INCOMING_DIR,
@@ -708,21 +709,19 @@ def filter_unprocessed_s3_files(
     if not parquet_paths:
         return []
 
-    # Build a parameterized IN clause for SQLAlchemy execution
-    # Use positional parameters: first is pipeline_name, then parquet paths
-    placeholders = ",".join(["%s" for _ in parquet_paths])
-    sql = (
-        "SELECT file_path FROM s3_processed_files "
-        "WHERE pipeline_name = %s AND file_path IN ("
-        + placeholders
-        + ") AND status = 'completed'"
-    )
-    params = [pipeline_name] + parquet_paths
-    completed_set: set[str] = set()
-    with pgdb.engine.connect() as conn:
-        res = conn.execute(sql, params)
-        for row in res.fetchall():
-            completed_set.add(row[0])
+    sql = text("""
+        SELECT file_path 
+        FROM s3_processed_files 
+        WHERE pipeline_name = :pipeline_name 
+          AND file_path = ANY(:parquet_paths) 
+          AND status = 'completed'
+        """)
+
+    with pgdb.engine.begin() as conn:
+        res = conn.execute(
+            sql, {"pipeline_name": pipeline_name, "parquet_paths": list(parquet_paths)}
+        )
+        completed_set = {row[0] for row in res.fetchall()}
 
     return [path for path in parquet_paths if path not in completed_set]
 
@@ -752,18 +751,15 @@ def record_s3_file_status(
     }
     df = pd.DataFrame([cols])
     insert_cols = [c for c in df.columns]
-    try:
-        upsert_df(
-            df=df,
-            table_name="s3_processed_files",
-            pgdb=pgdb,
-            key_columns=["pipeline_name", "file_path"],
-            insert_columns=insert_cols,
-            on_conflict_update=True,
-        )
-        logger.info(f"Recorded s3 status {pipeline_name=} {file_path=} {status=}")
-    except Exception as e:
-        logger.exception(f"Failed to record s3 file status for {file_path}: {e}")
+    upsert_df(
+        df=df,
+        table_name="s3_processed_files",
+        pgdb=pgdb,
+        key_columns=["pipeline_name", "file_path"],
+        insert_columns=insert_cols,
+        on_conflict_update=True,
+    )
+    logger.info(f"Recorded s3 status {pipeline_name=} {file_path=} {status=}")
 
 
 def set_iptables_rule_for_wt0() -> None:

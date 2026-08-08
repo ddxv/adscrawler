@@ -454,7 +454,7 @@ class ProcessManager:
             )
         for store in [1, 2]:
             for crawled_date in [
-                (datetime.date.today() - datetime.timedelta(days=1)).isoformat(),
+                (datetime.date.today() - datetime.timedelta(days=5)).isoformat(),
                 datetime.date.today().isoformat(),
             ]:
                 try:

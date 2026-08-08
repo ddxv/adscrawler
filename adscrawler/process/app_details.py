@@ -183,7 +183,8 @@ def import_app_details_from_s3_into_db(
         crawled_date: ISO-format date string (e.g. ``"2026-07-02"``).
         pgdb: Database connection.
     """
-    logger.info(f"Importing app_details from S3 {store=} {crawled_date=} country=US")
+    pipeline_name = "import_app_details_from_s3"
+    logger.info(f"{pipeline_name} {store=} {crawled_date=} country=US")
 
     bucket = CONFIG["s3"]["bucket"]
 
@@ -194,19 +195,21 @@ def import_app_details_from_s3_into_db(
         return
 
     # Skip files already recorded as completed for this pipeline
-    parquet_paths = filter_unprocessed_s3_files(
-        parquet_paths, pipeline_name="import_app_details_from_s3", pgdb=pgdb
+    unprocessed_parquets = filter_unprocessed_s3_files(
+        parquet_paths, pipeline_name=pipeline_name, pgdb=pgdb
     )
-    if not parquet_paths:
+    if not unprocessed_parquets:
         logger.info("No unprocessed app_details parquet files found; nothing to do")
         return
 
-    for parquet_path in parquet_paths:
-        # Gather s3 metadata (etag, size) for recording
-        meta = get_s3_objects_metadata(bucket, [parquet_path])
-        etag = meta.get(parquet_path, {}).get("etag")
-        size = meta.get(parquet_path, {}).get("size")
+    s3_metadata_map = get_s3_objects_metadata(bucket, unprocessed_parquets)
+
+    for parquet_path in unprocessed_parquets:
+        file_meta = s3_metadata_map.get(parquet_path, {})
+        etag = file_meta.get("etag")
+        size = file_meta.get("size")
         rows_processed = 0
+        err_msg = None
         try:
             with get_duckdb_connection("s3") as duckdb_con:
                 # Execute query without calling .df() immediately
@@ -215,36 +218,27 @@ def import_app_details_from_s3_into_db(
                 )
                 # vectors * 2,048 = rows
                 while True:
-                    df_chunk = rel.fetch_df_chunk(vectors_per_chunk=100)
+                    df_chunk = rel.fetch_df_chunk(vectors_per_chunk=40)
                     if df_chunk.empty:
                         break
                     process_chunk(df_chunk, store, pgdb)
                     rows_processed += len(df_chunk)
 
-            # Record successful processing for this parquet file
-            record_s3_file_status(
-                    pipeline_name="import_app_details_from_s3",
-                    file_path=parquet_path,
-                    status="completed",
-                    pgdb=pgdb,
-                    row_count=rows_processed,
-                    error_message=None,
-                    e_tag=etag,
-                    file_size_bytes=size,
-                )
-
+            status = "completed"
         except Exception as e:
-            record_s3_file_status(
-                    pipeline_name="import_app_details_from_s3",
-                    file_path=parquet_path,
-                    status="failed",
-                    pgdb=pgdb,
-                    row_count=rows_processed or None,
-                    error_message=str(e),
-                    e_tag=etag,
-                    file_size_bytes=size,
-                )
+            status = "failed"
+            err_msg = str(e)[:1000]
             logger.exception(f"Error processing parquet {parquet_path}: {e}")
+        record_s3_file_status(
+            pipeline_name=pipeline_name,
+            file_path=parquet_path,
+            status=status,
+            pgdb=pgdb,
+            row_count=rows_processed,
+            error_message=err_msg,
+            e_tag=etag,
+            file_size_bytes=size,
+        )
 
 
 def process_chunk(df_chunk: pd.DataFrame, store: int, pgdb: PostgresEngine) -> None:
