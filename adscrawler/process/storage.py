@@ -146,17 +146,15 @@ def delete_s3_objects_by_keys(
         else:
             keys_to_delete.append({"Key": path})
 
-    logger.info(f"Deleting {len(keys_to_delete)} S3 objects in batches of 500")
-    for i in range(0, len(keys_to_delete), 500):
-        logger.info(
-            f"Deleting {len(keys_to_delete)} S3 objects in batch {i // 500 + 1}"
-        )
-        batch = keys_to_delete[i : i + 500]
+    logger.info(f"Deleting {len(keys_to_delete)} S3 objects in batches...")
+    batch_size = 1000
+    for i in range(0, len(keys_to_delete), batch_size):
+        batch = keys_to_delete[i : i + batch_size]
         s3.delete_objects(
             Bucket=bucket,
             Delete={"Objects": batch},
         )
-        if i + 500 < len(keys_to_delete):
+        if i + batch_size < len(keys_to_delete):
             time.sleep(0.1)
 
 
