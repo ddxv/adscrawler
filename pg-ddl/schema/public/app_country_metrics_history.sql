@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict AqahakAHVJGBIruAgPtTk4rVWNlGQ46Acl0DmoV9F3zaZk95nndSFuGaD6n2HzX
+\restrict 6jXiuwUw9Ijf75PtCMq4p7oFba03kjfZ1h6GCnxhSq0YuhqiARfxHpQYFAmG9RG
 
 -- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
 -- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
@@ -55,5 +55,5 @@ CREATE INDEX app_country_metrics_history_app_idx ON public.app_country_metrics_h
 -- PostgreSQL database dump complete
 --
 
-\unrestrict AqahakAHVJGBIruAgPtTk4rVWNlGQ46Acl0DmoV9F3zaZk95nndSFuGaD6n2HzX
+\unrestrict 6jXiuwUw9Ijf75PtCMq4p7oFba03kjfZ1h6GCnxhSq0YuhqiARfxHpQYFAmG9RG
 

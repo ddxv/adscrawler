@@ -109,7 +109,7 @@ scheduled_vcs_crawl AS (
                             lsvc.scanned_at < current_date - INTERVAL '90 days'
                             OR lsvc.scanned_at IS NULL
                         )
-                        AND ls.scanned_at < current_date - INTERVAL '5 days'
+                        AND ls.scanned_at < current_date - INTERVAL '2 days'
                     )
                 )
             )

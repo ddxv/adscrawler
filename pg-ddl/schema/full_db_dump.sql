@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 56q9LdDnEhvMwU5RX2ZysCgsuxU849hqkF7Z9F2CKXLcH6CYrepXm1w6LVlwxkJ
+\restrict IAZk5hLeY3E7YiRbB1O9UHo4J4MtpZKvCvwtKo0pCAGZCa3eSngU0Jojjbqiq8p
 
 -- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
 -- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
@@ -435,19 +435,19 @@ PARTITION BY LIST (batch_date);
 ALTER TABLE adtech.app_sdk_strings OWNER TO postgres;
 
 --
--- Name: app_sdk_strings_20260803; Type: TABLE; Schema: adtech; Owner: postgres
+-- Name: app_sdk_strings_20260808; Type: TABLE; Schema: adtech; Owner: postgres
 --
 
-CREATE TABLE adtech.app_sdk_strings_20260803 (
+CREATE TABLE adtech.app_sdk_strings_20260808 (
     store_app integer CONSTRAINT app_sdk_strings_store_app_not_null NOT NULL,
     string_id integer CONSTRAINT app_sdk_strings_string_id_not_null NOT NULL,
     sdk_id integer,
     batch_date date CONSTRAINT app_sdk_strings_batch_date_not_null NOT NULL,
-    CONSTRAINT app_sdk_strings_20260803_batch_date_check CHECK ((batch_date = '2026-08-03'::date))
+    CONSTRAINT app_sdk_strings_20260808_batch_date_check CHECK ((batch_date = '2026-08-08'::date))
 );
 
 
-ALTER TABLE adtech.app_sdk_strings_20260803 OWNER TO postgres;
+ALTER TABLE adtech.app_sdk_strings_20260808 OWNER TO postgres;
 
 --
 -- Name: app_sdks; Type: TABLE; Schema: adtech; Owner: postgres
@@ -466,20 +466,20 @@ PARTITION BY LIST (batch_date);
 ALTER TABLE adtech.app_sdks OWNER TO postgres;
 
 --
--- Name: app_sdks_20260803; Type: TABLE; Schema: adtech; Owner: postgres
+-- Name: app_sdks_20260808; Type: TABLE; Schema: adtech; Owner: postgres
 --
 
-CREATE TABLE adtech.app_sdks_20260803 (
+CREATE TABLE adtech.app_sdks_20260808 (
     store_app integer CONSTRAINT app_sdks_store_app_not_null NOT NULL,
     version_code_id integer CONSTRAINT app_sdks_version_code_id_not_null NOT NULL,
     sdk_id integer CONSTRAINT app_sdks_sdk_id_not_null NOT NULL,
     version_code_created_at timestamp without time zone CONSTRAINT app_sdks_version_code_created_at_not_null NOT NULL,
     batch_date date CONSTRAINT app_sdks_batch_date_not_null NOT NULL,
-    CONSTRAINT app_sdks_20260803_batch_date_check CHECK ((batch_date = '2026-08-03'::date))
+    CONSTRAINT app_sdks_20260808_batch_date_check CHECK ((batch_date = '2026-08-08'::date))
 );
 
 
-ALTER TABLE adtech.app_sdks_20260803 OWNER TO postgres;
+ALTER TABLE adtech.app_sdks_20260808 OWNER TO postgres;
 
 --
 -- Name: categories; Type: TABLE; Schema: adtech; Owner: postgres
@@ -1524,10 +1524,10 @@ PARTITION BY LIST (batch_date);
 ALTER TABLE adtech.domain_app_changes_quarterly OWNER TO postgres;
 
 --
--- Name: domain_app_changes_quarterly_20260801; Type: TABLE; Schema: adtech; Owner: postgres
+-- Name: domain_app_changes_quarterly_20260808; Type: TABLE; Schema: adtech; Owner: postgres
 --
 
-CREATE TABLE adtech.domain_app_changes_quarterly_20260801 (
+CREATE TABLE adtech.domain_app_changes_quarterly_20260808 (
     domain_id integer,
     store_app integer,
     tag_source text,
@@ -1535,11 +1535,11 @@ CREATE TABLE adtech.domain_app_changes_quarterly_20260801 (
     quarter smallint,
     status text,
     batch_date date CONSTRAINT domain_app_changes_quarterly_batch_date_not_null NOT NULL,
-    CONSTRAINT domain_app_changes_quarterly_20260801_batch_date_check CHECK ((batch_date = '2026-08-01'::date))
+    CONSTRAINT domain_app_changes_quarterly_20260808_batch_date_check CHECK ((batch_date = '2026-08-08'::date))
 );
 
 
-ALTER TABLE adtech.domain_app_changes_quarterly_20260801 OWNER TO postgres;
+ALTER TABLE adtech.domain_app_changes_quarterly_20260808 OWNER TO postgres;
 
 --
 -- Name: sdk_mediation_patterns; Type: TABLE; Schema: adtech; Owner: postgres
@@ -1686,10 +1686,10 @@ PARTITION BY LIST (batch_date);
 ALTER TABLE adtech.trend_companies OWNER TO postgres;
 
 --
--- Name: trend_companies_20260801; Type: TABLE; Schema: adtech; Owner: postgres
+-- Name: trend_companies_20260808; Type: TABLE; Schema: adtech; Owner: postgres
 --
 
-CREATE TABLE adtech.trend_companies_20260801 (
+CREATE TABLE adtech.trend_companies_20260808 (
     company_domain character varying,
     year smallint,
     quarter smallint,
@@ -1703,11 +1703,11 @@ CREATE TABLE adtech.trend_companies_20260801 (
     pct_apps_added numeric,
     pct_apps_lost numeric,
     batch_date date CONSTRAINT trend_companies_batch_date_not_null NOT NULL,
-    CONSTRAINT trend_companies_20260801_batch_date_check CHECK ((batch_date = '2026-08-01'::date))
+    CONSTRAINT trend_companies_20260808_batch_date_check CHECK ((batch_date = '2026-08-08'::date))
 );
 
 
-ALTER TABLE adtech.trend_companies_20260801 OWNER TO postgres;
+ALTER TABLE adtech.trend_companies_20260808 OWNER TO postgres;
 
 --
 -- Name: trend_domains; Type: TABLE; Schema: adtech; Owner: postgres
@@ -1734,10 +1734,10 @@ PARTITION BY LIST (batch_date);
 ALTER TABLE adtech.trend_domains OWNER TO postgres;
 
 --
--- Name: trend_domains_20260801; Type: TABLE; Schema: adtech; Owner: postgres
+-- Name: trend_domains_20260808; Type: TABLE; Schema: adtech; Owner: postgres
 --
 
-CREATE TABLE adtech.trend_domains_20260801 (
+CREATE TABLE adtech.trend_domains_20260808 (
     domain_name character varying,
     year smallint,
     quarter smallint,
@@ -1751,11 +1751,11 @@ CREATE TABLE adtech.trend_domains_20260801 (
     pct_apps_added numeric,
     pct_apps_lost numeric,
     batch_date date CONSTRAINT trend_domains_batch_date_not_null NOT NULL,
-    CONSTRAINT trend_domains_20260801_batch_date_check CHECK ((batch_date = '2026-08-01'::date))
+    CONSTRAINT trend_domains_20260808_batch_date_check CHECK ((batch_date = '2026-08-08'::date))
 );
 
 
-ALTER TABLE adtech.trend_domains_20260801 OWNER TO postgres;
+ALTER TABLE adtech.trend_domains_20260808 OWNER TO postgres;
 
 --
 -- Name: trend_parent_companies; Type: TABLE; Schema: adtech; Owner: postgres
@@ -1782,10 +1782,10 @@ PARTITION BY LIST (batch_date);
 ALTER TABLE adtech.trend_parent_companies OWNER TO postgres;
 
 --
--- Name: trend_parent_companies_20260801; Type: TABLE; Schema: adtech; Owner: postgres
+-- Name: trend_parent_companies_20260808; Type: TABLE; Schema: adtech; Owner: postgres
 --
 
-CREATE TABLE adtech.trend_parent_companies_20260801 (
+CREATE TABLE adtech.trend_parent_companies_20260808 (
     company_domain character varying,
     year smallint,
     quarter smallint,
@@ -1799,11 +1799,11 @@ CREATE TABLE adtech.trend_parent_companies_20260801 (
     pct_apps_added numeric,
     pct_apps_lost numeric,
     batch_date date CONSTRAINT trend_parent_companies_batch_date_not_null NOT NULL,
-    CONSTRAINT trend_parent_companies_20260801_batch_date_check CHECK ((batch_date = '2026-08-01'::date))
+    CONSTRAINT trend_parent_companies_20260808_batch_date_check CHECK ((batch_date = '2026-08-08'::date))
 );
 
 
-ALTER TABLE adtech.trend_parent_companies_20260801 OWNER TO postgres;
+ALTER TABLE adtech.trend_parent_companies_20260808 OWNER TO postgres;
 
 --
 -- Name: url_redirect_chains; Type: TABLE; Schema: adtech; Owner: postgres
@@ -2730,91 +2730,6 @@ UNION ALL
 ALTER MATERIALIZED VIEW frontend.category_tag_type_stats OWNER TO postgres;
 
 --
--- Name: companies_apps_overview; Type: MATERIALIZED VIEW; Schema: frontend; Owner: postgres
---
-
-CREATE MATERIALIZED VIEW frontend.companies_apps_overview AS
- WITH store_app_sdk_company_category AS (
-         SELECT DISTINCT savs.store_app,
-            sd.company_id,
-            sc.category_id
-           FROM ((adtech.app_sdks savs
-             LEFT JOIN adtech.sdks sd ON ((savs.sdk_id = sd.id)))
-             JOIN adtech.sdk_categories sc ON ((savs.sdk_id = sc.sdk_id)))
-        )
- SELECT sa.store_id,
-    sacs.company_id,
-    c.name AS company_name,
-    d.domain_name AS company_domain,
-    cc2.url_slug AS category_slug
-   FROM ((((store_app_sdk_company_category sacs
-     LEFT JOIN public.store_apps sa ON ((sacs.store_app = sa.id)))
-     LEFT JOIN adtech.companies c ON ((sacs.company_id = c.id)))
-     LEFT JOIN public.domains d ON ((c.domain_id = d.id)))
-     LEFT JOIN adtech.categories cc2 ON ((sacs.category_id = cc2.id)))
-  WHERE (sacs.company_id IS NOT NULL)
-  WITH NO DATA;
-
-
-ALTER MATERIALIZED VIEW frontend.companies_apps_overview OWNER TO postgres;
-
---
--- Name: companies_category_stats; Type: MATERIALIZED VIEW; Schema: frontend; Owner: postgres
---
-
-CREATE MATERIALIZED VIEW frontend.companies_category_stats AS
- SELECT sa.store,
-    sa.category AS app_category,
-    COALESCE(cd.domain_name, ad.domain_name) AS company_domain,
-    c.name AS company_name,
-    count(DISTINCT csac.store_app) AS app_count,
-    sum(sa.installs) AS installs_total,
-    sum(sa.installs_sum_4w) AS installs_d30
-   FROM ((((adtech.combined_app_companies csac
-     LEFT JOIN public.domains ad ON ((csac.domain_id = ad.id)))
-     LEFT JOIN adtech.companies c ON ((csac.company_id = c.id)))
-     LEFT JOIN public.domains cd ON ((c.domain_id = cd.id)))
-     LEFT JOIN frontend.store_apps_overview sa ON ((csac.store_app = sa.id)))
-  GROUP BY sa.store, sa.category, COALESCE(cd.domain_name, ad.domain_name), c.name
-  WITH NO DATA;
-
-
-ALTER MATERIALIZED VIEW frontend.companies_category_stats OWNER TO postgres;
-
---
--- Name: companies_category_tag_stats; Type: MATERIALIZED VIEW; Schema: frontend; Owner: postgres
---
-
-CREATE MATERIALIZED VIEW frontend.companies_category_tag_stats AS
- WITH distinct_apps_group AS (
-         SELECT csac.store_app,
-            tag.tag_source,
-            COALESCE(cd.domain_name, ad.domain_name) AS company_domain,
-            c.name AS company_name
-           FROM ((((adtech.combined_app_companies csac
-             LEFT JOIN public.domains ad ON ((csac.domain_id = ad.id)))
-             LEFT JOIN adtech.companies c ON ((csac.company_id = c.id)))
-             LEFT JOIN public.domains cd ON ((c.domain_id = cd.id)))
-             CROSS JOIN LATERAL ( VALUES ('sdk'::text,csac.sdk), ('api_call'::text,csac.api_call), ('publisher'::text,csac.publisher), ('app_ads_direct'::text,csac.app_ads_direct), ('app_ads_reseller'::text,csac.app_ads_reseller)) tag(tag_source, present))
-          WHERE (tag.present IS TRUE)
-        )
- SELECT sa.store,
-    sa.category AS app_category,
-    dag.tag_source,
-    dag.company_domain,
-    dag.company_name,
-    count(DISTINCT dag.store_app) AS app_count,
-    sum(sa.installs_sum_4w) AS installs_d30,
-    sum(sa.installs) AS installs_total
-   FROM (distinct_apps_group dag
-     LEFT JOIN frontend.store_apps_overview sa ON ((dag.store_app = sa.id)))
-  GROUP BY sa.store, sa.category, dag.tag_source, dag.company_domain, dag.company_name
-  WITH NO DATA;
-
-
-ALTER MATERIALIZED VIEW frontend.companies_category_tag_stats OWNER TO postgres;
-
---
 -- Name: companies_category_tag_type_stats; Type: MATERIALIZED VIEW; Schema: frontend; Owner: postgres
 --
 
@@ -3408,6 +3323,118 @@ CREATE MATERIALIZED VIEW frontend.companies_overview AS
 
 
 ALTER MATERIALIZED VIEW frontend.companies_overview OWNER TO postgres;
+
+--
+-- Name: category_type_country_stats; Type: MATERIALIZED VIEW; Schema: frontend; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW frontend.category_type_country_stats AS
+ WITH mygroups AS (
+         SELECT DISTINCT cctts.store,
+            cctts.app_category,
+            cctts.company_domain,
+            cctts.type_url_slug,
+            co.country
+           FROM (frontend.companies_category_tag_type_stats cctts
+             LEFT JOIN frontend.companies_overview co ON (((co.company_domain)::text = (cctts.company_domain)::text)))
+          WHERE (cctts.app_count > 0)
+        )
+ SELECT store,
+    app_category,
+    type_url_slug,
+    country,
+    count(*) AS company_count
+   FROM mygroups
+  GROUP BY store, app_category, type_url_slug, country
+  WITH NO DATA;
+
+
+ALTER MATERIALIZED VIEW frontend.category_type_country_stats OWNER TO postgres;
+
+--
+-- Name: companies_apps_overview; Type: MATERIALIZED VIEW; Schema: frontend; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW frontend.companies_apps_overview AS
+ WITH store_app_sdk_company_category AS (
+         SELECT DISTINCT savs.store_app,
+            sd.company_id,
+            sc.category_id
+           FROM ((adtech.app_sdks savs
+             LEFT JOIN adtech.sdks sd ON ((savs.sdk_id = sd.id)))
+             JOIN adtech.sdk_categories sc ON ((savs.sdk_id = sc.sdk_id)))
+        )
+ SELECT sa.store_id,
+    sacs.company_id,
+    c.name AS company_name,
+    d.domain_name AS company_domain,
+    cc2.url_slug AS category_slug
+   FROM ((((store_app_sdk_company_category sacs
+     LEFT JOIN public.store_apps sa ON ((sacs.store_app = sa.id)))
+     LEFT JOIN adtech.companies c ON ((sacs.company_id = c.id)))
+     LEFT JOIN public.domains d ON ((c.domain_id = d.id)))
+     LEFT JOIN adtech.categories cc2 ON ((sacs.category_id = cc2.id)))
+  WHERE (sacs.company_id IS NOT NULL)
+  WITH NO DATA;
+
+
+ALTER MATERIALIZED VIEW frontend.companies_apps_overview OWNER TO postgres;
+
+--
+-- Name: companies_category_stats; Type: MATERIALIZED VIEW; Schema: frontend; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW frontend.companies_category_stats AS
+ SELECT sa.store,
+    sa.category AS app_category,
+    COALESCE(cd.domain_name, ad.domain_name) AS company_domain,
+    c.name AS company_name,
+    count(DISTINCT csac.store_app) AS app_count,
+    sum(sa.installs) AS installs_total,
+    sum(sa.installs_sum_4w) AS installs_d30
+   FROM ((((adtech.combined_app_companies csac
+     LEFT JOIN public.domains ad ON ((csac.domain_id = ad.id)))
+     LEFT JOIN adtech.companies c ON ((csac.company_id = c.id)))
+     LEFT JOIN public.domains cd ON ((c.domain_id = cd.id)))
+     LEFT JOIN frontend.store_apps_overview sa ON ((csac.store_app = sa.id)))
+  GROUP BY sa.store, sa.category, COALESCE(cd.domain_name, ad.domain_name), c.name
+  WITH NO DATA;
+
+
+ALTER MATERIALIZED VIEW frontend.companies_category_stats OWNER TO postgres;
+
+--
+-- Name: companies_category_tag_stats; Type: MATERIALIZED VIEW; Schema: frontend; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW frontend.companies_category_tag_stats AS
+ WITH distinct_apps_group AS (
+         SELECT csac.store_app,
+            tag.tag_source,
+            COALESCE(cd.domain_name, ad.domain_name) AS company_domain,
+            c.name AS company_name
+           FROM ((((adtech.combined_app_companies csac
+             LEFT JOIN public.domains ad ON ((csac.domain_id = ad.id)))
+             LEFT JOIN adtech.companies c ON ((csac.company_id = c.id)))
+             LEFT JOIN public.domains cd ON ((c.domain_id = cd.id)))
+             CROSS JOIN LATERAL ( VALUES ('sdk'::text,csac.sdk), ('api_call'::text,csac.api_call), ('publisher'::text,csac.publisher), ('app_ads_direct'::text,csac.app_ads_direct), ('app_ads_reseller'::text,csac.app_ads_reseller)) tag(tag_source, present))
+          WHERE (tag.present IS TRUE)
+        )
+ SELECT sa.store,
+    sa.category AS app_category,
+    dag.tag_source,
+    dag.company_domain,
+    dag.company_name,
+    count(DISTINCT dag.store_app) AS app_count,
+    sum(sa.installs_sum_4w) AS installs_d30,
+    sum(sa.installs) AS installs_total
+   FROM (distinct_apps_group dag
+     LEFT JOIN frontend.store_apps_overview sa ON ((dag.store_app = sa.id)))
+  GROUP BY sa.store, sa.category, dag.tag_source, dag.company_domain, dag.company_name
+  WITH NO DATA;
+
+
+ALTER MATERIALIZED VIEW frontend.companies_category_tag_stats OWNER TO postgres;
 
 --
 -- Name: companies_parent_category_stats; Type: MATERIALIZED VIEW; Schema: frontend; Owner: postgres
@@ -4898,10 +4925,10 @@ CREATE VIEW public.s3_file_keys AS
 ALTER VIEW public.s3_file_keys OWNER TO postgres;
 
 --
--- Name: s3_package_inventory_20260807; Type: TABLE; Schema: public; Owner: postgres
+-- Name: s3_package_inventory_20260809; Type: TABLE; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.s3_package_inventory_20260807 (
+CREATE TABLE public.s3_package_inventory_20260809 (
     myregion text CONSTRAINT s3_package_inventory_myregion_not_null NOT NULL,
     versionstr text CONSTRAINT s3_package_inventory_versionstr_not_null NOT NULL,
     version_code_id integer,
@@ -4909,11 +4936,30 @@ CREATE TABLE public.s3_package_inventory_20260807 (
     file_key text CONSTRAINT s3_package_inventory_file_key_not_null NOT NULL,
     last_modified timestamp with time zone CONSTRAINT s3_package_inventory_last_modified_not_null NOT NULL,
     batch_date date CONSTRAINT s3_package_inventory_batch_date_not_null NOT NULL,
-    CONSTRAINT s3_package_inventory_20260807_batch_date_check CHECK ((batch_date = '2026-08-07'::date))
+    CONSTRAINT s3_package_inventory_20260809_batch_date_check CHECK ((batch_date = '2026-08-09'::date))
 );
 
 
-ALTER TABLE public.s3_package_inventory_20260807 OWNER TO postgres;
+ALTER TABLE public.s3_package_inventory_20260809 OWNER TO postgres;
+
+--
+-- Name: s3_processed_files; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.s3_processed_files (
+    pipeline_name character varying(64) NOT NULL,
+    file_path text NOT NULL,
+    status character varying(16) NOT NULL,
+    row_count bigint,
+    error_message text,
+    e_tag character varying(64),
+    file_size_bytes bigint,
+    processed_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT chk_s3_processed_files_status CHECK (((status)::text = ANY ((ARRAY['completed'::character varying, 'failed'::character varying])::text[])))
+);
+
+
+ALTER TABLE public.s3_processed_files OWNER TO postgres;
 
 --
 -- Name: store_app_z_scores_history_2025; Type: TABLE; Schema: public; Owner: postgres
@@ -5407,52 +5453,52 @@ ALTER TABLE public.version_strings ALTER COLUMN id ADD GENERATED BY DEFAULT AS I
 
 
 --
--- Name: app_sdk_strings_20260803; Type: TABLE ATTACH; Schema: adtech; Owner: postgres
+-- Name: app_sdk_strings_20260808; Type: TABLE ATTACH; Schema: adtech; Owner: postgres
 --
 
-ALTER TABLE ONLY adtech.app_sdk_strings ATTACH PARTITION adtech.app_sdk_strings_20260803 FOR VALUES IN ('2026-08-03');
-
-
---
--- Name: app_sdks_20260803; Type: TABLE ATTACH; Schema: adtech; Owner: postgres
---
-
-ALTER TABLE ONLY adtech.app_sdks ATTACH PARTITION adtech.app_sdks_20260803 FOR VALUES IN ('2026-08-03');
+ALTER TABLE ONLY adtech.app_sdk_strings ATTACH PARTITION adtech.app_sdk_strings_20260808 FOR VALUES IN ('2026-08-08');
 
 
 --
--- Name: domain_app_changes_quarterly_20260801; Type: TABLE ATTACH; Schema: adtech; Owner: postgres
+-- Name: app_sdks_20260808; Type: TABLE ATTACH; Schema: adtech; Owner: postgres
 --
 
-ALTER TABLE ONLY adtech.domain_app_changes_quarterly ATTACH PARTITION adtech.domain_app_changes_quarterly_20260801 FOR VALUES IN ('2026-08-01');
-
-
---
--- Name: trend_companies_20260801; Type: TABLE ATTACH; Schema: adtech; Owner: postgres
---
-
-ALTER TABLE ONLY adtech.trend_companies ATTACH PARTITION adtech.trend_companies_20260801 FOR VALUES IN ('2026-08-01');
+ALTER TABLE ONLY adtech.app_sdks ATTACH PARTITION adtech.app_sdks_20260808 FOR VALUES IN ('2026-08-08');
 
 
 --
--- Name: trend_domains_20260801; Type: TABLE ATTACH; Schema: adtech; Owner: postgres
+-- Name: domain_app_changes_quarterly_20260808; Type: TABLE ATTACH; Schema: adtech; Owner: postgres
 --
 
-ALTER TABLE ONLY adtech.trend_domains ATTACH PARTITION adtech.trend_domains_20260801 FOR VALUES IN ('2026-08-01');
-
-
---
--- Name: trend_parent_companies_20260801; Type: TABLE ATTACH; Schema: adtech; Owner: postgres
---
-
-ALTER TABLE ONLY adtech.trend_parent_companies ATTACH PARTITION adtech.trend_parent_companies_20260801 FOR VALUES IN ('2026-08-01');
+ALTER TABLE ONLY adtech.domain_app_changes_quarterly ATTACH PARTITION adtech.domain_app_changes_quarterly_20260808 FOR VALUES IN ('2026-08-08');
 
 
 --
--- Name: s3_package_inventory_20260807; Type: TABLE ATTACH; Schema: public; Owner: postgres
+-- Name: trend_companies_20260808; Type: TABLE ATTACH; Schema: adtech; Owner: postgres
 --
 
-ALTER TABLE ONLY public.s3_package_inventory ATTACH PARTITION public.s3_package_inventory_20260807 FOR VALUES IN ('2026-08-07');
+ALTER TABLE ONLY adtech.trend_companies ATTACH PARTITION adtech.trend_companies_20260808 FOR VALUES IN ('2026-08-08');
+
+
+--
+-- Name: trend_domains_20260808; Type: TABLE ATTACH; Schema: adtech; Owner: postgres
+--
+
+ALTER TABLE ONLY adtech.trend_domains ATTACH PARTITION adtech.trend_domains_20260808 FOR VALUES IN ('2026-08-08');
+
+
+--
+-- Name: trend_parent_companies_20260808; Type: TABLE ATTACH; Schema: adtech; Owner: postgres
+--
+
+ALTER TABLE ONLY adtech.trend_parent_companies ATTACH PARTITION adtech.trend_parent_companies_20260808 FOR VALUES IN ('2026-08-08');
+
+
+--
+-- Name: s3_package_inventory_20260809; Type: TABLE ATTACH; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.s3_package_inventory ATTACH PARTITION public.s3_package_inventory_20260809 FOR VALUES IN ('2026-08-09');
 
 
 --
@@ -6157,6 +6203,14 @@ ALTER TABLE ONLY public.platforms
 
 
 --
+-- Name: s3_processed_files s3_processed_files_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.s3_processed_files
+    ADD CONSTRAINT s3_processed_files_pkey PRIMARY KEY (pipeline_name, file_path);
+
+
+--
 -- Name: app_country_evidence store_app_country_evidence_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -6377,10 +6431,10 @@ CREATE INDEX idx_domain_app_changes_lookup ON ONLY adtech.domain_app_changes_qua
 
 
 --
--- Name: idx_domain_app_changes_quarterly_20260801_idx_domain_app_change; Type: INDEX; Schema: adtech; Owner: postgres
+-- Name: idx_domain_app_changes_quarterly_20260808_idx_domain_app_change; Type: INDEX; Schema: adtech; Owner: postgres
 --
 
-CREATE INDEX idx_domain_app_changes_quarterly_20260801_idx_domain_app_change ON adtech.domain_app_changes_quarterly_20260801 USING btree (year, quarter, domain_id);
+CREATE INDEX idx_domain_app_changes_quarterly_20260808_idx_domain_app_change ON adtech.domain_app_changes_quarterly_20260808 USING btree (year, quarter, domain_id);
 
 
 --
@@ -7140,10 +7194,10 @@ CREATE UNIQUE INDEX s3_package_inventory_myregion_file_key_idx ON ONLY public.s3
 
 
 --
--- Name: idx_s3_package_inventory_20260807_s3_package_inventory_myregion; Type: INDEX; Schema: public; Owner: postgres
+-- Name: idx_s3_package_inventory_20260809_s3_package_inventory_myregion; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE UNIQUE INDEX idx_s3_package_inventory_20260807_s3_package_inventory_myregion ON public.s3_package_inventory_20260807 USING btree (myregion, file_key, batch_date);
+CREATE UNIQUE INDEX idx_s3_package_inventory_20260809_s3_package_inventory_myregion ON public.s3_package_inventory_20260809 USING btree (myregion, file_key, batch_date);
 
 
 --
@@ -7231,17 +7285,17 @@ CREATE INDEX version_strings_xml_path_lower_idx ON public.version_strings USING 
 
 
 --
--- Name: idx_domain_app_changes_quarterly_20260801_idx_domain_app_change; Type: INDEX ATTACH; Schema: adtech; Owner: postgres
+-- Name: idx_domain_app_changes_quarterly_20260808_idx_domain_app_change; Type: INDEX ATTACH; Schema: adtech; Owner: postgres
 --
 
-ALTER INDEX adtech.idx_domain_app_changes_lookup ATTACH PARTITION adtech.idx_domain_app_changes_quarterly_20260801_idx_domain_app_change;
+ALTER INDEX adtech.idx_domain_app_changes_lookup ATTACH PARTITION adtech.idx_domain_app_changes_quarterly_20260808_idx_domain_app_change;
 
 
 --
--- Name: idx_s3_package_inventory_20260807_s3_package_inventory_myregion; Type: INDEX ATTACH; Schema: public; Owner: postgres
+-- Name: idx_s3_package_inventory_20260809_s3_package_inventory_myregion; Type: INDEX ATTACH; Schema: public; Owner: postgres
 --
 
-ALTER INDEX public.s3_package_inventory_myregion_file_key_idx ATTACH PARTITION public.idx_s3_package_inventory_20260807_s3_package_inventory_myregion;
+ALTER INDEX public.s3_package_inventory_myregion_file_key_idx ATTACH PARTITION public.idx_s3_package_inventory_20260809_s3_package_inventory_myregion;
 
 
 --
@@ -7962,5 +8016,5 @@ GRANT ALL ON SCHEMA public TO PUBLIC;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 56q9LdDnEhvMwU5RX2ZysCgsuxU849hqkF7Z9F2CKXLcH6CYrepXm1w6LVlwxkJ
+\unrestrict IAZk5hLeY3E7YiRbB1O9UHo4J4MtpZKvCvwtKo0pCAGZCa3eSngU0Jojjbqiq8p
 

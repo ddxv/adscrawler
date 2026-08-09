@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict KRg4dil5dqSEKkD2XQxFX6mGfDSv9jjTYDVZah59eJyqfvp4V9hChxMBDCR30NX
+\restrict Y6TZeBHb4AcpbtRldaFKMDDIMyByIzWUltJ7vEpVUVgC1UF9UhlEzp3geXEcsw2
 
 -- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
 -- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
@@ -63,5 +63,5 @@ ALTER TABLE ONLY adtech.company_domain_mapping
 -- PostgreSQL database dump complete
 --
 
-\unrestrict KRg4dil5dqSEKkD2XQxFX6mGfDSv9jjTYDVZah59eJyqfvp4V9hChxMBDCR30NX
+\unrestrict Y6TZeBHb4AcpbtRldaFKMDDIMyByIzWUltJ7vEpVUVgC1UF9UhlEzp3geXEcsw2
 

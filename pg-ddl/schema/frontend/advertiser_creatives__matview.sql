@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 3l5GvA7bw7NhyLBtLOw3iMarXmcQWqcJbRhBMkbYoLb0lzsC5rLmAXlFKrfaWOO
+\restrict moo8ZKxKx6xvlcuYJuhdg3VOwHiz4f4ayY45pp0yfaujVnrkW8Gptde019iHkff
 
 -- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
 -- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
@@ -108,5 +108,5 @@ CREATE INDEX idx_adv_creatives_host_domain_company_domain ON frontend.advertiser
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 3l5GvA7bw7NhyLBtLOw3iMarXmcQWqcJbRhBMkbYoLb0lzsC5rLmAXlFKrfaWOO
+\unrestrict moo8ZKxKx6xvlcuYJuhdg3VOwHiz4f4ayY45pp0yfaujVnrkW8Gptde019iHkff
 

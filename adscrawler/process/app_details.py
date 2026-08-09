@@ -183,7 +183,8 @@ def import_app_details_from_s3_into_db(
         pgdb: Database connection.
     """
     pipeline_name = "import_app_details_from_s3"
-    logger.info(f"{pipeline_name} {store=} {crawled_date=} country=US")
+    log_info = f"{pipeline_name} {store=} {crawled_date=} country=US"
+    logger.info(f"{log_info} start")
 
     bucket = CONFIG["s3"]["bucket"]
 
@@ -198,7 +199,9 @@ def import_app_details_from_s3_into_db(
         parquet_paths, pipeline_name=pipeline_name, pgdb=pgdb
     )
     if not unprocessed_parquets:
-        logger.info("All app_details parquet files already processed, skipping")
+        logger.info(
+            "{log_info} all app_details parquet files already processed, skipping"
+        )
         return
 
     s3_metadata_map = get_s3_objects_metadata(bucket, unprocessed_parquets)
@@ -224,9 +227,10 @@ def import_app_details_from_s3_into_db(
                 i = 0
                 while True:
                     i += 1
-                    logger.info(
+                    chunk_info = (
                         f"chunk {i}/{chunk_est} rows {rows_processed}/{row_count}"
                     )
+                    logger.info(f"{log_info} {chunk_info}")
                     df_chunk = rel.fetch_df_chunk(vectors_per_chunk=5)
                     if df_chunk.empty:
                         break

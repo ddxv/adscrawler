@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 2T9sMGwn4kNiFL5UB8VnLZxlR2fStu6HncH1zjiFmPxU1aUqHtnmaDkZ4jxGA6M
+\restrict AfmV0eGnQYOVJcYb4jxOhDldFhU1hN00jWhwe8L7Nybhuh8G6iW7j2DLV7Td0v3
 
 -- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
 -- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
@@ -47,5 +47,5 @@ ALTER TABLE logging.creative_scan_results OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 2T9sMGwn4kNiFL5UB8VnLZxlR2fStu6HncH1zjiFmPxU1aUqHtnmaDkZ4jxGA6M
+\unrestrict AfmV0eGnQYOVJcYb4jxOhDldFhU1hN00jWhwe8L7Nybhuh8G6iW7j2DLV7Td0v3
 
