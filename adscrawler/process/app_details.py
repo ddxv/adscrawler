@@ -56,7 +56,7 @@ def raw_keywords_to_s3(df: pd.DataFrame) -> None:
                 country_df.to_parquet(buffer, index=False)
                 buffer.seek(0)
                 s3_client.upload_fileobj(buffer, bucket, s3_key)
-    logger.info(f"S3 upload keywords {store=} finished")
+        logger.info(f"S3 upload keywords {store=} finished")
 
 
 def app_details_to_s3(df: pd.DataFrame, store: int) -> None:

@@ -1,3 +1,4 @@
+
 WITH rank_crawled_keywords AS (
     SELECT DISTINCT akr.keyword_id
     FROM
@@ -10,14 +11,13 @@ log_crawled_keywords AS (
     FROM
         logging.keywords_crawled_at
     WHERE
-        crawled_at > CURRENT_DATE - INTERVAL '7 days'
+        crawled_at > CURRENT_DATE - INTERVAL '3 days'
 ),
 scheduled_keywords AS (
     SELECT
         ks.keyword_id,
         ks.keyword_text,
-        ks.app_count,
-        ks.total_apps
+        sum(ks.app_count) AS app_count
     FROM
         frontend.keyword_scores AS ks
     WHERE
@@ -29,27 +29,27 @@ scheduled_keywords AS (
                 FROM
                     rank_crawled_keywords AS rck
             )
-            OR ks.keyword_id NOT IN (
+            AND ks.keyword_id NOT IN (
                 SELECT lck.keyword
                 FROM
                     log_crawled_keywords AS lck
             )
         )
+    GROUP BY ks.keyword_id, ks.keyword_text
     ORDER BY
-        ks.competitiveness_score
+        app_count
         DESC
 ),
 distinct_sq AS (
     SELECT DISTINCT search_term
     FROM
         agadmin.search_queries
-)
-SELECT
+),
+allresults AS (SELECT
     k.id AS keyword_id,
     k.keyword_text,
     'user' AS priority,
-    0 AS app_count,
-    0 AS total_apps
+    0 AS app_count
 FROM
     distinct_sq AS sq
 LEFT JOIN keywords AS k
@@ -57,18 +57,27 @@ LEFT JOIN keywords AS k
         sq.search_term = k.keyword_text
 WHERE
     k.id IS NOT NULL
-    AND k.id NOT IN (
-        SELECT lck.keyword
-        FROM
-            log_crawled_keywords AS lck
-    )
+        AND
+        (
+            k.id NOT IN (
+                SELECT rck.keyword_id
+                FROM
+                    rank_crawled_keywords AS rck
+            )
+         AND k.id NOT IN (
+                SELECT lck.keyword
+                FROM
+                    log_crawled_keywords AS lck
+            )
+        )
 UNION ALL
 SELECT
     sk.keyword_id,
     sk.keyword_text,
     'scheduled' AS priority,
-    sk.app_count,
-    sk.total_apps
+    sk.app_count
 FROM
     scheduled_keywords AS sk
+)
+SELECT keyword_id, keyword_text, app_count FROM allresults
 LIMIT :mylimit;

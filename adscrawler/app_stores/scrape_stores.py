@@ -241,8 +241,8 @@ def crawl_keyword_ranks(pgdb: PostgresEngine) -> None:
     language = "en"
     kdf = query_keywords_to_crawl(pgdb, limit=500)
     all_keywords = pd.DataFrame()
+    sleep_time = 1
     crawl_log = []
-    consecutive_errors = 0
     for _id, row in kdf.iterrows():
         logger.info(
             f"Crawling keywords: {_id}/{kdf.shape[0]:,} keyword={row.keyword_text}"
@@ -261,9 +261,7 @@ def crawl_keyword_ranks(pgdb: PostgresEngine) -> None:
             df["crawled_at"] = datetime.datetime.now(tz=datetime.UTC)
             df["crawled_date"] = df["crawled_at"].dt.date
             all_keywords = pd.concat([all_keywords, df], ignore_index=True)
-            consecutive_errors = 0
         except Exception:
-            consecutive_errors += 1
             logger.exception(f"Scrape keyword={keyword} hit error, skipping")
         finally:
             crawl_log.append(
@@ -273,8 +271,6 @@ def crawl_keyword_ranks(pgdb: PostgresEngine) -> None:
                 }
             )
         # Backoff: 1–3 seconds depending on recent errors
-        backoff = min(1.0 + consecutive_errors * 0.5, 3.0)
-        sleep_time = random.uniform(backoff - 0.25, backoff + 0.25)
         time.sleep(sleep_time)
     raw_keywords_to_s3(all_keywords)
     if crawl_log:
@@ -431,11 +427,12 @@ def scrape_keyword(
         adf = pd.DataFrame()
         logger.exception(f"{keyword=} apple failed")
     df = pd.concat([gdf, adf])
+    if df.empty():
+        logger.info(f"{keyword=} no resuts for either store")
+        return pd.DataFrame(columns=["store", "store_id", "rank"])
     logger.info(
         f"{keyword=} apple_apps:{adf.shape[0]:,} google_apps:{gdf.shape[0]:,} finished"
     )
-    if df.empty:
-        return pd.DataFrame(columns=["store", "store_id", "rank"])
     df = df[["store", "store_id", "rank"]]
     return df
 
