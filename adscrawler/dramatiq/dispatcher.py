@@ -173,15 +173,17 @@ def dispatch_app_details_jobs(
     log_info = f"{store=} group={country_priority_group} dispatcher"
 
     # --- Throttle: don't enqueue more if this queue is already full ---
+    my_max_chunks = _MAX_PENDING_CHUNKS if group == 1 else _MAX_PENDING_CHUNKS * 40
     group = country_priority_group
     pending = _count_pending_chunks(store, group)
-    empty_slots = _MAX_PENDING_CHUNKS - pending
-    if empty_slots < _MAX_PENDING_CHUNKS / 10:
+    empty_slots = my_max_chunks - pending
+
+    if empty_slots < my_max_chunks / 10:
         logger.info(f"{log_info} {pending=} queue is mostly full, skipping")
         return
     logger.info(f"{log_info} {pending=} {empty_slots=}")
 
-    query_app_limit = min([empty_slots * MAX_CHUNK_SIZE, app_limit])
+    query_app_limit = min([empty_slots * my_max_chunks, app_limit])
 
     # We do need a larger query to handle possibly locked apps still in queue
     query_app_limit *= 2
