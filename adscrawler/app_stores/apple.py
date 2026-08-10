@@ -12,7 +12,7 @@ from appgoblin_itunes_scraper.util import AppStoreCategories, AppStoreCollection
 from bs4 import BeautifulSoup
 
 from adscrawler.app_stores.utils import truncate_utf8_bytes
-from adscrawler.config import DEVLEOPER_IGNORE_TLDS, get_logger
+from adscrawler.config import DEVLEOPER_IGNORE_TLDS, get_logger, CONFIG
 
 logger = get_logger(__name__, "scrape_apple")
 
@@ -511,7 +511,12 @@ def search_app_store_for_ids(
     except Exception:
         proxies = CONFIG.get("proxies", None)
         ids: list[str] = scraper.get_app_ids_for_query(
-            search_term, country=country, lang=language, timeout=5, num=None, proxies
+            search_term,
+            country=country,
+            lang=language,
+            timeout=5,
+            num=None,
+            proxies=proxies,
         )
     logger.info(f"adscralwer apple search {len(ids)=}")
     return ids
