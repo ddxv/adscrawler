@@ -725,7 +725,7 @@ def scan_all_apps(
     if retry_failed:
         df = get_failed_mitm_logs(pgdb, lookback_days=retry_lookback_days)
         mitm_runs_to_scan = df.sort_values(
-            by="inserted_at", ascending=True
+            by="last_parse_attempted_at", ascending=True
         ).reset_index(drop=True)
         # Normalize column name: get_failed_mitm_logs returns pub_store_id,
         # while the worker function expects store_id

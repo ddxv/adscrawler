@@ -1545,15 +1545,18 @@ def get_failed_mitm_logs(pgdb: PostgresEngine, lookback_days: int = 90) -> pd.Da
     lookback_date = (
         datetime.datetime.now() - datetime.timedelta(days=lookback_days)
     ).strftime("%Y-%m-%d")
-    sel_query = f"""WITH last_run_result AS (SELECT DISTINCT ON (run_id)
+    sel_query = f"""
+          WITH last_run_result AS (SELECT DISTINCT ON (run_id)
       run_id, pub_store_id, error_msg, inserted_at
         FROM logging.creative_scan_results 
+        WHERE inserted_at >= '{lookback_date}'
       ORDER BY run_id, inserted_at DESC
       )
-      SELECT * 
-          FROM last_run_result
-          WHERE error_msg like 'CRITICAL %%' AND inserted_at >= '{lookback_date}'
-        ;
+      SELECT run_id, pub_store_id, inserted_at AS last_parse_attempted_at
+          FROM last_run_result lrs
+          LEFT JOIN version_code_api_scan_results vcasr ON lrs.run_id = vcasr.id
+          WHERE error_msg like 'CRITICAL %%' AND vcasr.run_at >= '{lookback_date}'
+;
     """
     df = pd.read_sql(sel_query, con=pgdb.engine)
     return df

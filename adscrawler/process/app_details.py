@@ -216,22 +216,20 @@ def import_app_details_from_s3_into_db(
             # Check if the parquet file is empty before processing
             count_query = f"SELECT COUNT(*) FROM read_parquet('{parquet_path}', union_by_name=true)"
             row_count = duckdb_con.execute(count_query).fetchone()[0]
-        chunk_est = max(1, row_count // 2048)
+        vector_count = 5
+        # vectors * 2,048 = rows
         try:
             with get_duckdb_connection("s3") as duckdb_con:
                 # Execute query without calling .df() immediately
                 rel = duckdb_con.execute(
                     f"SELECT * FROM read_parquet('{parquet_path}', union_by_name=true)"
                 )
-                # vectors * 2,048 = rows
                 i = 0
                 while True:
                     i += 1
-                    chunk_info = (
-                        f"chunk {i}/{chunk_est} rows {rows_processed}/{row_count}"
-                    )
+                    chunk_info = f"rows {rows_processed}/{row_count}"
                     logger.info(f"{log_info} {chunk_info}")
-                    df_chunk = rel.fetch_df_chunk(vectors_per_chunk=5)
+                    df_chunk = rel.fetch_df_chunk(vectors_per_chunk=vector_count)
                     if df_chunk.empty:
                         break
                     process_chunk(df_chunk, store, pgdb)

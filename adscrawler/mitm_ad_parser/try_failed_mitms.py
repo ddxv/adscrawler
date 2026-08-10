@@ -15,8 +15,12 @@ def retry_failed_mitm_logs(
     Catches all exceptions since failures need to be investigated manually.
     """
     logger.info("Rety failed mitm logs start")
+    lookback_days = 40
+    throw_errors = True
     df = get_failed_mitm_logs(pgdb, lookback_days=lookback_days)
-    df = df.sort_values(by="inserted_at", ascending=True).reset_index(drop=True)
+    df = df.sort_values(by="last_parse_attempted_at", ascending=True).reset_index(
+        drop=True
+    )
     for _i, row in df.iterrows():
         log_info = f"{_i}/{df.shape[0]} {row['pub_store_id']} {row['run_id']}"
         logger.info(f"{log_info} start")
