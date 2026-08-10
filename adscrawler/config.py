@@ -164,7 +164,7 @@ def get_logger(mod_name: str, sep_file: str | None = "main") -> logging.Logger:
 
     _truncate_oversized_log(
         os.path.join(LOG_DIR, f"{sep_file}.log"), 500 * 1024 * 1024
-    )  # 50MB
+    )  # 500MB
 
     indiv_handler = logging.handlers.WatchedFileHandler(
         filename=os.path.join(LOG_DIR, f"{sep_file}.log"),

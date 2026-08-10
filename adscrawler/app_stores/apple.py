@@ -504,9 +504,15 @@ def search_app_store_for_ids(
     """Search store for new apps or keyword rankings."""
     logger.info(f"Apple search start {search_term=} {country=} {language=}")
     scraper = AppStoreScraper()
-    ids: list[str] = scraper.get_app_ids_for_query(
-        search_term, country=country, lang=language, timeout=5, num=None
-    )
+    try:
+        ids: list[str] = scraper.get_app_ids_for_query(
+            search_term, country=country, lang=language, timeout=5, num=None
+        )
+    except Exception:
+        proxies = CONFIG.get("proxies", None)
+        ids: list[str] = scraper.get_app_ids_for_query(
+            search_term, country=country, lang=language, timeout=5, num=None, proxies
+        )
     logger.info(f"adscralwer apple search {len(ids)=}")
     return ids
 

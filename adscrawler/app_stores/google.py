@@ -321,57 +321,79 @@ def crawl_google_developers(
     return apps_df
 
 
+def _resolve_node_path() -> str:
+    """Return the node binary path, preferring the local-dev override."""
+    if "local-dev" in CONFIG:
+        return CONFIG["local-dev"].get("node_env", "node")
+    return "node"
+
+
+def _run_node_search(
+    node_path: str, search_term: str, country: str, language: str
+) -> list[dict]:
+    """Fallback: call google-play-scraper via Node.js.
+
+    Depending how node is installed you may need a system link like::
+
+        sudo ln -sf /home/user/.nvm/versions/node/v24.14.0/bin/node /usr/local/bin/node
+    """
+    process = subprocess.Popen(
+        [
+            node_path,
+            f"{MODULE_DIR}/static/searchApps.js",
+            search_term,
+            "200",
+            country,
+            language,
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    try:
+        output, error = process.communicate(timeout=60)
+        if error:
+            logger.error(f"failed to search: {error!r}")
+    except subprocess.TimeoutExpired:
+        process.kill()
+        try:
+            process.communicate(timeout=5)  # drain pipes safely
+        except subprocess.TimeoutExpired:
+            pass
+        raise Exception("Search process timed out")
+
+    return json.loads(output)
+
+
 def search_play_store(
     search_term: str, country: str = "us", language: str = "en"
 ) -> list[dict]:
     """Search store for new apps or keyword rankings."""
     logger.info(f"Run Playstore search {search_term=} {country=} {language=}")
-    results = []
-    # Returns few results
-    try:
-        results = appgoblin_play_scraper.search(
-            search_term,
-            lang=language,
-            country=country,
-        )
-    except Exception:
-        node_path = "node"
-        if "local-dev" in CONFIG.keys():
-            node_path = CONFIG["local-dev"].get("node_env")
 
-        # Call the Node.js script that runs google-play-scraper
-        # Depending how node is installed you may need
-        # a system link like sudo ln -sf /home/user/.nvm/versions/node/v24.14.0/bin/node /usr/local/bin/node
-        process = subprocess.Popen(
-            [
-                node_path,
-                f"{MODULE_DIR}/static/searchApps.js",
-                search_term,
-                "200",
-                country,
-                language,
-            ],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
+    proxies = CONFIG.get("proxies", None)
+    node_path = _resolve_node_path()
+
+    strategies = [
+        lambda: appgoblin_play_scraper.search(
+            search_term, lang=language, country=country
+        ),
+        lambda: appgoblin_play_scraper.search(
+            search_term, lang=language, country=country, proxies=proxies
+        ),
+        lambda: _run_node_search(node_path, search_term, country, language),
+    ]
+
+    for strategy in strategies:
         try:
-            output, error = process.communicate(timeout=60)
-        except subprocess.TimeoutExpired:
-            process.kill()
-            try:
-                process.communicate(timeout=5)  # drain pipes safely
-            except subprocess.TimeoutExpired:
-                pass
-            raise Exception("Search process timed out")
+            results = strategy()
+            break
+        except Exception:
+            continue
+    else:
+        raise RuntimeError("All Play Store search strategies failed")
 
-        if error:
-            logger.error(f"failed to search: {error!r}")
-
-        results: list[dict] = json.loads(output)
     results = normalize_google_search_results(
         results, country=country, language=language
     )
-
     logger.info(f"Playstore search finished with {len(results)} results")
-
     return results
