@@ -273,6 +273,16 @@ def crawl_keyword_ranks(pgdb: PostgresEngine) -> None:
         # Backoff: 1–3 seconds depending on recent errors
         time.sleep(sleep_time)
     raw_keywords_to_s3(all_keywords)
+    try:
+        for store, check_df in df.groupby("store"):
+            check_and_insert_new_apps(
+                pgdb=pgdb,
+                dicts=check_df.to_dict(orient="records"),
+                crawl_source="keywords",
+                store=store,
+            )
+    except Exception:
+        logger.warning("check and insert new apps failed")
     if crawl_log:
         crawl_log_df = pd.DataFrame(crawl_log).rename(columns={"keyword_id": "keyword"})
         upsert_df(
