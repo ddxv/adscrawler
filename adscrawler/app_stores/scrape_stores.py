@@ -245,7 +245,7 @@ def crawl_keyword_ranks(pgdb: PostgresEngine) -> None:
     crawl_log = []
     for _id, row in kdf.iterrows():
         logger.info(
-            f"Crawling keywords: {_id}/{kdf.shape[0]:,} keyword={row.keyword_text}"
+            f"crawl_keywords: {_id}/{kdf.shape[0]:,} keyword={row.keyword_text}"
         )
         keyword = row.keyword_text
         try:
@@ -274,6 +274,7 @@ def crawl_keyword_ranks(pgdb: PostgresEngine) -> None:
         time.sleep(sleep_time)
     raw_keywords_to_s3(all_keywords)
     try:
+        logger.info("crawl_keywords insert new apps...")
         for store, check_df in df.groupby("store"):
             check_and_insert_new_apps(
                 pgdb=pgdb,
