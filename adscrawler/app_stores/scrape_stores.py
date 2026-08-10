@@ -243,10 +243,9 @@ def crawl_keyword_ranks(pgdb: PostgresEngine) -> None:
     all_keywords = pd.DataFrame()
     sleep_time = 1
     crawl_log = []
+    log_info = "crawl_keywords"
     for _id, row in kdf.iterrows():
-        logger.info(
-            f"crawl_keywords: {_id}/{kdf.shape[0]:,} keyword={row.keyword_text}"
-        )
+        logger.info(f"{log_info} {_id}/{kdf.shape[0]:,} keyword={row.keyword_text}")
         keyword = row.keyword_text
         try:
             df = scrape_keyword(
@@ -262,7 +261,7 @@ def crawl_keyword_ranks(pgdb: PostgresEngine) -> None:
             df["crawled_date"] = df["crawled_at"].dt.date
             all_keywords = pd.concat([all_keywords, df], ignore_index=True)
         except Exception:
-            logger.exception(f"Scrape keyword={keyword} hit error, skipping")
+            logger.exception(f"{log_info} {keyword=} hit error, skipping")
         finally:
             crawl_log.append(
                 {
@@ -272,10 +271,13 @@ def crawl_keyword_ranks(pgdb: PostgresEngine) -> None:
             )
         # Backoff: 1–3 seconds depending on recent errors
         time.sleep(sleep_time)
+    if all_keywords.empty:
+        logger.error(f"{log_info} all keywords failed!")
+        return
     raw_keywords_to_s3(all_keywords)
     try:
-        logger.info("crawl_keywords insert new apps...")
-        for store, check_df in df.groupby("store"):
+        logger.info(f"{log_info} insert new apps...")
+        for store, check_df in all_keywords.groupby("store"):
             check_and_insert_new_apps(
                 pgdb=pgdb,
                 dicts=check_df.to_dict(orient="records"),
@@ -283,17 +285,16 @@ def crawl_keyword_ranks(pgdb: PostgresEngine) -> None:
                 store=store,
             )
     except Exception:
-        logger.warning("check and insert new apps failed")
-    if crawl_log:
-        crawl_log_df = pd.DataFrame(crawl_log).rename(columns={"keyword_id": "keyword"})
-        upsert_df(
-            table_name="keywords_crawled_at",
-            schema="logging",
-            insert_columns=["keyword", "crawled_at"],
-            df=crawl_log_df[["keyword", "crawled_at"]],
-            key_columns=["keyword"],
-            pgdb=pgdb,
-        )
+        logger.warning(f"{log_info} check and insert new apps failed")
+    crawl_log_df = pd.DataFrame(crawl_log).rename(columns={"keyword_id": "keyword"})
+    upsert_df(
+        table_name="keywords_crawled_at",
+        schema="logging",
+        insert_columns=["keyword", "crawled_at"],
+        df=crawl_log_df[["keyword", "crawled_at"]],
+        key_columns=["keyword"],
+        pgdb=pgdb,
+    )
 
 
 def scrape_store_ranks(pgdb: PostgresEngine, store: int) -> None:
@@ -977,7 +978,7 @@ def upsert_store_apps_descriptions(
         null_langs = apps_df[null_ids][
             ["store_id", "store_language_code"]
         ].drop_duplicates()
-        logger.debug(f"App descriptions dropping unknown language codes")
+        logger.debug("App descriptions dropping unknown language codes")
         apps_df = apps_df[~null_ids]
         if apps_df.empty:
             logger.debug("Dropped all descriptions, no language id found")
