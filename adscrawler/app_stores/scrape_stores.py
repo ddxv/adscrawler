@@ -439,7 +439,7 @@ def scrape_keyword(
         adf = pd.DataFrame()
         logger.exception(f"{keyword=} apple failed")
     df = pd.concat([gdf, adf])
-    if df.empty():
+    if df.empty:
         logger.info(f"{keyword=} no resuts for either store")
         return pd.DataFrame(columns=["store", "store_id", "rank"])
     logger.info(
