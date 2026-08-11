@@ -211,5 +211,5 @@ SELECT store_app,
         last_scanned_at,
         last_scuccess_scanned_at,
         COUNT(*) OVER() AS total_queue_depth
-FROM  AS all_results
+FROM all_results
 LIMIT :mylimit;
