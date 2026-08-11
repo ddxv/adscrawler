@@ -21,7 +21,7 @@ SSH_KNOWN_HOSTS = pathlib.Path(HOME, pathlib.Path(".ssh/known_hosts"))
 
 GEO_DATA_DIR = pathlib.Path(CONFIG_DIR, pathlib.Path("geo-data"))
 
-PROM_DIR = pathlib.Path(LOG_DIR, pathlib.Path("prom"))
+PROM_DIR = pathlib.Path(CONFIG_DIR, pathlib.Path("/var/lib/node_exporter/textfile_collector")
 
 # Temp download dirs
 MITM_DIR = pathlib.Path(CONFIG_DIR, pathlib.Path("mitmlogs"))
@@ -104,7 +104,6 @@ def check_dirs() -> None:
         IPAS_INCOMING_DIR,
         SPLITS_INCOMING_DIR,
         GEO_DATA_DIR,
-        PROM_DIR,
         APP_ICONS_TMP_DIR,
     ]
     for _dir in dirs:
