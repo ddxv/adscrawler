@@ -16,13 +16,13 @@ from sqlalchemy.exc import OperationalError
 from sqlalchemy.sql.elements import TextClause
 
 from adscrawler.config import CONFIG, SQL_DIR, get_logger
-from adscrawler.dbcon.connection import PostgresEngine
 from adscrawler.metrics import (
     CRAWL_BACKLOG_GAUGE,
     DOWNLOAD_BACKLOG_GAUGE,
     SDK_SCAN_BACKLOG_GAUGE,
     WAYDROID_RUN_BACKLOG_GAUGE,
 )
+from adscrawler.dbcon.connection import PostgresEngine
 
 logger = get_logger(__name__)
 
@@ -1361,13 +1361,12 @@ def query_apps_to_sdk_scan_fix(pgdb: PostgresEngine, store: int) -> pd.DataFrame
 
 
 def query_apps_to_sdk_scan(
-    pgdb: PostgresEngine,
-    store: int,
+    pgdb: PostgresEngine, store: int, limit: int
 ) -> pd.DataFrame:
     df = pd.read_sql(
         QUERY_APPS_TO_SDK_SCAN,
         con=pgdb.engine,
-        params={"store": store},
+        params={"store": store, "mylimit": limit},
     )
     if df.empty:
         total_backlog = 0
@@ -1411,7 +1410,7 @@ def query_all_apps_to_process(
 
 
 def query_apps_to_api_scan(
-    pgdb: PostgresEngine, store: int, run_name: str
+    pgdb: PostgresEngine, store: int, run_name: str, limit: int
 ) -> pd.DataFrame:
     if run_name == "ads":
         query = QUERY_APPS_TO_API_SCAN_ADS
@@ -1420,7 +1419,7 @@ def query_apps_to_api_scan(
     df = pd.read_sql(
         query,
         con=pgdb.engine,
-        params={"store": store},
+        params={"store": store, "mylimit": limit},
     )
     if df.empty:
         total_backlog = 0
