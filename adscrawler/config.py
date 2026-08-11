@@ -21,6 +21,8 @@ SSH_KNOWN_HOSTS = pathlib.Path(HOME, pathlib.Path(".ssh/known_hosts"))
 
 GEO_DATA_DIR = pathlib.Path(CONFIG_DIR, pathlib.Path("geo-data"))
 
+PROM_DIR = pathlib.Path("/var/lib/node_exporter/textfile_collector")
+
 # Temp download dirs
 MITM_DIR = pathlib.Path(CONFIG_DIR, pathlib.Path("mitmlogs"))
 CREATIVES_DIR = pathlib.Path(CONFIG_DIR, pathlib.Path("creatives"))

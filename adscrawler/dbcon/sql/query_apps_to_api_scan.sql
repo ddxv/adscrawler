@@ -117,6 +117,37 @@ user_requested_apps_crawl AS (
         AND (fr.failed_attempts < 1 OR fr.failed_attempts IS NULL
         )
     ORDER BY sa.id ASC, urs.created_at DESC
+),
+all_results AS (
+    SELECT
+        store_app,
+        store_id,
+        name,
+        version_string,
+        version_code_id,
+        installs,
+        last_run_at,
+        failed_attempts,
+        last_run_result,
+        last_succesful_run_at,
+        user_requested_at,
+        'user' AS mysource
+    FROM user_requested_apps_crawl
+    UNION ALL
+    SELECT
+        store_app,
+        store_id,
+        name,
+        version_string,
+        version_code_id,
+        installs,
+        last_run_at,
+        failed_attempts,
+        last_run_result,
+        last_succesful_run_at,
+        NULL AS user_requested_at,
+        'scheduled' AS mysource
+    FROM all_scheduled_to_run
 )
 SELECT
     store_app,
@@ -130,20 +161,7 @@ SELECT
     last_run_result,
     last_succesful_run_at,
     user_requested_at,
-    'user' AS mysource
-FROM user_requested_apps_crawl
-UNION ALL
-SELECT
-    store_app,
-    store_id,
-    name,
-    version_string,
-    version_code_id,
-    installs,
-    last_run_at,
-    failed_attempts,
-    last_run_result,
-    last_succesful_run_at,
-    NULL AS user_requested_at,
-    'scheduled' AS mysource
-FROM all_scheduled_to_run;
+    mysource,
+    count(*) OVER () AS total_queue_depth
+FROM all_results
+LIMIT :mylimit;

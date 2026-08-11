@@ -15,7 +15,6 @@ from appgoblin_itunes_scraper.exceptions import (
     TemporaryBlockException,
 )
 from appgoblin_play_scraper.exceptions import ExtraHTTPError
-from prometheus_client import Counter
 
 from adscrawler.app_stores.apkcombo import get_apkcombo_android_apps
 from adscrawler.app_stores.appbrain import get_appbrain_android_apps
@@ -64,6 +63,7 @@ from adscrawler.dbcon.queries import (
     update_from_df,
     upsert_df,
 )
+from adscrawler.metrics import CRAWL_RESULTS_COUNTER
 from adscrawler.process.app_details import (
     app_details_to_s3,
     raw_keywords_to_s3,
@@ -72,13 +72,6 @@ from adscrawler.process.app_rankings import process_store_rankings
 from adscrawler.process.storage import rankings_parquet_exists_in_s3
 
 logger = get_logger(__name__, "scrape_stores")
-
-
-CRAWL_RESULTS_COUNTER = Counter(
-    name="app_crawl_results_total",
-    documentation="Total number of app crawls processed by store and outcome",
-    labelnames=["store", "crawl_result"],
-)
 
 
 def process_scrape_apps_and_save(
@@ -178,8 +171,6 @@ def update_app_details(
     logger.info(f"{log_info} start apps={len(df)}")
 
     # Keep chunk size large for efficient S3 parquet files
-    # For store 1 (sequential), processes provide parallelism
-    # For store 2 (threading), threads within chunks provide parallelism
     max_chunk_size = 3000
     chunks = []
     # Try keeping countries together for larger end S3 files

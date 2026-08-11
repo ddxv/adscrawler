@@ -13,6 +13,10 @@ from adscrawler.dbcon.queries import (
     query_apps_to_sdk_scan_fix,
     upsert_df,
 )
+from adscrawler.metrics import (
+    DOWNLOAD_RESULTS_COUNTER,
+    SDK_SCAN_RESULTS_COUNTER,
+)
 from adscrawler.packages.apks.download_apk import (
     manage_apk_download,
     manual_process_download,
@@ -54,13 +58,12 @@ def download_apps(
     store: int, pgdb: PostgresEngine, number_of_apps_to_pull: int = 20
 ) -> None:
     total_errors = 0
-    apps = query_apps_to_download(
-        pgdb=pgdb,
-        store=store,
-    )
-    logger.info(
-        f"download_apps: {store=} {apps.shape[0]:,} total apps, start top {number_of_apps_to_pull}"
-    )
+    apps = query_apps_to_download(pgdb=pgdb, store=store, limit=number_of_apps_to_pull)
+    if apps.empty:
+        total_apps = 0
+    else:
+        total_apps = apps["total_queue_backlog"].values[0]
+    logger.info(f"download_apps: {store=} {total_apps=:,} start")
     apps = apps.head(number_of_apps_to_pull)
     set_iptables_rule_for_wt0()
     for _id, row in apps.iterrows():
@@ -119,6 +122,12 @@ def download_apps(
         except Exception:
             logger.exception(f"Download for {store_id} failed")
         remove_tmp_files(store_id=store_id)
+        DOWNLOAD_RESULTS_COUNTER.labels(
+            store=store,
+            download_result=(
+                str(download_result.crawl_result) if download_result else "0"
+            ),
+        ).inc()
         errors_msg = (
             f" with errors={download_result.error_count}"
             if download_result.error_count > 0
@@ -158,13 +167,11 @@ def process_sdks(
         apps = query_apps_to_sdk_scan_fix(pgdb, store)
     else:
         apps = query_apps_to_sdk_scan(
-            pgdb=pgdb,
-            store=store,
+            pgdb=pgdb, store=store, limit=number_of_apps_to_pull
         )
     apps["store"] = store
-    logger.info(
-        f"SDK processing: {store=} total apps:{apps.shape[0]:,} top {number_of_apps_to_pull} start"
-    )
+    log_info = f"process_sdks: {store=}"
+    logger.info(f"{log_info} {number_of_apps_to_pull} start")
     apps = apps.head(number_of_apps_to_pull)
     for _id, row in apps.iterrows():
         store_id = row.store_id
@@ -172,10 +179,10 @@ def process_sdks(
         version_str = row["version_code_str"]
         version_code_dbid = row["version_code_db_id"]
         crawl_result = 3
-        logger.info(f"SDK processing: {store_id=} start")
+        logger.info(f"{log_info} {store_id=} start")
         if version_code_dbid is None:
             logger.error(
-                f"Version code dbid is None for {store_id=}, data not recorded!"
+                f"{log_info} version code dbid is None for {store_id=}, data not recorded!"
             )
             raise
         try:
@@ -226,8 +233,14 @@ def process_sdks(
                 raw_txt_str=raw_txt_str,
             )
         else:
-            logger.info(f"{store_id=} crawl_result {crawl_result=} skipping upsert")
+            logger.info(
+                f"{log_info} {store_id=} crawl_result {crawl_result=} skipping upsert"
+            )
 
+        SDK_SCAN_RESULTS_COUNTER.labels(
+            store=store,
+            scan_result=str(crawl_result),
+        ).inc()
         remove_tmp_files(store_id=store_id)
 
 

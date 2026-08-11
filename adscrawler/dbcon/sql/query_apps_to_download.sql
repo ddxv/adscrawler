@@ -1,8 +1,7 @@
-
 WITH
 s3_file_keys AS (
     SELECT * FROM public.s3_file_keys
-),	
+),
 latest_version_codes AS (
     SELECT DISTINCT ON
     (store_app)
@@ -27,9 +26,10 @@ latest_success_version_codes AS (
         vc.updated_at,
         vc.crawl_result
     FROM
-        version_codes vc
-    INNER JOIN s3_file_keys AS sfk ON
-        vc.id = sfk.version_code_id
+        version_codes AS vc
+    INNER JOIN s3_file_keys AS sfk
+        ON
+            vc.id = sfk.version_code_id
     ORDER BY
         store_app ASC,
         vc.created_at DESC
@@ -39,7 +39,7 @@ apps_last_downloaded AS (
         store_app,
         max(updated_at) AS last_downloaded_at
     FROM
-        logging.store_app_downloads sad
+        logging.store_app_downloads
     WHERE
         crawl_result = 1
     GROUP BY
@@ -98,7 +98,9 @@ scheduled_apps_crawl AS (
     LEFT JOIN apps_last_downloaded AS ald
         ON
             dc.store_app = ald.store_app
-    LEFT JOIN latest_success_version_codes AS lsvc ON dc.store_app = lsvc.store_app
+    LEFT JOIN
+        latest_success_version_codes AS lsvc
+        ON dc.store_app = lsvc.store_app
     LEFT JOIN faily_downloads_monthly AS fd
         ON
             vc.store_app = fd.store_app
@@ -120,7 +122,8 @@ scheduled_apps_crawl AS (
                     ald.last_downloaded_at IS NULL
                     -- success not downloaded > x days and store recently updated
                     OR (
-                        ald.last_downloaded_at < current_date - interval '120 days'
+                        ald.last_downloaded_at
+                        < current_date - interval '120 days'
                         AND (
                             sa.store_last_updated
                             > current_date - interval '90 days'
@@ -132,7 +135,8 @@ scheduled_apps_crawl AS (
                 -- Retry failing every couple days, including same x days from above
                 (
                     ald.last_downloaded_at IS NULL
-                    OR ald.last_downloaded_at < current_date - interval '120 days'
+                    OR ald.last_downloaded_at
+                    < current_date - interval '120 days'
                     AND (
                         sa.store_last_updated
                         > current_date - interval '90 days'
@@ -304,7 +308,8 @@ SELECT
     last_download_attempt,
     last_downloaded_at,
     last_downloaded_version_code,
-    app_rank
+    app_rank,
+    count(*) OVER () AS total_queue_depth
 FROM
     final_selection
-    ;
+LIMIT :mylimit;

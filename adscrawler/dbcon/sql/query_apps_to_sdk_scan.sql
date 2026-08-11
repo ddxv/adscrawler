@@ -167,33 +167,49 @@ user_requested_apps_crawl AS (
     ORDER BY
         sa.id ASC,
         urs.created_at DESC
+),
+all_results AS (
+    SELECT
+        store_app,
+        version_code_db_id,
+        version_code_str,
+        store_id,
+        name,
+        installs,
+        rating_count,
+        mysource,
+        last_analyzed_result,
+        last_scanned_at,
+        last_scuccess_scanned_at
+    FROM
+        user_requested_apps_crawl
+    UNION ALL
+    SELECT
+        store_app,
+        version_code_db_id,
+        version_code_str,
+        store_id,
+        name,
+        installs,
+        rating_count,
+        mysource,
+        last_analyzed_result,
+        last_scanned_at,
+        last_scuccess_scanned_at
+    FROM
+        scheduled_vcs_crawl
 )
-SELECT
-    store_app,
-    version_code_db_id,
-    version_code_str,
-    store_id,
-    name,
-    installs,
-    rating_count,
-    mysource,
-    last_analyzed_result,
-    last_scanned_at,
-    last_scuccess_scanned_at
-FROM
-    user_requested_apps_crawl
-UNION ALL
-SELECT
-    store_app,
-    version_code_db_id,
-    version_code_str,
-    store_id,
-    name,
-    installs,
-    rating_count,
-    mysource,
-    last_analyzed_result,
-    last_scanned_at,
-    last_scuccess_scanned_at
-FROM
-    scheduled_vcs_crawl;
+SELECT store_app,
+        version_code_db_id,
+        version_code_str,
+        store_id,
+        name,
+        installs,
+        rating_count,
+        mysource,
+        last_analyzed_result,
+        last_scanned_at,
+        last_scuccess_scanned_at,
+        COUNT(*) OVER() AS total_queue_depth
+FROM  AS all_results
+LIMIT :mylimit;

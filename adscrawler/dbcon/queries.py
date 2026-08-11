@@ -17,6 +17,12 @@ from sqlalchemy.sql.elements import TextClause
 
 from adscrawler.config import CONFIG, SQL_DIR, get_logger
 from adscrawler.dbcon.connection import PostgresEngine
+from adscrawler.metrics import (
+    CRAWL_BACKLOG_GAUGE,
+    DOWNLOAD_BACKLOG_GAUGE,
+    SDK_SCAN_BACKLOG_GAUGE,
+    WAYDROID_RUN_BACKLOG_GAUGE,
+)
 
 logger = get_logger(__name__)
 
@@ -1162,7 +1168,49 @@ def query_store_apps_to_update(
         dtype={"store_app": int, "store": int, "store_id": str},
     )
     df["language"] = "en"
+    if df.empty:
+        total_backlog = 0
+    else:
+        total_backlog = (
+            int(df["total_queue_depth"].iloc[0])
+            if "total_queue_depth" in df.columns
+            else 0
+        )
+        df = df.drop(columns=["total_queue_depth"], errors="ignore")
+    log_store_apps_query(
+        store=store,
+        country_priority_group=country_priority_group,
+        total_backlog=total_backlog,
+    )
     return df
+
+
+def log_store_apps_query(store: int, country_priority_group: int, total_backlog: int):
+    store_str = str(store)
+    country_priority_group_str = str(country_priority_group)
+    CRAWL_BACKLOG_GAUGE.labels(
+        store=store_str, country_priority_group=country_priority_group_str
+    ).set(total_backlog)
+
+
+def log_downloads_query(store: int, total_backlog: int):
+    store_str = str(store)
+    DOWNLOAD_BACKLOG_GAUGE.labels(
+        store=store_str,
+    ).set(total_backlog)
+
+
+def log_sdk_scan_query(store: int, total_backlog: int):
+    store_str = str(store)
+    SDK_SCAN_BACKLOG_GAUGE.labels(
+        store=store_str,
+    ).set(total_backlog)
+
+
+def log_waydroid_backlog_query(run_name: str, total_backlog: int):
+    WAYDROID_RUN_BACKLOG_GAUGE.labels(
+        run_name=run_name,
+    ).set(total_backlog)
 
 
 def query_keywords_to_crawl(
@@ -1237,13 +1285,24 @@ def query_all(
 
 
 def query_apps_to_download(
-    pgdb: PostgresEngine,
-    store: int,
+    pgdb: PostgresEngine, store: int, limit: int
 ) -> pd.DataFrame:
     df = pd.read_sql(
         QUERY_APPS_TO_DOWNLOAD,
         con=pgdb.engine,
-        params={"store": store},
+        params={"store": store, "mylimit": limit},
+    )
+    if df.empty:
+        total_backlog = 0
+    else:
+        total_backlog = (
+            int(df["total_queue_depth"].iloc[0])
+            if "total_queue_depth" in df.columns
+            else 0
+        )
+    log_downloads_query(
+        store=store,
+        total_backlog=total_backlog,
     )
     return df
 
@@ -1286,6 +1345,18 @@ def query_apps_to_sdk_scan_fix(pgdb: PostgresEngine, store: int) -> pd.DataFrame
         con=pgdb.engine,
         params={"store": store},
     )
+    if df.empty:
+        total_backlog = 0
+    else:
+        total_backlog = (
+            int(df["total_queue_depth"].iloc[0])
+            if "total_queue_depth" in df.columns
+            else 0
+        )
+    log_sdk_scan_query(
+        store=store,
+        total_backlog=total_backlog,
+    )
     return df
 
 
@@ -1297,6 +1368,18 @@ def query_apps_to_sdk_scan(
         QUERY_APPS_TO_SDK_SCAN,
         con=pgdb.engine,
         params={"store": store},
+    )
+    if df.empty:
+        total_backlog = 0
+    else:
+        total_backlog = (
+            int(df["total_queue_depth"].iloc[0])
+            if "total_queue_depth" in df.columns
+            else 0
+        )
+    log_sdk_scan_query(
+        store=store,
+        total_backlog=total_backlog,
     )
     return df
 
@@ -1338,6 +1421,18 @@ def query_apps_to_api_scan(
         query,
         con=pgdb.engine,
         params={"store": store},
+    )
+    if df.empty:
+        total_backlog = 0
+    else:
+        total_backlog = (
+            int(df["total_queue_depth"].iloc[0])
+            if "total_queue_depth" in df.columns
+            else 0
+        )
+    log_waydroid_backlog_query(
+        run_name=run_name,
+        total_backlog=total_backlog,
     )
     return df
 

@@ -28,6 +28,7 @@ from adscrawler.dbcon.queries import (
     query_store_app_by_store_id,
     upsert_df,
 )
+from adscrawler.metrics import WAYDROID_RUN_RESULTS_COUNTER
 from adscrawler.mitm_ad_parser import mitm_logs
 from adscrawler.mitm_ad_parser.mitm_logs import parse_log
 from adscrawler.packages.apks.weston import (
@@ -92,6 +93,10 @@ def run_app(
         crawl_result=crawl_result,
         pgdb=pgdb,
     )
+    WAYDROID_RUN_RESULTS_COUNTER.labels(
+        run_name=run_name,
+        run_result=str(crawl_result),
+    ).inc()
 
     try:
         mdf = mitm_logs.parse_log(store_id=store_id, run_id=None, pgdb=pgdb)
@@ -894,7 +899,9 @@ def manual_waydroid_process(
 def process_apks_for_waydroid(
     pgdb: PostgresEngine, num_apps: int = 20, run_name: str = "regular"
 ) -> None:
-    apps_df = query_apps_to_api_scan(pgdb=pgdb, store=1, run_name=run_name)
+    apps_df = query_apps_to_api_scan(
+        pgdb=pgdb, store=1, run_name=run_name, limit=num_apps
+    )
     logger.info(
         f"Waydroid has {apps_df.shape[0]:,} apps to process, starting {num_apps}"
     )

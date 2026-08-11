@@ -2,7 +2,9 @@ import argparse
 import datetime
 import os
 import sys
+
 import pandas as pd
+from prometheus_client import write_to_textfile
 
 from adscrawler.app_stores.process_icons import refresh_app_icons
 from adscrawler.app_stores.process_keywords import process_app_keywords
@@ -12,8 +14,9 @@ from adscrawler.app_stores.scrape_stores import (
     scrape_store_ranks,
     update_app_details,
 )
-from adscrawler.config import get_logger
+from adscrawler.config import PROM_DIR, get_logger
 from adscrawler.dbcon.connection import PostgresEngine, get_db_connection
+from adscrawler.metrics import registry
 from adscrawler.packages.apks.cleanup_apks import run_cleanup
 from adscrawler.packages.process_files import (
     download_apps,
@@ -604,6 +607,7 @@ class ProcessManager:
             download_apps(store=store, pgdb=self.pgcon, number_of_apps_to_pull=50)
         except Exception:
             logger.exception(f"Download app/decompile failing {store=}")
+        write_to_textfile(str(prom_file), registry)
 
     def process_sdks(self, store: int) -> None:
         run_fixes = self.args.run_fixes
@@ -614,6 +618,7 @@ class ProcessManager:
             number_of_apps_to_pull=number_of_apps_to_pull,
             run_fixes=run_fixes,
         )
+        write_to_textfile(str(prom_file), registry)
 
     def cleanup_apks(self) -> None:
         try:
@@ -676,10 +681,8 @@ class ProcessManager:
             )
         else:
             # Default processing of apk/xapk files that need to be processed
-            try:
-                process_apks_for_waydroid(pgdb=self.pgcon, run_name=run_name)
-            except Exception:
-                logger.exception("Process APKs with Waydroid failed")
+            process_apks_for_waydroid(pgdb=self.pgcon, run_name=run_name)
+            write_to_textfile(str(prom_file), registry)
 
     def retry_failed_mitm_logs(self) -> None:
         from adscrawler.mitm_ad_parser.mitm_scrape_ads import (  # noqa: PLC0415
@@ -713,4 +716,5 @@ class ProcessManager:
 
 if __name__ == "__main__":
     process_manager = ProcessManager()
+    prom_file = PROM_DIR / f"process_files_{os.getpid()}.prom"
     process_manager.run()

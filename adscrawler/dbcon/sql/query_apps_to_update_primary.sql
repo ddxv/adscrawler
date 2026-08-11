@@ -93,7 +93,8 @@ SELECT
     COALESCE(ta.additional_html_scraped_at >= :year_ago_ts, FALSE)
         AS html_recently_scraped,
     ta.updated_at AS app_updated_at,
-    lc.crawled_at AS country_crawled_at
+    lc.crawled_at AS country_crawled_at,
+    COUNT(*) OVER () AS total_queue_depth
 FROM
     target_apps AS ta
 CROSS JOIN countries_to_crawl AS ctc
