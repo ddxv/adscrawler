@@ -104,7 +104,7 @@ def check_dirs() -> None:
         IPAS_INCOMING_DIR,
         SPLITS_INCOMING_DIR,
         GEO_DATA_DIR,
-        LOG_DIR,
+        PROM_DIR,
         APP_ICONS_TMP_DIR,
     ]
     for _dir in dirs:
