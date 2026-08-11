@@ -607,6 +607,7 @@ class ProcessManager:
             download_apps(store=store, pgdb=self.pgcon, number_of_apps_to_pull=50)
         except Exception:
             logger.exception(f"Download app/decompile failing {store=}")
+        prom_file = PROM_DIR / f"download_apks_{store}.prom"
         write_to_textfile(str(prom_file), registry)
 
     def process_sdks(self, store: int) -> None:
@@ -618,6 +619,7 @@ class ProcessManager:
             number_of_apps_to_pull=number_of_apps_to_pull,
             run_fixes=run_fixes,
         )
+        prom_file = PROM_DIR / f"process_sdks_{store}.prom"
         write_to_textfile(str(prom_file), registry)
 
     def cleanup_apks(self) -> None:
@@ -682,6 +684,7 @@ class ProcessManager:
         else:
             # Default processing of apk/xapk files that need to be processed
             process_apks_for_waydroid(pgdb=self.pgcon, run_name=run_name)
+            prom_file = PROM_DIR / f"waydroid_{run_name}.prom"
             write_to_textfile(str(prom_file), registry)
 
     def retry_failed_mitm_logs(self) -> None:
@@ -716,5 +719,4 @@ class ProcessManager:
 
 if __name__ == "__main__":
     process_manager = ProcessManager()
-    prom_file = PROM_DIR / f"process_files_{os.getpid()}.prom"
     process_manager.run()
