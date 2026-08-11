@@ -6,6 +6,7 @@ import time
 from collections.abc import Callable
 from functools import lru_cache
 from typing import Any
+from prometheus_client import write_to_textfile
 
 import numpy as np
 import pandas as pd
@@ -15,12 +16,13 @@ from sqlalchemy import bindparam, text
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.sql.elements import TextClause
 
-from adscrawler.config import CONFIG, SQL_DIR, get_logger
+from adscrawler.config import CONFIG, SQL_DIR, get_logger, PROM_DIR
 from adscrawler.metrics import (
     CRAWL_BACKLOG_GAUGE,
     DOWNLOAD_BACKLOG_GAUGE,
     SDK_SCAN_BACKLOG_GAUGE,
     WAYDROID_RUN_BACKLOG_GAUGE,
+    registry,
 )
 from adscrawler.dbcon.connection import PostgresEngine
 
@@ -1191,6 +1193,8 @@ def log_store_apps_query(store: int, country_priority_group: int, total_backlog:
     CRAWL_BACKLOG_GAUGE.labels(
         store=store_str, country_priority_group=country_priority_group_str
     ).set(total_backlog)
+    prom_file = PROM_DIR / f"crawl_{store}_{country_priority_group_str}.prom"
+    write_to_textfile(str(prom_file), registry)
 
 
 def log_downloads_query(store: int, total_backlog: int):

@@ -18,6 +18,7 @@ CRAWL_BACKLOG_GAUGE = Gauge(
     "app_crawl_backlog_total",
     "Total apps meeting crawl criteria in SQL queue",
     labelnames=["store", "country_priority_group"],
+    registry=registry,
 )
 
 DOWNLOAD_BACKLOG_GAUGE = Gauge(
