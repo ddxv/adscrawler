@@ -59,7 +59,7 @@ redis_client = redis_module.Redis(
     socket_timeout=5,
 )
 
-_MAX_PENDING_CHUNKS = 1500
+_MAX_PENDING_CHUNKS = 2000
 MAX_CHUNK_SIZE = 40
 
 
