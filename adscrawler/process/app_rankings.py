@@ -116,10 +116,11 @@ def process_ranks_from_s3(
     else:
         raise ValueError(f"Invalid period {period}")
     period_date_str = dt.strftime("%Y-%m-%d")
-    logger.info(f"Processing store={store} period_start={period_date_str}")
+    log_info = f"process_ranks_from_s3"
+    logger.info(f"{log_info} {store=} {period_date_str=}")
     all_parquet_paths = get_s3_rank_parquet_paths(s3_config_key, dt, days, store)
     if len(all_parquet_paths) == 0:
-        logger.info(f"No parquet files found for period_start={period_date_str}")
+        logger.info(f"{log_info} no parquet files found for {period_date_str=}")
         return
     countries_in_period = [
         x.split("country=")[1].split("/")[0]
@@ -128,7 +129,7 @@ def process_ranks_from_s3(
     ]
     countries_in_period = list(set(countries_in_period))
     logger.info(
-        f"S3 Ranks {store=} {period_date_str=} {countries_in_period=} files={len(all_parquet_paths)}"
+        f"{log_info} {store=} {period_date_str=} countries={len(countries_in_period)} files={len(all_parquet_paths)}"
     )
     df = query_store_collection_ranks(
         country_parquet_paths=all_parquet_paths,

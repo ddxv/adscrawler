@@ -173,8 +173,8 @@ def dispatch_app_details_jobs(
     log_info = f"{store=} group={country_priority_group} dispatcher"
 
     # --- Throttle: don't enqueue more if this queue is already full ---
-    my_max_chunks = _MAX_PENDING_CHUNKS if group == 1 else _MAX_PENDING_CHUNKS * 40
     group = country_priority_group
+    my_max_chunks = _MAX_PENDING_CHUNKS if group == 1 else _MAX_PENDING_CHUNKS * 40
     pending = _count_pending_chunks(store, group)
     empty_slots = my_max_chunks - pending
 
