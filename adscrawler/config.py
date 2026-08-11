@@ -21,7 +21,7 @@ SSH_KNOWN_HOSTS = pathlib.Path(HOME, pathlib.Path(".ssh/known_hosts"))
 
 GEO_DATA_DIR = pathlib.Path(CONFIG_DIR, pathlib.Path("geo-data"))
 
-PROM_DIR = pathlib.Path(LOG_DIR, pathlib.Path("/prom"))
+PROM_DIR = pathlib.Path(LOG_DIR, pathlib.Path("prom"))
 
 # Temp download dirs
 MITM_DIR = pathlib.Path(CONFIG_DIR, pathlib.Path("mitmlogs"))
