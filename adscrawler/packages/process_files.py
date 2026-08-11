@@ -62,7 +62,7 @@ def download_apps(
     if apps.empty:
         total_apps = 0
     else:
-        total_apps = apps["total_queue_backlog"].values[0]
+        total_apps = apps["total_queue_depth"].values[0]
     logger.info(f"download_apps: {store=} {total_apps=:,} start")
     apps = apps.head(number_of_apps_to_pull)
     set_iptables_rule_for_wt0()
