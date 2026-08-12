@@ -240,7 +240,6 @@ def dispatch_app_details_jobs(
             app_data=app_data,
             store=store,
             process_icon=process_icon,
-            max_age=int(_lock_ttl_seconds * 1.1),
         )
 
     logger.info(
