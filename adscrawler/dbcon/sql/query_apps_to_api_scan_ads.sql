@@ -102,5 +102,8 @@ SELECT
     last_run_result,
     last_succesful_run_at,
     NULL AS user_requested_at,
-    'scheduled_ads' AS mysource
-FROM monthly_ads_scheduled_to_run;
+    'scheduled_ads' AS mysource,
+     count(*) OVER () AS total_queue_depth
+FROM monthly_ads_scheduled_to_run
+LIMIT :mylimit;
+

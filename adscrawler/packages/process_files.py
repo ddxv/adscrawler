@@ -173,17 +173,18 @@ def process_sdks(
     log_info = f"process_sdks: {store=}"
     logger.info(f"{log_info} {number_of_apps_to_pull} start")
     apps = apps.head(number_of_apps_to_pull)
+    i = 0
     for _id, row in apps.iterrows():
+        i += 1
         store_id = row.store_id
+        row_info = f"{log_info} {store_id=}"
         store_app = row.store_app
         version_str = row["version_code_str"]
         version_code_dbid = row["version_code_db_id"]
         crawl_result = 3
-        logger.info(f"{log_info} {store_id=} start")
+        logger.info(f"{row_info} {i}/{number_of_apps_to_pull} start")
         if version_code_dbid is None:
-            logger.error(
-                f"{log_info} version code dbid is None for {store_id=}, data not recorded!"
-            )
+            logger.error(f"{row_info} version code dbid is None, data not recorded!")
             raise
         try:
             if store == 1:
@@ -197,7 +198,7 @@ def process_sdks(
             else:
                 raise ValueError(f"Invalid store: {store}")
         except Exception:
-            logger.exception(f"Manifest for {store_id} failed")
+            logger.exception(f"{row_info} failed")
             raise
 
         if details_df is None or details_df.empty:
@@ -233,15 +234,14 @@ def process_sdks(
                 raw_txt_str=raw_txt_str,
             )
         else:
-            logger.info(
-                f"{log_info} {store_id=} crawl_result {crawl_result=} skipping upsert"
-            )
+            logger.info(f"{row_info} {crawl_result=} skipping upsert")
 
         SDK_SCAN_RESULTS_COUNTER.labels(
             store=store,
             scan_result=str(crawl_result),
         ).inc()
         remove_tmp_files(store_id=store_id)
+        logger.info(f"{row_info} {crawl_result=} end")
 
 
 def upsert_sdk_details_df(
