@@ -1,119 +1,167 @@
-
-WITH target_apps AS (
-    SELECT
-        sa.store,
-        sa.id AS store_app,
-        sa.store_id,
-        sa.icon_url_100,
-        sa.updated_at,
-        sa.store_last_updated,
-        agm.total_installs AS installs,
-        agm.total_ratings AS rating_count
-    FROM
-        store_apps AS sa
-    LEFT JOIN app_global_metrics_latest AS agm
-        ON
-            sa.id = agm.store_app
-    WHERE
-        sa.store = :store
-        AND (
-            sa.crawl_result = 1
-            OR sa.id IN (
-                SELECT sailr.store_app
-                FROM
-                    store_apps_in_latest_rankings AS sailr
-            )
-            OR sa.store_last_updated > :year_ago_ts
-        )
+WITH s3_file_keys AS (
+    SELECT * FROM public.s3_file_keys
 ),
-mycountries AS (
-    SELECT DISTINCT
-        c.alpha2 AS country_code,
-        country_id
-    FROM
-        crawl_scenario_country_config AS cc
-    LEFT JOIN countries AS c
-        ON
-            cc.country_id = c.id
-    WHERE
-        priority = :country_crawl_priority AND cc.scenario_id = 1
-),
-apps_last_crawled_at AS (
+latest_version_codes AS (
     SELECT DISTINCT ON
-    (store_app)
-        acmh.store_app,
-        acmh.crawled_at,
-        acmh.crawl_result
+    (vc.store_app)
+        vc.id,
+        vc.store_app,
+        vc.version_code,
+        sfk.myregion,
+        sfk.file_key
     FROM
-        logging.app_country_crawls AS acmh
-    INNER JOIN mycountries AS mc
-        ON
-            acmh.country_id = mc.country_id
-    WHERE
-        acmh.crawled_at > :max_recrawl_ts
+        version_codes AS vc
+    INNER JOIN s3_file_keys AS sfk ON vc.id = sfk.version_code_id
     ORDER BY
         store_app ASC,
-        crawled_at DESC
+        created_at DESC
 ),
-apps_to_crawl AS (
-    SELECT
-        sa.store,
-        sa.store_app,
-        sa.store_id,
-        sa.icon_url_100,
-        sa.updated_at AS app_updated_at,
-        lc.crawled_at AS last_crawled_at,
-                count(*) OVER () AS total_queue_depth
+last_scanned AS (
+    SELECT DISTINCT ON
+    (vc.store_app)
+        vasr.version_code_id,
+        vc.store_app,
+        vasr.run_at,
+        vasr.run_result
     FROM
-        target_apps AS sa
-    LEFT JOIN apps_last_crawled_at AS lc
-        ON
-            sa.store_app = lc.store_app
+        version_code_api_scan_results AS vasr
+    LEFT JOIN version_codes AS vc
+        ON vasr.version_code_id = vc.id
+    ORDER BY vc.store_app ASC, vasr.run_at DESC
+),
+last_successful_scanned AS (
+    SELECT DISTINCT ON
+    (vc.store_app)
+        vasr.version_code_id,
+        vasr.run_at
+    FROM
+        version_code_api_scan_results AS vasr
+    LEFT JOIN version_codes AS vc
+        ON vasr.version_code_id = vc.id
     WHERE
-        -- Long update conditions
+        vasr.run_result = 1
+    ORDER BY vc.store_app ASC, vasr.run_at DESC
+),
+failed_runs AS (
+    SELECT
+        store_app,
+        count(*) AS failed_attempts
+    FROM logging.version_code_api_scan_results
+    WHERE
+        crawl_result != 1
+        AND updated_at >= current_date - interval '10 days'
+    GROUP BY store_app
+),
+all_scheduled_to_run AS (
+    SELECT
+        lvc.store_app,
+        sa.name,
+        sa.store_id,
+        lvc.version_code AS version_string,
+        lvc.id AS version_code_id,
+        agm.total_installs AS installs,
+        ls.run_at AS last_run_at,
+        fr.failed_attempts,
+        ls.run_result AS last_run_result,
+        lss.run_at AS last_succesful_run_at
+    FROM
+        latest_version_codes AS lvc
+    LEFT JOIN last_scanned AS ls
+        ON
+            lvc.store_app = ls.store_app
+    LEFT JOIN last_successful_scanned AS lss ON lvc.id = lss.version_code_id
+    LEFT JOIN store_apps AS sa
+        ON
+            lvc.store_app = sa.id
+    LEFT JOIN app_global_metrics_latest AS agm
+        ON sa.id = agm.store_app
+    LEFT JOIN failed_runs AS fr ON sa.id = fr.store_app
+    WHERE
+        (ls.run_at <= current_date - interval '120 days' OR ls.run_at IS NULL)
+        AND sa.store = :store
+        AND (fr.failed_attempts < 1 OR fr.failed_attempts IS NULL)
+    ORDER BY agm.total_installs DESC NULLS LAST
+),
+user_requested_apps_crawl AS (
+    SELECT DISTINCT ON (sa.id)
+        sa.id AS store_app,
+        sa.store_id,
+        sa.name,
+        lsvc.id AS version_code_id,
+        lsvc.version_code AS version_string,
+        agm.total_installs AS installs,
+        ls.run_at AS last_run_at,
+        fr.failed_attempts,
+        ls.run_result AS last_run_result,
+        lss.run_at AS last_succesful_run_at,
+        urs.created_at AS user_requested_at
+    FROM
+        agadmin.user_requested_scan AS urs
+    LEFT JOIN store_apps AS sa
+        ON
+            urs.store_id = sa.store_id
+    LEFT JOIN app_global_metrics_latest AS agm
+        ON sa.id = agm.store_app
+    INNER JOIN latest_version_codes AS lsvc
+        ON
+            sa.id = lsvc.store_app
+    LEFT JOIN last_scanned AS ls ON lsvc.id = ls.version_code_id
+    LEFT JOIN last_successful_scanned AS lss ON lsvc.id = lss.version_code_id
+    LEFT JOIN failed_runs AS fr ON sa.id = fr.store_app
+    WHERE
         (
-            lc.crawled_at <= :long_update_ts
-            AND
-            sa.store_last_updated >= :year_ago_ts
+            ls.run_at < urs.created_at
+            OR ls.run_at IS NULL
         )
-        -- Crawl at least once a year conditions
-        OR (
-            (
-                lc.crawled_at <= :max_recrawl_ts
-                OR lc.crawl_result IS NULL
-            )
+        AND sa.store = :store
+        AND (fr.failed_attempts < 1 OR fr.failed_attempts IS NULL
         )
-    ORDER BY
-        (
-            CASE
-                WHEN lc.crawl_result IS NULL
-                    THEN 0
-                ELSE 1
-            END
-        ),
-        (
-            CASE
-                WHEN lc.crawled_at < :max_recrawl_ts
-                    THEN 0
-                ELSE 1
-            END
-        ),
-        GREATEST(
-            COALESCE(sa.installs, 0),
-            COALESCE(CAST(sa.rating_count AS bigint), 0)
-        )
-        DESC NULLS LAST
-    LIMIT :mylimit
+    ORDER BY sa.id ASC, urs.created_at DESC
+),
+all_results AS (
+    SELECT
+        store_app,
+        store_id,
+        name,
+        version_string,
+        version_code_id,
+        installs,
+        last_run_at,
+        failed_attempts,
+        last_run_result,
+        last_succesful_run_at,
+        user_requested_at,
+        'user' AS mysource
+    FROM user_requested_apps_crawl
+    UNION ALL
+    SELECT
+        store_app,
+        store_id,
+        name,
+        version_string,
+        version_code_id,
+        installs,
+        last_run_at,
+        failed_attempts,
+        last_run_result,
+        last_succesful_run_at,
+        NULL AS user_requested_at,
+        'scheduled' AS mysource
+    FROM all_scheduled_to_run
 )
 SELECT
-    store,
     store_app,
     store_id,
-    icon_url_100,
-    app_updated_at,
-    last_crawled_at,
-    c.country_code,
-    total_queue_depth
-FROM
-    apps_to_crawl
-CROSS JOIN mycountries AS c;
+    name,
+    version_string,
+    version_code_id,
+    installs,
+    last_run_at,
+    failed_attempts,
+    last_run_result,
+    last_succesful_run_at,
+    user_requested_at,
+    mysource,
+    count(*) OVER () AS total_queue_depth
+FROM all_results
+LIMIT :mylimit;

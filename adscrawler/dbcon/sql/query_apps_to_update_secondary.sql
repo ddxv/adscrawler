@@ -61,7 +61,8 @@ apps_to_crawl AS (
         sa.store_id,
         sa.icon_url_100,
         sa.updated_at AS app_updated_at,
-        lc.crawled_at AS last_crawled_at
+        lc.crawled_at AS last_crawled_at,
+        count(*) OVER () AS total_queue_depth
     FROM
         target_apps AS sa
     LEFT JOIN apps_last_crawled_at AS lc
@@ -96,9 +97,9 @@ apps_to_crawl AS (
                 ELSE 1
             END
         ),
-        GREATEST(
-            COALESCE(sa.installs, 0),
-            COALESCE(CAST(sa.rating_count AS bigint), 0)
+        greatest(
+            coalesce(sa.installs, 0),
+            coalesce(cast(sa.rating_count AS bigint), 0)
         )
         DESC NULLS LAST
     LIMIT :mylimit
@@ -110,7 +111,8 @@ SELECT
     icon_url_100,
     app_updated_at,
     last_crawled_at,
-    c.country_code
+    c.country_code,
+    total_queue_depth
 FROM
     apps_to_crawl
 CROSS JOIN mycountries AS c;
