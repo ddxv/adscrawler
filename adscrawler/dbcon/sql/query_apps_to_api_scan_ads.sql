@@ -13,6 +13,7 @@ latest_version_codes AS (
     FROM
         version_codes AS vc
     INNER JOIN s3_file_keys AS sfk ON vc.id = sfk.version_code_id
+    WHERE sfk.myregion = 'loki'
     ORDER BY
         store_app ASC,
         created_at DESC
