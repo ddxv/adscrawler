@@ -3,7 +3,6 @@ WITH target_apps AS (
         sa.store,
         sa.id AS store_app,
         sa.store_id,
-        sa.icon_url_100,
         sa.updated_at,
         sa.store_last_updated,
         agm.total_installs AS installs,
@@ -59,7 +58,6 @@ apps_to_crawl AS (
         sa.store,
         sa.store_app,
         sa.store_id,
-        sa.icon_url_100,
         sa.updated_at AS app_updated_at,
         lc.crawled_at AS last_crawled_at,
         count(*) OVER () AS total_queue_depth
@@ -108,7 +106,6 @@ SELECT
     store,
     store_app,
     store_id,
-    icon_url_100,
     app_updated_at,
     last_crawled_at,
     c.country_code,

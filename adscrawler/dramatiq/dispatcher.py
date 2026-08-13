@@ -107,7 +107,6 @@ SERIALIZABLE_COLUMNS = [
     "store_id",
     "country_code",
     "language",
-    "icon_url_100",
     "html_recently_scraped",
 ]
 
@@ -123,7 +122,7 @@ def _serialize_chunk(df: pd.DataFrame) -> list[dict]:
 
     # Fill optional columns with None where missing (e.g. group-2 queries
     # don't return html_recently_scraped).
-    for col in ("icon_url_100", "html_recently_scraped"):
+    for col in "html_recently_scraped":
         if col not in records.columns:
             records[col] = None
 

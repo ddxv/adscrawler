@@ -32,7 +32,6 @@ target_apps AS (
         sa.updated_at,
         sa.created_at,
         sa.release_date,
-        sa.icon_url_100,
         sa.additional_html_scraped_at,
         CASE
             WHEN sa.crawl_result IS NULL THEN 1
@@ -89,7 +88,6 @@ SELECT
     ctc.country_id,
     ctc.alpha2 AS country_code,
     ctc.priority,
-    ta.icon_url_100,
     COALESCE(ta.additional_html_scraped_at >= :max_recrawl_ts, FALSE)
         AS html_recently_scraped,
     ta.updated_at AS app_updated_at,
