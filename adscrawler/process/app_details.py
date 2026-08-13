@@ -238,7 +238,7 @@ def import_app_details_from_s3_into_db(
         except Exception as e:
             status = "failed"
             err_msg = str(e)[:1000]
-            logger.exception(f"Error processing parquet {parquet_path}: {e}")
+            logger.exception(f"{log_info} Error processing {parquet_path=}: {e}")
         record_s3_file_status(
             pipeline_name=pipeline_name,
             file_path=parquet_path,

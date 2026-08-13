@@ -68,11 +68,6 @@ def _queue_key(store: int, group: int) -> str:
     return f"dramatiq:{queue_for(store, group)}"
 
 
-def _lock_prefix(store: int, group: int) -> str:
-    """Return the lock key prefix for a given queue."""
-    return f"{queue_for(store, group)}:lock:"
-
-
 def _count_pending_chunks(store: int, group: int) -> int:
     """O(1) check of how many messages are waiting in a specific Dramatiq queue."""
     try:
@@ -84,12 +79,14 @@ def _count_pending_chunks(store: int, group: int) -> int:
         return 0
 
 
-def _acquire_locks(store_app_ids: list[int], store: int, group: int) -> list[int]:
+def filter_apps_not_in_redis(
+    store_app_ids: list[int], store: int, group: int
+) -> list[int]:
     """Atomically claim locks for a list of ``store_app`` IDs on a specific queue.
 
     Returns only the IDs that were *not* already locked.
     """
-    prefix = _lock_prefix(store, group)
+    prefix = f"{queue_for(store, group)}:lock:"
     pipe = redis_client.pipeline()
     for app_id in store_app_ids:
         pipe.set(
@@ -174,19 +171,17 @@ def dispatch_app_details_jobs(
 
     # --- Throttle: don't enqueue more if this queue is already full ---
     group = country_priority_group
-    my_max_chunks = _MAX_PENDING_CHUNKS if group == 1 else _MAX_PENDING_CHUNKS * 40
+    max_pending_chunks = _MAX_PENDING_CHUNKS if group == 1 else _MAX_PENDING_CHUNKS * 40
     pending = _count_pending_chunks(store, group)
-    empty_slots = my_max_chunks - pending
+    empty_slots = max_pending_chunks - pending
 
-    if empty_slots < my_max_chunks / 10:
+    if empty_slots < max_pending_chunks / 10:
         logger.info(f"{log_info} {pending=} queue is mostly full, skipping")
         return
     logger.info(f"{log_info} {pending=} {empty_slots=}")
 
-    query_app_limit = min([empty_slots * my_max_chunks, app_limit])
-
     # We do need a larger query to handle possibly locked apps still in queue
-    query_app_limit *= 2
+    query_app_limit = min([pending * 2, app_limit])
 
     df = query_store_apps_to_update(
         store=store,
@@ -201,10 +196,10 @@ def dispatch_app_details_jobs(
         return
 
     all_app_ids = df["store_app"].astype(int).tolist()
-    acquired_ids = _acquire_locks(all_app_ids, store, group)
-    df_active = df[df["store_app"].isin(acquired_ids)].copy()
+    new_apps = filter_apps_not_in_redis(all_app_ids, store, group)
+    df_active = df[df["store_app"].isin(new_apps)].copy()
     if df_active.empty:
-        logger.info(f"{log_info} No new locks acquired. Skipping dispatch.")
+        logger.error(f"{log_info} No new locks acquired. Skipping dispatch.")
         return
 
     chunks: list[pd.DataFrame] = []
