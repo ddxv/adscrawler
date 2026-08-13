@@ -125,7 +125,6 @@ def queue_for(store: int, country_priority_group: int) -> str:
 def _actor_body(
     app_data: list[dict[str, Any]],
     store: int,
-    process_icon: bool,
     *,
     group: int,
 ) -> None:
@@ -155,7 +154,6 @@ def _actor_body(
         process_scrape_apps_and_save(
             df_chunk=df_chunk,
             store=store,
-            process_icon=process_icon,
         )
         logger.info("Actor finished chunk: store=%s apps=%d", store, len(app_data))
     except Exception:
@@ -178,10 +176,9 @@ def _actor_body(
 def scrape_chunk_google_1(
     app_data: list[dict[str, Any]],
     store: int,
-    process_icon: bool,
 ) -> None:
     """Scrape Google Play apps (country priority group 1, e.g. US)."""
-    _actor_body(app_data, store, process_icon, group=1)
+    _actor_body(app_data, store, group=1)
 
 
 @dramatiq.actor(
@@ -190,10 +187,9 @@ def scrape_chunk_google_1(
 def scrape_chunk_apple_1(
     app_data: list[dict[str, Any]],
     store: int,
-    process_icon: bool,
 ) -> None:
     """Scrape Apple App Store apps (country priority group 1, e.g. US)."""
-    _actor_body(app_data, store, process_icon, group=1)
+    _actor_body(app_data, store, group=1)
 
 
 @dramatiq.actor(
@@ -202,10 +198,9 @@ def scrape_chunk_apple_1(
 def scrape_chunk_google_2(
     app_data: list[dict[str, Any]],
     store: int,
-    process_icon: bool,
 ) -> None:
     """Scrape Google Play apps (country priority group 2, e.g. international)."""
-    _actor_body(app_data, store, process_icon, group=2)
+    _actor_body(app_data, store, group=2)
 
 
 @dramatiq.actor(
@@ -214,7 +209,6 @@ def scrape_chunk_google_2(
 def scrape_chunk_apple_2(
     app_data: list[dict[str, Any]],
     store: int,
-    process_icon: bool,
 ) -> None:
     """Scrape Apple App Store apps (country priority group 2, e.g. international)."""
-    _actor_body(app_data, store, process_icon, group=2)
+    _actor_body(app_data, store, group=2)

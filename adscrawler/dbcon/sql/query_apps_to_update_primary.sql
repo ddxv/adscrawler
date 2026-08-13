@@ -90,7 +90,7 @@ SELECT
     ctc.alpha2 AS country_code,
     ctc.priority,
     ta.icon_url_100,
-    COALESCE(ta.additional_html_scraped_at >= :year_ago_ts, FALSE)
+    COALESCE(ta.additional_html_scraped_at >= :max_recrawl_ts, FALSE)
         AS html_recently_scraped,
     ta.updated_at AS app_updated_at,
     lc.crawled_at AS country_crawled_at,

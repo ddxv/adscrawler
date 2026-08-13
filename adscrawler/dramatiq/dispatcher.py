@@ -139,7 +139,6 @@ def _serialize_chunk(df: pd.DataFrame) -> list[dict]:
 def dispatch_app_details_jobs(
     pgdb: PostgresEngine,
     store: int,
-    process_icon: bool,
     app_limit: int,
     country_priority_group: int,
 ) -> None:
@@ -233,7 +232,6 @@ def dispatch_app_details_jobs(
         actor.send(
             app_data=app_data,
             store=store,
-            process_icon=process_icon,
         )
 
     logger.info(
@@ -243,7 +241,6 @@ def dispatch_app_details_jobs(
 
 def dispatch_all_queues(
     pgdb: PostgresEngine,
-    process_icon: bool,
 ) -> None:
     """Dispatch all 4 store×group combinations in a single call.
 
@@ -262,7 +259,6 @@ def dispatch_all_queues(
         dispatch_app_details_jobs(
             pgdb=pgdb,
             store=store,
-            process_icon=process_icon,
             app_limit=app_limit,
             country_priority_group=group,
         )

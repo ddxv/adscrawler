@@ -77,7 +77,7 @@ logger = get_logger(__name__, "scrape_stores")
 def process_scrape_apps_and_save(
     df_chunk: pd.DataFrame,
     store: int,
-    process_icon: bool,
+    process_icon: bool = False,
     total_rows: int | None = None,
     do_pg_update: bool = False,
 ) -> None:
@@ -93,16 +93,20 @@ def process_scrape_apps_and_save(
         total_rows = len(df_chunk)
     chunk_info = f"{store=} process_scrape_apps_and_save {total_rows=}"
     logger.info(f"{chunk_info} start")
+    html_recently_scraped = None
     pgdb = get_db_connection()
     chunk_results = []
     try:
         for _, row in df_chunk.iterrows():
             try:
+                if store == 2:
+                    html_recently_scraped = row["html_recently_scraped"]
                 result = scrape_app(
                     store=store,
                     store_id=row["store_id"],
                     country=row["country_code"].lower(),
                     language=row["language"].lower(),
+                    html_recently_scraped=html_recently_scraped,
                 )
                 result["store_app_db_id"] = row["store_app"]
                 if process_icon:

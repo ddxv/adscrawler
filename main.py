@@ -577,7 +577,6 @@ class ProcessManager:
             logger.info("Using Dramatiq dispatcher for ALL queues")
             dispatch_all_queues(
                 pgdb=self.pgcon,
-                process_icon=False,
             )
             return
 
