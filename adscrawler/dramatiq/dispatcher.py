@@ -171,8 +171,10 @@ def dispatch_app_details_jobs(
 
     # --- Throttle: don't enqueue more if this queue is already full ---
     group = country_priority_group
-    max_pending_chunks = _MAX_PENDING_CHUNKS if group == 1 else _MAX_PENDING_CHUNKS * 40
+    max_pending_chunks = _MAX_PENDING_CHUNKS
     pending = _count_pending_chunks(store, group)
+    if group == 2:
+        pending = pending / 36
     empty_slots = max_pending_chunks - pending
 
     if empty_slots < max_pending_chunks / 10:
@@ -180,13 +182,10 @@ def dispatch_app_details_jobs(
         return
     logger.info(f"{log_info} {pending=} {empty_slots=}")
 
-    # We do need a larger query to handle possibly locked apps still in queue
-    query_app_limit = min([pending * 2, app_limit])
-
     df = query_store_apps_to_update(
         store=store,
         pgdb=pgdb,
-        limit=query_app_limit,
+        limit=app_limit,
         country_priority_group=group,
     )
 
@@ -245,7 +244,6 @@ def dispatch_app_details_jobs(
 def dispatch_all_queues(
     pgdb: PostgresEngine,
     process_icon: bool,
-    limit: int = 20_000,
 ) -> None:
     """Dispatch all 4 store×group combinations in a single call.
 
@@ -260,7 +258,7 @@ def dispatch_all_queues(
     invocation replaces four separate cron jobs.
     """
     for store, group in ((1, 1), (2, 1), (1, 2), (2, 2)):
-        app_limit = 5_000 if group == 2 else limit
+        app_limit = 500 if group == 2 else 5_000
         dispatch_app_details_jobs(
             pgdb=pgdb,
             store=store,

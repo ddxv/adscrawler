@@ -578,7 +578,6 @@ class ProcessManager:
             dispatch_all_queues(
                 pgdb=self.pgcon,
                 process_icon=False,
-                limit=self.args.limit_query_rows,
             )
             return
 
