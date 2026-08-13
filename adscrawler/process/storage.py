@@ -765,14 +765,30 @@ def record_s3_file_status(
     logger.info(f"Recorded s3 status {pipeline_name=} {status=}")
 
 
-def set_iptables_rule_for_wt0() -> None:
+import subprocess
+
+
+def ensure_wt0_rule_at_top(iptables_cmd: str) -> None:
     """
-    Ensures the iptables-legacy rule allowing output on wt0 is placed at position 1.
-    Silently succeeds if the command isn't available or fails gracefully on missing permissions.
+    Ensure '-o wt0 -j ACCEPT' is the first rule in the OUTPUT chain.
+
+    Does nothing if the exact rule is already at position 1.
     """
+    check_cmd = [
+        "sudo",
+        iptables_cmd,
+        "-C",
+        "OUTPUT",
+        "1",
+        "-o",
+        "wt0",
+        "-j",
+        "ACCEPT",
+    ]
+
     insert_cmd = [
         "sudo",
-        "iptables-legacy",
+        iptables_cmd,
         "-I",
         "OUTPUT",
         "1",
@@ -781,24 +797,30 @@ def set_iptables_rule_for_wt0() -> None:
         "-j",
         "ACCEPT",
     ]
-    insert_cmd2 = [
-        "sudo",
-        "iptables",
-        "-I",
-        "OUTPUT",
-        "1",
-        "-o",
-        "wt0",
-        "-j",
-        "ACCEPT",
-    ]
-    subprocess.run(
-        insert_cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+
+    result = subprocess.run(
+        check_cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
     )
+
+    if result.returncode == 0:
+        logger.info("%s: wt0 ACCEPT rule is already at position 1.", iptables_cmd)
+        return
+
     subprocess.run(
-        insert_cmd2, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        insert_cmd,
+        check=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
     )
-    logger.info("Successfully added wt0 ACCEPT rule to iptables-legacy.")
+
+    logger.info("%s: inserted wt0 ACCEPT rule at position 1.", iptables_cmd)
+
+
+def set_iptables_rule_for_wt0() -> None:
+    ensure_wt0_rule_at_top("iptables-legacy")
+    ensure_wt0_rule_at_top("iptables")
 
 
 def download_app_to_local(
