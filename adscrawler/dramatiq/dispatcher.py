@@ -79,7 +79,7 @@ def _count_pending_chunks(store: int, group: int) -> int:
         return 0
 
 
-def filter_apps_not_in_redis(
+def insert_apps_into_redis(
     store_app_ids: list[int], store: int, group: int
 ) -> list[int]:
     """Atomically claim locks for a list of ``store_app`` IDs on a specific queue.
@@ -193,7 +193,7 @@ def dispatch_app_details_jobs(
         return
 
     all_app_ids = df["store_app"].astype(int).tolist()
-    new_apps = filter_apps_not_in_redis(all_app_ids, store, group)
+    new_apps = insert_apps_into_redis(all_app_ids, store, group)
     df_active = df[df["store_app"].isin(new_apps)].copy()
     if df_active.empty:
         logger.error(f"{log_info} No new locks acquired. Skipping dispatch.")

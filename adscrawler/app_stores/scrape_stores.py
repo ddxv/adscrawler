@@ -763,7 +763,7 @@ def scrape_app(
 ) -> dict:
     scrape_info = f"{store=}, {country=}, {language=}, {store_id=} scrape_app"
     proxies = None
-    max_retries = 2
+    max_retries = 1
     base_delay = 0.5
     retries = 0
     logger.debug(f"{scrape_info} start")
@@ -771,7 +771,7 @@ def scrape_app(
     crawl_result = 0
     while retries <= max_retries:
         retries += 1
-        if retries > 1:
+        if retries > 1 or store == 2:
             proxies = CONFIG.get("proxies", None)
         try:
             result_dict = scrape_from_store(

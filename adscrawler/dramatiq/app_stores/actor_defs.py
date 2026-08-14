@@ -165,7 +165,7 @@ def _actor_body(
 
 
 @dramatiq.actor(
-    queue_name=QUEUE_GOOGLE_1, max_retries=3, min_backoff=15_000, time_limit=1_200_000
+    queue_name=QUEUE_GOOGLE_1, max_retries=1, min_backoff=15_000, time_limit=1_200_000
 )
 def scrape_chunk_google_1(
     app_data: list[dict[str, Any]],
@@ -176,7 +176,7 @@ def scrape_chunk_google_1(
 
 
 @dramatiq.actor(
-    queue_name=QUEUE_APPLE_1, max_retries=3, min_backoff=15_000, time_limit=1_200_000
+    queue_name=QUEUE_APPLE_1, max_retries=1, min_backoff=15_000, time_limit=1_200_000
 )
 def scrape_chunk_apple_1(
     app_data: list[dict[str, Any]],
@@ -187,7 +187,7 @@ def scrape_chunk_apple_1(
 
 
 @dramatiq.actor(
-    queue_name=QUEUE_GOOGLE_2, max_retries=3, min_backoff=15_000, time_limit=1_200_000
+    queue_name=QUEUE_GOOGLE_2, max_retries=1, min_backoff=15_000, time_limit=1_200_000
 )
 def scrape_chunk_google_2(
     app_data: list[dict[str, Any]],
@@ -198,7 +198,7 @@ def scrape_chunk_google_2(
 
 
 @dramatiq.actor(
-    queue_name=QUEUE_APPLE_2, max_retries=3, min_backoff=15_000, time_limit=1_200_000
+    queue_name=QUEUE_APPLE_2, max_retries=1, min_backoff=15_000, time_limit=1_200_000
 )
 def scrape_chunk_apple_2(
     app_data: list[dict[str, Any]],
