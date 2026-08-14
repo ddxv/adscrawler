@@ -11,6 +11,7 @@ import boto3
 import duckdb
 import pandas as pd
 from botocore.exceptions import ClientError
+import boto3.s3.transfer
 from sqlalchemy import text
 
 from adscrawler.config import (
@@ -291,25 +292,36 @@ def upload_apk_to_s3(
         prefix = f"apks/ios/{app_prefix}"
     else:
         raise ValueError(f"Invalid store: {store}")
+
     metadata = {
         "store_id": store_id,
         "version_code": version_str,
         "md5": md5_hash,
     }
+
     s3_client = get_s3_client(s3_config_key)
-    response = s3_client.put_object(
-        Bucket=bucket,
-        Key=prefix,
-        Body=file_path.read_bytes(),
-        Metadata=metadata,
+
+    transfer_config = boto3.s3.transfer.TransferConfig(
+        multipart_threshold=8 * 1024 * 1024,  # 8MB
+        multipart_chunksize=8 * 1024 * 1024,
+        max_concurrency=10,
+        use_threads=True,
     )
-    if response["ResponseMetadata"]["HTTPStatusCode"] == 200:
+
+    try:
+        s3_client.upload_file(
+            Filename=str(file_path),
+            Bucket=bucket,
+            Key=prefix,
+            ExtraArgs={"Metadata": metadata},
+            Config=transfer_config,
+        )
         logger.info(f"S3 uploaded apk={store_id} prefix={prefix}")
-    else:
-        logger.error(f"S3 upload failed apk={store_id} prefix={prefix}")
-        return None
-    s3_key = f"s3://{bucket}/{prefix}"
-    return s3_key
+    except Exception:
+        logger.exception(f"S3 upload failed apk={store_id} prefix={prefix}")
+        raise
+
+    return f"s3://{bucket}/{prefix}"
 
 
 def get_downloaded_mitm_files(pgdb: PostgresEngine) -> pd.DataFrame:

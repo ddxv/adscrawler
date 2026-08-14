@@ -210,7 +210,11 @@ def query_store_collection_ranks(
                 ar.country,
                 ar.collection,
                 ar.category,
-                ar.crawled_date,
+                CASE 
+                    WHEN '{period}' = 'week' AND ANY_VALUE(pmd.period_start) < DATE_TRUNC('week', CURRENT_DATE)
+                    THEN ANY_VALUE(pmd.period_start)
+                    ELSE ar.crawled_date 
+                END AS crawled_date,
                 ar.store_id
                FROM all_data ar
                  JOIN period_max_dates pmd ON ar.country = pmd.country 
@@ -219,7 +223,8 @@ def query_store_collection_ranks(
                  AND ar.crawled_date = pmd.max_crawled_date
                  GROUP BY ar.rank, ar.country, ar.collection, ar.category, ar.crawled_date, ar.store_id
                  )
-            SELECT par.rank, par.best_rank, par.country, par.collection, par.category, par.crawled_date, par.store_id FROM period_app_ranks par
+            SELECT par.rank, par.best_rank, par.country, par.collection, par.category, par.crawled_date, par.store_id 
+            FROM period_app_ranks par
               ORDER BY par.country, par.collection, par.category, par.crawled_date, par.rank
             """
     with get_duckdb_connection(s3_config_key) as duckdb_con:
