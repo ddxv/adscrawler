@@ -60,7 +60,6 @@ apps_to_crawl AS (
         sa.store_id,
         sa.updated_at AS app_updated_at,
         lc.crawled_at AS last_crawled_at,
-        sa.additional_html_scraped_at,
         count(*) OVER () AS total_queue_depth
     FROM
         target_apps AS sa
@@ -110,8 +109,6 @@ SELECT
     app_updated_at,
     last_crawled_at,
     c.country_code,
-    COALESCE(sa.additional_html_scraped_at >= :max_recrawl_ts, FALSE)
-        AS html_recently_scraped
     total_queue_depth
 FROM
     apps_to_crawl

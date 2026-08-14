@@ -44,9 +44,7 @@ logger = get_logger(__name__, "actor_defs")
 
 _redis_url = CONFIG.get("redis", {}).get("url", "redis://127.0.0.1:6379/0")
 _redis_lock = threading.Lock()
-_worker_redis: Any = (
-    None  # redis.Redis client — type-erased to avoid import at module level
-)
+_worker_redis: Any = None
 
 
 def _get_lock_client() -> Any:  # noqa: ANN401
@@ -57,22 +55,8 @@ def _get_lock_client() -> Any:  # noqa: ANN401
             if _worker_redis is None:
                 import redis as redis_module  # noqa: PLW0415
 
-                _redis_url_parts = _redis_url.split("redis://", 1)[-1]
-                _redis_host = _redis_url_parts.split(":", 1)[0]
-                _redis_rest = (
-                    _redis_url_parts.split(":", 1)[1]
-                    if ":" in _redis_url_parts
-                    else "6379/0"
-                )
-                _redis_port_str, _redis_db_str = (
-                    _redis_rest.split("/", 1)
-                    if "/" in _redis_rest
-                    else (_redis_rest, "0")
-                )
-                _worker_redis = redis_module.Redis(
-                    host=_redis_host,
-                    port=int(_redis_port_str),
-                    db=int(_redis_db_str) if _redis_db_str else 0,
+                _worker_redis = redis_module.from_url(
+                    _redis_url,
                     socket_connect_timeout=5,
                     socket_timeout=5,
                 )
@@ -89,7 +73,7 @@ def _release_locks(store_app_ids: list[int], store: int, group: int) -> None:
         client = _get_lock_client()
         pipe = client.pipeline()
         for app_id in store_app_ids:
-            pipe.delete(f"{prefix}{app_id}")
+            pipe.unlink(f"{prefix}{app_id}")
         pipe.execute()
         logger.info(
             "Released %d locks for store=%s group=%s",
@@ -122,46 +106,25 @@ def _actor_body(
     *,
     group: int,
 ) -> None:
-    """Shared execution body for all scrape-chunk actors.
-
-    Extracted so each per-queue actor can delegate to the same logic without
-    duplicating it four times.
-
-    Parameters
-    ----------
-    group:
-        Country priority group — used to derive the lock key namespace for
-        this queue so lock release targets the correct keys.
-    """
-    logger.info(
-        "Actor received chunk: store=%s group=%s apps=%d",
-        store,
-        group,
-        len(app_data),
-    )
+    """Shared execution body for all scrape-chunk actors."""
+    logger.info(f"Actor received chunk: {store=} {group=} apps={len(app_data)}")
 
     df_chunk = pd.DataFrame(app_data)
-    df_chunk["store_app"] = df_chunk["store_app"].astype(int)
-    store_app_ids = df_chunk["store_app"].tolist()
+    store_app_ids = df_chunk["store_app"].unique().tolist()
 
     try:
         process_scrape_apps_and_save(
             df_chunk=df_chunk,
             store=store,
         )
-        logger.info("Actor finished chunk: store=%s apps=%d", store, len(app_data))
+        logger.info(f"Actor finished chunk: {store=} {group=} apps={len(app_data)}")
     except Exception:
-        logger.exception("Fatal error processing chunk for store=%s", store)
+        logger.exception(f"Fatal error processing chunk for {store=} {group=}")
         raise
     finally:
-        _release_locks(store_app_ids, store, group)
-
-
-# ---------------------------------------------------------------------------
-# Per-queue actor definitions.
-# Each actor shares the same body but lives on a separate Dramatiq queue so
-# workers can subscribe to only the queues they care about.
-# ---------------------------------------------------------------------------
+        # Group 2 apps are split across 36 chunks, locks expire naturally via TTL (1800s)
+        if group == 1:
+            _release_locks(store_app_ids, store, group)
 
 
 @dramatiq.actor(
@@ -187,7 +150,7 @@ def scrape_chunk_apple_1(
 
 
 @dramatiq.actor(
-    queue_name=QUEUE_GOOGLE_2, max_retries=1, min_backoff=15_000, time_limit=1_200_000
+    queue_name=QUEUE_GOOGLE_2, max_retries=1, min_backoff=15_000, time_limit=2_100_000
 )
 def scrape_chunk_google_2(
     app_data: list[dict[str, Any]],
@@ -198,7 +161,7 @@ def scrape_chunk_google_2(
 
 
 @dramatiq.actor(
-    queue_name=QUEUE_APPLE_2, max_retries=1, min_backoff=15_000, time_limit=1_200_000
+    queue_name=QUEUE_APPLE_2, max_retries=1, min_backoff=15_000, time_limit=2_100_000
 )
 def scrape_chunk_apple_2(
     app_data: list[dict[str, Any]],

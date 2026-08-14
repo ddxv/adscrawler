@@ -37,8 +37,10 @@ from adscrawler.dramatiq.app_stores.actor_defs import (  # noqa: E402
     scrape_chunk_google_2,
 )
 
-# Time in redis, after this app is removed from queue
-_lock_ttl_seconds = 10800
+# Seconds in redis, after this app is removed from queue
+# Dispatcher Cron 5m < Dispatcher Lock TTL  < actor_defs time_limit
+_lock_ttl_seconds = 1800
+
 
 # Extract host/port/db from the configured URL so we always talk to the
 # same Redis instance the broker uses.
@@ -68,27 +70,19 @@ def _queue_key(store: int, group: int) -> str:
     return f"dramatiq:{queue_for(store, group)}"
 
 
-def _count_pending_chunks(store: int, group: int) -> int:
-    """O(1) check of how many messages are waiting in a specific Dramatiq queue."""
-    try:
-        return redis_client.llen(_queue_key(store, group)) or 0
-    except Exception:
-        logger.warning(
-            "Failed to check queue length for store=%s group=%s", store, group
-        )
-        return 0
-
-
 def insert_apps_into_redis(
     store_app_ids: list[int], store: int, group: int
-) -> list[int]:
-    """Atomically claim locks for a list of ``store_app`` IDs on a specific queue.
+) -> set[int]:
+    """Atomically claim locks for unique store_app IDs on a queue."""
+    if not store_app_ids:
+        return set()
 
-    Returns only the IDs that were *not* already locked.
-    """
+    # Deduplicate IDs so we only hit Redis ONCE per app
+    unique_ids = list(set(store_app_ids))
     prefix = f"{queue_for(store, group)}:lock:"
+
     pipe = redis_client.pipeline()
-    for app_id in store_app_ids:
+    for app_id in unique_ids:
         pipe.set(
             f"{prefix}{app_id}",
             "in_flight",
@@ -96,10 +90,11 @@ def insert_apps_into_redis(
             ex=_lock_ttl_seconds,
         )
     results = pipe.execute()
-    acquired = [
-        app_id for app_id, success in zip(store_app_ids, results) if success is True
-    ]
-    return acquired
+
+    acquired_ids = {
+        app_id for app_id, success in zip(unique_ids, results) if success is True
+    }
+    return acquired_ids
 
 
 SERIALIZABLE_COLUMNS = [
@@ -120,9 +115,8 @@ def _serialize_chunk(df: pd.DataFrame) -> list[dict]:
     # Cast store_app to native int so JSON serialization works
     records["store_app"] = records["store_app"].astype(int)
 
-    # Fill optional columns with None where missing (e.g. group-2 queries
-    # don't return html_recently_scraped).
-    for col in "html_recently_scraped":
+    # Fill optional columns with None where missing
+    for col in ["html_recently_scraped"]:
         if col not in records.columns:
             records[col] = None
 
@@ -139,7 +133,7 @@ def dispatch_app_details_jobs(
     pgdb: PostgresEngine,
     store: int,
     app_limit: int,
-    country_priority_group: int,
+    group: int,
 ) -> None:
     """Query Postgres, chunk the results, and fire each chunk over Redis.
 
@@ -149,7 +143,7 @@ def dispatch_app_details_jobs(
     distributed Dramatiq workers.
 
     Messages are routed to the appropriate queue based on ``(store,
-    country_priority_group)``.  Each queue has its own lock namespace and
+    group)``.  Each queue has its own lock namespace and
     throttle counter, so one slow queue doesn't block the others.
 
     Parameters
@@ -158,21 +152,16 @@ def dispatch_app_details_jobs(
         Postgres connection (Controller-local).
     store:
         Store identifier (1 = Google Play, 2 = Apple App Store).
-    process_icon:
-        Whether workers should resize and upload app icons to S3.
-    limit:
+    app_limit:
         Maximum number of apps to fetch from the database.
-    country_priority_group:
+    group:
         Country priority group passed to ``query_store_apps_to_update``.
     """
-    log_info = f"{store=} group={country_priority_group} dispatcher"
+    log_info = f"{store=} group={group} dispatcher"
 
-    # --- Throttle: don't enqueue more if this queue is already full ---
-    group = country_priority_group
     max_pending_chunks = _MAX_PENDING_CHUNKS
-    pending = _count_pending_chunks(store, group)
-    if group == 2:
-        pending = pending / 36
+    pending = redis_client.llen(_queue_key(store, group)) or 0
+
     empty_slots = max_pending_chunks - pending
 
     if empty_slots < max_pending_chunks / 10:
@@ -192,9 +181,13 @@ def dispatch_app_details_jobs(
         logger.info(f"{log_info} query returned no apps to update")
         return
 
-    all_app_ids = df["store_app"].astype(int).tolist()
-    new_apps = insert_apps_into_redis(all_app_ids, store, group)
-    df_active = df[df["store_app"].isin(new_apps)].copy()
+    df["store_app"] = df["store_app"].astype(int)
+    unique_apps = df["store_app"].unique().tolist()
+
+    acquired_apps = insert_apps_into_redis(unique_apps, store, group)
+
+    df_active = df[df["store_app"].isin(acquired_apps)].copy()
+
     if df_active.empty:
         logger.error(f"{log_info} No new locks acquired. Skipping dispatch.")
         return
@@ -259,5 +252,5 @@ def dispatch_all_queues(
             pgdb=pgdb,
             store=store,
             app_limit=app_limit,
-            country_priority_group=group,
+            group=group,
         )
