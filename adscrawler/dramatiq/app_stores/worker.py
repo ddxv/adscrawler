@@ -40,18 +40,12 @@ from adscrawler.config import CONFIG, get_logger
 
 logger = get_logger(__name__, "worker")
 
-# ---------------------------------------------------------------------------
-# 1. Set the broker FIRST — the actor decorator captures it at import time.
-# ---------------------------------------------------------------------------
 _redis_url = CONFIG.get("redis", {}).get("url", "redis://127.0.0.1:6379/0")
 logger.info("Worker broker: %s", _redis_url)
 broker = RedisBroker(url=_redis_url)
 broker.add_middleware(Prometheus())
 dramatiq.set_broker(broker)
 
-# ---------------------------------------------------------------------------
-# 2. Now import the actors — they will bind to the broker we just set.
-# ---------------------------------------------------------------------------
 # The actors live in actor_defs.py so neither worker.py nor dispatcher.py
 # causes the other's broker to leak into the actor.
 from adscrawler.dramatiq.app_stores.actor_defs import (  # noqa: E402, F401

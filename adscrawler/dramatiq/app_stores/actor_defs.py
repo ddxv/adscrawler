@@ -42,12 +42,6 @@ from adscrawler.config import CONFIG, get_logger
 
 logger = get_logger(__name__, "actor_defs")
 
-# ---------------------------------------------------------------------------
-# Lazy Redis lock client — created once per process on first use.
-# Postgres connections are created per-chunk (inside the actor body) and
-# disposed in the finally block, so no persistent DB state is shared.
-# ---------------------------------------------------------------------------
-
 _redis_url = CONFIG.get("redis", {}).get("url", "redis://127.0.0.1:6379/0")
 _redis_lock = threading.Lock()
 _worker_redis: Any = (

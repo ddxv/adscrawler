@@ -4,7 +4,9 @@ SELECT
     sa.store_id,
     'US' AS country_code,
     sa.icon_url_100,
-    sa.updated_at AS app_updated_at
+    sa.updated_at AS app_updated_at,
+    COALESCE(sa.additional_html_scraped_at >= :max_recrawl_ts, FALSE)
+        AS html_recently_scraped
 FROM
     public.store_apps AS sa
 WHERE
