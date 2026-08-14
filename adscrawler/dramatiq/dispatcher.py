@@ -39,7 +39,7 @@ from adscrawler.dramatiq.app_stores.actor_defs import (  # noqa: E402
 
 # Seconds in redis, after this app is removed from queue
 # Dispatcher Cron 5m < Dispatcher Lock TTL  < actor_defs time_limit
-_lock_ttl_seconds = 1800
+_lock_ttl_seconds = 1500
 
 
 # Extract host/port/db from the configured URL so we always talk to the
@@ -227,7 +227,7 @@ def dispatch_app_details_jobs(
         )
 
     logger.info(
-        f"{log_info} finished: queried={len(df)} apps={len(df_active)} {len(chunks)} chunks"
+        f"{log_info} finished: queried={len(df)} inserted_apps={len(df_active)} {len(chunks)} chunks"
     )
 
 
