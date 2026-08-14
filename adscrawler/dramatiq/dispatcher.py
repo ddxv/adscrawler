@@ -247,7 +247,7 @@ def dispatch_all_queues(
     invocation replaces four separate cron jobs.
     """
     for store, group in ((1, 1), (2, 1), (1, 2), (2, 2)):
-        app_limit = 500 if group == 2 else 5_000
+        app_limit = 100 if group == 2 else 5_000
         dispatch_app_details_jobs(
             pgdb=pgdb,
             store=store,

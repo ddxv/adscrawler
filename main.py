@@ -205,7 +205,7 @@ class ProcessManager:
             type=str,
             default="regular",
         )
-        ### OPTIONS FOR IMPORT RANKS FROM S3
+        ### OPTIONS FOR IMPORT FROM S3
         parser.add_argument(
             "--daily-s3-imports",
             help="Import app ranks and metrics from s3",
@@ -441,7 +441,7 @@ class ProcessManager:
     def daily_s3_imports(self) -> None:
         period = self.args.ranks_period
         if period == "week":
-            start_date = datetime.date.today() - datetime.timedelta(days=8)
+            start_date = datetime.date.today() - datetime.timedelta(days=9)
             end_date = datetime.date.today()
         elif period == "day":
             start_date = datetime.date.today() - datetime.timedelta(days=3)
