@@ -15,6 +15,7 @@ from adscrawler.app_stores.scrape_stores import (
 )
 from adscrawler.config import get_logger
 from adscrawler.dbcon.connection import PostgresEngine, get_db_connection
+from adscrawler.metrics import init_metrics
 from adscrawler.packages.apks.cleanup_apks import run_cleanup
 from adscrawler.packages.process_files import (
     download_apps,
@@ -29,7 +30,6 @@ from adscrawler.process.app_details import (
 from adscrawler.process.app_domain_history import (
     process_company_history,
 )
-from adscrawler.metrics import init_metrics
 from adscrawler.process.app_metrics_history import (
     clean_history_tables,
     delete_and_aggregate_s3_agg,
@@ -616,6 +616,7 @@ class ProcessManager:
             pgdb=self.pgcon,
             number_of_apps_to_pull=number_of_apps_to_pull,
             run_fixes=run_fixes,
+            workers=int(self.args.workers),
         )
 
     def cleanup_apks(self) -> None:

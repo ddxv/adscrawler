@@ -1,10 +1,11 @@
 import datetime
 import time
+from concurrent.futures import ProcessPoolExecutor, as_completed
 
 import pandas as pd
 
 from adscrawler.config import get_logger
-from adscrawler.dbcon.connection import PostgresEngine
+from adscrawler.dbcon.connection import PostgresEngine, get_db_connection
 from adscrawler.dbcon.queries import (
     insert_s3_key_to_hot,
     insert_version_code,
@@ -35,6 +36,91 @@ from adscrawler.process.storage import (
 from adscrawler.process.version_details import write_version_details_to_s3
 
 logger = get_logger(__name__, "process_sdks")
+
+
+def _scan_single_app(row: dict, store: int) -> dict:
+    """Worker entrypoint that decodes one app and persists its scan results.
+
+    A fresh Postgres connection is created inside the worker process (never
+    forked/shared across processes) and disposed when the app is done. Temp
+    files are also cleaned up here, in the worker's own workspace.
+    """
+    store_id = row["store_id"]
+    store_app = row["store_app"]
+    version_str = row["version_code_str"]
+    version_code_dbid = row["version_code_db_id"]
+    crawl_result = 3
+    log_info = f"process_sdks: {store_id=}"
+    pgdb = get_db_connection()
+    try:
+        try:
+            logger.info(f"{log_info} scan start")
+            if version_code_dbid is None:
+                logger.error(
+                    f"{log_info} version code dbid is None, data not recorded!"
+                )
+                return {
+                    "store_id": store_id,
+                    "success": False,
+                    "scan_result": crawl_result,
+                }
+            details_df, crawl_result, raw_txt_str = decode_app_files(
+                store, store_id, version_str
+            )
+            if details_df is None or details_df.empty:
+                details_df = pd.DataFrame(
+                    [
+                        {
+                            "store_app": store_app,
+                            "version_code_id": version_code_dbid,
+                            "scan_result": crawl_result,
+                        }
+                    ]
+                )
+            else:
+                details_df["store_app"] = store_app
+                details_df["version_code_id"] = version_code_dbid
+                details_df["scan_result"] = crawl_result
+
+            version_code_df = details_df[
+                ["version_code_id", "scan_result"]
+            ].drop_duplicates()
+            version_code_df.to_sql(
+                "version_code_sdk_scan_results",
+                pgdb.engine,
+                if_exists="append",
+                index=False,
+            )
+            if crawl_result == 1:
+                upsert_sdk_details_df(
+                    details_df=details_df,
+                    pgdb=pgdb,
+                    store_id=store_id,
+                    raw_txt_str=raw_txt_str,
+                )
+            else:
+                logger.info(f"{log_info} {crawl_result=} skipping upsert")
+            return {
+                "store_id": store_id,
+                "success": True,
+                "scan_result": crawl_result,
+            }
+        except Exception:
+            logger.exception(f"{log_info} failed")
+            return {
+                "store_id": store_id,
+                "success": False,
+                "scan_result": crawl_result,
+            }
+    finally:
+        # Clean up in the worker's own workspace; never in the orchestrator.
+        try:
+            remove_tmp_files(store_id=store_id)
+        except Exception:
+            logger.exception(f"{log_info} failed to clean tmp files")
+        if pgdb and hasattr(pgdb, "engine"):
+            pgdb.engine.dispose()
+            logger.debug(f"{log_info} database connection disposed")
 
 
 def manual_download_app(
@@ -155,16 +241,40 @@ def download_apps(
     logger.info("Finished downloading APKs")
 
 
+def decode_app_files(
+    store: int, store_id: str, version_str: str
+) -> tuple[pd.DataFrame, int, str]:
+    if store == 1:
+        details_df, crawl_result, raw_txt_str = decode_apk(
+            store_id=store_id, store=store, specific_version_str=version_str
+        )
+    elif store == 2:
+        details_df, crawl_result, raw_txt_str = decode_ipa(
+            store_id=store_id, version_str=version_str
+        )
+    else:
+        raise ValueError(f"Invalid store: {store}")
+    return details_df, crawl_result, raw_txt_str
+
+
 def process_sdks(
     store: int,
     pgdb: PostgresEngine,
     number_of_apps_to_pull: int = 20,
     run_fixes: bool = False,
+    workers: int = 1,
 ) -> None:
     """
     Decompile the app into its various files and directories.
     This shows which SDKs are used in the app.
     All results are saved to the database.
+
+    Args:
+        store: 1 for google, 2 for apple.
+        pgdb: Orchestrator Postgres connection (used only for logging here).
+        number_of_apps_to_pull: Max apps to scan per run.
+        run_fixes: If True, scan apps needing fixes instead of the normal queue.
+        workers: Number of parallel worker processes to use for scanning.
     """
     if run_fixes:
         apps = query_apps_to_sdk_scan_fix(pgdb, store)
@@ -174,80 +284,33 @@ def process_sdks(
         )
     apps["store"] = store
     log_info = f"process_sdks: {store=}"
-    logger.info(f"{log_info} {number_of_apps_to_pull} start")
+    logger.info(f"{log_info} {number_of_apps_to_pull} start with {workers=}")
     apps = apps.head(number_of_apps_to_pull)
-    i = 0
-    for _id, row in apps.iterrows():
-        i += 1
-        store_id = row.store_id
-        row_info = f"{log_info} {store_id=}"
-        store_app = row.store_app
-        version_str = row["version_code_str"]
-        version_code_dbid = row["version_code_db_id"]
-        crawl_result = 3
-        logger.info(f"{row_info} {i}/{number_of_apps_to_pull} start")
-        if version_code_dbid is None:
-            logger.error(f"{row_info} version code dbid is None, data not recorded!")
-            raise
-        try:
-            if store == 1:
-                details_df, crawl_result, raw_txt_str = decode_apk(
-                    store_id=store_id, store=store, specific_version_str=version_str
-                )
-            elif store == 2:
-                details_df, crawl_result, raw_txt_str = decode_ipa(
-                    store_id=store_id, version_str=version_str
-                )
-            else:
-                raise ValueError(f"Invalid store: {store}")
-        except Exception:
-            logger.exception(f"{row_info} failed")
-            raise
-
-        if details_df is None or details_df.empty:
-            details_df = pd.DataFrame(
-                [
-                    {
-                        "store_app": store_app,
-                        "version_code_id": version_code_dbid,
-                        "scan_result": crawl_result,
-                    }
-                ]
+    # Only one version per app when scanning in parallel
+    apps = apps.drop_duplicates("store_id", keep="first")
+    # Pass plain dicts to workers to avoid pickling the whole DataFrame metadata
+    rows = apps.to_dict(orient="records")
+    total = len(rows)
+    logger.info(f"{log_info} scanning {total:,} apps across {workers} workers")
+    completed = 0
+    with ProcessPoolExecutor(max_workers=workers) as executor:
+        futures = [executor.submit(_scan_single_app, row, store) for row in rows]
+        for future in as_completed(futures):
+            completed += 1
+            result = future.result()
+            store_id = result.get("store_id")
+            scan_result = result.get("scan_result")
+            SDK_SCAN_RESULTS_COUNTER.add(
+                1,
+                attributes={
+                    "store": str(store),
+                    "scan_result": str(scan_result),
+                },
             )
-        else:
-            details_df["store_app"] = store_app
-            details_df["version_code_id"] = version_code_dbid
-            details_df["scan_result"] = crawl_result
-
-        version_code_df = details_df[
-            ["version_code_id", "scan_result"]
-        ].drop_duplicates()
-
-        version_code_df.to_sql(
-            "version_code_sdk_scan_results",
-            pgdb.engine,
-            if_exists="append",
-            index=False,
-        )
-        if crawl_result == 1:
-            upsert_sdk_details_df(
-                details_df=details_df,
-                pgdb=pgdb,
-                store_id=store_id,
-                raw_txt_str=raw_txt_str,
+            logger.info(
+                f"{log_info} {store_id=} {completed}/{total} result={scan_result}"
             )
-        else:
-            logger.info(f"{row_info} {crawl_result=} skipping upsert")
-
-        SDK_SCAN_RESULTS_COUNTER.add(
-            1,
-            attributes={
-                "store": str(store),
-                "scan_result": str(crawl_result),
-            },
-        )
-        remove_tmp_files(store_id=store_id)
-        logger.info(f"{row_info} {crawl_result=} end")
+    logger.info(f"{log_info} finished scanning {completed}/{total}")
 
 
 def upsert_sdk_details_df(
