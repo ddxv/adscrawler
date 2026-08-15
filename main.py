@@ -698,9 +698,11 @@ class ProcessManager:
             logger.exception("Retrying failed MITM logs failed")
 
     def crawl_keywords(self) -> None:
+        init_metrics(job_name="crawl_keywords")
         crawl_keyword_ranks(pgdb=self.pgcon)
 
     def extract_app_keywords(self) -> None:
+        init_metrics(job_name="process_app_keywords")
         process_app_keywords(pgdb=self.pgcon, limit=self.args.limit_query_rows)
 
     def run(self) -> None:
