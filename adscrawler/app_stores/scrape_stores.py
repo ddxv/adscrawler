@@ -783,7 +783,7 @@ def scrape_app(
     crawl_result = 0
     while retries <= max_retries:
         retries += 1
-        if retries > 1 or store == 2:
+        if retries > 1:
             proxies = CONFIG.get("proxies", None)
         try:
             result_dict = scrape_from_store(
