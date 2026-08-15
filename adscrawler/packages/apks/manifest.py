@@ -173,10 +173,12 @@ def decode_apk(
         apk_path, _version_str = download_app_to_local(
             store=store, store_id=store_id, version_str=specific_version_str
         )
+        logger.info(f"{log_info} downloaded")
         if apk_path is None:
             raise FileNotFoundError(f"APK file not found for {store_id=}")
 
         apk_tmp_decoded_output_path = unzip_apk(store_id=store_id, file_path=apk_path)
+        logger.info(f"{log_info} unzipped")
 
         manifest_str, details_df = get_parsed_manifest(
             apk_tmp_decoded_output_path, store_id
