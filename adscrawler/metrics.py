@@ -1,14 +1,14 @@
-from prometheus_client import Counter
-from adscrawler.config import get_logger
 import atexit
 import socket
+
 from opentelemetry import metrics
 from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter
 from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
 from opentelemetry.sdk.resources import Resource
+from prometheus_client import Counter
 
-import os
+from adscrawler.config import get_logger
 
 logger = get_logger(__name__)
 
@@ -35,11 +35,14 @@ def init_metrics(job_name: str) -> None:
     if _provider is not None:
         return  # Prevent re-initialization
 
+    hostname = socket.gethostname()
+
     resource = Resource.create(
         {
             "service.name": "app_pipeline_cron",
             "job.name": job_name,
-            "host.name": os.getenv("HOSTNAME") or socket.gethostname(),
+            "service.instance.id": hostname,
+            "host.name": hostname,
         }
     )
 
@@ -47,7 +50,8 @@ def init_metrics(job_name: str) -> None:
 
     # Configure reader with reasonable export defaults
     reader = PeriodicExportingMetricReader(
-        exporter, export_interval_millis=10000  # Flush every 10s if long-running
+        exporter,
+        export_interval_millis=10000,  # Flush every 10s if long-running
     )
 
     _provider = MeterProvider(resource=resource, metric_readers=[reader])
