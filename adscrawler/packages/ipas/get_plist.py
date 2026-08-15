@@ -11,7 +11,7 @@ from adscrawler.config import get_logger
 from adscrawler.packages.utils import unzip_ipa
 from adscrawler.process.storage import download_app_to_local
 
-logger = get_logger(__name__)
+logger = get_logger(__name__, "process_sdks")
 
 FAILED_VERSION_STR = "-1"
 
@@ -195,10 +195,13 @@ def special_files(tmp_decoded_output_path: pathlib.Path) -> pd.DataFrame:
     return df
 
 
-def process_plist(
+def decode_ipa(
     store_id: str,
     version_str: str,
 ) -> tuple[pd.DataFrame, int, str, str]:
+    log_info = f"decode_ipa {store_id=} start {version_str=}"
+    logger.info(f"{log_info} start")
+
     store = 2
     downloaded_file_path, _version_str = download_app_to_local(
         store=store, store_id=store_id, version_str=version_str
@@ -210,4 +213,5 @@ def process_plist(
         tmp_decoded_output_path=tmp_decoded_output_path
     )
     crawl_result = 1
+    logger.info(f"{log_info} {crawl_result=} rows={len(details_df)} start")
     return details_df, crawl_result, plist_str

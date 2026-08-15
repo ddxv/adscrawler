@@ -157,14 +157,15 @@ def xml_to_dataframe(root: ElementTree.Element) -> pd.DataFrame:
     return df
 
 
-def process_manifest(
+def decode_apk(
     store_id: str, store: int, specific_version_str: str | None = None
 ) -> tuple[pd.DataFrame, int, str, str]:
     """Process an APKs manifest.
     Due to the original implementation, this still downloads, processes manifest and saves the version_details.
     """
     crawl_result = 3
-    logger.info(f"process_manifest {store_id=} start")
+    log_info = f"decode_apk {store_id=} start {specific_version_str=}"
+    logger.info(f"{log_info} start")
     details_df = pd.DataFrame()
     manifest_str = ""
 
@@ -193,4 +194,5 @@ def process_manifest(
     except Exception as e:
         logger.exception(f"Unexpected error for {store_id=}: {str(e)}")
         crawl_result = 3  # Unexpected errors
+    logger.info(f"{log_info} {crawl_result=} rows={len(details_df)}")
     return details_df, crawl_result, manifest_str

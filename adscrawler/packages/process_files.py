@@ -21,9 +21,9 @@ from adscrawler.packages.apks.download_apk import (
     manage_apk_download,
     manual_process_download,
 )
-from adscrawler.packages.apks.manifest import process_manifest
+from adscrawler.packages.apks.manifest import decode_apk
 from adscrawler.packages.ipas.download_ipa import manage_ipa_download
-from adscrawler.packages.ipas.get_plist import process_plist
+from adscrawler.packages.ipas.get_plist import decode_ipa
 from adscrawler.packages.utils import (
     move_downloaded_app_to_main_dir,
     remove_tmp_files,
@@ -34,7 +34,7 @@ from adscrawler.process.storage import (
 )
 from adscrawler.process.version_details import write_version_details_to_s3
 
-logger = get_logger(__name__)
+logger = get_logger(__name__, "process_sdks")
 
 
 def manual_download_app(
@@ -191,11 +191,11 @@ def process_sdks(
             raise
         try:
             if store == 1:
-                details_df, crawl_result, raw_txt_str = process_manifest(
+                details_df, crawl_result, raw_txt_str = decode_apk(
                     store_id=store_id, store=store, specific_version_str=version_str
                 )
             elif store == 2:
-                details_df, crawl_result, raw_txt_str = process_plist(
+                details_df, crawl_result, raw_txt_str = decode_ipa(
                     store_id=store_id, version_str=version_str
                 )
             else:
