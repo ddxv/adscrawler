@@ -51,7 +51,7 @@ def init_metrics(job_name: str) -> None:
     # Configure reader with reasonable export defaults
     reader = PeriodicExportingMetricReader(
         exporter,
-        export_interval_millis=10000,  # Flush every 10s if long-running
+        export_interval_millis=60000,  # Flush every 10s if long-running
     )
 
     _provider = MeterProvider(resource=resource, metric_readers=[reader])
