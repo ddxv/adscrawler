@@ -285,7 +285,6 @@ def process_sdks(
     apps["store"] = store
     log_info = f"process_sdks: {store=}"
     logger.info(f"{log_info} {number_of_apps_to_pull} start with {workers=}")
-    apps = apps.head(number_of_apps_to_pull)
     # Only one version per app when scanning in parallel
     apps = apps.drop_duplicates("store_id", keep="first")
     # Pass plain dicts to workers to avoid pickling the whole DataFrame metadata
