@@ -84,7 +84,7 @@ def unzip_apk(store_id: str, file_path: pathlib.Path) -> pathlib.Path:
             check=False,
             capture_output=True,
             text=True,
-            timeout=60,
+            timeout=120,
         )
         if "filename not matched" in output.stderr:
             unzip_command = f"unzip -o {file_path.as_posix()} base.apk -d {partial_apk_dir.as_posix()}"
@@ -123,6 +123,7 @@ def unzip_apk(store_id: str, file_path: pathlib.Path) -> pathlib.Path:
             capture_output=True,
             text=True,
             check=False,  # Don't raise exception on non-zero exit
+            timeout=180
         )
 
         if "java.lang.OutOfMemoryError" in result.stderr:

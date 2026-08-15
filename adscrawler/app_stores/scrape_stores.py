@@ -63,7 +63,7 @@ from adscrawler.dbcon.queries import (
     update_from_df,
     upsert_df,
 )
-from adscrawler.metrics import CRAWL_RESULTS_COUNTER
+from adscrawler.metrics import CRAWL_KEYWORDS_RESULTS_COUNTER, CRAWL_RESULTS_COUNTER
 from adscrawler.process.app_details import (
     app_details_to_s3,
     raw_keywords_to_s3,
@@ -238,6 +238,7 @@ def crawl_keyword_ranks(pgdb: PostgresEngine) -> None:
     all_keywords = pd.DataFrame()
     sleep_time = 1
     crawl_log = []
+    crawl_result_counts: dict[int, int] = {}
     log_info = "crawl_keywords"
     for _id, row in kdf.iterrows():
         logger.info(f"{log_info} {_id}/{kdf.shape[0]:,} keyword={row.keyword_text}")
@@ -248,15 +249,20 @@ def crawl_keyword_ranks(pgdb: PostgresEngine) -> None:
                 language=language,
                 keyword=keyword,
             )
-            df["keyword_text"] = keyword
-            df["keyword_id"] = row["keyword_id"]
-            df["language"] = language.lower()
-            df["country"] = country.upper()
-            df["crawled_at"] = datetime.datetime.now(tz=datetime.UTC)
-            df["crawled_date"] = df["crawled_at"].dt.date
-            all_keywords = pd.concat([all_keywords, df], ignore_index=True)
+            if df.empty:
+                crawl_result_counts[3] = crawl_result_counts.get(3, 0) + 1
+            else:
+                df["keyword_text"] = keyword
+                df["keyword_id"] = row["keyword_id"]
+                df["language"] = language.lower()
+                df["country"] = country.upper()
+                df["crawled_at"] = datetime.datetime.now(tz=datetime.UTC)
+                df["crawled_date"] = df["crawled_at"].dt.date
+                all_keywords = pd.concat([all_keywords, df], ignore_index=True)
+                crawl_result_counts[1] = crawl_result_counts.get(1, 0) + 1
         except Exception:
             logger.exception(f"{log_info} {keyword=} hit error, skipping")
+            crawl_result_counts[4] = crawl_result_counts.get(4, 0) + 1
         finally:
             crawl_log.append(
                 {
@@ -290,6 +296,12 @@ def crawl_keyword_ranks(pgdb: PostgresEngine) -> None:
         key_columns=["keyword"],
         pgdb=pgdb,
     )
+    # Emit aggregated keyword crawl results after the whole run completes
+    for crawl_result, count in crawl_result_counts.items():
+        CRAWL_KEYWORDS_RESULTS_COUNTER.add(
+            count,
+            attributes={"crawl_result": str(crawl_result)},
+        )
 
 
 def scrape_store_ranks(pgdb: PostgresEngine, store: int) -> None:

@@ -93,10 +93,13 @@ def run_app(
         crawl_result=crawl_result,
         pgdb=pgdb,
     )
-    WAYDROID_RUN_RESULTS_COUNTER.labels(
-        run_name=run_name,
-        run_result=str(crawl_result),
-    ).inc()
+    WAYDROID_RUN_RESULTS_COUNTER.add(
+        1,
+        attributes={
+            "run_name": str(run_name),
+            "run_result": str(crawl_result),
+        },
+    )
 
     try:
         mdf = mitm_logs.parse_log(store_id=store_id, run_id=None, pgdb=pgdb)

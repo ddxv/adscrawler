@@ -43,7 +43,8 @@ SELECT
     id,
     url,
     ad_supported,
-    crawled_at
+    crawled_at,
+    count(*) OVER () AS total_queue_depth
 FROM
     myq
 ORDER BY

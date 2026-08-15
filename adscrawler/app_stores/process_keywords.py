@@ -15,6 +15,7 @@ from adscrawler.dbcon.queries import (
     query_keywords_base,
     upsert_df,
 )
+from adscrawler.metrics import PROCESS_KEYWORDS_RESULTS_COUNTER
 
 logger = get_logger(__name__)
 
@@ -488,4 +489,8 @@ def extract_app_keywords_from_descriptions(pgdb: PostgresEngine, limit: int) -> 
         if_exists="append",
         index=False,
         schema="logging",
+    )
+    PROCESS_KEYWORDS_RESULTS_COUNTER.add(
+        apps_extracted_df.shape[0],
+        attributes={},
     )

@@ -33,6 +33,8 @@ dependencies = [
     "gplaydl",
     "prometheus-client",
     "dramatiq[redis,prometheus]",
+    "opentelemetry-sdk",
+    "opentelemetry-exporter-otlp-proto-grpc",
 ]
 
 

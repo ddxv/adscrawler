@@ -79,5 +79,11 @@ SELECT
 FROM
     scheduled_keywords AS sk
 )
-SELECT keyword_id, keyword_text, app_count FROM allresults
+SELECT
+    keyword_id,
+    keyword_text,
+    app_count,
+    count(*) OVER () AS total_queue_depth
+FROM
+    allresults
 LIMIT :mylimit;

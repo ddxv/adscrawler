@@ -6,7 +6,6 @@ import time
 from collections.abc import Callable
 from functools import lru_cache
 from typing import Any
-from prometheus_client import write_to_textfile
 
 import numpy as np
 import pandas as pd
@@ -16,13 +15,15 @@ from sqlalchemy import bindparam, text
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.sql.elements import TextClause
 
-from adscrawler.config import CONFIG, SQL_DIR, get_logger, PROM_DIR
+from adscrawler.config import CONFIG, SQL_DIR, get_logger
 from adscrawler.metrics import (
+    ADS_TXT_BACKLOG_GAUGE,
     CRAWL_BACKLOG_GAUGE,
+    CRAWL_KEYWORDS_BACKLOG_GAUGE,
     DOWNLOAD_BACKLOG_GAUGE,
+    PROCESS_KEYWORDS_BACKLOG_GAUGE,
     SDK_SCAN_BACKLOG_GAUGE,
     WAYDROID_RUN_BACKLOG_GAUGE,
-    registry,
 )
 from adscrawler.dbcon.connection import PostgresEngine
 
@@ -975,6 +976,15 @@ def query_pub_domains_to_crawl_ads_txt(
             "mylimit": limit,
         },
     )
+    if df.empty:
+        total_backlog = 0
+    else:
+        total_backlog = (
+            int(df["total_queue_depth"].iloc[0])
+            if "total_queue_depth" in df.columns
+            else 0
+        )
+    log_ads_txt_query(total_backlog=total_backlog)
     return df
 
 
@@ -1188,33 +1198,61 @@ def query_store_apps_to_update(
 
 
 def log_store_apps_query(store: int, country_priority_group: int, total_backlog: int):
-    store_str = str(store)
-    country_priority_group_str = str(country_priority_group)
-    CRAWL_BACKLOG_GAUGE.labels(
-        store=store_str, country_priority_group=country_priority_group_str
-    ).set(total_backlog)
-    prom_file = PROM_DIR / f"crawl_{store}_{country_priority_group_str}.prom"
-    write_to_textfile(str(prom_file), registry)
+    CRAWL_BACKLOG_GAUGE.set(
+        total_backlog,
+        attributes={
+            "store": str(store),
+            "country_priority_group": str(country_priority_group),
+        },
+    )
 
 
 def log_downloads_query(store: int, total_backlog: int):
-    store_str = str(store)
-    DOWNLOAD_BACKLOG_GAUGE.labels(
-        store=store_str,
-    ).set(total_backlog)
+    DOWNLOAD_BACKLOG_GAUGE.set(
+        total_backlog,
+        attributes={
+            "store": str(store),
+        },
+    )
 
 
 def log_sdk_scan_query(store: int, total_backlog: int):
-    store_str = str(store)
-    SDK_SCAN_BACKLOG_GAUGE.labels(
-        store=store_str,
-    ).set(total_backlog)
+    SDK_SCAN_BACKLOG_GAUGE.set(
+        total_backlog,
+        attributes={
+            "store": str(store),
+        },
+    )
 
 
 def log_waydroid_backlog_query(run_name: str, total_backlog: int):
-    WAYDROID_RUN_BACKLOG_GAUGE.labels(
-        run_name=run_name,
-    ).set(total_backlog)
+    WAYDROID_RUN_BACKLOG_GAUGE.set(
+        total_backlog,
+        attributes={
+            "run_name": str(run_name),
+        },
+    )
+
+
+def log_ads_txt_query(total_backlog: int):
+    ADS_TXT_BACKLOG_GAUGE.set(
+        total_backlog,
+        attributes={},
+    )
+
+
+def log_process_keywords_query(total_backlog: int):
+    PROCESS_KEYWORDS_BACKLOG_GAUGE.set(
+        total_backlog,
+        attributes={},
+    )
+
+
+def log_crawl_keywords_query(total_backlog: int):
+    CRAWL_KEYWORDS_BACKLOG_GAUGE.set(
+        total_backlog,
+        attributes={},
+    )
 
 
 def query_keywords_to_crawl(
@@ -1228,6 +1266,15 @@ def query_keywords_to_crawl(
         params={"mylimit": limit},
         con=pgdb.engine,
     )
+    if df.empty:
+        total_backlog = 0
+    else:
+        total_backlog = (
+            int(df["total_queue_depth"].iloc[0])
+            if "total_queue_depth" in df.columns
+            else 0
+        )
+    log_crawl_keywords_query(total_backlog=total_backlog)
     return df
 
 
@@ -1449,6 +1496,15 @@ def query_apps_to_process_keywords(
         con=pgdb.engine,
         params={"mylimit": limit},
     )
+    if df.empty:
+        total_backlog = 0
+    else:
+        total_backlog = (
+            int(df["total_queue_depth"].iloc[0])
+            if "total_queue_depth" in df.columns
+            else 0
+        )
+    log_process_keywords_query(total_backlog=total_backlog)
     return df
 
 

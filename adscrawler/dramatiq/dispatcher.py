@@ -12,6 +12,7 @@ import dramatiq
 import pandas as pd
 from dramatiq.brokers.redis import RedisBroker
 from dramatiq.middleware.prometheus import Prometheus
+from adscrawler.metrics import init_metrics
 
 from adscrawler.config import CONFIG, get_logger
 from adscrawler.dbcon.connection import PostgresEngine
@@ -246,6 +247,7 @@ def dispatch_all_queues(
     This is the recommended entry point for cron — a single ``* * * * *``
     invocation replaces four separate cron jobs.
     """
+    init_metrics(job_name="dramatiq_dispatch_all")
     for store, group in ((1, 1), (2, 1), (1, 2), (2, 2)):
         app_limit = 100 if group == 2 else 5_000
         dispatch_app_details_jobs(

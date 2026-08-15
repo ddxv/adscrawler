@@ -122,12 +122,15 @@ def download_apps(
         except Exception:
             logger.exception(f"Download for {store_id} failed")
         remove_tmp_files(store_id=store_id)
-        DOWNLOAD_RESULTS_COUNTER.labels(
-            store=store,
-            download_result=(
-                str(download_result.crawl_result) if download_result else "0"
-            ),
-        ).inc()
+        DOWNLOAD_RESULTS_COUNTER.add(
+            1,
+            attributes={
+                "store": str(store),
+                "download_result": (
+                    str(download_result.crawl_result) if download_result else "0"
+                ),
+            },
+        )
         errors_msg = (
             f" with errors={download_result.error_count}"
             if download_result.error_count > 0
@@ -236,10 +239,13 @@ def process_sdks(
         else:
             logger.info(f"{row_info} {crawl_result=} skipping upsert")
 
-        SDK_SCAN_RESULTS_COUNTER.labels(
-            store=store,
-            scan_result=str(crawl_result),
-        ).inc()
+        SDK_SCAN_RESULTS_COUNTER.add(
+            1,
+            attributes={
+                "store": str(store),
+                "scan_result": str(crawl_result),
+            },
+        )
         remove_tmp_files(store_id=store_id)
         logger.info(f"{row_info} {crawl_result=} end")
 

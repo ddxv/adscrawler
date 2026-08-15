@@ -47,7 +47,8 @@ SELECT
     b.description_id,
     b.app_keywords_extracted_at,
     b.description_short,
-    b.description
+    b.description,
+    count(*) OVER () AS total_queue_depth
 FROM
     base AS b
 INNER JOIN app_global_metrics_latest AS agml ON b.store_app = agml.store_app

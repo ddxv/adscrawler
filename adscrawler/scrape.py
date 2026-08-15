@@ -10,6 +10,7 @@ import tldextract
 from .config import DEVLEOPER_IGNORE_TLDS, get_logger
 from .dbcon.connection import PostgresEngine
 from .dbcon.queries import query_pub_domains_to_crawl_ads_txt, upsert_df
+from .metrics import ADS_TXT_RESULTS_COUNTER
 
 """
     Pulling, parsing and save to db for app-ads.txt
@@ -299,6 +300,12 @@ def scrape_app_ads_url(url: str, domain_id: int, pgdb: PostgresEngine) -> None:
     except Exception as error:
         logger.exception(f"{info} unknown ERROR: {error}")
         result_dict["crawl_result"] = 4
+    ADS_TXT_RESULTS_COUNTER.add(
+        1,
+        attributes={
+            "crawl_result": str(result_dict["crawl_result"]),
+        },
+    )
     insert_columns = ["domain_id", "crawl_result", "crawled_at"]
     pub_domain_df = pd.DataFrame([result_dict])
     pub_domain_df["domain_id"] = domain_id

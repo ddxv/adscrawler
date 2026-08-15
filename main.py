@@ -4,7 +4,6 @@ import os
 import sys
 
 import pandas as pd
-from prometheus_client import write_to_textfile
 
 from adscrawler.app_stores.process_icons import refresh_app_icons
 from adscrawler.app_stores.process_keywords import process_app_keywords
@@ -14,9 +13,8 @@ from adscrawler.app_stores.scrape_stores import (
     scrape_store_ranks,
     update_app_details,
 )
-from adscrawler.config import PROM_DIR, get_logger
+from adscrawler.config import get_logger
 from adscrawler.dbcon.connection import PostgresEngine, get_db_connection
-from adscrawler.metrics import registry
 from adscrawler.packages.apks.cleanup_apks import run_cleanup
 from adscrawler.packages.process_files import (
     download_apps,
@@ -31,6 +29,7 @@ from adscrawler.process.app_details import (
 from adscrawler.process.app_domain_history import (
     process_company_history,
 )
+from adscrawler.metrics import init_metrics, pipeline_stage
 from adscrawler.process.app_metrics_history import (
     clean_history_tables,
     delete_and_aggregate_s3_agg,
@@ -439,6 +438,7 @@ class ProcessManager:
         logger.info("Adscrawler exiting main")
 
     def daily_s3_imports(self) -> None:
+        init_metrics(job_name="daily_s3_imports")
         period = self.args.ranks_period
         if period == "week":
             start_date = datetime.date.today() - datetime.timedelta(days=9)
@@ -448,65 +448,53 @@ class ProcessManager:
             end_date = datetime.date.today()
         else:
             raise ValueError(f"Invalid period {period}")
-        try:
+        with pipeline_stage("import_ranks"):
             import_ranks_from_s3(
                 pgdb=self.pgcon,
                 start_date=start_date,
                 end_date=end_date,
                 period=period,
             )
-        except Exception:
-            logger.exception(
-                f"Importing {self.args.ranks_period} ranks from s3 for failed"
-            )
-        try:
-            start_date = datetime.date.today() - datetime.timedelta(days=5)
-            end_date = datetime.date.today() - datetime.timedelta(days=1)
+
+        with pipeline_stage("import_keywords"):
             import_keywords_from_s3(
                 pgdb=self.pgcon,
-                start_date=start_date,
-                end_date=end_date,
+                start_date=datetime.date.today() - datetime.timedelta(days=5),
+                end_date=datetime.date.today() - datetime.timedelta(days=1),
             )
-        except Exception:
-            logger.exception("Importing keywords from s3 for failed")
 
         start_date = datetime.date.today() - datetime.timedelta(days=5)
         end_date = datetime.date.today().isoformat()
         for dt in pd.date_range(start_date, end_date, freq="D"):
             crawled_date = dt.strftime("%Y-%m-%d")
-            compact_incoming_version_details(date_str=crawled_date)
+            with pipeline_stage("compact_version_details", crawled_date=crawled_date):
+                compact_incoming_version_details(date_str=crawled_date)
             for store in [1, 2]:
-                try:
-                    compact_incoming_app_details(store=store, crawled_date=crawled_date)
+                with pipeline_stage(
+                    "compact_and_import_app_details",
+                    store=store,
+                    crawled_date=crawled_date,
+                ):
+                    compact_incoming_app_details(
+                        store=store, crawled_date=crawled_date
+                    )
                     import_app_details_from_s3_into_db(
                         store=store,
                         crawled_date=crawled_date,
                         pgdb=self.pgcon,
                     )
-                except Exception:
-                    logger.exception(
-                        f"Importing app_details from s3 failed {store=} {crawled_date=}"
-                    )
 
-        try:
+        with pipeline_stage("delete_and_aggregate", store=store):
             delete_and_aggregate_s3_agg(store=store, pgdb=self.pgcon)
-        except Exception:
-            logger.exception(f"Importing {store=} app metrics from s3 for failed")
 
-        try:
+        with pipeline_stage("clean_history_tables"):
             clean_history_tables(pgdb=self.pgcon)
-        except Exception:
-            logger.exception("Cleaning history tables failed")
 
-        try:
+        with pipeline_stage("process_company_history"):
             process_company_history(pgdb=self.pgcon)
-        except Exception:
-            logger.exception("Exporting combined domain history to s3 failed")
 
-        try:
+        with pipeline_stage("map_version_details"):
             map_version_details(pgdb=self.pgcon)
-        except Exception:
-            logger.exception("Syncing version details to Postgres failed")
 
     def scrape_new_apps(self, store: int) -> None:
         try:
@@ -563,6 +551,7 @@ class ProcessManager:
             logger.exception(f"Crawling developers for {store=} failed")
 
     def update_app_details(self, store: int, country_priority_group: int) -> None:
+        init_metrics(job_name="update_app_details")
         if not country_priority_group and not self.args.dispatch_all:
             logger.error(
                 "No country priority group provided, ie --country-priority-group=1"
@@ -602,13 +591,13 @@ class ProcessManager:
             )
             return
         try:
+            init_metrics(job_name="download_apps")
             download_apps(store=store, pgdb=self.pgcon, number_of_apps_to_pull=50)
         except Exception:
             logger.exception(f"Download app/decompile failing {store=}")
-        prom_file = PROM_DIR / f"download_apks_{store}.prom"
-        write_to_textfile(str(prom_file), registry)
 
     def process_sdks(self, store: int) -> None:
+        init_metrics(job_name="process_sdks")
         run_fixes = self.args.run_fixes
         number_of_apps_to_pull = 200 if run_fixes else 20
         process_sdks(
@@ -617,8 +606,6 @@ class ProcessManager:
             number_of_apps_to_pull=number_of_apps_to_pull,
             run_fixes=run_fixes,
         )
-        prom_file = PROM_DIR / f"process_sdks_{store}.prom"
-        write_to_textfile(str(prom_file), registry)
 
     def cleanup_apks(self) -> None:
         try:
@@ -681,9 +668,8 @@ class ProcessManager:
             )
         else:
             # Default processing of apk/xapk files that need to be processed
+            init_metrics(job_name="process_apks_in_waydroid")
             process_apks_for_waydroid(pgdb=self.pgcon, run_name=run_name)
-            prom_file = PROM_DIR / f"waydroid_{run_name}.prom"
-            write_to_textfile(str(prom_file), registry)
 
     def retry_failed_mitm_logs(self) -> None:
         from adscrawler.mitm_ad_parser.mitm_scrape_ads import (  # noqa: PLC0415
