@@ -13,7 +13,6 @@ all_version_codes AS (
         version_codes AS vc
     INNER JOIN s3_file_keys AS sfk ON
         vc.id = sfk.version_code_id
-    WHERE sfk.myregion = 'loki'
 ),
 latest_version_codes AS (
     SELECT DISTINCT ON
