@@ -2,6 +2,7 @@
 
 import json
 import pathlib
+import re
 import subprocess
 from xml.etree import ElementTree
 
@@ -21,6 +22,64 @@ logger = get_logger(__name__, "process_sdks")
 FAILED_VERSION_STR = "-1"
 
 
+# Matches one XML attribute declaration ``name="value"`` (double or single
+# quoted), capturing the attribute name.
+_ATTR_RE = re.compile(
+    r'([a-zA-Z0-9_:.-]+)\s*=\s*("(?:[^"\\]|\\.)*"|\'(?:[^\'\\]|\\.)*\')'
+)
+
+
+def _dedupe_duplicate_attributes(xml_str: str) -> str:
+    """Drop duplicate attributes inside a single start tag, keeping the first.
+
+    Python's ``ElementTree`` rejects a tag that has two attributes with the same
+    name (``ParseError: duplicate attribute``). Some APKs ship manifests like
+    that, which previously made the whole scan fail. This rewrites the raw text
+    per start tag so the first value of each attribute name is kept and any later
+    duplicate ``name="..."`` on the same tag is blanked out.
+    """
+
+    def fix_start_tag(match: re.Match[str]) -> str:
+        opening, body, closing = match.group(1), match.group(2), match.group(3)
+        chars = list(body)
+        seen: set[str] = set()
+        for attr in _ATTR_RE.finditer(body):
+            if attr.group(1) not in seen:
+                seen.add(attr.group(1))
+                continue
+            # Duplicate attribute on this tag: keep the tag/whitespace but drop it.
+            for i in range(attr.start(), attr.end()):
+                if chars[i] not in " \t\r\n":
+                    chars[i] = " "
+        return f"{opening}{''.join(chars)}{closing}"
+
+    # Match every start tag (including self-closing `<tag .../>`), but never
+    # closing tags `</tag>`. The body pattern stops at the matching `>` and
+    # treats quoted values atomically so a `>` inside an attribute value is fine.
+    return re.sub(
+        r"(<\s*(?!/)[a-zA-Z0-9_:.-]+)"  # `<tag` (not `</tag>`)`
+        r'((?:[^>"\']|"[^"]*"|\'[^\']*\')*)'  # body up to `>`
+        r"(>)",
+        fix_start_tag,
+        xml_str,
+    )
+
+
+def _parse_manifest(filename: pathlib.Path) -> ElementTree.Element:
+    """Parse a manifest, tolerating duplicate XML attributes on a tag."""
+    try:
+        return ElementTree.parse(filename).getroot()
+    except ElementTree.ParseError:
+        # Fall back to deduplicating attributes before ElementTree can choke.
+        logger.warning(
+            f"Manifest {filename} has unparseable XML; attempting directed rewrite"
+        )
+        with filename.open("r") as f:
+            xml_str = f.read()
+        rewritten = _dedupe_duplicate_attributes(xml_str)
+        return ElementTree.fromstring(rewritten)
+
+
 def get_parsed_manifest(
     apk_tmp_decoded_output_path: pathlib.Path, store_id: str
 ) -> tuple[str, pd.DataFrame]:
@@ -28,8 +87,7 @@ def get_parsed_manifest(
     # Load the XML file
     with manifest_filename.open("r") as f:
         manifest_str = f.read()
-    tree = ElementTree.parse(manifest_filename)
-    root = tree.getroot()
+    root = _parse_manifest(manifest_filename)
     df = xml_to_dataframe(root)
     smali_df = get_smali_df(apk_tmp_decoded_output_path, store_id)
     jsons_df = get_json_df(apk_tmp_decoded_output_path)
