@@ -344,6 +344,8 @@ def make_s3_app_hash_metrics_history_daily(
     snapshot_date_str = snapshot_date.strftime("%Y-%m-%d")
     prefix = f"{RAW_DATA_APP_DETAILS}/store={store}/crawled_date={snapshot_date_str}/country="
     all_parquet_paths = get_parquet_paths_by_prefix(bucket, prefix)
+    if snapshot_date_str > "2026-07-10":
+        all_parquet_paths = [x for x in all_parquet_paths if "crawl_result=1" in x]
     hex_values = [f"{i:02x}" for i in range(256)]
     for hex_val in hex_values:
         agg_prefix = f"{AGG_APP_HASH_BUCKETS_DAILY}/store={store}/hash_bucket={hex_val}/snapshot_date={snapshot_date_str}/"
@@ -352,7 +354,7 @@ def make_s3_app_hash_metrics_history_daily(
         )
     if len(all_parquet_paths) == 0:
         logger.error(
-            f"No app detail parquet files found for store={store} snapshot_date={snapshot_date_str}"
+            f"No app detail parquet files found for {store=} {snapshot_date_str=}"
         )
         return
     query = copy_raw_details_to_hash_buckets(
@@ -366,12 +368,12 @@ def make_s3_app_hash_metrics_history_daily(
         except duckdb.BinderException as e:
             if store == 2 and """"trackId" not found""" in str(e):
                 logger.error(
-                    f"trackId column not found in parquets for store={store}, skipping"
+                    f"trackId column not found in parquets for {store=}, skipping"
                 )
                 handle_missing_trackid_files(duckdb_con, all_parquet_paths, store)
             elif store == 1 and """"appId" not found""" in str(e):
                 logger.error(
-                    f"appId column not found in parquets for store={store}, skipping"
+                    f"appId column not found in parquets for {store=}, skipping"
                 )
                 handle_missing_trackid_files(duckdb_con, all_parquet_paths, store)
             else:
@@ -1141,7 +1143,7 @@ def copy_raw_details_to_hash_buckets(
                       {data_cols},
                       left(md5(store_id), 2) AS hash_bucket,
                       '{snapshot_date_str}' AS snapshot_date
-                  FROM read_parquet({app_detail_parquets}, union_by_name=true)
+                  FROM read_parquet({app_detail_parquets}, union_by_name=true, hive_partitioning=true)
                     {crawl_result_filter}
               ),
               deduped AS (
