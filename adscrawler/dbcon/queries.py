@@ -1147,6 +1147,9 @@ def query_store_apps_to_update(
         days=max_recrawl_days
     )
     year_ago_ts = datetime.datetime.now(tz=datetime.UTC) - datetime.timedelta(days=365)
+    half_year_ago_ts = datetime.datetime.now(tz=datetime.UTC) - datetime.timedelta(
+        days=180
+    )
     if country_priority_group == -1:
         insert_any_user_requested_apps(pgdb, long_update_ts)
     params = {
@@ -1158,6 +1161,7 @@ def query_store_apps_to_update(
         "long_update_ts": long_update_ts,
         "max_recrawl_ts": max_recrawl_ts,
         "year_ago_ts": year_ago_ts,
+        "half_year_ago_ts": year_ago_ts,
         "mylimit": limit,
     }
     country_priority_group_query = {
