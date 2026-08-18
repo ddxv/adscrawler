@@ -124,7 +124,9 @@ def _actor_body(
     finally:
         # Group 2 apps are split across 36 chunks, locks expire naturally via TTL (1800s)
         if group == 1:
-            _release_locks(store_app_ids, store, group)
+            # _release_locks(store_app_ids, store, group)
+            # Try relying on TTL only
+            pass
 
 
 @dramatiq.actor(
