@@ -80,6 +80,54 @@ latest_crawls AS (
         store_app ASC,
         country_id ASC,
         crawled_at DESC
+),
+app_removed_info AS (
+	WITH ranked_us_crawls AS (
+		SELECT
+			app_country_crawls.store_app,
+			app_country_crawls.crawl_result,
+			app_country_crawls.crawled_at,
+			ROW_NUMBER() OVER (
+				PARTITION BY app_country_crawls.store_app
+			ORDER BY
+				app_country_crawls.crawled_at DESC
+			) AS crawl_rank
+		FROM
+			logging.app_country_crawls
+		WHERE
+			app_country_crawls.country_id = 840
+	),
+	recent_us_crawls AS (
+		SELECT
+			ranked_us_crawls.store_app,
+			ranked_us_crawls.crawl_result,
+			ranked_us_crawls.crawled_at,
+			ranked_us_crawls.crawl_rank
+		FROM
+			ranked_us_crawls
+		WHERE
+			ranked_us_crawls.crawl_rank <= 2
+	)
+	SELECT
+		recent_us_crawls.store_app,
+		CASE
+			WHEN count(*) = 2
+			AND count(*) FILTER (
+			WHERE
+				recent_us_crawls.crawl_result = 1
+			) = 0 THEN TRUE
+			ELSE FALSE
+		END AS is_removed,
+		max(recent_us_crawls.crawled_at) AS last_crawled_at,
+		count(*) FILTER (
+		WHERE
+			recent_us_crawls.crawl_result = 1
+		) AS us_success_count_last_2_passes,
+		count(*) AS total_us_passes_evaluated
+	FROM
+		recent_us_crawls
+	GROUP BY
+		recent_us_crawls.store_app
 )
 SELECT
     ta.store,
@@ -92,6 +140,7 @@ SELECT
         AS html_recently_scraped,
     ta.updated_at AS app_updated_at,
     lc.crawled_at AS country_crawled_at,
+    ari.is_removed,
     COUNT(*) OVER () AS total_queue_depth
 FROM
     target_apps AS ta
@@ -100,6 +149,7 @@ LEFT JOIN latest_crawls AS lc
     ON
         ta.id = lc.store_app
         AND ctc.country_id = lc.country_id
+LEFT JOIN app_removed_info ari ON ta.id = ari.store_app
 WHERE
     (
         lc.crawled_at IS NULL
