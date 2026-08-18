@@ -101,7 +101,6 @@ def process_scrape_apps_and_save(
             try:
                 if store == 2:
                     html_recently_scraped = row["html_recently_scraped"]
-                is_removed = row["is_removed"]
                 result = scrape_app(
                     store=store,
                     store_id=row["store_id"],
@@ -772,12 +771,11 @@ def scrape_app(
     store_id: str,
     country: str,
     language: str,
-    is_removed: bool,
     html_recently_scraped: bool | None = None,
 ) -> dict:
     scrape_info = f"{store=}, {country=}, {language=}, {store_id=} scrape_app"
     proxies = None
-    max_retries = 0 if is_removed else 1
+    max_retries = 1
     base_delay = 0.5
     retries = 0
     logger.debug(f"{scrape_info} start")
