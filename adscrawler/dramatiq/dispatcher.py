@@ -38,9 +38,8 @@ from adscrawler.dramatiq.app_stores.actor_defs import (  # noqa: E402
     scrape_chunk_google_2,
 )
 
-# Seconds in redis, after this app is removed from queue
-# Dispatcher Cron 5m < Dispatcher Lock TTL  < actor_defs time_limit
-_lock_ttl_seconds = 1500
+# Seconds in redis, after this app lock is removed from queue, not from Dramatiq
+_lock_ttl_seconds = 46000
 
 
 # Extract host/port/db from the configured URL so we always talk to the
