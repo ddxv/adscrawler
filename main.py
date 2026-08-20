@@ -487,10 +487,11 @@ class ProcessManager:
                         f"Importing app_details from s3 failed {store=} {crawled_date=}"
                     )
 
-        try:
-            delete_and_aggregate_s3_agg(store=store, pgdb=self.pgcon)
-        except Exception:
-            logger.exception(f"Importing {store=} app metrics from s3 for failed")
+        for store in [1, 2]:
+            try:
+                delete_and_aggregate_s3_agg(store=store, pgdb=self.pgcon)
+            except Exception:
+                logger.exception(f"Importing {store=} app metrics from s3 for failed")
 
         try:
             clean_history_tables(pgdb=self.pgcon)

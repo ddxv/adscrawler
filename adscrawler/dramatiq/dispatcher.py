@@ -22,7 +22,7 @@ logger = get_logger(__name__, "dispatcher")
 
 
 _redis_url = CONFIG.get("redis", {}).get("url", "redis://127.0.0.1:6379/0")
-logger.info("Dispatcher connecting to Redis at %s", _redis_url)
+logger.info("Dispatcher connecting to localhost redis")
 broker = RedisBroker(url=_redis_url)
 broker.add_middleware(Prometheus())
 dramatiq.set_broker(broker)
