@@ -31,7 +31,6 @@ dramatiq.set_broker(broker)
 import redis as redis_module  # noqa: E402
 
 from adscrawler.dramatiq.app_stores.actor_defs import (  # noqa: E402
-    queue_for,
     scrape_chunk_apple_1,
     scrape_chunk_apple_2,
     scrape_chunk_google_1,
@@ -67,7 +66,13 @@ MAX_CHUNK_SIZE = 40
 
 def _queue_key(store: int, group: int) -> str:
     """Return the Dramatiq Redis list key for a given queue."""
-    return f"dramatiq:{queue_for(store, group)}"
+    return f"dramatiq:{crawl_app_queue_name(store, group)}"
+
+
+def crawl_app_queue_name(store: int, group: int) -> str:
+    store_name = "google" if store == 1 else "apple"
+    prefix = f"store_crawls_{store_name}_{group}"
+    return prefix
 
 
 def insert_apps_into_redis(
@@ -79,7 +84,7 @@ def insert_apps_into_redis(
 
     # Deduplicate IDs so we only hit Redis ONCE per app
     unique_ids = list(set(store_app_ids))
-    prefix = f"{queue_for(store, group)}:lock:"
+    prefix = f"{crawl_app_queue_name(store, group)}:lock:"
 
     pipe = redis_client.pipeline()
     for app_id in unique_ids:

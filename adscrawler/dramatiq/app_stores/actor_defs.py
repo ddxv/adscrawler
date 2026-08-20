@@ -68,36 +68,24 @@ def _release_locks(store_app_ids: list[int], store: int, group: int) -> None:
     """Remove distributed locks for a list of ``store_app`` IDs on a given queue."""
     if not store_app_ids:
         return
-    prefix = f"{queue_for(store, group)}:lock:"
+    store_name = "google" if store == 1 else "apple"
+    prefix = f"store_crawls_{store_name}_{group}:lock:"
     try:
         client = _get_lock_client()
         pipe = client.pipeline()
         for app_id in store_app_ids:
             pipe.unlink(f"{prefix}{app_id}")
         pipe.execute()
-        logger.info(
-            "Released %d locks for store=%s group=%s",
-            len(store_app_ids),
-            store,
-            group,
-        )
+        logger.info(f"{store=} {group=} locks={len(store_app_ids)} released")
     except Exception:
-        logger.warning("Failed to release locks", exc_info=True)
+        logger.exception("Failed to release locks", exc_info=True)
 
 
-# ---------------------------------------------------------------------------
 # Queue names — one per (store × country_priority_group) combination.
-# ---------------------------------------------------------------------------
 QUEUE_GOOGLE_1 = "store_crawls_google_1"
 QUEUE_APPLE_1 = "store_crawls_apple_1"
 QUEUE_GOOGLE_2 = "store_crawls_google_2"
 QUEUE_APPLE_2 = "store_crawls_apple_2"
-
-
-def queue_for(store: int, country_priority_group: int) -> str:
-    """Map (store, group) to the canonical Dramatiq queue name."""
-    prefix = "google" if store == 1 else "apple"
-    return f"store_crawls_{prefix}_{country_priority_group}"
 
 
 def _actor_body(
@@ -107,7 +95,7 @@ def _actor_body(
     group: int,
 ) -> None:
     """Shared execution body for all scrape-chunk actors."""
-    logger.info(f"Actor received chunk: {store=} {group=} apps={len(app_data)}")
+    logger.info(f"{store=} {group=} apps={len(app_data)} start")
 
     df_chunk = pd.DataFrame(app_data)
     store_app_ids = df_chunk["store_app"].unique().tolist()
@@ -117,14 +105,13 @@ def _actor_body(
             df_chunk=df_chunk,
             store=store,
         )
-        logger.info(f"Actor finished chunk: {store=} {group=} apps={len(app_data)}")
+        # Group 2 apps are split across 36 chunks, locks expire naturally via TTL
+        if group == 1:
+            _release_locks(store_app_ids, store, group)
+        logger.info(f"{store=} {group=} apps={len(app_data)} finished")
     except Exception:
         logger.exception(f"Fatal error processing chunk for {store=} {group=}")
         raise
-    finally:
-        # Group 2 apps are split across 36 chunks, locks expire naturally via TTL (1800s)
-        if group == 1:
-            _release_locks(store_app_ids, store, group)
 
 
 @dramatiq.actor(

@@ -85,12 +85,9 @@ latest_crawls AS (
 		crawled_at DESC
 )
 SELECT
-	ta.store,
 	ta.id AS store_app,
 	ta.store_id,
-	ctc.country_id,
 	ctc.alpha2 AS country_code,
-	ctc.priority,
 	COALESCE(ta.additional_html_scraped_at >= :half_year_ago_ts, FALSE)
         AS html_recently_scraped,
 	ta.updated_at AS app_updated_at,

@@ -103,7 +103,6 @@ apps_to_crawl AS (
     LIMIT :mylimit
 )
 SELECT
-    store,
     store_app,
     store_id,
     app_updated_at,
