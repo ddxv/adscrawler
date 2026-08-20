@@ -1181,7 +1181,7 @@ def query_store_apps_to_update(
         query,
         con=pgdb.engine,
         params=params,
-        dtype={"store_app": int, "store": int, "store_id": str},
+        dtype={"store_app": int, "store_id": str},
     )
     df["language"] = "en"
     if df.empty:
