@@ -801,40 +801,28 @@ def scrape_app(
             NotFoundError,
         ):
             crawl_result = 3
-            logger.warning(f"{scrape_info} failed to find app")
+            logger.info(f"{scrape_info} failed to find app")
             break
         except (ExtraHTTPError, TemporaryBlockException) as error:
-            logger.warning(
-                f"{scrape_info} HTTP error / temporary block (rate limit / server error): {error=}"
-            )
-            crawl_result = 4
-            if retries <= max_retries:
-                if proxies:
-                    continue
-                # Add extra jitter for rate-limit errors to avoid conflicts
-                sleep_time = base_delay * (2**retries) + random.uniform(0.05, 1)
-                logger.info(f"{scrape_info} Retrying in {sleep_time:.2f} seconds...")
-                time.sleep(sleep_time)
-                continue
-            else:
-                logger.error(
-                    f"{scrape_info} Max retries reached for HTTP error. Giving up."
-                )
-                break
-        except (URLError, ssl.SSLError, requests.exceptions.SSLError) as error:
-            logger.warning(f"{scrape_info} Network/SSL error: {error=}")
+            logger.warning(f"{scrape_info} HTTP error / temporary block {error=}")
             crawl_result = 4
             if proxies:
                 continue
-            if retries <= max_retries:
-                # Add extra jitter for SSL errors to avoid connection conflicts
-                sleep_time = base_delay * (2**retries) + random.uniform(0.1, 0.5)
-                logger.info(f"{scrape_info} Retrying in {sleep_time:.2f} seconds...")
-                time.sleep(sleep_time)
+            # Add extra jitter for rate-limit errors to avoid conflicts
+            sleep_time = base_delay * (2**retries) + random.uniform(0.05, 1)
+            logger.info(f"{scrape_info} Retrying in {sleep_time:.2f} seconds...")
+            time.sleep(sleep_time)
+            continue
+        except (URLError, ssl.SSLError, requests.exceptions.SSLError) as error:
+            logger.warning(f"{scrape_info} Network/SSL error {error=}")
+            crawl_result = 4
+            if proxies:
                 continue
-            else:
-                logger.error(f"{scrape_info} Max retries reached. Giving up.")
-                break
+            # Add extra jitter for SSL errors to avoid connection conflicts
+            sleep_time = base_delay * (2**retries) + random.uniform(0.1, 0.5)
+            logger.info(f"{scrape_info} Retrying in {sleep_time:.2f} seconds...")
+            time.sleep(sleep_time)
+            continue
         except AppStoreException as error:
             crawl_result = 4
             logger.exception(f"{scrape_info} unexpected error: {error=}")

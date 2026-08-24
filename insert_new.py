@@ -152,6 +152,7 @@ def _main_yaml() -> None:
     has_third_party_tracking = data["has_third_party_tracking"]
     category_id = data["category_id"]
     sdk_package_patterns = data["sdk_package_patterns"]
+    additional_domains = data.get("additional_domains", []) or []
 
     try:
         with pgdb.get_cursor() as cur:
@@ -173,6 +174,11 @@ def _main_yaml() -> None:
             company_id = insert_company_with_domain(
                 cur, company_name, domain, company_linkedin, company_github_user
             )
+
+            for additional_domain in additional_domains:
+                additional_domain = additional_domain.strip()
+                if additional_domain:
+                    insert_company_domain_mapping(cur, company_id, additional_domain)
 
             if category_id == 7:
                 # Publisher — skip SDK, just tag the company category
@@ -252,6 +258,35 @@ def insert_company_with_domain(
     )
 
     return company_id
+
+
+def insert_company_domain_mapping(cur, company_id: int, domain: str) -> None:
+    """Add a domain and map it to an existing company."""
+    cur.execute(
+        """
+            INSERT INTO domains (domain_name)
+            VALUES (%s)
+            ON CONFLICT (domain_name) DO NOTHING
+            RETURNING id;
+        """,
+        (domain,),
+    )
+    domain_id = cur.fetchone()
+
+    if domain_id:
+        domain_id = domain_id[0]
+    else:
+        cur.execute("SELECT id FROM domains WHERE domain_name = %s;", (domain,))
+        domain_id = cur.fetchone()[0]
+
+    cur.execute(
+        """
+            INSERT INTO adtech.company_domain_mapping (company_id, domain_id)
+            VALUES (%s, %s)
+            ON CONFLICT (company_id, domain_id) DO NOTHING;
+        """,
+        (company_id, domain_id),
+    )
 
 
 def insert_sdk(

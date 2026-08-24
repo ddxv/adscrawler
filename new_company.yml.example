@@ -1,6 +1,9 @@
 # This is an example of a new company to add to the database
 # Remove .example from the file name and fill in the details.
 domain: example.com
+# Optional additional domains to map to the same company.
+# additional_domains:
+#   - example.org
 company_name: Example
 # linkedin_url: company/example
 # github_user: ExampleOrg
