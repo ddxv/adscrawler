@@ -405,27 +405,26 @@ def clean_ios_app_df(df: pd.DataFrame) -> pd.DataFrame:
     )
     if "price" not in df.columns:
         df["price"] = 0
-    try:
-        # Complicated way to get around many games having genre lists
-        # Best case "Games,Puzzles" worst case like "Games,Shopping,Puzzles"
-        # TODO: Just store categories as list!
-        cat_is_games = df["category"] == "Games"
-        genre_is_not_games = df["genres"] != "Games"
-        rows_to_update = cat_is_games & genre_is_not_games
-        df.loc[rows_to_update, "category"] = "game_" + df.loc[
-            rows_to_update,
-            "genres",
-        ].apply(
-            lambda x: [
-                cat.lower().replace(" ", "_")
-                for cat in x.split(",")
-                if cat.lower().replace(" ", "_") in GAME_CATEGORIES
-            ][0],
-        )
-    except Exception as e:
-        logger.debug(
-            f"store_id={df['store_id'].to_numpy()[0]} split genre IDs failed {e}",
-        )
+
+    def get_game_category(genres):
+        if pd.isna(genres):
+            return pd.NA
+        for genre in genres.split(","):
+            category = genre.strip().lower().replace(" ", "_")
+            if category in GAME_CATEGORIES:
+                return f"game_{category}"
+        return pd.NA
+
+    # Complicated way to get around many games having genre lists
+    # Best case "Games,Shopping,Puzzles" worst case like "Games,Shopping"
+    # Fallback to Games
+    # TODO: Just store categories as list!
+    cat_is_games = df["category"] == "Games"
+    genre_is_not_games = df["genres"] != "Games"
+    rows_to_update = cat_is_games & genre_is_not_games
+    game_categories = df.loc[rows_to_update, "genres"].apply(get_game_category)
+    game_categories = game_categories.fillna("Games")
+    df.loc[rows_to_update, "category"] = game_categories
     df = df.assign(
         free=df["price"] == 0,
         developer_id=df["developer_id"].astype(str),
