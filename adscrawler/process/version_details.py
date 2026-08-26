@@ -459,7 +459,8 @@ def build_matched_app_sdk_strings_latest() -> None:
                 SELECT 
                     store_app, 
                     id AS version_code_id
-                FROM read_parquet('{vc_path}')
+                FROM read_parquet('{vc_path}') vc
+                WHERE vc.created_at < CURRENT_DATE
                 QUALIFY DENSE_RANK() OVER (
                     PARTITION BY store_app 
                     ORDER BY created_at DESC, id DESC

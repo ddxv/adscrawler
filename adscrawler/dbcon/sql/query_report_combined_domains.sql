@@ -16,6 +16,8 @@ WITH latest_version_codes AS (
         AND vc_1.created_at
         >= '2025-01-01 00:00:00'::timestamp without time zone
         AND vc_1.created_at < :start_of_next_period
+        -- Avoid processing new version_codes that have not gone through S3 pipeline
+        AND vc_1.created_at < CURRENT_DATE
     ORDER BY
         vc_1.store_app ASC,
         vc_1.created_at DESC
@@ -99,9 +101,9 @@ combined_sources AS (
 SELECT
     cs.domain_id,
     cs.store_app,
-    bool_or(cs.tag_source = 'sdk'::text) AS sdk,
-    bool_or(cs.tag_source = 'api_call'::text) AS api_call,
-    bool_or(cs.tag_source = 'app_ads_direct'::text) AS app_ads_direct,
-    bool_or(cs.tag_source = 'app_ads_reseller'::text) AS app_ads_reseller
+    BOOL_OR(cs.tag_source = 'sdk'::text) AS sdk,
+    BOOL_OR(cs.tag_source = 'api_call'::text) AS api_call,
+    BOOL_OR(cs.tag_source = 'app_ads_direct'::text) AS app_ads_direct,
+    BOOL_OR(cs.tag_source = 'app_ads_reseller'::text) AS app_ads_reseller
 FROM combined_sources AS cs
 GROUP BY cs.domain_id, cs.store_app;
