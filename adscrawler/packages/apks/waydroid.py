@@ -905,10 +905,16 @@ def process_apks_for_waydroid(
     apps_df = query_apps_to_api_scan(
         pgdb=pgdb, store=1, run_name=run_name, limit=num_apps
     )
-    logger.info(
-        f"Waydroid has {apps_df.shape[0]:,} apps to process, starting {num_apps}"
-    )
-    apps_df = apps_df.head(num_apps)
+    if apps_df.empty:
+        if run_name != "regular":
+            run_name = "regular"
+            apps_df = query_apps_to_api_scan(
+                pgdb=pgdb, store=1, run_name=run_name, limit=100
+            )
+            apps_df = apps_df.tail(10)
+            if apps_df.empty:
+                logger.info("Waydroid no apps in queue")
+    logger.info(f"Waydroid {run_name=} apps={apps_df.shape[0]:,} start")
     set_iptables_rule_for_wt0()
     for _, row in apps_df.iterrows():
         logger.info(f"Start app {_}/{apps_df.shape[0]:,}: {row.store_id}")
