@@ -1,6 +1,7 @@
 import csv
 import datetime
 import io
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from typing import TypedDict
 
 import pandas as pd
@@ -8,7 +9,7 @@ import requests
 import tldextract
 
 from .config import DEVLEOPER_IGNORE_TLDS, get_logger
-from .dbcon.connection import PostgresEngine
+from .dbcon.connection import PostgresEngine, get_db_connection
 from .dbcon.queries import query_pub_domains_to_crawl_ads_txt, upsert_df
 from .metrics import ADS_TXT_RESULTS_COUNTER
 
@@ -26,6 +27,16 @@ class NoAdsTxtError(Exception):
 
 class AdsTxtEmptyError(Exception):
     pass
+
+
+def _crawl_app_ads_worker(url: str, domain_id: int) -> None:
+    """Crawl one publisher domain in a worker-owned database connection."""
+    pgdb = get_db_connection()
+    try:
+        scrape_app_ads_url(url=url, domain_id=domain_id, pgdb=pgdb)
+    finally:
+        if hasattr(pgdb, "engine"):
+            pgdb.engine.dispose()
 
 
 def get_text_from_response(response: requests.Response) -> str:
@@ -261,15 +272,21 @@ def clean_raw_txt_df(txt_df: pd.DataFrame) -> pd.DataFrame:
     return txt_df
 
 
-def crawl_app_ads(pgdb: PostgresEngine, limit: int | None = 5000) -> None:
+def crawl_app_ads(
+    pgdb: PostgresEngine, limit: int | None = 5000, workers: int = 1
+) -> None:
     df = query_pub_domains_to_crawl_ads_txt(
         pgdb=pgdb, limit=limit, exclude_recent_days=7
     )
     logger.info(f"Start crawl app-ads from pub domains: {df.shape[0]:,}")
-    for _i, row in df.iterrows():
-        url = row.url
-        domain_id = row.id
-        scrape_app_ads_url(url=url, domain_id=domain_id, pgdb=pgdb)
+    rows = df[["url", "id"]].itertuples(index=False, name=None)
+    with ProcessPoolExecutor(max_workers=workers) as executor:
+        futures = [
+            executor.submit(_crawl_app_ads_worker, url, domain_id)
+            for url, domain_id in rows
+        ]
+        for future in as_completed(futures):
+            future.result()
     logger.info("Crawl app-ads from pub domains finished")
 
 

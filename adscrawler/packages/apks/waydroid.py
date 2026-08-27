@@ -911,7 +911,7 @@ def process_apks_for_waydroid(
             apps_df = query_apps_to_api_scan(
                 pgdb=pgdb, store=1, run_name=run_name, limit=100
             )
-            apps_df = apps_df.tail(10)
+            apps_df = apps_df.tail(num_apps)
             if apps_df.empty:
                 logger.info("Waydroid no apps in queue")
     logger.info(f"Waydroid {run_name=} apps={apps_df.shape[0]:,} start")

@@ -25,15 +25,15 @@ WITH myq AS (
                 -- crawl ad_supported more often
                 sa.ad_supported
                 AND (
-                    pdcr.crawled_at <= cast(:short_update_ts AS timestamp)
+                    pdcr.crawled_at <= CAST(:short_update_ts AS timestamp)
                     OR pdcr.crawled_at IS NULL
                 )
             )
         -- crawl all apps domains occassionally
-        -- OR (
-        -- 	pdcr.crawled_at <= CAST( max_recrawl_ts AS timestamp)
-        -- 		OR pdcr.crawled_at IS NULL
-        -- )
+        OR (
+        	pdcr.crawled_at <= CAST(:max_recrawl_ts AS timestamp)
+        		OR pdcr.crawled_at IS NULL
+        )
         )
     GROUP BY
         pd.id,

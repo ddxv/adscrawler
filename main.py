@@ -591,7 +591,11 @@ class ProcessManager:
         )
 
     def crawl_app_ads(self) -> None:
-        crawl_app_ads(self.pgcon, limit=self.args.limit_query_rows)
+        crawl_app_ads(
+            self.pgcon,
+            limit=self.args.limit_query_rows,
+            workers=int(self.args.workers),
+        )
 
     def download_apks(self, store: int) -> None:
         if self.args.store_id:
