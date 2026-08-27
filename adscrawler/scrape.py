@@ -29,11 +29,16 @@ class AdsTxtEmptyError(Exception):
     pass
 
 
-def _crawl_app_ads_worker(url: str, domain_id: int) -> None:
+def _crawl_app_ads_worker(url: str, domain_id: int) -> dict:
     """Crawl one publisher domain in a worker-owned database connection."""
     pgdb = get_db_connection()
     try:
-        scrape_app_ads_url(url=url, domain_id=domain_id, pgdb=pgdb)
+        result_dict = scrape_app_ads_url(url=url, domain_id=domain_id, pgdb=pgdb)
+        return result_dict
+    except Exception as e:
+        logger.error(f"Worker failed for {url}: {e}")
+        return {"crawl_result": 4}
+
     finally:
         if hasattr(pgdb, "engine"):
             pgdb.engine.dispose()
@@ -280,13 +285,27 @@ def crawl_app_ads(
     )
     logger.info(f"Start crawl app-ads from pub domains: {df.shape[0]:,}")
     rows = df[["url", "id"]].itertuples(index=False, name=None)
+
     with ProcessPoolExecutor(max_workers=workers) as executor:
         futures = [
             executor.submit(_crawl_app_ads_worker, url, domain_id)
             for url, domain_id in rows
         ]
+
         for future in as_completed(futures):
-            future.result()
+            try:
+                result_dict = future.result()
+
+                ADS_TXT_RESULTS_COUNTER.add(
+                    1,
+                    attributes={
+                        "crawl_result": str(result_dict["crawl_result"]),
+                    },
+                )
+            except Exception as e:
+                logger.error(f"Worker failed: {e}")
+                ADS_TXT_RESULTS_COUNTER.add(1, attributes={"crawl_result": 4})
+
     logger.info("Crawl app-ads from pub domains finished")
 
 
@@ -295,7 +314,7 @@ class ResultDict(TypedDict):
     url: str
 
 
-def scrape_app_ads_url(url: str, domain_id: int, pgdb: PostgresEngine) -> None:
+def scrape_app_ads_url(url: str, domain_id: int, pgdb: PostgresEngine) -> dict:
     info = f"{url=} scrape app-ads.txt"
     logger.info(f"{info} start")
     result_dict = ResultDict(url=url, crawl_result=4)
@@ -317,12 +336,6 @@ def scrape_app_ads_url(url: str, domain_id: int, pgdb: PostgresEngine) -> None:
     except Exception as error:
         logger.exception(f"{info} unknown ERROR: {error}")
         result_dict["crawl_result"] = 4
-    ADS_TXT_RESULTS_COUNTER.add(
-        1,
-        attributes={
-            "crawl_result": str(result_dict["crawl_result"]),
-        },
-    )
     insert_columns = ["domain_id", "crawl_result", "crawled_at"]
     pub_domain_df = pd.DataFrame([result_dict])
     pub_domain_df["domain_id"] = domain_id
@@ -337,7 +350,7 @@ def scrape_app_ads_url(url: str, domain_id: int, pgdb: PostgresEngine) -> None:
         return_rows=True,
     )
     if result_dict["crawl_result"] != 1:
-        return
+        return result_dict
     insert_columns = ["domain_name"]
     found_domains = txt_df[["domain_name"]].drop_duplicates()
     domain_df = upsert_df(
@@ -401,3 +414,4 @@ def scrape_app_ads_url(url: str, domain_id: int, pgdb: PostgresEngine) -> None:
             pgdb=pgdb,
         )
         logger.info(f"{info} finished")
+    return result_dict
