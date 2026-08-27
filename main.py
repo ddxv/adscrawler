@@ -591,6 +591,7 @@ class ProcessManager:
         )
 
     def crawl_app_ads(self) -> None:
+        init_metrics(job_name="crawl_app_ads")
         crawl_app_ads(
             self.pgcon,
             limit=self.args.limit_query_rows,

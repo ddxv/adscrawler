@@ -969,7 +969,7 @@ def query_pub_domains_to_crawl_ads_txt(
         datetime.datetime.today() - datetime.timedelta(days=exclude_recent_days)
     ).strftime("%Y-%m-%d")
     max_recrawl_ts = before_date = datetime.datetime.today() - datetime.timedelta(
-        days=120
+        days=90
     )
     df = pd.read_sql(
         QUERY_PUB_DOMAINS_TO_CRAWL_ADS_TXT,
