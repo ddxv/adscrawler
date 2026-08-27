@@ -426,7 +426,7 @@ def process_app_keywords(pgdb: PostgresEngine, limit: int) -> None:
 
 def extract_app_keywords_from_descriptions(pgdb: PostgresEngine, limit: int) -> None:
     """Process keywords for app descriptions."""
-    log_info = "Extracting keywords from app descriptions"
+    log_info = "extract_keywords_from_descriptions"
 
     description_df = query_apps_to_process_keywords(pgdb, limit=limit)
     logger.info(f"{log_info} count={len(description_df)}")
@@ -465,7 +465,8 @@ def extract_app_keywords_from_descriptions(pgdb: PostgresEngine, limit: int) -> 
         all_keywords_dfs.append(keywords_df)
     main_keywords_df = pd.concat(all_keywords_dfs)
     main_keywords_df = main_keywords_df[["store_app", "description_id", "keyword_id"]]
-    main_keywords_df["extracted_at"] = datetime.datetime.now(tz=datetime.UTC)
+    extracted_at = datetime.datetime.now(tz=datetime.UTC)
+    main_keywords_df["extracted_at"] = extracted_at
     table_name = "app_keywords_extracted"
     insert_columns = ["store_app", "description_id", "keyword_id", "extracted_at"]
     logger.info(f"{log_info} delete and insert {len(main_keywords_df)} app keywords")
@@ -479,11 +480,11 @@ def extract_app_keywords_from_descriptions(pgdb: PostgresEngine, limit: int) -> 
         delete_keys_have_duplicates=True,
     )
     table_name = "app_description_keywords_extracted"
-    apps_extracted_df = main_keywords_df[
+    description_df["extracted_at"] = extracted_at
+    description_df = description_df[
         ["store_app", "description_id", "extracted_at"]
     ].drop_duplicates()
-    apps_extracted_df["extracted_at"] = apps_extracted_df["extracted_at"]
-    apps_extracted_df.to_sql(
+    description_df.to_sql(
         name=table_name,
         con=pgdb.engine,
         if_exists="append",
@@ -491,6 +492,6 @@ def extract_app_keywords_from_descriptions(pgdb: PostgresEngine, limit: int) -> 
         schema="logging",
     )
     PROCESS_KEYWORDS_RESULTS_COUNTER.add(
-        apps_extracted_df.shape[0],
+        description_df.shape[0],
         attributes={},
     )
