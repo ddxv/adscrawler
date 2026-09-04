@@ -8,10 +8,10 @@ import time
 from collections.abc import Iterable
 
 import boto3
+import boto3.s3.transfer
 import duckdb
 import pandas as pd
 from botocore.exceptions import ClientError
-import boto3.s3.transfer
 from sqlalchemy import text
 
 from adscrawler.config import (
@@ -149,8 +149,11 @@ def delete_s3_objects_by_keys(
         else:
             keys_to_delete.append({"Key": path})
 
-    logger.info(f"Deleting {len(keys_to_delete)} S3 objects in batches...")
     batch_size = 1000
+    log_info = f"delete_s3_objects_by_keys {bucket=} keys={len(keys_to_delete)}"
+    if len(keys_to_delete) > 1000:
+        log_info += " in batches..."
+    logger.info(log_info)
     for i in range(0, len(keys_to_delete), batch_size):
         batch = keys_to_delete[i : i + batch_size]
         s3.delete_objects(
@@ -775,9 +778,6 @@ def record_s3_file_status(
         on_conflict_update=True,
     )
     logger.info(f"Recorded s3 status {pipeline_name=} {status=}")
-
-
-import subprocess
 
 
 def ensure_wt0_rule_at_top(iptables_cmd: str) -> None:

@@ -200,7 +200,7 @@ def import_app_details_from_s3_into_db(
     )
     if not unprocessed_parquets:
         logger.info(
-            "{log_info} all app_details parquet files already processed, skipping"
+            f"{log_info} all app_details parquet files already processed, skipping"
         )
         return
 
