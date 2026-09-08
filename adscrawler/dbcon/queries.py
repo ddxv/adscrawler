@@ -1471,6 +1471,7 @@ def query_all_apps_to_process(
 def query_apps_to_api_scan(
     pgdb: PostgresEngine, store: int, run_name: str, limit: int
 ) -> pd.DataFrame:
+    myregion = CONFIG["s3"].get("os_user", "loki")
     if run_name == "ads":
         query = QUERY_APPS_TO_API_SCAN_ADS
     else:
@@ -1478,7 +1479,7 @@ def query_apps_to_api_scan(
     df = pd.read_sql(
         query,
         con=pgdb.engine,
-        params={"store": store, "mylimit": limit},
+        params={"store": store, "myregion": myregion, "mylimit": limit},
     )
     if df.empty:
         total_backlog = 0
