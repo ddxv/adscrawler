@@ -16,6 +16,7 @@ from sqlalchemy.exc import OperationalError
 from sqlalchemy.sql.elements import TextClause
 
 from adscrawler.config import CONFIG, SQL_DIR, get_logger
+from adscrawler.dbcon.connection import PostgresEngine
 from adscrawler.metrics import (
     ADS_TXT_BACKLOG_GAUGE,
     CRAWL_BACKLOG_GAUGE,
@@ -25,7 +26,6 @@ from adscrawler.metrics import (
     SDK_SCAN_BACKLOG_GAUGE,
     WAYDROID_RUN_BACKLOG_GAUGE,
 )
-from adscrawler.dbcon.connection import PostgresEngine
 
 logger = get_logger(__name__)
 
@@ -1471,7 +1471,7 @@ def query_all_apps_to_process(
 def query_apps_to_api_scan(
     pgdb: PostgresEngine, store: int, run_name: str, limit: int
 ) -> pd.DataFrame:
-    myregion = CONFIG["s3"].get("os_user", "loki")
+    myregion = CONFIG["s3"].get("use_region", "loki")
     if run_name == "ads":
         query = QUERY_APPS_TO_API_SCAN_ADS
     else:
