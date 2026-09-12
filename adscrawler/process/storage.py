@@ -836,7 +836,9 @@ def set_iptables_rule_for_wt0() -> None:
 
 
 def download_app_to_local(
-    store: int, store_id: str, version_str: str | None = None
+    store: int,
+    store_id: str,
+    version_str: str | None = None,
 ) -> tuple[pathlib.Path, str | None]:
     """Return a local app package path, downloading from S3 when needed.
 
@@ -850,6 +852,9 @@ def download_app_to_local(
     """
     if version_str:
         s3_config_keys = ["s3", "s3thirdgate"]
+        myregion = CONFIG["s3"].get("use_region", "loki")
+        if "thirdgate" in myregion:
+            s3_config_keys = s3_config_keys[::-1]
         for s3_config_key in s3_config_keys:
             try:
                 file_path = download_app_by_vc(
