@@ -1,7 +1,6 @@
 import datetime
 import os
 import pathlib
-import select
 import subprocess
 import time
 
@@ -50,6 +49,8 @@ from adscrawler.process.storage import (
 )
 
 logger = get_logger(__name__, "waydroid")
+
+_waydroid_process: subprocess.Popen | None = None
 
 ANDROID_PERMISSION_ACTIVITY = (
     "com.android.permissioncontroller/.permission.ui.ReviewPermissionsActivity"
@@ -397,8 +398,22 @@ def stop_container() -> None:
 
 
 def restart_session(run_name) -> subprocess.Popen | None:
+    global _waydroid_process
+
     logger.info("Waydroid session restart")
     os.system("waydroid session stop")
+    if _waydroid_process is not None:
+        try:
+            _waydroid_process.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            _waydroid_process.terminate()
+            try:
+                _waydroid_process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                _waydroid_process.kill()
+                _waydroid_process.wait()
+        finally:
+            _waydroid_process = None
 
     if "manual" in run_name:
         pass
@@ -425,6 +440,7 @@ def restart_session(run_name) -> subprocess.Popen | None:
     if not check_session():
         logger.error("Waydroid failed check session")
         raise Exception("Waydroid failed check session")
+    _waydroid_process = waydroid_process
     return waydroid_process
 
 
@@ -580,28 +596,44 @@ def launch_and_track_app(
     )
     mitm_logfile = pathlib.Path(MITM_DIR, f"traffic_{store_id}.log")
     mitm_process = subprocess.Popen(
-        [f"{mitm_script.as_posix()}", "-w", "-s", mitm_logfile.as_posix()],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
+        [mitm_script.as_posix(), "-w", "-s", mitm_logfile.as_posix()],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
     )
-    # Store the PID
-    mitm_pid = mitm_process.pid
-    logger.info(f"{function_info} mitmdump started with PID: {mitm_pid}")
+    logger.info(f"{function_info} mitmdump started with PID: {mitm_process.pid}")
 
     try:
         launch_app(store_id)
-    except Exception as e:
-        logger.exception(f"{function_info} failed: {e}")
-        remove_app(store_id)
-        raise
+        logger.info(f"{function_info} waiting for {timeout} seconds")
+        time.sleep(timeout)
+    finally:
+        logger.info(f"{function_info} stopping app and mitmdump")
+        try:
+            remove_app(store_id)
+        except Exception:
+            logger.exception(f"{function_info} failed to remove app")
 
-    logger.info(f"{function_info} waiting for {timeout} seconds")
-    time.sleep(timeout)
-    logger.info(f"{function_info} stopping app & mitmdump")
-    os.system(f"{mitm_script.as_posix()} -d")
-    # version_str, version_code_id = get_installed_version_str(store_id, store_app, pgdb)
-    remove_app(store_id)
+        # The shell script runs mitmdump in the foreground. Kill the process
+        # group so both the script and its mitmdump child are reaped.
+        try:
+            os.killpg(mitm_process.pid, 15)
+        except ProcessLookupError:
+            pass
+        try:
+            mitm_process.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            try:
+                os.killpg(mitm_process.pid, 9)
+            except ProcessLookupError:
+                pass
+            mitm_process.wait()
+        subprocess.run(
+            [mitm_script.as_posix(), "-d"],
+            check=False,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
     # if version_code_id is None:
     # raise Exception(f"{function_info} failed to get version code")
     logger.info(f"{function_info} success")
@@ -776,65 +808,46 @@ def install_app(store_id: str, apk_path: pathlib.Path) -> None:
 
 
 def start_session() -> subprocess.Popen:
+    global _waydroid_process
+
     function_info = "Waydroid session"
     logger.info(f"{function_info} start")
     # Start the Waydroid session process
     waydroid_process = subprocess.Popen(
         ["waydroid", "session", "start"],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-        bufsize=1,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
     )
 
     # Set a timeout (in seconds)
     timeout = 120  # Wait up to 2 minutes
     start_time = time.time()
     ready = False
-    display_waiting = True
-
     logger.info(f"{function_info} start loop")
     while (
         waydroid_process.poll() is None
         and not ready
         and (time.time() - start_time) < timeout
     ):
-        rlist, _, _ = select.select(
-            [waydroid_process.stdout], [], [], 1.0
-        )  # 1-second timeout for select
-
-        logger.info(f"{function_info} rlist: {rlist}")
-
-        if rlist:
-            line = waydroid_process.stdout.readline()
-            logger.info(f"{function_info} line: {line=}")
-            if line:
-                if (
-                    "Android with user 0 is ready" in line
-                    or "Session is already running" in line
-                ):
-                    ready = True
-                    logger.info("Waydroid is ready! Continuing with the script...")
-                    break
-                if display_waiting:
-                    logger.info(f"{function_info} waiting for session to be ready...")
-                    display_waiting = False
-                if "Unable to autolaunch a dbus-daemon" in line:
-                    logger.exception(
-                        f"{function_info} unable to autolaunch a dbus-daemon"
-                    )
-                    raise Exception(
-                        f"{function_info} unable to autolaunch a dbus-daemon"
-                    )
-                if "container is not running" in line:
-                    logger.error(f"{function_info} container is not running")
-                    raise Exception(f"{function_info} container failed to start")
+        status = subprocess.run(
+            ["waydroid", "status"],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=10,
+        )
+        status_output = status.stdout.lower()
+        if "session:" in status_output and "running" in status_output:
+            ready = True
+            logger.info("Waydroid is ready! Continuing with the script...")
+            break
         time.sleep(1)
 
     if not ready:
         if waydroid_process.poll() is not None:
-            stdout = waydroid_process.stdout.read() if waydroid_process.stdout else ""
-            stderr = waydroid_process.stderr.read() if waydroid_process.stderr else ""
+            stdout = "redirected to DEVNULL"
+            stderr = "redirected to DEVNULL"
             msg = f"{function_info} process ended without becoming ready stdout:{stdout} stderr:{stderr}"
             raise Exception(msg)
         else:
@@ -842,7 +855,15 @@ def start_session() -> subprocess.Popen:
                 f"{function_info} session timed out after {timeout} seconds waiting for session to be ready"
             )
             waydroid_process.terminate()
+            try:
+                waydroid_process.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                waydroid_process.kill()
+                waydroid_process.wait()
+        _waydroid_process = None
+        raise Exception(f"{function_info} failed to become ready")
     logger.info(f"{function_info} success")
+    _waydroid_process = waydroid_process
     return waydroid_process
 
 
