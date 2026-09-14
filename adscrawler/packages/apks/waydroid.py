@@ -350,11 +350,10 @@ def check_container() -> bool:
         check=False,
         timeout=60,
     )
-    # Look specifically for the line "Container:  RUNNING"
-    is_container_running = False
-    for line in waydroid_process.stdout.splitlines():
-        if line.strip() == "Container:\tRUNNING":
-            is_container_running = True
+    is_container_running = any(
+        line.strip().split() == ["Container:", "RUNNING"]
+        for line in waydroid_process.stdout.splitlines()
+    )
     if not is_container_running:
         logger.error("Waydroid container is not running")
     return is_container_running
@@ -368,7 +367,6 @@ def check_session() -> bool:
         check=False,
         timeout=60,
     )
-    # Look specifically for the line "Session:  RUNNING"
     is_session_running = False
     for line in waydroid_process.stdout.splitlines():
         logger.info(line.strip())
@@ -400,6 +398,11 @@ def stop_container() -> None:
 def start_container(timeout: int = 60) -> None:
     function_info = "Waydroid container"
     logger.info(f"{function_info} starting")
+    subprocess.run(
+        ["sudo", "systemctl", "stop", "waydroid-container.service"],
+        check=False,
+        timeout=timeout,
+    )
     subprocess.run(
         ["sudo", "systemctl", "start", "waydroid-container.service"],
         check=True,
@@ -433,6 +436,9 @@ def restart_session(run_name) -> subprocess.Popen | None:
                 _waydroid_process.wait()
         finally:
             _waydroid_process = None
+
+    if not check_container():
+        start_container()
 
     if "manual" in run_name:
         pass
