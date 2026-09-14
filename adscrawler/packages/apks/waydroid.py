@@ -962,7 +962,9 @@ def process_apks_for_waydroid(
     logger.info(f"Waydroid {run_name=} apps={apps_df.shape[0]:,} start")
     set_iptables_rule_for_wt0()
     for _, row in apps_df.iterrows():
-        logger.info(f"Start app {_}/{apps_df.shape[0]:,}: {row.store_id}")
+        logger.info(
+            f"Start app {_}/{apps_df.shape[0]:,}: {row.store_id} version={row.version_string}"
+        )
         store_id = row.store_id
         store_app = row.store_app
         version_str = row.version_string
