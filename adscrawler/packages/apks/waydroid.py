@@ -397,6 +397,25 @@ def stop_container() -> None:
     time.sleep(1)
 
 
+def start_container(timeout: int = 60) -> None:
+    function_info = "Waydroid container"
+    logger.info(f"{function_info} starting")
+    subprocess.run(
+        ["sudo", "systemctl", "start", "waydroid-container.service"],
+        check=True,
+        timeout=timeout,
+    )
+
+    start_time = time.time()
+    while time.time() - start_time < timeout:
+        if check_container():
+            logger.info(f"{function_info} started")
+            return
+        time.sleep(1)
+
+    raise TimeoutError(f"{function_info} failed to start within {timeout} seconds")
+
+
 def restart_session(run_name) -> subprocess.Popen | None:
     global _waydroid_process
 
@@ -662,11 +681,16 @@ def remove_app(store_id: str) -> None:
 def kill_waydroid() -> None:
     function_info = "Waydroid kill"
     logger.info(f"{function_info} start")
-    stop_container()
-    time.sleep(1)
     os.system("waydroid session stop")
+    stop_container()
+    subprocess.run(
+        ["sudo", "systemctl", "stop", "waydroid-container.service"],
+        check=True,
+        timeout=60,
+    )
     time.sleep(1)
     os.system("sudo pkill waydroid")
+    start_container()
     logger.info(f"{function_info} success")
 
 
