@@ -343,20 +343,16 @@ def process_app_for_waydroid(
 
 
 def check_container() -> bool:
-    waydroid_process = subprocess.run(
-        ["waydroid", "status"],
+    container_service = subprocess.run(
+        ["sudo", "systemctl", "status", "waydroid-container.service"],
         capture_output=True,
         text=True,
         check=False,
         timeout=60,
     )
-    is_container_running = any(
-        line.strip().split() == ["Container:", "RUNNING"]
-        for line in waydroid_process.stdout.splitlines()
-    )
-    if not is_container_running:
+    if container_service.returncode != 0:
         logger.error("Waydroid container is not running")
-    return is_container_running
+    return container_service.returncode == 0
 
 
 def check_session() -> bool:
