@@ -318,9 +318,7 @@ def process_app_for_waydroid(
         raise FileNotFoundError(f"{apk_path=} not found")
     fd_count = get_waydroid_container_fd_count()
     if fd_count is not None and fd_count > WAYDROID_CONTAINER_FD_LIMIT:
-        logger.warning(
-            f"Waydroid container manager has {fd_count} FDs; restarting it"
-        )
+        logger.warning(f"Waydroid container manager has {fd_count} FDs; restarting it")
         restart_waydroid_container()
     if not check_container() or not check_session():
         waydroid_process = restart_session(run_name)
@@ -364,19 +362,29 @@ def check_container() -> bool:
 
 def get_waydroid_container_fd_count() -> int | None:
     result = subprocess.run(
-        ["pgrep", "-f", r"/usr/bin/waydroid container start"],
+        [
+            "sudo",
+            "systemctl",
+            "show",
+            "-p",
+            "MainPID",
+            "--value",
+            "waydroid-container.service",
+        ],
         capture_output=True,
         text=True,
         check=False,
     )
-    pids = result.stdout.strip().splitlines()
-    if not pids:
+
+    pid = result.stdout.strip()
+    if not pid or pid == "0":
         return None
 
-    fd_dir = pathlib.Path("/proc", pids[0], "fd")
+    fd_dir = pathlib.Path("/proc", pid, "fd")
+
     try:
         return sum(1 for _ in fd_dir.iterdir())
-    except FileNotFoundError:
+    except (FileNotFoundError, PermissionError):
         return None
 
 
