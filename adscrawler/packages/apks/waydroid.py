@@ -51,6 +51,7 @@ from adscrawler.process.storage import (
 logger = get_logger(__name__, "waydroid")
 
 _waydroid_process: subprocess.Popen | None = None
+WAYDROID_CONTAINER_FD_LIMIT = 800
 
 ANDROID_PERMISSION_ACTIVITY = (
     "com.android.permissioncontroller/.permission.ui.ReviewPermissionsActivity"
@@ -315,6 +316,12 @@ def process_app_for_waydroid(
 ) -> None:
     if not apk_path.exists():
         raise FileNotFoundError(f"{apk_path=} not found")
+    fd_count = get_waydroid_container_fd_count()
+    if fd_count is not None and fd_count > WAYDROID_CONTAINER_FD_LIMIT:
+        logger.warning(
+            f"Waydroid container manager has {fd_count} FDs; restarting it"
+        )
+        restart_waydroid_container()
     if not check_container() or not check_session():
         waydroid_process = restart_session(run_name)
         if waydroid_process:
@@ -353,6 +360,24 @@ def check_container() -> bool:
     if container_service.returncode != 0:
         logger.error("Waydroid container is not running")
     return container_service.returncode == 0
+
+
+def get_waydroid_container_fd_count() -> int | None:
+    result = subprocess.run(
+        ["pgrep", "-f", r"/usr/bin/waydroid container start"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    pids = result.stdout.strip().splitlines()
+    if not pids:
+        return None
+
+    fd_dir = pathlib.Path("/proc", pids[0], "fd")
+    try:
+        return sum(1 for _ in fd_dir.iterdir())
+    except FileNotFoundError:
+        return None
 
 
 def check_session() -> bool:
@@ -413,6 +438,25 @@ def start_container(timeout: int = 60) -> None:
         time.sleep(1)
 
     raise TimeoutError(f"{function_info} failed to start within {timeout} seconds")
+
+
+def restart_waydroid_container(timeout: int = 60) -> None:
+    function_info = "Waydroid container"
+    logger.info(f"{function_info} restart")
+    subprocess.run(
+        ["sudo", "systemctl", "restart", "waydroid-container.service"],
+        check=True,
+        timeout=timeout,
+    )
+
+    start_time = time.time()
+    while time.time() - start_time < timeout:
+        if check_container():
+            logger.info(f"{function_info} restarted")
+            return
+        time.sleep(1)
+
+    raise TimeoutError(f"{function_info} failed to restart within {timeout} seconds")
 
 
 def restart_session(run_name) -> subprocess.Popen | None:
