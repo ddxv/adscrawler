@@ -51,7 +51,7 @@ from adscrawler.process.storage import (
 logger = get_logger(__name__, "waydroid")
 
 _waydroid_process: subprocess.Popen | None = None
-WAYDROID_CONTAINER_FD_LIMIT = 800
+WAYDROID_CONTAINER_FD_LIMIT = 700
 
 ANDROID_PERMISSION_ACTIVITY = (
     "com.android.permissioncontroller/.permission.ui.ReviewPermissionsActivity"
@@ -317,9 +317,11 @@ def process_app_for_waydroid(
     if not apk_path.exists():
         raise FileNotFoundError(f"{apk_path=} not found")
     fd_count = get_waydroid_container_fd_count()
-    if fd_count is not None and fd_count > WAYDROID_CONTAINER_FD_LIMIT:
-        logger.warning(f"Waydroid container manager has {fd_count} FDs; restarting it")
-        restart_waydroid_container()
+    if fd_count is not None:
+        logger.info(f"Waydroid container manager FD count={fd_count}")
+        if fd_count >= WAYDROID_CONTAINER_FD_LIMIT:
+            logger.warning(f"Waydroid container manager has {fd_count} FDs; recycling")
+            recycle_waydroid_for_fd_leak()
     if not check_container() or not check_session():
         waydroid_process = restart_session(run_name)
         if waydroid_process:
@@ -448,23 +450,49 @@ def start_container(timeout: int = 60) -> None:
     raise TimeoutError(f"{function_info} failed to start within {timeout} seconds")
 
 
-def restart_waydroid_container(timeout: int = 60) -> None:
-    function_info = "Waydroid container"
-    logger.info(f"{function_info} restart")
+def recycle_waydroid_for_fd_leak(timeout: int = 60) -> subprocess.Popen:
+    global _waydroid_process
+
+    logger.warning("Recycling Waydroid container manager due to FD leak")
+    subprocess.run(
+        ["waydroid", "session", "stop"],
+        check=False,
+        timeout=30,
+    )
+
+    if _waydroid_process is not None:
+        try:
+            _waydroid_process.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            logger.warning("Waydroid session process did not exit; terminating")
+            _waydroid_process.terminate()
+            try:
+                _waydroid_process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                _waydroid_process.kill()
+                _waydroid_process.wait()
+        finally:
+            _waydroid_process = None
+
     subprocess.run(
         ["sudo", "systemctl", "restart", "waydroid-container.service"],
         check=True,
         timeout=timeout,
     )
 
-    start_time = time.time()
-    while time.time() - start_time < timeout:
-        if check_container():
-            logger.info(f"{function_info} restarted")
-            return
-        time.sleep(1)
+    time.sleep(2)
+    waydroid_process = start_session()
+    if not waydroid_process:
+        raise RuntimeError("Waydroid session failed to restart after FD recycle")
+    if not check_session():
+        raise RuntimeError("Waydroid session failed health check after FD recycle")
 
-    raise TimeoutError(f"{function_info} failed to restart within {timeout} seconds")
+    _waydroid_process = waydroid_process
+    fd_count = get_waydroid_container_fd_count()
+    logger.info(
+        f"Waydroid FD recycle complete; new container manager FD count={fd_count}"
+    )
+    return waydroid_process
 
 
 def restart_session(run_name) -> subprocess.Popen | None:
