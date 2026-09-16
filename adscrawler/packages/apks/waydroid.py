@@ -386,8 +386,9 @@ def get_waydroid_container_fd_count() -> int | None:
 
     if result.returncode != 0:
         logger.warning(
-            f"Failed to get Waydroid container MainPID: "
-            f"returncode={result.returncode} stderr={result.stderr.strip()!r}"
+            "Failed to get Waydroid container MainPID: "
+            f"returncode={result.returncode} "
+            f"stderr={result.stderr.strip()!r}"
         )
         return None
 
@@ -397,19 +398,35 @@ def get_waydroid_container_fd_count() -> int | None:
         logger.warning(f"Waydroid container has no MainPID: {pid!r}")
         return None
 
-    fd_dir = pathlib.Path("/proc", pid, "fd")
+    # Count FDs as root because the container manager runs as root.
+    fd_result = subprocess.run(
+        [
+            "sudo",
+            "find",
+            f"/proc/{pid}/fd",
+            "-mindepth",
+            "1",
+            "-maxdepth",
+            "1",
+            "-type",
+            "l",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=10,
+    )
 
-    try:
-        fd_count = sum(1 for _ in fd_dir.iterdir())
-    except FileNotFoundError:
-        logger.warning(f"Waydroid container PID disappeared while checking: pid={pid}")
+    if fd_result.returncode != 0:
+        logger.warning(
+            f"Failed to count Waydroid container FDs: "
+            f"pid={pid} "
+            f"returncode={fd_result.returncode} "
+            f"stderr={fd_result.stderr.strip()!r}"
+        )
         return None
-    except PermissionError:
-        logger.exception(f"Permission denied reading Waydroid container FDs: pid={pid}")
-        return None
-    except OSError:
-        logger.exception(f"OS error reading Waydroid container FDs: pid={pid}")
-        return None
+
+    fd_count = len(fd_result.stdout.splitlines())
 
     logger.info(f"Waydroid container manager PID={pid} FD count={fd_count}")
 
