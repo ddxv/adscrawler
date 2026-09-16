@@ -317,11 +317,16 @@ def process_app_for_waydroid(
     if not apk_path.exists():
         raise FileNotFoundError(f"{apk_path=} not found")
     fd_count = get_waydroid_container_fd_count()
-    if fd_count is not None:
-        logger.info(f"Waydroid container manager FD count={fd_count}")
-        if fd_count >= WAYDROID_CONTAINER_FD_LIMIT:
-            logger.warning(f"Waydroid container manager has {fd_count} FDs; recycling")
-            recycle_waydroid_for_fd_leak()
+
+    if fd_count is None:
+        logger.warning(
+            "Could not determine Waydroid container manager FD count; "
+            "FD leak protection was not applied"
+        )
+    elif fd_count >= WAYDROID_CONTAINER_FD_LIMIT:
+        logger.warning(f"Waydroid container manager has {fd_count} FDs; recycling")
+        recycle_waydroid_for_fd_leak()
+
     if not check_container() or not check_session():
         waydroid_process = restart_session(run_name)
         if waydroid_process:
@@ -376,18 +381,39 @@ def get_waydroid_container_fd_count() -> int | None:
         capture_output=True,
         text=True,
         check=False,
+        timeout=10,
     )
 
+    if result.returncode != 0:
+        logger.warning(
+            f"Failed to get Waydroid container MainPID: "
+            f"returncode={result.returncode} stderr={result.stderr.strip()!r}"
+        )
+        return None
+
     pid = result.stdout.strip()
+
     if not pid or pid == "0":
+        logger.warning(f"Waydroid container has no MainPID: {pid!r}")
         return None
 
     fd_dir = pathlib.Path("/proc", pid, "fd")
 
     try:
-        return sum(1 for _ in fd_dir.iterdir())
-    except (FileNotFoundError, PermissionError):
+        fd_count = sum(1 for _ in fd_dir.iterdir())
+    except FileNotFoundError:
+        logger.warning(f"Waydroid container PID disappeared while checking: pid={pid}")
         return None
+    except PermissionError:
+        logger.exception(f"Permission denied reading Waydroid container FDs: pid={pid}")
+        return None
+    except OSError:
+        logger.exception(f"OS error reading Waydroid container FDs: pid={pid}")
+        return None
+
+    logger.info(f"Waydroid container manager PID={pid} FD count={fd_count}")
+
+    return fd_count
 
 
 def check_session() -> bool:
