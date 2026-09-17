@@ -30,7 +30,6 @@ from adscrawler.packages.utils import (
     remove_tmp_files,
 )
 from adscrawler.process.storage import (
-    set_iptables_rule_for_wt0,
     upload_apk_to_s3,
 )
 from adscrawler.process.version_details import write_version_details_to_s3
@@ -151,7 +150,6 @@ def download_apps(
         total_apps = apps["total_queue_depth"].values[0]
     logger.info(f"download_apps: {store=} {total_apps=:,} start")
     apps = apps.head(number_of_apps_to_pull)
-    set_iptables_rule_for_wt0()
     for _id, row in apps.iterrows():
         store_id = row.store_id
         store_app = row.store_app

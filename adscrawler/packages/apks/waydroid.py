@@ -44,7 +44,6 @@ from adscrawler.packages.utils import (
 )
 from adscrawler.process.storage import (
     download_app_to_local,
-    set_iptables_rule_for_wt0,
     upload_mitm_log_to_s3,
 )
 
@@ -1085,7 +1084,6 @@ def process_apks_for_waydroid(
             if apps_df.empty:
                 logger.info("Waydroid no apps in queue")
     logger.info(f"Waydroid {run_name=} apps={apps_df.shape[0]:,} start")
-    set_iptables_rule_for_wt0()
     for _, row in apps_df.iterrows():
         logger.info(
             f"Start app {_}/{apps_df.shape[0]:,}: {row.store_id} version={row.version_string}"
