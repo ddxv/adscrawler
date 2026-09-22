@@ -1,5 +1,6 @@
 import json
 import os
+import shutil
 import subprocess
 from typing import Any
 
@@ -249,12 +250,20 @@ def call_js_to_update_file(
 ) -> None:
     if os.path.exists(filepath):
         os.remove(filepath)
-    cmd = f"node {PACKAGE_DIR}/pullAppIds.js -c {country}"
+    node = shutil.which("node")
+    if node is None:
+        raise RuntimeError(f"node not found on PATH={os.environ.get('PATH')!r}")
+    if os.path.realpath(node) == "/usr/bin/node":
+        logger.warning("node resolves to /usr/bin/node (distro default)")
+    cmd = f"{node} {PACKAGE_DIR}/pullAppIds.js -c {country}"
     if is_developers:
         cmd += " --developers"
     logger.info("Js pull start")
-    # subprocess.run(cmd, shell=True, check=True)
-    os.system(cmd)
+    result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"Js pull failed rc={result.returncode} stderr={result.stderr.strip()!r}"
+        )
     logger.info("Js pull finished")
 
 
@@ -272,9 +281,10 @@ def scrape_google_ranks(country: str) -> list[dict]:
     filepath = f"/tmp/googleplay_json_{country}.txt"
     try:
         call_js_to_update_file(filepath, country)
+        ranked_dicts = get_js_data(filepath)
     except Exception as error:
         logger.exception(f"JS pull failed with {country=} {error=}")
-    ranked_dicts = get_js_data(filepath)
+        return []
     try:
         os.unlink(filepath)
     except FileNotFoundError:
