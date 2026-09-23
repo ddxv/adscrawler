@@ -161,18 +161,18 @@ def external_download(
         if not do_redownload:
             logger.info(f"ipa already exists {filepath=}, skipping")
             return
-    logger.info(f"Will download {bundle_id}")
+    logger.info(f"Will download {store_id}")
     command = (
-        f"ipatool download -b '{bundle_id}' -o {filepath.as_posix()} "
+        f"ipatool download -i '{store_id}' -o {filepath.as_posix()} "
         f"--keychain-passphrase '{KEYCHAIN_PASSPHRASE}' "
         f"--non-interactive --purchase --verbose"
     )
     try:
         _run_ipatool(command)
     except RuntimeError:
-        logger.exception(f"ipatool download failed for {bundle_id}")
-        raise FileNotFoundError(f"ipatool download failed for {bundle_id}")
+        logger.exception(f"ipatool download failed for {store_id}")
+        raise FileNotFoundError(f"ipatool download failed for {store_id}")
     if filepath.exists():
         return filepath
     else:
-        raise FileNotFoundError(f"Failed to download {bundle_id}")
+        raise FileNotFoundError(f"Failed to download {store_id}")
