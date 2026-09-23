@@ -11,7 +11,6 @@ import time
 
 import requests
 
-from adscrawler.app_stores.apple import lookupby_id
 from adscrawler.config import CONFIG, IPAS_INCOMING_DIR, get_logger
 from adscrawler.packages.ipas.get_plist import get_parsed_plist
 from adscrawler.packages.models import DownloadResult
@@ -41,12 +40,8 @@ def manage_ipa_download(
 
     try:
         ipatool_auth()
-        r = lookupby_id(app_id=store_id)
-        bundle_id: str = r["bundleId"]
         time.sleep(2)
-        downloaded_file_path = external_download(
-            store_id=store_id, bundle_id=bundle_id, do_redownload=True
-        )
+        downloaded_file_path = external_download(store_id=store_id, do_redownload=True)
         tmp_decoded_output_path = unzip_ipa(
             ipa_path=downloaded_file_path, store_id=store_id
         )
@@ -152,9 +147,7 @@ def ipatool_auth() -> None:
         raise
 
 
-def external_download(
-    store_id: str, bundle_id: str, do_redownload: bool = False
-) -> pathlib.Path:
+def external_download(store_id: str, do_redownload: bool = False) -> pathlib.Path:
     filepath = pathlib.Path(IPAS_INCOMING_DIR, f"{store_id}.ipa")
     exists = filepath.exists()
     if exists:
