@@ -20,6 +20,7 @@ from adscrawler.dbcon.queries import (
     update_from_df,
     upsert_df,
 )
+from adscrawler.metrics import REFRESH_APP_ICONS_RESULTS_COUNTER
 from adscrawler.process.storage import get_s3_client
 
 logger = get_logger(__name__, "process_icons")
@@ -298,6 +299,13 @@ def refresh_app_icons(
 
     icon_update_df = build_icon_update_df(apps_df)
     if icon_update_df.empty:
+        REFRESH_APP_ICONS_RESULTS_COUNTER.add(
+            len(apps_df),
+            attributes={
+                "store": str(store) if store is not None else "all",
+                "result": "failure",
+            },
+        )
         logger.info("No missing icon variants could be generated")
         return 0
 
@@ -308,6 +316,24 @@ def refresh_app_icons(
         key_columns=["id"],
         pgdb=pgdb,
     )
+
+    # Count successful results only after the database update completes.
+    REFRESH_APP_ICONS_RESULTS_COUNTER.add(
+        len(icon_update_df),
+        attributes={
+            "store": str(store) if store is not None else "all",
+            "result": "success",
+        },
+    )
+    failed_count = len(apps_df) - len(icon_update_df)
+    if failed_count:
+        REFRESH_APP_ICONS_RESULTS_COUNTER.add(
+            failed_count,
+            attributes={
+                "store": str(store) if store is not None else "all",
+                "result": "failure",
+            },
+        )
 
     # Log which apps were crawled
     crawl_log = pd.DataFrame(

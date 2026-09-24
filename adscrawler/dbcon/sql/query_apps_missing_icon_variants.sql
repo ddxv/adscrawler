@@ -4,7 +4,8 @@ SELECT
     sa.store,
     sa.icon_url_512,
     sa.icon_128,
-    sa.icon_64
+    sa.icon_64,
+    count(*) OVER () AS total_queue_depth
 FROM
     public.store_apps AS sa
 LEFT JOIN logging.app_icons_crawled_at AS aica

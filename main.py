@@ -521,6 +521,7 @@ class ProcessManager:
         or all stores when ``None``.  Run two instances with ``-p google`` and
         ``-p apple`` to process both stores concurrently.
         """
+        init_metrics(job_name="refresh_app_icons")
         stores = [store] if store else [1, 2]
         batch_size = 100
         for current_store in stores:

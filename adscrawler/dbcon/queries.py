@@ -23,6 +23,7 @@ from adscrawler.metrics import (
     CRAWL_KEYWORDS_BACKLOG_GAUGE,
     DOWNLOAD_BACKLOG_GAUGE,
     PROCESS_KEYWORDS_BACKLOG_GAUGE,
+    REFRESH_APP_ICONS_BACKLOG_GAUGE,
     SDK_SCAN_BACKLOG_GAUGE,
     WAYDROID_RUN_BACKLOG_GAUGE,
 )
@@ -1263,6 +1264,13 @@ def log_crawl_keywords_query(total_backlog: int):
     )
 
 
+def log_refresh_app_icons_query(store: int | None, total_backlog: int):
+    REFRESH_APP_ICONS_BACKLOG_GAUGE.set(
+        total_backlog,
+        attributes={"store": str(store) if store is not None else "all"},
+    )
+
+
 def query_keywords_to_crawl(
     pgdb: PostgresEngine,
     limit: int,
@@ -1312,6 +1320,12 @@ def query_apps_missing_icon_variants(
         con=pgdb.engine,
         dtype={"id": int},
     )
+    total_backlog = (
+        int(df["total_queue_depth"].iloc[0])
+        if not df.empty and "total_queue_depth" in df.columns
+        else 0
+    )
+    log_refresh_app_icons_query(store=store, total_backlog=total_backlog)
     return df
 
 

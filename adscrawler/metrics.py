@@ -124,6 +124,11 @@ CRAWL_KEYWORDS_BACKLOG_GAUGE = meter.create_gauge(
     description="Total keywords queued for rank crawl",
 )
 
+REFRESH_APP_ICONS_BACKLOG_GAUGE = meter.create_gauge(
+    "refresh_app_icons_backlog_total",
+    description="Total apps queued for missing icon variant refresh",
+)
+
 # --- Result counters: app-ads.txt / keyword pipelines ---
 ADS_TXT_RESULTS_COUNTER = meter.create_counter(
     "app_ads_txt_results_total",
@@ -138,4 +143,9 @@ PROCESS_KEYWORDS_RESULTS_COUNTER = meter.create_counter(
 CRAWL_KEYWORDS_RESULTS_COUNTER = meter.create_counter(
     "crawl_keywords_results_total",
     description="Total keywords crawled for ranks by outcome",
+)
+
+REFRESH_APP_ICONS_RESULTS_COUNTER = meter.create_counter(
+    "refresh_app_icons_results_total",
+    description="Total apps processed for missing icon variant refresh by outcome",
 )
