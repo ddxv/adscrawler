@@ -108,6 +108,11 @@ WAYDROID_RUN_RESULTS_COUNTER = meter.create_counter(
     description="Total waydroid run results",
 )
 
+API_CALLS_COUNTER = meter.create_counter(
+    name="api_calls_inserted_total",
+    description="Total API calls successfully processed and inserted",
+)
+
 # --- Backlog gauges: app-ads.txt / keyword pipelines ---
 ADS_TXT_BACKLOG_GAUGE = meter.create_gauge(
     "app_ads_txt_backlog_total",

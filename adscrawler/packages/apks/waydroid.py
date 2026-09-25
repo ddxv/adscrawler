@@ -27,7 +27,7 @@ from adscrawler.dbcon.queries import (
     query_store_app_by_store_id,
     upsert_df,
 )
-from adscrawler.metrics import WAYDROID_RUN_RESULTS_COUNTER
+from adscrawler.metrics import API_CALLS_COUNTER, WAYDROID_RUN_RESULTS_COUNTER
 from adscrawler.mitm_ad_parser import mitm_logs
 from adscrawler.mitm_ad_parser.mitm_logs import parse_log
 from adscrawler.packages.apks.weston import (
@@ -136,6 +136,7 @@ def run_app(
         run_id = run_df["id"].to_numpy()[0]
         record_mitm_to_db(
             run_id=run_id,
+            run_name=run_name,
             mdf=mdf,
             pgdb=pgdb,
         )
@@ -152,6 +153,7 @@ def manual_reprocess_mitm(
     store_id: str,
     store_app: int,
     pgdb: PostgresEngine,
+    run_name: str,
 ) -> None:
     apps_df = query_apps_mitm_in_s3(pgdb=pgdb)
     rows = apps_df.shape[0]
@@ -180,6 +182,7 @@ def manual_reprocess_mitm(
             mdf["store_app"] = store_app
         record_mitm_to_db(
             run_id=run_id,
+            run_name=run_name,
             mdf=mdf,
             pgdb=pgdb,
         )
@@ -187,6 +190,7 @@ def manual_reprocess_mitm(
 
 def record_mitm_to_db(
     run_id: int,
+    run_name: str,
     mdf: pd.DataFrame,
     pgdb: PostgresEngine,
 ) -> None:
@@ -222,12 +226,14 @@ def record_mitm_to_db(
     insert_api_calls(
         pgdb=pgdb,
         mdf=mdf,
+        run_name=run_name,
     )
 
 
 def insert_api_calls(
     pgdb: PostgresEngine,
     mdf: pd.DataFrame,
+    run_name: str | None = None,
 ) -> int:
     insert_columns = [
         "run_id",
@@ -244,12 +250,14 @@ def insert_api_calls(
         "called_at",
     ]
     mdf = mdf[insert_columns]
+
     insert_df(
         df=mdf,
         table_name="api_calls",
         pgdb=pgdb,
         insert_columns=insert_columns,
     )
+
     try:
         insert_missing_ad_domains(
             api_calls_df=mdf,
@@ -257,7 +265,18 @@ def insert_api_calls(
         )
     except Exception:
         logger.exception("Failed to insert missing ad domains")
-    logger.info(f"inserted {mdf.shape[0]:,} api calls")
+
+    row_count = mdf.shape[0]
+
+    # Construct OTel attributes dynamically
+    attributes = {}
+    if run_name:
+        attributes["run_name"] = run_name
+
+    API_CALLS_COUNTER.add(row_count, attributes)
+
+    logger.info(f"inserted {row_count:,} api calls for run: {run_name}")
+    return row_count
 
 
 def insert_missing_ad_domains(
