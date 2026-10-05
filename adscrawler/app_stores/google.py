@@ -163,6 +163,8 @@ def add_language_column(
 
 
 def clean_google_play_app_df(apps_df: pd.DataFrame) -> pd.DataFrame:
+    apps_df["free"] = apps_df["free"].astype(bool)
+    apps_df["offersIAP"] = apps_df["offersIAP"].astype(bool)
     apps_df = apps_df.rename(
         columns={
             "title": "name",
