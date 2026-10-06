@@ -351,6 +351,13 @@ def scrape_app_ios(
         )
     else:
         result_dict["additional_html_crawl_result"] = 0
+    logger.info(
+        f"store=2 {store_id=} {country=} "
+        "additional HTML result: "
+        f"additional_html_crawl_result="
+        f"{result_dict.get('additional_html_crawl_result')}, "
+        f"additional_html_scraped_at={result_dict.get('additional_html_scraped_at')}"
+    )
     logger.debug(f"store=2 {country=} {language=} {store_id=} ios store scraped")
     return result_dict
 

@@ -900,13 +900,13 @@ def process_live_app_details(
             # If additional html crawl failed, drop fields that rely on it to avoid overwriting good data with nulls
             if store == 2:
                 cols_to_drop = [
-                    "additional_html_crawled_at",
+                    "additional_html_scraped_at",
                     "ad_supported",
                     "in_app_purchases",
                     "url",
                 ]
             else:
-                cols_to_drop = ["additional_html_crawled_at"]
+                cols_to_drop = ["additional_html_scraped_at"]
             apps_df = apps_df.drop(
                 cols_to_drop,
                 axis=1,
