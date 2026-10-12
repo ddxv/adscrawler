@@ -1,4 +1,5 @@
 import datetime
+import json
 import random
 import re
 import time
@@ -12,7 +13,7 @@ from appgoblin_itunes_scraper.util import AppStoreCategories, AppStoreCollection
 from bs4 import BeautifulSoup
 
 from adscrawler.app_stores.utils import truncate_utf8_bytes
-from adscrawler.config import DEVLEOPER_IGNORE_TLDS, get_logger, CONFIG
+from adscrawler.config import CONFIG, DEVLEOPER_IGNORE_TLDS, get_logger
 
 logger = get_logger(__name__, "scrape_apple")
 
@@ -203,6 +204,41 @@ def get_provider_address(soup: BeautifulSoup) -> str | None:
     return " ".join(lines).strip()
 
 
+def _has_apple_tv_device(value: object) -> bool:
+    if isinstance(value, str):
+        devices = value.split(",")
+    elif isinstance(value, list):
+        devices = value
+    else:
+        return False
+    return any(str(device).strip().casefold() == "apple tv" for device in devices)
+
+
+def _contains_available_apple_tv(value: object) -> bool:
+    if isinstance(value, dict):
+        if _has_apple_tv_device(value.get("availableOnDevice")):
+            return True
+        return any(_contains_available_apple_tv(item) for item in value.values())
+    if isinstance(value, list):
+        return any(_contains_available_apple_tv(item) for item in value)
+    return False
+
+
+def is_apple_tv_supported(soup: BeautifulSoup) -> bool:
+    """Return whether the App Store page lists Apple TV as a supported device."""
+    for script in soup.find_all("script", type="application/ld+json"):
+        try:
+            if _contains_available_apple_tv(json.loads(script.get_text())):
+                return True
+        except (json.JSONDecodeError, TypeError):
+            continue
+
+    platforms = soup.find(
+        "div", class_=lambda classes: classes and "all-platforms-names" in classes
+    )
+    return platforms is not None and _has_apple_tv_device(platforms.get_text())
+
+
 def scrape_store_html(store_id: str, country: str, proxies: dict | None = None) -> dict:
     """
     Scrape the store html for the developer site.
@@ -229,6 +265,8 @@ def scrape_store_html(store_id: str, country: str, proxies: dict | None = None) 
         logger.warning(f"Failed to get provider address for {store_id=} {country=}")
         address = None
 
+    tv_supported = is_apple_tv_supported(soup)
+
     purpose_section = soup.find(
         "section", class_=lambda classes: classes and "purpose-section" in classes
     )
@@ -246,6 +284,7 @@ def scrape_store_html(store_id: str, country: str, proxies: dict | None = None) 
         "ad_supported": has_third_party_advertising,
         "urls": urls,
         "provider_address": address,
+        "tv_supported": tv_supported,
     }
 
 
@@ -372,6 +411,7 @@ def scrape_itunes_additional_html(
         result["in_app_purchases"] = html_res["in_app_purchases"]
         result["ad_supported"] = html_res["ad_supported"]
         result["provider_address"] = html_res["provider_address"]
+        result["tv_supported"] = html_res["tv_supported"]
         try:
             result["sellerUrl"] = get_developer_url(result, html_res["urls"])
         except Exception as e:

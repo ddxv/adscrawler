@@ -903,6 +903,7 @@ def process_live_app_details(
                     "additional_html_scraped_at",
                     "ad_supported",
                     "in_app_purchases",
+                    "tv_supported",
                     "url",
                 ]
             else:
