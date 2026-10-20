@@ -661,7 +661,6 @@ def swap_matched_app_sdks_todb(pgdb):
         FROM read_parquet('{app_sdks_glob}')
         WHERE sdk_id IS NOT NULL and version_code_id IS NOT NULL
     """
-
     columns = [
         "store_app",
         "version_code_id",
@@ -669,7 +668,6 @@ def swap_matched_app_sdks_todb(pgdb):
         "sdk_id",
         "batch_date",
     ]
-
     atomic_swap_partition_stream(
         stream=stream_duckdb_tsv(query),
         columns=columns,
@@ -677,6 +675,28 @@ def swap_matched_app_sdks_todb(pgdb):
         pgdb=pgdb,
         schema="adtech",
         table="app_sdks",
+    )
+    query_latest = f"""
+       SELECT DISTINCT
+           store_app,
+           version_code_id,
+           version_code_created_at,
+           sdk_id,
+           '{batch_date_str}'::DATE AS batch_date
+       FROM read_parquet('{app_sdks_glob}')
+       WHERE sdk_id IS NOT NULL
+         AND version_code_id IS NOT NULL
+       QUALIFY version_code_id = MAX(version_code_id) OVER (
+           PARTITION BY store_app
+       ); 
+    """
+    atomic_swap_partition_stream(
+        stream=stream_duckdb_tsv(query_latest),
+        columns=columns,
+        batch_date=batch_date,
+        pgdb=pgdb,
+        schema="adtech",
+        table="app_sdks_latest",
     )
 
 
