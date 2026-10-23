@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict mZewdNoTodxc3Qfnu0xklbBckKomNnEIH017GYhy47TAmM55SuYY9GiHweeMi4T
+\restrict xiXtntaHdT7Ra90PbJ1RpwmJaZguOHVpSRwMxawdtdDHB6EbKtsTgY5pH42wKOU
 
--- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
--- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
+-- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
+-- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -81,5 +81,5 @@ CREATE UNIQUE INDEX frontend_company_domain_country_unique ON frontend.company_d
 -- PostgreSQL database dump complete
 --
 
-\unrestrict mZewdNoTodxc3Qfnu0xklbBckKomNnEIH017GYhy47TAmM55SuYY9GiHweeMi4T
+\unrestrict xiXtntaHdT7Ra90PbJ1RpwmJaZguOHVpSRwMxawdtdDHB6EbKtsTgY5pH42wKOU
 

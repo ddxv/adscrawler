@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict wp8yx1YuGLJdpHnVlU248hLDlNP7CHwP9TshyxdCR6JddxKobcfaPSR7UHhPEqm
+\restrict d2wQ41371nqe0cVhV1hMwNsQkWZgsbv1e5vkRITq6M2emSdBcehLsOiLJlu6rjC
 
--- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
--- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
+-- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
+-- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -79,5 +79,5 @@ CREATE UNIQUE INDEX frontend_app_keyword_rank_stats ON frontend.app_keyword_rank
 -- PostgreSQL database dump complete
 --
 
-\unrestrict wp8yx1YuGLJdpHnVlU248hLDlNP7CHwP9TshyxdCR6JddxKobcfaPSR7UHhPEqm
+\unrestrict d2wQ41371nqe0cVhV1hMwNsQkWZgsbv1e5vkRITq6M2emSdBcehLsOiLJlu6rjC
 

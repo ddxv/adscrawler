@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict PtjFfyFQFCEwZ8whHrEu92N8iQfdgFMTwQpn0uPEvJhXYe6uet7KkmBOZzzT8Ib
+\restrict PrNNabQO3DTqTTe31clpe0q0rfELtgtSHVdUZeMt4ohyft438iuCwL3Y8NeQETY
 
--- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
--- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
+-- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
+-- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -80,5 +80,5 @@ ALTER TABLE ONLY frontend.app_keyword_ranks_daily
 -- PostgreSQL database dump complete
 --
 
-\unrestrict PtjFfyFQFCEwZ8whHrEu92N8iQfdgFMTwQpn0uPEvJhXYe6uet7KkmBOZzzT8Ib
+\unrestrict PrNNabQO3DTqTTe31clpe0q0rfELtgtSHVdUZeMt4ohyft438iuCwL3Y8NeQETY
 

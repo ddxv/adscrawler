@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict qsR1xU2fzXDGm21ugw8RGm015wgJcxEV8TMcCflLussVbHCGxH93JsQYO4IkXpR
+\restrict 0jUwzDHGv3yynl6Ed8exJocE21drljQrlhnz2nj5IzlzIg3S6xhKFxB4UQEseeU
 
--- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
--- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
+-- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
+-- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -80,5 +80,5 @@ ALTER TABLE ONLY public.countries
 -- PostgreSQL database dump complete
 --
 
-\unrestrict qsR1xU2fzXDGm21ugw8RGm015wgJcxEV8TMcCflLussVbHCGxH93JsQYO4IkXpR
+\unrestrict 0jUwzDHGv3yynl6Ed8exJocE21drljQrlhnz2nj5IzlzIg3S6xhKFxB4UQEseeU
 

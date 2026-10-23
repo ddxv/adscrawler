@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict ZzZy24wudjzmhxVUx1t34CASo1HLNgu0a4j0Wk6hhrhArq6UBLHl2O9h6JYtfQh
+\restrict b48vjLRxrD2Jzeb9TcEo8jvIiKjMAyHM6AX7JkybKiKgbcLrEFWlSjEaTigvqZN
 
--- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
--- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
+-- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
+-- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -114,5 +114,5 @@ ALTER MATERIALIZED VIEW frontend.advertiser_creative_rankings_recent_month OWNER
 -- PostgreSQL database dump complete
 --
 
-\unrestrict ZzZy24wudjzmhxVUx1t34CASo1HLNgu0a4j0Wk6hhrhArq6UBLHl2O9h6JYtfQh
+\unrestrict b48vjLRxrD2Jzeb9TcEo8jvIiKjMAyHM6AX7JkybKiKgbcLrEFWlSjEaTigvqZN
 

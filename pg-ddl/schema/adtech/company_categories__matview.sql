@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict M6nUBnTRx58HXAcMVYUtS9kpUnKFe7mUTc7VuZFl1odDwHQBvqPzYoEW3AvX0ki
+\restrict twSnoEMjEVfkaAAmHAiiBIPLsKCDbAutTmzQXJTKohXBea5TKdYdxZskqT6Nrkk
 
--- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
--- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
+-- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
+-- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -57,5 +57,5 @@ CREATE INDEX adtech_company_category ON adtech.company_categories USING btree (c
 -- PostgreSQL database dump complete
 --
 
-\unrestrict M6nUBnTRx58HXAcMVYUtS9kpUnKFe7mUTc7VuZFl1odDwHQBvqPzYoEW3AvX0ki
+\unrestrict twSnoEMjEVfkaAAmHAiiBIPLsKCDbAutTmzQXJTKohXBea5TKdYdxZskqT6Nrkk
 

@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict i7eTRByFMdXMGUYY7dmE5OE4cQah8e0osH52H7dOKzV8c0wIvmWMrrXUpAgWZge
+\restrict MXu8zOIPbhbt3EwOxh97biMCpQOJne45uk9gyv7qHGpQAzssDcsYhj1yVBiaHYg
 
--- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
--- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
+-- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
+-- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -28,7 +28,7 @@ SET default_table_access_method = heap;
 --
 
 CREATE MATERIALIZED VIEW frontend.companies_overview AS
- WITH domain_base AS (
+ WITH domains_union AS (
          SELECT d.id AS domain_id,
             d.domain_name AS company_domain,
             cac.company_id,
@@ -44,13 +44,75 @@ CREATE MATERIALIZED VIEW frontend.companies_overview AS
             bool_or(cac.api_call) AS has_api_signal,
             bool_or(cac.publisher) AS has_publisher_signal,
             bool_or(cac.app_ads_direct) AS has_app_ads_direct,
-            bool_or(cac.app_ads_reseller) AS has_app_ads_reseller
+            bool_or(cac.app_ads_reseller) AS has_app_ads_reseller,
+            2 AS source_priority
            FROM ((((adtech.combined_app_companies cac
              JOIN public.domains d ON ((cac.domain_id = d.id)))
              LEFT JOIN adtech.companies c_1 ON ((cac.company_id = c_1.id)))
              LEFT JOIN adtech.companies pc_1 ON ((c_1.parent_company_id = pc_1.id)))
              LEFT JOIN public.domains pd ON ((pc_1.domain_id = pd.id)))
           GROUP BY d.id, d.domain_name, cac.company_id, c_1.name, c_1.logo_url, c_1.linkedin_url, c_1.github_user, c_1.parent_company_id, pc_1.name, pd.domain_name, pd.id
+        UNION ALL
+         SELECT d.id AS domain_id,
+            d.domain_name AS company_domain,
+            capc.company_id,
+            c_1.name AS company_name,
+            c_1.logo_url,
+            c_1.linkedin_url,
+            c_1.github_user,
+            c_1.parent_company_id,
+            NULL::character varying AS parent_company_name,
+            NULL::character varying AS parent_domain,
+            NULL::integer AS parent_domain_id,
+            bool_or(capc.sdk) AS has_sdk_signal,
+            bool_or(capc.api_call) AS has_api_signal,
+            bool_or(capc.publisher) AS has_publisher_signal,
+            bool_or(capc.app_ads_direct) AS has_app_ads_direct,
+            bool_or(capc.app_ads_reseller) AS has_app_ads_reseller,
+            1 AS source_priority
+           FROM ((adtech.combined_app_parent_companies capc
+             JOIN adtech.companies c_1 ON ((capc.company_id = c_1.id)))
+             JOIN public.domains d ON ((c_1.domain_id = d.id)))
+          GROUP BY d.id, d.domain_name, capc.company_id, c_1.name, c_1.logo_url, c_1.linkedin_url, c_1.github_user, c_1.parent_company_id
+        ), doms_ranked AS (
+         SELECT domains_union.domain_id,
+            domains_union.company_domain,
+            domains_union.company_id,
+            domains_union.company_name,
+            domains_union.logo_url,
+            domains_union.linkedin_url,
+            domains_union.github_user,
+            domains_union.parent_company_id,
+            domains_union.parent_company_name,
+            domains_union.parent_domain,
+            domains_union.parent_domain_id,
+            domains_union.has_sdk_signal,
+            domains_union.has_api_signal,
+            domains_union.has_publisher_signal,
+            domains_union.has_app_ads_direct,
+            domains_union.has_app_ads_reseller,
+            domains_union.source_priority,
+            row_number() OVER (PARTITION BY domains_union.company_domain ORDER BY domains_union.source_priority, domains_union.company_id) AS rn
+           FROM domains_union
+        ), domain_base AS (
+         SELECT doms_ranked.domain_id,
+            doms_ranked.company_domain,
+            doms_ranked.company_id,
+            doms_ranked.company_name,
+            doms_ranked.logo_url,
+            doms_ranked.linkedin_url,
+            doms_ranked.github_user,
+            doms_ranked.parent_company_id,
+            doms_ranked.parent_company_name,
+            doms_ranked.parent_domain,
+            doms_ranked.parent_domain_id,
+            doms_ranked.has_sdk_signal,
+            doms_ranked.has_api_signal,
+            doms_ranked.has_publisher_signal,
+            doms_ranked.has_app_ads_direct,
+            doms_ranked.has_app_ads_reseller
+           FROM doms_ranked
+          WHERE (doms_ranked.rn = 1)
         ), creatives_agg AS (
          SELECT companies_creative_rankings.company_domain,
             (count(*))::integer AS creatives_app_count
@@ -271,6 +333,20 @@ CREATE MATERIALIZED VIEW frontend.companies_overview AS
 ALTER MATERIALIZED VIEW frontend.companies_overview OWNER TO postgres;
 
 --
+-- Name: companies_overview_company_domain_trgm_idx; Type: INDEX; Schema: frontend; Owner: postgres
+--
+
+CREATE INDEX companies_overview_company_domain_trgm_idx ON frontend.companies_overview USING gin (company_domain public.gin_trgm_ops);
+
+
+--
+-- Name: companies_overview_company_name_trgm_idx; Type: INDEX; Schema: frontend; Owner: postgres
+--
+
+CREATE INDEX companies_overview_company_name_trgm_idx ON frontend.companies_overview USING gin (company_name public.gin_trgm_ops);
+
+
+--
 -- Name: frontend_companies_overview; Type: INDEX; Schema: frontend; Owner: postgres
 --
 
@@ -288,5 +364,5 @@ CREATE UNIQUE INDEX frontend_companies_overview_domain ON frontend.companies_ove
 -- PostgreSQL database dump complete
 --
 
-\unrestrict i7eTRByFMdXMGUYY7dmE5OE4cQah8e0osH52H7dOKzV8c0wIvmWMrrXUpAgWZge
+\unrestrict MXu8zOIPbhbt3EwOxh97biMCpQOJne45uk9gyv7qHGpQAzssDcsYhj1yVBiaHYg
 

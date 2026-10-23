@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict n9XZahw8qheoIKKLyya7Hr9yBnfQ99UUUShCkUdwJIsdFu0cL9nrJPrnnC9XqQ0
+\restrict BGEyeetWv3Rsehr7udVTCihfaqWgIToCLGR7fYa7Ixcy5CcJpaAd1vzi365fF1H
 
--- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
--- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
+-- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
+-- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -37,14 +37,6 @@ CREATE TABLE logging.app_description_keywords_extracted (
 ALTER TABLE logging.app_description_keywords_extracted OWNER TO postgres;
 
 --
--- Name: app_description_keywords_extracted app_description_keywords_extracted_pk; Type: CONSTRAINT; Schema: logging; Owner: postgres
---
-
-ALTER TABLE ONLY logging.app_description_keywords_extracted
-    ADD CONSTRAINT app_description_keywords_extracted_pk PRIMARY KEY (store_app, description_id);
-
-
---
 -- Name: app_description_keywords_extrac_description_id_extracted_at_idx; Type: INDEX; Schema: logging; Owner: postgres
 --
 
@@ -55,5 +47,5 @@ CREATE INDEX app_description_keywords_extrac_description_id_extracted_at_idx ON 
 -- PostgreSQL database dump complete
 --
 
-\unrestrict n9XZahw8qheoIKKLyya7Hr9yBnfQ99UUUShCkUdwJIsdFu0cL9nrJPrnnC9XqQ0
+\unrestrict BGEyeetWv3Rsehr7udVTCihfaqWgIToCLGR7fYa7Ixcy5CcJpaAd1vzi365fF1H
 

@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict 5oS6vdFzZZSQfRXi2nUapDzmGkdQyCVEoioISGvI3m6BZ7myyc47QNuyBdO9aRk
+\restrict adoLW791DZxz15kUoEl9haie3R8A2Sb4eIgCdA86gc9vnmxgDeFwJBCYpLJra0X
 
--- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
--- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
+-- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
+-- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -136,8 +136,15 @@ CREATE MATERIALIZED VIEW adtech.combined_app_companies AS
 ALTER MATERIALIZED VIEW adtech.combined_app_companies OWNER TO postgres;
 
 --
+-- Name: combined_app_companies_company_id_store_app_idx; Type: INDEX; Schema: adtech; Owner: postgres
+--
+
+CREATE INDEX combined_app_companies_company_id_store_app_idx ON adtech.combined_app_companies USING btree (company_id, store_app);
+
+
+--
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 5oS6vdFzZZSQfRXi2nUapDzmGkdQyCVEoioISGvI3m6BZ7myyc47QNuyBdO9aRk
+\unrestrict adoLW791DZxz15kUoEl9haie3R8A2Sb4eIgCdA86gc9vnmxgDeFwJBCYpLJra0X
 

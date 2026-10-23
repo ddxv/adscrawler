@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict JB1JfewhEJon1wOygHaxB0KIlcy1GywOSLmlsjgQrkU9GgJUjgZreGkT4zWRhtw
+\restrict ON6lUhFIwycqcj7wwMGd2g9QpCmQcurJbMFngw8RuNmWcvPXeOxpven7edAQocg
 
--- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
--- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
+-- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
+-- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -71,5 +71,5 @@ CREATE UNIQUE INDEX store_app_ranks_best_monthly_uidx ON frontend.store_app_rank
 -- PostgreSQL database dump complete
 --
 
-\unrestrict JB1JfewhEJon1wOygHaxB0KIlcy1GywOSLmlsjgQrkU9GgJUjgZreGkT4zWRhtw
+\unrestrict ON6lUhFIwycqcj7wwMGd2g9QpCmQcurJbMFngw8RuNmWcvPXeOxpven7edAQocg
 

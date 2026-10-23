@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict 6jXiuwUw9Ijf75PtCMq4p7oFba03kjfZ1h6GCnxhSq0YuhqiARfxHpQYFAmG9RG
+\restrict v4vKBXfZaYQRCdUu8ZJ7f0oGFjfGxcUWyrdyGPRAowgZQHHbHzTVIq65L1cwYg7
 
--- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
--- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
+-- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
+-- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -55,5 +55,5 @@ CREATE INDEX app_country_metrics_history_app_idx ON public.app_country_metrics_h
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 6jXiuwUw9Ijf75PtCMq4p7oFba03kjfZ1h6GCnxhSq0YuhqiARfxHpQYFAmG9RG
+\unrestrict v4vKBXfZaYQRCdUu8ZJ7f0oGFjfGxcUWyrdyGPRAowgZQHHbHzTVIq65L1cwYg7
 

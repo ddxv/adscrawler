@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict znPgOJPyjuafnSt6W0GtJ7ECik0QaFlQiDjzrDm5LbNQSChJts8UVGbxGR581Lo
+\restrict ZNwsaREbETcCJfSUF868RJarZz0iTO9Qj6GGetXlyoqESlKPYwJcNpcS4VCycRs
 
--- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
--- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
+-- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
+-- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -28,11 +28,17 @@ SET default_table_access_method = heap;
 --
 
 CREATE MATERIALIZED VIEW frontend.companies_apps_overview AS
- WITH store_app_sdk_company_category AS (
+ WITH latest_app_versions AS (
+         SELECT savs.store_app,
+            max(savs.version_code_created_at) AS latest_version_code_created_at
+           FROM adtech.app_sdks savs
+          GROUP BY savs.store_app
+        ), store_app_sdk_company_category AS (
          SELECT DISTINCT savs.store_app,
             sd.company_id,
             sc.category_id
-           FROM ((adtech.app_sdks savs
+           FROM (((adtech.app_sdks savs
+             JOIN latest_app_versions lav ON (((lav.store_app = savs.store_app) AND (lav.latest_version_code_created_at = savs.version_code_created_at))))
              LEFT JOIN adtech.sdks sd ON ((savs.sdk_id = sd.id)))
              JOIN adtech.sdk_categories sc ON ((savs.sdk_id = sc.sdk_id)))
         )
@@ -70,5 +76,5 @@ CREATE UNIQUE INDEX companies_apps_overview_unique_idx ON frontend.companies_app
 -- PostgreSQL database dump complete
 --
 
-\unrestrict znPgOJPyjuafnSt6W0GtJ7ECik0QaFlQiDjzrDm5LbNQSChJts8UVGbxGR581Lo
+\unrestrict ZNwsaREbETcCJfSUF868RJarZz0iTO9Qj6GGetXlyoqESlKPYwJcNpcS4VCycRs
 

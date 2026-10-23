@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict Y6TZeBHb4AcpbtRldaFKMDDIMyByIzWUltJ7vEpVUVgC1UF9UhlEzp3geXEcsw2
+\restrict 7HVqoJOf0ZXXQQEoG2CzPLLUbUlmMO5WTqbd6m8PR7U4hpRaBxEVjkkVJZ2aiAR
 
--- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
--- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
+-- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
+-- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -63,5 +63,5 @@ ALTER TABLE ONLY adtech.company_domain_mapping
 -- PostgreSQL database dump complete
 --
 
-\unrestrict Y6TZeBHb4AcpbtRldaFKMDDIMyByIzWUltJ7vEpVUVgC1UF9UhlEzp3geXEcsw2
+\unrestrict 7HVqoJOf0ZXXQQEoG2CzPLLUbUlmMO5WTqbd6m8PR7U4hpRaBxEVjkkVJZ2aiAR
 

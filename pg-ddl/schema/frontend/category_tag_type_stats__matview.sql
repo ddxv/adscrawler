@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict M3TexL7bgNgPTtxmeLyUZTdZG0bcgIYCBmHxgLlmdhyCn5VTbVJgSPyNhN6Q8H3
+\restrict PRUHZXefyiti9z85Q2K6m8HKpHpsdckLMtn75yfHhx96UcGwVJFa3jgaXsd1Say
 
--- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
--- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
+-- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
+-- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -113,5 +113,5 @@ CREATE UNIQUE INDEX frontend_category_tag_type_stats_unique ON frontend.category
 -- PostgreSQL database dump complete
 --
 
-\unrestrict M3TexL7bgNgPTtxmeLyUZTdZG0bcgIYCBmHxgLlmdhyCn5VTbVJgSPyNhN6Q8H3
+\unrestrict PRUHZXefyiti9z85Q2K6m8HKpHpsdckLMtn75yfHhx96UcGwVJFa3jgaXsd1Say
 

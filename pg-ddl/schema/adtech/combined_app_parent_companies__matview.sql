@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict iDLWaTDZzWaKVxKSrAmAohxNCHOd2a5yCS6T42qZKHph8qwNdzBDTLI1VEB9seJ
+\restrict bX2dJeBhpwM2VdzVKd6GxvOEaVALwAmtPETEyXxVqbrxhRJnxNVopLxxcSdaA80
 
--- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
--- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
+-- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
+-- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -94,5 +94,5 @@ CREATE UNIQUE INDEX idx_combined_app_parent_companies_idx ON adtech.combined_app
 -- PostgreSQL database dump complete
 --
 
-\unrestrict iDLWaTDZzWaKVxKSrAmAohxNCHOd2a5yCS6T42qZKHph8qwNdzBDTLI1VEB9seJ
+\unrestrict bX2dJeBhpwM2VdzVKd6GxvOEaVALwAmtPETEyXxVqbrxhRJnxNVopLxxcSdaA80
 

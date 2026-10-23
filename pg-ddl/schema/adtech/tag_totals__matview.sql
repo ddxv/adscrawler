@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict PrCgZtMCpDwbMDtkTwd76uypnTjJgb3qEdGSIqzjj4KfuQ4XwtQarZFtf4XKg3c
+\restrict v6AXRqBQhplSfSoCkDQPHrXm3DzbbUrTbICn5nNzQr2iCT373TV9fD1YaBKfbfo
 
--- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
--- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
+-- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
+-- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -74,5 +74,5 @@ CREATE UNIQUE INDEX adtech_tag_totals_unique ON adtech.tag_totals USING btree (s
 -- PostgreSQL database dump complete
 --
 
-\unrestrict PrCgZtMCpDwbMDtkTwd76uypnTjJgb3qEdGSIqzjj4KfuQ4XwtQarZFtf4XKg3c
+\unrestrict v6AXRqBQhplSfSoCkDQPHrXm3DzbbUrTbICn5nNzQr2iCT373TV9fD1YaBKfbfo
 

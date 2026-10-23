@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict LMpTfvlkNCDhbgxu0QsATIC27T1OL6DFGaqKAx7XTxofP70RkLNDaWp8QzUhhIg
+\restrict MdWhvoFZ8bNLU0qc6oU9gOp2rkvkcxNh6IZPTC22lhRLNICWhnrW1Y8Me4HakH0
 
--- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
--- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
+-- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
+-- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -42,7 +42,9 @@ CREATE MATERIALIZED VIEW frontend.company_parent_top_apps AS
             csapc.sdk,
             csapc.api_call,
             csapc.publisher,
-            csapc.app_ads_direct
+            csapc.app_ads_direct,
+            (((COALESCE((csapc.sdk)::integer, 0) + COALESCE((csapc.api_call)::integer, 0)) + COALESCE((csapc.publisher)::integer, 0)) + COALESCE((csapc.app_ads_direct)::integer, 0)) AS match_score,
+            COALESCE((sa.installs_sum_4w)::double precision, (0)::double precision) AS installs_d30_sorted
            FROM (((adtech.combined_app_parent_companies csapc
              LEFT JOIN frontend.store_apps_overview sa ON ((csapc.store_app = sa.id)))
              LEFT JOIN adtech.companies c_1 ON ((csapc.company_id = c_1.id)))
@@ -63,8 +65,8 @@ CREATE MATERIALIZED VIEW frontend.company_parent_top_apps AS
             dd.api_call,
             dd.publisher,
             dd.app_ads_direct,
-            row_number() OVER (PARTITION BY dd.store, dd.company_domain ORDER BY ((COALESCE((dd.sdk)::integer, 0) + COALESCE((dd.api_call)::integer, 0)) + COALESCE((dd.publisher)::integer, 0)) DESC, COALESCE((dd.installs_d30)::double precision, (0)::double precision) DESC) AS app_company_rank,
-            row_number() OVER (PARTITION BY dd.store, dd.app_category, dd.company_domain ORDER BY ((COALESCE((dd.sdk)::integer, 0) + COALESCE((dd.api_call)::integer, 0)) + COALESCE((dd.publisher)::integer, 0)) DESC, COALESCE((dd.installs_d30)::double precision, (0)::double precision) DESC) AS app_company_category_rank
+            row_number() OVER (PARTITION BY dd.store, dd.company_domain ORDER BY dd.match_score DESC, dd.installs_d30_sorted DESC) AS app_company_rank,
+            row_number() OVER (PARTITION BY dd.store, dd.app_category, dd.company_domain ORDER BY dd.match_score DESC, dd.installs_d30_sorted DESC) AS app_company_category_rank
            FROM deduped_data dd
         )
  SELECT ra.company_domain,
@@ -116,5 +118,5 @@ CREATE UNIQUE INDEX idx_company_parent_top_apps_unique ON frontend.company_paren
 -- PostgreSQL database dump complete
 --
 
-\unrestrict LMpTfvlkNCDhbgxu0QsATIC27T1OL6DFGaqKAx7XTxofP70RkLNDaWp8QzUhhIg
+\unrestrict MdWhvoFZ8bNLU0qc6oU9gOp2rkvkcxNh6IZPTC22lhRLNICWhnrW1Y8Me4HakH0
 

@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict IYauESgdEc3bMKkF1WljaeRix1iUTlGdPvG5X4qa64LC5RvbrucYEzjog8Wxe4L
+\restrict y9Fd2XA5CEzRkb0k8RLQSVE0i0DyWZDymsaQ0Vit55q9rcEuMlrs2eV0EGCnNPh
 
--- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
--- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
+-- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
+-- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -95,5 +95,5 @@ ALTER TABLE ONLY public.app_urls_map
 -- PostgreSQL database dump complete
 --
 
-\unrestrict IYauESgdEc3bMKkF1WljaeRix1iUTlGdPvG5X4qa64LC5RvbrucYEzjog8Wxe4L
+\unrestrict y9Fd2XA5CEzRkb0k8RLQSVE0i0DyWZDymsaQ0Vit55q9rcEuMlrs2eV0EGCnNPh
 

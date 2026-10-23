@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict moo8ZKxKx6xvlcuYJuhdg3VOwHiz4f4ayY45pp0yfaujVnrkW8Gptde019iHkff
+\restrict k1jRtUwvYA9ywCtK3sasfzUbYeztHWzKThLfUxWNrmif5lJJcLU18tNehzrYUb5
 
--- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
--- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
+-- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
+-- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -108,5 +108,5 @@ CREATE INDEX idx_adv_creatives_host_domain_company_domain ON frontend.advertiser
 -- PostgreSQL database dump complete
 --
 
-\unrestrict moo8ZKxKx6xvlcuYJuhdg3VOwHiz4f4ayY45pp0yfaujVnrkW8Gptde019iHkff
+\unrestrict k1jRtUwvYA9ywCtK3sasfzUbYeztHWzKThLfUxWNrmif5lJJcLU18tNehzrYUb5
 

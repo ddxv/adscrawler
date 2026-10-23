@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict ixLSa9cTT18cRjNWAPgULZR6UpofyJuisvc9iXLNNFn2JVDA1nyt48UdsEAScVY
+\restrict Lza0rjnVq3WZrjwiHNCfXLwFRZ65fydTJhlWYkKBm6c0Z8txtkWusbDx9dIxtJ7
 
--- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
--- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
+-- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
+-- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -72,5 +72,5 @@ CREATE UNIQUE INDEX idx_store_app_ranks_latest_filter_sort ON frontend.store_app
 -- PostgreSQL database dump complete
 --
 
-\unrestrict ixLSa9cTT18cRjNWAPgULZR6UpofyJuisvc9iXLNNFn2JVDA1nyt48UdsEAScVY
+\unrestrict Lza0rjnVq3WZrjwiHNCfXLwFRZ65fydTJhlWYkKBm6c0Z8txtkWusbDx9dIxtJ7
 

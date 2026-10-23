@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict Vws2E7x7dOmYoWQtcEnIi9a2qTpohcvgX7a6GsAl8KWmgWdNypuhrPLPmUntygb
+\restrict pt3BY784uz19LlOkiMJ7Y4dMnFYvV35CMTCDAAJlnLDE5ndpMEn91C1D38dGhfF
 
--- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
--- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
+-- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
+-- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -92,5 +92,5 @@ ALTER TABLE ONLY adtech.sdk_paths
 -- PostgreSQL database dump complete
 --
 
-\unrestrict Vws2E7x7dOmYoWQtcEnIi9a2qTpohcvgX7a6GsAl8KWmgWdNypuhrPLPmUntygb
+\unrestrict pt3BY784uz19LlOkiMJ7Y4dMnFYvV35CMTCDAAJlnLDE5ndpMEn91C1D38dGhfF
 

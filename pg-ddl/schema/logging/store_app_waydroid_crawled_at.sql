@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict 8fXK5akt0r5JZD9TOdtjfHcCBCUJvg3vzKdMbtOJ06pnknbejOKeRECvnYewKDZ
+\restrict zanCQjkMvEYbZcxL1n1Y1iCPL02EE1UrPZl6jn4487lEkZwYVbz6enCROrz7sQH
 
--- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
--- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
+-- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
+-- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -63,5 +63,5 @@ ALTER TABLE ONLY logging.store_app_waydroid_crawled_at
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 8fXK5akt0r5JZD9TOdtjfHcCBCUJvg3vzKdMbtOJ06pnknbejOKeRECvnYewKDZ
+\unrestrict zanCQjkMvEYbZcxL1n1Y1iCPL02EE1UrPZl6jn4487lEkZwYVbz6enCROrz7sQH
 

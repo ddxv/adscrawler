@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict vYin167TDYZ1ugy9xXEhc0hVnlLMUDU4DBGB2l6GqLGfyIPbZlV0zhUv9lRsNSe
+\restrict i1rwQ1Ulioa0fuLMQQ89r0DJlcoHrIO8DzPZWqCou7BQZCXcgPgf2wpachXvvDc
 
--- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
--- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
+-- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
+-- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -64,5 +64,5 @@ CREATE INDEX companies_category_stats_query_idx ON frontend.companies_category_s
 -- PostgreSQL database dump complete
 --
 
-\unrestrict vYin167TDYZ1ugy9xXEhc0hVnlLMUDU4DBGB2l6GqLGfyIPbZlV0zhUv9lRsNSe
+\unrestrict i1rwQ1Ulioa0fuLMQQ89r0DJlcoHrIO8DzPZWqCou7BQZCXcgPgf2wpachXvvDc
 

@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict M2OGz9o0HaW3aj6Ba4J9ZiHptTBqTCDwke3pPjZyMucnLeZjwRmHhczrXmY9qQm
+\restrict wykVBiZMDD4TyQ6iznTf3XM58MYKPvB49igizYK8S9t62XyrP2p8cXe64dVGIJY
 
--- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
--- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
+-- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
+-- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -43,5 +43,5 @@ ALTER TABLE logging.snapshot_pub_domains OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict M2OGz9o0HaW3aj6Ba4J9ZiHptTBqTCDwke3pPjZyMucnLeZjwRmHhczrXmY9qQm
+\unrestrict wykVBiZMDD4TyQ6iznTf3XM58MYKPvB49igizYK8S9t62XyrP2p8cXe64dVGIJY
 

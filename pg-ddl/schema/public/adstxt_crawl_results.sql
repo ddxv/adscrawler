@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict agudgH2pwbWTrNKU2VdX4U6F5FarZBeBJIxTbuh6c5cNhXDLbGTQDPL2z4sRzIf
+\restrict caDjKQ2KGncSK3GaEpP3lucN8ddEzMtkwAIA239hWeHLkfklnkfYnIyg5ra7o27
 
--- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
--- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
+-- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
+-- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -96,5 +96,5 @@ ALTER TABLE ONLY public.adstxt_crawl_results
 -- PostgreSQL database dump complete
 --
 
-\unrestrict agudgH2pwbWTrNKU2VdX4U6F5FarZBeBJIxTbuh6c5cNhXDLbGTQDPL2z4sRzIf
+\unrestrict caDjKQ2KGncSK3GaEpP3lucN8ddEzMtkwAIA239hWeHLkfklnkfYnIyg5ra7o27
 

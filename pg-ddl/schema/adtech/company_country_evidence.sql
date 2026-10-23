@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict pkZsnraZcY4hsnNLVRWQZPrPRfN0DYuXHc45l79OQXagDe0qa0KUMTlTm5kJrTr
+\restrict T2EAqudk4sxcmpeLbc0lvWfseoIOZuy5OzvfJjG39nfgBZhyGvY7j7U7Hb3eDZm
 
--- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
--- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
+-- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
+-- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -90,5 +90,5 @@ ALTER TABLE ONLY adtech.company_country_evidence
 -- PostgreSQL database dump complete
 --
 
-\unrestrict pkZsnraZcY4hsnNLVRWQZPrPRfN0DYuXHc45l79OQXagDe0qa0KUMTlTm5kJrTr
+\unrestrict T2EAqudk4sxcmpeLbc0lvWfseoIOZuy5OzvfJjG39nfgBZhyGvY7j7U7Hb3eDZm
 

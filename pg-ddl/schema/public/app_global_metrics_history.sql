@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict xcQB1XClu1sSEY9wERoggYeHNdxo2jsh3rHXEqfbl9GmEVTcuTJs6NowZvj5Ogw
+\restrict gA4SnthkCcQDuPzhN2DbHy8OUEW3Nmm5mcpGgSHHtsmLYo4zpd4WQMpCPxriyWa
 
--- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
--- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
+-- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
+-- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -61,5 +61,5 @@ ALTER TABLE ONLY public.app_global_metrics_history
 -- PostgreSQL database dump complete
 --
 
-\unrestrict xcQB1XClu1sSEY9wERoggYeHNdxo2jsh3rHXEqfbl9GmEVTcuTJs6NowZvj5Ogw
+\unrestrict gA4SnthkCcQDuPzhN2DbHy8OUEW3Nmm5mcpGgSHHtsmLYo4zpd4WQMpCPxriyWa
 

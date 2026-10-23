@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict yzLsxcyNPq5E7ZZRHFzMaXYgWIRBVNkg5CRPbcN7TcQ5iJRF0rJVdCEL2cotWY3
+\restrict lTGpnsMa2PknCBwTLfihyIv9jN7ammGYoS7jAzlVFf1dlcfjaW81agC53mI7K1I
 
--- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
--- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
+-- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
+-- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -37,8 +37,22 @@ PARTITION BY LIST (batch_date);
 ALTER TABLE adtech.app_sdk_strings OWNER TO postgres;
 
 --
+-- Name: idx_app_sdk_strings_store_app; Type: INDEX; Schema: adtech; Owner: postgres
+--
+
+CREATE INDEX idx_app_sdk_strings_store_app ON ONLY adtech.app_sdk_strings USING btree (store_app);
+
+
+--
+-- Name: idx_app_sdk_strings_string_id; Type: INDEX; Schema: adtech; Owner: postgres
+--
+
+CREATE INDEX idx_app_sdk_strings_string_id ON ONLY adtech.app_sdk_strings USING btree (string_id);
+
+
+--
 -- PostgreSQL database dump complete
 --
 
-\unrestrict yzLsxcyNPq5E7ZZRHFzMaXYgWIRBVNkg5CRPbcN7TcQ5iJRF0rJVdCEL2cotWY3
+\unrestrict lTGpnsMa2PknCBwTLfihyIv9jN7ammGYoS7jAzlVFf1dlcfjaW81agC53mI7K1I
 

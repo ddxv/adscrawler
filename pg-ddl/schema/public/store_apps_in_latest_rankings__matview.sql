@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict SdAHQPnoLNgxPSPeGrIhmCF7kPrc9s53znwaV4xgk0Wrig7YuvhkMyPrB8Aelx9
+\restrict cOB1RADDY1XwArrbKhPpyUiex2mK83DHsVj5icBSKBbu4caYZir4Sckj9GUR2YG
 
--- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
--- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
+-- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
+-- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -80,5 +80,5 @@ ALTER MATERIALIZED VIEW public.store_apps_in_latest_rankings OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict SdAHQPnoLNgxPSPeGrIhmCF7kPrc9s53znwaV4xgk0Wrig7YuvhkMyPrB8Aelx9
+\unrestrict cOB1RADDY1XwArrbKhPpyUiex2mK83DHsVj5icBSKBbu4caYZir4Sckj9GUR2YG
 

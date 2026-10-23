@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict wOJjnfXfTQAl7TGcHVpsH4H3XPCiP28ehTSYzzS2ac0e5Yq889KopP2Yobeu6Gy
+\restrict 0gJLmK13NOB62ehjfEKP7E9qM8YOPWhBXA1J8xJL2RzzZbx1cFMe9neaJXDJRBH
 
--- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
--- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
+-- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
+-- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -54,5 +54,5 @@ ALTER MATERIALIZED VIEW frontend.category_type_country_stats OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict wOJjnfXfTQAl7TGcHVpsH4H3XPCiP28ehTSYzzS2ac0e5Yq889KopP2Yobeu6Gy
+\unrestrict 0gJLmK13NOB62ehjfEKP7E9qM8YOPWhBXA1J8xJL2RzzZbx1cFMe9neaJXDJRBH
 

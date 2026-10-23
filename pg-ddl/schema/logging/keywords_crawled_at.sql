@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict TVKtukzFdNrbLwqEyPiIRWMI6VMsjRNqXcyEDg8ppG79BgJh8XeAEGayMaC8bgK
+\restrict wUJDhPfcMmp0gXB5smWfYzlEq8kzaQPxkVeuZ4QBgqXVuDWV8W4iBfxtnAHPBQ0
 
--- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
--- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
+-- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
+-- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -55,5 +55,5 @@ ALTER TABLE ONLY logging.keywords_crawled_at
 -- PostgreSQL database dump complete
 --
 
-\unrestrict TVKtukzFdNrbLwqEyPiIRWMI6VMsjRNqXcyEDg8ppG79BgJh8XeAEGayMaC8bgK
+\unrestrict wUJDhPfcMmp0gXB5smWfYzlEq8kzaQPxkVeuZ4QBgqXVuDWV8W4iBfxtnAHPBQ0
 
