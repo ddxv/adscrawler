@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict H5bVU7KVhrDHH335gwSFg5lGOmRvp8ycUb2hYLwg4mjycKrbUQB6DZfvMVrUhsu
+\restrict vqxwzsOFwFZdFeI60ENpU1sw8qEuS63MiBvEBAiT1wx87p1OzEmKgdFJVxeSCrM
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
@@ -35,7 +35,7 @@ CREATE MATERIALIZED VIEW frontend.companies_category_stats AS
     count(DISTINCT csac.store_app) AS app_count,
     sum(sa.installs) AS installs_total,
     sum(sa.installs_sum_4w) AS installs_d30
-   FROM ((((adtech.combined_app_companies csac
+   FROM ((((adtech.combined_domain_apps csac
      LEFT JOIN public.domains ad ON ((csac.domain_id = ad.id)))
      LEFT JOIN adtech.companies c ON ((csac.company_id = c.id)))
      LEFT JOIN public.domains cd ON ((c.domain_id = cd.id)))
@@ -64,5 +64,5 @@ CREATE INDEX companies_category_stats_query_idx ON frontend.companies_category_s
 -- PostgreSQL database dump complete
 --
 
-\unrestrict H5bVU7KVhrDHH335gwSFg5lGOmRvp8ycUb2hYLwg4mjycKrbUQB6DZfvMVrUhsu
+\unrestrict vqxwzsOFwFZdFeI60ENpU1sw8qEuS63MiBvEBAiT1wx87p1OzEmKgdFJVxeSCrM
 

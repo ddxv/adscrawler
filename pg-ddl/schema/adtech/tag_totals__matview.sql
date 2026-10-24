@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict BcTwuadi9xqN4NADPGSpJp3hRu4glKIpQrYgOEMdOOKb4Mq4lDwtMSYeclLRMgv
+\restrict s0leWffFaXeajmKb3LXCCTovohej4G1asBjVk8yS9f1EZ5Zx42WlrsjgtKhv0fg
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
@@ -31,7 +31,7 @@ CREATE MATERIALIZED VIEW adtech.tag_totals AS
  WITH distinct_apps_group AS (
          SELECT DISTINCT csac.store_app,
             tag.tag_source
-           FROM (adtech.combined_app_companies csac
+           FROM (adtech.combined_domain_apps csac
              CROSS JOIN LATERAL ( VALUES ('sdk'::text,csac.sdk), ('api_call'::text,csac.api_call), ('publisher'::text,csac.publisher), ('app_ads_direct'::text,csac.app_ads_direct), ('app_ads_reseller'::text,csac.app_ads_reseller)) tag(tag_source, present))
           WHERE (tag.present IS TRUE)
         ), store_category_universes AS (
@@ -74,5 +74,5 @@ CREATE UNIQUE INDEX adtech_tag_totals_unique ON adtech.tag_totals USING btree (s
 -- PostgreSQL database dump complete
 --
 
-\unrestrict BcTwuadi9xqN4NADPGSpJp3hRu4glKIpQrYgOEMdOOKb4Mq4lDwtMSYeclLRMgv
+\unrestrict s0leWffFaXeajmKb3LXCCTovohej4G1asBjVk8yS9f1EZ5Zx42WlrsjgtKhv0fg
 

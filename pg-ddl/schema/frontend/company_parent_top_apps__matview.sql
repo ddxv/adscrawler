@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict IcBPHKRkCFoXexoiVoVxcDdmz0n7BkzwV2p6wGXSUs97U9f93UadlMImqjfoOBD
+\restrict o2aeEXRLaBWbHj8W1Ik7WHNIYozUkVEPEnMaHDo4MruvPy2NyiEQnGKBJve3f5r
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
@@ -45,7 +45,7 @@ CREATE MATERIALIZED VIEW frontend.company_parent_top_apps AS
             csapc.app_ads_direct,
             (((COALESCE((csapc.sdk)::integer, 0) + COALESCE((csapc.api_call)::integer, 0)) + COALESCE((csapc.publisher)::integer, 0)) + COALESCE((csapc.app_ads_direct)::integer, 0)) AS match_score,
             COALESCE((sa.installs_sum_4w)::double precision, (0)::double precision) AS installs_d30_sorted
-           FROM (((adtech.combined_app_parent_companies csapc
+           FROM (((adtech.combined_parent_company_apps csapc
              LEFT JOIN frontend.store_apps_overview sa ON ((csapc.store_app = sa.id)))
              LEFT JOIN adtech.companies c_1 ON ((csapc.company_id = c_1.id)))
              LEFT JOIN public.domains ad ON ((c_1.domain_id = ad.id)))
@@ -118,5 +118,5 @@ CREATE UNIQUE INDEX idx_company_parent_top_apps_unique ON frontend.company_paren
 -- PostgreSQL database dump complete
 --
 
-\unrestrict IcBPHKRkCFoXexoiVoVxcDdmz0n7BkzwV2p6wGXSUs97U9f93UadlMImqjfoOBD
+\unrestrict o2aeEXRLaBWbHj8W1Ik7WHNIYozUkVEPEnMaHDo4MruvPy2NyiEQnGKBJve3f5r
 

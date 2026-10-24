@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict u4Xd6VLeCPLmTlyAc24j0v7ryZPXxSP69zr0WVYlzMEFUfZKIab5nunBBIdJzQr
+\restrict AJ3iZMYb0QUOopu5HOhq8OvB1MkUwph6JztkDV8cBKvyaAwMOIysJvurw8xE9OU
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
@@ -32,7 +32,7 @@ CREATE MATERIALIZED VIEW frontend.companies_parent_category_stats AS
          SELECT csac.store_app,
             ad.domain_name AS company_domain,
             c.name AS company_name
-           FROM ((adtech.combined_app_parent_companies csac
+           FROM ((adtech.combined_parent_company_apps csac
              LEFT JOIN adtech.companies c ON ((csac.company_id = c.id)))
              LEFT JOIN public.domains ad ON ((c.domain_id = ad.id)))
         )
@@ -69,5 +69,5 @@ CREATE INDEX companies_parent_category_stats_query_idx ON frontend.companies_par
 -- PostgreSQL database dump complete
 --
 
-\unrestrict u4Xd6VLeCPLmTlyAc24j0v7ryZPXxSP69zr0WVYlzMEFUfZKIab5nunBBIdJzQr
+\unrestrict AJ3iZMYb0QUOopu5HOhq8OvB1MkUwph6JztkDV8cBKvyaAwMOIysJvurw8xE9OU
 

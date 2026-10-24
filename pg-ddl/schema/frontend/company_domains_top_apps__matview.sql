@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict wXGY5CZs8cSDFrWXx71Ho8UQBVa4tBzDIW7K363TA3LIvV5l01uGjwDgUeh1aTl
+\restrict 3s9nThAgqyaMOF79r4UhMOuppXMiz7TeiC0e44HYkERa1FJimAflb7bsbja0U3b
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
@@ -44,7 +44,7 @@ CREATE MATERIALIZED VIEW frontend.company_domains_top_apps AS
             cac.app_ads_direct,
             row_number() OVER (PARTITION BY sa.store, d.domain_name ORDER BY COALESCE((sa.installs_sum_4w)::double precision, (0)::double precision) DESC) AS app_company_rank,
             row_number() OVER (PARTITION BY sa.store, d.domain_name, sa.category ORDER BY COALESCE((sa.installs_sum_4w)::double precision, (0)::double precision) DESC) AS app_company_category_rank
-           FROM (((adtech.combined_app_companies cac
+           FROM (((adtech.combined_domain_apps cac
              LEFT JOIN public.domains d ON ((cac.domain_id = d.id)))
              LEFT JOIN adtech.company_domain_mapping cdm ON ((cac.domain_id = cdm.domain_id)))
              LEFT JOIN frontend.store_apps_overview sa ON ((cac.store_app = sa.id)))
@@ -104,5 +104,5 @@ CREATE UNIQUE INDEX idx_unique_company_domains_top_apps ON frontend.company_doma
 -- PostgreSQL database dump complete
 --
 
-\unrestrict wXGY5CZs8cSDFrWXx71Ho8UQBVa4tBzDIW7K363TA3LIvV5l01uGjwDgUeh1aTl
+\unrestrict 3s9nThAgqyaMOF79r4UhMOuppXMiz7TeiC0e44HYkERa1FJimAflb7bsbja0U3b
 

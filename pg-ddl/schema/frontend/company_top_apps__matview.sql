@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict n84ikTpv8Zq9W70rM2578xP2fJhw48tcElOcqrBDuAORlazeRnBObgnE9vEOBT0
+\restrict 62fA1ZiBNrJIcvwCgavlXeWDi6L5hHQxzKQQexGahcKEVUXclrrGNvyWxq6CNJc
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
@@ -43,7 +43,7 @@ CREATE MATERIALIZED VIEW frontend.company_top_apps AS
             bool_or(cac.api_call) AS api_call,
             bool_or(cac.publisher) AS publisher,
             bool_or(cac.app_ads_direct) AS app_ads_direct
-           FROM ((((adtech.combined_app_companies cac
+           FROM ((((adtech.combined_domain_apps cac
              LEFT JOIN frontend.store_apps_overview sa ON ((cac.store_app = sa.id)))
              LEFT JOIN public.domains ad ON ((cac.domain_id = ad.id)))
              LEFT JOIN adtech.companies c_1 ON ((cac.company_id = c_1.id)))
@@ -125,5 +125,5 @@ CREATE UNIQUE INDEX idx_unique_company_top_apps ON frontend.company_top_apps USI
 -- PostgreSQL database dump complete
 --
 
-\unrestrict n84ikTpv8Zq9W70rM2578xP2fJhw48tcElOcqrBDuAORlazeRnBObgnE9vEOBT0
+\unrestrict 62fA1ZiBNrJIcvwCgavlXeWDi6L5hHQxzKQQexGahcKEVUXclrrGNvyWxq6CNJc
 

@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict MJrRahCfD4OOmI17pubACJC3EBdC3Y5CyBbqon0Adfo2fjOFHZlZQzk7tlbi0YH
+\restrict pE0wjHNoNcrh6HNl0AHbPfsZTlPyLwqznHm5Fcik6P8QYVA6mX3HB1KOwOXszwB
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
@@ -62,5 +62,5 @@ ALTER MATERIALIZED VIEW logging.app_status OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict MJrRahCfD4OOmI17pubACJC3EBdC3Y5CyBbqon0Adfo2fjOFHZlZQzk7tlbi0YH
+\unrestrict pE0wjHNoNcrh6HNl0AHbPfsZTlPyLwqznHm5Fcik6P8QYVA6mX3HB1KOwOXszwB
 

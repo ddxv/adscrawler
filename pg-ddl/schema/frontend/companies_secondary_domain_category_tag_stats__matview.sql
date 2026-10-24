@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict yK5p4nPXLgyVa2QtU4uCOGr6hJ59nqOO6UUzIy8lNrUy4qgeDMzgVyz90QJNHQN
+\restrict 98sWsFPpO3YwaoH8Az2fmhJGEjkYK8O1LlM29SqFyWZKjOwZeho1vqNZ1ZrqefI
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
@@ -32,7 +32,7 @@ CREATE MATERIALIZED VIEW frontend.companies_secondary_domain_category_tag_stats 
          SELECT csac.store_app,
             tag.tag_source,
             d.domain_name
-           FROM (((adtech.combined_app_companies csac
+           FROM (((adtech.combined_domain_apps csac
              LEFT JOIN adtech.companies c ON ((csac.company_id = c.id)))
              LEFT JOIN public.domains d ON ((csac.domain_id = d.id)))
              CROSS JOIN LATERAL ( VALUES ('sdk'::text,csac.sdk), ('api_call'::text,csac.api_call), ('publisher'::text,csac.publisher), ('app_ads_direct'::text,csac.app_ads_direct), ('app_ads_reseller'::text,csac.app_ads_reseller)) tag(tag_source, present))
@@ -71,5 +71,5 @@ CREATE INDEX companies_secondary_category_tag_stats_query_idx ON frontend.compan
 -- PostgreSQL database dump complete
 --
 
-\unrestrict yK5p4nPXLgyVa2QtU4uCOGr6hJ59nqOO6UUzIy8lNrUy4qgeDMzgVyz90QJNHQN
+\unrestrict 98sWsFPpO3YwaoH8Az2fmhJGEjkYK8O1LlM29SqFyWZKjOwZeho1vqNZ1ZrqefI
 

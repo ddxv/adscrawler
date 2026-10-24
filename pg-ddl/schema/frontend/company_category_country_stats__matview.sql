@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict Uw94hVzBmvl1YXqMXFfdg5hRwliSNmBPvZBI2NU7bGRSwsFIhHbP5ySLoMsrahh
+\restrict G8M2dPfaUgGHpRvTqlsqH8wNdfhEgDv8VMzP1CSZTIf8XsqGzUKwNW2PdejdLJf
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
@@ -29,18 +29,18 @@ SET default_table_access_method = heap;
 
 CREATE MATERIALIZED VIEW frontend.company_category_country_stats AS
  WITH target_apps AS (
-         SELECT combined_app_parent_companies.store_app,
-            combined_app_parent_companies.company_id,
-            combined_app_parent_companies.sdk,
-            combined_app_parent_companies.api_call,
-            combined_app_parent_companies.publisher,
-            combined_app_parent_companies.app_ads_direct,
-            combined_app_parent_companies.app_ads_reseller
-           FROM adtech.combined_app_parent_companies
-          WHERE ((combined_app_parent_companies.sdk OR combined_app_parent_companies.api_call OR combined_app_parent_companies.app_ads_direct OR combined_app_parent_companies.publisher) AND (combined_app_parent_companies.company_id IN ( SELECT combined_app_parent_companies_1.company_id
-                   FROM adtech.combined_app_parent_companies combined_app_parent_companies_1
-                  WHERE (combined_app_parent_companies_1.sdk OR combined_app_parent_companies_1.api_call OR combined_app_parent_companies_1.app_ads_direct OR combined_app_parent_companies_1.publisher)
-                  GROUP BY combined_app_parent_companies_1.company_id
+         SELECT cpca.store_app,
+            cpca.company_id,
+            cpca.sdk,
+            cpca.api_call,
+            cpca.publisher,
+            cpca.app_ads_direct,
+            cpca.app_ads_reseller
+           FROM adtech.combined_parent_company_apps cpca
+          WHERE ((cpca.sdk OR cpca.api_call OR cpca.app_ads_direct OR cpca.publisher) AND (cpca.company_id IN ( SELECT cpca_1.company_id
+                   FROM adtech.combined_parent_company_apps cpca_1
+                  WHERE (cpca_1.sdk OR cpca_1.api_call OR cpca_1.app_ads_direct OR cpca_1.publisher)
+                  GROUP BY cpca_1.company_id
                  HAVING (count(*) > 100))))
         ), company_app_countries AS (
          SELECT ta.company_id,
@@ -70,5 +70,5 @@ ALTER MATERIALIZED VIEW frontend.company_category_country_stats OWNER TO postgre
 -- PostgreSQL database dump complete
 --
 
-\unrestrict Uw94hVzBmvl1YXqMXFfdg5hRwliSNmBPvZBI2NU7bGRSwsFIhHbP5ySLoMsrahh
+\unrestrict G8M2dPfaUgGHpRvTqlsqH8wNdfhEgDv8VMzP1CSZTIf8XsqGzUKwNW2PdejdLJf
 

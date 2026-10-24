@@ -116,9 +116,7 @@ class TestExtractAndDecodeUrls(unittest.TestCase):
         self.assertNotIn("https://ad.com[slot", urls)
 
     def test_extracts_top_level_double_encoded_url(self) -> None:
-        text = (
-            "redirect=https%3A%2F%2Fmiddle.com%3Furl%3Dhttps%253A%252F%252Finner.com"
-        )
+        text = "redirect=https%3A%2F%2Fmiddle.com%3Furl%3Dhttps%253A%252F%252Finner.com"
 
         urls = extract_and_decode_urls(text)
 

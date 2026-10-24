@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict gSDY76o3h3oGJpgxXKyDjl14HzUmcNad1xymUaJgB0tb7moeVfgsszolcycLhzR
+\restrict ovTiY7mnDSgjjygUKtMKbuxhuvLK8GFDVMDy9LV7zY2WnQ4UqVxpf2lHSxpH50n
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
@@ -45,7 +45,7 @@ CREATE MATERIALIZED VIEW frontend.store_apps_overview AS
            FROM (public.version_codes vc
              LEFT JOIN public.version_code_sdk_scan_results vcss ON ((vc.id = vcss.version_code_id)))
           WHERE (vcss.scan_result = 1)
-          ORDER BY vc.store_app, vcss.scanned_at DESC, (string_to_array((vc.version_code)::text, '.'::text))::bigint[] DESC
+          ORDER BY vc.store_app, vc.id DESC, vcss.scanned_at DESC
         ), latest_en_descriptions AS (
          SELECT DISTINCT ON (store_apps_descriptions.store_app) store_apps_descriptions.store_app,
             store_apps_descriptions.description,
@@ -154,6 +154,7 @@ CREATE MATERIALIZED VIEW frontend.store_apps_overview AS
     COALESCE(sa.icon_128, sa.icon_url_100) AS icon_128,
     sa.icon_url_512,
     sa.release_date,
+    sa.tv_supported,
     sa.featured_image_url,
     sa.phone_image_url_1,
     sa.phone_image_url_2,
@@ -267,5 +268,5 @@ CREATE UNIQUE INDEX store_apps_overview_unique_store_id_idx ON frontend.store_ap
 -- PostgreSQL database dump complete
 --
 
-\unrestrict gSDY76o3h3oGJpgxXKyDjl14HzUmcNad1xymUaJgB0tb7moeVfgsszolcycLhzR
+\unrestrict ovTiY7mnDSgjjygUKtMKbuxhuvLK8GFDVMDy9LV7zY2WnQ4UqVxpf2lHSxpH50n
 

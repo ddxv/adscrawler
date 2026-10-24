@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict CizSHVwCsRXnv1hi9waDzg87eHVyvBYt9vgajuqcMFI7TO71oaQoV5SXEwSoYvk
+\restrict reYfhgcjeICXT5j2VcY37up080XjssCDXkBPgO0pima8umW7wftmlfgigUHnx3a
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
@@ -112,5 +112,5 @@ CREATE UNIQUE INDEX idx_apps_new_monthly ON frontend.apps_new_monthly USING btre
 -- PostgreSQL database dump complete
 --
 
-\unrestrict CizSHVwCsRXnv1hi9waDzg87eHVyvBYt9vgajuqcMFI7TO71oaQoV5SXEwSoYvk
+\unrestrict reYfhgcjeICXT5j2VcY37up080XjssCDXkBPgO0pima8umW7wftmlfgigUHnx3a
 

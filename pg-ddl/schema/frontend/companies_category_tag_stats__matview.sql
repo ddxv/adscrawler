@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict tf2d98mwy1GfgrzXVcybyzn8lWVpk7JI4FkjY5NPHM8IiIwiMV9sPDajDocOWhf
+\restrict wC1dfasr9T7uF2GjjWYsR2dE5meiHWFBlmXjeFm9GsRHdBeyVt7dOUmd00dRDtg
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
@@ -33,7 +33,7 @@ CREATE MATERIALIZED VIEW frontend.companies_category_tag_stats AS
             tag.tag_source,
             COALESCE(cd.domain_name, ad.domain_name) AS company_domain,
             c.name AS company_name
-           FROM ((((adtech.combined_app_companies csac
+           FROM ((((adtech.combined_domain_apps csac
              LEFT JOIN public.domains ad ON ((csac.domain_id = ad.id)))
              LEFT JOIN adtech.companies c ON ((csac.company_id = c.id)))
              LEFT JOIN public.domains cd ON ((c.domain_id = cd.id)))
@@ -74,5 +74,5 @@ CREATE UNIQUE INDEX companies_category_tag_stats_idx ON frontend.companies_categ
 -- PostgreSQL database dump complete
 --
 
-\unrestrict tf2d98mwy1GfgrzXVcybyzn8lWVpk7JI4FkjY5NPHM8IiIwiMV9sPDajDocOWhf
+\unrestrict wC1dfasr9T7uF2GjjWYsR2dE5meiHWFBlmXjeFm9GsRHdBeyVt7dOUmd00dRDtg
 

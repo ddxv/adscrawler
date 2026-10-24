@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict VPJNyXjbpcbPdrpWIcnZgBVc7zOYscdVnfXmReei8qk4H1ZzPE7wFKCntFg1Ixh
+\restrict RksaFUKa5qynAgTaWaC4n6mwzLsJMMLKztm3zEWIL4EsmsP8F6Og9EA4GBOJMRT
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
@@ -51,7 +51,7 @@ CREATE MATERIALIZED VIEW frontend.category_tag_type_stats AS
                         END AS type_url_slug,
                     sa.installs_sum_4w,
                     sa.installs
-                   FROM ((((adtech.combined_app_companies csac
+                   FROM ((((adtech.combined_domain_apps csac
                      LEFT JOIN frontend.store_apps_overview sa ON ((csac.store_app = sa.id)))
                      JOIN minimized_company_categories mcc ON ((csac.company_id = mcc.company_id)))
                      LEFT JOIN adtech.categories cats ON ((mcc.category_id = cats.id)))
@@ -113,5 +113,5 @@ CREATE UNIQUE INDEX frontend_category_tag_type_stats_unique ON frontend.category
 -- PostgreSQL database dump complete
 --
 
-\unrestrict VPJNyXjbpcbPdrpWIcnZgBVc7zOYscdVnfXmReei8qk4H1ZzPE7wFKCntFg1Ixh
+\unrestrict RksaFUKa5qynAgTaWaC4n6mwzLsJMMLKztm3zEWIL4EsmsP8F6Og9EA4GBOJMRT
 

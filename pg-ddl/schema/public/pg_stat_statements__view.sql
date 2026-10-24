@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 8Myc04afRdq6vbOKuaQ0ktcoowfepKZduDXhzpmrxtga1ZsMJipbmodlD6rpZfQ
+\restrict DbOvJbach66WpmeN1qhdlGQXTgYqqWl9nnmy6MFSYSqVRkijPBKxnXA0nvuzbg9
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
@@ -23,5 +23,5 @@ SET row_security = off;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 8Myc04afRdq6vbOKuaQ0ktcoowfepKZduDXhzpmrxtga1ZsMJipbmodlD6rpZfQ
+\unrestrict DbOvJbach66WpmeN1qhdlGQXTgYqqWl9nnmy6MFSYSqVRkijPBKxnXA0nvuzbg9
 

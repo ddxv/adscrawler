@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict u5yCCXjvizVbD3U8Ue2dzElT6shbvGBOGkMcUnacToTt3JHbglBa2byW2iL3HQP
+\restrict vt2cBs2FxVA25LZjrAJIKIuEgsrAmL8urxMuCO9ccrtptos2OtK5bohXQZkHo6Z
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
@@ -46,7 +46,7 @@ CREATE MATERIALIZED VIEW frontend.companies_overview AS
             bool_or(cac.app_ads_direct) AS has_app_ads_direct,
             bool_or(cac.app_ads_reseller) AS has_app_ads_reseller,
             2 AS source_priority
-           FROM ((((adtech.combined_app_companies cac
+           FROM ((((adtech.combined_domain_apps cac
              JOIN public.domains d ON ((cac.domain_id = d.id)))
              LEFT JOIN adtech.companies c_1 ON ((cac.company_id = c_1.id)))
              LEFT JOIN adtech.companies pc_1 ON ((c_1.parent_company_id = pc_1.id)))
@@ -70,7 +70,7 @@ CREATE MATERIALIZED VIEW frontend.companies_overview AS
             bool_or(capc.app_ads_direct) AS has_app_ads_direct,
             bool_or(capc.app_ads_reseller) AS has_app_ads_reseller,
             1 AS source_priority
-           FROM ((adtech.combined_app_parent_companies capc
+           FROM ((adtech.combined_parent_company_apps capc
              JOIN adtech.companies c_1 ON ((capc.company_id = c_1.id)))
              JOIN public.domains d ON ((c_1.domain_id = d.id)))
           GROUP BY d.id, d.domain_name, capc.company_id, c_1.name, c_1.logo_url, c_1.linkedin_url, c_1.github_user, c_1.parent_company_id
@@ -364,5 +364,5 @@ CREATE UNIQUE INDEX frontend_companies_overview_domain ON frontend.companies_ove
 -- PostgreSQL database dump complete
 --
 
-\unrestrict u5yCCXjvizVbD3U8Ue2dzElT6shbvGBOGkMcUnacToTt3JHbglBa2byW2iL3HQP
+\unrestrict vt2cBs2FxVA25LZjrAJIKIuEgsrAmL8urxMuCO9ccrtptos2OtK5bohXQZkHo6Z
 
