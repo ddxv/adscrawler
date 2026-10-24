@@ -56,7 +56,7 @@ distinct_ad_and_pub_domains AS (
         acc.crawled_at >= :start_of_period
         AND acc.created_at < :start_of_next_period
         AND (acc.crawled_at - aam.updated_at) < '01:00:00'::interval
-        AND aae.updated_at >= :start_of_period
+        AND aae.updated_at >= :oldest_allowed_app_ads_crawl
         AND aae.created_at < :start_of_next_period
 ),
 adstxt_based_companies AS (
@@ -76,7 +76,7 @@ adstxt_based_companies AS (
         ON pd.id = pnv.publisher_domain_id
     WHERE
         (pnv.ad_domain_id IS NOT NULL)
-        AND aum.updated_at >= :start_of_period
+        AND aum.updated_at >= :oldest_allowed_app_ads_crawl
         AND aum.created_at < :start_of_next_period
 ),
 developer_based_domains AS (

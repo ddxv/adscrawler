@@ -139,6 +139,7 @@ def _stream_combined_domain_history_to_s3(
     prefix: str,
     start_date: str,
     start_of_next_period: str,
+    oldest_allowed_app_ads_crawl: str | None = None,
     year: int | None = None,
     quarter: int | None = None,
     chunk_size: int = 1_000_000,
@@ -149,6 +150,9 @@ def _stream_combined_domain_history_to_s3(
     so it is streamed in chunks to avoid loading everything into memory. The
     destination prefix is cleared first so reruns replace old files. When
     ``year``/``quarter`` are provided they are added as partition columns.
+
+    ``oldest_allowed_app_ads_crawl`` defaults to ``start_date``; the all-time
+    export passes a recent cutoff so long-dead apps are excluded.
     """
     s3_client = get_s3_client()
     bucket = CONFIG["s3"]["bucket"]
@@ -159,13 +163,15 @@ def _stream_combined_domain_history_to_s3(
     logger.info(
         "Streaming combined domain history to "
         f"s3://{bucket}/{prefix}/  "
-        f"start={start_date} next={start_of_next_period}"
+        f"start={start_date} next={start_of_next_period} "
+        f"oldest_app_ads_crawl={oldest_allowed_app_ads_crawl or start_date}"
     )
 
     chunk_iter = query_report_combined_domains(
         pgdb=pgdb,
         start_date=start_date,
         start_of_next_period=start_of_next_period,
+        oldest_allowed_app_ads_crawl=oldest_allowed_app_ads_crawl,
         chunksize=chunk_size,
     )
 
@@ -221,6 +227,7 @@ def combined_domain_history_to_s3(
 def combined_domain_history_alltime_to_s3(
     pgdb: PostgresEngine,
     chunk_size: int = 1_000_000,
+    oldest_allowed_app_ads_crawl_days: int = 90,
 ) -> None:
     """Export the full combined domain app history (since 2025-01-01) to S3.
 
@@ -228,15 +235,23 @@ def combined_domain_history_alltime_to_s3(
 
       s3://bucket/agg-data/combined-domain-app-history-alltime/
 
-    The upper bound is tomorrow so rows created today are included. Call this
-    once per run, not once per quarter.
+    The upper bound is tomorrow so rows created today are included. The
+    ``oldest_allowed_app_ads_crawl`` cutoff is set to
+    ``oldest_allowed_app_ads_crawl_days`` before today, which keeps long-dead
+    apps from flooding the all-time snapshot. Call this once per run, not once
+    per quarter.
     """
-    tomorrow = datetime.date.today() + datetime.timedelta(days=1)
+    today = datetime.date.today()
+    tomorrow = today + datetime.timedelta(days=1)
+    oldest_allowed_app_ads_crawl = today - datetime.timedelta(
+        days=oldest_allowed_app_ads_crawl_days
+    )
     _stream_combined_domain_history_to_s3(
         pgdb=pgdb,
         prefix=AGG_COMBINED_DOMAIN_HISTORY_ALLTIME,
         start_date="2025-01-01",
         start_of_next_period=str(tomorrow),
+        oldest_allowed_app_ads_crawl=str(oldest_allowed_app_ads_crawl),
         chunk_size=chunk_size,
     )
 
@@ -365,3 +380,4 @@ def process_company_history(pgdb: PostgresEngine) -> None:
     combined_domain_history_alltime_to_s3(pgdb=pgdb)
     combined_domain_history_alltime_to_db(pgdb=pgdb)
     run_changes(pgdb=pgdb)
+    start_of_next_period = datetime.date.today() + datetime.timedelta(days=1)

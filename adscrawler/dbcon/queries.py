@@ -1384,9 +1384,14 @@ def query_report_combined_domains(
     pgdb: PostgresEngine,
     start_date: str,
     start_of_next_period: str,
+    oldest_allowed_app_ads_crawl: str | None = None,
     chunksize: int | None = None,
 ) -> pd.DataFrame | pd.io.sql.SQLTable:
     """Query combined domain-app history.
+
+    ``oldest_allowed_app_ads_crawl`` bounds how far back app-ads/app_urls rows
+    are considered. It defaults to ``start_date`` (per-quarter behaviour); the
+    all-time export passes a more recent cutoff to drop long-dead apps.
 
     If chunksize is set, returns an iterator of DataFrames (for streaming
     large results without loading everything into memory).
@@ -1397,6 +1402,7 @@ def query_report_combined_domains(
         params={
             "start_of_period": start_date,
             "start_of_next_period": start_of_next_period,
+            "oldest_allowed_app_ads_crawl": oldest_allowed_app_ads_crawl or start_date,
         },
         chunksize=chunksize,
     )
