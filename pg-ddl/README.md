@@ -15,4 +15,4 @@
    `pre-commit run --files schema/*`
 
 5. Rerunning MVs? 
-   `python pg-ddl/recreate_all_mvs.py --create-all-mvs --config-key madrone`
+   `python -m adscrawler.tools.recreate_all_mvs --create-all-mvs --config-key madrone`
