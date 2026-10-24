@@ -1,4 +1,7 @@
-"""Combined domain-app history export + change-detection (domain_app_changes_quarterly)."""
+"""Combined domain-app history export + change-detection (domain_app_changes_quarterly).
+
+Also publishes the all-time snapshot into ``adtech.combined_domain_apps``.
+"""
 
 import datetime
 import pathlib
@@ -10,7 +13,10 @@ from typing import Any
 import pandas as pd
 
 from adscrawler.config import CONFIG, get_logger
-from adscrawler.dbcon.atomic_swap import atomic_swap_partition
+from adscrawler.dbcon.atomic_swap import (
+    atomic_swap_partition,
+    atomic_swap_partition_stream,
+)
 from adscrawler.dbcon.connection import PostgresEngine
 from adscrawler.dbcon.queries import (
     CREATE_DOMAIN_APP_CHANGES,
@@ -22,6 +28,7 @@ from adscrawler.dbcon.queries import (
 )
 from adscrawler.process import (
     AGG_COMBINED_DOMAIN_HISTORY,
+    AGG_COMBINED_DOMAIN_HISTORY_ALLTIME,
     LOOKUP_STORE_APPS_RELEASE_DATES,
 )
 from adscrawler.process.storage import (
@@ -30,6 +37,7 @@ from adscrawler.process.storage import (
     get_parquet_paths_by_prefix,
     get_s3_client,
     pg_db_uri,
+    stream_duckdb_tsv,
 )
 
 logger = get_logger(__name__, "scrape_stores")
@@ -126,27 +134,25 @@ def run_changes(pgdb: PostgresEngine) -> None:
     )
 
 
-def combined_domain_history_to_s3(
+def _stream_combined_domain_history_to_s3(
     pgdb: PostgresEngine,
+    prefix: str,
     start_date: str,
     start_of_next_period: str,
-    year: int,
-    quarter: int,
+    year: int | None = None,
+    quarter: int | None = None,
     chunk_size: int = 1_000_000,
 ) -> None:
-    """Stream combined domain app history data from Postgres to S3 as parquet.
+    """Stream combined domain history into ``prefix`` as chunked parquet files.
 
-    The query_report_combined_domains query can return 100M+ rows (GB+ of data).
-    This function streams it in chunks to avoid loading everything into memory,
-    writing each chunk as a separate parquet file to::
-
-      s3://bucket/agg-data/combined-domain-app-history-quarter/year={year}/quarter={quarter}/
+    The query_report_combined_domains query can return 100M+ rows (GB+ of data),
+    so it is streamed in chunks to avoid loading everything into memory. The
+    destination prefix is cleared first so reruns replace old files. When
+    ``year``/``quarter`` are provided they are added as partition columns.
     """
     s3_client = get_s3_client()
     bucket = CONFIG["s3"]["bucket"]
-    prefix = f"{AGG_COMBINED_DOMAIN_HISTORY}/year={year}/quarter={quarter}"
 
-    # Delete any existing files for this year/quarter before writing fresh data
     logger.info(f"Clearing existing history parquets at s3://{bucket}/{prefix}/")
     delete_s3_objects_by_prefix(bucket=bucket, prefix=f"{prefix}/")
 
@@ -165,8 +171,9 @@ def combined_domain_history_to_s3(
 
     part = 0
     for chunk in chunk_iter:
-        chunk["year"] = year
-        chunk["quarter"] = quarter
+        if year is not None and quarter is not None:
+            chunk["year"] = year
+            chunk["quarter"] = quarter
 
         epoch_ms = int(time.time() * 1000)
         suffix = uuid.uuid4().hex[:8]
@@ -183,7 +190,118 @@ def combined_domain_history_to_s3(
             f"Uploaded part {part} ({len(chunk):,} rows) to s3://{bucket}/{s3_key}"
         )
 
-    logger.info(f"Finished {part=} written to s3://{bucket}/{prefix}/")
+    logger.info(f"Finished s3://{bucket}/{prefix}/")
+
+
+def combined_domain_history_to_s3(
+    pgdb: PostgresEngine,
+    start_date: str,
+    start_of_next_period: str,
+    year: int,
+    quarter: int,
+    chunk_size: int = 1_000_000,
+) -> None:
+    """Export one quarter of combined domain app history to S3.
+
+    Writes partitioned parquet files to::
+
+      s3://bucket/agg-data/combined-domain-app-history-quarter/year={year}/quarter={quarter}/
+    """
+    _stream_combined_domain_history_to_s3(
+        pgdb=pgdb,
+        prefix=f"{AGG_COMBINED_DOMAIN_HISTORY}/year={year}/quarter={quarter}",
+        start_date=start_date,
+        start_of_next_period=start_of_next_period,
+        year=year,
+        quarter=quarter,
+        chunk_size=chunk_size,
+    )
+
+
+def combined_domain_history_alltime_to_s3(
+    pgdb: PostgresEngine,
+    chunk_size: int = 1_000_000,
+) -> None:
+    """Export the full combined domain app history (since 2025-01-01) to S3.
+
+    Writes a single, un-partitioned snapshot to::
+
+      s3://bucket/agg-data/combined-domain-app-history-alltime/
+
+    The upper bound is tomorrow so rows created today are included. Call this
+    once per run, not once per quarter.
+    """
+    tomorrow = datetime.date.today() + datetime.timedelta(days=1)
+    _stream_combined_domain_history_to_s3(
+        pgdb=pgdb,
+        prefix=AGG_COMBINED_DOMAIN_HISTORY_ALLTIME,
+        start_date="2025-01-01",
+        start_of_next_period=str(tomorrow),
+        chunk_size=chunk_size,
+    )
+
+
+def combined_domain_history_alltime_to_db(
+    pgdb: PostgresEngine,
+    batch_date: datetime.date | None = None,
+) -> None:
+    """Atomic-swap the all-time snapshot into ``adtech.combined_domain_apps``.
+
+    Streams the parquet files written by ``combined_domain_history_alltime_to_s3``
+    straight from DuckDB into Postgres, joining ``company_id`` from
+    ``adtech.company_domain_mapping``, then swaps them in as the partition for
+    ``batch_date``.
+    """
+    bucket = CONFIG["s3"]["bucket"]
+    batch_date = batch_date or datetime.date.today()
+    parquet_glob = f"s3://{bucket}/{AGG_COMBINED_DOMAIN_HISTORY_ALLTIME}/*.parquet"
+
+    setup_sql = f"""
+        INSTALL postgres;
+        LOAD postgres;
+        ATTACH '{pg_db_uri()}' AS pg (TYPE postgres);
+        CREATE TEMP TABLE company_domain_mapping_cache AS
+            SELECT company_id, domain_id FROM pg.adtech.company_domain_mapping;
+    """
+
+    query = f"""
+        SELECT
+            h.domain_id,
+            h.store_app,
+            cdm.company_id,
+            h.sdk,
+            h.api_call,
+            h.publisher,
+            h.app_ads_direct,
+            h.app_ads_reseller,
+            '{batch_date}'::DATE AS batch_date
+        FROM read_parquet('{parquet_glob}') h
+        LEFT JOIN company_domain_mapping_cache cdm
+          ON h.domain_id = cdm.domain_id
+    """
+    columns = [
+        "domain_id",
+        "store_app",
+        "company_id",
+        "sdk",
+        "api_call",
+        "publisher",
+        "app_ads_direct",
+        "app_ads_reseller",
+        "batch_date",
+    ]
+
+    logger.info(
+        f"Swapping all-time history into adtech.combined_domain_apps {batch_date=}"
+    )
+    atomic_swap_partition_stream(
+        stream=stream_duckdb_tsv(query, setup_sql=setup_sql),
+        columns=columns,
+        batch_date=batch_date,
+        pgdb=pgdb,
+        schema="adtech",
+        table="combined_domain_apps",
+    )
 
 
 def store_apps_release_dates_to_s3(pgdb: PostgresEngine) -> None:
@@ -213,7 +331,8 @@ def process_company_history(pgdb: PostgresEngine) -> None:
     """Export combined domain-app history + store_apps release-dates lookup to S3.
 
     Iterates from Q1 2025 up to the current quarter, exporting each quarter's
-    combined domain-app history to S3 as partitioned parquet files.
+    combined domain-app history to S3 as partitioned parquet files, then
+    exports the all-time snapshot once.
     """
 
     today = datetime.date.today()
@@ -243,4 +362,6 @@ def process_company_history(pgdb: PostgresEngine) -> None:
             year=year,
             quarter=quarter,
         )
+    combined_domain_history_alltime_to_s3(pgdb=pgdb)
+    combined_domain_history_alltime_to_db(pgdb=pgdb)
     run_changes(pgdb=pgdb)

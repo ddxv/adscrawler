@@ -940,11 +940,18 @@ def pg_db_uri():
     return f"dbname={database} host={host} user={user} password={password}"
 
 
-def stream_duckdb_tsv(query: str) -> Iterable[str]:
-    """Executes a DuckDB query and streams TSV string chunks for Postgres COPY."""
+def stream_duckdb_tsv(query: str, setup_sql: str | None = None) -> Iterable[str]:
+    """Executes a DuckDB query and streams TSV string chunks for Postgres COPY.
+
+    ``setup_sql`` may contain extra statements (e.g. ``ATTACH``-ing Postgres)
+    that must run on the same connection before ``query``.
+    """
     import pyarrow.csv as pa_csv
 
     with get_duckdb_connection("s3") as duckdb_con:
+        if setup_sql:
+            for stmt in (s.strip() for s in setup_sql.split(";") if s.strip()):
+                duckdb_con.execute(stmt)
         relation = duckdb_con.sql(query)
         record_batch_reader = relation.fetch_arrow_reader(batch_size=100_000)
 

@@ -79,6 +79,35 @@ adstxt_based_companies AS (
         AND aum.updated_at >= :start_of_period
         AND aum.created_at < :start_of_next_period
 ),
+developer_based_domains AS (
+    SELECT DISTINCT
+        sa_1.id AS store_app,
+        d.id AS domain_id
+    FROM adtech.company_developers AS cd
+    LEFT JOIN store_apps AS sa_1 ON cd.developer_id = sa_1.developer
+    LEFT JOIN adtech.companies AS c_1 ON cd.company_id = c_1.id
+    LEFT JOIN domains AS d ON c_1.domain_id = d.id
+), store_urls AS (
+    SELECT
+        dsa.store_app,
+        dsa.domain_id
+    FROM developer_store_apps AS dsa
+    LEFT JOIN domains AS d ON dsa.domain_id = d.id
+    WHERE dsa.domain_id IS NOT NULL AND NOT (dsa.domain_id IN (
+        SELECT domains_third_party.domain_id
+        FROM domains_third_party
+    ))
+), app_domain_publishers AS (
+    SELECT
+        store_urls.store_app,
+        store_urls.domain_id
+    FROM store_urls
+    UNION ALL
+    SELECT
+        developer_based_domains.store_app,
+        developer_based_domains.domain_id
+    FROM developer_based_domains
+),
 combined_sources AS (
     SELECT
         abc.domain_id,
@@ -97,12 +126,19 @@ combined_sources AS (
         atbc.store_app,
         atbc.tag_source
     FROM adstxt_based_companies AS atbc
+    UNION ALL
+    SELECT
+        app_domain_publishers.store_app,
+        app_domain_publishers.domain_id,
+        'publisher' AS tag_source
+    FROM app_domain_publishers
 )
 SELECT
     cs.domain_id,
     cs.store_app,
     BOOL_OR(cs.tag_source = 'sdk'::text) AS sdk,
     BOOL_OR(cs.tag_source = 'api_call'::text) AS api_call,
+    BOOL_OR(cs.tag_source = 'publisher'::text) AS publisher,
     BOOL_OR(cs.tag_source = 'app_ads_direct'::text) AS app_ads_direct,
     BOOL_OR(cs.tag_source = 'app_ads_reseller'::text) AS app_ads_reseller
 FROM combined_sources AS cs

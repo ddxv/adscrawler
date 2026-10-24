@@ -43,4 +43,5 @@ AGG_APP_HASH_BUCKETS_FILLED = "agg-data/app-hash-weekly-filled"
 # Domain-app history & change detection (app_domain_history.py)
 # ---------------------------------------------------------------------------
 AGG_COMBINED_DOMAIN_HISTORY = "agg-data/combined-domain-app-history-quarter"
+AGG_COMBINED_DOMAIN_HISTORY_ALLTIME = "agg-data/combined-domain-app-history-alltime"
 LOOKUP_STORE_APPS_RELEASE_DATES = "lookups/store-apps-release-dates"
