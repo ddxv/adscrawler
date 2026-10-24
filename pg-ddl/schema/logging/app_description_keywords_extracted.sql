@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict BGEyeetWv3Rsehr7udVTCihfaqWgIToCLGR7fYa7Ixcy5CcJpaAd1vzi365fF1H
+\restrict AvXJQwCaXbiCfIgg5AbkwAQpZ9oBdz8o0E7Dvbz3YqbRg2DY4AvjdWOnn4Z4kHX
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
@@ -47,5 +47,5 @@ CREATE INDEX app_description_keywords_extrac_description_id_extracted_at_idx ON 
 -- PostgreSQL database dump complete
 --
 
-\unrestrict BGEyeetWv3Rsehr7udVTCihfaqWgIToCLGR7fYa7Ixcy5CcJpaAd1vzi365fF1H
+\unrestrict AvXJQwCaXbiCfIgg5AbkwAQpZ9oBdz8o0E7Dvbz3YqbRg2DY4AvjdWOnn4Z4kHX
 

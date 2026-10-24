@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict KKm00Y3apTD3bDfWHmpcejIKwLlRpIwhh8xy0zgwS4ixJtN5MysQC1ukEzSdKCF
+\restrict MhwYgPM0Mpa63W1iMoE2z9Nw1WtvhUbfhrAalsLbEPOcKdbG2VvXwbDRRhRh0pJ
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
@@ -64,5 +64,5 @@ ALTER TABLE ONLY adtech.company_categories_manual
 -- PostgreSQL database dump complete
 --
 
-\unrestrict KKm00Y3apTD3bDfWHmpcejIKwLlRpIwhh8xy0zgwS4ixJtN5MysQC1ukEzSdKCF
+\unrestrict MhwYgPM0Mpa63W1iMoE2z9Nw1WtvhUbfhrAalsLbEPOcKdbG2VvXwbDRRhRh0pJ
 

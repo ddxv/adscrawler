@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict RxzuYmmv2YdMe1bbume7McdPf4UcdKq5s3YBK2XRIZVeMFEZa9isDrr50xKxd45
+\restrict krpXNYfKhFyrktV6sc1v8WhOIcBXFbPuweYLlL0airxdQz1lc0S2Qq0mwQrKFvr
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
@@ -55,5 +55,5 @@ ALTER TABLE ONLY adtech.company_mediation_adapters
 -- PostgreSQL database dump complete
 --
 
-\unrestrict RxzuYmmv2YdMe1bbume7McdPf4UcdKq5s3YBK2XRIZVeMFEZa9isDrr50xKxd45
+\unrestrict krpXNYfKhFyrktV6sc1v8WhOIcBXFbPuweYLlL0airxdQz1lc0S2Qq0mwQrKFvr
 

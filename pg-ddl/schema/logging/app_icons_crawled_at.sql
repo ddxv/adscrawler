@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict KV4rNKU1DGeQ8Z8HpXqbWwewl6HY3Y1FE9ygDYUrVFeEx4BdDf2okOPaGZ9mNHg
+\restrict BsUnmgKRlthIAg5Anc8VhL2XMVEwdkzF3bbfnwl8fZXldDPkxTfyhYgpMZWq1L9
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
@@ -47,5 +47,5 @@ ALTER TABLE ONLY logging.app_icons_crawled_at
 -- PostgreSQL database dump complete
 --
 
-\unrestrict KV4rNKU1DGeQ8Z8HpXqbWwewl6HY3Y1FE9ygDYUrVFeEx4BdDf2okOPaGZ9mNHg
+\unrestrict BsUnmgKRlthIAg5Anc8VhL2XMVEwdkzF3bbfnwl8fZXldDPkxTfyhYgpMZWq1L9
 
