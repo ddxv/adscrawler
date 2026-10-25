@@ -163,8 +163,10 @@ def add_language_column(
 
 
 def clean_google_play_app_df(apps_df: pd.DataFrame) -> pd.DataFrame:
-    apps_df["free"] = apps_df["free"].astype(bool)
-    apps_df["offersIAP"] = apps_df["offersIAP"].astype(bool)
+    # Google can omit these flags, producing nullable boolean columns with NaN.
+    # Missing values mean the feature is not reported, so treat them as false.
+    for column in ("free", "offersIAP"):
+        apps_df[column] = apps_df[column].fillna(False).astype(bool)
     apps_df = apps_df.rename(
         columns={
             "title": "name",
