@@ -464,13 +464,17 @@ def check_session() -> bool:
         logger.info(line.strip())
         if "Session" in line and "RUNNING" in line:
             is_session_running = True
-    app_list = subprocess.run(
-        ["waydroid", "app", "list"],
-        capture_output=True,
-        text=True,
-        check=False,
-        timeout=60,
-    )
+    try:
+        app_list = subprocess.run(
+            ["waydroid", "app", "list"],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=60,
+        )
+    except subprocess.TimeoutExpired:
+        logger.warning("Waydroid app list timed out while checking the session")
+        return False
     if "waydroid session is stopped" in app_list.stderr.lower():
         err = app_list.stderr
         logger.error(
