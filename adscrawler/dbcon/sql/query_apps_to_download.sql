@@ -188,7 +188,8 @@ user_requested_apps_crawl AS (
         ON
             sa.id = fdq.store_app
     WHERE
-        (
+        urs.created_at >= CURRENT_DATE - INTERVAL '100 days'
+        AND (
             ald.last_downloaded_at < urs.created_at
             OR ald.last_downloaded_at IS NULL
         )
