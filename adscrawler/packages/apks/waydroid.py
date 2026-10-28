@@ -929,6 +929,9 @@ def install_app(store_id: str, apk_path: pathlib.Path) -> None:
             "Split null was defined multiple times"
             in _install_output.stdout + _install_output.stderr
         ):
+            logger.warning(
+                f"{function_info} failed: 'sudo waydroid shell pm install {split_apk_paths}'"
+            )
             logger.warning(f"{function_info} retrying without asset splits")
             filtered_paths = [p for p in split_apk_paths if "-asset" not in p]
             _install_output = subprocess.run(
