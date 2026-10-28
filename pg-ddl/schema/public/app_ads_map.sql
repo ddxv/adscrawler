@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict ZKjITHz1EVwZJ8Gju4TzItARxUHSuRcuudLajObQ5VZcqhhcQMORugTHvtR8owm
+\restrict L6drdnOgX4mkjUggHq4lBwcL5hwPdxDWdwnsRM7BLOIbYwKPGUXIqwY4bDAYuGt
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
@@ -95,5 +95,5 @@ ALTER TABLE ONLY public.app_ads_map
 -- PostgreSQL database dump complete
 --
 
-\unrestrict ZKjITHz1EVwZJ8Gju4TzItARxUHSuRcuudLajObQ5VZcqhhcQMORugTHvtR8owm
+\unrestrict L6drdnOgX4mkjUggHq4lBwcL5hwPdxDWdwnsRM7BLOIbYwKPGUXIqwY4bDAYuGt
 

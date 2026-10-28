@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict BGuKDdKKOdcq796SqnQ3SzW1YIDGQHpUmNUBomR0cdWanZzPCRIYh5oDOmuALPX
+\restrict SHxCWzHZYhZLvnccepTYJyvz0dFF3cGQbz1G4smHeN9yhfK9JT7DWrdi3kLiXwz
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
@@ -39,8 +39,15 @@ CREATE MATERIALIZED VIEW adtech.sdk_string_stats AS
 ALTER MATERIALIZED VIEW adtech.sdk_string_stats OWNER TO postgres;
 
 --
+-- Name: sdk_string_stats_uniq_idx; Type: INDEX; Schema: adtech; Owner: postgres
+--
+
+CREATE UNIQUE INDEX sdk_string_stats_uniq_idx ON adtech.sdk_string_stats USING btree (string_id, sdk_id);
+
+
+--
 -- PostgreSQL database dump complete
 --
 
-\unrestrict BGuKDdKKOdcq796SqnQ3SzW1YIDGQHpUmNUBomR0cdWanZzPCRIYh5oDOmuALPX
+\unrestrict SHxCWzHZYhZLvnccepTYJyvz0dFF3cGQbz1G4smHeN9yhfK9JT7DWrdi3kLiXwz
 

@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict ekfpEiLeyhRGLVErgyZ305zRcI9HkL8OVL3qFGfEsEnkIxl5FxDaei00jwgvIGU
+\restrict eA35BettPaLiTmD7NZ1s43jVPQIFneKdoZkoQjwQevgHj8uUzxam178zFQei9Tg
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
@@ -54,5 +54,5 @@ CREATE INDEX idx_app_sdk_strings_string_id ON ONLY adtech.app_sdk_strings USING 
 -- PostgreSQL database dump complete
 --
 
-\unrestrict ekfpEiLeyhRGLVErgyZ305zRcI9HkL8OVL3qFGfEsEnkIxl5FxDaei00jwgvIGU
+\unrestrict eA35BettPaLiTmD7NZ1s43jVPQIFneKdoZkoQjwQevgHj8uUzxam178zFQei9Tg
 

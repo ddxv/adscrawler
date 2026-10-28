@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict qdLg69QczeuF1aoEmpyXZ379assqXpXxSfiakhvZUfjyPa70nf1jSOTNmp8xabT
+\restrict B9i7xJ0a5pzo89eWwkajE5S63wTyRvP16hHwtZsoxQv44HkrMMxHgYFTv4rUS2J
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
@@ -5123,10 +5123,10 @@ CREATE VIEW public.s3_file_keys AS
 ALTER VIEW public.s3_file_keys OWNER TO postgres;
 
 --
--- Name: s3_package_inventory_20261024; Type: TABLE; Schema: public; Owner: postgres
+-- Name: s3_package_inventory_20261027; Type: TABLE; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.s3_package_inventory_20261024 (
+CREATE TABLE public.s3_package_inventory_20261027 (
     myregion text CONSTRAINT s3_package_inventory_myregion_not_null NOT NULL,
     versionstr text CONSTRAINT s3_package_inventory_versionstr_not_null NOT NULL,
     version_code_id integer,
@@ -5134,11 +5134,11 @@ CREATE TABLE public.s3_package_inventory_20261024 (
     file_key text CONSTRAINT s3_package_inventory_file_key_not_null NOT NULL,
     last_modified timestamp with time zone CONSTRAINT s3_package_inventory_last_modified_not_null NOT NULL,
     batch_date date CONSTRAINT s3_package_inventory_batch_date_not_null NOT NULL,
-    CONSTRAINT s3_package_inventory_20261024_batch_date_check CHECK ((batch_date = '2026-10-24'::date))
+    CONSTRAINT s3_package_inventory_20261027_batch_date_check CHECK ((batch_date = '2026-10-27'::date))
 );
 
 
-ALTER TABLE public.s3_package_inventory_20261024 OWNER TO postgres;
+ALTER TABLE public.s3_package_inventory_20261027 OWNER TO postgres;
 
 --
 -- Name: s3_processed_files; Type: TABLE; Schema: public; Owner: postgres
@@ -5724,10 +5724,10 @@ ALTER TABLE ONLY adtech.trend_parent_companies ATTACH PARTITION adtech.trend_par
 
 
 --
--- Name: s3_package_inventory_20261024; Type: TABLE ATTACH; Schema: public; Owner: postgres
+-- Name: s3_package_inventory_20261027; Type: TABLE ATTACH; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.s3_package_inventory ATTACH PARTITION public.s3_package_inventory_20261024 FOR VALUES IN ('2026-10-24');
+ALTER TABLE ONLY public.s3_package_inventory ATTACH PARTITION public.s3_package_inventory_20261027 FOR VALUES IN ('2026-10-27');
 
 
 --
@@ -6766,6 +6766,13 @@ CREATE INDEX sdk_paths_path_pattern_trgm_idx ON adtech.sdk_paths USING gin (lowe
 
 
 --
+-- Name: sdk_string_stats_uniq_idx; Type: INDEX; Schema: adtech; Owner: postgres
+--
+
+CREATE UNIQUE INDEX sdk_string_stats_uniq_idx ON adtech.sdk_string_stats USING btree (string_id, sdk_id);
+
+
+--
 -- Name: url_redirect_chains_unique_idx; Type: INDEX; Schema: adtech; Owner: postgres
 --
 
@@ -6885,6 +6892,13 @@ CREATE INDEX app_keywords_delete_and_insert_on ON frontend.app_keyword_ranks_dai
 
 
 --
+-- Name: category_type_country_stats_uniq_idx; Type: INDEX; Schema: frontend; Owner: postgres
+--
+
+CREATE UNIQUE INDEX category_type_country_stats_uniq_idx ON frontend.category_type_country_stats USING btree (store, app_category, type_url_slug, country);
+
+
+--
 -- Name: companies_apps_overview_idx; Type: INDEX; Schema: frontend; Owner: postgres
 --
 
@@ -6994,6 +7008,13 @@ CREATE UNIQUE INDEX companies_secondary_category_tag_stats_idx ON frontend.compa
 --
 
 CREATE INDEX companies_secondary_category_tag_stats_query_idx ON frontend.companies_secondary_domain_category_tag_stats USING btree (domain_name);
+
+
+--
+-- Name: company_category_country_stats_uniq_idx; Type: INDEX; Schema: frontend; Owner: postgres
+--
+
+CREATE UNIQUE INDEX company_category_country_stats_uniq_idx ON frontend.company_category_country_stats USING btree (domain_name, store, app_category, country);
 
 
 --
@@ -7494,10 +7515,10 @@ CREATE UNIQUE INDEX s3_package_inventory_myregion_file_key_idx ON ONLY public.s3
 
 
 --
--- Name: idx_s3_package_inventory_20261024_s3_package_inventory_myregion; Type: INDEX; Schema: public; Owner: postgres
+-- Name: idx_s3_package_inventory_20261027_s3_package_inventory_myregion; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE UNIQUE INDEX idx_s3_package_inventory_20261024_s3_package_inventory_myregion ON public.s3_package_inventory_20261024 USING btree (myregion, file_key, batch_date);
+CREATE UNIQUE INDEX idx_s3_package_inventory_20261027_s3_package_inventory_myregion ON public.s3_package_inventory_20261027 USING btree (myregion, file_key, batch_date);
 
 
 --
@@ -7634,10 +7655,10 @@ ALTER INDEX adtech.idx_domain_app_changes_lookup ATTACH PARTITION adtech.idx_dom
 
 
 --
--- Name: idx_s3_package_inventory_20261024_s3_package_inventory_myregion; Type: INDEX ATTACH; Schema: public; Owner: postgres
+-- Name: idx_s3_package_inventory_20261027_s3_package_inventory_myregion; Type: INDEX ATTACH; Schema: public; Owner: postgres
 --
 
-ALTER INDEX public.s3_package_inventory_myregion_file_key_idx ATTACH PARTITION public.idx_s3_package_inventory_20261024_s3_package_inventory_myregion;
+ALTER INDEX public.s3_package_inventory_myregion_file_key_idx ATTACH PARTITION public.idx_s3_package_inventory_20261027_s3_package_inventory_myregion;
 
 
 --
@@ -8358,5 +8379,5 @@ GRANT ALL ON SCHEMA public TO PUBLIC;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict qdLg69QczeuF1aoEmpyXZ379assqXpXxSfiakhvZUfjyPa70nf1jSOTNmp8xabT
+\unrestrict B9i7xJ0a5pzo89eWwkajE5S63wTyRvP16hHwtZsoxQv44HkrMMxHgYFTv4rUS2J
 

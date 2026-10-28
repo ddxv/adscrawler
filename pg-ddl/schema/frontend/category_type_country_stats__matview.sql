@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict ORk3ckqsWa7ZXRvOlvOeRohiozrVSUhBUBPFkEbxkZOq2xfIbGHtfNIw3sajhdr
+\restrict ovIOJ6zgX8MuqwjCLSVqfPSTi2au0gftrqkGNSCnce9GduHmF3c17vKwap4aaDG
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
@@ -51,8 +51,15 @@ CREATE MATERIALIZED VIEW frontend.category_type_country_stats AS
 ALTER MATERIALIZED VIEW frontend.category_type_country_stats OWNER TO postgres;
 
 --
+-- Name: category_type_country_stats_uniq_idx; Type: INDEX; Schema: frontend; Owner: postgres
+--
+
+CREATE UNIQUE INDEX category_type_country_stats_uniq_idx ON frontend.category_type_country_stats USING btree (store, app_category, type_url_slug, country);
+
+
+--
 -- PostgreSQL database dump complete
 --
 
-\unrestrict ORk3ckqsWa7ZXRvOlvOeRohiozrVSUhBUBPFkEbxkZOq2xfIbGHtfNIw3sajhdr
+\unrestrict ovIOJ6zgX8MuqwjCLSVqfPSTi2au0gftrqkGNSCnce9GduHmF3c17vKwap4aaDG
 
