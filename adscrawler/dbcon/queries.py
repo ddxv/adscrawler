@@ -1445,7 +1445,11 @@ def query_apps_to_sdk_scan(
     df = pd.read_sql(
         QUERY_APPS_TO_SDK_SCAN,
         con=pgdb.engine,
-        params={"store": store, "mylimit": limit},
+        params={
+            "store": store,
+            "mylimit": limit,
+            "myregion": CONFIG["s3"].get("use_region", "loki"),
+        },
     )
     if df.empty:
         total_backlog = 0
