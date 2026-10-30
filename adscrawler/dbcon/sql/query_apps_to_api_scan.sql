@@ -78,7 +78,7 @@ all_scheduled_to_run AS (
         ON sa.id = agm.store_app
     LEFT JOIN failed_runs AS fr ON sa.id = fr.store_app
     WHERE
-        (ls.run_at <= current_date - interval '120 days' OR ls.run_at IS NULL)
+        (ls.run_at <= current_date - interval '200 days' OR ls.run_at IS NULL)
         AND sa.store = :store
         AND (fr.failed_attempts < 1 OR fr.failed_attempts IS NULL)
     ORDER BY agm.total_installs DESC NULLS LAST
