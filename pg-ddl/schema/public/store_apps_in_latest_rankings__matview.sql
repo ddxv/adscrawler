@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 6ZNK7jWLza1VchrEtlLId79U7zTEX8FuVlanavi7iUagcdX3ufQTgf7itkczfZe
+\restrict fRfhIuVhqDawZPSkDKK88YqF1N2ycjk0RfHgHXQwCex7xCU2F5YGbxsTEqvEwyK
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
@@ -52,7 +52,7 @@ CREATE MATERIALIZED VIEW public.store_apps_in_latest_rankings AS
            FROM ((frontend.store_app_ranks_weekly ar
              LEFT JOIN frontend.store_apps_overview sa ON ((ar.store_app = sa.id)))
              LEFT JOIN public.countries c ON ((ar.country = c.id)))
-          WHERE ((ar.store_collection = ANY (ARRAY[1, 3, 4, 6])) AND (ar.crawled_date > (CURRENT_DATE - '15 days'::interval)) AND ((c.alpha2)::text = ANY (ARRAY[('US'::character varying)::text, ('GB'::character varying)::text, ('CA'::character varying)::text, ('AR'::character varying)::text, ('CN'::character varying)::text, ('DE'::character varying)::text, ('ID'::character varying)::text, ('IN'::character varying)::text, ('JP'::character varying)::text, ('FR'::character varying)::text, ('BR'::character varying)::text, ('MX'::character varying)::text, ('KR'::character varying)::text, ('RU'::character varying)::text])) AND (ar.rank < 150))
+          WHERE ((ar.store_collection = ANY (ARRAY[1, 3, 4, 6])) AND (ar.crawled_date > (CURRENT_DATE - '15 days'::interval)) AND ((c.alpha2)::text = ANY (ARRAY[('US'::character varying)::text, ('GB'::character varying)::text, ('CA'::character varying)::text, ('AR'::character varying)::text, ('CN'::character varying)::text, ('DE'::character varying)::text, ('ID'::character varying)::text, ('IN'::character varying)::text, ('JP'::character varying)::text, ('FR'::character varying)::text, ('BR'::character varying)::text, ('MX'::character varying)::text, ('KR'::character varying)::text, ('RU'::character varying)::text, ('SA'::character varying)::text, ('TR'::character varying)::text])) AND (ar.rank < 150))
         )
  SELECT growth_apps.store_app,
     growth_apps.store,
@@ -80,5 +80,5 @@ ALTER MATERIALIZED VIEW public.store_apps_in_latest_rankings OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 6ZNK7jWLza1VchrEtlLId79U7zTEX8FuVlanavi7iUagcdX3ufQTgf7itkczfZe
+\unrestrict fRfhIuVhqDawZPSkDKK88YqF1N2ycjk0RfHgHXQwCex7xCU2F5YGbxsTEqvEwyK
 

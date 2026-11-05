@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict th6wnn35vAfILLGm2zucyDSt5uPx9PEOdn5Ytb7BlaRUrFqVxxILARhTeiiucKp
+\restrict gYzIYXn490LhhxaMgoSy06UtoL7HU5rbzFGCB1K8fFxcMt6AVMLqkYJCiiApKcz
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
@@ -81,5 +81,5 @@ CREATE UNIQUE INDEX frontend_company_domain_country_unique ON frontend.company_d
 -- PostgreSQL database dump complete
 --
 
-\unrestrict th6wnn35vAfILLGm2zucyDSt5uPx9PEOdn5Ytb7BlaRUrFqVxxILARhTeiiucKp
+\unrestrict gYzIYXn490LhhxaMgoSy06UtoL7HU5rbzFGCB1K8fFxcMt6AVMLqkYJCiiApKcz
 

@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict ruvVT6bc9SeAYaIWjftFud688lIhbS23alfL677U6mxjg4QKlXv3kfUT2ILZkhk
+\restrict oSCJa7PXfX8PrvMiUgLHFhmsuogh20DVVYKqeog5hE7afzVbcoaPk5HUTbnT1Sp
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
@@ -53,5 +53,5 @@ ALTER TABLE ONLY adtech.combined_domain_apps
 -- PostgreSQL database dump complete
 --
 
-\unrestrict ruvVT6bc9SeAYaIWjftFud688lIhbS23alfL677U6mxjg4QKlXv3kfUT2ILZkhk
+\unrestrict oSCJa7PXfX8PrvMiUgLHFhmsuogh20DVVYKqeog5hE7afzVbcoaPk5HUTbnT1Sp
 

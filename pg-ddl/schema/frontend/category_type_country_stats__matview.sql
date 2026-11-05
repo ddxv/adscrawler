@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict ovIOJ6zgX8MuqwjCLSVqfPSTi2au0gftrqkGNSCnce9GduHmF3c17vKwap4aaDG
+\restrict YgPymQ1XgmP6yk9jEqbvFBnZpEaGp579RnLLuVwBbT61PMdBBdv5dC7icqbY9zT
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
@@ -61,5 +61,5 @@ CREATE UNIQUE INDEX category_type_country_stats_uniq_idx ON frontend.category_ty
 -- PostgreSQL database dump complete
 --
 
-\unrestrict ovIOJ6zgX8MuqwjCLSVqfPSTi2au0gftrqkGNSCnce9GduHmF3c17vKwap4aaDG
+\unrestrict YgPymQ1XgmP6yk9jEqbvFBnZpEaGp579RnLLuVwBbT61PMdBBdv5dC7icqbY9zT
 

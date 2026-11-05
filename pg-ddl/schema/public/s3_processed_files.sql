@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict az2Wp4VPeSglLhAezVsBZhLAMEMU31BcTUGcmsy0to9iTT6w93rc64E9GRyMZbT
+\restrict BarqXJRG8k4rBGV0WrbTLMMufdijOtJ7kCZvWKCgjkYCsNSEazZhudsBZWUhrjy
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
@@ -54,5 +54,5 @@ ALTER TABLE ONLY public.s3_processed_files
 -- PostgreSQL database dump complete
 --
 
-\unrestrict az2Wp4VPeSglLhAezVsBZhLAMEMU31BcTUGcmsy0to9iTT6w93rc64E9GRyMZbT
+\unrestrict BarqXJRG8k4rBGV0WrbTLMMufdijOtJ7kCZvWKCgjkYCsNSEazZhudsBZWUhrjy
 

@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict L6p6xw9LuiQ6vSmodXxefL5OONXyArp9jMB9KJVlMCdyMHREJ2do6uIf2QLK7pf
+\restrict XtTUoXuEbeyhNa9UPVcG9lRSeASpBRehSieIf1IGc5nFMMxbXmPMqve8rdi9ZUL
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
@@ -102,5 +102,5 @@ CREATE INDEX idx_cso_parent_company_domain ON frontend.companies_sdks_overview U
 -- PostgreSQL database dump complete
 --
 
-\unrestrict L6p6xw9LuiQ6vSmodXxefL5OONXyArp9jMB9KJVlMCdyMHREJ2do6uIf2QLK7pf
+\unrestrict XtTUoXuEbeyhNa9UPVcG9lRSeASpBRehSieIf1IGc5nFMMxbXmPMqve8rdi9ZUL
 
