@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict Ckp09xpZSvqcy7K0HMJe81wGPNbe1W0TuXwnA6HzAgYpSfOHKZydS8yVLYVZhgB
+\restrict 8zN7IQRSHWA961cX5zoUeCMDhrJg7i5dUoTjkmZjrOmPSQpIpxIlFm2v8y9ifpp
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
@@ -71,5 +71,5 @@ ALTER TABLE ONLY adtech.stock_exchanges
 -- PostgreSQL database dump complete
 --
 
-\unrestrict Ckp09xpZSvqcy7K0HMJe81wGPNbe1W0TuXwnA6HzAgYpSfOHKZydS8yVLYVZhgB
+\unrestrict 8zN7IQRSHWA961cX5zoUeCMDhrJg7i5dUoTjkmZjrOmPSQpIpxIlFm2v8y9ifpp
 

@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict PoeD7wR4CpTwalcuLGYVa6fGKTNMfbjzg1uNOUwvVKgbP52yGduQoUVxmnrZwen
+\restrict waIoEOGo16cH1MyFHZz78YlzivYXVftmfGA8zwSb9lWpccj7DBmqw2asyZZEqLm
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
@@ -64,5 +64,5 @@ ALTER TABLE ONLY adtech.company_ticker_mapping
 -- PostgreSQL database dump complete
 --
 
-\unrestrict PoeD7wR4CpTwalcuLGYVa6fGKTNMfbjzg1uNOUwvVKgbP52yGduQoUVxmnrZwen
+\unrestrict waIoEOGo16cH1MyFHZz78YlzivYXVftmfGA8zwSb9lWpccj7DBmqw2asyZZEqLm
 

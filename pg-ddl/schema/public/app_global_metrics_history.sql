@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict FJbNpa6lA1hhWzwImbDTb7KVQPx1Zn5rY4NEB4S05IvaBW9nn4tk5fKtF7JcW5H
+\restrict dAnS6VEMqQM7oKxZ3jLtTzc4C2NCgEUJlrftqPQkYvDXFMcMR8gJN5P6jQhKuD8
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
@@ -61,5 +61,5 @@ ALTER TABLE ONLY public.app_global_metrics_history
 -- PostgreSQL database dump complete
 --
 
-\unrestrict FJbNpa6lA1hhWzwImbDTb7KVQPx1Zn5rY4NEB4S05IvaBW9nn4tk5fKtF7JcW5H
+\unrestrict dAnS6VEMqQM7oKxZ3jLtTzc4C2NCgEUJlrftqPQkYvDXFMcMR8gJN5P6jQhKuD8
 

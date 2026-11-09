@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict kmckXP6NMpYx3hHG8UnHiOZxyhF5rFGEaLWF4rbOUtvhqhgsXN5sSX1pJndaajy
+\restrict F9SQT8OZJDixIkxU4qdehqQDyNHsHl0CXeak67dTLJDxlK8CNSyxudybPG2GOec
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
@@ -118,5 +118,5 @@ ALTER TABLE ONLY adtech.api_call_urls
 -- PostgreSQL database dump complete
 --
 
-\unrestrict kmckXP6NMpYx3hHG8UnHiOZxyhF5rFGEaLWF4rbOUtvhqhgsXN5sSX1pJndaajy
+\unrestrict F9SQT8OZJDixIkxU4qdehqQDyNHsHl0CXeak67dTLJDxlK8CNSyxudybPG2GOec
 

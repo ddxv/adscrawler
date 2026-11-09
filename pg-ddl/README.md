@@ -1,6 +1,8 @@
 # Schema Sync Script
 
-## Notes for syncing when wanting to update all changes made on remote to git
+Run `./pg-ddl/sync_schema.sh` from the repository root
+
+## Manual steps for syncing changes made on remote to git
 
 0. Move to `cd pg-ddl`
 1. Remotely run export script. This exports the schema tables/views/functions

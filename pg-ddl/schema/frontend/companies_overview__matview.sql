@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 2Y7ibtVSAE7TIgrfy5C41zdsidpOfC8ZcxCPWqIXYi2vabHvitbJ1BibIZcRTfu
+\restrict w9GZZoS4Z97v8A8hYf5d13o7lNVJOMxqri85J36zhLSWRuzf3nA7TUogGV9AMAc
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
@@ -230,6 +230,19 @@ CREATE MATERIALIZED VIEW frontend.companies_overview AS
              JOIN mediation_agg m_1 ON (((db.company_domain)::text = (m_1.company_domain)::text)))
           WHERE (db.parent_domain IS NOT NULL)
           GROUP BY db.parent_domain
+        ), company_tickers AS (
+         SELECT ctm.company_id,
+            array_agg(DISTINCT t_1.symbol) AS symbols
+           FROM (adtech.company_ticker_mapping ctm
+             LEFT JOIN adtech.tickers t_1 ON ((ctm.ticker_id = t_1.id)))
+          GROUP BY ctm.company_id
+        ), parent_company_tickers AS (
+         SELECT COALESCE((pc.parent_company_id)::bigint, ctm.company_id) AS parent_company_id,
+            array_agg(DISTINCT t_1.symbol) AS symbols
+           FROM ((adtech.company_ticker_mapping ctm
+             LEFT JOIN adtech.tickers t_1 ON ((ctm.ticker_id = t_1.id)))
+             LEFT JOIN adtech.companies pc ON ((ctm.company_id = pc.id)))
+          GROUP BY COALESCE((pc.parent_company_id)::bigint, ctm.company_id)
         )
  SELECT dom.company_domain,
     dom.domain_id,
@@ -248,6 +261,8 @@ CREATE MATERIALIZED VIEW frontend.companies_overview AS
     dom.has_app_ads_reseller,
     COALESCE(co.country, pco.country) AS country,
     co.country AS country_direct,
+    ct.symbols AS tickers_direct,
+    pct.symbols AS company_tickers,
     COALESCE(ipco.api_ip_resolved_country, pipco.api_ip_resolved_country) AS api_ip_resolved_country,
     ipco.api_ip_resolved_country AS api_ip_resolved_country_direct,
     COALESCE(po.percent_open_source, ppo.percent_open_source) AS percent_open_source,
@@ -308,7 +323,7 @@ CREATE MATERIALIZED VIEW frontend.companies_overview AS
     (((dom.company_id IS NOT NULL) AND (dom.company_id IN ( SELECT DISTINCT companies.parent_company_id
            FROM adtech.companies
           WHERE (companies.parent_company_id IS NOT NULL)))))::integer AS is_parent_domain
-   FROM ((((((((((((((((((domain_base dom
+   FROM ((((((((((((((((((((domain_base dom
      LEFT JOIN creatives_agg c ON (((dom.company_domain)::text = (c.company_domain)::text)))
      LEFT JOIN trends_agg t ON (((dom.company_domain)::text = t.company_domain)))
      LEFT JOIN app_changes_agg a ON (((dom.company_domain)::text = (a.company_domain)::text)))
@@ -327,6 +342,8 @@ CREATE MATERIALIZED VIEW frontend.companies_overview AS
      LEFT JOIN ip_country_resolved pipco ON (((dom.parent_domain)::text = (pipco.company_domain)::text)))
      LEFT JOIN percent_opensource po ON (((dom.company_domain)::text = (po.company_domain)::text)))
      LEFT JOIN percent_opensource ppo ON (((dom.parent_domain)::text = (ppo.company_domain)::text)))
+     LEFT JOIN company_tickers ct ON ((dom.company_id = ct.company_id)))
+     LEFT JOIN parent_company_tickers pct ON ((dom.company_id = pct.parent_company_id)))
   WITH NO DATA;
 
 
@@ -364,5 +381,5 @@ CREATE UNIQUE INDEX frontend_companies_overview_domain ON frontend.companies_ove
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 2Y7ibtVSAE7TIgrfy5C41zdsidpOfC8ZcxCPWqIXYi2vabHvitbJ1BibIZcRTfu
+\unrestrict w9GZZoS4Z97v8A8hYf5d13o7lNVJOMxqri85J36zhLSWRuzf3nA7TUogGV9AMAc
 

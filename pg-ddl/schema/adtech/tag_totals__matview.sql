@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 7aBIdoQ39EidaDDOaNeKlbLs7SXfLb3hBWgXozsDnlawIKsulxSOZpkU4zoUbzl
+\restrict GO2JlLANt4lf3mip0P3DOMLxzsfpJiCDtYM6fzTsyAUURly6xjkZiZVV64LFcaH
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
@@ -74,5 +74,5 @@ CREATE UNIQUE INDEX adtech_tag_totals_unique ON adtech.tag_totals USING btree (s
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 7aBIdoQ39EidaDDOaNeKlbLs7SXfLb3hBWgXozsDnlawIKsulxSOZpkU4zoUbzl
+\unrestrict GO2JlLANt4lf3mip0P3DOMLxzsfpJiCDtYM6fzTsyAUURly6xjkZiZVV64LFcaH
 

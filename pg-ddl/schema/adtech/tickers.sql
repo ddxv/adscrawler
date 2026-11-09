@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict UzQPeVpY9AD8JLQn9GzmXjxAiZgYrY5Hg0d37mbgNzf0fFw1T1KhpWhVY5M5mEf
+\restrict 9DVoMWpsaK4HMn6JoJ6Xd33GGWckJgNmadBDItwpIZKS9ZTZ0TE2cLDazc21xk8
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
@@ -31,7 +31,8 @@ CREATE TABLE adtech.tickers (
     id integer NOT NULL,
     symbol character varying(32) NOT NULL,
     exchange_id integer NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    ticker_company_name text
 );
 
 
@@ -79,5 +80,5 @@ ALTER TABLE ONLY adtech.tickers
 -- PostgreSQL database dump complete
 --
 
-\unrestrict UzQPeVpY9AD8JLQn9GzmXjxAiZgYrY5Hg0d37mbgNzf0fFw1T1KhpWhVY5M5mEf
+\unrestrict 9DVoMWpsaK4HMn6JoJ6Xd33GGWckJgNmadBDItwpIZKS9ZTZ0TE2cLDazc21xk8
 

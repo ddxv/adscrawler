@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict nle8FZkm6MeSb3RmK4JFV5bMlm9wTFYFVlexJb64FDie3IbJxsZyaeVmwci3kBp
+\restrict sVCGgSUUEPNxvqiBTB5MbHOhXqKuMZGzMjBTf0m4xtELqH6DMBmFItsFrgdeQcW
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
@@ -1683,7 +1683,8 @@ CREATE TABLE adtech.tickers (
     id integer NOT NULL,
     symbol character varying(32) NOT NULL,
     exchange_id integer NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    ticker_company_name text
 );
 
 
@@ -3389,6 +3390,19 @@ CREATE MATERIALIZED VIEW frontend.companies_overview AS
              JOIN mediation_agg m_1 ON (((db.company_domain)::text = (m_1.company_domain)::text)))
           WHERE (db.parent_domain IS NOT NULL)
           GROUP BY db.parent_domain
+        ), company_tickers AS (
+         SELECT ctm.company_id,
+            array_agg(DISTINCT t_1.symbol) AS symbols
+           FROM (adtech.company_ticker_mapping ctm
+             LEFT JOIN adtech.tickers t_1 ON ((ctm.ticker_id = t_1.id)))
+          GROUP BY ctm.company_id
+        ), parent_company_tickers AS (
+         SELECT COALESCE((pc.parent_company_id)::bigint, ctm.company_id) AS parent_company_id,
+            array_agg(DISTINCT t_1.symbol) AS symbols
+           FROM ((adtech.company_ticker_mapping ctm
+             LEFT JOIN adtech.tickers t_1 ON ((ctm.ticker_id = t_1.id)))
+             LEFT JOIN adtech.companies pc ON ((ctm.company_id = pc.id)))
+          GROUP BY COALESCE((pc.parent_company_id)::bigint, ctm.company_id)
         )
  SELECT dom.company_domain,
     dom.domain_id,
@@ -3407,6 +3421,8 @@ CREATE MATERIALIZED VIEW frontend.companies_overview AS
     dom.has_app_ads_reseller,
     COALESCE(co.country, pco.country) AS country,
     co.country AS country_direct,
+    ct.symbols AS tickers_direct,
+    pct.symbols AS company_tickers,
     COALESCE(ipco.api_ip_resolved_country, pipco.api_ip_resolved_country) AS api_ip_resolved_country,
     ipco.api_ip_resolved_country AS api_ip_resolved_country_direct,
     COALESCE(po.percent_open_source, ppo.percent_open_source) AS percent_open_source,
@@ -3467,7 +3483,7 @@ CREATE MATERIALIZED VIEW frontend.companies_overview AS
     (((dom.company_id IS NOT NULL) AND (dom.company_id IN ( SELECT DISTINCT companies.parent_company_id
            FROM adtech.companies
           WHERE (companies.parent_company_id IS NOT NULL)))))::integer AS is_parent_domain
-   FROM ((((((((((((((((((domain_base dom
+   FROM ((((((((((((((((((((domain_base dom
      LEFT JOIN creatives_agg c ON (((dom.company_domain)::text = (c.company_domain)::text)))
      LEFT JOIN trends_agg t ON (((dom.company_domain)::text = t.company_domain)))
      LEFT JOIN app_changes_agg a ON (((dom.company_domain)::text = (a.company_domain)::text)))
@@ -3486,6 +3502,8 @@ CREATE MATERIALIZED VIEW frontend.companies_overview AS
      LEFT JOIN ip_country_resolved pipco ON (((dom.parent_domain)::text = (pipco.company_domain)::text)))
      LEFT JOIN percent_opensource po ON (((dom.company_domain)::text = (po.company_domain)::text)))
      LEFT JOIN percent_opensource ppo ON (((dom.parent_domain)::text = (ppo.company_domain)::text)))
+     LEFT JOIN company_tickers ct ON ((dom.company_id = ct.company_id)))
+     LEFT JOIN parent_company_tickers pct ON ((dom.company_id = pct.parent_company_id)))
   WITH NO DATA;
 
 
@@ -3930,6 +3948,95 @@ CREATE MATERIALIZED VIEW frontend.company_top_apps AS
 
 
 ALTER MATERIALIZED VIEW frontend.company_top_apps OWNER TO postgres;
+
+--
+-- Name: ctv_app_ranks; Type: MATERIALIZED VIEW; Schema: frontend; Owner: postgres
+--
+
+CREATE MATERIALIZED VIEW frontend.ctv_app_ranks AS
+ WITH ranked_apps AS (
+         SELECT store_apps_overview.id,
+            store_apps_overview.name,
+            store_apps_overview.store_id,
+            store_apps_overview.store,
+            store_apps_overview.category,
+            store_apps_overview.rating,
+            store_apps_overview.rating_count,
+            store_apps_overview.installs,
+            store_apps_overview.installs_sum_1w,
+            store_apps_overview.ratings_sum_1w,
+            store_apps_overview.installs_sum_4w,
+            store_apps_overview.installs_z_score_2w,
+            store_apps_overview.installs_z_score_4w,
+            store_apps_overview.weekly_active_users,
+            store_apps_overview.monthly_active_users,
+            store_apps_overview.weekly_ad_revenue,
+            store_apps_overview.weekly_iap_revenue,
+            store_apps_overview.monthly_ad_revenue,
+            store_apps_overview.monthly_iap_revenue,
+            store_apps_overview.ad_supported,
+            store_apps_overview.free,
+            store_apps_overview.in_app_purchases,
+            store_apps_overview.store_last_updated,
+            store_apps_overview.created_at,
+            store_apps_overview.last_crawled_at,
+            store_apps_overview.crawl_result,
+            store_apps_overview.icon_64,
+            store_apps_overview.icon_128,
+            store_apps_overview.icon_url_512,
+            store_apps_overview.release_date,
+            store_apps_overview.tv_supported,
+            store_apps_overview.featured_image_url,
+            store_apps_overview.phone_image_url_1,
+            store_apps_overview.phone_image_url_2,
+            store_apps_overview.phone_image_url_3,
+            store_apps_overview.tablet_image_url_1,
+            store_apps_overview.tablet_image_url_2,
+            store_apps_overview.tablet_image_url_3,
+            store_apps_overview.textsearchable,
+            store_apps_overview.developer_id,
+            store_apps_overview.developer_name,
+            store_apps_overview.developer_url,
+            store_apps_overview.adstxt_last_crawled,
+            store_apps_overview.adstxt_crawl_result,
+            store_apps_overview.sdk_last_crawled,
+            store_apps_overview.sdk_last_crawl_result,
+            store_apps_overview.sdk_successful_last_crawled,
+            store_apps_overview.description,
+            store_apps_overview.description_short,
+            store_apps_overview.api_last_crawled,
+            store_apps_overview.run_result,
+            store_apps_overview.api_successful_last_crawled,
+            store_apps_overview.ad_creative_count,
+            store_apps_overview.ad_mon_creatives,
+            store_apps_overview.is_removed,
+            store_apps_overview.country_id,
+            row_number() OVER (PARTITION BY store_apps_overview.store ORDER BY store_apps_overview.installs_sum_4w DESC NULLS LAST) AS rn
+           FROM frontend.store_apps_overview
+          WHERE store_apps_overview.tv_supported
+        )
+ SELECT name AS app_name,
+    store_id,
+    store,
+    COALESCE(icon_64, icon_128) AS app_icon,
+    category AS app_category,
+    developer_name,
+    developer_id,
+    rating,
+    rating_count,
+    installs,
+    installs_sum_4w AS monthly_installs,
+    (monthly_ad_revenue + monthly_iap_revenue) AS monthly_revenue,
+    installs_z_score_2w,
+    country_id,
+    rn AS rank_num
+   FROM ranked_apps
+  WHERE (rn <= 50)
+  ORDER BY store, installs_sum_4w DESC
+  WITH NO DATA;
+
+
+ALTER MATERIALIZED VIEW frontend.ctv_app_ranks OWNER TO postgres;
 
 --
 -- Name: app_keywords_extracted; Type: TABLE; Schema: public; Owner: postgres
@@ -5192,10 +5299,10 @@ CREATE VIEW public.s3_file_keys AS
 ALTER VIEW public.s3_file_keys OWNER TO postgres;
 
 --
--- Name: s3_package_inventory_20261104; Type: TABLE; Schema: public; Owner: postgres
+-- Name: s3_package_inventory_20261109; Type: TABLE; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.s3_package_inventory_20261104 (
+CREATE TABLE public.s3_package_inventory_20261109 (
     myregion text CONSTRAINT s3_package_inventory_myregion_not_null NOT NULL,
     versionstr text CONSTRAINT s3_package_inventory_versionstr_not_null NOT NULL,
     version_code_id integer,
@@ -5203,11 +5310,11 @@ CREATE TABLE public.s3_package_inventory_20261104 (
     file_key text CONSTRAINT s3_package_inventory_file_key_not_null NOT NULL,
     last_modified timestamp with time zone CONSTRAINT s3_package_inventory_last_modified_not_null NOT NULL,
     batch_date date CONSTRAINT s3_package_inventory_batch_date_not_null NOT NULL,
-    CONSTRAINT s3_package_inventory_20261104_batch_date_check CHECK ((batch_date = '2026-11-04'::date))
+    CONSTRAINT s3_package_inventory_20261109_batch_date_check CHECK ((batch_date = '2026-11-09'::date))
 );
 
 
-ALTER TABLE public.s3_package_inventory_20261104 OWNER TO postgres;
+ALTER TABLE public.s3_package_inventory_20261109 OWNER TO postgres;
 
 --
 -- Name: s3_processed_files; Type: TABLE; Schema: public; Owner: postgres
@@ -5793,10 +5900,10 @@ ALTER TABLE ONLY adtech.trend_parent_companies ATTACH PARTITION adtech.trend_par
 
 
 --
--- Name: s3_package_inventory_20261104; Type: TABLE ATTACH; Schema: public; Owner: postgres
+-- Name: s3_package_inventory_20261109; Type: TABLE ATTACH; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.s3_package_inventory ATTACH PARTITION public.s3_package_inventory_20261104 FOR VALUES IN ('2026-11-04');
+ALTER TABLE ONLY public.s3_package_inventory ATTACH PARTITION public.s3_package_inventory_20261109 FOR VALUES IN ('2026-11-09');
 
 
 --
@@ -7624,10 +7731,10 @@ CREATE UNIQUE INDEX s3_package_inventory_myregion_file_key_idx ON ONLY public.s3
 
 
 --
--- Name: idx_s3_package_inventory_20261104_s3_package_inventory_myregion; Type: INDEX; Schema: public; Owner: postgres
+-- Name: idx_s3_package_inventory_20261109_s3_package_inventory_myregion; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE UNIQUE INDEX idx_s3_package_inventory_20261104_s3_package_inventory_myregion ON public.s3_package_inventory_20261104 USING btree (myregion, file_key, batch_date);
+CREATE UNIQUE INDEX idx_s3_package_inventory_20261109_s3_package_inventory_myregion ON public.s3_package_inventory_20261109 USING btree (myregion, file_key, batch_date);
 
 
 --
@@ -7764,10 +7871,10 @@ ALTER INDEX adtech.idx_domain_app_changes_lookup ATTACH PARTITION adtech.idx_dom
 
 
 --
--- Name: idx_s3_package_inventory_20261104_s3_package_inventory_myregion; Type: INDEX ATTACH; Schema: public; Owner: postgres
+-- Name: idx_s3_package_inventory_20261109_s3_package_inventory_myregion; Type: INDEX ATTACH; Schema: public; Owner: postgres
 --
 
-ALTER INDEX public.s3_package_inventory_myregion_file_key_idx ATTACH PARTITION public.idx_s3_package_inventory_20261104_s3_package_inventory_myregion;
+ALTER INDEX public.s3_package_inventory_myregion_file_key_idx ATTACH PARTITION public.idx_s3_package_inventory_20261109_s3_package_inventory_myregion;
 
 
 --
@@ -8512,5 +8619,5 @@ GRANT ALL ON SCHEMA public TO PUBLIC;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict nle8FZkm6MeSb3RmK4JFV5bMlm9wTFYFVlexJb64FDie3IbJxsZyaeVmwci3kBp
+\unrestrict sVCGgSUUEPNxvqiBTB5MbHOhXqKuMZGzMjBTf0m4xtELqH6DMBmFItsFrgdeQcW
 
