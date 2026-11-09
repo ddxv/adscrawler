@@ -47,7 +47,7 @@ Note: This project is not a one click setup but feel free to reach out for help.
 
 - `-n, --new-apps-check` This crawls app rank data and stores to S3. It is also the source of new apps. Crawl the iTunes and Play Store front pages to discover new apps. Checks top apps for each category and collection.
 
-- `--daily-s3-imports` This processes and imports data stored in S3. App Ranks and app metrics.
+- `--daily-s3-imports` Processes and imports data stored in S3
 
 - `-d, --new-apps-check-devs` Crawl developers' pages to find new apps from those developers.
 

@@ -1,9 +1,6 @@
 import argparse
-import datetime
 import os
 import sys
-
-import pandas as pd
 
 from adscrawler.app_stores.process_icons import refresh_app_icons
 from adscrawler.app_stores.process_keywords import process_app_keywords
@@ -22,23 +19,8 @@ from adscrawler.packages.process_files import (
     manual_download_app,
     process_sdks,
 )
-from adscrawler.process.app_details import (
-    compact_incoming_app_details,
-    import_app_details_from_s3_into_db,
-    import_keywords_from_s3,
-)
-from adscrawler.process.app_domain_history import (
-    process_company_history,
-)
-from adscrawler.process.app_metrics_history import (
-    clean_history_tables,
-    delete_and_aggregate_s3_agg,
-)
-from adscrawler.process.app_rankings import import_ranks_from_s3
-from adscrawler.process.version_details import (
-    compact_incoming_version_details,
-    map_version_details,
-)
+from adscrawler.process.app_domain_history import process_company_history
+from adscrawler.process.pipeline_manager import daily_s3_imports
 from adscrawler.scrape import crawl_app_ads
 from adscrawler.tools.get_company_logos import refresh_metadata
 
@@ -438,75 +420,7 @@ class ProcessManager:
         logger.info("Adscrawler exiting main")
 
     def daily_s3_imports(self) -> None:
-        period = self.args.ranks_period
-        if period == "week":
-            start_date = datetime.date.today() - datetime.timedelta(days=9)
-            end_date = datetime.date.today()
-        elif period == "day":
-            start_date = datetime.date.today() - datetime.timedelta(days=3)
-            end_date = datetime.date.today()
-        else:
-            raise ValueError(f"Invalid period {period}")
-        try:
-            import_ranks_from_s3(
-                pgdb=self.pgcon,
-                start_date=start_date,
-                end_date=end_date,
-                period=period,
-            )
-        except Exception:
-            logger.exception(
-                f"Importing {self.args.ranks_period} ranks from s3 for failed"
-            )
-        try:
-            start_date = datetime.date.today() - datetime.timedelta(days=5)
-            end_date = datetime.date.today() - datetime.timedelta(days=1)
-            import_keywords_from_s3(
-                pgdb=self.pgcon,
-                start_date=start_date,
-                end_date=end_date,
-            )
-        except Exception:
-            logger.exception("Importing keywords from s3 for failed")
-
-        start_date = datetime.date.today() - datetime.timedelta(days=5)
-        end_date = datetime.date.today().isoformat()
-        for dt in pd.date_range(start_date, end_date, freq="D"):
-            crawled_date = dt.strftime("%Y-%m-%d")
-            compact_incoming_version_details(date_str=crawled_date)
-            for store in [1, 2]:
-                try:
-                    compact_incoming_app_details(store=store, crawled_date=crawled_date)
-                    import_app_details_from_s3_into_db(
-                        store=store,
-                        crawled_date=crawled_date,
-                        pgdb=self.pgcon,
-                    )
-                except Exception:
-                    logger.exception(
-                        f"Importing app_details from s3 failed {store=} {crawled_date=}"
-                    )
-
-        for store in [1, 2]:
-            try:
-                delete_and_aggregate_s3_agg(store=store, pgdb=self.pgcon)
-            except Exception:
-                logger.exception(f"Importing {store=} app metrics from s3 for failed")
-
-        try:
-            clean_history_tables(pgdb=self.pgcon)
-        except Exception:
-            logger.exception("Cleaning history tables failed")
-
-        try:
-            process_company_history(pgdb=self.pgcon)
-        except Exception:
-            logger.exception("Exporting combined domain history to s3 failed")
-
-        try:
-            map_version_details(pgdb=self.pgcon)
-        except Exception:
-            logger.exception("Syncing version details to Postgres failed")
+        daily_s3_imports(pgdb=self.pgcon, period=self.args.ranks_period)
 
     def scrape_new_apps(self, store: int) -> None:
         try:

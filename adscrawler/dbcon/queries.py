@@ -1,6 +1,7 @@
 import datetime
 import hashlib
 import io
+import json
 import pathlib
 import time
 from collections.abc import Callable
@@ -1906,6 +1907,85 @@ def query_store_app_categories(
         params={"store_apps": store_apps_tuple},
     )
     return df
+
+
+def create_pipeline_run(
+    pgdb: PostgresEngine,
+    pipeline_name: str,
+    context: dict[str, Any],
+    steps: list[tuple[str, str, dict[str, Any]]],
+) -> tuple[int, dict[tuple[str, str], int]]:
+    """Create a run and all its planned steps in a single transaction."""
+    insert = text("""
+        INSERT INTO logging.pipeline_runs
+            (parent_run_id, pipeline_name, step_name, unit_key, status,
+             started_at, heartbeat_at, context)
+        VALUES
+            (:parent_run_id, :pipeline_name, :step_name, :unit_key, :status,
+             CASE WHEN :status = 'running' THEN now() END,
+             CASE WHEN :status = 'running' THEN now() END,
+             CAST(:context AS jsonb))
+        RETURNING id
+    """)
+    with pgdb.engine.begin() as conn:
+        run_id = conn.execute(
+            insert,
+            {
+                "parent_run_id": None,
+                "pipeline_name": pipeline_name,
+                "step_name": None,
+                "unit_key": "",
+                "status": "running",
+                "context": json.dumps(context),
+            },
+        ).scalar_one()
+        step_ids = {}
+        for name, unit_key, step_context in steps:
+            key = (name, unit_key)
+            if key in step_ids:
+                raise ValueError(f"Duplicate pipeline step: {key}")
+            step_ids[key] = conn.execute(
+                insert,
+                {
+                    "parent_run_id": run_id,
+                    "pipeline_name": pipeline_name,
+                    "step_name": name,
+                    "unit_key": unit_key,
+                    "status": "pending",
+                    "context": json.dumps(step_context),
+                },
+            ).scalar_one()
+    return run_id, step_ids
+
+
+def update_pipeline_run(
+    pgdb: PostgresEngine, row_id: int, status: str, error: str | None = None
+) -> None:
+    with pgdb.engine.begin() as conn:
+        conn.execute(
+            text("""
+                UPDATE logging.pipeline_runs
+                SET status = :status,
+                    started_at = CASE WHEN :status = 'running' THEN now() ELSE started_at END,
+                    heartbeat_at = CASE WHEN :status = 'running' THEN now() ELSE heartbeat_at END,
+                    finished_at = CASE WHEN :status != 'running' THEN now() ELSE NULL END,
+                    error_summary = :error
+                WHERE id = :id
+            """),
+            {"id": row_id, "status": status, "error": error},
+        )
+
+
+def heartbeat_pipeline_run(pgdb: PostgresEngine, run_id: int | None) -> None:
+    with pgdb.engine.begin() as conn:
+        conn.execute(
+            text("""
+                UPDATE logging.pipeline_runs SET heartbeat_at = now()
+                WHERE (id = :run_id OR parent_run_id = :run_id)
+                  AND status = 'running'
+            """),
+            {"run_id": run_id},
+        )
 
 
 @lru_cache(maxsize=2)
