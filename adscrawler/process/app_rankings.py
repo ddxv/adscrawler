@@ -144,7 +144,7 @@ def process_ranks_from_s3(
     else:
         raise ValueError(f"Invalid period {period}")
     period_date_str = dt.strftime("%Y-%m-%d")
-    log_info = f"process_ranks_from_s3"
+    log_info = "process_ranks_from_s3"
     logger.info(f"{log_info} {store=} {period_date_str=}")
     all_parquet_paths = get_s3_rank_parquet_paths(s3_config_key, dt, days, store)
     if len(all_parquet_paths) == 0:

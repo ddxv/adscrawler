@@ -107,7 +107,9 @@ def atomic_swap_date_partition(
             cur.execute(sql.SQL("ANALYZE {}").format(staging))
             conn.commit()
             with conn.transaction():
-                cur.execute(sql.SQL("LOCK TABLE {} IN ACCESS EXCLUSIVE MODE").format(parent))
+                cur.execute(
+                    sql.SQL("LOCK TABLE {} IN ACCESS EXCLUSIVE MODE").format(parent)
+                )
                 attached = _get_existing_partitions(cur, schema, table)
                 if partition_name in attached:
                     cur.execute(
