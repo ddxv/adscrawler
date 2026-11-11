@@ -117,16 +117,26 @@ def test_process_keywords_resolves_missing_apps(monkeypatch):
 
 
 def keyword_frame(store, date="2026-07-10", country=4):
-    return pd.DataFrame([{
-        "crawled_date": date, "store": store, "country": country,
-        "keyword_id": 5, "store_app": store + 10, "app_rank": 1,
-    }])
+    return pd.DataFrame(
+        [
+            {
+                "crawled_date": date,
+                "store": store,
+                "country": country,
+                "keyword_id": 5,
+                "store_app": store + 10,
+                "app_rank": 1,
+            }
+        ]
+    )
 
 
 def test_import_keywords_rebuilds_all_stores_when_any_file_unprocessed(monkeypatch):
     monkeypatch.setattr(keywords, "CONFIG", {"s3": {"bucket": "bucket"}})
     monkeypatch.setattr(
-        keywords, "get_parquet_paths_by_prefix", lambda bucket, prefix: [prefix + "old", prefix + "new"]
+        keywords,
+        "get_parquet_paths_by_prefix",
+        lambda bucket, prefix: [prefix + "old", prefix + "new"],
     )
     process = Mock(side_effect=lambda paths, config, db, store: keyword_frame(store))
     swap = Mock()
@@ -144,12 +154,17 @@ def test_import_keywords_rebuilds_all_stores_when_any_file_unprocessed(monkeypat
     assert [call.args[3] for call in process.call_args_list] == [1, 2]
     assert all(len(call.args[0]) == 2 for call in process.call_args_list)
     assert len(unprocessed.call_args.args[0]) == 4
-    assert unprocessed.call_args.kwargs == {"pipeline_name": "import_keywords_from_s3_v2", "pgdb": db}
+    assert unprocessed.call_args.kwargs == {
+        "pipeline_name": "import_keywords_from_s3_v2",
+        "pgdb": db,
+    }
     assert swap.call_count == 1
     assert set(swap.call_args.args[0]["store"]) == {1, 2}
     assert swap.call_args.kwargs == {
-        "schema": "frontend", "table": "app_keyword_ranks_daily",
-        "partition_prefix": "app_keyword_ranks_daily", "partition_date": date,
+        "schema": "frontend",
+        "table": "app_keyword_ranks_daily",
+        "partition_prefix": "app_keyword_ranks_daily",
+        "partition_date": date,
     }
     assert record.call_args.kwargs["status"] == "completed"
     assert len(record.call_args.kwargs["file_path"]) == 4
@@ -157,7 +172,9 @@ def test_import_keywords_rebuilds_all_stores_when_any_file_unprocessed(monkeypat
 
 def test_import_keywords_skips_dates_with_only_completed_files(monkeypatch):
     monkeypatch.setattr(keywords, "CONFIG", {"s3": {"bucket": "bucket"}})
-    monkeypatch.setattr(keywords, "get_parquet_paths_by_prefix", lambda bucket, prefix: [prefix])
+    monkeypatch.setattr(
+        keywords, "get_parquet_paths_by_prefix", lambda bucket, prefix: [prefix]
+    )
     unprocessed = Mock(return_value=[])
     process = Mock()
     swap = Mock()
@@ -167,7 +184,9 @@ def test_import_keywords_skips_dates_with_only_completed_files(monkeypatch):
     monkeypatch.setattr(keywords, "atomic_swap_date_partition", swap)
     monkeypatch.setattr(keywords, "record_s3_file_status", record)
     start = datetime.date(2026, 7, 10)
-    keywords.import_keywords_from_s3(start, start + datetime.timedelta(days=4), object())
+    keywords.import_keywords_from_s3(
+        start, start + datetime.timedelta(days=4), object()
+    )
     assert unprocessed.call_count == 5
     process.assert_not_called()
     swap.assert_not_called()
@@ -176,8 +195,14 @@ def test_import_keywords_skips_dates_with_only_completed_files(monkeypatch):
 
 def test_import_keywords_missing_store_uses_available_files(monkeypatch):
     monkeypatch.setattr(keywords, "CONFIG", {"s3": {"bucket": "bucket"}})
-    monkeypatch.setattr(keywords, "get_parquet_paths_by_prefix", lambda bucket, prefix: [prefix] if "store=1/" in prefix else [])
-    monkeypatch.setattr(keywords, "filter_unprocessed_s3_files", lambda paths, **_: paths)
+    monkeypatch.setattr(
+        keywords,
+        "get_parquet_paths_by_prefix",
+        lambda bucket, prefix: [prefix] if "store=1/" in prefix else [],
+    )
+    monkeypatch.setattr(
+        keywords, "filter_unprocessed_s3_files", lambda paths, **_: paths
+    )
     process = Mock(return_value=keyword_frame(1))
     swap = Mock()
     record = Mock()
@@ -194,8 +219,12 @@ def test_import_keywords_missing_store_uses_available_files(monkeypatch):
 
 def test_import_keywords_failure_never_swaps_partial_date(monkeypatch):
     monkeypatch.setattr(keywords, "CONFIG", {"s3": {"bucket": "bucket"}})
-    monkeypatch.setattr(keywords, "get_parquet_paths_by_prefix", lambda bucket, prefix: [prefix])
-    monkeypatch.setattr(keywords, "filter_unprocessed_s3_files", lambda paths, **_: paths)
+    monkeypatch.setattr(
+        keywords, "get_parquet_paths_by_prefix", lambda bucket, prefix: [prefix]
+    )
+    monkeypatch.setattr(
+        keywords, "filter_unprocessed_s3_files", lambda paths, **_: paths
+    )
     process = Mock(side_effect=[keyword_frame(1), ValueError("bad parquet")])
     swap = Mock()
     record = Mock()
@@ -212,7 +241,9 @@ def test_import_keywords_failure_never_swaps_partial_date(monkeypatch):
 
 def test_import_keywords_retries_failed_date_and_skips_after_success(monkeypatch):
     monkeypatch.setattr(keywords, "CONFIG", {"s3": {"bucket": "bucket"}})
-    monkeypatch.setattr(keywords, "get_parquet_paths_by_prefix", lambda bucket, prefix: [prefix])
+    monkeypatch.setattr(
+        keywords, "get_parquet_paths_by_prefix", lambda bucket, prefix: [prefix]
+    )
     statuses = {}
 
     def filter_files(paths, **kwargs):
@@ -221,7 +252,14 @@ def test_import_keywords_retries_failed_date_and_skips_after_success(monkeypatch
     def record_status(**kwargs):
         statuses.update({path: kwargs["status"] for path in kwargs["file_path"]})
 
-    process = Mock(side_effect=[keyword_frame(1), ValueError("bad parquet"), keyword_frame(1), keyword_frame(2)])
+    process = Mock(
+        side_effect=[
+            keyword_frame(1),
+            ValueError("bad parquet"),
+            keyword_frame(1),
+            keyword_frame(2),
+        ]
+    )
     swap = Mock()
     monkeypatch.setattr(keywords, "filter_unprocessed_s3_files", filter_files)
     monkeypatch.setattr(keywords, "record_s3_file_status", record_status)
@@ -243,8 +281,12 @@ def test_import_keywords_retries_failed_date_and_skips_after_success(monkeypatch
 
 def test_import_keywords_empty_store_does_not_swap_other_store(monkeypatch):
     monkeypatch.setattr(keywords, "CONFIG", {"s3": {"bucket": "bucket"}})
-    monkeypatch.setattr(keywords, "get_parquet_paths_by_prefix", lambda bucket, prefix: [prefix])
-    monkeypatch.setattr(keywords, "filter_unprocessed_s3_files", lambda paths, **_: paths)
+    monkeypatch.setattr(
+        keywords, "get_parquet_paths_by_prefix", lambda bucket, prefix: [prefix]
+    )
+    monkeypatch.setattr(
+        keywords, "filter_unprocessed_s3_files", lambda paths, **_: paths
+    )
     process = Mock(side_effect=[keyword_frame(1), keyword_frame(2).iloc[0:0]])
     swap = Mock()
     record = Mock()
@@ -259,8 +301,14 @@ def test_import_keywords_empty_store_does_not_swap_other_store(monkeypatch):
 
 def test_import_keywords_invalid_or_empty_data_does_not_swap(monkeypatch):
     monkeypatch.setattr(keywords, "CONFIG", {"s3": {"bucket": "bucket"}})
-    monkeypatch.setattr(keywords, "get_parquet_paths_by_prefix", lambda bucket, prefix: [prefix] if "store=1/" in prefix else [])
-    monkeypatch.setattr(keywords, "filter_unprocessed_s3_files", lambda paths, **_: paths)
+    monkeypatch.setattr(
+        keywords,
+        "get_parquet_paths_by_prefix",
+        lambda bucket, prefix: [prefix] if "store=1/" in prefix else [],
+    )
+    monkeypatch.setattr(
+        keywords, "filter_unprocessed_s3_files", lambda paths, **_: paths
+    )
     process = Mock()
     swap = Mock()
     record = Mock()
@@ -268,7 +316,11 @@ def test_import_keywords_invalid_or_empty_data_does_not_swap(monkeypatch):
     monkeypatch.setattr(keywords, "atomic_swap_date_partition", swap)
     monkeypatch.setattr(keywords, "record_s3_file_status", record)
     date = datetime.date(2026, 7, 10)
-    for frame in [keyword_frame(1, country=None), keyword_frame(1, date="2026-07-11"), keyword_frame(1).iloc[0:0]]:
+    for frame in [
+        keyword_frame(1, country=None),
+        keyword_frame(1, date="2026-07-11"),
+        keyword_frame(1).iloc[0:0],
+    ]:
         process.return_value = frame
         keywords.import_keywords_from_s3(date, date, object())
     swap.assert_not_called()
@@ -277,7 +329,9 @@ def test_import_keywords_invalid_or_empty_data_does_not_swap(monkeypatch):
 
 def test_import_keywords_no_files_does_not_swap(monkeypatch):
     monkeypatch.setattr(keywords, "CONFIG", {"s3": {"bucket": "bucket"}})
-    monkeypatch.setattr(keywords, "get_parquet_paths_by_prefix", lambda bucket, prefix: [])
+    monkeypatch.setattr(
+        keywords, "get_parquet_paths_by_prefix", lambda bucket, prefix: []
+    )
     swap = Mock()
     record = Mock()
     monkeypatch.setattr(keywords, "atomic_swap_date_partition", swap)

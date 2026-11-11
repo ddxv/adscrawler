@@ -73,7 +73,9 @@ class TestSaveAppRanks(unittest.TestCase):
     @patch("adscrawler.app_stores.scrape_stores.process_store_rankings")
     @patch("adscrawler.app_stores.scrape_stores.query_store_id_map")
     def test_crawl_timestamp_is_added_or_preserved(self, query_map, upload):
-        query_map.return_value = pd.DataFrame([{"store": 1, "store_id": "app", "id": 5}])
+        query_map.return_value = pd.DataFrame(
+            [{"store": 1, "store_id": "app", "id": 5}]
+        )
         source = pd.DataFrame([{"store": 1, "store_id": "app", "country": "us"}])
         save_app_ranks(source, object(), 1, pd.DataFrame(), pd.DataFrame())
         uploaded = upload.call_args.kwargs["df"]
@@ -82,7 +84,10 @@ class TestSaveAppRanks(unittest.TestCase):
 
         source["crawled_at"] = pd.Timestamp("2025-01-01T12:00:00Z")
         save_app_ranks(source, object(), 1, pd.DataFrame(), pd.DataFrame())
-        self.assertEqual(upload.call_args.kwargs["df"].loc[0, "crawled_at"], source.loc[0, "crawled_at"])
+        self.assertEqual(
+            upload.call_args.kwargs["df"].loc[0, "crawled_at"],
+            source.loc[0, "crawled_at"],
+        )
 
 
 if __name__ == "__main__":

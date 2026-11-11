@@ -31,6 +31,7 @@ Note: This project is not a one click setup but feel free to reach out for help.
 
 - From your environment run `python main.py` to check setup. This will also help verify the database connection is working.
 
+
 - `-l, --limit-processes` Ensure only one instance of adscrawler runs. If another instance is detected, the script will not run. This includes some some options like `-p apple`
 
 - `-t, --use-ssh-tunnel` Include to use SSH port forwarding to connect to a remote PostgreSQL database based on your `~/.config/adscrawler/config.toml`
