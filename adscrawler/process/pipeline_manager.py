@@ -17,7 +17,6 @@ from adscrawler.dbcon.queries import (
 from adscrawler.process.app_details import (
     compact_incoming_app_details,
     import_app_details_from_s3_into_db,
-    import_keywords_from_s3,
 )
 from adscrawler.process.app_domain_history import process_company_history
 from adscrawler.process.app_metrics_history import (
@@ -25,6 +24,7 @@ from adscrawler.process.app_metrics_history import (
     delete_and_aggregate_s3_agg,
 )
 from adscrawler.process.app_rankings import import_ranks_from_s3
+from adscrawler.process.keywords import import_keywords_from_s3
 from adscrawler.process.version_details import (
     compact_incoming_version_details,
     map_version_details,

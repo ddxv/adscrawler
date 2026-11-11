@@ -64,11 +64,9 @@ from adscrawler.dbcon.queries import (
     upsert_df,
 )
 from adscrawler.metrics import CRAWL_KEYWORDS_RESULTS_COUNTER, CRAWL_RESULTS_COUNTER
-from adscrawler.process.app_details import (
-    app_details_to_s3,
-    raw_keywords_to_s3,
-)
+from adscrawler.process.app_details import app_details_to_s3
 from adscrawler.process.app_rankings import process_store_rankings
+from adscrawler.process.keywords import raw_keywords_to_s3
 from adscrawler.process.storage import rankings_parquet_exists_in_s3
 
 logger = get_logger(__name__, "scrape_stores")
