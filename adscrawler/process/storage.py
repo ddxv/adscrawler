@@ -104,8 +104,8 @@ def rankings_parquet_exists_in_s3(
 def delete_s3_objects_by_prefix(bucket: str, prefix: str, key_name: str = "s3") -> None:
     """Delete all S3 objects with the given prefix.
 
-    Paginates all matching objects, then deletes in batches of 1000
-    with a small sleep between batches.
+    Paginates matching objects and deletes in batches of 500. Raises if S3
+    reports per-object deletion errors.
     """
     s3 = get_s3_client(key_name)
     paginator = s3.get_paginator("list_objects_v2")
@@ -122,7 +122,11 @@ def delete_s3_objects_by_prefix(bucket: str, prefix: str, key_name: str = "s3") 
     for i in range(0, key_len, chunk_size):
         logger.info(f"Deleting {key_len} objects in batch {i} / {key_len}")
         chunk = keys_to_delete[i : i + chunk_size]
-        s3.delete_objects(Bucket=bucket, Delete={"Objects": chunk})
+        response = s3.delete_objects(Bucket=bucket, Delete={"Objects": chunk})
+        if response.get("Errors"):
+            raise RuntimeError(
+                f"Failed to delete {len(response['Errors'])} objects at prefix {prefix}"
+            )
         if i + chunk_size < len(keys_to_delete):
             time.sleep(0.1)
 

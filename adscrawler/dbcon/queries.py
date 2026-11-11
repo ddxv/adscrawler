@@ -526,22 +526,84 @@ def clean_app_ranks_weekly_table(pgdb: PostgresEngine) -> None:
 
 
 def clean_app_metrics_history_table(pgdb: PostgresEngine, table_name: str) -> None:
-    batch_size = 100000
-    del_query = text(f"""
-        DELETE FROM {table_name}
-        WHERE ctid IN (
-            SELECT ctid FROM {table_name}
-            WHERE week_start < CURRENT_DATE - INTERVAL '400 days'
-            LIMIT {batch_size}
+    """Drop daily range partitions whose week_start is over 400 days old."""
+    if table_name not in {"app_country_metrics_history", "app_global_metrics_history"}:
+        raise ValueError(f"Invalid metrics history table: {table_name}")
+    parent = Identifier("public", table_name)
+    with pgdb.get_driver_connection() as (conn, cur):
+        cur.execute("SELECT CURRENT_DATE")
+        cutoff = cur.fetchone()[0] - datetime.timedelta(days=400)
+        cur.execute("SET LOCAL DateStyle = 'ISO, YMD'")
+        cur.execute(
+            """
+            SELECT n.nspname, c.relname, pg_get_expr(c.relpartbound, c.oid),
+                   i.inhdetachpending
+            FROM pg_inherits i
+            JOIN pg_class c ON c.oid = i.inhrelid
+            JOIN pg_namespace n ON n.oid = c.relnamespace
+            WHERE i.inhparent = %s::regclass
+            """,
+            (f"public.{table_name}",),
         )
-    """)
-    with pgdb.engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
-        while True:
-            result = conn.execute(del_query)
-            rows_affected = result.rowcount
-            logger.info(f"Deleted {rows_affected} rows...")
-            if rows_affected == 0:
-                break
+        partitions = cur.fetchall()
+        conn.commit()
+        conn.autocommit = True
+        try:
+            prefix = f"{table_name}_"
+            expired = []
+            for schema, name, bound, pending in partitions:
+                if not name.startswith(prefix):
+                    logger.warning(
+                        "Skipping unrecognized metrics partition %s.%s", schema, name
+                    )
+                    continue
+                date_str = name[len(prefix) :]
+                try:
+                    week = datetime.datetime.strptime(date_str, "%Y_%m_%d").date()
+                except ValueError:
+                    logger.warning(
+                        "Skipping unrecognized metrics partition %s.%s", schema, name
+                    )
+                    continue
+                if week >= cutoff:
+                    continue
+                if isinstance(bound, bytes):
+                    bound = bound.decode("ascii")
+                end = week + datetime.timedelta(days=1)
+                expected = (
+                    f"FOR VALUES FROM ('{week.isoformat()}') TO ('{end.isoformat()}')"
+                )
+                if date_str != week.strftime("%Y_%m_%d") or bound != expected:
+                    logger.warning(
+                        "Skipping metrics partition %s.%s with unexpected bounds",
+                        schema,
+                        name,
+                    )
+                    continue
+                if pending:
+                    raise RuntimeError(
+                        f"Metrics partition {schema}.{name} has a pending detach; manual recovery required"
+                    )
+                expired.append((schema, name))
+            for schema, name in expired:
+                partition = Identifier(schema, name)
+                cur.execute(
+                    SQL("ALTER TABLE {} DETACH PARTITION {} CONCURRENTLY").format(
+                        parent, partition
+                    )
+                )
+                try:
+                    cur.execute(SQL("DROP TABLE {}").format(partition))
+                except Exception:
+                    logger.exception(
+                        "Detached metrics partition %s.%s could not be dropped; manual cleanup required",
+                        schema,
+                        name,
+                    )
+                    raise
+                logger.info("Dropped metrics partition %s.%s", schema, name)
+        finally:
+            conn.autocommit = False
 
 
 def delete_and_insert(

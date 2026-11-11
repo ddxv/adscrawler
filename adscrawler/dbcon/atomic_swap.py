@@ -2,6 +2,7 @@
 
 import datetime
 import io
+import json
 import uuid
 from collections.abc import Iterable
 from typing import Any
@@ -138,6 +139,140 @@ def atomic_swap_date_partition(
             cur.execute(sql.SQL("DROP TABLE IF EXISTS {}").format(staging))
             conn.commit()
             raise
+
+
+def atomic_swap_date_partition_stream(
+    stream: Iterable[str],
+    columns: list[str],
+    pgdb: PostgresEngine,
+    schema: str,
+    table: str,
+    partition_prefix: str,
+    partition_date: datetime.date,
+    *,
+    date_column: str = "week_start",
+    unique_keys: Iterable[str] | None = None,
+) -> None:
+    r"""Stream PostgreSQL COPY text chunks into a daily range partition.
+
+    Fields are tab-delimited, rows newline-delimited, and NULL is ``\N``.
+    Unquoted numeric/date fields need no escaping; text fields must follow
+    PostgreSQL COPY text escaping (CSV quoting is not interpreted).
+
+    Concurrent detach creates a temporary gap; a failed cutover leaves the old
+    table detached for manual recovery. Coordinate other writers separately.
+    """
+    end_date = partition_date + datetime.timedelta(days=1)
+    partition_name = f"{partition_prefix}_{partition_date:%Y_%m_%d}"
+    if len(partition_name.encode("utf-8")) > 63:
+        raise ValueError("partition name exceeds PostgreSQL's 63-byte limit")
+    keys = tuple(unique_keys) if unique_keys is not None else None
+    if keys is not None and (not keys or any(not key for key in keys)):
+        raise ValueError("unique_keys must contain column names")
+
+    staging_name = f"rank_stage_{uuid.uuid4().hex}"
+    parent = sql.Identifier(schema, table)
+    partition = sql.Identifier(schema, partition_name)
+    staging = sql.Identifier(schema, staging_name)
+    date_id = sql.Identifier(date_column)
+    lock_key = json.dumps([schema, table, partition_date.isoformat()])
+
+    # The connection manager does not reset autocommit when returning to its pool.
+    with pgdb.get_driver_connection(autocommit=False) as (conn, cur):
+        previous_autocommit = conn.autocommit
+        conn.autocommit = True
+        prepared = locked = detach_attempted = detached = False
+        try:
+            cur.execute("SELECT pg_advisory_lock(hashtextextended(%s, 0))", (lock_key,))
+            locked = True
+            with conn.transaction():
+                cur.execute(
+                    sql.SQL(
+                        "CREATE TABLE {} (LIKE {} INCLUDING DEFAULTS INCLUDING STORAGE INCLUDING CONSTRAINTS INCLUDING INDEXES)"
+                    ).format(staging, parent)
+                )
+                cur.execute(
+                    sql.SQL("ALTER TABLE {} ADD CHECK ({} >= {} AND {} < {})").format(
+                        staging,
+                        date_id,
+                        sql.Literal(partition_date),
+                        date_id,
+                        sql.Literal(end_date),
+                    )
+                )
+                _copy_stream_to_table_freeze(stream, columns, staging, cur)
+                if keys is not None:
+                    cur.execute(
+                        sql.SQL("CREATE UNIQUE INDEX {} ON {} ({})").format(
+                            sql.Identifier(f"swap_key_{uuid.uuid4().hex}"),
+                            staging,
+                            sql.SQL(", ").join(map(sql.Identifier, keys)),
+                        )
+                    )
+            prepared = True
+            cur.execute(sql.SQL("ANALYZE {}").format(staging))
+            if partition_name in _get_existing_partitions(cur, schema, table):
+                detach_attempted = True
+                cur.execute(
+                    sql.SQL("ALTER TABLE {} DETACH PARTITION {} CONCURRENTLY").format(
+                        parent, partition
+                    )
+                )
+                detached = True
+            with conn.transaction():
+                if detached:
+                    cur.execute(sql.SQL("DROP TABLE {}").format(partition))
+                cur.execute(
+                    sql.SQL("ALTER TABLE {} RENAME TO {}").format(
+                        staging, sql.Identifier(partition_name)
+                    )
+                )
+                cur.execute(
+                    sql.SQL(
+                        "ALTER TABLE {} ATTACH PARTITION {} FOR VALUES FROM ({}) TO ({})"
+                    ).format(
+                        parent,
+                        partition,
+                        sql.Literal(partition_date),
+                        sql.Literal(end_date),
+                    )
+                )
+        except Exception:
+            if detached:
+                logger.error(
+                    "Partition %s.%s remains detached for manual recovery",
+                    schema,
+                    partition_name,
+                )
+            elif detach_attempted:
+                logger.error(
+                    "Concurrent detach failed for %s.%s; inspect pg_inherits.inhdetachpending "
+                    "and consider DETACH PARTITION ... FINALIZE if pending",
+                    schema,
+                    partition_name,
+                )
+            if prepared:
+                try:
+                    cur.execute(sql.SQL("DROP TABLE IF EXISTS {}").format(staging))
+                except Exception:
+                    logger.exception(
+                        "Failed to clean up staging table %s", staging_name
+                    )
+            raise
+        finally:
+            try:
+                if locked:
+                    try:
+                        cur.execute(
+                            "SELECT pg_advisory_unlock(hashtextextended(%s, 0))",
+                            (lock_key,),
+                        )
+                    except Exception:
+                        conn.close()
+                        raise
+            finally:
+                if not conn.closed:
+                    conn.autocommit = previous_autocommit
 
 
 def atomic_swap_partition(

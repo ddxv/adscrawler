@@ -1,19 +1,23 @@
 """App metrics history — raw → hashed daily → weekly → interpolated → DB."""
 
 import datetime
+import json
+import re
+import uuid
+from io import BytesIO
 
 import duckdb
 import numpy as np
 import pandas as pd
+from psycopg import sql
 
 from adscrawler.config import CONFIG, get_logger
+from adscrawler.dbcon.atomic_swap import atomic_swap_date_partition_stream
 from adscrawler.dbcon.connection import PostgresEngine
 from adscrawler.dbcon.queries import (
     clean_app_metrics_history_table,
-    delete_app_metrics_by_date_and_apps,
     get_ecpm_benchmarks,
     get_retention_benchmarks,
-    insert_bulk,
     query_countries,
     query_live_apps,
     query_store_app_categories,
@@ -24,12 +28,14 @@ from adscrawler.process import (
     AGG_APP_HASH_BUCKETS_FILLED,
     AGG_APP_HASH_BUCKETS_WEEKLY,
     RAW_DATA_APP_DETAILS,
+    TMP_APP_HASH_BUCKET_WEEKLY_METRICS,
 )
 from adscrawler.process.storage import (
     delete_s3_objects_by_date_range,
     delete_s3_objects_by_prefix,
     get_duckdb_connection,
     get_parquet_paths_by_prefix,
+    get_s3_client,
 )
 
 logger = get_logger(__name__, "scrape_stores")
@@ -142,8 +148,9 @@ def clean_history_tables(pgdb: PostgresEngine) -> None:
 def delete_and_aggregate_s3_agg(
     store: int,
     pgdb: PostgresEngine,
+    run_id: str,
+    end_date: datetime.date,
 ) -> None:
-    end_date = datetime.date.today()
     raw_data_lookback_days = 3
     raw_weekly_lookback_days = 8
     interpolate_query_lookback_days = 180
@@ -199,6 +206,8 @@ def delete_and_aggregate_s3_agg(
             pgdb=pgdb,
             store=store,
             db_delete_start=db_delete_start,
+            run_id=run_id,
+            end_date=end_date,
         )
 
 
@@ -323,10 +332,9 @@ def make_s3_app_hash_metrics_history_weekly(
     )
 
     if len(all_parquet_paths) == 0:
-        logger.error(
-            f"No daily parquet files found for store={store} week_start={range_start_str}"
+        raise ValueError(
+            f"No daily parquet files found for {store=} {hash_bucket=} week_start={range_start_str}"
         )
-        return
 
     query = copy_daily_to_weekly_hash_buckets(
         store=store,
@@ -353,10 +361,9 @@ def make_s3_app_hash_metrics_history_daily(
             bucket=bucket, prefix=agg_prefix, key_name=s3_config_key
         )
     if len(all_parquet_paths) == 0:
-        logger.error(
+        raise ValueError(
             f"No app detail parquet files found for {store=} {snapshot_date_str=}"
         )
-        return
     query = copy_raw_details_to_hash_buckets(
         store=store,
         app_detail_parquets=all_parquet_paths,
@@ -380,6 +387,7 @@ def make_s3_app_hash_metrics_history_daily(
                 logger.warning(
                     f"Unexpected BinderException: {e}, investigate data issue"
                 )
+            raise
 
 
 def estimate_ios_installs(df: pd.DataFrame) -> pd.DataFrame:
@@ -715,10 +723,9 @@ def write_app_hash_buckets_interpolated_to_s3(
         prefix = f"{AGG_APP_HASH_BUCKETS_WEEKLY}/store={store}/hash_bucket={hash_bucket}/week_start={ddt_str}/"
         all_parquet_paths += get_parquet_paths_by_prefix(bucket, prefix)
     if len(all_parquet_paths) == 0:
-        logger.warning(
-            f"No parquet paths found for agg app hash buckets {store=} {query_start_mon=} {end_date=}"
+        raise ValueError(
+            f"No parquet paths found for agg app hash buckets {store=} {hash_bucket=} {query_start_mon=} {end_date=}"
         )
-        return
     config = _get_store_metrics_config(store)
     metrics = config["metrics"]
     interpolated_metrics = config["interpolated_metrics"]
@@ -878,32 +885,207 @@ def process_metrics(
     return country_df, global_df
 
 
-def delete_and_insert_app_metrics(
-    pgdb: PostgresEngine,
+METRICS_BUCKETS = tuple(f"{i:02x}" for i in range(256))
+METRICS_TABLES = {"country": COUNTRY_HISTORY_COLS, "global": GLOBAL_FINAL_COLS}
+
+
+def _metrics_run_prefix(run_id: str) -> str:
+    if not re.fullmatch(r"[0-9a-f]{32}", run_id):
+        raise ValueError("Invalid metrics staging run ID")
+    return f"{TMP_APP_HASH_BUCKET_WEEKLY_METRICS}/run={run_id}"
+
+
+def stage_app_metrics(
     country_df: pd.DataFrame,
     global_df: pd.DataFrame,
     store: int,
+    hash_bucket: str,
+    run_id: str,
     delete_from_date: datetime.date,
+    end_date: datetime.date,
 ) -> None:
-    log_info = f"{store=} {delete_from_date=} delete_and_insert_app_metrics"
-    table_name = "app_country_metrics_history"
-    logger.info(f"{log_info} {table_name=} start")
-    delete_app_metrics_by_date_and_apps(
-        pgdb=pgdb,
-        delete_from_date=delete_from_date,
-        store_apps=country_df["store_app"].unique().tolist(),
-        table_name=table_name,
+    """Write bucket outputs and a completion manifest only after all uploads succeed."""
+    if store not in (1, 2) or hash_bucket not in METRICS_BUCKETS:
+        raise ValueError("Invalid metrics store or hash bucket")
+    prefix = f"{_metrics_run_prefix(run_id)}/store={store}/hash_bucket={hash_bucket}"
+    s3 = get_s3_client()
+    bucket = CONFIG["s3"]["bucket"]
+    manifest = {
+        "store": store,
+        "hash_bucket": hash_bucket,
+        "delete_from_date": delete_from_date.isoformat(),
+        "end_date": end_date.isoformat(),
+        "tables": {},
+    }
+    for name, df in (("country", country_df), ("global", global_df)):
+        columns = METRICS_TABLES[name]
+        if df.empty:
+            manifest["tables"][name] = {}
+            continue
+        missing = set(columns) - set(df.columns)
+        if missing:
+            raise ValueError(f"Missing {name} metrics columns: {sorted(missing)}")
+        df = df[columns]
+        keys = ["store_app", "week_start"] + (
+            ["country_id"] if name == "country" else []
+        )
+        if df[keys].isna().any().any() or df.duplicated(keys).any():
+            raise ValueError(f"Invalid or duplicate {name} metrics keys")
+        weeks = pd.to_datetime(df["week_start"])
+        invalid_weeks = (
+            (weeks.dt.weekday != 0)
+            | (weeks.dt.date < delete_from_date)
+            | (weeks.dt.date > end_date)
+        )
+        if invalid_weeks.any():
+            raise ValueError("Metrics week_start outside the expected Monday range")
+        entries = {}
+        for week, part in df.groupby(weeks.dt.date):
+            key = f"{prefix}/{name}/week_start={week.isoformat()}.parquet"
+            data = BytesIO()
+            part.to_parquet(data, index=False)
+            s3.put_object(Bucket=bucket, Key=key, Body=data.getvalue())
+            entries[week.isoformat()] = {"key": key, "rows": len(part)}
+        manifest["tables"][name] = entries
+    s3.put_object(
+        Bucket=bucket,
+        Key=f"{prefix}/manifest.json",
+        Body=json.dumps(manifest).encode(),
     )
-    insert_bulk(df=country_df, table_name=table_name, pgdb=pgdb)
-    table_name = "app_global_metrics_history"
-    logger.info(f"{log_info} {table_name=} start")
-    delete_app_metrics_by_date_and_apps(
-        pgdb=pgdb,
-        delete_from_date=delete_from_date,
-        store_apps=global_df["store_app"].unique().tolist(),
-        table_name=table_name,
-    )
-    insert_bulk(df=global_df, table_name=table_name, pgdb=pgdb)
+
+
+def _load_metrics_manifests(run_id: str, end_date: datetime.date) -> dict:
+    prefix = _metrics_run_prefix(run_id)
+    s3 = get_s3_client()
+    bucket = CONFIG["s3"]["bucket"]
+    cutoff = end_date - datetime.timedelta(days=30)
+    tables = {name: {} for name in METRICS_TABLES}
+    for store in (1, 2):
+        for hash_bucket in METRICS_BUCKETS:
+            base = f"{prefix}/store={store}/hash_bucket={hash_bucket}"
+            body = s3.get_object(Bucket=bucket, Key=f"{base}/manifest.json")["Body"]
+            try:
+                manifest = json.loads(body.read())
+            finally:
+                body.close()
+            if (
+                manifest.get("store") != store
+                or manifest.get("hash_bucket") != hash_bucket
+                or manifest.get("delete_from_date") != cutoff.isoformat()
+                or manifest.get("end_date") != end_date.isoformat()
+                or set(manifest.get("tables", {})) != set(METRICS_TABLES)
+            ):
+                raise ValueError(f"Invalid metrics staging manifest: {base}")
+            for name, entries in manifest["tables"].items():
+                for week_str, entry in entries.items():
+                    week = datetime.date.fromisoformat(week_str)
+                    expected = f"{base}/{name}/week_start={week_str}.parquet"
+                    if (
+                        week.isoformat() != week_str
+                        or week.weekday() != 0
+                        or not cutoff <= week <= end_date
+                        or entry.get("key") != expected
+                        or not isinstance(entry.get("rows"), int)
+                        or entry["rows"] <= 0
+                    ):
+                        raise ValueError(f"Invalid metrics staging entry: {base}")
+                    tables[name].setdefault(week, []).append(entry)
+    return tables
+
+
+def _read_staged_metrics(entry: dict, name: str, week: datetime.date) -> pd.DataFrame:
+    obj = get_s3_client().get_object(Bucket=CONFIG["s3"]["bucket"], Key=entry["key"])
+    try:
+        df = pd.read_parquet(BytesIO(obj["Body"].read()))
+    finally:
+        obj["Body"].close()
+    columns = METRICS_TABLES[name]
+    keys = ["store_app", "week_start"] + (["country_id"] if name == "country" else [])
+    if list(df.columns) != columns or len(df) != entry["rows"]:
+        raise ValueError(f"Invalid staged metrics file: {entry['key']}")
+    if (
+        df[keys].isna().any().any()
+        or df.duplicated(keys).any()
+        or (pd.to_datetime(df["week_start"]).dt.date != week).any()
+    ):
+        raise ValueError(f"Invalid staged metrics keys: {entry['key']}")
+    for column in columns:
+        if column != "week_start" and not pd.api.types.is_numeric_dtype(df[column]):
+            raise ValueError(f"Invalid metrics type for {column} in {entry['key']}")
+    return df
+
+
+def _stream_metrics(entries: list[dict], name: str, week: datetime.date):
+    """Stream numeric/date parquet fields as PostgreSQL COPY text."""
+    for entry in entries:
+        df = _read_staged_metrics(entry, name, week)
+        for offset in range(0, len(df), 100_000):
+            chunk = df.iloc[offset : offset + 100_000].copy()
+            chunk["week_start"] = pd.to_datetime(chunk["week_start"]).dt.date
+            buffer = BytesIO()
+            chunk.to_csv(buffer, index=False, header=False, sep="\t", na_rep="\\N")
+            yield buffer.getvalue().decode("utf-8")
+
+
+def run_app_metrics_pipeline(pgdb: PostgresEngine) -> None:
+    """Stage both stores before publishing; schedule only one run at a time."""
+    run_id = uuid.uuid4().hex
+    end_date = datetime.date.today()
+    logger.info("Starting metrics staging run %s for %s", run_id, end_date)
+    for store in (1, 2):
+        delete_and_aggregate_s3_agg(store, pgdb, run_id, end_date)
+    publish_app_metrics_history(pgdb, run_id, end_date)
+
+
+def publish_app_metrics_history(
+    pgdb: PostgresEngine, run_id: str, end_date: datetime.date
+) -> None:
+    """Stream complete staged date partitions; concurrent detach briefly hides each date."""
+    tables = _load_metrics_manifests(run_id, end_date)
+    cutoff = end_date - datetime.timedelta(days=30)
+    for name, staged_weeks in tables.items():
+        for week, entries in staged_weeks.items():
+            for entry in entries:
+                _read_staged_metrics(entry, name, week)
+    weeks = set(tables["country"]) | set(tables["global"])
+    with pgdb.get_driver_connection(autocommit=False) as (_, cur):
+        for table in ("app_country_metrics_history", "app_global_metrics_history"):
+            cur.execute(
+                sql.SQL(
+                    "SELECT DISTINCT week_start FROM {} WHERE week_start >= %s AND week_start <= %s"
+                ).format(sql.Identifier("public", table)),
+                (cutoff, end_date),
+            )
+            weeks.update(row[0] for row in cur.fetchall())
+    ordered_weeks = sorted(weeks)
+    for week in ordered_weeks:
+        if week.weekday() != 0:
+            raise ValueError(f"Unexpected non-Monday metrics week: {week}")
+    for week in ordered_weeks:
+        for name, columns in METRICS_TABLES.items():
+            table = f"app_{name}_metrics_history"
+            keys = ["week_start", "store_app"] + (
+                ["country_id"] if name == "country" else []
+            )
+            atomic_swap_date_partition_stream(
+                stream=_stream_metrics(tables[name].get(week, []), name, week),
+                columns=columns,
+                pgdb=pgdb,
+                schema="public",
+                table=table,
+                partition_prefix=table,
+                partition_date=week,
+                date_column="week_start",
+                unique_keys=keys,
+            )
+    try:
+        delete_s3_objects_by_prefix(
+            bucket=CONFIG["s3"]["bucket"], prefix=f"{_metrics_run_prefix(run_id)}/"
+        )
+    except Exception:
+        logger.exception("Metrics run %s published but staging cleanup failed", run_id)
+        raise
+    logger.info("Metrics run %s published and staging removed", run_id)
 
 
 def ffill_app_metrics(
@@ -1034,6 +1216,8 @@ def process_app_metrics_to_db(
     pgdb: PostgresEngine,
     store: int,
     db_delete_start: datetime.date,
+    run_id: str,
+    end_date: datetime.date,
 ) -> None:
     log_info = f"{store=} date={db_delete_start} {hash_bucket=} process to DB"
     logger.info(f"{log_info} start")
@@ -1057,12 +1241,8 @@ def process_app_metrics_to_db(
     country_df, global_df = drop_unwanted_rows(
         country_df, global_df, store, db_delete_start
     )
-    delete_and_insert_app_metrics(
-        pgdb=pgdb,
-        country_df=country_df,
-        global_df=global_df,
-        store=store,
-        delete_from_date=db_delete_start,
+    stage_app_metrics(
+        country_df, global_df, store, hash_bucket, run_id, db_delete_start, end_date
     )
 
 

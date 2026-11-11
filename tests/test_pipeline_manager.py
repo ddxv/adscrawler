@@ -56,7 +56,7 @@ def pgdb():
 def test_daily_plan_preserves_order_and_dates(pgdb):
     today = datetime.date(2026, 7, 10)
     steps = manager._daily_s3_steps(pgdb, "week", today)
-    assert len(steps) == 37
+    assert len(steps) == 36
     assert [step.name for step in steps[:5]] == [
         "import_ranks_from_s3",
         "import_keywords_from_s3",
@@ -72,7 +72,14 @@ def test_daily_plan_preserves_order_and_dates(pgdb):
     assert steps[1].context == {"start_date": "2026-07-05", "end_date": "2026-07-09"}
     assert steps[2].unit_key == "2026-07-05"
     assert steps[4].depends_on == steps[3].name
-    assert steps[-1].name == "map_version_details"
+    assert [step.name for step in steps[-4:]] == [
+        "run_app_metrics_pipeline",
+        "clean_history_tables",
+        "process_company_history",
+        "map_version_details",
+    ]
+    assert steps[-3].depends_on == steps[-4].name
+    assert steps[-3].unit_key == steps[-4].unit_key == ""
     day_steps = manager._daily_s3_steps(pgdb, "day", today)
     assert day_steps[0].context["start_date"] == "2026-07-07"
     with pytest.raises(ValueError):
@@ -86,7 +93,7 @@ def test_daily_plan_calls_all_functions_with_expected_arguments(pgdb):
         "compact_incoming_version_details",
         "compact_incoming_app_details",
         "import_app_details_from_s3_into_db",
-        "delete_and_aggregate_s3_agg",
+        "run_app_metrics_pipeline",
         "clean_history_tables",
         "process_company_history",
         "map_version_details",
@@ -109,8 +116,8 @@ def test_daily_plan_calls_all_functions_with_expected_arguments(pgdb):
     assert mocks["compact_incoming_version_details"].call_count == 6
     assert mocks["compact_incoming_app_details"].call_count == 12
     assert mocks["import_app_details_from_s3_into_db"].call_count == 12
-    assert mocks["delete_and_aggregate_s3_agg"].call_count == 2
     for name in (
+        "run_app_metrics_pipeline",
         "clean_history_tables",
         "process_company_history",
         "map_version_details",
@@ -160,6 +167,35 @@ def test_pipeline_continues_after_failure_and_skips_dependent_step(pgdb):
     ]
     assert rows[1]["error"] == "bad input"
     assert calls == ["later"]
+
+
+def test_metrics_failure_skips_cleanup_but_runs_later_steps(pgdb):
+    names = (
+        "import_ranks_from_s3",
+        "import_keywords_from_s3",
+        "compact_incoming_version_details",
+        "compact_incoming_app_details",
+        "import_app_details_from_s3_into_db",
+        "run_app_metrics_pipeline",
+        "clean_history_tables",
+        "process_company_history",
+        "map_version_details",
+    )
+    with patch.multiple(manager, **dict.fromkeys(names, DEFAULT)) as mocks:
+        mocks["run_app_metrics_pipeline"].side_effect = RuntimeError("staging failed")
+        manager.daily_s3_imports(pgdb, "day")
+
+    rows = list(pgdb.engine.rows.values())
+    assert rows[0]["status"] == "partial_failure"
+    metrics, cleanup, company, versions = rows[-4:]
+    assert metrics["status"] == "failed"
+    assert metrics["error"] == "staging failed"
+    assert cleanup["status"] == "skipped"
+    assert cleanup["error"] == "Dependency run_app_metrics_pipeline failed"
+    mocks["clean_history_tables"].assert_not_called()
+    assert company["status"] == versions["status"] == "completed"
+    mocks["process_company_history"].assert_called_once_with(pgdb=pgdb)
+    mocks["map_version_details"].assert_called_once_with(pgdb=pgdb)
 
 
 def test_fatal_error_keeps_later_steps_pending(pgdb):

@@ -39,6 +39,8 @@ AGG_APP_HASH_BUCKETS_DAILY = "agg-data/app-hash-daily"
 AGG_APP_HASH_BUCKETS_WEEKLY = "agg-data/app-hash-weekly"
 AGG_APP_HASH_BUCKETS_FILLED = "agg-data/app-hash-weekly-filled"
 
+TMP_APP_HASH_BUCKET_WEEKLY_METRICS = "tmp-data/app-hash-weekly-metrics"
+
 # ---------------------------------------------------------------------------
 # Domain-app history & change detection (app_domain_history.py)
 # ---------------------------------------------------------------------------

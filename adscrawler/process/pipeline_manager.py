@@ -21,7 +21,7 @@ from adscrawler.process.app_details import (
 from adscrawler.process.app_domain_history import process_company_history
 from adscrawler.process.app_metrics_history import (
     clean_history_tables,
-    delete_and_aggregate_s3_agg,
+    run_app_metrics_pipeline,
 )
 from adscrawler.process.app_rankings import import_ranks_from_s3
 from adscrawler.process.keywords import import_keywords_from_s3
@@ -155,19 +155,15 @@ def _daily_s3_steps(
                     ),
                 ]
             )
-    for store in (1, 2):
-        steps.append(
-            PipelineStep(
-                "delete_and_aggregate_s3_agg",
-                partial(delete_and_aggregate_s3_agg, store=store, pgdb=pgdb),
-                unit_key=f"store={store}",
-                context={"store": store},
-            )
-        )
     steps.extend(
         [
             PipelineStep(
-                "clean_history_tables", partial(clean_history_tables, pgdb=pgdb)
+                "run_app_metrics_pipeline", partial(run_app_metrics_pipeline, pgdb=pgdb)
+            ),
+            PipelineStep(
+                "clean_history_tables",
+                partial(clean_history_tables, pgdb=pgdb),
+                depends_on="run_app_metrics_pipeline",
             ),
             PipelineStep(
                 "process_company_history", partial(process_company_history, pgdb=pgdb)
