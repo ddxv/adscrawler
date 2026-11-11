@@ -488,6 +488,8 @@ def save_app_ranks(
     collections_map: pd.DataFrame | None = None,
     categories_map: pd.DataFrame | None = None,
 ) -> None:
+    if "crawled_at" not in df.columns:
+        df = df.assign(crawled_at=datetime.datetime.now(datetime.UTC))
     all_scraped_ids = df["store_id"].unique().tolist()
     new_existing_ids_map = query_store_id_map(
         pgdb,

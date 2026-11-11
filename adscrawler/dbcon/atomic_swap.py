@@ -2,6 +2,7 @@
 
 import datetime
 import io
+import uuid
 from collections.abc import Iterable
 from typing import Any
 
@@ -66,6 +67,75 @@ def _get_existing_partitions(cursor: Any, schema: str, table: str) -> list[str]:
         {"schema": schema, "table": table},
     )
     return [row[0] for row in cursor.fetchall()]
+
+
+def atomic_swap_date_partition(
+    df: pd.DataFrame,
+    pgdb: PostgresEngine,
+    schema: str,
+    table: str,
+    partition_prefix: str,
+    partition_date: datetime.date,
+) -> None:
+    """Replace one daily RANGE partition without affecting other dates."""
+    end_date = partition_date + datetime.timedelta(days=1)
+    partition_name = f"{partition_prefix}_{partition_date:%Y_%m_%d}"
+    staging_name = f"rank_stage_{uuid.uuid4().hex}"
+    parent = sql.Identifier(schema, table)
+    partition = sql.Identifier(schema, partition_name)
+    staging = sql.Identifier(schema, staging_name)
+    date_column = sql.Identifier("crawled_date")
+
+    with pgdb.get_driver_connection(autocommit=False) as (conn, cur):
+        try:
+            with conn.transaction():
+                cur.execute(
+                    sql.SQL(
+                        "CREATE TABLE {} (LIKE {} INCLUDING DEFAULTS INCLUDING STORAGE)"
+                    ).format(staging, parent)
+                )
+                cur.execute(
+                    sql.SQL("ALTER TABLE {} ADD CHECK ({} >= {} AND {} < {})").format(
+                        staging,
+                        date_column,
+                        sql.Literal(partition_date),
+                        date_column,
+                        sql.Literal(end_date),
+                    )
+                )
+                _copy_df_to_table_freeze(df, staging, cur)
+            cur.execute(sql.SQL("ANALYZE {}").format(staging))
+            conn.commit()
+            with conn.transaction():
+                cur.execute(sql.SQL("LOCK TABLE {} IN ACCESS EXCLUSIVE MODE").format(parent))
+                attached = _get_existing_partitions(cur, schema, table)
+                if partition_name in attached:
+                    cur.execute(
+                        sql.SQL("ALTER TABLE {} DETACH PARTITION {}").format(
+                            parent, partition
+                        )
+                    )
+                    cur.execute(sql.SQL("DROP TABLE {}").format(partition))
+                cur.execute(
+                    sql.SQL("ALTER TABLE {} RENAME TO {}").format(
+                        staging, sql.Identifier(partition_name)
+                    )
+                )
+                cur.execute(
+                    sql.SQL(
+                        "ALTER TABLE {} ATTACH PARTITION {} FOR VALUES FROM ({}) TO ({})"
+                    ).format(
+                        parent,
+                        partition,
+                        sql.Literal(partition_date),
+                        sql.Literal(end_date),
+                    )
+                )
+        except Exception:
+            conn.rollback()
+            cur.execute(sql.SQL("DROP TABLE IF EXISTS {}").format(staging))
+            conn.commit()
+            raise
 
 
 def atomic_swap_partition(

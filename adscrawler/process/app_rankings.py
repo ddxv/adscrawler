@@ -8,6 +8,7 @@ import pandas as pd
 
 from adscrawler.app_stores.utils import check_and_insert_new_apps
 from adscrawler.config import CONFIG, get_logger
+from adscrawler.dbcon.atomic_swap import atomic_swap_date_partition
 from adscrawler.dbcon.connection import PostgresEngine
 from adscrawler.dbcon.queries import (
     clean_app_ranks_weekly_table,
@@ -16,7 +17,6 @@ from adscrawler.dbcon.queries import (
     query_countries,
     query_store_id_map,
     query_store_id_map_cached,
-    upsert_df,
 )
 from adscrawler.process import RAW_DATA_APP_RANKINGS
 from adscrawler.process.storage import (
@@ -88,15 +88,45 @@ def import_ranks_from_s3(
     bucket = CONFIG[s3_config_key]["bucket"]
     s3_region = CONFIG[s3_config_key]["region_name"]
     logger.info(f"Importing ranks from S3 {bucket=} in {s3_region=}")
+    # Collect every period before swapping: the same output date can occur in
+    # multiple periods, and a partition must contain data from both stores.
+    frames = []
     for dt in pd.date_range(start_date, end_date, freq=freq):
         for store in [1, 2]:
-            process_ranks_from_s3(
+            df = process_ranks_from_s3(
                 store=store,
                 dt=dt,
                 pgdb=pgdb,
                 period=period,
                 s3_config_key=s3_config_key,
             )
+            if not df.empty:
+                frames.append(df)
+    if not frames:
+        clean_app_ranks_weekly_table(pgdb)
+        return
+
+    ranks = pd.concat(frames, ignore_index=True)
+    keys = ["crawled_date", "country", "store_collection", "store_category", "rank"]
+    required = keys + ["store_app", "best_rank", "source_crawled_date"]
+    if ranks[required].isna().any().any():
+        raise ValueError("Ranking rows contain missing required values")
+    # Historical files lack crawl times; store_app makes same-date ties repeatable.
+    ranks = ranks.sort_values(
+        ["source_crawled_date", "source_crawled_at", "store_app"],
+        kind="stable",
+        na_position="first",
+    ).drop_duplicates(subset=keys, keep="last")
+    ranks = ranks.drop(columns=["source_crawled_date", "source_crawled_at"])
+    for crawled_date, date_ranks in ranks.groupby("crawled_date"):
+        atomic_swap_date_partition(
+            date_ranks,
+            pgdb,
+            schema="frontend",
+            table="app_ranks_weekly",
+            partition_prefix="store_app_ranks",
+            partition_date=pd.Timestamp(crawled_date).date(),
+        )
     clean_app_ranks_weekly_table(pgdb)
 
 
@@ -106,13 +136,11 @@ def process_ranks_from_s3(
     pgdb: PostgresEngine,
     period: str,
     s3_config_key: str,
-) -> None:
+) -> pd.DataFrame:
     if period == "week":
         days = 6
-        table_suffix = "weekly"
     elif period == "day":
-        days = 1
-        table_suffix = "daily"
+        days = 0
     else:
         raise ValueError(f"Invalid period {period}")
     period_date_str = dt.strftime("%Y-%m-%d")
@@ -121,7 +149,7 @@ def process_ranks_from_s3(
     all_parquet_paths = get_s3_rank_parquet_paths(s3_config_key, dt, days, store)
     if len(all_parquet_paths) == 0:
         logger.info(f"{log_info} no parquet files found for {period_date_str=}")
-        return
+        return pd.DataFrame()
     countries_in_period = [
         x.split("country=")[1].split("/")[0]
         for x in all_parquet_paths
@@ -162,29 +190,7 @@ def process_ranks_from_s3(
         store_id_map.set_index("store_id")["id"].to_dict()
     )
     df = df.drop(columns=["store_id", "collection", "category"])
-    table_name = f"store_app_ranks_{table_suffix}"
-    upsert_df(
-        df=df,
-        table_name=table_name,
-        schema="frontend",
-        pgdb=pgdb,
-        key_columns=[
-            "country",
-            "store_collection",
-            "store_category",
-            "crawled_date",
-            "rank",
-        ],
-        insert_columns=[
-            "country",
-            "store_collection",
-            "store_category",
-            "crawled_date",
-            "rank",
-            "store_app",
-            "best_rank",
-        ],
-    )
+    return df
 
 
 def query_store_collection_ranks(
@@ -194,7 +200,7 @@ def query_store_collection_ranks(
 ) -> pd.DataFrame:
     """Query parquet files for app country ranks."""
     period_query = f"""WITH all_data AS (
-                SELECT * FROM read_parquet({country_parquet_paths})
+                SELECT * FROM read_parquet({country_parquet_paths}, union_by_name=true)
                  ),
              period_max_dates AS (
                           SELECT ar_1.country,
@@ -215,7 +221,9 @@ def query_store_collection_ranks(
                     THEN ANY_VALUE(pmd.period_start)
                     ELSE ar.crawled_date 
                 END AS crawled_date,
-                ar.store_id
+                ar.store_id,
+                ar.crawled_date AS source_crawled_date,
+                max(try_cast(to_json(ar)->>'crawled_at' AS TIMESTAMPTZ)) AS source_crawled_at
                FROM all_data ar
                  JOIN period_max_dates pmd ON ar.country = pmd.country 
                  AND ar.collection = pmd.collection 
@@ -223,7 +231,8 @@ def query_store_collection_ranks(
                  AND ar.crawled_date = pmd.max_crawled_date
                  GROUP BY ar.rank, ar.country, ar.collection, ar.category, ar.crawled_date, ar.store_id
                  )
-            SELECT par.rank, par.best_rank, par.country, par.collection, par.category, par.crawled_date, par.store_id 
+            SELECT par.rank, par.best_rank, par.country, par.collection, par.category,
+                   par.crawled_date, par.store_id, par.source_crawled_date, par.source_crawled_at
             FROM period_app_ranks par
               ORDER BY par.country, par.collection, par.category, par.crawled_date, par.rank
             """

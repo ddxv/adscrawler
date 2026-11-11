@@ -488,38 +488,41 @@ def upsert_df(
 
 
 def clean_app_ranks_weekly_table(pgdb: PostgresEngine) -> None:
-    batch_size = 100000
-    del_query = text(f"""
-        DELETE FROM frontend.store_app_ranks_weekly
-        WHERE ctid IN (
-            SELECT ctid FROM frontend.store_app_ranks_weekly
-            WHERE crawled_date < CURRENT_DATE - INTERVAL '14 days'
-              AND EXTRACT(DOW FROM crawled_date) != 1
-            LIMIT {batch_size}
-        )
-    """)
-    with pgdb.engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
-        while True:
-            result = conn.execute(del_query)
-            rows_affected = result.rowcount
-            logger.info(f"Deleted {rows_affected} rows...")
-            if rows_affected == 0:
-                break
-    del_query = text(f"""
-        DELETE FROM frontend.store_app_ranks_weekly
-        WHERE ctid IN (
-            SELECT ctid FROM frontend.store_app_ranks_weekly
-            WHERE crawled_date < CURRENT_DATE - INTERVAL '200 days'
-            LIMIT {batch_size}
-        )
-    """)
-    with pgdb.engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
-        while True:
-            result = conn.execute(del_query)
-            rows_affected = result.rowcount
-            logger.info(f"Deleted {rows_affected} rows...")
-            if rows_affected == 0:
-                break
+    """Keep the last 14 days and Mondays up to 200 days old."""
+    with pgdb.get_driver_connection() as (conn, cur):
+        cur.execute("SELECT CURRENT_DATE")
+        today = cur.fetchone()[0]
+        cur.execute("""
+            SELECT n.nspname, c.relname
+            FROM pg_inherits i
+            JOIN pg_class c ON c.oid = i.inhrelid
+            JOIN pg_namespace n ON n.oid = c.relnamespace
+            WHERE i.inhparent = 'frontend.app_ranks_weekly'::regclass
+        """)
+        partitions = cur.fetchall()
+        # DETACH CONCURRENTLY cannot run inside a transaction block.
+        conn.commit()
+        conn.autocommit = True
+        try:
+            dates = (today - datetime.timedelta(days=age) for age in range(201))
+            retained = {
+                f"store_app_ranks_{date:%Y_%m_%d}"
+                for date in dates
+                if date >= today - datetime.timedelta(days=14) or date.weekday() == 0
+            }
+            for schema, name in partitions:
+                if name in retained:
+                    continue
+                partition = Identifier(schema, name)
+                cur.execute(
+                    SQL(
+                        "ALTER TABLE frontend.app_ranks_weekly DETACH PARTITION {} CONCURRENTLY"
+                    ).format(partition)
+                )
+                cur.execute(SQL("DROP TABLE {}").format(partition))
+                logger.info("Dropped rankings partition %s.%s", schema, name)
+        finally:
+            conn.autocommit = False
 
 
 def clean_app_metrics_history_table(pgdb: PostgresEngine, table_name: str) -> None:
