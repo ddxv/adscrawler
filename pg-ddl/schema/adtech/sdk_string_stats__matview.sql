@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict Cb7LOiSRpyOogLyMnbdUKW5qs0S29bR9yq6PBVm2I02HfmKVFOaZmkvybLsQgCX
+\restrict 3WuaFphyNFnhhmTMGnmHxzxkIIhyvHZmYaQbpTEY1ZL7mIDZffYCdtFSpyswotD
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
@@ -49,5 +49,5 @@ CREATE UNIQUE INDEX sdk_string_stats_uniq_idx ON adtech.sdk_string_stats USING b
 -- PostgreSQL database dump complete
 --
 
-\unrestrict Cb7LOiSRpyOogLyMnbdUKW5qs0S29bR9yq6PBVm2I02HfmKVFOaZmkvybLsQgCX
+\unrestrict 3WuaFphyNFnhhmTMGnmHxzxkIIhyvHZmYaQbpTEY1ZL7mIDZffYCdtFSpyswotD
 

@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict gLpxua0rqLmiNBF7uaE0zLWLwdwXgm30QtlqBEqaWxeE6gBVWBmHiv9xTl4aPrs
+\restrict 93bKAvzwNWVEyYoOlcbi5t5GoTvuvBwHh85HDPsX4HKe01x9KWxAtLxjfXeUi97
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
@@ -118,5 +118,5 @@ CREATE UNIQUE INDEX idx_company_parent_top_apps_unique ON frontend.company_paren
 -- PostgreSQL database dump complete
 --
 
-\unrestrict gLpxua0rqLmiNBF7uaE0zLWLwdwXgm30QtlqBEqaWxeE6gBVWBmHiv9xTl4aPrs
+\unrestrict 93bKAvzwNWVEyYoOlcbi5t5GoTvuvBwHh85HDPsX4HKe01x9KWxAtLxjfXeUi97
 

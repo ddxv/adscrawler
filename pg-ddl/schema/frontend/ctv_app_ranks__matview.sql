@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict KmdyhAINBf8o8VjD132RIBG1aiAekMNQ8HcEHeQSKAbajW3Yrm3au8n8YKAm2E1
+\restrict wfix0G71mYKd4aPd3v3L4JSYf0SaN89zHT1iCyiRXhu3id3n4GLFnuuAWEF2EAT
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
@@ -116,5 +116,5 @@ ALTER MATERIALIZED VIEW frontend.ctv_app_ranks OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict KmdyhAINBf8o8VjD132RIBG1aiAekMNQ8HcEHeQSKAbajW3Yrm3au8n8YKAm2E1
+\unrestrict wfix0G71mYKd4aPd3v3L4JSYf0SaN89zHT1iCyiRXhu3id3n4GLFnuuAWEF2EAT
 

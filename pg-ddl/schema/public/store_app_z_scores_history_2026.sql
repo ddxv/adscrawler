@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 9yxK9uzCcsQcKSnwudiYcNeqY6sBcpzAcrgttNvGeA7tQ5HgaEXzgpPGFhnSqVV
+\restrict SCaQ0PfiQgfnU5QMAn3HxnvtkbJEFqlhfqRvmk8fHYbxb6iBwBsBkMuKa8zxmvt
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
@@ -58,5 +58,5 @@ ALTER TABLE public.store_app_z_scores_history_2026 OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 9yxK9uzCcsQcKSnwudiYcNeqY6sBcpzAcrgttNvGeA7tQ5HgaEXzgpPGFhnSqVV
+\unrestrict SCaQ0PfiQgfnU5QMAn3HxnvtkbJEFqlhfqRvmk8fHYbxb6iBwBsBkMuKa8zxmvt
 

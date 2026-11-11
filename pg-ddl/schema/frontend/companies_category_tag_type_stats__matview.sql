@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict O35tabBFrYJGV2MVeMRMdshFnZEGzgboth3vnjf2yaJVPM6ic2sC1EY4hVgmqJt
+\restrict hJpJZLbfcF3hz13jEYew4oe9agliU5vJBIA0byxBDiNxQeXOjhVbI9sYkVyGpI6
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
@@ -124,5 +124,5 @@ CREATE UNIQUE INDEX frontend_companies_category_tag_type_stats_unique ON fronten
 -- PostgreSQL database dump complete
 --
 
-\unrestrict O35tabBFrYJGV2MVeMRMdshFnZEGzgboth3vnjf2yaJVPM6ic2sC1EY4hVgmqJt
+\unrestrict hJpJZLbfcF3hz13jEYew4oe9agliU5vJBIA0byxBDiNxQeXOjhVbI9sYkVyGpI6
 
