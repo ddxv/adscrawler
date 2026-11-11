@@ -9,9 +9,9 @@ import pandas as pd
 
 from adscrawler.app_stores.utils import check_and_insert_new_apps
 from adscrawler.config import CONFIG, get_logger
+from adscrawler.dbcon.atomic_swap import atomic_swap_date_partition
 from adscrawler.dbcon.connection import PostgresEngine
 from adscrawler.dbcon.queries import (
-    delete_and_insert,
     query_countries,
     query_store_id_map,
     query_store_id_map_cached,
@@ -55,50 +55,82 @@ def import_keywords_from_s3(
     end_date: datetime.date,
     pgdb: PostgresEngine,
 ) -> None:
-    pipeline_name = "import_keywords_from_s3"
+    """Rebuild dates with unprocessed files from all available keyword parquets."""
+    pipeline_name = "import_keywords_from_s3_v2"
     s3_config_key = "s3"
     bucket = CONFIG[s3_config_key]["bucket"]
     for snapshot_date in pd.date_range(start_date, end_date, freq="D"):
         snapshot_date = snapshot_date.date()
+        paths_by_store = {}
         for store in [1, 2]:
-            log_info = f"{pipeline_name} {snapshot_date=} {store=}"
             s3_key = f"{RAW_DATA_KEYWORDS}/store={store}/crawled_date={snapshot_date}/"
             parquet_paths = get_parquet_paths_by_prefix(bucket, s3_key)
-            if len(parquet_paths) == 0:
+            if not parquet_paths:
                 logger.warning(f"No parquet paths found for {s3_key}")
                 continue
-            unprocessed_parquets = filter_unprocessed_s3_files(
-                parquet_paths, pipeline_name=pipeline_name, pgdb=pgdb
+            paths_by_store[store] = parquet_paths
+        if not paths_by_store:
+            continue
+
+        all_paths = [path for paths in paths_by_store.values() for path in paths]
+        if not filter_unprocessed_s3_files(
+            all_paths, pipeline_name=pipeline_name, pgdb=pgdb
+        ):
+            logger.info(
+                "%s %s: all parquet files already processed, skipping",
+                pipeline_name,
+                snapshot_date,
             )
-            # If any files not processed, need to reprocess all for that day
-            if len(unprocessed_parquets) == 0:
-                logger.info(f"{log_info} all parquets already processed, skipping")
-                continue
-            logger.info(f"{log_info} start")
-            err_msg = None
-            status = "failed"
-            try:
-                process_keywords(
-                    parquet_paths=parquet_paths,
-                    s3_config_key=s3_config_key,
-                    store=store,
-                    pgdb=pgdb,
+            continue
+        err_msg = None
+        status = "failed"
+        try:
+            frames = [
+                process_keywords(paths, s3_config_key, pgdb, store)
+                for store, paths in paths_by_store.items()
+            ]
+            if any(frame.empty for frame in frames):
+                raise ValueError("Keyword ranks are empty for a store with files")
+            ranks = pd.concat(frames, ignore_index=True)
+            columns = [
+                "crawled_date",
+                "store",
+                "country",
+                "keyword_id",
+                "store_app",
+                "app_rank",
+            ]
+            if ranks.empty or ranks[columns].isna().any().any():
+                raise ValueError(
+                    "Keyword ranks are empty or contain missing required values"
                 )
-                status = "completed"
-            except Exception as e:
-                err_msg = str(e)[0:500]
-            record_s3_file_status(
-                pipeline_name=pipeline_name,
-                file_path=parquet_paths,
-                status=status,
-                error_message=err_msg,
-                pgdb=pgdb,
+            dates = pd.to_datetime(ranks["crawled_date"], errors="raise").dt.date
+            if not dates.eq(snapshot_date).all():
+                raise ValueError("Keyword ranks contain rows for a different date")
+            atomic_swap_date_partition(
+                ranks[columns],
+                pgdb,
+                schema="frontend",
+                table="app_keyword_ranks_daily",
+                partition_prefix="app_keyword_ranks",
+                partition_date=snapshot_date,
             )
+            status = "completed"
+        except Exception as e:
+            err_msg = str(e)[:500]
+            logger.exception("%s failed for %s", pipeline_name, snapshot_date)
+        record_s3_file_status(
+            pipeline_name=pipeline_name,
+            file_path=all_paths,
+            status=status,
+            error_message=err_msg,
+            pgdb=pgdb,
+        )
 
 
 def process_keywords(
-    parquet_paths: list[str], s3_config_key: str, pgdb: PostgresEngine, store: 1
-):
+    parquet_paths: list[str], s3_config_key: str, pgdb: PostgresEngine, store: int
+) -> pd.DataFrame:
     country_map = query_countries(pgdb)
     df = query_keywords_from_s3(parquet_paths, s3_config_key)
     store_id_map = query_store_id_map_cached(pgdb, store)
@@ -119,23 +151,8 @@ def process_keywords(
         )
     assert not df["store_app"].isna().any(), "Missing store_app rows"
     df["store"] = store
-    logger.info(f"Keywords from S3 insert  {store=} {df.shape[0]:,} rows")
-    delete_and_insert(
-        df=df,
-        table_name="app_keyword_ranks_daily",
-        schema="frontend",
-        pgdb=pgdb,
-        delete_by_keys=["crawled_date", "store"],
-        insert_columns=[
-            "country",
-            "keyword_id",
-            "store",
-            "crawled_date",
-            "store_app",
-            "app_rank",
-        ],
-        delete_keys_have_duplicates=True,
-    )
+    logger.info(f"Keywords from S3 processed {store=} {df.shape[0]:,} rows")
+    return df
 
 
 def query_keywords_from_s3(
