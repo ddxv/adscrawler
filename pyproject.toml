@@ -22,6 +22,8 @@ dependencies = [
     "nltk",
     "rake_nltk",
     "langdetect",
+    "fasttext-langdetect",
+    "fasttext",
     "mitmproxy",
     "cloudscraper",
     "geoip2",
