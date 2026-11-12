@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict MbBKHgNVeSJvQKhbotBBcHqNSXOH8GOdROsdh01QhphKUsZRCYbDMdH6ClCrOmY
+\restrict WIxqKeIAsgozlWiMGlgJrJKdySiXXQD55gx36a7jN1lE6Dc13aEsTvlNsFbQHXc
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
@@ -69,6 +69,13 @@ ALTER TABLE ONLY public.countries
 
 
 --
+-- Name: countries_alpha2_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX countries_alpha2_idx ON public.countries USING btree (alpha2);
+
+
+--
 -- Name: countries countries_tier_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -80,5 +87,5 @@ ALTER TABLE ONLY public.countries
 -- PostgreSQL database dump complete
 --
 
-\unrestrict MbBKHgNVeSJvQKhbotBBcHqNSXOH8GOdROsdh01QhphKUsZRCYbDMdH6ClCrOmY
+\unrestrict WIxqKeIAsgozlWiMGlgJrJKdySiXXQD55gx36a7jN1lE6Dc13aEsTvlNsFbQHXc
 

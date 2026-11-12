@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict qIZQzySMpoSNLo9PZZF23ilKD2HiUlhvg28AuIgPa3R1gaUpJmfISrZMYLs0hQi
+\restrict d5J0xP0Rc7CuaYYLuUdsweNla2C0iPmlMwP2VUw9sh2cnivRBMtdcYceaU3yZrx
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
@@ -40,8 +40,15 @@ PARTITION BY RANGE (crawled_date);
 ALTER TABLE frontend.app_ranks_weekly OWNER TO postgres;
 
 --
+-- Name: idx_app_ranks_collection_category_country_date; Type: INDEX; Schema: frontend; Owner: postgres
+--
+
+CREATE INDEX idx_app_ranks_collection_category_country_date ON ONLY frontend.app_ranks_weekly USING btree (store_collection, store_category, country, crawled_date) INCLUDE (store_app, rank);
+
+
+--
 -- PostgreSQL database dump complete
 --
 
-\unrestrict qIZQzySMpoSNLo9PZZF23ilKD2HiUlhvg28AuIgPa3R1gaUpJmfISrZMYLs0hQi
+\unrestrict d5J0xP0Rc7CuaYYLuUdsweNla2C0iPmlMwP2VUw9sh2cnivRBMtdcYceaU3yZrx
 

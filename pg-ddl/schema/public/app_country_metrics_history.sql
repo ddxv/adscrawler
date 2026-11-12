@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 7Qyg497biPpnJ1PWd6KPUGA1IqCxL6COAPyl4Yel7EdGU3EX308kq0X6Unbl1c1
+\restrict ObGs9HHhpnf9xInjPiJn5oP1eDaiU7g4WPcxTBs2jjqhnG8t6wiGMcUacoU8xd0
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
@@ -21,8 +21,6 @@ SET row_security = off;
 
 SET default_tablespace = '';
 
-SET default_table_access_method = heap;
-
 --
 -- Name: app_country_metrics_history; Type: TABLE; Schema: public; Owner: postgres
 --
@@ -39,21 +37,29 @@ CREATE TABLE public.app_country_metrics_history (
     three_star integer,
     four_star integer,
     five_star integer
-);
+)
+PARTITION BY RANGE (week_start);
 
 
 ALTER TABLE public.app_country_metrics_history OWNER TO postgres;
 
 --
--- Name: app_country_metrics_history_app_idx; Type: INDEX; Schema: public; Owner: postgres
+-- Name: app_country_metrics_hist_app_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE INDEX app_country_metrics_history_app_idx ON public.app_country_metrics_history USING btree (store_app);
+CREATE INDEX app_country_metrics_hist_app_idx ON ONLY public.app_country_metrics_history USING btree (store_app);
+
+
+--
+-- Name: idx_acmh_store_app_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_acmh_store_app_idx ON ONLY public.app_country_metrics_history USING btree (store_app, week_start);
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 7Qyg497biPpnJ1PWd6KPUGA1IqCxL6COAPyl4Yel7EdGU3EX308kq0X6Unbl1c1
+\unrestrict ObGs9HHhpnf9xInjPiJn5oP1eDaiU7g4WPcxTBs2jjqhnG8t6wiGMcUacoU8xd0
 

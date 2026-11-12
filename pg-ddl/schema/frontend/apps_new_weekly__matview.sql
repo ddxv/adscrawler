@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict uDXKplSOjeBxctwzynOR3vWeEaNDw320HQltftOgxR7CkuvIP4saiAHsaYPxFsM
+\restrict idfvyPS7Yd7oPbTILpbc6ah9J3ZTLgGakofFOBOBgF1ZOnJbY8M7ILCDc4YhPkc
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
@@ -119,5 +119,5 @@ CREATE UNIQUE INDEX idx_apps_new_weekly_f ON frontend.apps_new_weekly USING btre
 -- PostgreSQL database dump complete
 --
 
-\unrestrict uDXKplSOjeBxctwzynOR3vWeEaNDw320HQltftOgxR7CkuvIP4saiAHsaYPxFsM
+\unrestrict idfvyPS7Yd7oPbTILpbc6ah9J3ZTLgGakofFOBOBgF1ZOnJbY8M7ILCDc4YhPkc
 

@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict JAGp66qnD1hKSkGNqGYpXlysZiduCLNkgI0gfZuZprgEbgc2EYcREPMyD1LlzvC
+\restrict 6XybHxKNWLdObyP010uQOTSZ0GbmbuUWWqrWueheBdc4Um2b2m2O2uhhrwzqpjb
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
@@ -71,5 +71,5 @@ CREATE INDEX idx_app_ranks_best_monthly_store ON frontend.app_ranks_best_monthly
 -- PostgreSQL database dump complete
 --
 
-\unrestrict JAGp66qnD1hKSkGNqGYpXlysZiduCLNkgI0gfZuZprgEbgc2EYcREPMyD1LlzvC
+\unrestrict 6XybHxKNWLdObyP010uQOTSZ0GbmbuUWWqrWueheBdc4Um2b2m2O2uhhrwzqpjb
 

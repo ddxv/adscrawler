@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 71uhxlVHaRgNJhFHc2aLiUEfu5HjXrfzPHdeunBVbFnRr2oHC473mlYzwkvtp6A
+\restrict 17S0zlj36c3PUe6cJTtljteH8ocIoUW7DzpVdVieqox4sk7hbmnmwbJbw7t5Q7e
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
@@ -92,5 +92,5 @@ ALTER TABLE ONLY adtech.sdk_paths
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 71uhxlVHaRgNJhFHc2aLiUEfu5HjXrfzPHdeunBVbFnRr2oHC473mlYzwkvtp6A
+\unrestrict 17S0zlj36c3PUe6cJTtljteH8ocIoUW7DzpVdVieqox4sk7hbmnmwbJbw7t5Q7e
 

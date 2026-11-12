@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict wAC2S3OfrXZ1vA8l35sUxMvNs3dDeBYgZap78kqxCdmrWaHPt4aj2Ta2APaIlnB
+\restrict dXyEs72RKWh46c6XcfSzNFwf5x6nSOUljy0P3mAeiighqC0knQ5HGsK2dZpQIt1
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
@@ -39,8 +39,15 @@ PARTITION BY RANGE (crawled_date);
 ALTER TABLE frontend.app_keyword_ranks_daily OWNER TO postgres;
 
 --
+-- Name: app_keyword_ranks_daily_lookup; Type: INDEX; Schema: frontend; Owner: postgres
+--
+
+CREATE INDEX app_keyword_ranks_daily_lookup ON ONLY frontend.app_keyword_ranks_daily USING btree (store_app, crawled_date);
+
+
+--
 -- PostgreSQL database dump complete
 --
 
-\unrestrict wAC2S3OfrXZ1vA8l35sUxMvNs3dDeBYgZap78kqxCdmrWaHPt4aj2Ta2APaIlnB
+\unrestrict dXyEs72RKWh46c6XcfSzNFwf5x6nSOUljy0P3mAeiighqC0knQ5HGsK2dZpQIt1
 

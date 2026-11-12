@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 9b8xo8VoE0uMBMeXGeAamzIbvpNDHZWlM55VTvjO6RQcCv37tFdIKbQ3LUn1BH1
+\restrict NcNATM7s0UVvSyV7wPmXHRjHfufxRgmv6f24rC5pGOXCPG9dhopcnfFgIDZW5Tt
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
@@ -20,8 +20,6 @@ SET client_min_messages = warning;
 SET row_security = off;
 
 SET default_tablespace = '';
-
-SET default_table_access_method = heap;
 
 --
 -- Name: app_global_metrics_history; Type: TABLE; Schema: public; Owner: postgres
@@ -44,22 +42,22 @@ CREATE TABLE public.app_global_metrics_history (
     three_star bigint,
     four_star bigint,
     five_star bigint
-);
+)
+PARTITION BY RANGE (week_start);
 
 
 ALTER TABLE public.app_global_metrics_history OWNER TO postgres;
 
 --
--- Name: app_global_metrics_history test_app_global_metrics_weekly_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+-- Name: idx_agmh_store_app_week_start; Type: INDEX; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.app_global_metrics_history
-    ADD CONSTRAINT test_app_global_metrics_weekly_pkey PRIMARY KEY (store_app, week_start);
+CREATE INDEX idx_agmh_store_app_week_start ON ONLY public.app_global_metrics_history USING btree (store_app, week_start);
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 9b8xo8VoE0uMBMeXGeAamzIbvpNDHZWlM55VTvjO6RQcCv37tFdIKbQ3LUn1BH1
+\unrestrict NcNATM7s0UVvSyV7wPmXHRjHfufxRgmv6f24rC5pGOXCPG9dhopcnfFgIDZW5Tt
 
