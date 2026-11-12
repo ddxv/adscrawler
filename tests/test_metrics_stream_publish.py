@@ -106,6 +106,48 @@ def test_complete_run_streams_both_tables_and_empty_existing_weeks():
     )
 
 
+@pytest.mark.parametrize(
+    ("weekly_ratings", "expected"),
+    [(0.0, "0"), (3.6, "4"), (-2.0, "-2"), (None, "0")],
+)
+def test_processed_weekly_ratings_stream_as_bigint(weekly_ratings, expected):
+    s3 = MemoryS3()
+    week = datetime.date(2026, 7, 6)
+    source = pd.DataFrame(
+        {"store_app": [4], "week_start": [week], "rating_count": [10]}
+    )
+    derived = pd.DataFrame({col: [0] for col in metrics.GLOBAL_FINAL_COLS})
+    derived["store_app"] = 4
+    derived["week_start"] = week
+    derived["weekly_ratings"] = weekly_ratings
+    for col in metrics.TIER_PCT_COLS:
+        derived[col] = 0.0
+    with (
+        patch.object(
+            metrics, "process_metrics_google", return_value=(country_frame(), source)
+        ),
+        patch.object(metrics, "calculate_derived_metrics", return_value=derived),
+        patch.object(metrics, "get_s3_client", return_value=s3),
+    ):
+        _, result = metrics.process_metrics(1, pd.DataFrame(), FakeDB())
+        metrics.stage_app_metrics(
+            pd.DataFrame(),
+            result,
+            1,
+            "00",
+            "a" * 32,
+            datetime.date(2026, 6, 10),
+            datetime.date(2026, 7, 10),
+        )
+        manifest = json.loads(
+            s3.objects[next(k for k in s3.objects if k.endswith("manifest.json"))]
+        )
+        entry = manifest["tables"]["global"][week.isoformat()]
+        output = "".join(metrics._stream_metrics([entry], "global", week))
+    fields = output.rstrip("\n").split("\t")
+    assert fields[metrics.GLOBAL_FINAL_COLS.index("weekly_ratings")] == expected
+
+
 def test_stream_formats_timestamp_and_null_for_postgres_copy():
     s3 = MemoryS3()
     frame = country_frame()
