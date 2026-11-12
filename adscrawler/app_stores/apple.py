@@ -383,7 +383,8 @@ def scrape_app_ios(
     )
     result_dict.keys()
     result_dict["trackId"] = str(result_dict["trackId"])
-    result_dict["artistId"] = str(result_dict["artistId"])
+    if result_dict["artistId"] is not None:
+        result_dict["artistId"] = str(result_dict["artistId"])
     if scrape_html:
         result_dict = scrape_itunes_additional_html(
             result_dict, store_id, country, proxies
@@ -533,13 +534,13 @@ def clean_ios_app_df(df: pd.DataFrame) -> pd.DataFrame:
         ] = "zh"
     # Fix .0 int to string issues
     # Mixing nulls in and ints cause .0 to be added to the end of the string
-    problem_rows = df["developer_id"].str.contains(".0")
+    problem_rows = df["developer_id"].str.contains(r"\.0$", regex=True)
     if problem_rows.any():
         logger.warning(
             f'Found {problem_rows.sum()} developer_id with ".0" suffix, fixing'
         )
         df.loc[problem_rows, "developer_id"] = (
-            df.loc[problem_rows, "developer_id"].str.split(".").str[0]
+            df.loc[problem_rows, "developer_id"].str.removesuffix(".0")
         )
     return df
 
