@@ -201,7 +201,7 @@ def delete_and_aggregate_s3_agg(
             end_date=end_date,
         )
         db_delete_start = end_date - datetime.timedelta(days=db_delete_lookback_days)
-        process_app_metrics_to_db(
+        process_metrics_to_staging(
             hash_bucket=hash_bucket,
             pgdb=pgdb,
             store=store,
@@ -818,11 +818,6 @@ def write_app_hash_buckets_interpolated_to_s3(
         duckdb_con.execute(msv_query)
 
 
-# ---------------------------------------------------------------------------
-# Metrics processing → DB
-# ---------------------------------------------------------------------------
-
-
 def process_metrics(
     store: int,
     df: pd.DataFrame,
@@ -865,6 +860,7 @@ def process_metrics(
     ]
     cols_as_int = [
         "weekly_installs",
+        "weekly_ratings",
         "weekly_active_users",
         "monthly_active_users",
         "total_installs",
@@ -1043,12 +1039,15 @@ def publish_app_metrics_history(
     """Stream complete staged date partitions; concurrent detach briefly hides each date."""
     tables = _load_metrics_manifests(run_id, end_date)
     cutoff = end_date - datetime.timedelta(days=30)
+    log_info = f"metrics_from_s3_to_db {run_id=}"
+    logger.info(f"{log_info} start")
     for name, staged_weeks in tables.items():
         for week, entries in staged_weeks.items():
             for entry in entries:
                 _read_staged_metrics(entry, name, week)
     weeks = set(tables["country"]) | set(tables["global"])
     with pgdb.get_driver_connection(autocommit=False) as (_, cur):
+        logger.info(f"{log_info} checking existing weeks in DB")
         for table in ("app_country_metrics_history", "app_global_metrics_history"):
             cur.execute(
                 sql.SQL(
@@ -1060,8 +1059,9 @@ def publish_app_metrics_history(
     ordered_weeks = sorted(weeks)
     for week in ordered_weeks:
         if week.weekday() != 0:
-            raise ValueError(f"Unexpected non-Monday metrics week: {week}")
+            raise ValueError(f"Unexpected non-Monday metrics {week=}")
     for week in ordered_weeks:
+        logger.info(f"{log_info} atomic swap for {week=}")
         for name, columns in METRICS_TABLES.items():
             table = f"app_{name}_metrics_history"
             keys = ["week_start", "store_app"] + (
@@ -1083,9 +1083,11 @@ def publish_app_metrics_history(
             bucket=CONFIG["s3"]["bucket"], prefix=f"{_metrics_run_prefix(run_id)}/"
         )
     except Exception:
-        logger.exception("Metrics run %s published but staging cleanup failed", run_id)
+        logger.exception(
+            f"{log_info} Metrics run {run_id} published but cleanup failed"
+        )
         raise
-    logger.info("Metrics run %s published and staging removed", run_id)
+    logger.info(f"{log_info} end")
 
 
 def ffill_app_metrics(
@@ -1211,7 +1213,7 @@ def store_app_updated_history(
     return df
 
 
-def process_app_metrics_to_db(
+def process_metrics_to_staging(
     hash_bucket: str,
     pgdb: PostgresEngine,
     store: int,
