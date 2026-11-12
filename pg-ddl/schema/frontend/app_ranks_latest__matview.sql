@@ -32,7 +32,7 @@ CREATE MATERIALIZED VIEW frontend.app_ranks_latest AS
          SELECT arr.store_collection,
             arr.country,
             max(arr.crawled_date) AS crawled_date
-           FROM frontend.store_app_ranks_weekly arr
+           FROM frontend.app_ranks_weekly arr
           GROUP BY arr.store_collection, arr.country
         )
  SELECT ar.rank,
