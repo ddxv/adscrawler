@@ -128,8 +128,8 @@ combined_sources AS (
     FROM adstxt_based_companies AS atbc
     UNION ALL
     SELECT
-        app_domain_publishers.store_app,
         app_domain_publishers.domain_id,
+        app_domain_publishers.store_app,
         'publisher' AS tag_source
     FROM app_domain_publishers
 )
