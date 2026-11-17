@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 3SCqETLW9dJQSS3NdFvuGGaNk92JoW5CmEKnq0nKHO0KN0Ek5yYlo2sKSNTO3UC
+\restrict onThzYoBQWebDd7asVBiVCE0fmce8bfHum7pnVcIWkxin4tUg4u1iHccPgdFRaC
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
@@ -28,14 +28,13 @@ SET default_table_access_method = heap;
 --
 
 CREATE MATERIALIZED VIEW public.mv_app_categories AS
- SELECT sa.store,
-    cm.mapped_category AS category,
+ SELECT store,
+    category,
     count(*) AS app_count
-   FROM (public.store_apps sa
-     JOIN public.category_mapping cm ON (((sa.category)::text = (cm.original_category)::text)))
-  WHERE ((sa.crawl_result = 1) AND (sa.category IS NOT NULL))
-  GROUP BY sa.store, cm.mapped_category
-  ORDER BY sa.store, cm.mapped_category
+   FROM frontend.store_apps_overview sa
+  WHERE ((category IS NOT NULL) AND (NOT is_removed))
+  GROUP BY store, category
+  ORDER BY store, category
   WITH NO DATA;
 
 
@@ -45,5 +44,5 @@ ALTER MATERIALIZED VIEW public.mv_app_categories OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 3SCqETLW9dJQSS3NdFvuGGaNk92JoW5CmEKnq0nKHO0KN0Ek5yYlo2sKSNTO3UC
+\unrestrict onThzYoBQWebDd7asVBiVCE0fmce8bfHum7pnVcIWkxin4tUg4u1iHccPgdFRaC
 

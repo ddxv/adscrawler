@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict dzGeCLHIG93nGH9elyyW8354Pgr6V4z1ZLyLfhGbJzWKnf7bdShWQZQ8CqubY5H
+\restrict eqjTCYpim7Ys08VgyZuikiN7PBNdWlGGZbADvIcckd89JLf3AsQzrhoK2MJSi93
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
@@ -513,19 +513,19 @@ PARTITION BY LIST (batch_date);
 ALTER TABLE adtech.app_sdk_strings OWNER TO postgres;
 
 --
--- Name: app_sdk_strings_20261112; Type: TABLE; Schema: adtech; Owner: postgres
+-- Name: app_sdk_strings_20261115; Type: TABLE; Schema: adtech; Owner: postgres
 --
 
-CREATE TABLE adtech.app_sdk_strings_20261112 (
+CREATE TABLE adtech.app_sdk_strings_20261115 (
     store_app integer CONSTRAINT app_sdk_strings_store_app_not_null NOT NULL,
     string_id integer CONSTRAINT app_sdk_strings_string_id_not_null NOT NULL,
     sdk_id integer,
     batch_date date CONSTRAINT app_sdk_strings_batch_date_not_null NOT NULL,
-    CONSTRAINT app_sdk_strings_20261112_batch_date_check CHECK ((batch_date = '2026-11-12'::date))
+    CONSTRAINT app_sdk_strings_20261115_batch_date_check CHECK ((batch_date = '2026-11-15'::date))
 );
 
 
-ALTER TABLE adtech.app_sdk_strings_20261112 OWNER TO postgres;
+ALTER TABLE adtech.app_sdk_strings_20261115 OWNER TO postgres;
 
 --
 -- Name: app_sdks; Type: TABLE; Schema: adtech; Owner: postgres
@@ -544,20 +544,20 @@ PARTITION BY LIST (batch_date);
 ALTER TABLE adtech.app_sdks OWNER TO postgres;
 
 --
--- Name: app_sdks_20261112; Type: TABLE; Schema: adtech; Owner: postgres
+-- Name: app_sdks_20261115; Type: TABLE; Schema: adtech; Owner: postgres
 --
 
-CREATE TABLE adtech.app_sdks_20261112 (
+CREATE TABLE adtech.app_sdks_20261115 (
     store_app integer CONSTRAINT app_sdks_store_app_not_null NOT NULL,
     version_code_id integer CONSTRAINT app_sdks_version_code_id_not_null NOT NULL,
     sdk_id integer CONSTRAINT app_sdks_sdk_id_not_null NOT NULL,
     version_code_created_at timestamp without time zone CONSTRAINT app_sdks_version_code_created_at_not_null NOT NULL,
     batch_date date CONSTRAINT app_sdks_batch_date_not_null NOT NULL,
-    CONSTRAINT app_sdks_20261112_batch_date_check CHECK ((batch_date = '2026-11-12'::date))
+    CONSTRAINT app_sdks_20261115_batch_date_check CHECK ((batch_date = '2026-11-15'::date))
 );
 
 
-ALTER TABLE adtech.app_sdks_20261112 OWNER TO postgres;
+ALTER TABLE adtech.app_sdks_20261115 OWNER TO postgres;
 
 --
 -- Name: app_sdks_latest; Type: TABLE; Schema: adtech; Owner: postgres
@@ -576,20 +576,20 @@ PARTITION BY LIST (batch_date);
 ALTER TABLE adtech.app_sdks_latest OWNER TO postgres;
 
 --
--- Name: app_sdks_latest_20261112; Type: TABLE; Schema: adtech; Owner: postgres
+-- Name: app_sdks_latest_20261115; Type: TABLE; Schema: adtech; Owner: postgres
 --
 
-CREATE TABLE adtech.app_sdks_latest_20261112 (
+CREATE TABLE adtech.app_sdks_latest_20261115 (
     store_app integer CONSTRAINT app_sdks_store_app_not_null NOT NULL,
     version_code_id integer CONSTRAINT app_sdks_version_code_id_not_null NOT NULL,
     sdk_id integer CONSTRAINT app_sdks_sdk_id_not_null NOT NULL,
     version_code_created_at timestamp without time zone CONSTRAINT app_sdks_version_code_created_at_not_null NOT NULL,
     batch_date date CONSTRAINT app_sdks_batch_date_not_null NOT NULL,
-    CONSTRAINT app_sdks_latest_20261112_batch_date_check CHECK ((batch_date = '2026-11-12'::date))
+    CONSTRAINT app_sdks_latest_20261115_batch_date_check CHECK ((batch_date = '2026-11-15'::date))
 );
 
 
-ALTER TABLE adtech.app_sdks_latest_20261112 OWNER TO postgres;
+ALTER TABLE adtech.app_sdks_latest_20261115 OWNER TO postgres;
 
 --
 -- Name: categories; Type: TABLE; Schema: adtech; Owner: postgres
@@ -640,10 +640,10 @@ PARTITION BY LIST (batch_date);
 ALTER TABLE adtech.combined_domain_apps OWNER TO postgres;
 
 --
--- Name: combined_domain_apps_20261112; Type: TABLE; Schema: adtech; Owner: postgres
+-- Name: combined_domain_apps_20261116; Type: TABLE; Schema: adtech; Owner: postgres
 --
 
-CREATE TABLE adtech.combined_domain_apps_20261112 (
+CREATE TABLE adtech.combined_domain_apps_20261116 (
     domain_id integer CONSTRAINT combined_domain_apps_domain_id_not_null NOT NULL,
     store_app integer CONSTRAINT combined_domain_apps_store_app_not_null NOT NULL,
     company_id integer,
@@ -653,11 +653,12 @@ CREATE TABLE adtech.combined_domain_apps_20261112 (
     app_ads_direct boolean,
     app_ads_reseller boolean,
     batch_date date CONSTRAINT combined_domain_apps_batch_date_not_null NOT NULL,
-    CONSTRAINT combined_domain_apps_20261112_batch_date_check CHECK ((batch_date = '2026-11-12'::date))
+    sdk_adapter boolean,
+    CONSTRAINT combined_domain_apps_20261116_batch_date_check CHECK ((batch_date = '2026-11-16'::date))
 );
 
 
-ALTER TABLE adtech.combined_domain_apps_20261112 OWNER TO postgres;
+ALTER TABLE adtech.combined_domain_apps_20261116 OWNER TO postgres;
 
 --
 -- Name: companies; Type: TABLE; Schema: adtech; Owner: postgres
@@ -917,10 +918,10 @@ PARTITION BY LIST (batch_date);
 ALTER TABLE adtech.domain_app_changes_quarterly OWNER TO postgres;
 
 --
--- Name: domain_app_changes_quarterly_20261112; Type: TABLE; Schema: adtech; Owner: postgres
+-- Name: domain_app_changes_quarterly_20261115; Type: TABLE; Schema: adtech; Owner: postgres
 --
 
-CREATE TABLE adtech.domain_app_changes_quarterly_20261112 (
+CREATE TABLE adtech.domain_app_changes_quarterly_20261115 (
     domain_id integer,
     store_app integer,
     tag_source text,
@@ -928,11 +929,25 @@ CREATE TABLE adtech.domain_app_changes_quarterly_20261112 (
     quarter smallint,
     status text,
     batch_date date CONSTRAINT domain_app_changes_quarterly_batch_date_not_null NOT NULL,
-    CONSTRAINT domain_app_changes_quarterly_20261112_batch_date_check CHECK ((batch_date = '2026-11-12'::date))
+    CONSTRAINT domain_app_changes_quarterly_20261115_batch_date_check CHECK ((batch_date = '2026-11-15'::date))
 );
 
 
-ALTER TABLE adtech.domain_app_changes_quarterly_20261112 OWNER TO postgres;
+ALTER TABLE adtech.domain_app_changes_quarterly_20261115 OWNER TO postgres;
+
+--
+-- Name: sdk_mediation_adapter_patterns; Type: TABLE; Schema: adtech; Owner: postgres
+--
+
+CREATE TABLE adtech.sdk_mediation_adapter_patterns (
+    mediation_sdk_id integer NOT NULL,
+    adapter_sdk_id integer NOT NULL,
+    adapter_pattern text NOT NULL,
+    CONSTRAINT sdk_mediation_adapter_patterns_check CHECK ((adapter_sdk_id <> mediation_sdk_id))
+);
+
+
+ALTER TABLE adtech.sdk_mediation_adapter_patterns OWNER TO postgres;
 
 --
 -- Name: sdk_mediation_patterns; Type: TABLE; Schema: adtech; Owner: postgres
@@ -1731,10 +1746,10 @@ PARTITION BY LIST (batch_date);
 ALTER TABLE adtech.trend_companies OWNER TO postgres;
 
 --
--- Name: trend_companies_20261112; Type: TABLE; Schema: adtech; Owner: postgres
+-- Name: trend_companies_20261115; Type: TABLE; Schema: adtech; Owner: postgres
 --
 
-CREATE TABLE adtech.trend_companies_20261112 (
+CREATE TABLE adtech.trend_companies_20261115 (
     company_domain character varying,
     year smallint,
     quarter smallint,
@@ -1748,11 +1763,11 @@ CREATE TABLE adtech.trend_companies_20261112 (
     pct_apps_added numeric,
     pct_apps_lost numeric,
     batch_date date CONSTRAINT trend_companies_batch_date_not_null NOT NULL,
-    CONSTRAINT trend_companies_20261112_batch_date_check CHECK ((batch_date = '2026-11-12'::date))
+    CONSTRAINT trend_companies_20261115_batch_date_check CHECK ((batch_date = '2026-11-15'::date))
 );
 
 
-ALTER TABLE adtech.trend_companies_20261112 OWNER TO postgres;
+ALTER TABLE adtech.trend_companies_20261115 OWNER TO postgres;
 
 --
 -- Name: trend_domains; Type: TABLE; Schema: adtech; Owner: postgres
@@ -1779,10 +1794,10 @@ PARTITION BY LIST (batch_date);
 ALTER TABLE adtech.trend_domains OWNER TO postgres;
 
 --
--- Name: trend_domains_20261112; Type: TABLE; Schema: adtech; Owner: postgres
+-- Name: trend_domains_20261115; Type: TABLE; Schema: adtech; Owner: postgres
 --
 
-CREATE TABLE adtech.trend_domains_20261112 (
+CREATE TABLE adtech.trend_domains_20261115 (
     domain_name character varying,
     year smallint,
     quarter smallint,
@@ -1796,11 +1811,11 @@ CREATE TABLE adtech.trend_domains_20261112 (
     pct_apps_added numeric,
     pct_apps_lost numeric,
     batch_date date CONSTRAINT trend_domains_batch_date_not_null NOT NULL,
-    CONSTRAINT trend_domains_20261112_batch_date_check CHECK ((batch_date = '2026-11-12'::date))
+    CONSTRAINT trend_domains_20261115_batch_date_check CHECK ((batch_date = '2026-11-15'::date))
 );
 
 
-ALTER TABLE adtech.trend_domains_20261112 OWNER TO postgres;
+ALTER TABLE adtech.trend_domains_20261115 OWNER TO postgres;
 
 --
 -- Name: trend_parent_companies; Type: TABLE; Schema: adtech; Owner: postgres
@@ -1827,10 +1842,10 @@ PARTITION BY LIST (batch_date);
 ALTER TABLE adtech.trend_parent_companies OWNER TO postgres;
 
 --
--- Name: trend_parent_companies_20261112; Type: TABLE; Schema: adtech; Owner: postgres
+-- Name: trend_parent_companies_20261115; Type: TABLE; Schema: adtech; Owner: postgres
 --
 
-CREATE TABLE adtech.trend_parent_companies_20261112 (
+CREATE TABLE adtech.trend_parent_companies_20261115 (
     company_domain character varying,
     year smallint,
     quarter smallint,
@@ -1844,11 +1859,11 @@ CREATE TABLE adtech.trend_parent_companies_20261112 (
     pct_apps_added numeric,
     pct_apps_lost numeric,
     batch_date date CONSTRAINT trend_parent_companies_batch_date_not_null NOT NULL,
-    CONSTRAINT trend_parent_companies_20261112_batch_date_check CHECK ((batch_date = '2026-11-12'::date))
+    CONSTRAINT trend_parent_companies_20261115_batch_date_check CHECK ((batch_date = '2026-11-15'::date))
 );
 
 
-ALTER TABLE adtech.trend_parent_companies_20261112 OWNER TO postgres;
+ALTER TABLE adtech.trend_parent_companies_20261115 OWNER TO postgres;
 
 --
 -- Name: url_redirect_chains; Type: TABLE; Schema: adtech; Owner: postgres
@@ -8409,11 +8424,96 @@ CREATE TABLE frontend.app_keyword_ranks_2026_11_11 (
     keyword_id integer CONSTRAINT app_keyword_ranks_daily_v2_keyword_id_not_null NOT NULL,
     store_app integer CONSTRAINT app_keyword_ranks_daily_v2_store_app_not_null NOT NULL,
     app_rank smallint CONSTRAINT app_keyword_ranks_daily_v2_app_rank_not_null NOT NULL,
-    CONSTRAINT rank_stage_69fb1dec6f9d466d9aa4e7d67ef04194_crawled_date_check CHECK (((crawled_date >= '2026-11-11'::date) AND (crawled_date < '2026-11-12'::date)))
+    CONSTRAINT rank_stage_7f782317164a4bec8bf57b8554a701a8_crawled_date_check CHECK (((crawled_date >= '2026-11-11'::date) AND (crawled_date < '2026-11-12'::date)))
 );
 
 
 ALTER TABLE frontend.app_keyword_ranks_2026_11_11 OWNER TO postgres;
+
+--
+-- Name: app_keyword_ranks_2026_11_12; Type: TABLE; Schema: frontend; Owner: postgres
+--
+
+CREATE TABLE frontend.app_keyword_ranks_2026_11_12 (
+    crawled_date date CONSTRAINT app_keyword_ranks_daily_v2_crawled_date_not_null NOT NULL,
+    store smallint CONSTRAINT app_keyword_ranks_daily_v2_store_not_null NOT NULL,
+    country smallint CONSTRAINT app_keyword_ranks_daily_v2_country_not_null NOT NULL,
+    keyword_id integer CONSTRAINT app_keyword_ranks_daily_v2_keyword_id_not_null NOT NULL,
+    store_app integer CONSTRAINT app_keyword_ranks_daily_v2_store_app_not_null NOT NULL,
+    app_rank smallint CONSTRAINT app_keyword_ranks_daily_v2_app_rank_not_null NOT NULL,
+    CONSTRAINT rank_stage_91c2f6acd5e34ba49eab47f43991a34a_crawled_date_check CHECK (((crawled_date >= '2026-11-12'::date) AND (crawled_date < '2026-11-13'::date)))
+);
+
+
+ALTER TABLE frontend.app_keyword_ranks_2026_11_12 OWNER TO postgres;
+
+--
+-- Name: app_keyword_ranks_2026_11_13; Type: TABLE; Schema: frontend; Owner: postgres
+--
+
+CREATE TABLE frontend.app_keyword_ranks_2026_11_13 (
+    crawled_date date CONSTRAINT app_keyword_ranks_daily_v2_crawled_date_not_null NOT NULL,
+    store smallint CONSTRAINT app_keyword_ranks_daily_v2_store_not_null NOT NULL,
+    country smallint CONSTRAINT app_keyword_ranks_daily_v2_country_not_null NOT NULL,
+    keyword_id integer CONSTRAINT app_keyword_ranks_daily_v2_keyword_id_not_null NOT NULL,
+    store_app integer CONSTRAINT app_keyword_ranks_daily_v2_store_app_not_null NOT NULL,
+    app_rank smallint CONSTRAINT app_keyword_ranks_daily_v2_app_rank_not_null NOT NULL,
+    CONSTRAINT rank_stage_98e89c4b8b9649d38e4254cd7225146a_crawled_date_check CHECK (((crawled_date >= '2026-11-13'::date) AND (crawled_date < '2026-11-14'::date)))
+);
+
+
+ALTER TABLE frontend.app_keyword_ranks_2026_11_13 OWNER TO postgres;
+
+--
+-- Name: app_keyword_ranks_2026_11_14; Type: TABLE; Schema: frontend; Owner: postgres
+--
+
+CREATE TABLE frontend.app_keyword_ranks_2026_11_14 (
+    crawled_date date CONSTRAINT app_keyword_ranks_daily_v2_crawled_date_not_null NOT NULL,
+    store smallint CONSTRAINT app_keyword_ranks_daily_v2_store_not_null NOT NULL,
+    country smallint CONSTRAINT app_keyword_ranks_daily_v2_country_not_null NOT NULL,
+    keyword_id integer CONSTRAINT app_keyword_ranks_daily_v2_keyword_id_not_null NOT NULL,
+    store_app integer CONSTRAINT app_keyword_ranks_daily_v2_store_app_not_null NOT NULL,
+    app_rank smallint CONSTRAINT app_keyword_ranks_daily_v2_app_rank_not_null NOT NULL,
+    CONSTRAINT rank_stage_82943b5afd194cc4b272999f69be6c67_crawled_date_check CHECK (((crawled_date >= '2026-11-14'::date) AND (crawled_date < '2026-11-15'::date)))
+);
+
+
+ALTER TABLE frontend.app_keyword_ranks_2026_11_14 OWNER TO postgres;
+
+--
+-- Name: app_keyword_ranks_2026_11_15; Type: TABLE; Schema: frontend; Owner: postgres
+--
+
+CREATE TABLE frontend.app_keyword_ranks_2026_11_15 (
+    crawled_date date CONSTRAINT app_keyword_ranks_daily_v2_crawled_date_not_null NOT NULL,
+    store smallint CONSTRAINT app_keyword_ranks_daily_v2_store_not_null NOT NULL,
+    country smallint CONSTRAINT app_keyword_ranks_daily_v2_country_not_null NOT NULL,
+    keyword_id integer CONSTRAINT app_keyword_ranks_daily_v2_keyword_id_not_null NOT NULL,
+    store_app integer CONSTRAINT app_keyword_ranks_daily_v2_store_app_not_null NOT NULL,
+    app_rank smallint CONSTRAINT app_keyword_ranks_daily_v2_app_rank_not_null NOT NULL,
+    CONSTRAINT rank_stage_e153b87e5ab140a59d86f672d64d97d3_crawled_date_check CHECK (((crawled_date >= '2026-11-15'::date) AND (crawled_date < '2026-11-16'::date)))
+);
+
+
+ALTER TABLE frontend.app_keyword_ranks_2026_11_15 OWNER TO postgres;
+
+--
+-- Name: app_keyword_ranks_2026_11_16; Type: TABLE; Schema: frontend; Owner: postgres
+--
+
+CREATE TABLE frontend.app_keyword_ranks_2026_11_16 (
+    crawled_date date CONSTRAINT app_keyword_ranks_daily_v2_crawled_date_not_null NOT NULL,
+    store smallint CONSTRAINT app_keyword_ranks_daily_v2_store_not_null NOT NULL,
+    country smallint CONSTRAINT app_keyword_ranks_daily_v2_country_not_null NOT NULL,
+    keyword_id integer CONSTRAINT app_keyword_ranks_daily_v2_keyword_id_not_null NOT NULL,
+    store_app integer CONSTRAINT app_keyword_ranks_daily_v2_store_app_not_null NOT NULL,
+    app_rank smallint CONSTRAINT app_keyword_ranks_daily_v2_app_rank_not_null NOT NULL,
+    CONSTRAINT rank_stage_2b422a169be14f09884f840cf3698db3_crawled_date_check CHECK (((crawled_date >= '2026-11-16'::date) AND (crawled_date < '2026-11-17'::date)))
+);
+
+
+ALTER TABLE frontend.app_keyword_ranks_2026_11_16 OWNER TO postgres;
 
 --
 -- Name: app_ranks_weekly; Type: TABLE; Schema: frontend; Owner: postgres
@@ -10284,23 +10384,6 @@ CREATE MATERIALIZED VIEW frontend.latest_sdk_scanned_apps AS
 ALTER MATERIALIZED VIEW frontend.latest_sdk_scanned_apps OWNER TO postgres;
 
 --
--- Name: store_app_ranks_2026_04_27; Type: TABLE; Schema: frontend; Owner: postgres
---
-
-CREATE TABLE frontend.store_app_ranks_2026_04_27 (
-    rank smallint CONSTRAINT app_ranks_weekly_rank_not_null NOT NULL,
-    best_rank smallint CONSTRAINT app_ranks_weekly_best_rank_not_null NOT NULL,
-    country smallint CONSTRAINT app_ranks_weekly_country_not_null NOT NULL,
-    store_collection smallint CONSTRAINT app_ranks_weekly_store_collection_not_null NOT NULL,
-    store_category smallint CONSTRAINT app_ranks_weekly_store_category_not_null NOT NULL,
-    crawled_date date CONSTRAINT app_ranks_weekly_crawled_date_not_null NOT NULL,
-    store_app integer CONSTRAINT app_ranks_weekly_store_app_not_null NOT NULL
-);
-
-
-ALTER TABLE frontend.store_app_ranks_2026_04_27 OWNER TO postgres;
-
---
 -- Name: store_app_ranks_2026_05_04; Type: TABLE; Schema: frontend; Owner: postgres
 --
 
@@ -10743,74 +10826,6 @@ CREATE TABLE frontend.store_app_ranks_2026_10_26 (
 ALTER TABLE frontend.store_app_ranks_2026_10_26 OWNER TO postgres;
 
 --
--- Name: store_app_ranks_2026_10_29; Type: TABLE; Schema: frontend; Owner: postgres
---
-
-CREATE TABLE frontend.store_app_ranks_2026_10_29 (
-    rank smallint CONSTRAINT app_ranks_weekly_rank_not_null NOT NULL,
-    best_rank smallint CONSTRAINT app_ranks_weekly_best_rank_not_null NOT NULL,
-    country smallint CONSTRAINT app_ranks_weekly_country_not_null NOT NULL,
-    store_collection smallint CONSTRAINT app_ranks_weekly_store_collection_not_null NOT NULL,
-    store_category smallint CONSTRAINT app_ranks_weekly_store_category_not_null NOT NULL,
-    crawled_date date CONSTRAINT app_ranks_weekly_crawled_date_not_null NOT NULL,
-    store_app integer CONSTRAINT app_ranks_weekly_store_app_not_null NOT NULL
-);
-
-
-ALTER TABLE frontend.store_app_ranks_2026_10_29 OWNER TO postgres;
-
---
--- Name: store_app_ranks_2026_10_30; Type: TABLE; Schema: frontend; Owner: postgres
---
-
-CREATE TABLE frontend.store_app_ranks_2026_10_30 (
-    rank smallint CONSTRAINT app_ranks_weekly_rank_not_null NOT NULL,
-    best_rank smallint CONSTRAINT app_ranks_weekly_best_rank_not_null NOT NULL,
-    country smallint CONSTRAINT app_ranks_weekly_country_not_null NOT NULL,
-    store_collection smallint CONSTRAINT app_ranks_weekly_store_collection_not_null NOT NULL,
-    store_category smallint CONSTRAINT app_ranks_weekly_store_category_not_null NOT NULL,
-    crawled_date date CONSTRAINT app_ranks_weekly_crawled_date_not_null NOT NULL,
-    store_app integer CONSTRAINT app_ranks_weekly_store_app_not_null NOT NULL
-);
-
-
-ALTER TABLE frontend.store_app_ranks_2026_10_30 OWNER TO postgres;
-
---
--- Name: store_app_ranks_2026_10_31; Type: TABLE; Schema: frontend; Owner: postgres
---
-
-CREATE TABLE frontend.store_app_ranks_2026_10_31 (
-    rank smallint CONSTRAINT app_ranks_weekly_rank_not_null NOT NULL,
-    best_rank smallint CONSTRAINT app_ranks_weekly_best_rank_not_null NOT NULL,
-    country smallint CONSTRAINT app_ranks_weekly_country_not_null NOT NULL,
-    store_collection smallint CONSTRAINT app_ranks_weekly_store_collection_not_null NOT NULL,
-    store_category smallint CONSTRAINT app_ranks_weekly_store_category_not_null NOT NULL,
-    crawled_date date CONSTRAINT app_ranks_weekly_crawled_date_not_null NOT NULL,
-    store_app integer CONSTRAINT app_ranks_weekly_store_app_not_null NOT NULL
-);
-
-
-ALTER TABLE frontend.store_app_ranks_2026_10_31 OWNER TO postgres;
-
---
--- Name: store_app_ranks_2026_11_01; Type: TABLE; Schema: frontend; Owner: postgres
---
-
-CREATE TABLE frontend.store_app_ranks_2026_11_01 (
-    rank smallint CONSTRAINT app_ranks_weekly_rank_not_null NOT NULL,
-    best_rank smallint CONSTRAINT app_ranks_weekly_best_rank_not_null NOT NULL,
-    country smallint CONSTRAINT app_ranks_weekly_country_not_null NOT NULL,
-    store_collection smallint CONSTRAINT app_ranks_weekly_store_collection_not_null NOT NULL,
-    store_category smallint CONSTRAINT app_ranks_weekly_store_category_not_null NOT NULL,
-    crawled_date date CONSTRAINT app_ranks_weekly_crawled_date_not_null NOT NULL,
-    store_app integer CONSTRAINT app_ranks_weekly_store_app_not_null NOT NULL
-);
-
-
-ALTER TABLE frontend.store_app_ranks_2026_11_01 OWNER TO postgres;
-
---
 -- Name: store_app_ranks_2026_11_02; Type: TABLE; Schema: frontend; Owner: postgres
 --
 
@@ -10942,7 +10957,7 @@ CREATE TABLE frontend.store_app_ranks_2026_11_09 (
     store_category smallint CONSTRAINT app_ranks_weekly_store_category_not_null NOT NULL,
     crawled_date date CONSTRAINT app_ranks_weekly_crawled_date_not_null NOT NULL,
     store_app integer CONSTRAINT app_ranks_weekly_store_app_not_null NOT NULL,
-    CONSTRAINT rank_stage_6d415e56eee44ff59a70c52a29c8a51a_crawled_date_check CHECK (((crawled_date >= '2026-11-09'::date) AND (crawled_date < '2026-11-10'::date)))
+    CONSTRAINT rank_stage_234ba5f86b9f4dedb7ecc00ea0d11218_crawled_date_check CHECK (((crawled_date >= '2026-11-09'::date) AND (crawled_date < '2026-11-10'::date)))
 );
 
 
@@ -10960,7 +10975,7 @@ CREATE TABLE frontend.store_app_ranks_2026_11_10 (
     store_category smallint CONSTRAINT app_ranks_weekly_store_category_not_null NOT NULL,
     crawled_date date CONSTRAINT app_ranks_weekly_crawled_date_not_null NOT NULL,
     store_app integer CONSTRAINT app_ranks_weekly_store_app_not_null NOT NULL,
-    CONSTRAINT rank_stage_7260989573fe4ffc96a510b74ba1c6c7_crawled_date_check CHECK (((crawled_date >= '2026-11-10'::date) AND (crawled_date < '2026-11-11'::date)))
+    CONSTRAINT rank_stage_b5f8e4ce17b5492ba43824e474fef369_crawled_date_check CHECK (((crawled_date >= '2026-11-10'::date) AND (crawled_date < '2026-11-11'::date)))
 );
 
 
@@ -10978,7 +10993,7 @@ CREATE TABLE frontend.store_app_ranks_2026_11_11 (
     store_category smallint CONSTRAINT app_ranks_weekly_store_category_not_null NOT NULL,
     crawled_date date CONSTRAINT app_ranks_weekly_crawled_date_not_null NOT NULL,
     store_app integer CONSTRAINT app_ranks_weekly_store_app_not_null NOT NULL,
-    CONSTRAINT rank_stage_f8fe01a41b2a4dd09f231c23926c99fb_crawled_date_check CHECK (((crawled_date >= '2026-11-11'::date) AND (crawled_date < '2026-11-12'::date)))
+    CONSTRAINT rank_stage_cf0549087ce8493eac173a8282a03ee0_crawled_date_check CHECK (((crawled_date >= '2026-11-11'::date) AND (crawled_date < '2026-11-12'::date)))
 );
 
 
@@ -10996,11 +11011,83 @@ CREATE TABLE frontend.store_app_ranks_2026_11_12 (
     store_category smallint CONSTRAINT app_ranks_weekly_store_category_not_null NOT NULL,
     crawled_date date CONSTRAINT app_ranks_weekly_crawled_date_not_null NOT NULL,
     store_app integer CONSTRAINT app_ranks_weekly_store_app_not_null NOT NULL,
-    CONSTRAINT rank_stage_da226b75f3ec4a5aa1d87cd490d86577_crawled_date_check CHECK (((crawled_date >= '2026-11-12'::date) AND (crawled_date < '2026-11-13'::date)))
+    CONSTRAINT rank_stage_3e5f1921f5964a6282e3764f4a676ae3_crawled_date_check CHECK (((crawled_date >= '2026-11-12'::date) AND (crawled_date < '2026-11-13'::date)))
 );
 
 
 ALTER TABLE frontend.store_app_ranks_2026_11_12 OWNER TO postgres;
+
+--
+-- Name: store_app_ranks_2026_11_13; Type: TABLE; Schema: frontend; Owner: postgres
+--
+
+CREATE TABLE frontend.store_app_ranks_2026_11_13 (
+    rank smallint CONSTRAINT app_ranks_weekly_rank_not_null NOT NULL,
+    best_rank smallint CONSTRAINT app_ranks_weekly_best_rank_not_null NOT NULL,
+    country smallint CONSTRAINT app_ranks_weekly_country_not_null NOT NULL,
+    store_collection smallint CONSTRAINT app_ranks_weekly_store_collection_not_null NOT NULL,
+    store_category smallint CONSTRAINT app_ranks_weekly_store_category_not_null NOT NULL,
+    crawled_date date CONSTRAINT app_ranks_weekly_crawled_date_not_null NOT NULL,
+    store_app integer CONSTRAINT app_ranks_weekly_store_app_not_null NOT NULL,
+    CONSTRAINT rank_stage_de6a9255e9044780b569972b5b9dd21c_crawled_date_check CHECK (((crawled_date >= '2026-11-13'::date) AND (crawled_date < '2026-11-14'::date)))
+);
+
+
+ALTER TABLE frontend.store_app_ranks_2026_11_13 OWNER TO postgres;
+
+--
+-- Name: store_app_ranks_2026_11_14; Type: TABLE; Schema: frontend; Owner: postgres
+--
+
+CREATE TABLE frontend.store_app_ranks_2026_11_14 (
+    rank smallint CONSTRAINT app_ranks_weekly_rank_not_null NOT NULL,
+    best_rank smallint CONSTRAINT app_ranks_weekly_best_rank_not_null NOT NULL,
+    country smallint CONSTRAINT app_ranks_weekly_country_not_null NOT NULL,
+    store_collection smallint CONSTRAINT app_ranks_weekly_store_collection_not_null NOT NULL,
+    store_category smallint CONSTRAINT app_ranks_weekly_store_category_not_null NOT NULL,
+    crawled_date date CONSTRAINT app_ranks_weekly_crawled_date_not_null NOT NULL,
+    store_app integer CONSTRAINT app_ranks_weekly_store_app_not_null NOT NULL,
+    CONSTRAINT rank_stage_cdf74dd9147148ad93688a08c5cb4861_crawled_date_check CHECK (((crawled_date >= '2026-11-14'::date) AND (crawled_date < '2026-11-15'::date)))
+);
+
+
+ALTER TABLE frontend.store_app_ranks_2026_11_14 OWNER TO postgres;
+
+--
+-- Name: store_app_ranks_2026_11_15; Type: TABLE; Schema: frontend; Owner: postgres
+--
+
+CREATE TABLE frontend.store_app_ranks_2026_11_15 (
+    rank smallint CONSTRAINT app_ranks_weekly_rank_not_null NOT NULL,
+    best_rank smallint CONSTRAINT app_ranks_weekly_best_rank_not_null NOT NULL,
+    country smallint CONSTRAINT app_ranks_weekly_country_not_null NOT NULL,
+    store_collection smallint CONSTRAINT app_ranks_weekly_store_collection_not_null NOT NULL,
+    store_category smallint CONSTRAINT app_ranks_weekly_store_category_not_null NOT NULL,
+    crawled_date date CONSTRAINT app_ranks_weekly_crawled_date_not_null NOT NULL,
+    store_app integer CONSTRAINT app_ranks_weekly_store_app_not_null NOT NULL,
+    CONSTRAINT rank_stage_ef73bd1c88384e33ba2785cea2b716e3_crawled_date_check CHECK (((crawled_date >= '2026-11-15'::date) AND (crawled_date < '2026-11-16'::date)))
+);
+
+
+ALTER TABLE frontend.store_app_ranks_2026_11_15 OWNER TO postgres;
+
+--
+-- Name: store_app_ranks_2026_11_16; Type: TABLE; Schema: frontend; Owner: postgres
+--
+
+CREATE TABLE frontend.store_app_ranks_2026_11_16 (
+    rank smallint CONSTRAINT app_ranks_weekly_rank_not_null NOT NULL,
+    best_rank smallint CONSTRAINT app_ranks_weekly_best_rank_not_null NOT NULL,
+    country smallint CONSTRAINT app_ranks_weekly_country_not_null NOT NULL,
+    store_collection smallint CONSTRAINT app_ranks_weekly_store_collection_not_null NOT NULL,
+    store_category smallint CONSTRAINT app_ranks_weekly_store_category_not_null NOT NULL,
+    crawled_date date CONSTRAINT app_ranks_weekly_crawled_date_not_null NOT NULL,
+    store_app integer CONSTRAINT app_ranks_weekly_store_app_not_null NOT NULL,
+    CONSTRAINT rank_stage_067b03d6dfaa49aca1a4df8e4216cb30_crawled_date_check CHECK (((crawled_date >= '2026-11-16'::date) AND (crawled_date < '2026-11-17'::date)))
+);
+
+
+ALTER TABLE frontend.store_app_ranks_2026_11_16 OWNER TO postgres;
 
 --
 -- Name: store_app_ranks_daily; Type: TABLE; Schema: frontend; Owner: postgres
@@ -12632,7 +12719,8 @@ CREATE TABLE public.app_country_metrics_history_2026_10_19 (
     two_star integer,
     three_star integer,
     four_star integer,
-    five_star integer
+    five_star integer,
+    CONSTRAINT rank_stage_65fb979652a2432990cd8344910f2802_week_start_check CHECK (((week_start >= '2026-10-19'::date) AND (week_start < '2026-10-20'::date)))
 );
 
 
@@ -12653,7 +12741,8 @@ CREATE TABLE public.app_country_metrics_history_2026_10_26 (
     two_star integer,
     three_star integer,
     four_star integer,
-    five_star integer
+    five_star integer,
+    CONSTRAINT rank_stage_dfa35f7fb7d5480bbcb07776b6255e46_week_start_check CHECK (((week_start >= '2026-10-26'::date) AND (week_start < '2026-10-27'::date)))
 );
 
 
@@ -12674,7 +12763,8 @@ CREATE TABLE public.app_country_metrics_history_2026_11_02 (
     two_star integer,
     three_star integer,
     four_star integer,
-    five_star integer
+    five_star integer,
+    CONSTRAINT rank_stage_c12d4f19f82c4bb499c6b85c60e767bb_week_start_check CHECK (((week_start >= '2026-11-02'::date) AND (week_start < '2026-11-03'::date)))
 );
 
 
@@ -12695,11 +12785,34 @@ CREATE TABLE public.app_country_metrics_history_2026_11_09 (
     two_star integer,
     three_star integer,
     four_star integer,
-    five_star integer
+    five_star integer,
+    CONSTRAINT rank_stage_015c49ea15da4875aa4503df98ee7605_week_start_check CHECK (((week_start >= '2026-11-09'::date) AND (week_start < '2026-11-10'::date)))
 );
 
 
 ALTER TABLE public.app_country_metrics_history_2026_11_09 OWNER TO postgres;
+
+--
+-- Name: app_country_metrics_history_2026_11_16; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.app_country_metrics_history_2026_11_16 (
+    week_start date CONSTRAINT new_app_country_metrics_history_week_start_not_null NOT NULL,
+    store_app integer CONSTRAINT new_app_country_metrics_history_store_app_not_null NOT NULL,
+    country_id smallint CONSTRAINT new_app_country_metrics_history_country_id_not_null NOT NULL,
+    rating real,
+    installs bigint,
+    rating_count integer,
+    one_star integer,
+    two_star integer,
+    three_star integer,
+    four_star integer,
+    five_star integer,
+    CONSTRAINT rank_stage_c6e13effba37407a8220c1c23bd0de74_week_start_check CHECK (((week_start >= '2026-11-16'::date) AND (week_start < '2026-11-17'::date)))
+);
+
+
+ALTER TABLE public.app_country_metrics_history_2026_11_16 OWNER TO postgres;
 
 --
 -- Name: app_global_metrics_history_2025_10_06; Type: TABLE; Schema: public; Owner: postgres
@@ -14125,7 +14238,8 @@ CREATE TABLE public.app_global_metrics_history_2026_10_19 (
     two_star bigint,
     three_star bigint,
     four_star bigint,
-    five_star bigint
+    five_star bigint,
+    CONSTRAINT rank_stage_e87e1a4747214839b06d5cf52853371b_week_start_check CHECK (((week_start >= '2026-10-19'::date) AND (week_start < '2026-10-20'::date)))
 );
 
 
@@ -14151,7 +14265,8 @@ CREATE TABLE public.app_global_metrics_history_2026_10_26 (
     two_star bigint,
     three_star bigint,
     four_star bigint,
-    five_star bigint
+    five_star bigint,
+    CONSTRAINT rank_stage_94b073e89d5a41ee8ac809e26f138f8e_week_start_check CHECK (((week_start >= '2026-10-26'::date) AND (week_start < '2026-10-27'::date)))
 );
 
 
@@ -14177,7 +14292,8 @@ CREATE TABLE public.app_global_metrics_history_2026_11_02 (
     two_star bigint,
     three_star bigint,
     four_star bigint,
-    five_star bigint
+    five_star bigint,
+    CONSTRAINT rank_stage_80593e0c1dbc4d59a71e73c154fd94f7_week_start_check CHECK (((week_start >= '2026-11-02'::date) AND (week_start < '2026-11-03'::date)))
 );
 
 
@@ -14203,11 +14319,39 @@ CREATE TABLE public.app_global_metrics_history_2026_11_09 (
     two_star bigint,
     three_star bigint,
     four_star bigint,
-    five_star bigint
+    five_star bigint,
+    CONSTRAINT rank_stage_2f866a96eb2b4159b617d147594a67dd_week_start_check CHECK (((week_start >= '2026-11-09'::date) AND (week_start < '2026-11-10'::date)))
 );
 
 
 ALTER TABLE public.app_global_metrics_history_2026_11_09 OWNER TO postgres;
+
+--
+-- Name: app_global_metrics_history_2026_11_16; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.app_global_metrics_history_2026_11_16 (
+    store_app integer CONSTRAINT new_app_global_metrics_weekly_store_app_not_null NOT NULL,
+    week_start date CONSTRAINT new_app_global_metrics_weekly_week_start_not_null NOT NULL,
+    weekly_installs bigint,
+    weekly_ratings bigint,
+    weekly_active_users bigint,
+    monthly_active_users bigint,
+    weekly_iap_revenue real,
+    weekly_ad_revenue real,
+    total_installs bigint,
+    total_ratings bigint,
+    rating real,
+    one_star bigint,
+    two_star bigint,
+    three_star bigint,
+    four_star bigint,
+    five_star bigint,
+    CONSTRAINT rank_stage_1382e4891adc48c29f539a24c1dfb51d_week_start_check CHECK (((week_start >= '2026-11-16'::date) AND (week_start < '2026-11-17'::date)))
+);
+
+
+ALTER TABLE public.app_global_metrics_history_2026_11_16 OWNER TO postgres;
 
 --
 -- Name: app_updated_history; Type: TABLE; Schema: public; Owner: postgres
@@ -14574,14 +14718,13 @@ ALTER SEQUENCE public.languages_id_seq OWNED BY public.languages.id;
 --
 
 CREATE MATERIALIZED VIEW public.mv_app_categories AS
- SELECT sa.store,
-    cm.mapped_category AS category,
+ SELECT store,
+    category,
     count(*) AS app_count
-   FROM (public.store_apps sa
-     JOIN public.category_mapping cm ON (((sa.category)::text = (cm.original_category)::text)))
-  WHERE ((sa.crawl_result = 1) AND (sa.category IS NOT NULL))
-  GROUP BY sa.store, cm.mapped_category
-  ORDER BY sa.store, cm.mapped_category
+   FROM frontend.store_apps_overview sa
+  WHERE ((category IS NOT NULL) AND (NOT is_removed))
+  GROUP BY store, category
+  ORDER BY store, category
   WITH NO DATA;
 
 
@@ -14712,10 +14855,10 @@ CREATE VIEW public.s3_file_keys AS
 ALTER VIEW public.s3_file_keys OWNER TO postgres;
 
 --
--- Name: s3_package_inventory_20261112; Type: TABLE; Schema: public; Owner: postgres
+-- Name: s3_package_inventory_20261117; Type: TABLE; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.s3_package_inventory_20261112 (
+CREATE TABLE public.s3_package_inventory_20261117 (
     myregion text CONSTRAINT s3_package_inventory_myregion_not_null NOT NULL,
     versionstr text CONSTRAINT s3_package_inventory_versionstr_not_null NOT NULL,
     version_code_id integer,
@@ -14723,11 +14866,11 @@ CREATE TABLE public.s3_package_inventory_20261112 (
     file_key text CONSTRAINT s3_package_inventory_file_key_not_null NOT NULL,
     last_modified timestamp with time zone CONSTRAINT s3_package_inventory_last_modified_not_null NOT NULL,
     batch_date date CONSTRAINT s3_package_inventory_batch_date_not_null NOT NULL,
-    CONSTRAINT s3_package_inventory_20261112_batch_date_check CHECK ((batch_date = '2026-11-12'::date))
+    CONSTRAINT s3_package_inventory_20261117_batch_date_check CHECK ((batch_date = '2026-11-17'::date))
 );
 
 
-ALTER TABLE public.s3_package_inventory_20261112 OWNER TO postgres;
+ALTER TABLE public.s3_package_inventory_20261117 OWNER TO postgres;
 
 --
 -- Name: s3_processed_files; Type: TABLE; Schema: public; Owner: postgres
@@ -15257,59 +15400,59 @@ ALTER TABLE public.version_strings ALTER COLUMN id ADD GENERATED BY DEFAULT AS I
 
 
 --
--- Name: app_sdk_strings_20261112; Type: TABLE ATTACH; Schema: adtech; Owner: postgres
+-- Name: app_sdk_strings_20261115; Type: TABLE ATTACH; Schema: adtech; Owner: postgres
 --
 
-ALTER TABLE ONLY adtech.app_sdk_strings ATTACH PARTITION adtech.app_sdk_strings_20261112 FOR VALUES IN ('2026-11-12');
-
-
---
--- Name: app_sdks_20261112; Type: TABLE ATTACH; Schema: adtech; Owner: postgres
---
-
-ALTER TABLE ONLY adtech.app_sdks ATTACH PARTITION adtech.app_sdks_20261112 FOR VALUES IN ('2026-11-12');
+ALTER TABLE ONLY adtech.app_sdk_strings ATTACH PARTITION adtech.app_sdk_strings_20261115 FOR VALUES IN ('2026-11-15');
 
 
 --
--- Name: app_sdks_latest_20261112; Type: TABLE ATTACH; Schema: adtech; Owner: postgres
+-- Name: app_sdks_20261115; Type: TABLE ATTACH; Schema: adtech; Owner: postgres
 --
 
-ALTER TABLE ONLY adtech.app_sdks_latest ATTACH PARTITION adtech.app_sdks_latest_20261112 FOR VALUES IN ('2026-11-12');
-
-
---
--- Name: combined_domain_apps_20261112; Type: TABLE ATTACH; Schema: adtech; Owner: postgres
---
-
-ALTER TABLE ONLY adtech.combined_domain_apps ATTACH PARTITION adtech.combined_domain_apps_20261112 FOR VALUES IN ('2026-11-12');
+ALTER TABLE ONLY adtech.app_sdks ATTACH PARTITION adtech.app_sdks_20261115 FOR VALUES IN ('2026-11-15');
 
 
 --
--- Name: domain_app_changes_quarterly_20261112; Type: TABLE ATTACH; Schema: adtech; Owner: postgres
+-- Name: app_sdks_latest_20261115; Type: TABLE ATTACH; Schema: adtech; Owner: postgres
 --
 
-ALTER TABLE ONLY adtech.domain_app_changes_quarterly ATTACH PARTITION adtech.domain_app_changes_quarterly_20261112 FOR VALUES IN ('2026-11-12');
-
-
---
--- Name: trend_companies_20261112; Type: TABLE ATTACH; Schema: adtech; Owner: postgres
---
-
-ALTER TABLE ONLY adtech.trend_companies ATTACH PARTITION adtech.trend_companies_20261112 FOR VALUES IN ('2026-11-12');
+ALTER TABLE ONLY adtech.app_sdks_latest ATTACH PARTITION adtech.app_sdks_latest_20261115 FOR VALUES IN ('2026-11-15');
 
 
 --
--- Name: trend_domains_20261112; Type: TABLE ATTACH; Schema: adtech; Owner: postgres
+-- Name: combined_domain_apps_20261116; Type: TABLE ATTACH; Schema: adtech; Owner: postgres
 --
 
-ALTER TABLE ONLY adtech.trend_domains ATTACH PARTITION adtech.trend_domains_20261112 FOR VALUES IN ('2026-11-12');
+ALTER TABLE ONLY adtech.combined_domain_apps ATTACH PARTITION adtech.combined_domain_apps_20261116 FOR VALUES IN ('2026-11-16');
 
 
 --
--- Name: trend_parent_companies_20261112; Type: TABLE ATTACH; Schema: adtech; Owner: postgres
+-- Name: domain_app_changes_quarterly_20261115; Type: TABLE ATTACH; Schema: adtech; Owner: postgres
 --
 
-ALTER TABLE ONLY adtech.trend_parent_companies ATTACH PARTITION adtech.trend_parent_companies_20261112 FOR VALUES IN ('2026-11-12');
+ALTER TABLE ONLY adtech.domain_app_changes_quarterly ATTACH PARTITION adtech.domain_app_changes_quarterly_20261115 FOR VALUES IN ('2026-11-15');
+
+
+--
+-- Name: trend_companies_20261115; Type: TABLE ATTACH; Schema: adtech; Owner: postgres
+--
+
+ALTER TABLE ONLY adtech.trend_companies ATTACH PARTITION adtech.trend_companies_20261115 FOR VALUES IN ('2026-11-15');
+
+
+--
+-- Name: trend_domains_20261115; Type: TABLE ATTACH; Schema: adtech; Owner: postgres
+--
+
+ALTER TABLE ONLY adtech.trend_domains ATTACH PARTITION adtech.trend_domains_20261115 FOR VALUES IN ('2026-11-15');
+
+
+--
+-- Name: trend_parent_companies_20261115; Type: TABLE ATTACH; Schema: adtech; Owner: postgres
+--
+
+ALTER TABLE ONLY adtech.trend_parent_companies ATTACH PARTITION adtech.trend_parent_companies_20261115 FOR VALUES IN ('2026-11-15');
 
 
 --
@@ -17903,10 +18046,38 @@ ALTER TABLE ONLY frontend.app_keyword_ranks_daily ATTACH PARTITION frontend.app_
 
 
 --
--- Name: store_app_ranks_2026_04_27; Type: TABLE ATTACH; Schema: frontend; Owner: postgres
+-- Name: app_keyword_ranks_2026_11_12; Type: TABLE ATTACH; Schema: frontend; Owner: postgres
 --
 
-ALTER TABLE ONLY frontend.app_ranks_weekly ATTACH PARTITION frontend.store_app_ranks_2026_04_27 FOR VALUES FROM ('2026-04-27') TO ('2026-04-28');
+ALTER TABLE ONLY frontend.app_keyword_ranks_daily ATTACH PARTITION frontend.app_keyword_ranks_2026_11_12 FOR VALUES FROM ('2026-11-12') TO ('2026-11-13');
+
+
+--
+-- Name: app_keyword_ranks_2026_11_13; Type: TABLE ATTACH; Schema: frontend; Owner: postgres
+--
+
+ALTER TABLE ONLY frontend.app_keyword_ranks_daily ATTACH PARTITION frontend.app_keyword_ranks_2026_11_13 FOR VALUES FROM ('2026-11-13') TO ('2026-11-14');
+
+
+--
+-- Name: app_keyword_ranks_2026_11_14; Type: TABLE ATTACH; Schema: frontend; Owner: postgres
+--
+
+ALTER TABLE ONLY frontend.app_keyword_ranks_daily ATTACH PARTITION frontend.app_keyword_ranks_2026_11_14 FOR VALUES FROM ('2026-11-14') TO ('2026-11-15');
+
+
+--
+-- Name: app_keyword_ranks_2026_11_15; Type: TABLE ATTACH; Schema: frontend; Owner: postgres
+--
+
+ALTER TABLE ONLY frontend.app_keyword_ranks_daily ATTACH PARTITION frontend.app_keyword_ranks_2026_11_15 FOR VALUES FROM ('2026-11-15') TO ('2026-11-16');
+
+
+--
+-- Name: app_keyword_ranks_2026_11_16; Type: TABLE ATTACH; Schema: frontend; Owner: postgres
+--
+
+ALTER TABLE ONLY frontend.app_keyword_ranks_daily ATTACH PARTITION frontend.app_keyword_ranks_2026_11_16 FOR VALUES FROM ('2026-11-16') TO ('2026-11-17');
 
 
 --
@@ -18092,34 +18263,6 @@ ALTER TABLE ONLY frontend.app_ranks_weekly ATTACH PARTITION frontend.store_app_r
 
 
 --
--- Name: store_app_ranks_2026_10_29; Type: TABLE ATTACH; Schema: frontend; Owner: postgres
---
-
-ALTER TABLE ONLY frontend.app_ranks_weekly ATTACH PARTITION frontend.store_app_ranks_2026_10_29 FOR VALUES FROM ('2026-10-29') TO ('2026-10-30');
-
-
---
--- Name: store_app_ranks_2026_10_30; Type: TABLE ATTACH; Schema: frontend; Owner: postgres
---
-
-ALTER TABLE ONLY frontend.app_ranks_weekly ATTACH PARTITION frontend.store_app_ranks_2026_10_30 FOR VALUES FROM ('2026-10-30') TO ('2026-10-31');
-
-
---
--- Name: store_app_ranks_2026_10_31; Type: TABLE ATTACH; Schema: frontend; Owner: postgres
---
-
-ALTER TABLE ONLY frontend.app_ranks_weekly ATTACH PARTITION frontend.store_app_ranks_2026_10_31 FOR VALUES FROM ('2026-10-31') TO ('2026-11-01');
-
-
---
--- Name: store_app_ranks_2026_11_01; Type: TABLE ATTACH; Schema: frontend; Owner: postgres
---
-
-ALTER TABLE ONLY frontend.app_ranks_weekly ATTACH PARTITION frontend.store_app_ranks_2026_11_01 FOR VALUES FROM ('2026-11-01') TO ('2026-11-02');
-
-
---
 -- Name: store_app_ranks_2026_11_02; Type: TABLE ATTACH; Schema: frontend; Owner: postgres
 --
 
@@ -18194,6 +18337,34 @@ ALTER TABLE ONLY frontend.app_ranks_weekly ATTACH PARTITION frontend.store_app_r
 --
 
 ALTER TABLE ONLY frontend.app_ranks_weekly ATTACH PARTITION frontend.store_app_ranks_2026_11_12 FOR VALUES FROM ('2026-11-12') TO ('2026-11-13');
+
+
+--
+-- Name: store_app_ranks_2026_11_13; Type: TABLE ATTACH; Schema: frontend; Owner: postgres
+--
+
+ALTER TABLE ONLY frontend.app_ranks_weekly ATTACH PARTITION frontend.store_app_ranks_2026_11_13 FOR VALUES FROM ('2026-11-13') TO ('2026-11-14');
+
+
+--
+-- Name: store_app_ranks_2026_11_14; Type: TABLE ATTACH; Schema: frontend; Owner: postgres
+--
+
+ALTER TABLE ONLY frontend.app_ranks_weekly ATTACH PARTITION frontend.store_app_ranks_2026_11_14 FOR VALUES FROM ('2026-11-14') TO ('2026-11-15');
+
+
+--
+-- Name: store_app_ranks_2026_11_15; Type: TABLE ATTACH; Schema: frontend; Owner: postgres
+--
+
+ALTER TABLE ONLY frontend.app_ranks_weekly ATTACH PARTITION frontend.store_app_ranks_2026_11_15 FOR VALUES FROM ('2026-11-15') TO ('2026-11-16');
+
+
+--
+-- Name: store_app_ranks_2026_11_16; Type: TABLE ATTACH; Schema: frontend; Owner: postgres
+--
+
+ALTER TABLE ONLY frontend.app_ranks_weekly ATTACH PARTITION frontend.store_app_ranks_2026_11_16 FOR VALUES FROM ('2026-11-16') TO ('2026-11-17');
 
 
 --
@@ -18571,28 +18742,35 @@ ALTER TABLE ONLY public.app_country_metrics_history ATTACH PARTITION public.app_
 -- Name: app_country_metrics_history_2026_10_19; Type: TABLE ATTACH; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.app_country_metrics_history ATTACH PARTITION public.app_country_metrics_history_2026_10_19 FOR VALUES FROM ('2026-10-19') TO ('2026-10-26');
+ALTER TABLE ONLY public.app_country_metrics_history ATTACH PARTITION public.app_country_metrics_history_2026_10_19 FOR VALUES FROM ('2026-10-19') TO ('2026-10-20');
 
 
 --
 -- Name: app_country_metrics_history_2026_10_26; Type: TABLE ATTACH; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.app_country_metrics_history ATTACH PARTITION public.app_country_metrics_history_2026_10_26 FOR VALUES FROM ('2026-10-26') TO ('2026-11-02');
+ALTER TABLE ONLY public.app_country_metrics_history ATTACH PARTITION public.app_country_metrics_history_2026_10_26 FOR VALUES FROM ('2026-10-26') TO ('2026-10-27');
 
 
 --
 -- Name: app_country_metrics_history_2026_11_02; Type: TABLE ATTACH; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.app_country_metrics_history ATTACH PARTITION public.app_country_metrics_history_2026_11_02 FOR VALUES FROM ('2026-11-02') TO ('2026-11-09');
+ALTER TABLE ONLY public.app_country_metrics_history ATTACH PARTITION public.app_country_metrics_history_2026_11_02 FOR VALUES FROM ('2026-11-02') TO ('2026-11-03');
 
 
 --
 -- Name: app_country_metrics_history_2026_11_09; Type: TABLE ATTACH; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.app_country_metrics_history ATTACH PARTITION public.app_country_metrics_history_2026_11_09 FOR VALUES FROM ('2026-11-09') TO ('2026-11-16');
+ALTER TABLE ONLY public.app_country_metrics_history ATTACH PARTITION public.app_country_metrics_history_2026_11_09 FOR VALUES FROM ('2026-11-09') TO ('2026-11-10');
+
+
+--
+-- Name: app_country_metrics_history_2026_11_16; Type: TABLE ATTACH; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.app_country_metrics_history ATTACH PARTITION public.app_country_metrics_history_2026_11_16 FOR VALUES FROM ('2026-11-16') TO ('2026-11-17');
 
 
 --
@@ -18977,35 +19155,42 @@ ALTER TABLE ONLY public.app_global_metrics_history ATTACH PARTITION public.app_g
 -- Name: app_global_metrics_history_2026_10_19; Type: TABLE ATTACH; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.app_global_metrics_history ATTACH PARTITION public.app_global_metrics_history_2026_10_19 FOR VALUES FROM ('2026-10-19') TO ('2026-10-26');
+ALTER TABLE ONLY public.app_global_metrics_history ATTACH PARTITION public.app_global_metrics_history_2026_10_19 FOR VALUES FROM ('2026-10-19') TO ('2026-10-20');
 
 
 --
 -- Name: app_global_metrics_history_2026_10_26; Type: TABLE ATTACH; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.app_global_metrics_history ATTACH PARTITION public.app_global_metrics_history_2026_10_26 FOR VALUES FROM ('2026-10-26') TO ('2026-11-02');
+ALTER TABLE ONLY public.app_global_metrics_history ATTACH PARTITION public.app_global_metrics_history_2026_10_26 FOR VALUES FROM ('2026-10-26') TO ('2026-10-27');
 
 
 --
 -- Name: app_global_metrics_history_2026_11_02; Type: TABLE ATTACH; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.app_global_metrics_history ATTACH PARTITION public.app_global_metrics_history_2026_11_02 FOR VALUES FROM ('2026-11-02') TO ('2026-11-09');
+ALTER TABLE ONLY public.app_global_metrics_history ATTACH PARTITION public.app_global_metrics_history_2026_11_02 FOR VALUES FROM ('2026-11-02') TO ('2026-11-03');
 
 
 --
 -- Name: app_global_metrics_history_2026_11_09; Type: TABLE ATTACH; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.app_global_metrics_history ATTACH PARTITION public.app_global_metrics_history_2026_11_09 FOR VALUES FROM ('2026-11-09') TO ('2026-11-16');
+ALTER TABLE ONLY public.app_global_metrics_history ATTACH PARTITION public.app_global_metrics_history_2026_11_09 FOR VALUES FROM ('2026-11-09') TO ('2026-11-10');
 
 
 --
--- Name: s3_package_inventory_20261112; Type: TABLE ATTACH; Schema: public; Owner: postgres
+-- Name: app_global_metrics_history_2026_11_16; Type: TABLE ATTACH; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.s3_package_inventory ATTACH PARTITION public.s3_package_inventory_20261112 FOR VALUES IN ('2026-11-12');
+ALTER TABLE ONLY public.app_global_metrics_history ATTACH PARTITION public.app_global_metrics_history_2026_11_16 FOR VALUES FROM ('2026-11-16') TO ('2026-11-17');
+
+
+--
+-- Name: s3_package_inventory_20261117; Type: TABLE ATTACH; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.s3_package_inventory ATTACH PARTITION public.s3_package_inventory_20261117 FOR VALUES IN ('2026-11-17');
 
 
 --
@@ -19190,11 +19375,11 @@ ALTER TABLE ONLY adtech.combined_domain_apps
 
 
 --
--- Name: combined_domain_apps_20261112 combined_domain_apps_20261112_pkey; Type: CONSTRAINT; Schema: adtech; Owner: postgres
+-- Name: combined_domain_apps_20261116 combined_domain_apps_20261116_pkey; Type: CONSTRAINT; Schema: adtech; Owner: postgres
 --
 
-ALTER TABLE ONLY adtech.combined_domain_apps_20261112
-    ADD CONSTRAINT combined_domain_apps_20261112_pkey PRIMARY KEY (domain_id, store_app, batch_date);
+ALTER TABLE ONLY adtech.combined_domain_apps_20261116
+    ADD CONSTRAINT combined_domain_apps_20261116_pkey PRIMARY KEY (domain_id, store_app, batch_date);
 
 
 --
@@ -19275,6 +19460,14 @@ ALTER TABLE ONLY adtech.company_ticker_mapping
 
 ALTER TABLE ONLY adtech.sdk_categories
     ADD CONSTRAINT sdk_categories_pkey PRIMARY KEY (sdk_id, category_id);
+
+
+--
+-- Name: sdk_mediation_adapter_patterns sdk_mediation_adapter_patterns_pkey; Type: CONSTRAINT; Schema: adtech; Owner: postgres
+--
+
+ALTER TABLE ONLY adtech.sdk_mediation_adapter_patterns
+    ADD CONSTRAINT sdk_mediation_adapter_patterns_pkey PRIMARY KEY (adapter_sdk_id, adapter_pattern);
 
 
 --
@@ -19963,10 +20156,10 @@ CREATE INDEX idx_app_sdk_strings_store_app ON ONLY adtech.app_sdk_strings USING 
 
 
 --
--- Name: idx_app_sdk_strings_20261112_idx_app_sdk_strings_store_app_2026; Type: INDEX; Schema: adtech; Owner: postgres
+-- Name: idx_app_sdk_strings_20261115_idx_app_sdk_strings_store_app_2026; Type: INDEX; Schema: adtech; Owner: postgres
 --
 
-CREATE INDEX idx_app_sdk_strings_20261112_idx_app_sdk_strings_store_app_2026 ON adtech.app_sdk_strings_20261112 USING btree (store_app);
+CREATE INDEX idx_app_sdk_strings_20261115_idx_app_sdk_strings_store_app_2026 ON adtech.app_sdk_strings_20261115 USING btree (store_app);
 
 
 --
@@ -19977,10 +20170,10 @@ CREATE INDEX idx_app_sdk_strings_string_id ON ONLY adtech.app_sdk_strings USING 
 
 
 --
--- Name: idx_app_sdk_strings_20261112_idx_app_sdk_strings_string_id_2026; Type: INDEX; Schema: adtech; Owner: postgres
+-- Name: idx_app_sdk_strings_20261115_idx_app_sdk_strings_string_id_2026; Type: INDEX; Schema: adtech; Owner: postgres
 --
 
-CREATE INDEX idx_app_sdk_strings_20261112_idx_app_sdk_strings_string_id_2026 ON adtech.app_sdk_strings_20261112 USING btree (string_id);
+CREATE INDEX idx_app_sdk_strings_20261115_idx_app_sdk_strings_string_id_2026 ON adtech.app_sdk_strings_20261115 USING btree (string_id);
 
 
 --
@@ -19991,10 +20184,10 @@ CREATE UNIQUE INDEX idx_combined_app_parent_company_idx ON adtech.combined_paren
 
 
 --
--- Name: idx_combined_domain_apps_20261112_combined_domain_apps_pkey_202; Type: INDEX; Schema: adtech; Owner: postgres
+-- Name: idx_combined_domain_apps_20261116_combined_domain_apps_pkey_202; Type: INDEX; Schema: adtech; Owner: postgres
 --
 
-CREATE UNIQUE INDEX idx_combined_domain_apps_20261112_combined_domain_apps_pkey_202 ON adtech.combined_domain_apps_20261112 USING btree (domain_id, store_app, batch_date);
+CREATE UNIQUE INDEX idx_combined_domain_apps_20261116_combined_domain_apps_pkey_202 ON adtech.combined_domain_apps_20261116 USING btree (domain_id, store_app, batch_date);
 
 
 --
@@ -20005,10 +20198,10 @@ CREATE INDEX idx_domain_app_changes_lookup ON ONLY adtech.domain_app_changes_qua
 
 
 --
--- Name: idx_domain_app_changes_quarterly_20261112_idx_domain_app_change; Type: INDEX; Schema: adtech; Owner: postgres
+-- Name: idx_domain_app_changes_quarterly_20261115_idx_domain_app_change; Type: INDEX; Schema: adtech; Owner: postgres
 --
 
-CREATE INDEX idx_domain_app_changes_quarterly_20261112_idx_domain_app_change ON adtech.domain_app_changes_quarterly_20261112 USING btree (year, quarter, domain_id);
+CREATE INDEX idx_domain_app_changes_quarterly_20261115_idx_domain_app_change ON adtech.domain_app_changes_quarterly_20261115 USING btree (year, quarter, domain_id);
 
 
 --
@@ -20030,6 +20223,13 @@ CREATE INDEX idx_urls_domain_id ON adtech.urls USING btree (domain_id);
 --
 
 CREATE INDEX idx_urls_scheme ON adtech.urls USING btree (scheme);
+
+
+--
+-- Name: sdk_mediation_adapter_pattern_lower_uidx; Type: INDEX; Schema: adtech; Owner: postgres
+--
+
+CREATE UNIQUE INDEX sdk_mediation_adapter_pattern_lower_uidx ON adtech.sdk_mediation_adapter_patterns USING btree (lower(adapter_pattern));
 
 
 --
@@ -22770,6 +22970,41 @@ CREATE INDEX app_keyword_ranks_2026_11_11_store_app_crawled_date_idx ON frontend
 
 
 --
+-- Name: app_keyword_ranks_2026_11_12_store_app_crawled_date_idx; Type: INDEX; Schema: frontend; Owner: postgres
+--
+
+CREATE INDEX app_keyword_ranks_2026_11_12_store_app_crawled_date_idx ON frontend.app_keyword_ranks_2026_11_12 USING btree (store_app, crawled_date);
+
+
+--
+-- Name: app_keyword_ranks_2026_11_13_store_app_crawled_date_idx; Type: INDEX; Schema: frontend; Owner: postgres
+--
+
+CREATE INDEX app_keyword_ranks_2026_11_13_store_app_crawled_date_idx ON frontend.app_keyword_ranks_2026_11_13 USING btree (store_app, crawled_date);
+
+
+--
+-- Name: app_keyword_ranks_2026_11_14_store_app_crawled_date_idx; Type: INDEX; Schema: frontend; Owner: postgres
+--
+
+CREATE INDEX app_keyword_ranks_2026_11_14_store_app_crawled_date_idx ON frontend.app_keyword_ranks_2026_11_14 USING btree (store_app, crawled_date);
+
+
+--
+-- Name: app_keyword_ranks_2026_11_15_store_app_crawled_date_idx; Type: INDEX; Schema: frontend; Owner: postgres
+--
+
+CREATE INDEX app_keyword_ranks_2026_11_15_store_app_crawled_date_idx ON frontend.app_keyword_ranks_2026_11_15 USING btree (store_app, crawled_date);
+
+
+--
+-- Name: app_keyword_ranks_2026_11_16_store_app_crawled_date_idx; Type: INDEX; Schema: frontend; Owner: postgres
+--
+
+CREATE INDEX app_keyword_ranks_2026_11_16_store_app_crawled_date_idx ON frontend.app_keyword_ranks_2026_11_16 USING btree (store_app, crawled_date);
+
+
+--
 -- Name: app_ranks_best_monthly_uidx; Type: INDEX; Schema: frontend; Owner: postgres
 --
 
@@ -23197,13 +23432,6 @@ CREATE UNIQUE INDEX mediation_adapter_app_counts_unique ON frontend.mediation_ad
 
 
 --
--- Name: store_app_ranks_2026_04_27_store_collection_store_category__idx; Type: INDEX; Schema: frontend; Owner: postgres
---
-
-CREATE INDEX store_app_ranks_2026_04_27_store_collection_store_category__idx ON frontend.store_app_ranks_2026_04_27 USING btree (store_collection, store_category, country, crawled_date) INCLUDE (store_app, rank);
-
-
---
 -- Name: store_app_ranks_2026_05_04_store_collection_store_category__idx; Type: INDEX; Schema: frontend; Owner: postgres
 --
 
@@ -23386,34 +23614,6 @@ CREATE INDEX store_app_ranks_2026_10_26_store_collection_store_category__idx ON 
 
 
 --
--- Name: store_app_ranks_2026_10_29_store_collection_store_category__idx; Type: INDEX; Schema: frontend; Owner: postgres
---
-
-CREATE INDEX store_app_ranks_2026_10_29_store_collection_store_category__idx ON frontend.store_app_ranks_2026_10_29 USING btree (store_collection, store_category, country, crawled_date) INCLUDE (store_app, rank);
-
-
---
--- Name: store_app_ranks_2026_10_30_store_collection_store_category__idx; Type: INDEX; Schema: frontend; Owner: postgres
---
-
-CREATE INDEX store_app_ranks_2026_10_30_store_collection_store_category__idx ON frontend.store_app_ranks_2026_10_30 USING btree (store_collection, store_category, country, crawled_date) INCLUDE (store_app, rank);
-
-
---
--- Name: store_app_ranks_2026_10_31_store_collection_store_category__idx; Type: INDEX; Schema: frontend; Owner: postgres
---
-
-CREATE INDEX store_app_ranks_2026_10_31_store_collection_store_category__idx ON frontend.store_app_ranks_2026_10_31 USING btree (store_collection, store_category, country, crawled_date) INCLUDE (store_app, rank);
-
-
---
--- Name: store_app_ranks_2026_11_01_store_collection_store_category__idx; Type: INDEX; Schema: frontend; Owner: postgres
---
-
-CREATE INDEX store_app_ranks_2026_11_01_store_collection_store_category__idx ON frontend.store_app_ranks_2026_11_01 USING btree (store_collection, store_category, country, crawled_date) INCLUDE (store_app, rank);
-
-
---
 -- Name: store_app_ranks_2026_11_02_store_collection_store_category__idx; Type: INDEX; Schema: frontend; Owner: postgres
 --
 
@@ -23488,6 +23688,34 @@ CREATE INDEX store_app_ranks_2026_11_11_store_collection_store_category__idx ON 
 --
 
 CREATE INDEX store_app_ranks_2026_11_12_store_collection_store_category__idx ON frontend.store_app_ranks_2026_11_12 USING btree (store_collection, store_category, country, crawled_date) INCLUDE (store_app, rank);
+
+
+--
+-- Name: store_app_ranks_2026_11_13_store_collection_store_category__idx; Type: INDEX; Schema: frontend; Owner: postgres
+--
+
+CREATE INDEX store_app_ranks_2026_11_13_store_collection_store_category__idx ON frontend.store_app_ranks_2026_11_13 USING btree (store_collection, store_category, country, crawled_date) INCLUDE (store_app, rank);
+
+
+--
+-- Name: store_app_ranks_2026_11_14_store_collection_store_category__idx; Type: INDEX; Schema: frontend; Owner: postgres
+--
+
+CREATE INDEX store_app_ranks_2026_11_14_store_collection_store_category__idx ON frontend.store_app_ranks_2026_11_14 USING btree (store_collection, store_category, country, crawled_date) INCLUDE (store_app, rank);
+
+
+--
+-- Name: store_app_ranks_2026_11_15_store_collection_store_category__idx; Type: INDEX; Schema: frontend; Owner: postgres
+--
+
+CREATE INDEX store_app_ranks_2026_11_15_store_collection_store_category__idx ON frontend.store_app_ranks_2026_11_15 USING btree (store_collection, store_category, country, crawled_date) INCLUDE (store_app, rank);
+
+
+--
+-- Name: store_app_ranks_2026_11_16_store_collection_store_category__idx; Type: INDEX; Schema: frontend; Owner: postgres
+--
+
+CREATE INDEX store_app_ranks_2026_11_16_store_collection_store_category__idx ON frontend.store_app_ranks_2026_11_16 USING btree (store_collection, store_category, country, crawled_date) INCLUDE (store_app, rank);
 
 
 --
@@ -24331,62 +24559,6 @@ CREATE INDEX app_country_metrics_history_2026_10_12_store_app_week_start_idx ON 
 
 
 --
--- Name: app_country_metrics_history_2026_10_19_store_app_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX app_country_metrics_history_2026_10_19_store_app_idx ON public.app_country_metrics_history_2026_10_19 USING btree (store_app);
-
-
---
--- Name: app_country_metrics_history_2026_10_19_store_app_week_start_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX app_country_metrics_history_2026_10_19_store_app_week_start_idx ON public.app_country_metrics_history_2026_10_19 USING btree (store_app, week_start);
-
-
---
--- Name: app_country_metrics_history_2026_10_26_store_app_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX app_country_metrics_history_2026_10_26_store_app_idx ON public.app_country_metrics_history_2026_10_26 USING btree (store_app);
-
-
---
--- Name: app_country_metrics_history_2026_10_26_store_app_week_start_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX app_country_metrics_history_2026_10_26_store_app_week_start_idx ON public.app_country_metrics_history_2026_10_26 USING btree (store_app, week_start);
-
-
---
--- Name: app_country_metrics_history_2026_11_02_store_app_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX app_country_metrics_history_2026_11_02_store_app_idx ON public.app_country_metrics_history_2026_11_02 USING btree (store_app);
-
-
---
--- Name: app_country_metrics_history_2026_11_02_store_app_week_start_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX app_country_metrics_history_2026_11_02_store_app_week_start_idx ON public.app_country_metrics_history_2026_11_02 USING btree (store_app, week_start);
-
-
---
--- Name: app_country_metrics_history_2026_11_09_store_app_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX app_country_metrics_history_2026_11_09_store_app_idx ON public.app_country_metrics_history_2026_11_09 USING btree (store_app);
-
-
---
--- Name: app_country_metrics_history_2026_11_09_store_app_week_start_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX app_country_metrics_history_2026_11_09_store_app_week_start_idx ON public.app_country_metrics_history_2026_11_09 USING btree (store_app, week_start);
-
-
---
 -- Name: idx_agmh_store_app_week_start; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -24772,34 +24944,6 @@ CREATE INDEX app_global_metrics_history_2026_10_12_store_app_week_start_idx ON p
 
 
 --
--- Name: app_global_metrics_history_2026_10_19_store_app_week_start_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX app_global_metrics_history_2026_10_19_store_app_week_start_idx ON public.app_global_metrics_history_2026_10_19 USING btree (store_app, week_start);
-
-
---
--- Name: app_global_metrics_history_2026_10_26_store_app_week_start_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX app_global_metrics_history_2026_10_26_store_app_week_start_idx ON public.app_global_metrics_history_2026_10_26 USING btree (store_app, week_start);
-
-
---
--- Name: app_global_metrics_history_2026_11_02_store_app_week_start_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX app_global_metrics_history_2026_11_02_store_app_week_start_idx ON public.app_global_metrics_history_2026_11_02 USING btree (store_app, week_start);
-
-
---
--- Name: app_global_metrics_history_2026_11_09_store_app_week_start_idx; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX app_global_metrics_history_2026_11_09_store_app_week_start_idx ON public.app_global_metrics_history_2026_11_09 USING btree (store_app, week_start);
-
-
---
 -- Name: app_global_metrics_latest_idx; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -24926,10 +25070,10 @@ CREATE UNIQUE INDEX s3_package_inventory_myregion_file_key_idx ON ONLY public.s3
 
 
 --
--- Name: idx_s3_package_inventory_20261112_s3_package_inventory_myregion; Type: INDEX; Schema: public; Owner: postgres
+-- Name: idx_s3_package_inventory_20261117_s3_package_inventory_myregion; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE UNIQUE INDEX idx_s3_package_inventory_20261112_s3_package_inventory_myregion ON public.s3_package_inventory_20261112 USING btree (myregion, file_key, batch_date);
+CREATE UNIQUE INDEX idx_s3_package_inventory_20261117_s3_package_inventory_myregion ON public.s3_package_inventory_20261117 USING btree (myregion, file_key, batch_date);
 
 
 --
@@ -24937,6 +25081,111 @@ CREATE UNIQUE INDEX idx_s3_package_inventory_20261112_s3_package_inventory_myreg
 --
 
 CREATE INDEX idx_s3_reports_domain_report_file ON public.s3_reports USING btree (domain_name, report_name, file_key);
+
+
+--
+-- Name: rank_stage_015c49ea15da4875aa4503df98e_store_app_week_start_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX rank_stage_015c49ea15da4875aa4503df98e_store_app_week_start_idx ON public.app_country_metrics_history_2026_11_09 USING btree (store_app, week_start);
+
+
+--
+-- Name: rank_stage_015c49ea15da4875aa4503df98ee7605_store_app_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX rank_stage_015c49ea15da4875aa4503df98ee7605_store_app_idx ON public.app_country_metrics_history_2026_11_09 USING btree (store_app);
+
+
+--
+-- Name: rank_stage_1382e4891adc48c29f539a24c1d_store_app_week_start_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX rank_stage_1382e4891adc48c29f539a24c1d_store_app_week_start_idx ON public.app_global_metrics_history_2026_11_16 USING btree (store_app, week_start);
+
+
+--
+-- Name: rank_stage_2f866a96eb2b4159b617d147594_store_app_week_start_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX rank_stage_2f866a96eb2b4159b617d147594_store_app_week_start_idx ON public.app_global_metrics_history_2026_11_09 USING btree (store_app, week_start);
+
+
+--
+-- Name: rank_stage_65fb979652a2432990cd8344910_store_app_week_start_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX rank_stage_65fb979652a2432990cd8344910_store_app_week_start_idx ON public.app_country_metrics_history_2026_10_19 USING btree (store_app, week_start);
+
+
+--
+-- Name: rank_stage_65fb979652a2432990cd8344910f2802_store_app_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX rank_stage_65fb979652a2432990cd8344910f2802_store_app_idx ON public.app_country_metrics_history_2026_10_19 USING btree (store_app);
+
+
+--
+-- Name: rank_stage_80593e0c1dbc4d59a71e73c154f_store_app_week_start_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX rank_stage_80593e0c1dbc4d59a71e73c154f_store_app_week_start_idx ON public.app_global_metrics_history_2026_11_02 USING btree (store_app, week_start);
+
+
+--
+-- Name: rank_stage_94b073e89d5a41ee8ac809e26f1_store_app_week_start_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX rank_stage_94b073e89d5a41ee8ac809e26f1_store_app_week_start_idx ON public.app_global_metrics_history_2026_10_26 USING btree (store_app, week_start);
+
+
+--
+-- Name: rank_stage_c12d4f19f82c4bb499c6b85c60e767bb_store_app_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX rank_stage_c12d4f19f82c4bb499c6b85c60e767bb_store_app_idx ON public.app_country_metrics_history_2026_11_02 USING btree (store_app);
+
+
+--
+-- Name: rank_stage_c12d4f19f82c4bb499c6b85c60e_store_app_week_start_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX rank_stage_c12d4f19f82c4bb499c6b85c60e_store_app_week_start_idx ON public.app_country_metrics_history_2026_11_02 USING btree (store_app, week_start);
+
+
+--
+-- Name: rank_stage_c6e13effba37407a8220c1c23bd0de74_store_app_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX rank_stage_c6e13effba37407a8220c1c23bd0de74_store_app_idx ON public.app_country_metrics_history_2026_11_16 USING btree (store_app);
+
+
+--
+-- Name: rank_stage_c6e13effba37407a8220c1c23bd_store_app_week_start_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX rank_stage_c6e13effba37407a8220c1c23bd_store_app_week_start_idx ON public.app_country_metrics_history_2026_11_16 USING btree (store_app, week_start);
+
+
+--
+-- Name: rank_stage_dfa35f7fb7d5480bbcb07776b6255e46_store_app_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX rank_stage_dfa35f7fb7d5480bbcb07776b6255e46_store_app_idx ON public.app_country_metrics_history_2026_10_26 USING btree (store_app);
+
+
+--
+-- Name: rank_stage_dfa35f7fb7d5480bbcb07776b62_store_app_week_start_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX rank_stage_dfa35f7fb7d5480bbcb07776b62_store_app_week_start_idx ON public.app_country_metrics_history_2026_10_26 USING btree (store_app, week_start);
+
+
+--
+-- Name: rank_stage_e87e1a4747214839b06d5cf5285_store_app_week_start_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX rank_stage_e87e1a4747214839b06d5cf5285_store_app_week_start_idx ON public.app_global_metrics_history_2026_10_19 USING btree (store_app, week_start);
 
 
 --
@@ -25010,6 +25259,76 @@ CREATE INDEX store_apps_updated_at_idx ON public.store_apps USING btree (updated
 
 
 --
+-- Name: swap_key_1188a0098c5e4befb86ad3ea10c858bd; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX swap_key_1188a0098c5e4befb86ad3ea10c858bd ON public.app_country_metrics_history_2026_11_16 USING btree (week_start, store_app, country_id);
+
+
+--
+-- Name: swap_key_481262c4315e438f9a4e9aec3154144c; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX swap_key_481262c4315e438f9a4e9aec3154144c ON public.app_country_metrics_history_2026_11_09 USING btree (week_start, store_app, country_id);
+
+
+--
+-- Name: swap_key_4c500124b0234aaeb6d41bc4804840bd; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX swap_key_4c500124b0234aaeb6d41bc4804840bd ON public.app_global_metrics_history_2026_11_16 USING btree (week_start, store_app);
+
+
+--
+-- Name: swap_key_6488a1b1a3014e4384cd65299a16b870; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX swap_key_6488a1b1a3014e4384cd65299a16b870 ON public.app_global_metrics_history_2026_11_09 USING btree (week_start, store_app);
+
+
+--
+-- Name: swap_key_7cebbffff52842f19a31998ef8b65981; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX swap_key_7cebbffff52842f19a31998ef8b65981 ON public.app_global_metrics_history_2026_11_02 USING btree (week_start, store_app);
+
+
+--
+-- Name: swap_key_7dc4be0a145b4cddaa43c575871e6dc1; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX swap_key_7dc4be0a145b4cddaa43c575871e6dc1 ON public.app_global_metrics_history_2026_10_19 USING btree (week_start, store_app);
+
+
+--
+-- Name: swap_key_aaa9ae47f5f344d2abb7d1589c7e7762; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX swap_key_aaa9ae47f5f344d2abb7d1589c7e7762 ON public.app_country_metrics_history_2026_11_02 USING btree (week_start, store_app, country_id);
+
+
+--
+-- Name: swap_key_d6969609988740c8aefde0bf6be7b9b0; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX swap_key_d6969609988740c8aefde0bf6be7b9b0 ON public.app_global_metrics_history_2026_10_26 USING btree (week_start, store_app);
+
+
+--
+-- Name: swap_key_f35fdd3e9b6a49a88ab43e2c5448eda6; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX swap_key_f35fdd3e9b6a49a88ab43e2c5448eda6 ON public.app_country_metrics_history_2026_10_19 USING btree (week_start, store_app, country_id);
+
+
+--
+-- Name: swap_key_ffc2fa6a3674411abae69cb585e6dbdc; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX swap_key_ffc2fa6a3674411abae69cb585e6dbdc ON public.app_country_metrics_history_2026_10_26 USING btree (week_start, store_app, country_id);
+
+
+--
 -- Name: textsearch_generated_idx; Type: INDEX; Schema: public; Owner: james
 --
 
@@ -25038,31 +25357,31 @@ CREATE INDEX version_strings_xml_path_lower_idx ON public.version_strings USING 
 
 
 --
--- Name: combined_domain_apps_20261112_pkey; Type: INDEX ATTACH; Schema: adtech; Owner: postgres
+-- Name: combined_domain_apps_20261116_pkey; Type: INDEX ATTACH; Schema: adtech; Owner: postgres
 --
 
-ALTER INDEX adtech.combined_domain_apps_pkey ATTACH PARTITION adtech.combined_domain_apps_20261112_pkey;
-
-
---
--- Name: idx_app_sdk_strings_20261112_idx_app_sdk_strings_store_app_2026; Type: INDEX ATTACH; Schema: adtech; Owner: postgres
---
-
-ALTER INDEX adtech.idx_app_sdk_strings_store_app ATTACH PARTITION adtech.idx_app_sdk_strings_20261112_idx_app_sdk_strings_store_app_2026;
+ALTER INDEX adtech.combined_domain_apps_pkey ATTACH PARTITION adtech.combined_domain_apps_20261116_pkey;
 
 
 --
--- Name: idx_app_sdk_strings_20261112_idx_app_sdk_strings_string_id_2026; Type: INDEX ATTACH; Schema: adtech; Owner: postgres
+-- Name: idx_app_sdk_strings_20261115_idx_app_sdk_strings_store_app_2026; Type: INDEX ATTACH; Schema: adtech; Owner: postgres
 --
 
-ALTER INDEX adtech.idx_app_sdk_strings_string_id ATTACH PARTITION adtech.idx_app_sdk_strings_20261112_idx_app_sdk_strings_string_id_2026;
+ALTER INDEX adtech.idx_app_sdk_strings_store_app ATTACH PARTITION adtech.idx_app_sdk_strings_20261115_idx_app_sdk_strings_store_app_2026;
 
 
 --
--- Name: idx_domain_app_changes_quarterly_20261112_idx_domain_app_change; Type: INDEX ATTACH; Schema: adtech; Owner: postgres
+-- Name: idx_app_sdk_strings_20261115_idx_app_sdk_strings_string_id_2026; Type: INDEX ATTACH; Schema: adtech; Owner: postgres
 --
 
-ALTER INDEX adtech.idx_domain_app_changes_lookup ATTACH PARTITION adtech.idx_domain_app_changes_quarterly_20261112_idx_domain_app_change;
+ALTER INDEX adtech.idx_app_sdk_strings_string_id ATTACH PARTITION adtech.idx_app_sdk_strings_20261115_idx_app_sdk_strings_string_id_2026;
+
+
+--
+-- Name: idx_domain_app_changes_quarterly_20261115_idx_domain_app_change; Type: INDEX ATTACH; Schema: adtech; Owner: postgres
+--
+
+ALTER INDEX adtech.idx_domain_app_changes_lookup ATTACH PARTITION adtech.idx_domain_app_changes_quarterly_20261115_idx_domain_app_change;
 
 
 --
@@ -27656,10 +27975,38 @@ ALTER INDEX frontend.app_keyword_ranks_daily_lookup ATTACH PARTITION frontend.ap
 
 
 --
--- Name: store_app_ranks_2026_04_27_store_collection_store_category__idx; Type: INDEX ATTACH; Schema: frontend; Owner: postgres
+-- Name: app_keyword_ranks_2026_11_12_store_app_crawled_date_idx; Type: INDEX ATTACH; Schema: frontend; Owner: postgres
 --
 
-ALTER INDEX frontend.idx_app_ranks_collection_category_country_date ATTACH PARTITION frontend.store_app_ranks_2026_04_27_store_collection_store_category__idx;
+ALTER INDEX frontend.app_keyword_ranks_daily_lookup ATTACH PARTITION frontend.app_keyword_ranks_2026_11_12_store_app_crawled_date_idx;
+
+
+--
+-- Name: app_keyword_ranks_2026_11_13_store_app_crawled_date_idx; Type: INDEX ATTACH; Schema: frontend; Owner: postgres
+--
+
+ALTER INDEX frontend.app_keyword_ranks_daily_lookup ATTACH PARTITION frontend.app_keyword_ranks_2026_11_13_store_app_crawled_date_idx;
+
+
+--
+-- Name: app_keyword_ranks_2026_11_14_store_app_crawled_date_idx; Type: INDEX ATTACH; Schema: frontend; Owner: postgres
+--
+
+ALTER INDEX frontend.app_keyword_ranks_daily_lookup ATTACH PARTITION frontend.app_keyword_ranks_2026_11_14_store_app_crawled_date_idx;
+
+
+--
+-- Name: app_keyword_ranks_2026_11_15_store_app_crawled_date_idx; Type: INDEX ATTACH; Schema: frontend; Owner: postgres
+--
+
+ALTER INDEX frontend.app_keyword_ranks_daily_lookup ATTACH PARTITION frontend.app_keyword_ranks_2026_11_15_store_app_crawled_date_idx;
+
+
+--
+-- Name: app_keyword_ranks_2026_11_16_store_app_crawled_date_idx; Type: INDEX ATTACH; Schema: frontend; Owner: postgres
+--
+
+ALTER INDEX frontend.app_keyword_ranks_daily_lookup ATTACH PARTITION frontend.app_keyword_ranks_2026_11_16_store_app_crawled_date_idx;
 
 
 --
@@ -27845,34 +28192,6 @@ ALTER INDEX frontend.idx_app_ranks_collection_category_country_date ATTACH PARTI
 
 
 --
--- Name: store_app_ranks_2026_10_29_store_collection_store_category__idx; Type: INDEX ATTACH; Schema: frontend; Owner: postgres
---
-
-ALTER INDEX frontend.idx_app_ranks_collection_category_country_date ATTACH PARTITION frontend.store_app_ranks_2026_10_29_store_collection_store_category__idx;
-
-
---
--- Name: store_app_ranks_2026_10_30_store_collection_store_category__idx; Type: INDEX ATTACH; Schema: frontend; Owner: postgres
---
-
-ALTER INDEX frontend.idx_app_ranks_collection_category_country_date ATTACH PARTITION frontend.store_app_ranks_2026_10_30_store_collection_store_category__idx;
-
-
---
--- Name: store_app_ranks_2026_10_31_store_collection_store_category__idx; Type: INDEX ATTACH; Schema: frontend; Owner: postgres
---
-
-ALTER INDEX frontend.idx_app_ranks_collection_category_country_date ATTACH PARTITION frontend.store_app_ranks_2026_10_31_store_collection_store_category__idx;
-
-
---
--- Name: store_app_ranks_2026_11_01_store_collection_store_category__idx; Type: INDEX ATTACH; Schema: frontend; Owner: postgres
---
-
-ALTER INDEX frontend.idx_app_ranks_collection_category_country_date ATTACH PARTITION frontend.store_app_ranks_2026_11_01_store_collection_store_category__idx;
-
-
---
 -- Name: store_app_ranks_2026_11_02_store_collection_store_category__idx; Type: INDEX ATTACH; Schema: frontend; Owner: postgres
 --
 
@@ -27947,6 +28266,34 @@ ALTER INDEX frontend.idx_app_ranks_collection_category_country_date ATTACH PARTI
 --
 
 ALTER INDEX frontend.idx_app_ranks_collection_category_country_date ATTACH PARTITION frontend.store_app_ranks_2026_11_12_store_collection_store_category__idx;
+
+
+--
+-- Name: store_app_ranks_2026_11_13_store_collection_store_category__idx; Type: INDEX ATTACH; Schema: frontend; Owner: postgres
+--
+
+ALTER INDEX frontend.idx_app_ranks_collection_category_country_date ATTACH PARTITION frontend.store_app_ranks_2026_11_13_store_collection_store_category__idx;
+
+
+--
+-- Name: store_app_ranks_2026_11_14_store_collection_store_category__idx; Type: INDEX ATTACH; Schema: frontend; Owner: postgres
+--
+
+ALTER INDEX frontend.idx_app_ranks_collection_category_country_date ATTACH PARTITION frontend.store_app_ranks_2026_11_14_store_collection_store_category__idx;
+
+
+--
+-- Name: store_app_ranks_2026_11_15_store_collection_store_category__idx; Type: INDEX ATTACH; Schema: frontend; Owner: postgres
+--
+
+ALTER INDEX frontend.idx_app_ranks_collection_category_country_date ATTACH PARTITION frontend.store_app_ranks_2026_11_15_store_collection_store_category__idx;
+
+
+--
+-- Name: store_app_ranks_2026_11_16_store_collection_store_category__idx; Type: INDEX ATTACH; Schema: frontend; Owner: postgres
+--
+
+ALTER INDEX frontend.idx_app_ranks_collection_category_country_date ATTACH PARTITION frontend.store_app_ranks_2026_11_16_store_collection_store_category__idx;
 
 
 --
@@ -28692,62 +29039,6 @@ ALTER INDEX public.idx_acmh_store_app_idx ATTACH PARTITION public.app_country_me
 
 
 --
--- Name: app_country_metrics_history_2026_10_19_store_app_idx; Type: INDEX ATTACH; Schema: public; Owner: postgres
---
-
-ALTER INDEX public.app_country_metrics_hist_app_idx ATTACH PARTITION public.app_country_metrics_history_2026_10_19_store_app_idx;
-
-
---
--- Name: app_country_metrics_history_2026_10_19_store_app_week_start_idx; Type: INDEX ATTACH; Schema: public; Owner: postgres
---
-
-ALTER INDEX public.idx_acmh_store_app_idx ATTACH PARTITION public.app_country_metrics_history_2026_10_19_store_app_week_start_idx;
-
-
---
--- Name: app_country_metrics_history_2026_10_26_store_app_idx; Type: INDEX ATTACH; Schema: public; Owner: postgres
---
-
-ALTER INDEX public.app_country_metrics_hist_app_idx ATTACH PARTITION public.app_country_metrics_history_2026_10_26_store_app_idx;
-
-
---
--- Name: app_country_metrics_history_2026_10_26_store_app_week_start_idx; Type: INDEX ATTACH; Schema: public; Owner: postgres
---
-
-ALTER INDEX public.idx_acmh_store_app_idx ATTACH PARTITION public.app_country_metrics_history_2026_10_26_store_app_week_start_idx;
-
-
---
--- Name: app_country_metrics_history_2026_11_02_store_app_idx; Type: INDEX ATTACH; Schema: public; Owner: postgres
---
-
-ALTER INDEX public.app_country_metrics_hist_app_idx ATTACH PARTITION public.app_country_metrics_history_2026_11_02_store_app_idx;
-
-
---
--- Name: app_country_metrics_history_2026_11_02_store_app_week_start_idx; Type: INDEX ATTACH; Schema: public; Owner: postgres
---
-
-ALTER INDEX public.idx_acmh_store_app_idx ATTACH PARTITION public.app_country_metrics_history_2026_11_02_store_app_week_start_idx;
-
-
---
--- Name: app_country_metrics_history_2026_11_09_store_app_idx; Type: INDEX ATTACH; Schema: public; Owner: postgres
---
-
-ALTER INDEX public.app_country_metrics_hist_app_idx ATTACH PARTITION public.app_country_metrics_history_2026_11_09_store_app_idx;
-
-
---
--- Name: app_country_metrics_history_2026_11_09_store_app_week_start_idx; Type: INDEX ATTACH; Schema: public; Owner: postgres
---
-
-ALTER INDEX public.idx_acmh_store_app_idx ATTACH PARTITION public.app_country_metrics_history_2026_11_09_store_app_week_start_idx;
-
-
---
 -- Name: app_global_metrics_history_2025_10_06_store_app_week_start_idx; Type: INDEX ATTACH; Schema: public; Owner: postgres
 --
 
@@ -29126,38 +29417,115 @@ ALTER INDEX public.idx_agmh_store_app_week_start ATTACH PARTITION public.app_glo
 
 
 --
--- Name: app_global_metrics_history_2026_10_19_store_app_week_start_idx; Type: INDEX ATTACH; Schema: public; Owner: postgres
+-- Name: idx_s3_package_inventory_20261117_s3_package_inventory_myregion; Type: INDEX ATTACH; Schema: public; Owner: postgres
 --
 
-ALTER INDEX public.idx_agmh_store_app_week_start ATTACH PARTITION public.app_global_metrics_history_2026_10_19_store_app_week_start_idx;
-
-
---
--- Name: app_global_metrics_history_2026_10_26_store_app_week_start_idx; Type: INDEX ATTACH; Schema: public; Owner: postgres
---
-
-ALTER INDEX public.idx_agmh_store_app_week_start ATTACH PARTITION public.app_global_metrics_history_2026_10_26_store_app_week_start_idx;
+ALTER INDEX public.s3_package_inventory_myregion_file_key_idx ATTACH PARTITION public.idx_s3_package_inventory_20261117_s3_package_inventory_myregion;
 
 
 --
--- Name: app_global_metrics_history_2026_11_02_store_app_week_start_idx; Type: INDEX ATTACH; Schema: public; Owner: postgres
+-- Name: rank_stage_015c49ea15da4875aa4503df98e_store_app_week_start_idx; Type: INDEX ATTACH; Schema: public; Owner: postgres
 --
 
-ALTER INDEX public.idx_agmh_store_app_week_start ATTACH PARTITION public.app_global_metrics_history_2026_11_02_store_app_week_start_idx;
-
-
---
--- Name: app_global_metrics_history_2026_11_09_store_app_week_start_idx; Type: INDEX ATTACH; Schema: public; Owner: postgres
---
-
-ALTER INDEX public.idx_agmh_store_app_week_start ATTACH PARTITION public.app_global_metrics_history_2026_11_09_store_app_week_start_idx;
+ALTER INDEX public.idx_acmh_store_app_idx ATTACH PARTITION public.rank_stage_015c49ea15da4875aa4503df98e_store_app_week_start_idx;
 
 
 --
--- Name: idx_s3_package_inventory_20261112_s3_package_inventory_myregion; Type: INDEX ATTACH; Schema: public; Owner: postgres
+-- Name: rank_stage_015c49ea15da4875aa4503df98ee7605_store_app_idx; Type: INDEX ATTACH; Schema: public; Owner: postgres
 --
 
-ALTER INDEX public.s3_package_inventory_myregion_file_key_idx ATTACH PARTITION public.idx_s3_package_inventory_20261112_s3_package_inventory_myregion;
+ALTER INDEX public.app_country_metrics_hist_app_idx ATTACH PARTITION public.rank_stage_015c49ea15da4875aa4503df98ee7605_store_app_idx;
+
+
+--
+-- Name: rank_stage_1382e4891adc48c29f539a24c1d_store_app_week_start_idx; Type: INDEX ATTACH; Schema: public; Owner: postgres
+--
+
+ALTER INDEX public.idx_agmh_store_app_week_start ATTACH PARTITION public.rank_stage_1382e4891adc48c29f539a24c1d_store_app_week_start_idx;
+
+
+--
+-- Name: rank_stage_2f866a96eb2b4159b617d147594_store_app_week_start_idx; Type: INDEX ATTACH; Schema: public; Owner: postgres
+--
+
+ALTER INDEX public.idx_agmh_store_app_week_start ATTACH PARTITION public.rank_stage_2f866a96eb2b4159b617d147594_store_app_week_start_idx;
+
+
+--
+-- Name: rank_stage_65fb979652a2432990cd8344910_store_app_week_start_idx; Type: INDEX ATTACH; Schema: public; Owner: postgres
+--
+
+ALTER INDEX public.idx_acmh_store_app_idx ATTACH PARTITION public.rank_stage_65fb979652a2432990cd8344910_store_app_week_start_idx;
+
+
+--
+-- Name: rank_stage_65fb979652a2432990cd8344910f2802_store_app_idx; Type: INDEX ATTACH; Schema: public; Owner: postgres
+--
+
+ALTER INDEX public.app_country_metrics_hist_app_idx ATTACH PARTITION public.rank_stage_65fb979652a2432990cd8344910f2802_store_app_idx;
+
+
+--
+-- Name: rank_stage_80593e0c1dbc4d59a71e73c154f_store_app_week_start_idx; Type: INDEX ATTACH; Schema: public; Owner: postgres
+--
+
+ALTER INDEX public.idx_agmh_store_app_week_start ATTACH PARTITION public.rank_stage_80593e0c1dbc4d59a71e73c154f_store_app_week_start_idx;
+
+
+--
+-- Name: rank_stage_94b073e89d5a41ee8ac809e26f1_store_app_week_start_idx; Type: INDEX ATTACH; Schema: public; Owner: postgres
+--
+
+ALTER INDEX public.idx_agmh_store_app_week_start ATTACH PARTITION public.rank_stage_94b073e89d5a41ee8ac809e26f1_store_app_week_start_idx;
+
+
+--
+-- Name: rank_stage_c12d4f19f82c4bb499c6b85c60e767bb_store_app_idx; Type: INDEX ATTACH; Schema: public; Owner: postgres
+--
+
+ALTER INDEX public.app_country_metrics_hist_app_idx ATTACH PARTITION public.rank_stage_c12d4f19f82c4bb499c6b85c60e767bb_store_app_idx;
+
+
+--
+-- Name: rank_stage_c12d4f19f82c4bb499c6b85c60e_store_app_week_start_idx; Type: INDEX ATTACH; Schema: public; Owner: postgres
+--
+
+ALTER INDEX public.idx_acmh_store_app_idx ATTACH PARTITION public.rank_stage_c12d4f19f82c4bb499c6b85c60e_store_app_week_start_idx;
+
+
+--
+-- Name: rank_stage_c6e13effba37407a8220c1c23bd0de74_store_app_idx; Type: INDEX ATTACH; Schema: public; Owner: postgres
+--
+
+ALTER INDEX public.app_country_metrics_hist_app_idx ATTACH PARTITION public.rank_stage_c6e13effba37407a8220c1c23bd0de74_store_app_idx;
+
+
+--
+-- Name: rank_stage_c6e13effba37407a8220c1c23bd_store_app_week_start_idx; Type: INDEX ATTACH; Schema: public; Owner: postgres
+--
+
+ALTER INDEX public.idx_acmh_store_app_idx ATTACH PARTITION public.rank_stage_c6e13effba37407a8220c1c23bd_store_app_week_start_idx;
+
+
+--
+-- Name: rank_stage_dfa35f7fb7d5480bbcb07776b6255e46_store_app_idx; Type: INDEX ATTACH; Schema: public; Owner: postgres
+--
+
+ALTER INDEX public.app_country_metrics_hist_app_idx ATTACH PARTITION public.rank_stage_dfa35f7fb7d5480bbcb07776b6255e46_store_app_idx;
+
+
+--
+-- Name: rank_stage_dfa35f7fb7d5480bbcb07776b62_store_app_week_start_idx; Type: INDEX ATTACH; Schema: public; Owner: postgres
+--
+
+ALTER INDEX public.idx_acmh_store_app_idx ATTACH PARTITION public.rank_stage_dfa35f7fb7d5480bbcb07776b62_store_app_week_start_idx;
+
+
+--
+-- Name: rank_stage_e87e1a4747214839b06d5cf5285_store_app_week_start_idx; Type: INDEX ATTACH; Schema: public; Owner: postgres
+--
+
+ALTER INDEX public.idx_agmh_store_app_week_start ATTACH PARTITION public.rank_stage_e87e1a4747214839b06d5cf5285_store_app_week_start_idx;
 
 
 --
@@ -29352,6 +29720,22 @@ ALTER TABLE ONLY adtech.sdk_categories
 
 ALTER TABLE ONLY adtech.tickers
     ADD CONSTRAINT fk_tickers_exchange FOREIGN KEY (exchange_id) REFERENCES adtech.stock_exchanges(id);
+
+
+--
+-- Name: sdk_mediation_adapter_patterns sdk_mediation_adapter_patterns_adapter_sdk_id_fkey; Type: FK CONSTRAINT; Schema: adtech; Owner: postgres
+--
+
+ALTER TABLE ONLY adtech.sdk_mediation_adapter_patterns
+    ADD CONSTRAINT sdk_mediation_adapter_patterns_adapter_sdk_id_fkey FOREIGN KEY (adapter_sdk_id) REFERENCES adtech.sdks(id);
+
+
+--
+-- Name: sdk_mediation_adapter_patterns sdk_mediation_adapter_patterns_mediation_sdk_id_fkey; Type: FK CONSTRAINT; Schema: adtech; Owner: postgres
+--
+
+ALTER TABLE ONLY adtech.sdk_mediation_adapter_patterns
+    ADD CONSTRAINT sdk_mediation_adapter_patterns_mediation_sdk_id_fkey FOREIGN KEY (mediation_sdk_id) REFERENCES adtech.sdks(id);
 
 
 --
@@ -29878,5 +30262,5 @@ GRANT ALL ON SCHEMA public TO PUBLIC;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict dzGeCLHIG93nGH9elyyW8354Pgr6V4z1ZLyLfhGbJzWKnf7bdShWQZQ8CqubY5H
+\unrestrict eqjTCYpim7Ys08VgyZuikiN7PBNdWlGGZbADvIcckd89JLf3AsQzrhoK2MJSi93
 

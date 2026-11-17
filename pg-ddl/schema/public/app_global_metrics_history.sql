@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict NcNATM7s0UVvSyV7wPmXHRjHfufxRgmv6f24rC5pGOXCPG9dhopcnfFgIDZW5Tt
+\restrict AgTrPbrraeRNdCKnPCuZLNRWTAKIdlfO0K6wi0sxOVg5EG1vpnffhsKNGOcQa6z
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
@@ -59,5 +59,5 @@ CREATE INDEX idx_agmh_store_app_week_start ON ONLY public.app_global_metrics_his
 -- PostgreSQL database dump complete
 --
 
-\unrestrict NcNATM7s0UVvSyV7wPmXHRjHfufxRgmv6f24rC5pGOXCPG9dhopcnfFgIDZW5Tt
+\unrestrict AgTrPbrraeRNdCKnPCuZLNRWTAKIdlfO0K6wi0sxOVg5EG1vpnffhsKNGOcQa6z
 
