@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict d5J0xP0Rc7CuaYYLuUdsweNla2C0iPmlMwP2VUw9sh2cnivRBMtdcYceaU3yZrx
+\restrict xU67OjJ5sfcG0j1qsDdmYM2PtHO8qUdsK79rRMKsiKMBtHRQJNBP3xTvtYXEqfn
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
@@ -50,5 +50,5 @@ CREATE INDEX idx_app_ranks_collection_category_country_date ON ONLY frontend.app
 -- PostgreSQL database dump complete
 --
 
-\unrestrict d5J0xP0Rc7CuaYYLuUdsweNla2C0iPmlMwP2VUw9sh2cnivRBMtdcYceaU3yZrx
+\unrestrict xU67OjJ5sfcG0j1qsDdmYM2PtHO8qUdsK79rRMKsiKMBtHRQJNBP3xTvtYXEqfn
 
