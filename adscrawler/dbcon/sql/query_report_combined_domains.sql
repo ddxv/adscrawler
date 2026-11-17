@@ -42,6 +42,17 @@ sdk_based_companies AS (
     LEFT JOIN adtech.sdks AS sd ON sasd.sdk_id = sd.id
     LEFT JOIN adtech.companies AS c_1 ON sd.company_id = c_1.id
 ),
+sdk_adapter_based_companies AS (
+    SELECT DISTINCT
+        sasd.store_app,
+        c_1.domain_id
+    FROM adtech.app_sdks AS sasd
+    INNER JOIN latest_version_codes AS lvc ON sasd.version_code_id = lvc.id
+    INNER JOIN adtech.sdk_mediation_adapter_patterns AS adapter
+        ON sasd.sdk_id = adapter.adapter_sdk_id
+    INNER JOIN adtech.sdks AS sd ON adapter.adapter_sdk_id = sd.id
+    INNER JOIN adtech.companies AS c_1 ON sd.company_id = c_1.id
+),
 distinct_ad_and_pub_domains AS (
     SELECT DISTINCT
         aam.pub_domain AS publisher_domain_id,
@@ -122,6 +133,12 @@ combined_sources AS (
     FROM sdk_based_companies AS sbc
     UNION ALL
     SELECT
+        sabc.domain_id,
+        sabc.store_app,
+        'sdk_adapter' AS tag_source
+    FROM sdk_adapter_based_companies AS sabc
+    UNION ALL
+    SELECT
         atbc.domain_id,
         atbc.store_app,
         atbc.tag_source
@@ -137,6 +154,7 @@ SELECT
     cs.domain_id,
     cs.store_app,
     BOOL_OR(cs.tag_source = 'sdk'::text) AS sdk,
+    BOOL_OR(cs.tag_source = 'sdk_adapter'::text) AS sdk_adapter,
     BOOL_OR(cs.tag_source = 'api_call'::text) AS api_call,
     BOOL_OR(cs.tag_source = 'publisher'::text) AS publisher,
     BOOL_OR(cs.tag_source = 'app_ads_direct'::text) AS app_ads_direct,

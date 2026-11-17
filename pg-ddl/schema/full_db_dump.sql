@@ -631,7 +631,8 @@ CREATE TABLE adtech.combined_domain_apps (
     publisher boolean,
     app_ads_direct boolean,
     app_ads_reseller boolean,
-    batch_date date NOT NULL
+    batch_date date NOT NULL,
+    sdk_adapter boolean
 )
 PARTITION BY LIST (batch_date);
 

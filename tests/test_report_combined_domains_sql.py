@@ -2,7 +2,6 @@ from pathlib import Path
 
 import duckdb
 
-
 QUERY_PATH = (
     Path(__file__).resolve().parents[1]
     / "adscrawler/dbcon/sql/query_report_combined_domains.sql"
@@ -19,6 +18,7 @@ def test_combined_domain_sources_keep_domain_and_app_ids_in_order():
         "CREATE TABLE domains (id INTEGER, domain_name VARCHAR)",
         "CREATE TABLE adtech.app_sdks (store_app INTEGER, version_code_id INTEGER, sdk_id INTEGER)",
         "CREATE TABLE adtech.sdks (id INTEGER, company_id INTEGER)",
+        "CREATE TABLE adtech.sdk_mediation_adapter_patterns (adapter_sdk_id INTEGER, mediation_sdk_id INTEGER, adapter_pattern VARCHAR)",
         "CREATE TABLE adtech.companies (id INTEGER, domain_id INTEGER)",
         "CREATE TABLE app_ads_entrys (id INTEGER, ad_domain INTEGER, relationship VARCHAR, updated_at TIMESTAMP, created_at TIMESTAMP)",
         "CREATE TABLE app_ads_map (app_ads_entry INTEGER, pub_domain INTEGER, updated_at TIMESTAMP)",
@@ -36,12 +36,13 @@ def test_combined_domain_sources_keep_domain_and_app_ids_in_order():
         "INSERT INTO developer_store_apps VALUES (101, 201)",
         "INSERT INTO store_apps VALUES (102, 12)",
         "INSERT INTO adtech.company_developers VALUES (12, 2)",
-        "INSERT INTO adtech.companies VALUES (1, 201), (2, 202)",
+        "INSERT INTO adtech.companies VALUES (1, 201), (2, 202), (3, 203)",
         "INSERT INTO api_calls VALUES (101, 'shared', '2025-02-01'), (201, 'reverse', '2025-02-01')",
-        "INSERT INTO version_codes VALUES (1, 101, '1', '2025-02-01', 1, '2025-02-01')",
-        "INSERT INTO version_code_sdk_scan_results VALUES (1, 1)",
-        "INSERT INTO adtech.app_sdks VALUES (101, 1, 1)",
-        "INSERT INTO adtech.sdks VALUES (1, 1)",
+        "INSERT INTO version_codes VALUES (1, 101, '1', '2025-02-01', 1, '2025-02-01'), (2, 104, '1', '2025-02-01', 1, '2025-02-01'), (3, 104, '2', '2025-03-01', 1, '2025-03-01')",
+        "INSERT INTO version_code_sdk_scan_results VALUES (1, 1), (2, 1), (3, 1)",
+        "INSERT INTO adtech.app_sdks VALUES (101, 1, 1), (101, 1, 2), (101, 1, 3), (101, 1, 4), (104, 2, 2), (104, 3, 1)",
+        "INSERT INTO adtech.sdks VALUES (1, 1), (2, 3), (3, 3), (4, 1)",
+        "INSERT INTO adtech.sdk_mediation_adapter_patterns VALUES (2, 1, 'first'), (2, 1, 'second'), (3, 1, 'third'), (4, 1, 'fourth')",
         "INSERT INTO app_ads_entrys VALUES (1, 201, 'DIRECT', '2025-02-01', '2025-02-01')",
         "INSERT INTO app_ads_map VALUES (1, 301, '2025-02-01')",
         "INSERT INTO adstxt_crawl_results VALUES (301, '2025-02-01', '2025-02-01')",
@@ -59,7 +60,9 @@ def test_combined_domain_sources_keep_domain_and_app_ids_in_order():
 
     rows = set(db.execute(query).fetchall())
     assert rows == {
-        (201, 101, True, True, True, True, False),
-        (202, 102, False, False, True, False, False),
-        (101, 201, False, True, False, False, False),
+        (201, 101, True, True, True, True, True, False),
+        (203, 101, True, True, False, False, False, False),
+        (201, 104, True, False, False, False, False, False),
+        (202, 102, False, False, False, True, False, False),
+        (101, 201, False, False, True, False, False, False),
     }
