@@ -37,7 +37,7 @@ sdk_based_companies AS (
     SELECT DISTINCT
         sasd.store_app,
         c_1.domain_id
-    FROM adtech.app_sdks AS sasd
+    FROM adtech.app_sdks_latest AS sasd
     INNER JOIN latest_version_codes AS lvc ON sasd.version_code_id = lvc.id
     LEFT JOIN adtech.sdks AS sd ON sasd.sdk_id = sd.id
     LEFT JOIN adtech.companies AS c_1 ON sd.company_id = c_1.id
@@ -46,7 +46,7 @@ sdk_adapter_based_companies AS (
     SELECT DISTINCT
         sasd.store_app,
         c_1.domain_id
-    FROM adtech.app_sdks AS sasd
+    FROM adtech.app_sdks_latest AS sasd
     INNER JOIN latest_version_codes AS lvc ON sasd.version_code_id = lvc.id
     INNER JOIN adtech.sdk_mediation_adapter_patterns AS adapter
         ON sasd.sdk_id = adapter.adapter_sdk_id
