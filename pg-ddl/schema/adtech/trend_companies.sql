@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict wtI2UQPgM0fEIJnjBYNWVTcdB8agGzEgWe6YMvYTQhMNLoE3xll6zSW6b16Jv6X
+\restrict 3wMT2a6O9YWoxLuVfhEsYCo6vcHHRBgf9BIeAxzHDrgIqMChj4J1ek1E1F8ch4K
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
@@ -49,5 +49,5 @@ ALTER TABLE adtech.trend_companies OWNER TO postgres;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict wtI2UQPgM0fEIJnjBYNWVTcdB8agGzEgWe6YMvYTQhMNLoE3xll6zSW6b16Jv6X
+\unrestrict 3wMT2a6O9YWoxLuVfhEsYCo6vcHHRBgf9BIeAxzHDrgIqMChj4J1ek1E1F8ch4K
 

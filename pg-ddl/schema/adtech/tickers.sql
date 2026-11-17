@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict hoYdJ9gUo50WTWGLV7ZF6ffi2tO4SaVZYfsqJ9cr12BTBC0EQHgKrXHCwJPNY9n
+\restrict ZjRt8xuMBVtDW3fD84z7rWmtPN177fJ3m8T821eqYh0xb4Ahi9K82XTVHkTuR3v
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
@@ -80,5 +80,5 @@ ALTER TABLE ONLY adtech.tickers
 -- PostgreSQL database dump complete
 --
 
-\unrestrict hoYdJ9gUo50WTWGLV7ZF6ffi2tO4SaVZYfsqJ9cr12BTBC0EQHgKrXHCwJPNY9n
+\unrestrict ZjRt8xuMBVtDW3fD84z7rWmtPN177fJ3m8T821eqYh0xb4Ahi9K82XTVHkTuR3v
 
