@@ -14,6 +14,7 @@ from adscrawler.process import (
     AGG_MATCHED_SDK_STRINGS_LATEST,
     AGG_PATTERN_MATCHES,
     AGG_VERSION_DETAILS,
+    LOOKUP_SDK_MEDIATION_ADAPTER_PATTERNS,
     LOOKUP_SDK_MEDIATION_PATTERNS,
     LOOKUP_SDK_PACKAGE_PATTERNS,
     LOOKUP_SDK_PATH_PATTERNS,
@@ -289,6 +290,7 @@ def build_aggregated_pattern_matches() -> None:
     pkg_path = f"s3://{bucket}/{LOOKUP_SDK_PACKAGE_PATTERNS}"
     paths_path = f"s3://{bucket}/{LOOKUP_SDK_PATH_PATTERNS}"
     med_path = f"s3://{bucket}/{LOOKUP_SDK_MEDIATION_PATTERNS}"
+    adapter_path = f"s3://{bucket}/{LOOKUP_SDK_MEDIATION_ADAPTER_PATTERNS}"
 
     agg_tmp_output = f"s3://{bucket}/{TMP_PATTERN_MATCHES}/"
 
@@ -339,6 +341,20 @@ def build_aggregated_pattern_matches() -> None:
                     JOIN read_parquet('{med_path}') cmp 
                       ON s.val IS NOT NULL 
                      AND STARTS_WITH(s.val, lower(cmp.mediation_pattern) || '.')
+
+                    UNION ALL
+
+                    -- 4. Mediation adapter patterns
+                    SELECT
+                        s.string_id,
+                        adapter.adapter_sdk_id AS sdk_id
+                    FROM strings s
+                    JOIN read_parquet('{adapter_path}') adapter
+                      ON s.val IS NOT NULL
+                     AND (
+                         s.val = lower(adapter.adapter_pattern)
+                         OR STARTS_WITH(s.val, lower(adapter.adapter_pattern) || '.')
+                     )
                 ),
                 deduped AS (
                     SELECT DISTINCT 
@@ -590,9 +606,8 @@ def _pg_table_to_s3(sql_query: str, s3_key: str, description: str) -> None:
 def copy_lookups() -> None:
     """Export lookup tables to static parquet files in S3.
 
-    Streams ``version_strings``, ``sdk_packages``, ``sdk_paths``, and
-    ``sdk_mediation_patterns`` to their respective ``lookups/`` keys, where
-    downstream DuckDB build functions read them.
+    Streams version strings, SDK patterns, and version codes to their
+    respective ``lookups/`` keys for downstream DuckDB build functions.
     """
     _pg_table_to_s3(
         "SELECT id, xml_path, tag, value_name FROM pg.public.version_strings ORDER BY id ASC",
@@ -613,6 +628,11 @@ def copy_lookups() -> None:
         "SELECT sdk_id, mediation_pattern FROM pg.adtech.sdk_mediation_patterns ORDER BY sdk_id ASC",
         LOOKUP_SDK_MEDIATION_PATTERNS,
         "sdk_mediation_patterns",
+    )
+    _pg_table_to_s3(
+        "SELECT mediation_sdk_id, adapter_sdk_id, adapter_pattern FROM pg.adtech.sdk_mediation_adapter_patterns ORDER BY adapter_sdk_id, adapter_pattern",
+        LOOKUP_SDK_MEDIATION_ADAPTER_PATTERNS,
+        "sdk_mediation_adapter_patterns",
     )
     _pg_table_to_s3(
         "SELECT id, created_at, store_app, version_code FROM pg.public.version_codes WHERE version_code != '-1' ORDER BY id ASC",

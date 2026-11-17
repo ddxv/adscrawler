@@ -29,6 +29,9 @@ LOOKUP_VERSION_STRINGS = "lookups/version-strings/version-strings.parquet"
 LOOKUP_SDK_PACKAGE_PATTERNS = "lookups/adtech-sdk-packages/sdk-packages.parquet"
 LOOKUP_SDK_PATH_PATTERNS = "lookups/adtech-sdk-paths/sdk-paths.parquet"
 LOOKUP_SDK_MEDIATION_PATTERNS = "lookups/adtech-sdk-mediation/sdk-mediation.parquet"
+LOOKUP_SDK_MEDIATION_ADAPTER_PATTERNS = (
+    "lookups/adtech-sdk-mediation-adapters/sdk-mediation-adapters.parquet"
+)
 LOOKUP_VERSION_CODES = "lookups/version-codes/version-codes.parquet"
 
 
