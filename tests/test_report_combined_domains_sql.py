@@ -66,3 +66,15 @@ def test_combined_domain_sources_keep_domain_and_app_ids_in_order():
         (202, 102, False, False, False, True, False, False),
         (101, 201, False, False, True, False, False, False),
     }
+
+    earlier_query = QUERY_PATH.read_text()
+    for parameter, value in (
+        (":start_of_next_period", "'2025-03-01'"),
+        (":start_of_period", "'2025-01-01'"),
+        (":oldest_allowed_app_ads_crawl", "'2025-01-01'"),
+    ):
+        earlier_query = earlier_query.replace(parameter, value)
+
+    earlier_rows = set(db.execute(earlier_query).fetchall())
+    assert (203, 104, True, True, False, False, False, False) in earlier_rows
+    assert not any(row[0:2] == (201, 104) for row in earlier_rows)

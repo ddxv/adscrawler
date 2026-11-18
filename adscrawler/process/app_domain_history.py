@@ -199,7 +199,7 @@ def _stream_combined_domain_history_to_s3(
     logger.info(f"Finished s3://{bucket}/{prefix}/")
 
 
-def combined_domain_history_to_s3(
+def combined_domain_quarterly_history_to_s3(
     pgdb: PostgresEngine,
     start_date: str,
     start_of_next_period: str,
@@ -372,7 +372,7 @@ def process_company_history(pgdb: PostgresEngine) -> None:
             )
             continue  # Skip the ongoing quarter to avoid incomplete data
 
-        combined_domain_history_to_s3(
+        combined_domain_quarterly_history_to_s3(
             pgdb=pgdb,
             start_date=str(start_date.date()),
             start_of_next_period=str(start_of_next_period.date()),
