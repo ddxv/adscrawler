@@ -3,7 +3,6 @@ import socket
 import threading
 from collections.abc import Generator
 from contextlib import contextmanager
-from socket import gethostbyname
 from typing import Any
 
 import asyncssh
@@ -47,10 +46,18 @@ class PostgresEngine:
             else:
                 db_login = f"postgresql+psycopg://{self.db_user}"
             db_uri = f"{db_login}@{self.db_ip}:{self.db_port}/{self.db_name}"
+            try:
+                hostname = socket.gethostname()
+            except OSError:
+                hostname = ""
+            application_name = f"adscrawler_{hostname}" if hostname else "adscrawler"
             logger.debug(f"PostgreSQL: config_key={self.config_key} db={self.db_name}")
             self.engine = sqlalchemy.create_engine(
                 db_uri,
-                connect_args={"connect_timeout": 10, "application_name": "adscrawler"},
+                connect_args={
+                    "connect_timeout": 10,
+                    "application_name": application_name,
+                },
             )
         except Exception as error:
             logger.error(
@@ -187,6 +194,6 @@ def get_host_ip(hostname: str) -> str:
         part.isdigit() and 0 <= int(part) <= 255 for part in hostname.split(".")
     ):  # noqa: PLR2004
         return hostname
-    ip_address = gethostbyname(hostname)
+    ip_address = socket.gethostbyname(hostname)
     logger.info(f"Resolved {hostname} to {ip_address}")
     return ip_address
