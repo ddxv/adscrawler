@@ -166,10 +166,12 @@ def _daily_s3_steps(
                 depends_on="run_app_metrics_pipeline",
             ),
             PipelineStep(
-                "process_company_history", partial(process_company_history, pgdb=pgdb)
+                "map_version_details", partial(map_version_details, pgdb=pgdb)
             ),
             PipelineStep(
-                "map_version_details", partial(map_version_details, pgdb=pgdb)
+                "process_company_history",
+                partial(process_company_history, pgdb=pgdb),
+                depends_on="map_version_details",
             ),
         ]
     )

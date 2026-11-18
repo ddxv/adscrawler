@@ -75,11 +75,13 @@ def test_daily_plan_preserves_order_and_dates(pgdb):
     assert [step.name for step in steps[-4:]] == [
         "run_app_metrics_pipeline",
         "clean_history_tables",
-        "process_company_history",
         "map_version_details",
+        "process_company_history",
     ]
     assert steps[-3].depends_on == steps[-4].name
     assert steps[-3].unit_key == steps[-4].unit_key == ""
+    assert steps[-1].depends_on == steps[-2].name
+    assert steps[-1].unit_key == steps[-2].unit_key == ""
     day_steps = manager._daily_s3_steps(pgdb, "day", today)
     assert day_steps[0].context["start_date"] == "2026-07-07"
     with pytest.raises(ValueError):
@@ -187,7 +189,7 @@ def test_metrics_failure_skips_cleanup_but_runs_later_steps(pgdb):
 
     rows = list(pgdb.engine.rows.values())
     assert rows[0]["status"] == "partial_failure"
-    metrics, cleanup, company, versions = rows[-4:]
+    metrics, cleanup, versions, company = rows[-4:]
     assert metrics["status"] == "failed"
     assert metrics["error"] == "staging failed"
     assert cleanup["status"] == "skipped"
@@ -196,6 +198,31 @@ def test_metrics_failure_skips_cleanup_but_runs_later_steps(pgdb):
     assert company["status"] == versions["status"] == "completed"
     mocks["process_company_history"].assert_called_once_with(pgdb=pgdb)
     mocks["map_version_details"].assert_called_once_with(pgdb=pgdb)
+
+
+def test_version_mapping_failure_skips_company_history(pgdb):
+    names = (
+        "import_ranks_from_s3",
+        "import_keywords_from_s3",
+        "compact_incoming_version_details",
+        "compact_incoming_app_details",
+        "import_app_details_from_s3_into_db",
+        "run_app_metrics_pipeline",
+        "clean_history_tables",
+        "map_version_details",
+        "process_company_history",
+    )
+    with patch.multiple(manager, **dict.fromkeys(names, DEFAULT)) as mocks:
+        mocks["map_version_details"].side_effect = RuntimeError("mapping failed")
+        manager.daily_s3_imports(pgdb, "day")
+
+    rows = list(pgdb.engine.rows.values())
+    assert rows[0]["status"] == "partial_failure"
+    versions, company = rows[-2:]
+    assert versions["status"] == "failed"
+    assert company["status"] == "skipped"
+    assert company["error"] == "Dependency map_version_details failed"
+    mocks["process_company_history"].assert_not_called()
 
 
 def test_fatal_error_keeps_later_steps_pending(pgdb):
