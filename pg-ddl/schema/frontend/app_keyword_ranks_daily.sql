@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict weZTRl1z0H66f5wD1Lypysh8OAhbk1jkLjgO3JxIdunPjSfcCETAdfH1q93I2Xz
+\restrict KLD3CvizLOPFfIUQ2gfIjIRretuquUz6iSGcrbPTi6QYVBE3RfTMv9Jwr2miUlQ
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
@@ -49,5 +49,5 @@ CREATE INDEX app_keyword_ranks_daily_lookup ON ONLY frontend.app_keyword_ranks_d
 -- PostgreSQL database dump complete
 --
 
-\unrestrict weZTRl1z0H66f5wD1Lypysh8OAhbk1jkLjgO3JxIdunPjSfcCETAdfH1q93I2Xz
+\unrestrict KLD3CvizLOPFfIUQ2gfIjIRretuquUz6iSGcrbPTi6QYVBE3RfTMv9Jwr2miUlQ
 

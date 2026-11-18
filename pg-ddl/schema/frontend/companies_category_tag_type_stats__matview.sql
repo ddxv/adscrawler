@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 4v3xJH1PMTsY2ClqqkBZOkYCmwWrm02z4vbFxSY5HPfJ0hzJu2Orwbkc9m4Xa2M
+\restrict Lcb139w9M3UXtXN2Udg2WNF0Fx2bQIgqOsRh43QQ2SGjWYQALuio93f6oS9v1Y9
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
@@ -62,14 +62,14 @@ CREATE MATERIALIZED VIEW frontend.companies_category_tag_type_stats AS
                     ELSE cats.url_slug
                 END
         ), latest_store_app_c AS (
-         SELECT app_sdks.store_app,
-            max(app_sdks.version_code_created_at) AS latest_created_at
-           FROM adtech.app_sdks
-          GROUP BY app_sdks.store_app
+         SELECT asl.store_app,
+            max(asl.version_code_created_at) AS latest_created_at
+           FROM adtech.app_sdks_latest asl
+          GROUP BY asl.store_app
         ), store_app_sdks AS (
          SELECT DISTINCT a.store_app,
             a.sdk_id
-           FROM (adtech.app_sdks a
+           FROM (adtech.app_sdks_latest a
              JOIN latest_store_app_c l ON (((l.store_app = a.store_app) AND (l.latest_created_at = a.version_code_created_at))))
         ), sdk_and_mediation AS (
          SELECT sa.store,
@@ -124,5 +124,5 @@ CREATE UNIQUE INDEX frontend_companies_category_tag_type_stats_unique ON fronten
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 4v3xJH1PMTsY2ClqqkBZOkYCmwWrm02z4vbFxSY5HPfJ0hzJu2Orwbkc9m4Xa2M
+\unrestrict Lcb139w9M3UXtXN2Udg2WNF0Fx2bQIgqOsRh43QQ2SGjWYQALuio93f6oS9v1Y9
 

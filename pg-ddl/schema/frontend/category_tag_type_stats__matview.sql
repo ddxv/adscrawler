@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict hrxZeL82S6bRbVinlHXMtvUE5elvSbN6H9gsq4y8gndELBswZkn2CpSTCE5e9nB
+\restrict FD29OH57FyhPi78Nfnb3cRPxc4EW5QaT91976A61PFdNz0QttSlTyXkaohVe1H7
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg26.04+2)
@@ -61,7 +61,7 @@ CREATE MATERIALIZED VIEW frontend.category_tag_type_stats AS
         ), store_app_sdks AS (
          SELECT sass.store_app,
             sass.sdk_id
-           FROM adtech.app_sdks sass
+           FROM adtech.app_sdks_latest sass
           WHERE (sass.sdk_id IS NOT NULL)
         ), sdk_and_mediation AS (
          SELECT x.store,
@@ -113,5 +113,5 @@ CREATE UNIQUE INDEX frontend_category_tag_type_stats_unique ON frontend.category
 -- PostgreSQL database dump complete
 --
 
-\unrestrict hrxZeL82S6bRbVinlHXMtvUE5elvSbN6H9gsq4y8gndELBswZkn2CpSTCE5e9nB
+\unrestrict FD29OH57FyhPi78Nfnb3cRPxc4EW5QaT91976A61PFdNz0QttSlTyXkaohVe1H7
 
