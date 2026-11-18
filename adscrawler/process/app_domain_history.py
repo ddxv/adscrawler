@@ -224,7 +224,7 @@ def combined_domain_quarterly_history_to_s3(
     )
 
 
-def combined_domain_history_alltime_to_s3(
+def combined_domain_latest_to_s3(
     pgdb: PostgresEngine,
     chunk_size: int = 1_000_000,
     oldest_allowed_app_ads_crawl_days: int = 90,
@@ -256,7 +256,7 @@ def combined_domain_history_alltime_to_s3(
     )
 
 
-def combined_domain_history_alltime_to_db(
+def combined_domain_latest_to_db(
     pgdb: PostgresEngine,
     batch_date: datetime.date | None = None,
 ) -> None:
@@ -379,7 +379,7 @@ def process_company_history(pgdb: PostgresEngine) -> None:
             year=year,
             quarter=quarter,
         )
-    combined_domain_history_alltime_to_s3(pgdb=pgdb)
-    combined_domain_history_alltime_to_db(pgdb=pgdb)
+    combined_domain_latest_to_s3(pgdb=pgdb)
+    combined_domain_latest_to_db(pgdb=pgdb)
     run_changes(pgdb=pgdb)
     start_of_next_period = datetime.date.today() + datetime.timedelta(days=1)
