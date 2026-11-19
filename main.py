@@ -7,6 +7,7 @@ from adscrawler.app_stores.process_keywords import process_app_keywords
 from adscrawler.app_stores.scrape_stores import (
     crawl_developers_for_new_store_ids,
     crawl_keyword_ranks,
+    refresh_developer_names,
     scrape_store_ranks,
     update_app_details,
 )
@@ -471,12 +472,34 @@ class ProcessManager:
     def process_company_history(self) -> None:
         process_company_history(pgdb=self.pgcon)
 
-    def scrape_new_apps_devs(self, store: int) -> None:
+    def scrape_new_apps_devs(self, store: int | None = None) -> None:
         init_metrics(job_name="crawl_developers")
-        try:
-            crawl_developers_for_new_store_ids(pgdb=self.pgcon, store=store)
-        except Exception:
-            logger.exception(f"Crawling developers for {store=} failed")
+        stores = [store] if store else [1, 2]
+        for current_store in stores:
+            try:
+                crawl_developers_for_new_store_ids(
+                    pgdb=self.pgcon,
+                    store=current_store,
+                )
+            except Exception:
+                logger.exception("Crawling developers for store=%s failed", current_store)
+
+            try:
+                checked = refresh_developer_names(
+                    pgdb=self.pgcon,
+                    store=current_store,
+                    batch_size=100,
+                )
+                logger.info(
+                    "Developer name refresh finished for store=%s: checked=%s",
+                    current_store,
+                    checked,
+                )
+            except Exception:
+                logger.exception(
+                    "Developer name refresh failed for store=%s",
+                    current_store,
+                )
 
     def update_app_details(self, store: int, country_priority_group: int) -> None:
         init_metrics(job_name="update_app_details")

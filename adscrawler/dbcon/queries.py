@@ -49,6 +49,9 @@ QUERY_APPS_TO_SDK_SCAN_FIX = load_sql_file("query_apps_to_sdk_scan_fix.sql")
 QUERY_APPS_TO_API_SCAN = load_sql_file("query_apps_to_api_scan.sql")
 QUERY_APPS_TO_API_SCAN_ADS = load_sql_file("query_apps_to_api_scan_ads.sql")
 QUERY_DEVS_TO_UPDATE = load_sql_file("query_devs_to_update.sql")
+QUERY_DEVELOPER_NAMES_TO_REFRESH = load_sql_file(
+    "query_developer_names_to_refresh.sql"
+)
 QUERY_API_CALLS_TO_CREATIVE_SCAN = load_sql_file("query_apps_to_creative_scan.sql")
 QUERY_KEYWORDS_TO_CRAWL = load_sql_file("query_keywords_to_crawl.sql")
 INSERT_NEW_KEYWORDS_FROM_SEARCH = load_sql_file("insert_new_keywords.sql")
@@ -691,6 +694,28 @@ def query_developers(
     log_developers_query(store=store, total_backlog=total_backlog)
     logger.info(f"Query developers {store=} returning rows:{df.shape[0]:,}")
     return df
+
+
+def query_developer_names_to_refresh(
+    pgdb: PostgresEngine,
+    store: int,
+    after_id: int,
+    limit: int,
+) -> pd.DataFrame:
+    df = pd.read_sql(
+        QUERY_DEVELOPER_NAMES_TO_REFRESH,
+        pgdb.engine,
+        params={"store": store, "after_id": after_id, "mylimit": limit},
+    )
+    if "total_queue_depth" in df.columns and not df.empty:
+        logger.info(
+            "Developer name refresh queue: store=%s after_id=%s remaining=%s batch=%s",
+            store,
+            after_id,
+            int(df["total_queue_depth"].iloc[0]),
+            len(df),
+        )
+    return df.drop(columns=["total_queue_depth"], errors="ignore")
 
 
 def log_developers_query(store: int, total_backlog: int) -> None:

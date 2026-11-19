@@ -54,6 +54,7 @@ from adscrawler.dbcon.queries import (
     query_categories,
     query_collections,
     query_countries,
+    query_developer_names_to_refresh,
     query_developers,
     query_keywords_to_crawl,
     query_languages,
@@ -558,6 +559,112 @@ def crawl_developers_for_new_store_ids(
         attributes={"store": str(store)},
     )
     logger.info(f"{store=} crawled, {apps_df.shape[0]:,} new store ids")
+
+
+def _scrape_developer_name(
+    store: int,
+    developer_id: str,
+    store_id: str,
+) -> str | None:
+    if store == 1:
+        result = scrape_app_gp(store_id, country="us", language="en")
+        scraped_developer_id = result.get("developerId")
+        name = result.get("developer") or result.get("developer_name")
+        if not scraped_developer_id or unquote_plus(
+            str(scraped_developer_id)
+        ) != unquote_plus(developer_id):
+            raise ValueError(
+                f"Google Play app {store_id} belongs to developer "
+                f"{scraped_developer_id!r}, not {developer_id!r}"
+            )
+    elif store == 2:
+        result = scrape_app_ios(
+            store_id,
+            country="us",
+            language="en",
+        )
+        scraped_developer_id = result.get("artistId")
+        name = result.get("artistName") or result.get("developer_name")
+        if not scraped_developer_id or str(scraped_developer_id) != developer_id:
+            raise ValueError(
+                f"App Store app {store_id} belongs to developer "
+                f"{scraped_developer_id!r}, not {developer_id!r}"
+            )
+    else:
+        raise ValueError(f"Unsupported store for developer name refresh: {store}")
+
+    if not isinstance(name, str) or not name.strip():
+        return None
+    return name.strip()
+
+
+def refresh_developer_names(
+    pgdb: PostgresEngine,
+    store: int,
+    batch_size: int = 100,
+) -> int:
+    """Refresh stale developer names in bounded database update batches."""
+    after_id = 0
+    total_checked = 0
+
+    while True:
+        developers = query_developer_names_to_refresh(
+            pgdb=pgdb,
+            store=store,
+            after_id=after_id,
+            limit=batch_size,
+        )
+        if developers.empty:
+            break
+        after_id = int(developers["id"].max())
+
+        updates = []
+        for row in developers.itertuples(index=False):
+            try:
+                scraped_name = _scrape_developer_name(
+                    store=store,
+                    developer_id=str(row.developer_id),
+                    store_id=str(row.store_id),
+                )
+            except Exception:
+                logger.exception(
+                    "Failed to refresh developer name for "
+                    "store=%s developer_id=%s",
+                    store,
+                    row.developer_id,
+                )
+                continue
+
+            # Keep the existing name when the store omits it, while still
+            # advancing updated_at so this successfully checked row leaves the queue.
+            updates.append(
+                {
+                    "store": store,
+                    "developer_id": row.developer_id,
+                    "name": scraped_name if scraped_name is not None else row.name,
+                }
+            )
+
+        if updates:
+            update_from_df(
+                df=pd.DataFrame(updates),
+                table_name="developers",
+                pgdb=pgdb,
+                key_columns=["store", "developer_id"],
+                update_columns=["name"],
+            )
+            total_checked += len(updates)
+
+        logger.info(
+            "Developer name refresh batch complete for store=%s: selected=%s, "
+            "saved=%s, through id=%s",
+            store,
+            len(developers),
+            len(updates),
+            after_id,
+        )
+
+    return total_checked
 
 
 def check_and_insert_developers(
