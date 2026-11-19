@@ -189,6 +189,7 @@ def crawl_apple_developers(
 
 
 def get_provider_address(soup: BeautifulSoup) -> str | None:
+    """Get the provider address from the App Store page."""
     strong = soup.find("strong", string=re.compile(r"Address", re.I))
     if not strong:
         return None
@@ -244,13 +245,25 @@ def scrape_store_html(store_id: str, country: str, proxies: dict | None = None) 
     Scrape the store html for the developer site.
     """
     logger.info(f"{store_id=} {country=} scrape store html for info")
-    url = f"https://apps.apple.com/{country}/app/-/id{store_id}?l=en-GB"
     headers = {"User-Agent": "Mozilla/5.0"}
-    response = requests.get(url, headers=headers, proxies=proxies)
 
+    def fetch(url, use_proxy=False):
+        return requests.get(
+            url, headers=headers, proxies=proxies if use_proxy else None, timeout=15
+        )
+
+    url = f"https://apps.apple.com/{country}/app/-/id{store_id}?l=en-GB"
+    response = fetch(url)
     if response.status_code != 200:
-        logger.error(f"Failed to retrieve the page: {response.status_code}")
-        return {}
+        if response.status_code != 404 and proxies:
+            response = fetch(url, use_proxy=True)
+        if response.status_code == 404 and country != "us":
+            logger.warning(f"App not found: {store_id=} {country=}")
+            url = f"https://apps.apple.com/us/app/-/id{store_id}"
+            response = fetch(url, use_proxy=True)
+        if response.status_code != 200:
+            logger.error(f"Failed to retrieve the page: {response.status_code}")
+            return {}
 
     soup = BeautifulSoup(response.text, "html.parser")
 
@@ -290,7 +303,6 @@ def scrape_store_html(store_id: str, country: str, proxies: dict | None = None) 
 
 def get_urls_from_html(soup: BeautifulSoup) -> dict:
     urls = {}
-
     # Find all links and look for relevant ones
     for link in soup.find_all("a", href=True):
         try:
@@ -298,7 +310,6 @@ def get_urls_from_html(soup: BeautifulSoup) -> dict:
         except Exception:
             continue
         href = link["href"]
-
         if "app support" in text:
             urls["app_support"] = href
         elif "developer" in text:
@@ -381,7 +392,6 @@ def scrape_app_ios(
         lang=language,
         proxies=proxies,
     )
-    result_dict.keys()
     result_dict["trackId"] = str(result_dict["trackId"])
     if result_dict["artistId"] is not None:
         result_dict["artistId"] = str(result_dict["artistId"])
@@ -539,9 +549,9 @@ def clean_ios_app_df(df: pd.DataFrame) -> pd.DataFrame:
         logger.warning(
             f'Found {problem_rows.sum()} developer_id with ".0" suffix, fixing'
         )
-        df.loc[problem_rows, "developer_id"] = (
-            df.loc[problem_rows, "developer_id"].str.removesuffix(".0")
-        )
+        df.loc[problem_rows, "developer_id"] = df.loc[
+            problem_rows, "developer_id"
+        ].str.removesuffix(".0")
     return df
 
 
