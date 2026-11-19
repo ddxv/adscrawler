@@ -24,6 +24,7 @@ SELECT
     id,
     developer_id,
     total_installs,
-    apps_crawled_at
+    apps_crawled_at,
+    COUNT(*) OVER () AS total_queue_depth
 FROM mydvs
 LIMIT :mylimit;

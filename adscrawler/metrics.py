@@ -134,6 +134,11 @@ REFRESH_APP_ICONS_BACKLOG_GAUGE = meter.create_gauge(
     description="Total apps queued for missing icon variant refresh",
 )
 
+CRAWL_DEVELOPERS_BACKLOG_GAUGE = meter.create_gauge(
+    "crawl_developers_backlog_total",
+    description="Total developers queued for app discovery",
+)
+
 # --- Result counters: app-ads.txt / keyword pipelines ---
 ADS_TXT_RESULTS_COUNTER = meter.create_counter(
     "app_ads_txt_results_total",
@@ -153,4 +158,9 @@ CRAWL_KEYWORDS_RESULTS_COUNTER = meter.create_counter(
 REFRESH_APP_ICONS_RESULTS_COUNTER = meter.create_counter(
     "refresh_app_icons_results_total",
     description="Total apps processed for missing icon variant refresh by outcome",
+)
+
+CRAWL_DEVELOPERS_RESULTS_COUNTER = meter.create_counter(
+    "crawl_developers_results_total",
+    description="Total developers successfully processed for app discovery",
 )

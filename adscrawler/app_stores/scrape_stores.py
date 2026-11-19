@@ -63,7 +63,11 @@ from adscrawler.dbcon.queries import (
     update_from_df,
     upsert_df,
 )
-from adscrawler.metrics import CRAWL_KEYWORDS_RESULTS_COUNTER, CRAWL_RESULTS_COUNTER
+from adscrawler.metrics import (
+    CRAWL_DEVELOPERS_RESULTS_COUNTER,
+    CRAWL_KEYWORDS_RESULTS_COUNTER,
+    CRAWL_RESULTS_COUNTER,
+)
 from adscrawler.process.app_details import app_details_to_s3
 from adscrawler.process.app_rankings import process_store_rankings
 from adscrawler.process.keywords import raw_keywords_to_s3
@@ -548,6 +552,10 @@ def crawl_developers_for_new_store_ids(
         df=dev_df,
         key_columns=key_columns,
         pgdb=pgdb,
+    )
+    CRAWL_DEVELOPERS_RESULTS_COUNTER.add(
+        len(db_ids_crawled),
+        attributes={"store": str(store)},
     )
     logger.info(f"{store=} crawled, {apps_df.shape[0]:,} new store ids")
 

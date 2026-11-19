@@ -472,6 +472,7 @@ class ProcessManager:
         process_company_history(pgdb=self.pgcon)
 
     def scrape_new_apps_devs(self, store: int) -> None:
+        init_metrics(job_name="crawl_developers")
         try:
             crawl_developers_for_new_store_ids(pgdb=self.pgcon, store=store)
         except Exception:

@@ -21,6 +21,7 @@ from adscrawler.dbcon.connection import PostgresEngine
 from adscrawler.metrics import (
     ADS_TXT_BACKLOG_GAUGE,
     CRAWL_BACKLOG_GAUGE,
+    CRAWL_DEVELOPERS_BACKLOG_GAUGE,
     CRAWL_KEYWORDS_BACKLOG_GAUGE,
     DOWNLOAD_BACKLOG_GAUGE,
     PROCESS_KEYWORDS_BACKLOG_GAUGE,
@@ -673,7 +674,7 @@ def query_developers(
     limit: int = 1000,
 ) -> pd.DataFrame:
     logger.info(f"Query developers {store=} start")
-    before_date = (datetime.datetime.today() - datetime.timedelta(days=15)).strftime(
+    before_date = (datetime.datetime.today() - datetime.timedelta(days=21)).strftime(
         "%Y-%m-%d",
     )
     df = pd.read_sql(
@@ -681,8 +682,22 @@ def query_developers(
         pgdb.engine,
         params={"store": store, "before_date": before_date, "mylimit": limit},
     )
+    total_backlog = (
+        int(df["total_queue_depth"].iloc[0])
+        if not df.empty and "total_queue_depth" in df.columns
+        else 0
+    )
+    df = df.drop(columns=["total_queue_depth"], errors="ignore")
+    log_developers_query(store=store, total_backlog=total_backlog)
     logger.info(f"Query developers {store=} returning rows:{df.shape[0]:,}")
     return df
+
+
+def log_developers_query(store: int, total_backlog: int) -> None:
+    CRAWL_DEVELOPERS_BACKLOG_GAUGE.set(
+        total_backlog,
+        attributes={"store": str(store)},
+    )
 
 
 def insert_s3_key_to_hot(
