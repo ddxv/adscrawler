@@ -322,19 +322,28 @@ def combined_domain_latest_to_db(
 
 
 def store_apps_release_dates_to_s3(pgdb: PostgresEngine) -> None:
-    """Export store_apps (id, release_date, store) to a static parquet in S3.
+    """Export store-app lookup and market-share eligibility fields to S3.
 
     Used by both ``build_domain_app_changes_quarterly_query`` (release_date
-    for added_initial logic) and ``build_domain_app_market_share_query``
-    (store for per-store breakdowns).
+    for added_initial logic), trend calculations (store for per-store
+    breakdowns and app inventory eligibility), and market-share denominators.
     """
     s3_client = get_s3_client()
     bucket = CONFIG["s3"]["bucket"]
     s3_key = f"{LOOKUP_STORE_APPS_RELEASE_DATES}/store_apps.parquet"
 
-    logger.info("Exporting store_apps (id, release_date, store) to S3")
+    logger.info("Exporting store-app trend lookup to S3")
     df = pd.read_sql(
-        "SELECT id, release_date, store FROM store_apps;",
+        """
+        SELECT DISTINCT
+            id,
+            release_date,
+            store,
+            created_at,
+            store_last_updated,
+            is_removed
+        FROM frontend.store_apps_overview;
+        """,
         con=pgdb.engine,
     )
     buffer = BytesIO()

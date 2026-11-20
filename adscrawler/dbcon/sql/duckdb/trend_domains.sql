@@ -1,18 +1,36 @@
 COPY (
 WITH
-pre_agg AS (
+tagged_apps AS (
     SELECT
         year,
         quarter,
         store,
         tag_source,
-        COUNT(DISTINCT store_app) AS total_apps_in_quarter
+        COUNT(DISTINCT store_app) AS tagged_apps_in_quarter
     FROM enriched_windowed e
     GROUP BY
         year,
         quarter,
         store,
         tag_source
+),
+
+pre_agg AS (
+    SELECT
+        t.year,
+        t.quarter,
+        t.store,
+        t.tag_source,
+        CASE
+            WHEN t.tag_source = 'app_ads_direct'
+                THEN u.total_apps_in_quarter
+            ELSE t.tagged_apps_in_quarter
+        END AS total_apps_in_quarter
+    FROM tagged_apps t
+    LEFT JOIN app_universe_by_quarter u
+      ON u.year = t.year
+     AND u.quarter = t.quarter
+     AND u.store = t.store
 ),
 
 current_quarter AS (

@@ -14,6 +14,39 @@ FROM (
 UNPIVOT (is_active FOR tag_source IN (sdk, api_call, app_ads_direct))
 WHERE is_active = true;
 
+CREATE TEMP TABLE app_universe_by_quarter AS
+WITH quarters AS (
+    SELECT DISTINCT
+        year,
+        quarter,
+        make_date(
+            CAST(year AS INTEGER),
+            (quarter - 1) * 3 + 1,
+            1
+        ) AS quarter_start
+    FROM read_parquet($parquet_files)
+)
+SELECT
+    q.year,
+    q.quarter,
+    sa.store,
+    COUNT(DISTINCT sa.id) AS total_apps_in_quarter
+FROM quarters q
+CROSS JOIN store_app_store sa
+WHERE sa.created_at < q.quarter_start + INTERVAL '3 months'
+  AND (
+      NOT COALESCE(sa.is_removed, false)
+      -- Keep removed apps through their last store update, with a one-month floor.
+      OR GREATEST(
+          COALESCE(
+              sa.store_last_updated,
+              sa.created_at + INTERVAL '1 month'
+          ),
+          sa.created_at + INTERVAL '1 month'
+      ) >= q.quarter_start
+  )
+GROUP BY q.year, q.quarter, sa.store;
+
 CREATE TEMP TABLE enriched_windowed AS
 SELECT
     e.*,

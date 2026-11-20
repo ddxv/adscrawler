@@ -8,4 +8,12 @@ CREATE TEMP TABLE companies_cache AS SELECT id, domain_id, parent_company_id FRO
 
 CREATE TEMP TABLE company_domain_mapping_cache AS SELECT company_id, domain_id FROM pg.adtech.company_domain_mapping;
 
-CREATE TEMP TABLE store_app_store AS SELECT id, store, release_date FROM read_parquet($store_apps_key);
+CREATE TEMP TABLE store_app_store AS
+SELECT DISTINCT
+    id,
+    store,
+    release_date,
+    created_at,
+    store_last_updated,
+    is_removed
+FROM read_parquet($store_apps_key);
