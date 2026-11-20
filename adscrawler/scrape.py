@@ -1,7 +1,7 @@
 import csv
 import datetime
 import io
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import TypedDict
 
 import pandas as pd
@@ -9,7 +9,7 @@ import requests
 import tldextract
 
 from .config import DEVLEOPER_IGNORE_TLDS, get_logger
-from .dbcon.connection import PostgresEngine, get_db_connection
+from .dbcon.connection import PostgresEngine
 from .dbcon.queries import query_pub_domains_to_crawl_ads_txt, upsert_df
 from .metrics import ADS_TXT_RESULTS_COUNTER
 
@@ -29,19 +29,14 @@ class AdsTxtEmptyError(Exception):
     pass
 
 
-def _crawl_app_ads_worker(url: str, domain_id: int) -> dict:
-    """Crawl one publisher domain in a worker-owned database connection."""
-    pgdb = get_db_connection()
+def _crawl_app_ads_worker(url: str, domain_id: int, pgdb: PostgresEngine) -> dict:
+    """Crawl one publisher domain using the shared SQLAlchemy engine."""
     try:
         result_dict = scrape_app_ads_url(url=url, domain_id=domain_id, pgdb=pgdb)
         return result_dict
     except Exception as e:
         logger.error(f"Worker failed for {url}: {e}")
         return {"crawl_result": 4}
-
-    finally:
-        if hasattr(pgdb, "engine"):
-            pgdb.engine.dispose()
 
 
 def get_text_from_response(response: requests.Response) -> str:
@@ -286,9 +281,9 @@ def crawl_app_ads(
     logger.info(f"Start crawl app-ads from pub domains: {df.shape[0]:,}")
     rows = df[["url", "id"]].itertuples(index=False, name=None)
 
-    with ProcessPoolExecutor(max_workers=workers) as executor:
+    with ThreadPoolExecutor(max_workers=workers) as executor:
         futures = [
-            executor.submit(_crawl_app_ads_worker, url, domain_id)
+            executor.submit(_crawl_app_ads_worker, url, domain_id, pgdb)
             for url, domain_id in rows
         ]
 
