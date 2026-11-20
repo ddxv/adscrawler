@@ -49,9 +49,7 @@ QUERY_APPS_TO_SDK_SCAN_FIX = load_sql_file("query_apps_to_sdk_scan_fix.sql")
 QUERY_APPS_TO_API_SCAN = load_sql_file("query_apps_to_api_scan.sql")
 QUERY_APPS_TO_API_SCAN_ADS = load_sql_file("query_apps_to_api_scan_ads.sql")
 QUERY_DEVS_TO_UPDATE = load_sql_file("query_devs_to_update.sql")
-QUERY_DEVELOPER_NAMES_TO_REFRESH = load_sql_file(
-    "query_developer_names_to_refresh.sql"
-)
+QUERY_DEVELOPER_NAMES_TO_REFRESH = load_sql_file("query_developer_names_to_refresh.sql")
 QUERY_API_CALLS_TO_CREATIVE_SCAN = load_sql_file("query_apps_to_creative_scan.sql")
 QUERY_KEYWORDS_TO_CRAWL = load_sql_file("query_keywords_to_crawl.sql")
 INSERT_NEW_KEYWORDS_FROM_SEARCH = load_sql_file("insert_new_keywords.sql")

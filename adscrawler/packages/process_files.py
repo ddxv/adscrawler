@@ -12,8 +12,8 @@ from adscrawler.dbcon.queries import (
     query_apps_to_download,
     query_apps_to_sdk_scan,
     query_apps_to_sdk_scan_fix,
-    upsert_df,
     update_version_name,
+    upsert_df,
 )
 from adscrawler.metrics import (
     DOWNLOAD_RESULTS_COUNTER,
