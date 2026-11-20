@@ -73,7 +73,7 @@ def get_macho_info(app_dir: pathlib.Path) -> pd.DataFrame:
 
 def get_parsed_plist(
     tmp_decoded_output_path: pathlib.Path,
-) -> tuple[str, str, pd.DataFrame]:
+) -> tuple[str, str, pd.DataFrame, str | None]:
     payload_dir = pathlib.Path(tmp_decoded_output_path, "Payload")
     ipa_filename = None
     for app_dir in payload_dir.glob("*"):  # '*' will match any directory inside Payload
@@ -123,6 +123,8 @@ def get_parsed_plist(
     ddf = ddf[["path", "value"]]
     version_id = data["CFBundleVersion"]
     version_str = data["CFBundleShortVersionString"]
+    version_name = str(version_str).strip() if version_str is not None else ""
+    version_name = version_name or None
     if (version_id == "0" or version_id == "1") and version_str:
         version_id = version_str
     frameworks_df = ipa_frameworks(tmp_decoded_output_path)
@@ -133,7 +135,7 @@ def get_parsed_plist(
     df = pd.concat([ddf, paths_df])
     df["tag"] = ""
     df = df.rename(columns={"value": "value_name"})
-    return version_id, plist_str, df
+    return version_id, plist_str, df, version_name
 
 
 def ipa_frameworks(tmp_decoded_output_path: pathlib.Path) -> pd.DataFrame:
@@ -198,7 +200,7 @@ def special_files(tmp_decoded_output_path: pathlib.Path) -> pd.DataFrame:
 def decode_ipa(
     store_id: str,
     version_str: str,
-) -> tuple[pd.DataFrame, int, str, str]:
+) -> tuple[pd.DataFrame, int, str, str | None]:
     log_info = f"decode_ipa {store_id=} start {version_str=}"
     logger.info(f"{log_info} start")
 
@@ -209,9 +211,9 @@ def decode_ipa(
     tmp_decoded_output_path = unzip_ipa(
         ipa_path=downloaded_file_path, store_id=store_id
     )
-    _parsed_version_str, plist_str, details_df = get_parsed_plist(
+    _parsed_version_str, plist_str, details_df, version_name = get_parsed_plist(
         tmp_decoded_output_path=tmp_decoded_output_path
     )
     crawl_result = 1
     logger.info(f"{log_info} {crawl_result=} rows={len(details_df)} start")
-    return details_df, crawl_result, plist_str
+    return details_df, crawl_result, plist_str, version_name

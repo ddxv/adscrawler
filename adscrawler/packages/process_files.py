@@ -13,6 +13,7 @@ from adscrawler.dbcon.queries import (
     query_apps_to_sdk_scan,
     query_apps_to_sdk_scan_fix,
     upsert_df,
+    update_version_name,
 )
 from adscrawler.metrics import (
     DOWNLOAD_RESULTS_COUNTER,
@@ -63,9 +64,15 @@ def _scan_single_app(row: dict, store: int) -> dict:
                     "success": False,
                     "scan_result": crawl_result,
                 }
-            details_df, crawl_result, raw_txt_str = decode_app_files(
+            details_df, crawl_result, raw_txt_str, version_name = decode_app_files(
                 store, store_id, version_str
             )
+            if version_name:
+                update_version_name(
+                    version_code_db_id=version_code_dbid,
+                    version_name=version_name,
+                    pgdb=pgdb,
+                )
             if details_df is None or details_df.empty:
                 details_df = pd.DataFrame(
                     [
@@ -241,18 +248,18 @@ def download_apps(
 
 def decode_app_files(
     store: int, store_id: str, version_str: str
-) -> tuple[pd.DataFrame, int, str]:
+) -> tuple[pd.DataFrame, int, str, str | None]:
     if store == 1:
-        details_df, crawl_result, raw_txt_str = decode_apk(
+        details_df, crawl_result, raw_txt_str, version_name = decode_apk(
             store_id=store_id, store=store, specific_version_str=version_str
         )
     elif store == 2:
-        details_df, crawl_result, raw_txt_str = decode_ipa(
+        details_df, crawl_result, raw_txt_str, version_name = decode_ipa(
             store_id=store_id, version_str=version_str
         )
     else:
         raise ValueError(f"Invalid store: {store}")
-    return details_df, crawl_result, raw_txt_str
+    return details_df, crawl_result, raw_txt_str, version_name
 
 
 def process_sdks(

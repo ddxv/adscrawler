@@ -82,7 +82,7 @@ def _parse_manifest(filename: pathlib.Path) -> ElementTree.Element:
 
 def get_parsed_manifest(
     apk_tmp_decoded_output_path: pathlib.Path, store_id: str
-) -> tuple[str, pd.DataFrame]:
+) -> tuple[str, pd.DataFrame, str | None]:
     manifest_filename = pathlib.Path(apk_tmp_decoded_output_path, "AndroidManifest.xml")
     # Load the XML file
     with manifest_filename.open("r") as f:
@@ -93,7 +93,12 @@ def get_parsed_manifest(
     jsons_df = get_json_df(apk_tmp_decoded_output_path)
     df = pd.concat([df, smali_df, jsons_df])
     df = df.drop_duplicates()
-    return manifest_str, df
+    version_name = root.attrib.get(
+        "{http://schemas.android.com/apk/res/android}versionName"
+    )
+    version_name = version_name.strip() if version_name else None
+    version_name = version_name or None
+    return manifest_str, df, version_name
 
 
 def get_json_df(apk_tmp_decoded_output_path: pathlib.Path) -> pd.DataFrame:
@@ -217,7 +222,7 @@ def xml_to_dataframe(root: ElementTree.Element) -> pd.DataFrame:
 
 def decode_apk(
     store_id: str, store: int, specific_version_str: str | None = None
-) -> tuple[pd.DataFrame, int, str, str]:
+) -> tuple[pd.DataFrame, int, str, str | None]:
     """Process an APKs manifest.
     Due to the original implementation, this still downloads, processes manifest and saves the version_details.
     """
@@ -226,6 +231,7 @@ def decode_apk(
     logger.info(f"{log_info} start")
     details_df = pd.DataFrame()
     manifest_str = ""
+    version_name = None
 
     try:
         apk_path, _version_str = download_app_to_local(
@@ -238,7 +244,7 @@ def decode_apk(
         apk_tmp_decoded_output_path = unzip_apk(store_id=store_id, file_path=apk_path)
         logger.info(f"{log_info} unzipped")
 
-        manifest_str, details_df = get_parsed_manifest(
+        manifest_str, details_df, version_name = get_parsed_manifest(
             apk_tmp_decoded_output_path, store_id
         )
         # apktool_info_path = pathlib.Path(apk_tmp_decoded_output_path, "apktool.yml")
@@ -255,4 +261,4 @@ def decode_apk(
         logger.exception(f"Unexpected error for {store_id=}: {str(e)}")
         crawl_result = 3  # Unexpected errors
     logger.info(f"{log_info} {crawl_result=} rows={len(details_df)}")
-    return details_df, crawl_result, manifest_str
+    return details_df, crawl_result, manifest_str, version_name

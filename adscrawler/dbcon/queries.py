@@ -788,6 +788,28 @@ def insert_version_code(
     return version_code_db_id
 
 
+def update_version_name(
+    version_code_db_id: int, version_name: str, pgdb: PostgresEngine
+) -> None:
+    with pgdb.engine.begin() as conn:
+        result = conn.execute(
+            text(
+                "UPDATE public.version_codes "
+                "SET version_name = :version_name "
+                "WHERE id = :version_code_db_id"
+            ),
+            {
+                "version_name": version_name,
+                "version_code_db_id": version_code_db_id,
+            },
+        )
+    if result.rowcount != 1:
+        raise RuntimeError(
+            f"Expected to update version_codes id={version_code_db_id}, "
+            f"updated {result.rowcount} rows"
+        )
+
+
 def log_download_crawl_results(df: pd.DataFrame, pgdb: PostgresEngine) -> None:
     insert_columns = ["store_app", "version_code", "crawl_result"]
     df["version_code"] = df["version_code"].fillna("-1")

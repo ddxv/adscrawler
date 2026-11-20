@@ -45,7 +45,7 @@ def manage_ipa_download(
         tmp_decoded_output_path = unzip_ipa(
             ipa_path=downloaded_file_path, store_id=store_id
         )
-        version_str, _plist_str, _details_df = get_parsed_plist(
+        version_str, _plist_str, _details_df, _version_name = get_parsed_plist(
             tmp_decoded_output_path=tmp_decoded_output_path
         )
         if version_str is None:
